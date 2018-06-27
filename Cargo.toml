@@ -1,0 +1,10 @@
+[workspace]
+
+members = [
+  "lib3h",
+  "cli3h",
+]
+
+[features]
+# Treat warnings as a build error.
+strict = []
