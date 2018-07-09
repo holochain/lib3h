@@ -1,0 +1,7 @@
+[package]
+name = "test_server"
+version = "0.1.0"
+authors = ["neonphog <neonphog@gmail.com>"]
+
+[dependencies]
+libsodacon = { path = "../libsodacon" }

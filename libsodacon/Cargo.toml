@@ -1,0 +1,19 @@
+[package]
+name = "libsodacon"
+version = "0.1.0"
+authors = ["neonphog <neonphog@gmail.com>"]
+
+[dependencies]
+byteorder = "1.2"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.3.2"
+Inflector = "0.11.3"
+lazy_static = "1.0"
+num-bigint = "0.2.0"
+num-traits = "0.2.5"
+regex = "1.0"
+rust-base58 = "0.0.4"
+serde = "1.0"
+serde_derive = "1.0"
+rmp-serde = "0.13.7"
+sodiumoxide = "0.1"

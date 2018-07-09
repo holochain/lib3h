@@ -1,0 +1,6 @@
+[package]
+name = "test_client"
+version = "0.1.0"
+authors = ["neonphog <neonphog@gmail.com>"]
+
+[dependencies]

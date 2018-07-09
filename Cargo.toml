@@ -1,8 +1,11 @@
 [workspace]
 
 members = [
+  "libsodacon",
   "lib3h",
   "cli3h",
+  "test_server",
+  "test_client"
 ]
 
 [features]
