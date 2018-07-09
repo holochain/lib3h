@@ -18,9 +18,9 @@ extern crate serde;
 extern crate serde_json;
 extern crate tiny_keccak;
 
-pub mod aes;
 pub mod client;
 pub mod config;
+pub mod crypto;
 #[macro_use]
 pub mod error;
 pub mod hash;
@@ -29,7 +29,6 @@ pub mod ident;
 pub mod message;
 pub mod netinfo;
 pub mod node;
-pub mod rsa;
 pub mod server;
 pub mod tcp;
 pub mod util;

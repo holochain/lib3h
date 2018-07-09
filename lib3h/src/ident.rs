@@ -1,8 +1,7 @@
-use aes;
+use crypto;
 use error;
 use hash;
 use rmp_serde;
-use rsa;
 use util;
 
 use rust_base58::base58::ToBase58;
@@ -79,7 +78,7 @@ impl FullIdentity {
     pub fn new_generate(passphrase: &[u8]) -> error::Result<Self> {
         let mut id = FullIdentity::new()?;
 
-        let key_pair = rsa::gen_key()?;
+        let key_pair = crypto::rsa::gen_key()?;
 
         id.load_pub_bundle(BundlePubIdentity {
             pub_keys: vec![AsymmetricPubKey::Rsa4096(key_pair.pub_key)],
@@ -167,7 +166,7 @@ impl FullIdentity {
 
         self.priv_keys = Some(BundlePrivIdentity { priv_keys: vec![] });
 
-        let priv_dec = aes::dec(&self.priv_raw.as_ref().unwrap(), &psk)?;
+        let priv_dec = crypto::aes::dec(&self.priv_raw.as_ref().unwrap(), &psk)?;
         let res = rmp_serde::from_slice(&priv_dec)?;
         self.priv_keys = Some(res);
 
@@ -186,7 +185,7 @@ impl FullIdentity {
         self.priv_keys
             .serialize(&mut rmp_serde::Serializer::new(&mut priv_dec))?;
 
-        let priv_raw = aes::enc(&priv_dec, &psk)?;
+        let priv_raw = crypto::aes::enc(&priv_dec, &psk)?;
         self.priv_raw = Some(priv_raw);
 
         Ok(())
@@ -200,7 +199,7 @@ impl FullIdentity {
         for pub_key in pub_keys {
             match pub_key {
                 AsymmetricPubKey::Rsa4096(ref k) => {
-                    return Ok(rsa::enc(data, k)?);
+                    return Ok(crypto::rsa::enc(data, k)?);
                 }
             }
         }
@@ -215,7 +214,7 @@ impl FullIdentity {
         for priv_key in priv_keys {
             match priv_key {
                 AsymmetricPrivKey::Rsa4096(ref k) => {
-                    return Ok(rsa::dec(data, k)?);
+                    return Ok(crypto::rsa::dec(data, k)?);
                 }
             }
         }
@@ -280,7 +279,7 @@ mod tests {
 
         // to actually test in this direction we need to manually decrypt it
         let psk = hash::hash(PASSPHRASE).unwrap();
-        let priv_dec = aes::dec(&id.priv_raw.as_ref().unwrap(), &psk).unwrap();
+        let priv_dec = crypto::aes::dec(&id.priv_raw.as_ref().unwrap(), &psk).unwrap();
         let priv_dec: BundlePrivIdentity = rmp_serde::from_slice(&priv_dec).unwrap();
 
         match priv_dec.priv_keys[0] {

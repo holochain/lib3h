@@ -1,4 +1,4 @@
-use aes;
+use crypto;
 use error;
 use http;
 use netinfo;
@@ -49,7 +49,7 @@ pub fn compile(
         out.append(&mut pad);
     }
 
-    let out = aes::enc(&out, psk)?;
+    let out = crypto::aes::enc(&out, psk)?;
 
     let mut req_out = http::Request::new(rtype);
     req_out.method = "GET".to_string();
@@ -68,7 +68,7 @@ pub fn compile(
 }
 
 pub fn parse(message: &[u8], psk: &[u8]) -> error::Result<Vec<Message>> {
-    let mut out = aes::dec(message, psk)?;
+    let mut out = crypto::aes::dec(message, psk)?;
     out.drain(..1024);
     let out: Vec<Message> = rmp_serde::from_slice(&out)?;
     Ok(out)
