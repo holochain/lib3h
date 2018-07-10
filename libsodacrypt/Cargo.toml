@@ -1,0 +1,7 @@
+[package]
+name = "libsodacrypt"
+version = "0.1.0"
+authors = ["neonphog <neonphog@gmail.com>"]
+
+[dependencies]
+sodiumoxide = "0.1"

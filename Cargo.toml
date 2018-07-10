@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+  "libsodacrypt",
   "libsodacon",
   "lib3h",
   "cli3h",

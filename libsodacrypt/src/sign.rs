@@ -1,5 +1,5 @@
 use error;
-use crypto::rand::rand_bytes;
+use rand::rand_bytes;
 
 use sodiumoxide::crypto::sign::ed25519 as so_sign;
 
