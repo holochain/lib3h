@@ -1,9 +1,11 @@
 use error;
 use hex;
 use libsodacrypt;
+use net::message;
 use net::http;
 use rmp_serde;
 use std;
+use std::collections::{hash_map, HashMap};
 use std::io::{Read, Write};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,26 +119,21 @@ impl SessionClient {
         })
     }
 
-    fn process_initial_handshake (mut self, mut events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
-        let (mut cli_recv, mut cli_send, mut remote_node_id) = match wrap_parse_initial_handshake(&response.body, &self.eph_pub, &self.eph_priv) {
-            Ok(v) => v,
-            Err(e) => {
-                events.push(Event::OnClientEvent(ClientEvent::OnError(error::Error::from(e))));
-                events.push(Event::OnClientEvent(ClientEvent::OnClose()));
-                return (None, events);
-            }
-        };
+    pub fn ping (&mut self) -> error::Result<()> {
+        let mut socket = wrap_connect(&self.endpoint)?;
 
-        self.remote_node_id.append(&mut remote_node_id);
-        self.eph_pub.drain(..);
-        self.eph_priv.drain(..);
-        self.key_send.append(&mut cli_send);
-        self.key_recv.append(&mut cli_recv);
+        let ping_req = message::PingReq::new();
 
-        self.state = SessionState::WaitPing;
-        events.push(Event::OnClientEvent(ClientEvent::OnConnected(self.remote_node_id.clone(), self.endpoint.clone())));
+        let out = message::compile(
+            &self.local_node_id,
+            &vec![message::Message::PingReq(Box::new(ping_req))],
+            http::RequestType::Request)?;
 
-        (Some(self), events)
+        socket.write(&out)?;
+
+        self.cur_socket = Some(socket);
+
+        Ok(())
     }
 
     pub fn process_once (mut self) -> (Option<Self>, Vec<Event>) {
@@ -188,6 +185,35 @@ impl SessionClient {
             }
         }
     }
+
+    // -- private -- //
+
+    fn process_initial_handshake (mut self, mut events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
+        let (mut cli_recv, mut cli_send, mut remote_node_id) = match wrap_parse_initial_handshake(&response.body, &self.eph_pub, &self.eph_priv) {
+            Ok(v) => v,
+            Err(e) => {
+                events.push(Event::OnClientEvent(ClientEvent::OnError(error::Error::from(e))));
+                events.push(Event::OnClientEvent(ClientEvent::OnClose()));
+                return (None, events);
+            }
+        };
+
+        self.remote_node_id.append(&mut remote_node_id);
+        self.eph_pub.drain(..);
+        self.eph_priv.drain(..);
+        self.key_send.append(&mut cli_send);
+
+        self.key_recv.append(&mut cli_recv);
+
+        self.state = SessionState::WaitPing;
+
+        self.ping().unwrap();
+
+        events.push(Event::OnClientEvent(ClientEvent::OnConnected(self.remote_node_id.clone(), self.endpoint.clone())));
+
+        (Some(self), events)
+    }
+
 }
 
 struct SessionServer {
@@ -221,6 +247,19 @@ impl SessionServer {
         })
     }
 
+    pub fn pong (&mut self, socket: &mut std::net::TcpStream, origin_time: u64) -> error::Result<()> {
+        let ping_res = message::PingRes::new(origin_time);
+
+        let out = message::compile(
+            &self.local_node_id,
+            &vec![message::Message::PingRes(Box::new(ping_res))],
+            http::RequestType::Response)?;
+
+        socket.write(&out)?;
+
+        Ok(())
+    }
+
     fn process_initial_handshake (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
         let (mut srv_recv, mut srv_send, mut remote_node_id) = match wrap_initial_handshake(&request.path, &self.local_node_id, &self.eph_pub, &self.eph_priv, &mut socket) {
             Ok(v) => v,
@@ -241,6 +280,25 @@ impl SessionServer {
         (Some(self), events)
     }
 
+    fn process_message (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
+        let msgs = message::parse(&request.body).unwrap();
+        println!("got messages: {:?}", msgs);
+
+        for msg in msgs {
+            match msg {
+                message::Message::PingReq(r) => {
+                    println!("got ping!: {:?}", r);
+                    self.pong(&mut socket, r.sent_time);
+                }
+                _ => {
+                    panic!("unhandled response type");
+                }
+            }
+        }
+
+        (Some(self), events)
+    }
+
     pub fn process_once (mut self) -> (Option<Self>, Vec<Event>) {
         let mut buf = [0u8; 1024];
         let mut events: Vec<Event> = Vec::new();
@@ -250,30 +308,32 @@ impl SessionServer {
             Some(s) => s
         };
 
-        let size = match socket.read(&mut buf) {
-            Ok(b) => {
-                if b < 1 {
-                    events.push(Event::OnServerEvent(ServerEvent::OnClose()));
-                    return (Some(self), events);
-                } else {
-                    b
+        if !self.cur_request.is_done() {
+            let size = match socket.read(&mut buf) {
+                Ok(b) => {
+                    if b < 1 {
+                        events.push(Event::OnServerEvent(ServerEvent::OnClose()));
+                        return (Some(self), events);
+                    } else {
+                        b
+                    }
                 }
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                self.cur_socket = Some(socket);
-                return (Some(self), events);
-            }
-            Err(e) => {
-                events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
-                events.push(Event::OnServerEvent(ServerEvent::OnClose()));
-                return (None, events);
-            }
-        };
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    self.cur_socket = Some(socket);
+                    return (Some(self), events);
+                }
+                Err(e) => {
+                    events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
+                    events.push(Event::OnServerEvent(ServerEvent::OnClose()));
+                    return (None, events);
+                }
+            };
 
-        {
-            if !self.cur_request.check_parse(&buf[..size]) {
-                self.cur_socket = Some(socket);
-                return (Some(self), events);
+            {
+                if !self.cur_request.check_parse(&buf[..size]) {
+                    self.cur_socket = Some(socket);
+                    return (Some(self), events);
+                }
             }
         }
 
@@ -283,28 +343,58 @@ impl SessionServer {
 
         match self.state {
             SessionState::New => {
-                self.process_initial_handshake(events, request, socket)
+                if self.remote_node_id.len() == 0 && &request.method == "GET" {
+                    println!("initial empty get");
+                    self.process_initial_handshake(events, request, socket)
+                } else if self.remote_node_id.len() == 0 && &request.method == "POST" {
+                    println!("empty post, need to move");
+                    {
+                        let parts: Vec<&str> = request.path.split('/').collect();
+                        self.remote_node_id = hex::decode(parts[1]).unwrap();
+                    }
+
+                    // re-attach so we can be processed in the proper context
+                    self.cur_socket = Some(socket);
+                    self.cur_request = request;
+                    (Some(self), events)
+                } else {
+                    panic!("I don't know what to do with this request!")
+                }
+            }
+            SessionState::WaitPing => {
+                if self.remote_node_id.len() == 0 {
+                    panic!("cannot process non-new tx without session info");
+                }
+                if &request.method == "GET" {
+                    panic!("cannot process GET requests on established session");
+                }
+                {
+                    let parts: Vec<&str> = request.path.split('/').collect();
+                    let remote_node_id = hex::decode(parts[1]).unwrap();
+                    if remote_node_id != self.remote_node_id {
+                        panic!("session id mismatch");
+                    }
+                }
+                println!("yay we can process a session request");
+                self.process_message(events, request, socket)
             }
             _ => {
-                panic!("ahh, cant handle this yet: {:?}", self.state);
+                panic!("ahh, cant handle this yet: {:?}", self.state)
             }
         }
     }
 }
 
-pub struct StdNetNode {
-    node_id: Vec<u8>,
-    listen_cons: Vec<StdNetListenCon>,
-    server_cons: Vec<SessionServer>,
-    client_cons: Vec<SessionClient>,
-    events: Vec<Event>,
-}
-
-fn wrap_connect (endpoint: &Endpoint, node_id: &[u8]) -> error::Result<SessionClient> {
+fn wrap_connect (endpoint: &Endpoint) -> error::Result<std::net::TcpStream> {
     let timeout = std::time::Duration::from_millis(1000);
     let addr = endpoint.to_socket_addr()?;
-    let mut socket = std::net::TcpStream::connect_timeout(&addr, timeout)?;
+    let socket = std::net::TcpStream::connect_timeout(&addr, timeout)?;
     socket.set_nonblocking(true)?;
+    Ok(socket)
+}
+
+fn wrap_initial_connect (endpoint: &Endpoint, node_id: &[u8]) -> error::Result<SessionClient> {
+    let mut socket = wrap_connect(endpoint)?;
 
     let mut session = SessionClient::new(node_id, endpoint)?;
 
@@ -322,7 +412,7 @@ fn wrap_connect (endpoint: &Endpoint, node_id: &[u8]) -> error::Result<SessionCl
 }
 
 fn wrap_listen (endpoint: &Endpoint) -> error::Result<std::net::TcpListener> {
-    let addr = endpoint.to_socket_addr()?;
+    let addr = endpoint.to_socket_addr()?; 
     let socket = std::net::TcpListener::bind(addr)?;
     socket.set_nonblocking(true)?;
     Ok(socket)
@@ -371,12 +461,22 @@ fn wrap_parse_initial_handshake (data: &[u8], eph_pub: &[u8], eph_priv: &[u8]) -
     Ok((cli_recv, cli_send, remote_node_id))
 }
 
+pub struct StdNetNode {
+    node_id: Vec<u8>,
+    listen_cons: Vec<StdNetListenCon>,
+    server_new_cons: Vec<SessionServer>,
+    server_cons: HashMap<Vec<u8>, SessionServer>,
+    client_cons: Vec<SessionClient>,
+    events: Vec<Event>,
+}
+
 impl StdNetNode {
     pub fn new (node_id: &[u8]) -> Self {
         StdNetNode {
             node_id: node_id.to_vec(),
             listen_cons: Vec::new(),
-            server_cons: Vec::new(),
+            server_new_cons: Vec::new(),
+            server_cons: HashMap::new(),
             client_cons: Vec::new(),
             events: Vec::new(),
         }
@@ -403,7 +503,7 @@ impl StdNetNode {
     }
 
     pub fn connect (&mut self, endpoint: &Endpoint) {
-        let session = match wrap_connect(endpoint, &self.node_id) {
+        let session = match wrap_initial_connect(endpoint, &self.node_id) {
             Err(e) => {
                 self.events.push(Event::OnClientEvent(ClientEvent::OnError(error::Error::from(e))));
                 return;
@@ -435,7 +535,7 @@ impl StdNetNode {
                             Ok(s) => s,
                         };
                         session.cur_socket = Some(s);
-                        self.server_cons.push(session);
+                        self.server_new_cons.push(session);
                         continue;
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -454,15 +554,43 @@ impl StdNetNode {
     }
 
     fn process_server_cons (&mut self) {
-        let mut new_server_cons: Vec<SessionServer> = Vec::new();
-        for mut con in self.server_cons.drain(..) {
+        let mut new_cons_list: Vec<SessionServer> = Vec::new();
+        let mut new_cons_hash: HashMap<Vec<u8>, SessionServer> = HashMap::new();
+
+        for (mut _k, mut con) in self.server_cons.drain() {
             let (con, mut events) = con.process_once();
             if let Some(con) = con {
-                new_server_cons.push(con);
+                new_cons_hash.insert(con.remote_node_id.clone(), con);
             }
             self.events.append(&mut events);
         }
-        self.server_cons = new_server_cons;
+
+        for mut con in self.server_new_cons.drain(..) {
+            let (con, mut events) = con.process_once();
+            if let Some(con) = con {
+                if con.remote_node_id.len() > 0 {
+                    let key = con.remote_node_id.clone();
+                    match new_cons_hash.entry(key) {
+                        hash_map::Entry::Occupied(mut e) => {
+                            let session = e.get_mut();
+                            println!("moving socket, dest state: {:?}", session.state);
+                            session.cur_socket = con.cur_socket;
+                            session.cur_request = con.cur_request;
+                        }
+                        hash_map::Entry::Vacant(e) => {
+                            println!("vacant insert");
+                            e.insert(con);
+                        }
+                    }
+                } else {
+                    new_cons_list.push(con);
+                }
+            }
+            self.events.append(&mut events);
+        }
+
+        self.server_new_cons = new_cons_list;
+        self.server_cons = new_cons_hash;
     }
 
     fn process_client_cons (&mut self) {

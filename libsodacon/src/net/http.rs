@@ -128,6 +128,13 @@ impl Request {
         out
     }
 
+    pub fn is_done(&self) -> bool {
+        match self.state {
+            RequestState::Done => true,
+            _ => false,
+        }
+    }
+
     pub fn check_parse(&mut self, data: &[u8]) -> bool {
         if let RequestState::Done = self.state {
             return true;

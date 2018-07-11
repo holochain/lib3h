@@ -1,19 +1,52 @@
 use error;
+use hex;
 use net::http;
 use rmp_serde;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn get_millis () -> u64 {
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
+    since_the_epoch.as_secs() * 1000 +
+        since_the_epoch.subsec_nanos() as u64 / 1_000_000
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct InitialHandshakeRes {
-    pub node_id: Vec<u8>,
-    pub eph_pub: Vec<u8>,
+pub struct PingReq {
+    pub sent_time: u64,
+}
+
+impl PingReq {
+    pub fn new () -> Self {
+        PingReq {
+            sent_time: get_millis(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct PingRes {
+    pub origin_time: u64,
+    pub response_time: u64,
+}
+
+impl PingRes {
+    pub fn new (origin_time: u64) -> Self {
+        PingRes {
+            origin_time: origin_time,
+            response_time: get_millis(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Message {
-    InitialHandshakeRes(Box<InitialHandshakeRes>),
+    PingReq(Box<PingReq>),
+    PingRes(Box<PingRes>),
 }
 
 pub fn compile(
+    node_id: &Vec<u8>,
     sub_messages: &Vec<Message>,
     rtype: http::RequestType,
 ) -> error::Result<Vec<u8>> {
@@ -25,7 +58,7 @@ pub fn compile(
 
     let mut req_out = http::Request::new(rtype);
     req_out.method = "POST".to_string();
-    req_out.path = "/".to_string();
+    req_out.path = format!("/{}", hex::encode(node_id));
     req_out.code = "200".to_string();
     req_out.status = "OK".to_string();
     req_out.headers.insert(
