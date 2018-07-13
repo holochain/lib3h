@@ -1,6 +1,8 @@
 extern crate libsodacon;
 
-use libsodacon::net::node::{Event, ServerEvent, Endpoint, StdNetNode};
+use libsodacon::net::event::{Event, ServerEvent};
+use libsodacon::net::endpoint::Endpoint;
+use libsodacon::node::StdNetNode;
 
 fn main() {
     let mut node = StdNetNode::new(b"hello, me");

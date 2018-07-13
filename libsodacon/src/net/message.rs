@@ -12,6 +12,13 @@ pub fn get_millis () -> u64 {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct InitialHandshakeRes {
+    pub session_id: String,
+    pub node_id: Vec<u8>,
+    pub eph_pub: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PingReq {
     pub sent_time: u64,
 }
@@ -54,7 +61,7 @@ pub fn compile(
     rtype: http::RequestType,
     psk: &[u8],
 ) -> error::Result<Vec<u8>> {
-    let mut msg = rmp_serde::to_vec(sub_messages)?;
+    let msg = rmp_serde::to_vec(sub_messages)?;
 
     let (nonce, msg) = libsodacrypt::sym::enc(&msg, psk)?;
     let msg = rmp_serde::to_vec(&MsgWrap(nonce, msg))?;
