@@ -90,6 +90,7 @@ enum SessionState {
 }
 
 struct SessionClient {
+    session_id: String,
     local_node_id: Vec<u8>,
     remote_node_id: Vec<u8>,
     endpoint: Endpoint,
@@ -106,6 +107,7 @@ impl SessionClient {
     pub fn new (local_node_id: &[u8], endpoint: &Endpoint) -> error::Result<Self> {
         let (key_pub, key_priv) = libsodacrypt::kx::gen_keypair()?;
         Ok(SessionClient {
+            session_id: "".to_string(),
             local_node_id: local_node_id.to_vec(),
             remote_node_id: Vec::new(),
             endpoint: endpoint.clone(),
@@ -125,9 +127,10 @@ impl SessionClient {
         let ping_req = message::PingReq::new();
 
         let out = message::compile(
-            &self.local_node_id,
+            &self.session_id,
             &vec![message::Message::PingReq(Box::new(ping_req))],
-            http::RequestType::Request)?;
+            http::RequestType::Request,
+            &self.key_send)?;
 
         socket.write(&out)?;
 
@@ -180,6 +183,9 @@ impl SessionClient {
             SessionState::New => {
                 self.process_initial_handshake(events, response)
             }
+            SessionState::WaitPing => {
+                self.process_initial_ping(events, response)
+            }
             _ => {
                 panic!("ahh, cant handle this yet: {:?}", self.state);
             }
@@ -189,7 +195,7 @@ impl SessionClient {
     // -- private -- //
 
     fn process_initial_handshake (mut self, mut events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
-        let (mut cli_recv, mut cli_send, mut remote_node_id) = match wrap_parse_initial_handshake(&response.body, &self.eph_pub, &self.eph_priv) {
+        let (mut cli_recv, mut cli_send, mut remote_node_id, session_id) = match wrap_parse_initial_handshake(&response.body, &self.eph_pub, &self.eph_priv) {
             Ok(v) => v,
             Err(e) => {
                 events.push(Event::OnClientEvent(ClientEvent::OnError(error::Error::from(e))));
@@ -202,8 +208,8 @@ impl SessionClient {
         self.eph_pub.drain(..);
         self.eph_priv.drain(..);
         self.key_send.append(&mut cli_send);
-
         self.key_recv.append(&mut cli_recv);
+        self.session_id = session_id;
 
         self.state = SessionState::WaitPing;
 
@@ -214,9 +220,26 @@ impl SessionClient {
         (Some(self), events)
     }
 
+    fn process_initial_ping (mut self, events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
+        let msg = message::parse(&response.body, &self.key_recv).unwrap();
+        match msg[0] {
+            message::Message::PingRes(ref r) => {
+                println!("ping response in {} ms",
+                    message::get_millis() - r.origin_time);
+            }
+            _ => {
+                panic!("unexpected message: {:?}", msg);
+            }
+        }
+
+        self.state = SessionState::Ready;
+
+        (Some(self), events)
+    }
 }
 
 struct SessionServer {
+    session_id: String,
     local_node_id: Vec<u8>,
     remote_node_id: Vec<u8>,
     endpoint: Endpoint,
@@ -234,6 +257,7 @@ impl SessionServer {
     pub fn new (local_node_id: &[u8], endpoint: &Endpoint) -> error::Result<Self> {
         let (key_pub, key_priv) = libsodacrypt::kx::gen_keypair()?;
         Ok(SessionServer {
+            session_id: "".to_string(),
             local_node_id: local_node_id.to_vec(),
             remote_node_id: Vec::new(),
             endpoint: endpoint.clone(),
@@ -251,9 +275,10 @@ impl SessionServer {
         let ping_res = message::PingRes::new(origin_time);
 
         let out = message::compile(
-            &self.local_node_id,
+            &self.session_id,
             &vec![message::Message::PingRes(Box::new(ping_res))],
-            http::RequestType::Response)?;
+            http::RequestType::Response,
+            &self.key_send)?;
 
         socket.write(&out)?;
 
@@ -261,7 +286,7 @@ impl SessionServer {
     }
 
     fn process_initial_handshake (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
-        let (mut srv_recv, mut srv_send, mut remote_node_id) = match wrap_initial_handshake(&request.path, &self.local_node_id, &self.eph_pub, &self.eph_priv, &mut socket) {
+        let (mut srv_recv, mut srv_send, mut remote_node_id, session_id) = match wrap_initial_handshake(&request.path, &self.local_node_id, &self.eph_pub, &self.eph_priv, &mut socket) {
             Ok(v) => v,
             Err(e) => {
                 events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
@@ -274,21 +299,23 @@ impl SessionServer {
         self.eph_priv.drain(..);
         self.key_send.append(&mut srv_send);
         self.key_recv.append(&mut srv_recv);
+        self.session_id = session_id;
 
         self.state = SessionState::WaitPing;
 
         (Some(self), events)
     }
 
-    fn process_message (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
-        let msgs = message::parse(&request.body).unwrap();
+    fn process_message (mut self, events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
+        let msgs = message::parse(&request.body, &self.key_recv).unwrap();
         println!("got messages: {:?}", msgs);
 
         for msg in msgs {
             match msg {
                 message::Message::PingReq(r) => {
                     println!("got ping!: {:?}", r);
-                    self.pong(&mut socket, r.sent_time);
+                    self.state = SessionState::Ready;
+                    self.pong(&mut socket, r.sent_time).unwrap();
                 }
                 _ => {
                     panic!("unhandled response type");
@@ -343,14 +370,12 @@ impl SessionServer {
 
         match self.state {
             SessionState::New => {
-                if self.remote_node_id.len() == 0 && &request.method == "GET" {
-                    println!("initial empty get");
+                if self.session_id.len() == 0 && &request.method == "GET" {
                     self.process_initial_handshake(events, request, socket)
-                } else if self.remote_node_id.len() == 0 && &request.method == "POST" {
-                    println!("empty post, need to move");
+                } else if self.session_id.len() == 0 && &request.method == "POST" {
                     {
                         let parts: Vec<&str> = request.path.split('/').collect();
-                        self.remote_node_id = hex::decode(parts[1]).unwrap();
+                        self.session_id = parts[1].to_string();
                     }
 
                     // re-attach so we can be processed in the proper context
@@ -362,7 +387,7 @@ impl SessionServer {
                 }
             }
             SessionState::WaitPing => {
-                if self.remote_node_id.len() == 0 {
+                if self.session_id.len() == 0 {
                     panic!("cannot process non-new tx without session info");
                 }
                 if &request.method == "GET" {
@@ -370,8 +395,7 @@ impl SessionServer {
                 }
                 {
                     let parts: Vec<&str> = request.path.split('/').collect();
-                    let remote_node_id = hex::decode(parts[1]).unwrap();
-                    if remote_node_id != self.remote_node_id {
+                    if parts[1] != self.session_id {
                         panic!("session id mismatch");
                     }
                 }
@@ -420,14 +444,17 @@ fn wrap_listen (endpoint: &Endpoint) -> error::Result<std::net::TcpListener> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct InitialHandshakeRes {
+    pub session_id: String,
     pub node_id: Vec<u8>,
     pub eph_pub: Vec<u8>,
 }
 
-fn wrap_initial_handshake (path: &str, local_node_id: &[u8], eph_pub: &[u8], eph_priv: &[u8], socket: &mut std::net::TcpStream) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+fn wrap_initial_handshake (path: &str, local_node_id: &[u8], eph_pub: &[u8], eph_priv: &[u8], socket: &mut std::net::TcpStream) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>, String)> {
     let parts: Vec<&str> = path.split('/').collect();
     let remote_node_id = hex::decode(parts[1])?;
     let cli_pub = hex::decode(parts[2])?;
+
+    let session_id = hex::encode(libsodacrypt::rand::rand_bytes(32)?);
 
     let (srv_recv, srv_send) = libsodacrypt::kx::derive_server(eph_pub, eph_priv, &cli_pub)?;
 
@@ -440,6 +467,7 @@ fn wrap_initial_handshake (path: &str, local_node_id: &[u8], eph_pub: &[u8], eph
     );
 
     let data_out = InitialHandshakeRes {
+        session_id: session_id.clone(),
         node_id: local_node_id.to_vec(),
         eph_pub: eph_pub.to_vec(),
     };
@@ -447,25 +475,26 @@ fn wrap_initial_handshake (path: &str, local_node_id: &[u8], eph_pub: &[u8], eph
 
     socket.write(&res.generate())?;
 
-    Ok((srv_recv, srv_send, remote_node_id))
+    Ok((srv_recv, srv_send, remote_node_id, session_id))
 }
 
-fn wrap_parse_initial_handshake (data: &[u8], eph_pub: &[u8], eph_priv: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+fn wrap_parse_initial_handshake (data: &[u8], eph_pub: &[u8], eph_priv: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>, String)> {
     let res: InitialHandshakeRes = rmp_serde::from_slice(data)?;
 
     let srv_pub = res.eph_pub;
     let remote_node_id = res.node_id;
+    let session_id = res.session_id;
 
     let (cli_recv, cli_send) = libsodacrypt::kx::derive_client(eph_pub, eph_priv, &srv_pub)?;
 
-    Ok((cli_recv, cli_send, remote_node_id))
+    Ok((cli_recv, cli_send, remote_node_id, session_id))
 }
 
 pub struct StdNetNode {
     node_id: Vec<u8>,
     listen_cons: Vec<StdNetListenCon>,
     server_new_cons: Vec<SessionServer>,
-    server_cons: HashMap<Vec<u8>, SessionServer>,
+    server_cons: HashMap<String, SessionServer>,
     client_cons: Vec<SessionClient>,
     events: Vec<Event>,
 }
@@ -555,12 +584,12 @@ impl StdNetNode {
 
     fn process_server_cons (&mut self) {
         let mut new_cons_list: Vec<SessionServer> = Vec::new();
-        let mut new_cons_hash: HashMap<Vec<u8>, SessionServer> = HashMap::new();
+        let mut new_cons_hash: HashMap<String, SessionServer> = HashMap::new();
 
         for (mut _k, mut con) in self.server_cons.drain() {
             let (con, mut events) = con.process_once();
             if let Some(con) = con {
-                new_cons_hash.insert(con.remote_node_id.clone(), con);
+                new_cons_hash.insert(con.session_id.clone(), con);
             }
             self.events.append(&mut events);
         }
@@ -568,17 +597,15 @@ impl StdNetNode {
         for mut con in self.server_new_cons.drain(..) {
             let (con, mut events) = con.process_once();
             if let Some(con) = con {
-                if con.remote_node_id.len() > 0 {
-                    let key = con.remote_node_id.clone();
+                if con.session_id.len() > 0 {
+                    let key = con.session_id.clone();
                     match new_cons_hash.entry(key) {
                         hash_map::Entry::Occupied(mut e) => {
                             let session = e.get_mut();
-                            println!("moving socket, dest state: {:?}", session.state);
                             session.cur_socket = con.cur_socket;
                             session.cur_request = con.cur_request;
                         }
                         hash_map::Entry::Vacant(e) => {
-                            println!("vacant insert");
                             e.insert(con);
                         }
                     }

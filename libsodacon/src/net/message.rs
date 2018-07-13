@@ -1,10 +1,10 @@
 use error;
-use hex;
+use libsodacrypt;
 use net::http;
 use rmp_serde;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn get_millis () -> u64 {
+pub fn get_millis () -> u64 {
     let start = SystemTime::now();
     let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
     since_the_epoch.as_secs() * 1000 +
@@ -45,34 +45,39 @@ pub enum Message {
     PingRes(Box<PingRes>),
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+struct MsgWrap (Vec<u8>, Vec<u8>);
+
 pub fn compile(
-    node_id: &Vec<u8>,
+    session_id: &str,
     sub_messages: &Vec<Message>,
     rtype: http::RequestType,
+    psk: &[u8],
 ) -> error::Result<Vec<u8>> {
-    let mut out: Vec<u8> = Vec::new();
-
     let mut msg = rmp_serde::to_vec(sub_messages)?;
 
-    out.append(&mut msg);
+    let (nonce, msg) = libsodacrypt::sym::enc(&msg, psk)?;
+    let msg = rmp_serde::to_vec(&MsgWrap(nonce, msg))?;
 
     let mut req_out = http::Request::new(rtype);
     req_out.method = "POST".to_string();
-    req_out.path = format!("/{}", hex::encode(node_id));
+    req_out.path = format!("/{}", session_id);
     req_out.code = "200".to_string();
     req_out.status = "OK".to_string();
     req_out.headers.insert(
         "content-type".to_string(),
         "application/octet-stream".to_string(),
     );
-    req_out.body = out;
+    req_out.body = msg;
 
-    let out = req_out.generate();
+    let msg = req_out.generate();
 
-    Ok(out)
+    Ok(msg)
 }
 
-pub fn parse(message: &[u8]) -> error::Result<Vec<Message>> {
-    let out: Vec<Message> = rmp_serde::from_slice(message)?;
-    Ok(out)
+pub fn parse(message: &[u8], psk: &[u8]) -> error::Result<Vec<Message>> {
+    let message: MsgWrap = rmp_serde::from_slice(message)?;
+    let message = libsodacrypt::sym::dec(&message.1, &message.0, psk)?;
+    let message: Vec<Message> = rmp_serde::from_slice(&message)?;
+    Ok(message)
 }
