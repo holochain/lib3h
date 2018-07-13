@@ -47,9 +47,23 @@ impl PingRes {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct UserMessage {
+    pub data: Vec<u8>,
+}
+
+impl UserMessage {
+    pub fn new (data: &[u8]) -> Self {
+        UserMessage {
+            data: data.to_vec()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Message {
     PingReq(Box<PingReq>),
     PingRes(Box<PingRes>),
+    UserMessage(Box<UserMessage>),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -84,6 +84,24 @@ impl SessionClient {
         Ok(())
     }
 
+    pub fn user_message (&mut self, data: &[u8]) -> error::Result<()> {
+        let mut socket = wrap_connect(&self.endpoint)?;
+
+        let msg = message::UserMessage::new(data);
+
+        let out = message::compile(
+            &self.session_id,
+            &vec![message::Message::UserMessage(Box::new(msg))],
+            http::RequestType::Request,
+            &self.key_send)?;
+
+        socket.write(&out)?;
+
+        self.cur_socket = Some(socket);
+
+        Ok(())
+    }
+
     pub fn process_once (mut self) -> (Option<Self>, Vec<Event>) {
         let mut buf = [0u8; 1024];
         let mut events: Vec<Event> = Vec::new();
@@ -122,7 +140,6 @@ impl SessionClient {
 
         let response = self.cur_response;
         self.cur_response = http::Request::new(http::RequestType::Response);
-        println!("GOT RESPONSE: {:?}", response);
 
         match self.state {
             SessionState::New => {
@@ -160,17 +177,17 @@ impl SessionClient {
 
         self.ping().unwrap();
 
-        events.push(Event::OnClientEvent(ClientEvent::OnConnected(self.remote_node_id.clone(), self.endpoint.clone())));
-
         (Some(self), events)
     }
 
-    fn process_initial_ping (mut self, events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
+    fn process_initial_ping (mut self, mut events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
         let msg = message::parse(&response.body, &self.key_recv).unwrap();
         match msg[0] {
             message::Message::PingRes(ref r) => {
                 println!("ping response in {} ms",
                     message::get_millis() - r.origin_time);
+                events.push(Event::OnClientEvent(ClientEvent::OnConnected(self.remote_node_id.clone(), self.endpoint.clone())));
+
             }
             _ => {
                 panic!("unexpected message: {:?}", msg);

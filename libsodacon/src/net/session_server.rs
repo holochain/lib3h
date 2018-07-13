@@ -83,16 +83,17 @@ impl SessionServer {
         (Some(self), events)
     }
 
-    fn process_message (mut self, events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
+    fn process_message (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
         let msgs = message::parse(&request.body, &self.key_recv).unwrap();
-        println!("got messages: {:?}", msgs);
 
         for msg in msgs {
             match msg {
                 message::Message::PingReq(r) => {
-                    println!("got ping!: {:?}", r);
                     self.state = SessionState::Ready;
                     self.pong(&mut socket, r.sent_time).unwrap();
+                }
+                message::Message::UserMessage(r) => {
+                    events.push(Event::OnServerEvent(ServerEvent::OnDataReceived(self.remote_node_id.clone(), r.data)));
                 }
                 _ => {
                     panic!("unhandled response type");
@@ -143,7 +144,6 @@ impl SessionServer {
 
         let request = self.cur_request;
         self.cur_request = http::Request::new(http::RequestType::Request);
-        println!("GOT REQUEST: {:?}", request);
 
         match self.state {
             SessionState::New => {
@@ -176,7 +176,21 @@ impl SessionServer {
                         panic!("session id mismatch");
                     }
                 }
-                println!("yay we can process a session request");
+                self.process_message(events, request, socket)
+            }
+            SessionState::Ready => {
+                if self.session_id.len() == 0 {
+                    panic!("cannot process non-new tx without session info");
+                }
+                if &request.method == "GET" {
+                    panic!("cannot process GET requests on established session");
+                }
+                {
+                    let parts: Vec<&str> = request.path.split('/').collect();
+                    if parts[1] != self.session_id {
+                        panic!("session id mismatch");
+                    }
+                }
                 self.process_message(events, request, socket)
             }
             _ => {

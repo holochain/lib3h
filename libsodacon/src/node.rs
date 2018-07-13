@@ -46,6 +46,34 @@ impl StdNetNode {
         }
     }
 
+    pub fn get_node_id (&self) -> Vec<u8> {
+        self.node_id.clone()
+    }
+
+    pub fn get_connected_nodes (&self) -> Vec<Vec<u8>> {
+        let mut out: Vec<Vec<u8>> = Vec::new();
+
+        for ref con in self.client_cons.iter() {
+            out.push(con.remote_node_id.clone());
+        }
+
+        for (ref _key, ref con) in self.server_cons.iter() {
+            out.push(con.remote_node_id.clone());
+        }
+
+        out
+    }
+
+    pub fn send (&mut self, dest_node_id: &[u8], data: &[u8]) {
+        for ref mut con in self.client_cons.iter_mut() {
+            if (con.remote_node_id == dest_node_id) {
+                con.user_message(data);
+                return;
+            }
+        }
+        self.events.push(Event::OnError(error::Error::str_error("no connection to node id")));
+    }
+
     pub fn process_once (&mut self) -> Vec<Event> {
         self.process_listen_cons();
         self.process_server_cons();
@@ -86,7 +114,6 @@ impl StdNetNode {
                 match con.socket.accept() {
                     Ok((s, addr)) => {
                         let addr = Endpoint::from(addr);
-                        println!("con addr: {:?}", addr);
                         if let Err(e) = s.set_nonblocking(true) {
                             self.events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
                             continue;

@@ -1,8 +1,0 @@
-[package]
-name = "cli3h"
-version = "0.1.0"
-authors = ["neonphog <neonphog@gmail.com>"]
-
-[dependencies]
-lib3h = { path = "../lib3h" }
-toml = "0.4"
