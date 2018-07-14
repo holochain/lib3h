@@ -1,9 +1,21 @@
+/*!
+Error / Result structure.
+
+All libsodacrypt apis will return an error::Result.
+*/
+
 use std;
 
+/**
+Basic error structure for libsodacrypt.
+*/
 pub struct Error {
     error: Box<ErrorType>,
 }
 
+/**
+Basic result type for libsodacrypt.
+*/
 pub type Result<T> = std::result::Result<T, Error>;
 
 enum ErrorType {
@@ -12,12 +24,18 @@ enum ErrorType {
 }
 
 impl Error {
+    /**
+    Generate an error struct based on a &str value.
+    */
     pub fn str_error(s: &str) -> Self {
         Error {
             error: Box::new(ErrorType::GenericError(Box::new(format!("{}", s))))
         }
     }
 
+    /**
+    Generate an error struct based of anything implementing std::fmt::Debug.
+    */
     pub fn generic_error(e: Box<std::fmt::Debug>) -> Self {
         Error {
             error: Box::new(ErrorType::GenericError(e)),

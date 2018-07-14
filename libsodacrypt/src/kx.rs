@@ -1,12 +1,61 @@
+/*!
+Key exchange utility functions.
+
+# Examples
+
+```
+use libsodacrypt::kx::*;
+
+let (cli_pub, cli_priv) = gen_keypair().unwrap();
+let (srv_pub, srv_priv) = gen_keypair().unwrap();
+
+// client / server need to exchange public keys
+
+let (cli_recv, cli_send) = derive_client(&cli_pub, &cli_priv, &srv_pub).unwrap();
+let (srv_recv, srv_send) = derive_server(&srv_pub, &srv_priv, &cli_pub).unwrap();
+
+assert_eq!(cli_recv, srv_send);
+assert_eq!(cli_send, srv_recv);
+```
+*/
+
 use error;
 
 use sodiumoxide::crypto::kx::x25519blake2b as so_kx;
 
+/**
+Generate a key exchange keypair.
+
+# Examples
+
+```
+use libsodacrypt::kx::gen_keypair;
+
+let (key_pub, key_priv) = gen_keypair().unwrap();
+```
+*/
 pub fn gen_keypair () -> error::Result<(Vec<u8>, Vec<u8>)> {
     let (key_pub, key_priv) = so_kx::gen_keypair();
     Ok((key_pub.0.to_vec(), key_priv.0.to_vec()))
 }
 
+/**
+Client-side derivation of secret symmetric keys.
+
+# Examples
+
+```
+use libsodacrypt::kx::*;
+
+let (cli_pub, cli_priv) = gen_keypair().unwrap();
+
+// obtain the server's public key
+let (srv_pub, _ignore) = gen_keypair().unwrap();
+
+// derive the secret symmetric keys.
+let (cli_recv, cli_send) = derive_client(&cli_pub, &cli_priv, &srv_pub).unwrap();
+```
+*/
 pub fn derive_client (cli_pub: &[u8], cli_priv: &[u8], srv_pub: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
     let cli_pub = match so_kx::PublicKey::from_slice(cli_pub) {
         Some(v) => v,
@@ -27,6 +76,23 @@ pub fn derive_client (cli_pub: &[u8], cli_priv: &[u8], srv_pub: &[u8]) -> error:
     Ok((recv.0.to_vec(), send.0.to_vec()))
 }
 
+/**
+Server-side derivation of secret symmetric keys.
+
+# Examples
+
+```
+use libsodacrypt::kx::*;
+
+let (srv_pub, srv_priv) = gen_keypair().unwrap();
+
+// obtain the client's public key
+let (cli_pub, _ignore) = gen_keypair().unwrap();
+
+// derive the secret symmetric keys.
+let (srv_recv, srv_send) = derive_server(&srv_pub, &srv_priv, &cli_pub).unwrap();
+```
+*/
 pub fn derive_server (srv_pub: &[u8], srv_priv: &[u8], cli_pub: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
     let srv_pub = match so_kx::PublicKey::from_slice(srv_pub) {
         Some(v) => v,
@@ -45,21 +111,4 @@ pub fn derive_server (srv_pub: &[u8], srv_priv: &[u8], cli_pub: &[u8]) -> error:
         _ => return Err(error::Error::str_error("failed generating session keys")),
     };
     Ok((recv.0.to_vec(), send.0.to_vec()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_can_derive_session_keys() {
-        let (cli_pub, cli_priv) = gen_keypair().unwrap();
-        let (srv_pub, srv_priv) = gen_keypair().unwrap();
-
-        let (cli_recv, cli_send) = derive_client(&cli_pub, &cli_priv, &srv_pub).unwrap();
-        let (srv_recv, srv_send) = derive_server(&srv_pub, &srv_priv, &cli_pub).unwrap();
-
-        assert_eq!(cli_recv, srv_send);
-        assert_eq!(cli_send, srv_recv);
-    }
 }
