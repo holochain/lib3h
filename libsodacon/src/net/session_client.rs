@@ -19,9 +19,12 @@ pub enum SessionState {
 pub struct SessionClient {
     pub session_id: String,
     pub local_node_id: Vec<u8>,
+    pub local_discover: Vec<Endpoint>,
     pub remote_node_id: Vec<u8>,
+    pub remote_discover: Vec<Endpoint>,
     pub endpoint: Endpoint,
     pub state: SessionState,
+    pub last_ping: std::time::Instant,
     pub eph_pub: Vec<u8>,
     pub eph_priv: Vec<u8>,
     pub key_send: Vec<u8>,
@@ -31,14 +34,17 @@ pub struct SessionClient {
 }
 
 impl SessionClient {
-    pub fn new (local_node_id: &[u8], endpoint: &Endpoint) -> error::Result<Self> {
+    pub fn new (local_node_id: &[u8], endpoint: &Endpoint, discover: Vec<Endpoint>) -> error::Result<Self> {
         let (key_pub, key_priv) = libsodacrypt::kx::gen_keypair()?;
         Ok(SessionClient {
             session_id: "".to_string(),
             local_node_id: local_node_id.to_vec(),
+            local_discover: discover,
             remote_node_id: Vec::new(),
+            remote_discover: Vec::new(),
             endpoint: endpoint.clone(),
             state: SessionState::New,
+            last_ping: std::time::Instant::now(),
             eph_pub: key_pub,
             eph_priv: key_priv,
             key_send: Vec::new(),
@@ -48,10 +54,10 @@ impl SessionClient {
         })
     }
 
-    pub fn new_initial_connect (endpoint: &Endpoint, node_id: &[u8]) -> error::Result<Self> {
+    pub fn new_initial_connect (endpoint: &Endpoint, node_id: &[u8], discover: Vec<Endpoint>) -> error::Result<Self> {
         let mut socket = wrap_connect(endpoint)?;
 
-        let mut session = SessionClient::new(node_id, endpoint)?;
+        let mut session = SessionClient::new(node_id, endpoint, discover)?;
 
         let mut req = http::Request::new(http::RequestType::Request);
         req.method = "GET".to_string();
@@ -66,10 +72,22 @@ impl SessionClient {
         Ok(session)
     }
 
+    pub fn check_ping (&mut self) -> error::Result<()> {
+        if self.last_ping.elapsed() > std::time::Duration::from_millis(100) {
+            self.ping()?;
+        }
+        Ok(())
+    }
+
     pub fn ping (&mut self) -> error::Result<()> {
+        self.last_ping = std::time::Instant::now();
+
         let mut socket = wrap_connect(&self.endpoint)?;
 
-        let ping_req = message::PingReq::new();
+        let ping_req = message::PingReq::new(
+            &self.local_node_id,
+            self.local_discover.clone(),
+        );
 
         let out = message::compile(
             &self.session_id,
@@ -107,8 +125,11 @@ impl SessionClient {
         let mut events: Vec<Event> = Vec::new();
 
         let mut socket = match self.cur_socket.take() {
-            None => return (Some(self), events),
-            Some(s) => s
+            None => {
+                self.check_ping();
+                return (Some(self), events)
+            }
+            Some(s) => s,
         };
 
         let size = match socket.read(&mut buf) {
@@ -146,7 +167,10 @@ impl SessionClient {
                 self.process_initial_handshake(events, response)
             }
             SessionState::WaitPing => {
-                self.process_initial_ping(events, response)
+                self.process_messages(events, response)
+            }
+            SessionState::Ready => {
+                self.process_messages(events, response)
             }
             _ => {
                 panic!("ahh, cant handle this yet: {:?}", self.state);
@@ -180,21 +204,32 @@ impl SessionClient {
         (Some(self), events)
     }
 
-    fn process_initial_ping (mut self, mut events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
-        let msg = message::parse(&response.body, &self.key_recv).unwrap();
-        match msg[0] {
-            message::Message::PingRes(ref r) => {
-                println!("ping response in {} ms",
-                    message::get_millis() - r.origin_time);
-                events.push(Event::OnClientEvent(ClientEvent::OnConnected(self.remote_node_id.clone(), self.endpoint.clone())));
+    fn process_messages (mut self, mut events: Vec<Event>, response: http::Request) -> (Option<Self>, Vec<Event>) {
+        let msgs = message::parse(&response.body, &self.key_recv).unwrap();
+        for msg in msgs {
+            match msg {
+                message::Message::PingRes(mut r) => {
+                    if self.state != SessionState::Ready {
+                        self.state = SessionState::Ready;
+                        println!("ping response in {} ms",
+                            message::get_millis() - r.origin_time);
+                    }
 
-            }
-            _ => {
-                panic!("unexpected message: {:?}", msg);
+                    self.last_ping = std::time::Instant::now();
+                    self.remote_node_id = r.node_id.drain(..).collect();
+                    self.remote_discover = r.discover.drain(..).collect();
+
+                    events.push(Event::OnClientEvent(ClientEvent::OnConnected(self.remote_node_id.clone(), self.endpoint.clone())));
+
+                }
+                message::Message::UserMessage(r) => {
+                    events.push(Event::OnClientEvent(ClientEvent::OnDataReceived(self.remote_node_id.clone(), r.data)));
+                }
+                _ => {
+                    panic!("unexpected message: {:?}", msg);
+                }
             }
         }
-
-        self.state = SessionState::Ready;
 
         (Some(self), events)
     }

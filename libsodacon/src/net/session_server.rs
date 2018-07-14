@@ -19,7 +19,9 @@ pub enum SessionState {
 pub struct SessionServer {
     pub session_id: String,
     pub local_node_id: Vec<u8>,
+    pub local_discover: Vec<Endpoint>,
     pub remote_node_id: Vec<u8>,
+    pub remote_discover: Vec<Endpoint>,
     pub endpoint: Endpoint,
     pub state: SessionState,
     pub eph_pub: Vec<u8>,
@@ -27,16 +29,19 @@ pub struct SessionServer {
     pub key_send: Vec<u8>,
     pub key_recv: Vec<u8>,
     pub cur_socket: Option<std::net::TcpStream>,
+    pub out_messages: Vec<message::Message>,
     pub cur_request: http::Request,
 }
 
 impl SessionServer {
-    pub fn new (local_node_id: &[u8], endpoint: &Endpoint) -> error::Result<Self> {
+    pub fn new (local_node_id: &[u8], endpoint: &Endpoint, discover: Vec<Endpoint>) -> error::Result<Self> {
         let (key_pub, key_priv) = libsodacrypt::kx::gen_keypair()?;
         Ok(SessionServer {
             session_id: "".to_string(),
             local_node_id: local_node_id.to_vec(),
+            local_discover: discover,
             remote_node_id: Vec::new(),
+            remote_discover: Vec::new(),
             endpoint: endpoint.clone(),
             state: SessionState::New,
             eph_pub: key_pub,
@@ -44,20 +49,36 @@ impl SessionServer {
             key_send: Vec::new(),
             key_recv: Vec::new(),
             cur_socket: None,
+            out_messages: Vec::new(),
             cur_request: http::Request::new(http::RequestType::Request),
         })
     }
 
-    pub fn pong (&mut self, socket: &mut std::net::TcpStream, origin_time: u64) -> error::Result<()> {
-        let ping_res = message::PingRes::new(origin_time);
-
+    pub fn send_buffered_messages (&mut self, socket: &mut std::net::TcpStream) -> error::Result<()> {
+        let out_messages = self.out_messages.drain(..).collect();
         let out = message::compile(
             &self.session_id,
-            &vec![message::Message::PingRes(Box::new(ping_res))],
+            &out_messages,
             http::RequestType::Response,
             &self.key_send)?;
 
         socket.write(&out)?;
+
+        Ok(())
+    }
+
+    pub fn pong (&mut self, socket: &mut std::net::TcpStream, origin_time: u64) -> error::Result<()> {
+        let ping_res = message::PingRes::new(origin_time, &self.local_node_id, self.local_discover.clone());
+
+        self.out_messages.push(message::Message::PingRes(Box::new(ping_res)));
+
+        self.send_buffered_messages(socket)
+    }
+
+    pub fn user_message (&mut self, data: &[u8]) -> error::Result<()> {
+        let msg = message::UserMessage::new(data);
+
+        self.out_messages.push(message::Message::UserMessage(Box::new(msg)));
 
         Ok(())
     }
@@ -88,8 +109,10 @@ impl SessionServer {
 
         for msg in msgs {
             match msg {
-                message::Message::PingReq(r) => {
+                message::Message::PingReq(mut r) => {
                     self.state = SessionState::Ready;
+                    self.remote_node_id = r.node_id.drain(..).collect();
+                    self.remote_discover = r.discover.drain(..).collect();
                     self.pong(&mut socket, r.sent_time).unwrap();
                 }
                 message::Message::UserMessage(r) => {

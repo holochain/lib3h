@@ -15,27 +15,44 @@ pub enum Event {
 pub struct Node {
     sodacon: StdNetNode,
     events: Vec<Event>,
+
+    // did our initial listen / connection list get satisfied?
     published_ready: bool,
+
+    // track our initial listen / connection list
     wait_listening: Vec<Endpoint>,
     wait_connecting: Vec<Endpoint>,
+
+    // have we ever tried to connect to this node?
+    // need to keep timing stuff in the future.
+    tried_connect: Vec<Endpoint>,
 }
 
 impl Node {
     pub fn new (
         node_id: &[u8],
         listen_endpoints: &[Endpoint],
+        discovery_endpoints: &[Endpoint],
         bootstrap_connections: &[Endpoint],
     ) -> Self {
         let mut node = StdNetNode::new(node_id);
+        for discover_endpoint in discovery_endpoints {
+            node.add_local_discover_endpoint(discover_endpoint);
+        }
+
+        let mut tried_connect: Vec<Endpoint> = Vec::new();
+
         let mut wait_listening: Vec<Endpoint> = Vec::new();
         let mut wait_connecting: Vec<Endpoint> = Vec::new();
 
         for listen_endpoint in listen_endpoints {
+            tried_connect.push(listen_endpoint.clone());
             node.listen(listen_endpoint);
             wait_listening.push(listen_endpoint.clone());
         }
 
         for bootstrap_connection in bootstrap_connections {
+            tried_connect.push(bootstrap_connection.clone());
             node.connect(bootstrap_connection);
             wait_connecting.push(bootstrap_connection.clone());
         }
@@ -46,6 +63,7 @@ impl Node {
             published_ready: false,
             wait_listening: wait_listening,
             wait_connecting: wait_connecting,
+            tried_connect: tried_connect,
         }
     }
 
@@ -53,8 +71,8 @@ impl Node {
         self.sodacon.get_node_id()
     }
 
-    pub fn get_connected_nodes (&self) -> Vec<Vec<u8>> {
-        self.sodacon.get_connected_nodes()
+    pub fn list_connected_nodes (&self) -> Vec<Vec<u8>> {
+        self.sodacon.list_connected_nodes()
     }
 
     pub fn send (&mut self, dest_node_id: &[u8], data: &[u8]) {
@@ -62,6 +80,30 @@ impl Node {
     }
 
     pub fn process_once (&mut self) -> Vec<Event> {
+        // -- check for new discoverable nodes -- //
+
+        let connected = self.sodacon.list_connected_nodes();
+        let discover = self.sodacon.list_discoverable();
+        'top: for (node_id, discover_item) in discover {
+            for c_node_id in connected.iter() {
+                if c_node_id == &node_id {
+                    continue 'top;
+                }
+            }
+            println!("Attempt Discover Connection: {:?}", &discover_item[0]);
+            for c_endpoint in self.tried_connect.iter() {
+                if c_endpoint == &discover_item[0] {
+                    continue 'top;
+                }
+            }
+
+            println!("Attempt Discover Connection: {:?}", &discover_item[0]);
+            self.tried_connect.push(discover_item[0].clone());
+            self.sodacon.connect(&discover_item[0]);
+        }
+
+        // -- process events -- //
+
         let events;
         {
             events = self.sodacon.process_once();
@@ -91,6 +133,9 @@ impl Node {
                             self.wait_connecting.retain(|ref ep| {
                                 return *ep != &endpoint;
                             });
+                        }
+                        ClientEvent::OnDataReceived(node_id, message) => {
+                            self.events.push(Event::OnData(node_id, message));
                         }
                         _ => (),
                     }

@@ -1,7 +1,7 @@
 use error;
 use std;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Endpoint {
     pub addr: String,
     pub port: u16,

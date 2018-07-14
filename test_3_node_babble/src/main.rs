@@ -19,39 +19,32 @@ fn main() {
 
     let test_sequence: Vec<Box<Fn(&mut Vec<Node>)>> = vec![
         Box::new(|nodes: &mut Vec<Node>| {
-            let (nodes, from_node, from_node_disp) = node_info(nodes, 0);
-            let (nodes, to_node, to_node_disp) = node_info(nodes, 1);
-            println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
-            nodes[0].send(&to_node, b"hello");
-        }),
-        Box::new(|nodes: &mut Vec<Node>| {
-            let (nodes, from_node, from_node_disp) = node_info(nodes, 2);
-            let (nodes, to_node, to_node_disp) = node_info(nodes, 0);
-            println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
-            for con_id in nodes[2].get_connected_nodes() {
-                println!("- (have connected): {}",
-                    String::from_utf8_lossy(&con_id));
-            }
-            nodes[0].send(&to_node, b"hello");
-        }),
-        /*
-        Box::new(|nodes: &mut Vec<Node>| {
             let (nodes, from_node, from_node_disp) = node_info(nodes, 1);
             let (nodes, to_node, to_node_disp) = node_info(nodes, 2);
             println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
+            println!("[tests a client connection to a router]");
+            nodes[0].send(&to_node, b"hello");
         }),
         Box::new(|nodes: &mut Vec<Node>| {
             let (nodes, from_node, from_node_disp) = node_info(nodes, 2);
-            let (nodes, to_node, to_node_disp) = node_info(nodes, 0);
+            let (nodes, to_node, to_node_disp) = node_info(nodes, 1);
             println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
+            println!("[tests a router that is connected to by a client]");
+            nodes[2].send(&to_node, b"hello");
         }),
         Box::new(|nodes: &mut Vec<Node>| {
-            let (nodes, from_node, from_node_disp) = node_info(nodes, 2);
-            let (nodes, to_node1, to_node_disp1) = node_info(nodes, 0);
-            let (nodes, to_node2, to_node_disp2) = node_info(nodes, 1);
-            println!("[test] from: {}, to: {}, {}", from_node_disp, to_node_disp1, to_node_disp2);
+            let (nodes, from_node, from_node_disp) = node_info(nodes, 0);
+            let (nodes, to_node, to_node_disp) = node_info(nodes, 1);
+            println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
+            println!("[tests a discovery connection]");
+            /*
+            for con_id in nodes[0].list_connected_nodes() {
+                println!("- (have connected): {}",
+                    String::from_utf8_lossy(&con_id));
+            }
+            */
+            nodes[0].send(&to_node, b"hello");
         }),
-        */
     ];
 
     {
@@ -59,7 +52,7 @@ fn main() {
             Endpoint::new("127.0.0.1", 12001),
             Endpoint::new("[::1]", 12001),
         ];
-        nodes.push(Node::new(NODE_A, &listen, &vec![]));
+        nodes.push(Node::new(NODE_A, &listen, &listen, &vec![]));
     }
 
     let mut all_ready = false;
@@ -93,7 +86,7 @@ fn main() {
                                 let connect: Vec<Endpoint> = vec![
                                     Endpoint::new("127.0.0.1", 12001),
                                 ];
-                                new_nodes.push(Node::new(NODE_B, &listen, &connect));
+                                new_nodes.push(Node::new(NODE_B, &listen, &listen, &connect));
                             } else if nid.as_slice() == NODE_B {
                                 println!("node-B Ready");
                                 let listen: Vec<Endpoint> = vec![
@@ -102,9 +95,8 @@ fn main() {
                                 ];
                                 let connect: Vec<Endpoint> = vec![
                                     Endpoint::new("127.0.0.1", 12001),
-                                    Endpoint::new("127.0.0.1", 12002),
                                 ];
-                                new_nodes.push(Node::new(NODE_C, &listen, &connect));
+                                new_nodes.push(Node::new(NODE_C, &listen, &listen, &connect));
                             } else if nid.as_slice() == NODE_C {
                                 println!("node-C Ready");
                                 all_ready = true;
@@ -127,9 +119,9 @@ fn main() {
 
         if all_ready && last_time.elapsed().as_secs() >= 1 {
             last_time = Instant::now();
-            index += 1;
             let test = &test_sequence[index % test_sequence.len()];
             test(&mut nodes);
+            index += 1;
         }
 
         if !did_something {

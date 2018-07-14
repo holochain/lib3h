@@ -1,6 +1,7 @@
 use error;
 use libsodacrypt;
 use net::http;
+use net::endpoint::Endpoint;
 use rmp_serde;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,12 +22,16 @@ pub struct InitialHandshakeRes {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PingReq {
     pub sent_time: u64,
+    pub node_id: Vec<u8>,
+    pub discover: Vec<Endpoint>,
 }
 
 impl PingReq {
-    pub fn new () -> Self {
+    pub fn new (node_id: &[u8], discover: Vec<Endpoint>) -> Self {
         PingReq {
             sent_time: get_millis(),
+            node_id: node_id.to_vec(),
+            discover: discover,
         }
     }
 }
@@ -35,13 +40,17 @@ impl PingReq {
 pub struct PingRes {
     pub origin_time: u64,
     pub response_time: u64,
+    pub node_id: Vec<u8>,
+    pub discover: Vec<Endpoint>,
 }
 
 impl PingRes {
-    pub fn new (origin_time: u64) -> Self {
+    pub fn new (origin_time: u64, node_id: &[u8], discover: Vec<Endpoint>) -> Self {
         PingRes {
             origin_time: origin_time,
             response_time: get_millis(),
+            node_id: node_id.to_vec(),
+            discover: discover,
         }
     }
 }
