@@ -34,7 +34,7 @@ use libsodacrypt::kx::gen_keypair;
 let (key_pub, key_priv) = gen_keypair().unwrap();
 ```
 */
-pub fn gen_keypair () -> error::Result<(Vec<u8>, Vec<u8>)> {
+pub fn gen_keypair() -> error::Result<(Vec<u8>, Vec<u8>)> {
     let (key_pub, key_priv) = so_kx::gen_keypair();
     Ok((key_pub.0.to_vec(), key_priv.0.to_vec()))
 }
@@ -56,7 +56,11 @@ let (srv_pub, _ignore) = gen_keypair().unwrap();
 let (cli_recv, cli_send) = derive_client(&cli_pub, &cli_priv, &srv_pub).unwrap();
 ```
 */
-pub fn derive_client (cli_pub: &[u8], cli_priv: &[u8], srv_pub: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
+pub fn derive_client(
+    cli_pub: &[u8],
+    cli_priv: &[u8],
+    srv_pub: &[u8],
+) -> error::Result<(Vec<u8>, Vec<u8>)> {
     let cli_pub = match so_kx::PublicKey::from_slice(cli_pub) {
         Some(v) => v,
         None => return Err(error::Error::str_error("invalid client pubkey")),
@@ -93,7 +97,11 @@ let (cli_pub, _ignore) = gen_keypair().unwrap();
 let (srv_recv, srv_send) = derive_server(&srv_pub, &srv_priv, &cli_pub).unwrap();
 ```
 */
-pub fn derive_server (srv_pub: &[u8], srv_priv: &[u8], cli_pub: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
+pub fn derive_server(
+    srv_pub: &[u8],
+    srv_priv: &[u8],
+    cli_pub: &[u8],
+) -> error::Result<(Vec<u8>, Vec<u8>)> {
     let srv_pub = match so_kx::PublicKey::from_slice(srv_pub) {
         Some(v) => v,
         None => return Err(error::Error::str_error("invalid server pubkey")),

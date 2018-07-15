@@ -1,6 +1,6 @@
 use error;
 use net::endpoint::Endpoint;
-use net::event::{Event, ClientEvent, ServerEvent};
+use net::event::{ClientEvent, Event, ServerEvent};
 use net::session_client::SessionClient;
 use net::session_server::SessionServer;
 use std;
@@ -11,15 +11,13 @@ struct StdNetListenCon {
 }
 
 impl StdNetListenCon {
-    fn new (socket: std::net::TcpListener) -> Self {
-        StdNetListenCon {
-            socket: socket,
-        }
+    fn new(socket: std::net::TcpListener) -> Self {
+        StdNetListenCon { socket: socket }
     }
 }
 
-fn wrap_listen (endpoint: &Endpoint) -> error::Result<std::net::TcpListener> {
-    let addr = endpoint.to_socket_addr()?; 
+fn wrap_listen(endpoint: &Endpoint) -> error::Result<std::net::TcpListener> {
+    let addr = endpoint.to_socket_addr()?;
     let socket = std::net::TcpListener::bind(addr)?;
     socket.set_nonblocking(true)?;
     Ok(socket)
@@ -28,7 +26,6 @@ fn wrap_listen (endpoint: &Endpoint) -> error::Result<std::net::TcpListener> {
 pub struct StdNetNode {
     node_id: Vec<u8>,
     local_discover_endpoints: Vec<Endpoint>,
-    discover_map: HashMap<Vec<u8>, Vec<Endpoint>>,
     listen_cons: Vec<StdNetListenCon>,
     server_new_cons: Vec<SessionServer>,
     server_cons: HashMap<String, SessionServer>,
@@ -37,11 +34,10 @@ pub struct StdNetNode {
 }
 
 impl StdNetNode {
-    pub fn new (node_id: &[u8]) -> Self {
+    pub fn new(node_id: &[u8]) -> Self {
         StdNetNode {
             node_id: node_id.to_vec(),
             local_discover_endpoints: Vec::new(),
-            discover_map: HashMap::new(),
             listen_cons: Vec::new(),
             server_new_cons: Vec::new(),
             server_cons: HashMap::new(),
@@ -50,19 +46,15 @@ impl StdNetNode {
         }
     }
 
-    pub fn add_local_discover_endpoint (&mut self, endpoint: &Endpoint) {
+    pub fn add_local_discover_endpoint(&mut self, endpoint: &Endpoint) {
         self.local_discover_endpoints.push(endpoint.clone());
-        self.discover_map.insert(
-            self.node_id.clone(),
-            self.local_discover_endpoints.clone()
-        );
     }
 
-    pub fn get_node_id (&self) -> Vec<u8> {
+    pub fn get_node_id(&self) -> Vec<u8> {
         self.node_id.clone()
     }
 
-    pub fn list_connected_nodes (&self) -> Vec<Vec<u8>> {
+    pub fn list_connected_nodes(&self) -> Vec<Vec<u8>> {
         let mut out: Vec<Vec<u8>> = Vec::new();
 
         for ref con in self.client_cons.iter() {
@@ -76,7 +68,7 @@ impl StdNetNode {
         out
     }
 
-    pub fn list_discoverable (&self) -> HashMap<Vec<u8>, Vec<Endpoint>> {
+    pub fn list_discoverable(&self) -> HashMap<Vec<u8>, Vec<Endpoint>> {
         let mut out: HashMap<Vec<u8>, Vec<Endpoint>> = HashMap::new();
 
         for ref con in self.client_cons.iter() {
@@ -96,23 +88,25 @@ impl StdNetNode {
         out
     }
 
-    pub fn send (&mut self, dest_node_id: &[u8], data: &[u8]) {
+    pub fn send(&mut self, dest_node_id: &[u8], data: Vec<u8>) {
         for ref mut con in self.client_cons.iter_mut() {
             if con.remote_node_id == dest_node_id {
-                con.user_message(data);
+                con.user_message(data).unwrap();
                 return;
             }
         }
         for (ref _key, ref mut con) in self.server_cons.iter_mut() {
             if con.remote_node_id == dest_node_id {
-                con.user_message(data);
+                con.user_message(data).unwrap();
                 return;
             }
         }
-        self.events.push(Event::OnError(error::Error::str_error("no connection to node id")));
+        self.events.push(Event::OnError(error::Error::str_error(
+            "no connection to node id",
+        )));
     }
 
-    pub fn process_once (&mut self) -> Vec<Event> {
+    pub fn process_once(&mut self) -> Vec<Event> {
         self.process_listen_cons();
         self.process_server_cons();
         self.process_client_cons();
@@ -120,22 +114,33 @@ impl StdNetNode {
         self.events.drain(..).collect()
     }
 
-    pub fn listen (&mut self, endpoint: &Endpoint) {
+    pub fn listen(&mut self, endpoint: &Endpoint) {
         let socket = match wrap_listen(endpoint) {
             Err(e) => {
-                self.events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
+                self.events.push(Event::OnServerEvent(ServerEvent::OnError(
+                    error::Error::from(e),
+                )));
                 return;
             }
             Ok(s) => s,
         };
         self.listen_cons.push(StdNetListenCon::new(socket));
-        self.events.push(Event::OnServerEvent(ServerEvent::OnListening(endpoint.clone())));
+        self.events
+            .push(Event::OnServerEvent(ServerEvent::OnListening(
+                endpoint.clone(),
+            )));
     }
 
-    pub fn connect (&mut self, endpoint: &Endpoint) {
-        let session = match SessionClient::new_initial_connect(endpoint, &self.node_id, self.local_discover_endpoints.clone()) {
+    pub fn connect(&mut self, endpoint: &Endpoint) {
+        let session = match SessionClient::new_initial_connect(
+            endpoint,
+            &self.node_id,
+            self.local_discover_endpoints.clone(),
+        ) {
             Err(e) => {
-                self.events.push(Event::OnClientEvent(ClientEvent::OnError(error::Error::from(e))));
+                self.events.push(Event::OnClientEvent(ClientEvent::OnError(
+                    error::Error::from(e),
+                )));
                 return;
             }
             Ok(s) => s,
@@ -145,7 +150,7 @@ impl StdNetNode {
 
     // -- private -- //
 
-    fn process_listen_cons (&mut self) {
+    fn process_listen_cons(&mut self) {
         let mut new_listen_cons: Vec<StdNetListenCon> = Vec::new();
         'top: for con in self.listen_cons.drain(..) {
             loop {
@@ -153,12 +158,20 @@ impl StdNetNode {
                     Ok((s, addr)) => {
                         let addr = Endpoint::from(addr);
                         if let Err(e) = s.set_nonblocking(true) {
-                            self.events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
+                            self.events.push(Event::OnServerEvent(ServerEvent::OnError(
+                                error::Error::from(e),
+                            )));
                             continue;
                         }
-                        let mut session = match SessionServer::new(&self.node_id, &addr, self.local_discover_endpoints.clone()) {
+                        let mut session = match SessionServer::new(
+                            &self.node_id,
+                            &addr,
+                            self.local_discover_endpoints.clone(),
+                        ) {
                             Err(e) => {
-                                self.events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
+                                self.events.push(Event::OnServerEvent(ServerEvent::OnError(
+                                    error::Error::from(e),
+                                )));
                                 continue;
                             }
                             Ok(s) => s,
@@ -171,7 +184,9 @@ impl StdNetNode {
                         break;
                     }
                     Err(e) => {
-                        self.events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
+                        self.events.push(Event::OnServerEvent(ServerEvent::OnError(
+                            error::Error::from(e),
+                        )));
                         break 'top;
                     }
                 }
@@ -182,7 +197,7 @@ impl StdNetNode {
         self.listen_cons = new_listen_cons;
     }
 
-    fn process_server_cons (&mut self) {
+    fn process_server_cons(&mut self) {
         let mut new_cons_list: Vec<SessionServer> = Vec::new();
         let mut new_cons_hash: HashMap<String, SessionServer> = HashMap::new();
 
@@ -220,7 +235,7 @@ impl StdNetNode {
         self.server_cons = new_cons_hash;
     }
 
-    fn process_client_cons (&mut self) {
+    fn process_client_cons(&mut self) {
         let mut new_client_cons: Vec<SessionClient> = Vec::new();
         for mut con in self.client_cons.drain(..) {
             let (con, mut events) = con.process_once();

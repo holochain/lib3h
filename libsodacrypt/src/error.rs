@@ -29,7 +29,7 @@ impl Error {
     */
     pub fn str_error(s: &str) -> Self {
         Error {
-            error: Box::new(ErrorType::GenericError(Box::new(format!("{}", s))))
+            error: Box::new(ErrorType::GenericError(Box::new(format!("{}", s)))),
         }
     }
 

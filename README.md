@@ -1,75 +1,71 @@
 # lib3h
 
-The Happy HedgeHog p2p and distributed hash table rust library.
+The lib3h p2p communication rust library.
 
-WIP!! Everything in here is subject to change!
+WIP/POC!! Everything in here is subject to change!
 
 ## What is it?
 
 This is intended as a functional stub for the p2p networking layer for the holochain rust rewrite.
 
-### MVP functionality required:
+## What does 3h stand for?
 
-- Ability for any node to query a list of all peers on the network.
-- Ability for any node to message any peer on the network.
-- Ability to publish DHT values.
-- Ability to query DHT values.
+Nothin' ... pick some acronym with 3 h-words that makes it easy to remember.
+- Harrowing Holographic Hat
+- Happy HedgeHog
+- Hilariously Humble Hippo
 
-### Nice to have, but not in MVP scope:
+## Crypto
 
-- Ability to route messages to nodes behind a NAT.
-- Solid encryption / anonymity.
-- Gossip and message efficiency.
-- DHT distribution efficiency.
+Using libsodium for everything to start: rng, key exchange, symmetric encryption, and eventually signing, hashing, and password hashing for private key encryption.
 
-## How does the p2p layer work?
+## Phases
 
-### Node identification
+We are currently in the proof-of-concept stub phase "0".
 
-Node IDs are a 256 bit hash of all public keys associated with an identity. Right now this includes a single rsa4096 key, but rsa will likely go away in favor of better alternatives.
+### Phase 0 - "Stub" - the fully connected network...
 
-### Node types
+This phase is intended to bootstrap the rest of the holochain rust project. It provides the functionality of nodes being able to communicate with each other.
 
-#### Routing Nodes
+- The code is not pretty, efficient, or final.
+- The model is a non-scalable fully connected network.
 
-Initially there will just be routing nodes. Routing nodes are required to be accessible to tcp connections.
+### Phase 1 - "IP Discovery" - the interim transport solution...
 
-#### Leaf Nodes
+This phase will provide a minimally connected p2p network that allows discovery of other nodes on the network, but will rely on ip routing to actually message those nodes.
 
-If we tackle the NAT accessibility, then leaf nodes that are not directly accessible will be allowed to connect and receive messages that are routed to them.
+- The code is becoming more production ready.
+- The transport layer is abstracted, but only provides a tcp/ip transport, and a dummy transport for unit testing.
+- The model is scalable and ready to be used in production, even if it isn't our final solution.
 
-### Flood Data
+### Phase 2 - "??" - the transport agnostic custom routing solution...
 
-A set of information, including node public keys, ids, u32_tags (see DHT info below), current routing connections, and some optional light metadata will be flood propagated to all peers on the network. This will allow each node to determine routing and dht coverage in an agent-centric manner.
+We have a shared discovery space, we can know what nodes are currently connected to each other. We should be able to route information between nodes without creating direct connecitions.
 
-### Node Communication
+- Everything TBD.
 
-Nodes will communicate via encrypted ephemeral http connections. Short term-sessions will be established through some TBD handshake protocol to agree on shared secret keys (Diffie-Hellman?). Nodes will attempt to keep sessions with some configurable number of other nodes distributed as evenly as possible through the current calculated DHT bucket space (see below). They will also slowly rotate connections to different nodes.
+## Building
 
-## How does the DHT layer work?
+For sodiumoxide, libsodium-sys, you need some packages:
 
-Rather than using Kademlia, or another similar approach, this library functions more like a classic hash structure, just distributed across the connected p2p nodes.
+```shell
+sudo apt-get install pkg-config libsodium clang-6.0 libclang-6.0-dev
+```
 
-### the u32_tag
+My particular disto didn't provide a new-enough libsodium, so I've included a script that will prep a local build, and set up the environment so cargo will use that one, you simply need to source the helper script:
 
-Every node or bit of data on the network is uniquely identified by a 256 bit hash. This hash is interpreted as an unsigned big integer (little-endian) then modulo down to fit into an unsigned 32 bit integer. This should maintain the distribution quality of the origin hashing algorithm.
+```shell
+source ./prep-3rd-party.bash
+```
 
-### DHT bucket algorithm
+This will build libsodim 1.0.16 the first time you run it, and use the cached build from then on. Note, you'll still need to source the helper script for every new terminal you open.
 
-Starting with 1 and doubling every iteration, the u32_tag space is divided up, and the node-count for each division is calculated. If there are more than N number of nodes depending on the redundancy settings, (Let us say 4 for example purposes) then we proceed to the next iteration, otherwise we have determined the DHT bucket count.
+## Example
 
-For the first iteration, the only consideration is the total number of nodes on the network. If there are > 4 nodes, we move on to iteration with bucket count 2.
+try out the three node babble example:
 
-For the second iteration, we see how many nodes fit into the 0 – 2147483647 range, and how many fit into the 2147483647 – 4294967295 range (u32 max / 2). If both these buckets have more than 4 nodes, continue onto the next iteration, etc.
+```shell
+cargo run -p test_3_node_babble
+```
 
-Every node individually runs their own bucket algorithm, and may come to different answers depending on node visibility.
-
-At the end of the algorithm, every node should know their current bucket count, and which bucket they fit into.
-
-### DHT value assignment
-
-Every value assigned to the DHT also has a u32_tag. Nodes that have self-assigned themselves a bucket range that includes the u32_tag of this piece of data, will be responsible for storing and responding to queries for this piece of data.
-
-### DHT re-hashing
-
-This bucket algorithm provides some stability that should make re-hashing less onerous. If a node re-evaluates the p2p network and decides to double the bucket count, then it is effectively deciding to forget half of the data it is currently indexing. Conversely, if a node decides to halve the bucket count, they will already be indexing half the data they need to be, they will just need to fetch the other half from the network.
+It will spin up three nodes, each of which will connect to or discover the other two nodes, and then begins sending messages between them.

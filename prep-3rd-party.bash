@@ -32,4 +32,5 @@ function buildlibsodium {
   export SODIUM_STATIC="1"
 }
 
+git submodule update --init --recursive
 buildlibsodium

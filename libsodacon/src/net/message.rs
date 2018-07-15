@@ -1,15 +1,14 @@
 use error;
 use libsodacrypt;
-use net::http;
 use net::endpoint::Endpoint;
+use net::http;
 use rmp_serde;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn get_millis () -> u64 {
+pub fn get_millis() -> u64 {
     let start = SystemTime::now();
     let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
-    since_the_epoch.as_secs() * 1000 +
-        since_the_epoch.subsec_nanos() as u64 / 1_000_000
+    since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -27,7 +26,7 @@ pub struct PingReq {
 }
 
 impl PingReq {
-    pub fn new (node_id: &[u8], discover: Vec<Endpoint>) -> Self {
+    pub fn new(node_id: &[u8], discover: Vec<Endpoint>) -> Self {
         PingReq {
             sent_time: get_millis(),
             node_id: node_id.to_vec(),
@@ -45,7 +44,7 @@ pub struct PingRes {
 }
 
 impl PingRes {
-    pub fn new (origin_time: u64, node_id: &[u8], discover: Vec<Endpoint>) -> Self {
+    pub fn new(origin_time: u64, node_id: &[u8], discover: Vec<Endpoint>) -> Self {
         PingRes {
             origin_time: origin_time,
             response_time: get_millis(),
@@ -61,10 +60,8 @@ pub struct UserMessage {
 }
 
 impl UserMessage {
-    pub fn new (data: &[u8]) -> Self {
-        UserMessage {
-            data: data.to_vec()
-        }
+    pub fn new(data: Vec<u8>) -> Self {
+        UserMessage { data: data }
     }
 }
 
@@ -76,7 +73,7 @@ pub enum Message {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-struct MsgWrap (Vec<u8>, Vec<u8>);
+struct MsgWrap(Vec<u8>, Vec<u8>);
 
 pub fn compile(
     session_id: &str,

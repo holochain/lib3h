@@ -178,6 +178,9 @@ name = "lib3h"
 version = "0.1.0"
 dependencies = [
  "libsodacon 0.1.0",
+ "rmp-serde 0.13.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.66 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.66 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

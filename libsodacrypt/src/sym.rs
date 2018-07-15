@@ -40,7 +40,7 @@ use libsodacrypt::sym::gen_random_psk;
 let psk = gen_random_psk().unwrap();
 ```
 */
-pub fn gen_random_psk () -> error::Result<Vec<u8>> {
+pub fn gen_random_psk() -> error::Result<Vec<u8>> {
     Ok(rand_bytes(so_box::PRECOMPUTEDKEYBYTES)?)
 }
 
@@ -56,7 +56,7 @@ let psk = gen_random_psk().unwrap();
 let (nonce, cipher_data) = enc(b"hello", &psk).unwrap();
 ```
 */
-pub fn enc (data: &[u8], psk: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
+pub fn enc(data: &[u8], psk: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
     if data.len() > 4096 {
         return Err(error::Error::str_error("enc is specd for <= 4096 bytes"));
     }
@@ -65,7 +65,10 @@ pub fn enc (data: &[u8], psk: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
         Some(v) => v,
         None => return Err(error::Error::str_error("invalid psk")),
     };
-    Ok((nonce.0.to_vec(), so_box::seal_precomputed(data, &nonce, &psk)))
+    Ok((
+        nonce.0.to_vec(),
+        so_box::seal_precomputed(data, &nonce, &psk),
+    ))
 }
 
 /**
@@ -82,7 +85,7 @@ let (nonce, cipher_data) = enc(b"test data", &psk).unwrap();
 assert_eq!(b"test data".to_vec(), dec(&cipher_data, &nonce, &psk).unwrap());
 ```
 */
-pub fn dec (data: &[u8], nonce: &[u8], psk: &[u8]) -> error::Result<Vec<u8>> {
+pub fn dec(data: &[u8], nonce: &[u8], psk: &[u8]) -> error::Result<Vec<u8>> {
     let nonce = match so_box::Nonce::from_slice(nonce) {
         Some(v) => v,
         None => return Err(error::Error::str_error("invalid nonce")),

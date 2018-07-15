@@ -1,4 +1,5 @@
 use libsodacon;
+use rmp_serde;
 use std;
 
 pub struct Error {
@@ -10,12 +11,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 enum ErrorType {
     GenericError(Box<std::fmt::Debug>),
     SodaconError(libsodacon::error::Error),
+    RmpDecode(rmp_serde::decode::Error),
+    RmpEncode(rmp_serde::encode::Error),
 }
 
 impl Error {
     pub fn str_error(s: &str) -> Self {
         Error {
-            error: Box::new(ErrorType::GenericError(Box::new(format!("{}", s))))
+            error: Box::new(ErrorType::GenericError(Box::new(format!("{}", s)))),
         }
     }
 
@@ -42,11 +45,29 @@ impl From<libsodacon::error::Error> for Error {
     }
 }
 
+impl From<rmp_serde::decode::Error> for Error {
+    fn from(e: rmp_serde::decode::Error) -> Self {
+        Error {
+            error: Box::new(ErrorType::RmpDecode(e)),
+        }
+    }
+}
+
+impl From<rmp_serde::encode::Error> for Error {
+    fn from(e: rmp_serde::encode::Error) -> Self {
+        Error {
+            error: Box::new(ErrorType::RmpEncode(e)),
+        }
+    }
+}
+
 impl std::fmt::Display for ErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             ErrorType::GenericError(ref err) => f.write_str(&format!("{:?}", err)),
             ErrorType::SodaconError(ref err) => f.write_str(&format!("{:?}", err)),
+            ErrorType::RmpDecode(ref err) => f.write_str(&format!("{:?}", err)),
+            ErrorType::RmpEncode(ref err) => f.write_str(&format!("{:?}", err)),
         }
     }
 }

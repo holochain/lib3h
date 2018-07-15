@@ -3,8 +3,8 @@ use hex;
 use libsodacrypt;
 use net::endpoint::Endpoint;
 use net::event::{Event, ServerEvent};
-use net::message;
 use net::http;
+use net::message;
 use rmp_serde;
 use std;
 use std::io::{Read, Write};
@@ -34,7 +34,11 @@ pub struct SessionServer {
 }
 
 impl SessionServer {
-    pub fn new (local_node_id: &[u8], endpoint: &Endpoint, discover: Vec<Endpoint>) -> error::Result<Self> {
+    pub fn new(
+        local_node_id: &[u8],
+        endpoint: &Endpoint,
+        discover: Vec<Endpoint>,
+    ) -> error::Result<Self> {
         let (key_pub, key_priv) = libsodacrypt::kx::gen_keypair()?;
         Ok(SessionServer {
             session_id: "".to_string(),
@@ -54,43 +58,71 @@ impl SessionServer {
         })
     }
 
-    pub fn send_buffered_messages (&mut self, socket: &mut std::net::TcpStream) -> error::Result<()> {
+    pub fn send_buffered_messages(
+        &mut self,
+        socket: &mut std::net::TcpStream,
+    ) -> error::Result<()> {
         let out_messages = self.out_messages.drain(..).collect();
         let out = message::compile(
             &self.session_id,
             &out_messages,
             http::RequestType::Response,
-            &self.key_send)?;
+            &self.key_send,
+        )?;
 
         socket.write(&out)?;
 
         Ok(())
     }
 
-    pub fn pong (&mut self, socket: &mut std::net::TcpStream, origin_time: u64) -> error::Result<()> {
-        let ping_res = message::PingRes::new(origin_time, &self.local_node_id, self.local_discover.clone());
+    pub fn pong(
+        &mut self,
+        socket: &mut std::net::TcpStream,
+        origin_time: u64,
+    ) -> error::Result<()> {
+        let ping_res = message::PingRes::new(
+            origin_time,
+            &self.local_node_id,
+            self.local_discover.clone(),
+        );
 
-        self.out_messages.push(message::Message::PingRes(Box::new(ping_res)));
+        self.out_messages
+            .push(message::Message::PingRes(Box::new(ping_res)));
 
         self.send_buffered_messages(socket)
     }
 
-    pub fn user_message (&mut self, data: &[u8]) -> error::Result<()> {
+    pub fn user_message(&mut self, data: Vec<u8>) -> error::Result<()> {
         let msg = message::UserMessage::new(data);
 
-        self.out_messages.push(message::Message::UserMessage(Box::new(msg)));
+        self.out_messages
+            .push(message::Message::UserMessage(Box::new(msg)));
 
         Ok(())
     }
 
-    fn process_initial_handshake (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
-        let (mut srv_recv, mut srv_send, mut remote_node_id, session_id) = match wrap_initial_handshake(&request.path, &self.local_node_id, &self.eph_pub, &self.eph_priv, &mut socket) {
-            Ok(v) => v,
-            Err(e) => {
-                events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
-                return (None, events);
-            }
-        };
+    fn process_initial_handshake(
+        mut self,
+        mut events: Vec<Event>,
+        request: http::Request,
+        mut socket: std::net::TcpStream,
+    ) -> (Option<Self>, Vec<Event>) {
+        let (mut srv_recv, mut srv_send, mut remote_node_id, session_id) =
+            match wrap_initial_handshake(
+                &request.path,
+                &self.local_node_id,
+                &self.eph_pub,
+                &self.eph_priv,
+                &mut socket,
+            ) {
+                Ok(v) => v,
+                Err(e) => {
+                    events.push(Event::OnServerEvent(ServerEvent::OnError(
+                        error::Error::from(e),
+                    )));
+                    return (None, events);
+                }
+            };
 
         self.remote_node_id.append(&mut remote_node_id);
         self.eph_pub.drain(..);
@@ -104,7 +136,12 @@ impl SessionServer {
         (Some(self), events)
     }
 
-    fn process_message (mut self, mut events: Vec<Event>, request: http::Request, mut socket: std::net::TcpStream) -> (Option<Self>, Vec<Event>) {
+    fn process_message(
+        mut self,
+        mut events: Vec<Event>,
+        request: http::Request,
+        mut socket: std::net::TcpStream,
+    ) -> (Option<Self>, Vec<Event>) {
         let msgs = message::parse(&request.body, &self.key_recv).unwrap();
 
         for msg in msgs {
@@ -116,7 +153,10 @@ impl SessionServer {
                     self.pong(&mut socket, r.sent_time).unwrap();
                 }
                 message::Message::UserMessage(r) => {
-                    events.push(Event::OnServerEvent(ServerEvent::OnDataReceived(self.remote_node_id.clone(), r.data)));
+                    events.push(Event::OnServerEvent(ServerEvent::OnDataReceived(
+                        self.remote_node_id.clone(),
+                        r.data,
+                    )));
                 }
                 _ => {
                     panic!("unhandled response type");
@@ -127,13 +167,13 @@ impl SessionServer {
         (Some(self), events)
     }
 
-    pub fn process_once (mut self) -> (Option<Self>, Vec<Event>) {
+    pub fn process_once(mut self) -> (Option<Self>, Vec<Event>) {
         let mut buf = [0u8; 1024];
         let mut events: Vec<Event> = Vec::new();
 
         let mut socket = match self.cur_socket.take() {
             None => return (Some(self), events),
-            Some(s) => s
+            Some(s) => s,
         };
 
         if !self.cur_request.is_done() {
@@ -151,7 +191,9 @@ impl SessionServer {
                     return (Some(self), events);
                 }
                 Err(e) => {
-                    events.push(Event::OnServerEvent(ServerEvent::OnError(error::Error::from(e))));
+                    events.push(Event::OnServerEvent(ServerEvent::OnError(
+                        error::Error::from(e),
+                    )));
                     events.push(Event::OnServerEvent(ServerEvent::OnClose()));
                     return (None, events);
                 }
@@ -216,14 +258,17 @@ impl SessionServer {
                 }
                 self.process_message(events, request, socket)
             }
-            _ => {
-                panic!("ahh, cant handle this yet: {:?}", self.state)
-            }
         }
     }
 }
 
-fn wrap_initial_handshake (path: &str, local_node_id: &[u8], eph_pub: &[u8], eph_priv: &[u8], socket: &mut std::net::TcpStream) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>, String)> {
+fn wrap_initial_handshake(
+    path: &str,
+    local_node_id: &[u8],
+    eph_pub: &[u8],
+    eph_priv: &[u8],
+    socket: &mut std::net::TcpStream,
+) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>, String)> {
     let parts: Vec<&str> = path.split('/').collect();
     let remote_node_id = hex::decode(parts[1])?;
     let cli_pub = hex::decode(parts[2])?;
@@ -237,7 +282,7 @@ fn wrap_initial_handshake (path: &str, local_node_id: &[u8], eph_pub: &[u8], eph
     res.code = "200".to_string();
     res.headers.insert(
         "content-type".to_string(),
-        "application/octet-stream".to_string()
+        "application/octet-stream".to_string(),
     );
 
     let data_out = message::InitialHandshakeRes {

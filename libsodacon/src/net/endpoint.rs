@@ -8,14 +8,14 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-    pub fn new (addr: &str, port: u16) -> Self {
+    pub fn new(addr: &str, port: u16) -> Self {
         Endpoint {
             addr: addr.to_string(),
-            port: port
+            port: port,
         }
     }
 
-    pub fn to_socket_addr (&self) -> error::Result<std::net::SocketAddr> {
+    pub fn to_socket_addr(&self) -> error::Result<std::net::SocketAddr> {
         let s: String = format!("{}:{}", self.addr, self.port);
         let out: std::net::SocketAddr = s.parse()?;
         Ok(out)

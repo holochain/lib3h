@@ -19,7 +19,7 @@ let expects: Vec<u8> = vec![44, 242, 77, 186, 95, 176, 163, 14, 38, 232, 59, 42,
 assert_eq!(expects, sha256(b"hello").unwrap());
 ```
 */
-pub fn sha256 (data: &[u8]) -> error::Result<Vec<u8>> {
+pub fn sha256(data: &[u8]) -> error::Result<Vec<u8>> {
     Ok(so_sha256(data).0.to_vec())
 }
 
@@ -35,6 +35,6 @@ let expects: Vec<u8> = vec![155, 113, 210, 36, 189, 98, 243, 120, 93, 150, 212, 
 assert_eq!(expects, sha512(b"hello").unwrap());
 ```
 */
-pub fn sha512 (data: &[u8]) -> error::Result<Vec<u8>> {
+pub fn sha512(data: &[u8]) -> error::Result<Vec<u8>> {
     Ok(so_sha512(data).0.to_vec())
 }

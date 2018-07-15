@@ -2,7 +2,7 @@ extern crate lib3h;
 
 use std::time::Instant;
 
-use lib3h::node::{Endpoint, Node, Event};
+use lib3h::node::{Endpoint, Event, Node};
 
 static NODE_A: &'static [u8] = b"node-A";
 static NODE_B: &'static [u8] = b"node-B";
@@ -19,31 +19,31 @@ fn main() {
 
     let test_sequence: Vec<Box<Fn(&mut Vec<Node>)>> = vec![
         Box::new(|nodes: &mut Vec<Node>| {
-            let (nodes, from_node, from_node_disp) = node_info(nodes, 1);
+            let (nodes, _from_node, from_node_disp) = node_info(nodes, 1);
             let (nodes, to_node, to_node_disp) = node_info(nodes, 2);
-            println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
-            println!("[tests a client connection to a router]");
-            nodes[0].send(&to_node, b"hello");
+            println!(
+                "\n[test] from: {}, to: {} (client con to a router)",
+                from_node_disp, to_node_disp
+            );
+            nodes[0].send(&to_node, b"hello".to_vec());
         }),
         Box::new(|nodes: &mut Vec<Node>| {
-            let (nodes, from_node, from_node_disp) = node_info(nodes, 2);
+            let (nodes, _from_node, from_node_disp) = node_info(nodes, 2);
             let (nodes, to_node, to_node_disp) = node_info(nodes, 1);
-            println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
-            println!("[tests a router that is connected to by a client]");
-            nodes[2].send(&to_node, b"hello");
+            println!(
+                "\n[test] from: {}, to: {} (router con from client)",
+                from_node_disp, to_node_disp
+            );
+            nodes[2].send(&to_node, b"hello".to_vec());
         }),
         Box::new(|nodes: &mut Vec<Node>| {
-            let (nodes, from_node, from_node_disp) = node_info(nodes, 0);
+            let (nodes, _from_node, from_node_disp) = node_info(nodes, 0);
             let (nodes, to_node, to_node_disp) = node_info(nodes, 1);
-            println!("[test] from: {}, to: {}", from_node_disp, to_node_disp);
-            println!("[tests a discovery connection]");
-            /*
-            for con_id in nodes[0].list_connected_nodes() {
-                println!("- (have connected): {}",
-                    String::from_utf8_lossy(&con_id));
-            }
-            */
-            nodes[0].send(&to_node, b"hello");
+            println!(
+                "\n[test] from: {}, to: {} (discovery con)",
+                from_node_disp, to_node_disp
+            );
+            nodes[0].send(&to_node, b"hello".to_vec());
         }),
     ];
 
@@ -58,6 +58,7 @@ fn main() {
     let mut all_ready = false;
     let mut last_time = Instant::now();
     let mut index = 0;
+    let mut wait_len = 0;
     loop {
         let mut did_something = false;
 
@@ -74,7 +75,6 @@ fn main() {
                 }
                 for event in events {
                     did_something = true;
-                    println!("Got event: {:?}", event);
                     match event {
                         Event::OnReady => {
                             if nid.as_slice() == NODE_A {
@@ -83,9 +83,8 @@ fn main() {
                                     Endpoint::new("127.0.0.1", 12002),
                                     Endpoint::new("[::1]", 12002),
                                 ];
-                                let connect: Vec<Endpoint> = vec![
-                                    Endpoint::new("127.0.0.1", 12001),
-                                ];
+                                let connect: Vec<Endpoint> =
+                                    vec![Endpoint::new("127.0.0.1", 12001)];
                                 new_nodes.push(Node::new(NODE_B, &listen, &listen, &connect));
                             } else if nid.as_slice() == NODE_B {
                                 println!("node-B Ready");
@@ -93,9 +92,8 @@ fn main() {
                                     Endpoint::new("127.0.0.1", 12003),
                                     Endpoint::new("[::1]", 12003),
                                 ];
-                                let connect: Vec<Endpoint> = vec![
-                                    Endpoint::new("127.0.0.1", 12001),
-                                ];
+                                let connect: Vec<Endpoint> =
+                                    vec![Endpoint::new("127.0.0.1", 12001)];
                                 new_nodes.push(Node::new(NODE_C, &listen, &listen, &connect));
                             } else if nid.as_slice() == NODE_C {
                                 println!("node-C Ready");
@@ -109,6 +107,7 @@ fn main() {
                             println!("[{}] - Got data from [{}] - {}", nid_disp, node_id, data);
                         }
                         Event::OnError(e) => {
+                            println!("{:?}", e);
                         }
                     }
                 }
@@ -125,7 +124,13 @@ fn main() {
         }
 
         if !did_something {
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(std::time::Duration::from_millis(wait_len));
+            wait_len += 1;
+            if wait_len > 50 {
+                wait_len = 50;
+            }
+        } else {
+            wait_len = 0;
         }
     }
 }
