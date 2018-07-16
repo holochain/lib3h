@@ -24,7 +24,9 @@ cipher_data[0] = cipher_data[0] + 1;
 assert_eq!(b"test data".to_vec(), dec(&cipher_data, &nonce, &psk).unwrap());
 ```
 */
-use error;
+
+use errors::*;
+
 use rand::rand_bytes;
 
 use sodiumoxide::crypto::box_::curve25519xsalsa20poly1305 as so_box;
@@ -40,7 +42,7 @@ use libsodacrypt::sym::gen_random_psk;
 let psk = gen_random_psk().unwrap();
 ```
 */
-pub fn gen_random_psk() -> error::Result<Vec<u8>> {
+pub fn gen_random_psk() -> Result<Vec<u8>> {
     Ok(rand_bytes(so_box::PRECOMPUTEDKEYBYTES)?)
 }
 
@@ -56,14 +58,14 @@ let psk = gen_random_psk().unwrap();
 let (nonce, cipher_data) = enc(b"hello", &psk).unwrap();
 ```
 */
-pub fn enc(data: &[u8], psk: &[u8]) -> error::Result<(Vec<u8>, Vec<u8>)> {
+pub fn enc(data: &[u8], psk: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     if data.len() > 4096 {
-        return Err(error::Error::str_error("enc is specd for <= 4096 bytes"));
+        return Err("enc is specd for <= 4096 bytes".into());
     }
     let nonce = so_box::gen_nonce();
     let psk = match so_box::PrecomputedKey::from_slice(psk) {
         Some(v) => v,
-        None => return Err(error::Error::str_error("invalid psk")),
+        None => return Err(ErrorKind::InvalidPresharedKey.into()),
     };
     Ok((
         nonce.0.to_vec(),
@@ -85,17 +87,17 @@ let (nonce, cipher_data) = enc(b"test data", &psk).unwrap();
 assert_eq!(b"test data".to_vec(), dec(&cipher_data, &nonce, &psk).unwrap());
 ```
 */
-pub fn dec(data: &[u8], nonce: &[u8], psk: &[u8]) -> error::Result<Vec<u8>> {
+pub fn dec(data: &[u8], nonce: &[u8], psk: &[u8]) -> Result<Vec<u8>> {
     let nonce = match so_box::Nonce::from_slice(nonce) {
         Some(v) => v,
-        None => return Err(error::Error::str_error("invalid nonce")),
+        None => return Err(ErrorKind::InvalidNonce.into()),
     };
     let psk = match so_box::PrecomputedKey::from_slice(psk) {
         Some(v) => v,
-        None => return Err(error::Error::str_error("invalid psk")),
+        None => return Err(ErrorKind::InvalidPresharedKey.into()),
     };
     match so_box::open_precomputed(&data, &nonce, &psk) {
         Ok(v) => Ok(v),
-        Err(_) => Err(error::Error::str_error("failed to decrypt")),
+        Err(_) => Err(ErrorKind::FailedToDecrypt.into()),
     }
 }
