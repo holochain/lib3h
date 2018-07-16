@@ -65,7 +65,7 @@ This will build libsodim 1.0.16 the first time you run it, and use the cached bu
 try out the three node babble example:
 
 ```shell
-cargo run -p test_3_node_babble
+cargo run -p babble
 ```
 
 It will spin up three nodes, each of which will connect to or discover the other two nodes, and then begins sending messages between them.

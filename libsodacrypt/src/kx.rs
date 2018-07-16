@@ -20,6 +20,7 @@ assert_eq!(cli_send, srv_recv);
 */
 
 use errors::*;
+use init;
 
 use sodiumoxide::crypto::kx::x25519blake2b as so_kx;
 
@@ -35,6 +36,7 @@ let (key_pub, key_priv) = gen_keypair().unwrap();
 ```
 */
 pub fn gen_keypair() -> Result<(Vec<u8>, Vec<u8>)> {
+    init::check()?;
     let (key_pub, key_priv) = so_kx::gen_keypair();
     Ok((key_pub.0.to_vec(), key_priv.0.to_vec()))
 }
@@ -61,6 +63,7 @@ pub fn derive_client(
     cli_priv: &[u8],
     srv_pub: &[u8],
 ) -> Result<(Vec<u8>, Vec<u8>)> {
+    init::check()?;
     let cli_pub = match so_kx::PublicKey::from_slice(cli_pub) {
         Some(v) => v,
         None => return Err(ErrorKind::InvalidClientPubKey.into()),
@@ -102,6 +105,7 @@ pub fn derive_server(
     srv_priv: &[u8],
     cli_pub: &[u8],
 ) -> Result<(Vec<u8>, Vec<u8>)> {
+    init::check()?;
     let srv_pub = match so_kx::PublicKey::from_slice(srv_pub) {
         Some(v) => v,
         None => return Err(ErrorKind::InvalidServerPubKey.into()),

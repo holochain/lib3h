@@ -25,6 +25,7 @@ assert!(verify(b"hello1", &sig, &sign_pub).unwrap());
 */
 
 use errors::*;
+use init;
 
 use rand::rand_bytes;
 
@@ -42,6 +43,7 @@ let seed = gen_seed().unwrap();
 ```
 */
 pub fn gen_seed() -> Result<Vec<u8>> {
+    init::check()?;
     Ok(rand_bytes(so_sign::SEEDBYTES)?)
 }
 
@@ -58,6 +60,7 @@ let (sign_pub, sign_priv) = keypair_from_seed(&seed).unwrap();
 ```
 */
 pub fn keypair_from_seed(seed: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+    init::check()?;
     let seed = match so_sign::Seed::from_slice(seed) {
         Some(v) => v,
         None => return Err(ErrorKind::InvalidSeed.into()),
@@ -80,6 +83,7 @@ let sig = sign(b"hello", &sign_priv).unwrap();
 ```
 */
 pub fn sign(data: &[u8], priv_key: &[u8]) -> Result<Vec<u8>> {
+    init::check()?;
     let priv_key = match so_sign::SecretKey::from_slice(priv_key) {
         Some(v) => v,
         None => return Err(ErrorKind::InvalidPrivKey.into()),
@@ -102,6 +106,7 @@ assert!(verify(b"hello", &sig, &sign_pub).unwrap());
 ```
 */
 pub fn verify(data: &[u8], signature: &[u8], pub_key: &[u8]) -> Result<bool> {
+    init::check()?;
     let pub_key = match so_sign::PublicKey::from_slice(pub_key) {
         Some(v) => v,
         None => return Err(ErrorKind::InvalidPubKey.into()),

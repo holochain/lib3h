@@ -21,6 +21,7 @@ error_chain! {
         InvalidClientPrivKey
         InvalidServerPubKey
         InvalidServerPrivKey
+        FailedLibSodiumInit
         FailedToDecrypt
     }
 }

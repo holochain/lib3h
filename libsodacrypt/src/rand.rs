@@ -3,6 +3,7 @@ Cryptographically secure, thread-safe, random bytes.
 */
 
 use errors::*;
+use init;
 
 use sodiumoxide::randombytes::randombytes as so_bytes;
 
@@ -19,5 +20,6 @@ assert_eq!(12, bytes.len());
 ```
 */
 pub fn rand_bytes(count: usize) -> Result<Vec<u8>> {
+    init::check()?;
     Ok(so_bytes(count))
 }
