@@ -52,7 +52,7 @@ fn main() {
             Endpoint::new("127.0.0.1", 12001),
             Endpoint::new("[::1]", 12001),
         ];
-        nodes.push(Node::new(NODE_A, &listen, &listen, &vec![]));
+        nodes.push(Node::new(NODE_A, &listen, &listen, &[]));
     }
 
     let mut all_ready = false;

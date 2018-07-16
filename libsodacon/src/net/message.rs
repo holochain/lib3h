@@ -8,7 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn get_millis() -> u64 {
     let start = SystemTime::now();
     let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
-    since_the_epoch.as_secs() * 1000 + since_the_epoch.subsec_nanos() as u64 / 1_000_000
+    let nanos: u64 = since_the_epoch.subsec_nanos().into();
+    since_the_epoch.as_secs() * 1000 + nanos / 1_000_000
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -30,7 +31,7 @@ impl PingReq {
         PingReq {
             sent_time: get_millis(),
             node_id: node_id.to_vec(),
-            discover: discover,
+            discover,
         }
     }
 }
@@ -46,10 +47,10 @@ pub struct PingRes {
 impl PingRes {
     pub fn new(origin_time: u64, node_id: &[u8], discover: Vec<Endpoint>) -> Self {
         PingRes {
-            origin_time: origin_time,
+            origin_time,
             response_time: get_millis(),
             node_id: node_id.to_vec(),
-            discover: discover,
+            discover,
         }
     }
 }
@@ -61,7 +62,7 @@ pub struct UserMessage {
 
 impl UserMessage {
     pub fn new(data: Vec<u8>) -> Self {
-        UserMessage { data: data }
+        UserMessage { data }
     }
 }
 
@@ -77,7 +78,7 @@ struct MsgWrap(Vec<u8>, Vec<u8>);
 
 pub fn compile(
     session_id: &str,
-    sub_messages: &Vec<Message>,
+    sub_messages: &[Message],
     rtype: http::RequestType,
     psk: &[u8],
 ) -> Result<Vec<u8>> {

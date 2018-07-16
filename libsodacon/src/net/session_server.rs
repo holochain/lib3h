@@ -55,7 +55,7 @@ impl SessionServer {
     }
 
     pub fn send_buffered_messages(&mut self, socket: &mut std::net::TcpStream) -> Result<()> {
-        let out_messages = self.out_messages.drain(..).collect();
+        let out_messages: Vec<message::Message> = self.out_messages.drain(..).collect();
         let out = message::compile(
             &self.session_id,
             &out_messages,
@@ -63,7 +63,9 @@ impl SessionServer {
             &self.key_send,
         )?;
 
-        socket.write(&out)?;
+        if out.len() != socket.write(&out)? {
+            panic!("incomplete write");
+        }
 
         Ok(())
     }
@@ -90,6 +92,8 @@ impl SessionServer {
         Ok(())
     }
 
+    #[allow(unknown_lints)]
+    #[allow(needless_pass_by_value)]
     fn process_initial_handshake(
         mut self,
         mut events: Vec<Event>,
@@ -106,7 +110,7 @@ impl SessionServer {
             ) {
                 Ok(v) => v,
                 Err(e) => {
-                    events.push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
+                    events.push(Event::OnServerEvent(ServerEvent::OnError(e)));
                     return (None, events);
                 }
             };
@@ -123,6 +127,8 @@ impl SessionServer {
         (Some(self), events)
     }
 
+    #[allow(unknown_lints)]
+    #[allow(needless_pass_by_value)]
     fn process_message(
         mut self,
         mut events: Vec<Event>,
@@ -197,9 +203,9 @@ impl SessionServer {
 
         match self.state {
             SessionState::New => {
-                if self.session_id.len() == 0 && &request.method == "GET" {
+                if self.session_id.is_empty() && &request.method == "GET" {
                     self.process_initial_handshake(events, request, socket)
-                } else if self.session_id.len() == 0 && &request.method == "POST" {
+                } else if self.session_id.is_empty() && &request.method == "POST" {
                     {
                         let parts: Vec<&str> = request.path.split('/').collect();
                         self.session_id = parts[1].to_string();
@@ -214,7 +220,7 @@ impl SessionServer {
                 }
             }
             SessionState::WaitPing => {
-                if self.session_id.len() == 0 {
+                if self.session_id.is_empty() {
                     panic!("cannot process non-new tx without session info");
                 }
                 if &request.method == "GET" {
@@ -229,7 +235,7 @@ impl SessionServer {
                 self.process_message(events, request, socket)
             }
             SessionState::Ready => {
-                if self.session_id.len() == 0 {
+                if self.session_id.is_empty() {
                     panic!("cannot process non-new tx without session info");
                 }
                 if &request.method == "GET" {
@@ -247,6 +253,8 @@ impl SessionServer {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(type_complexity)]
 fn wrap_initial_handshake(
     path: &str,
     local_node_id: &[u8],
@@ -277,7 +285,10 @@ fn wrap_initial_handshake(
     };
     res.body = rmp_serde::to_vec(&data_out)?;
 
-    socket.write(&res.generate())?;
+    let output = res.generate();
+    if output.len() != socket.write(&res.generate())? {
+        panic!("incomplete write");
+    }
 
     Ok((srv_recv, srv_send, remote_node_id, session_id))
 }

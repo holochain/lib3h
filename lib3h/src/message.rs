@@ -10,7 +10,7 @@ pub struct DiscoveryReq {
 
 impl DiscoveryReq {
     pub fn new(discover: HashMap<Vec<u8>, Vec<Endpoint>>) -> Self {
-        DiscoveryReq { discover: discover }
+        DiscoveryReq { discover }
     }
 }
 
@@ -21,7 +21,7 @@ pub struct DiscoveryRes {
 
 impl DiscoveryRes {
     pub fn new(discover: HashMap<Vec<u8>, Vec<Endpoint>>) -> Self {
-        DiscoveryRes { discover: discover }
+        DiscoveryRes { discover }
     }
 }
 
@@ -32,7 +32,7 @@ pub struct UserMessage {
 
 impl UserMessage {
     pub fn new(data: Vec<u8>) -> Self {
-        UserMessage { data: data }
+        UserMessage { data }
     }
 }
 
@@ -43,10 +43,10 @@ pub enum Message {
     UserMessage(Box<UserMessage>),
 }
 
-pub fn compile(message: Message) -> Result<Vec<u8>> {
-    Ok(rmp_serde::to_vec(&message)?)
+pub fn compile(message: &Message) -> Result<Vec<u8>> {
+    Ok(rmp_serde::to_vec(message)?)
 }
 
-pub fn parse(message: Vec<u8>) -> Result<Message> {
-    Ok(rmp_serde::from_slice(&message)?)
+pub fn parse(message: &[u8]) -> Result<Message> {
+    Ok(rmp_serde::from_slice(message)?)
 }
