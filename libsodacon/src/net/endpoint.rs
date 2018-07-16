@@ -1,4 +1,4 @@
-use error;
+use errors::*;
 use std;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -15,7 +15,7 @@ impl Endpoint {
         }
     }
 
-    pub fn to_socket_addr(&self) -> error::Result<std::net::SocketAddr> {
+    pub fn to_socket_addr(&self) -> Result<std::net::SocketAddr> {
         let s: String = format!("{}:{}", self.addr, self.port);
         let out: std::net::SocketAddr = s.parse()?;
         Ok(out)

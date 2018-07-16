@@ -1,4 +1,4 @@
-use error;
+use errors::*;
 use hex;
 use libsodacrypt;
 use net::endpoint::Endpoint;
@@ -34,11 +34,7 @@ pub struct SessionClient {
 }
 
 impl SessionClient {
-    pub fn new(
-        local_node_id: &[u8],
-        endpoint: &Endpoint,
-        discover: Vec<Endpoint>,
-    ) -> error::Result<Self> {
+    pub fn new(local_node_id: &[u8], endpoint: &Endpoint, discover: Vec<Endpoint>) -> Result<Self> {
         let (key_pub, key_priv) = libsodacrypt::kx::gen_keypair()?;
         Ok(SessionClient {
             session_id: "".to_string(),
@@ -62,7 +58,7 @@ impl SessionClient {
         endpoint: &Endpoint,
         node_id: &[u8],
         discover: Vec<Endpoint>,
-    ) -> error::Result<Self> {
+    ) -> Result<Self> {
         let mut socket = wrap_connect(endpoint)?;
 
         let mut session = SessionClient::new(node_id, endpoint, discover)?;
@@ -82,14 +78,14 @@ impl SessionClient {
         Ok(session)
     }
 
-    pub fn check_ping(&mut self) -> error::Result<()> {
+    pub fn check_ping(&mut self) -> Result<()> {
         if self.last_ping.elapsed() > std::time::Duration::from_millis(100) {
             self.ping()?;
         }
         Ok(())
     }
 
-    pub fn ping(&mut self) -> error::Result<()> {
+    pub fn ping(&mut self) -> Result<()> {
         self.last_ping = std::time::Instant::now();
 
         let mut socket = wrap_connect(&self.endpoint)?;
@@ -110,7 +106,7 @@ impl SessionClient {
         Ok(())
     }
 
-    pub fn user_message(&mut self, data: Vec<u8>) -> error::Result<()> {
+    pub fn user_message(&mut self, data: Vec<u8>) -> Result<()> {
         let mut socket = wrap_connect(&self.endpoint)?;
 
         let msg = message::UserMessage::new(data);
@@ -155,9 +151,7 @@ impl SessionClient {
                 return (Some(self), events);
             }
             Err(e) => {
-                events.push(Event::OnClientEvent(ClientEvent::OnError(
-                    error::Error::from(e),
-                )));
+                events.push(Event::OnClientEvent(ClientEvent::OnError(e.into())));
                 events.push(Event::OnClientEvent(ClientEvent::OnClose()));
                 return (None, events);
             }
@@ -191,9 +185,7 @@ impl SessionClient {
             match wrap_parse_initial_handshake(&response.body, &self.eph_pub, &self.eph_priv) {
                 Ok(v) => v,
                 Err(e) => {
-                    events.push(Event::OnClientEvent(ClientEvent::OnError(
-                        error::Error::from(e),
-                    )));
+                    events.push(Event::OnClientEvent(ClientEvent::OnError(e.into())));
                     events.push(Event::OnClientEvent(ClientEvent::OnClose()));
                     return (None, events);
                 }
@@ -255,7 +247,7 @@ impl SessionClient {
     }
 }
 
-fn wrap_connect(endpoint: &Endpoint) -> error::Result<std::net::TcpStream> {
+fn wrap_connect(endpoint: &Endpoint) -> Result<std::net::TcpStream> {
     let timeout = std::time::Duration::from_millis(1000);
     let addr = endpoint.to_socket_addr()?;
     let socket = std::net::TcpStream::connect_timeout(&addr, timeout)?;
@@ -267,7 +259,7 @@ fn wrap_parse_initial_handshake(
     data: &[u8],
     eph_pub: &[u8],
     eph_priv: &[u8],
-) -> error::Result<(Vec<u8>, Vec<u8>, Vec<u8>, String)> {
+) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, String)> {
     let res: message::InitialHandshakeRes = rmp_serde::from_slice(data)?;
 
     let srv_pub = res.eph_pub;

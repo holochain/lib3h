@@ -7,6 +7,7 @@ authors = ["neonphog <neonphog@gmail.com>"]
 base64 = "0.9"
 byteorder = "1.2"
 chrono = { version = "0.4", features = ["serde"] }
+error-chain = "0.12"
 hex = "0.3.2"
 Inflector = "0.11.3"
 lazy_static = "1.0"

@@ -1,4 +1,4 @@
-use error;
+use errors::*;
 use net::endpoint::Endpoint;
 use net::event::{ClientEvent, Event, ServerEvent};
 use net::session_client::SessionClient;
@@ -16,7 +16,7 @@ impl StdNetListenCon {
     }
 }
 
-fn wrap_listen(endpoint: &Endpoint) -> error::Result<std::net::TcpListener> {
+fn wrap_listen(endpoint: &Endpoint) -> Result<std::net::TcpListener> {
     let addr = endpoint.to_socket_addr()?;
     let socket = std::net::TcpListener::bind(addr)?;
     socket.set_nonblocking(true)?;
@@ -101,9 +101,8 @@ impl StdNetNode {
                 return;
             }
         }
-        self.events.push(Event::OnError(error::Error::str_error(
-            "no connection to node id",
-        )));
+        self.events
+            .push(Event::OnError("no connection to node id".into()));
     }
 
     pub fn process_once(&mut self) -> Vec<Event> {
@@ -117,9 +116,8 @@ impl StdNetNode {
     pub fn listen(&mut self, endpoint: &Endpoint) {
         let socket = match wrap_listen(endpoint) {
             Err(e) => {
-                self.events.push(Event::OnServerEvent(ServerEvent::OnError(
-                    error::Error::from(e),
-                )));
+                self.events
+                    .push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
                 return;
             }
             Ok(s) => s,
@@ -138,9 +136,8 @@ impl StdNetNode {
             self.local_discover_endpoints.clone(),
         ) {
             Err(e) => {
-                self.events.push(Event::OnClientEvent(ClientEvent::OnError(
-                    error::Error::from(e),
-                )));
+                self.events
+                    .push(Event::OnClientEvent(ClientEvent::OnError(e.into())));
                 return;
             }
             Ok(s) => s,
@@ -158,9 +155,8 @@ impl StdNetNode {
                     Ok((s, addr)) => {
                         let addr = Endpoint::from(addr);
                         if let Err(e) = s.set_nonblocking(true) {
-                            self.events.push(Event::OnServerEvent(ServerEvent::OnError(
-                                error::Error::from(e),
-                            )));
+                            self.events
+                                .push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
                             continue;
                         }
                         let mut session = match SessionServer::new(
@@ -169,9 +165,8 @@ impl StdNetNode {
                             self.local_discover_endpoints.clone(),
                         ) {
                             Err(e) => {
-                                self.events.push(Event::OnServerEvent(ServerEvent::OnError(
-                                    error::Error::from(e),
-                                )));
+                                self.events
+                                    .push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
                                 continue;
                             }
                             Ok(s) => s,
@@ -184,9 +179,8 @@ impl StdNetNode {
                         break;
                     }
                     Err(e) => {
-                        self.events.push(Event::OnServerEvent(ServerEvent::OnError(
-                            error::Error::from(e),
-                        )));
+                        self.events
+                            .push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
                         break 'top;
                     }
                 }

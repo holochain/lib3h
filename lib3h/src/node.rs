@@ -8,11 +8,11 @@ use message;
 use std;
 use std::collections::HashMap;
 
-use error;
+use errors::*;
 
 #[derive(Debug)]
 pub enum Event {
-    OnError(error::Error),
+    OnError(Error),
     OnReady,
     OnData(Vec<u8>, Vec<u8>),
 }
@@ -108,7 +108,7 @@ impl Node {
         for event in events {
             match event {
                 SCEvent::OnError(e) => {
-                    self.events.push(Event::OnError(error::Error::from(e)));
+                    self.events.push(Event::OnError(e.into()));
                 }
                 SCEvent::OnServerEvent(ev) => match ev {
                     ServerEvent::OnListening(endpoint) => {

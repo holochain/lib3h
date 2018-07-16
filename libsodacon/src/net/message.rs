@@ -1,4 +1,4 @@
-use error;
+use errors::*;
 use libsodacrypt;
 use net::endpoint::Endpoint;
 use net::http;
@@ -80,7 +80,7 @@ pub fn compile(
     sub_messages: &Vec<Message>,
     rtype: http::RequestType,
     psk: &[u8],
-) -> error::Result<Vec<u8>> {
+) -> Result<Vec<u8>> {
     let msg = rmp_serde::to_vec(sub_messages)?;
 
     let (nonce, msg) = libsodacrypt::sym::enc(&msg, psk)?;
@@ -102,7 +102,7 @@ pub fn compile(
     Ok(msg)
 }
 
-pub fn parse(message: &[u8], psk: &[u8]) -> error::Result<Vec<Message>> {
+pub fn parse(message: &[u8], psk: &[u8]) -> Result<Vec<Message>> {
     let message: MsgWrap = rmp_serde::from_slice(message)?;
     let message = libsodacrypt::sym::dec(&message.1, &message.0, psk)?;
     let message: Vec<Message> = rmp_serde::from_slice(&message)?;

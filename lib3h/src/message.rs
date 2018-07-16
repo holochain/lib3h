@@ -1,4 +1,4 @@
-use error;
+use errors::*;
 use libsodacon::net::endpoint::Endpoint;
 use rmp_serde;
 use std::collections::HashMap;
@@ -43,10 +43,10 @@ pub enum Message {
     UserMessage(Box<UserMessage>),
 }
 
-pub fn compile(message: Message) -> error::Result<Vec<u8>> {
+pub fn compile(message: Message) -> Result<Vec<u8>> {
     Ok(rmp_serde::to_vec(&message)?)
 }
 
-pub fn parse(message: Vec<u8>) -> error::Result<Message> {
+pub fn parse(message: Vec<u8>) -> Result<Message> {
     Ok(rmp_serde::from_slice(&message)?)
 }
