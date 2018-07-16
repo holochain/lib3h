@@ -1,7 +1,7 @@
 [package]
-name = "test_3_node_babble"
+name = "babble"
 version = "0.1.0"
 authors = ["neonphog <neonphog@gmail.com>"]
 
 [dependencies]
-lib3h = { path = "../lib3h" }
+lib3h = { path = "../../lib3h" }

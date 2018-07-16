@@ -3,6 +3,7 @@ Hashing utility functions.
 */
 
 use errors::*;
+use init;
 
 use sodiumoxide::crypto::hash::sha256::hash as so_sha256;
 use sodiumoxide::crypto::hash::sha512::hash as so_sha512;
@@ -20,6 +21,7 @@ assert_eq!(expects, sha256(b"hello").unwrap());
 ```
 */
 pub fn sha256(data: &[u8]) -> Result<Vec<u8>> {
+    init::check()?;
     Ok(so_sha256(data).0.to_vec())
 }
 
@@ -36,5 +38,6 @@ assert_eq!(expects, sha512(b"hello").unwrap());
 ```
 */
 pub fn sha512(data: &[u8]) -> Result<Vec<u8>> {
+    init::check()?;
     Ok(so_sha512(data).0.to_vec())
 }

@@ -5,4 +5,5 @@ authors = ["neonphog <neonphog@gmail.com>"]
 
 [dependencies]
 error-chain = "0.12"
+lazy_static = "1.0"
 sodiumoxide = "0.1"

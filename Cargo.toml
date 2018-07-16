@@ -4,7 +4,7 @@ members = [
   "libsodacrypt",
   "libsodacon",
   "lib3h",
-  "test_3_node_babble",
+  "examples/babble",
 ]
 
 [features]
