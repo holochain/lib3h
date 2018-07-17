@@ -12,7 +12,7 @@ struct StdNetListenCon {
 
 impl StdNetListenCon {
     fn new(socket: std::net::TcpListener) -> Self {
-        StdNetListenCon { socket: socket }
+        StdNetListenCon { socket }
     }
 }
 
@@ -57,11 +57,11 @@ impl StdNetNode {
     pub fn list_connected_nodes(&self) -> Vec<Vec<u8>> {
         let mut out: Vec<Vec<u8>> = Vec::new();
 
-        for ref con in self.client_cons.iter() {
+        for con in &self.client_cons {
             out.push(con.remote_node_id.clone());
         }
 
-        for (ref _key, ref con) in self.server_cons.iter() {
+        for con in self.server_cons.values() {
             out.push(con.remote_node_id.clone());
         }
 
@@ -71,15 +71,15 @@ impl StdNetNode {
     pub fn list_discoverable(&self) -> HashMap<Vec<u8>, Vec<Endpoint>> {
         let mut out: HashMap<Vec<u8>, Vec<Endpoint>> = HashMap::new();
 
-        for ref con in self.client_cons.iter() {
-            if con.remote_node_id.len() < 1 || con.remote_discover.len() < 1 {
+        for con in &self.client_cons {
+            if con.remote_node_id.is_empty() || con.remote_discover.is_empty() {
                 continue;
             }
             out.insert(con.remote_node_id.clone(), con.remote_discover.clone());
         }
 
-        for (ref _key, ref con) in self.server_cons.iter() {
-            if con.remote_node_id.len() < 1 || con.remote_discover.len() < 1 {
+        for con in self.server_cons.values() {
+            if con.remote_node_id.is_empty() || con.remote_discover.is_empty() {
                 continue;
             }
             out.insert(con.remote_node_id.clone(), con.remote_discover.clone());
@@ -89,13 +89,13 @@ impl StdNetNode {
     }
 
     pub fn send(&mut self, dest_node_id: &[u8], data: Vec<u8>) {
-        for ref mut con in self.client_cons.iter_mut() {
+        for con in &mut self.client_cons {
             if con.remote_node_id == dest_node_id {
                 con.user_message(data).unwrap();
                 return;
             }
         }
-        for (ref _key, ref mut con) in self.server_cons.iter_mut() {
+        for con in self.server_cons.values_mut() {
             if con.remote_node_id == dest_node_id {
                 con.user_message(data).unwrap();
                 return;
@@ -117,7 +117,7 @@ impl StdNetNode {
         let socket = match wrap_listen(endpoint) {
             Err(e) => {
                 self.events
-                    .push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
+                    .push(Event::OnServerEvent(ServerEvent::OnError(e)));
                 return;
             }
             Ok(s) => s,
@@ -137,7 +137,7 @@ impl StdNetNode {
         ) {
             Err(e) => {
                 self.events
-                    .push(Event::OnClientEvent(ClientEvent::OnError(e.into())));
+                    .push(Event::OnClientEvent(ClientEvent::OnError(e)));
                 return;
             }
             Ok(s) => s,
@@ -166,7 +166,7 @@ impl StdNetNode {
                         ) {
                             Err(e) => {
                                 self.events
-                                    .push(Event::OnServerEvent(ServerEvent::OnError(e.into())));
+                                    .push(Event::OnServerEvent(ServerEvent::OnError(e)));
                                 continue;
                             }
                             Ok(s) => s,
@@ -206,7 +206,7 @@ impl StdNetNode {
         for mut con in self.server_new_cons.drain(..) {
             let (con, mut events) = con.process_once();
             if let Some(con) = con {
-                if con.session_id.len() > 0 {
+                if !con.session_id.is_empty() {
                     let key = con.session_id.clone();
                     match new_cons_hash.entry(key) {
                         hash_map::Entry::Occupied(mut e) => {

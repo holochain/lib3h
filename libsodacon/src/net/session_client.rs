@@ -71,7 +71,10 @@ impl SessionClient {
             hex::encode(&session.eph_pub)
         );
 
-        socket.write(&req.generate())?;
+        let output = req.generate();
+        if output.len() != socket.write(&output)? {
+            panic!("incomplete write");
+        }
 
         session.cur_socket = Some(socket);
 
@@ -94,12 +97,14 @@ impl SessionClient {
 
         let out = message::compile(
             &self.session_id,
-            &vec![message::Message::PingReq(Box::new(ping_req))],
+            &[message::Message::PingReq(Box::new(ping_req))],
             http::RequestType::Request,
             &self.key_send,
         )?;
 
-        socket.write(&out)?;
+        if out.len() != socket.write(&out)? {
+            panic!("incomplete write");
+        }
 
         self.cur_socket = Some(socket);
 
@@ -113,12 +118,14 @@ impl SessionClient {
 
         let out = message::compile(
             &self.session_id,
-            &vec![message::Message::UserMessage(Box::new(msg))],
+            &[message::Message::UserMessage(Box::new(msg))],
             http::RequestType::Request,
             &self.key_send,
         )?;
 
-        socket.write(&out)?;
+        if out.len() != socket.write(&out)? {
+            panic!("incomplete write");
+        }
 
         self.cur_socket = Some(socket);
 
@@ -176,6 +183,8 @@ impl SessionClient {
 
     // -- private -- //
 
+    #[allow(unknown_lints)]
+    #[allow(needless_pass_by_value)]
     fn process_initial_handshake(
         mut self,
         mut events: Vec<Event>,
@@ -185,7 +194,7 @@ impl SessionClient {
             match wrap_parse_initial_handshake(&response.body, &self.eph_pub, &self.eph_priv) {
                 Ok(v) => v,
                 Err(e) => {
-                    events.push(Event::OnClientEvent(ClientEvent::OnError(e.into())));
+                    events.push(Event::OnClientEvent(ClientEvent::OnError(e)));
                     events.push(Event::OnClientEvent(ClientEvent::OnClose()));
                     return (None, events);
                 }
@@ -205,6 +214,8 @@ impl SessionClient {
         (Some(self), events)
     }
 
+    #[allow(unknown_lints)]
+    #[allow(needless_pass_by_value)]
     fn process_messages(
         mut self,
         mut events: Vec<Event>,
@@ -255,6 +266,8 @@ fn wrap_connect(endpoint: &Endpoint) -> Result<std::net::TcpStream> {
     Ok(socket)
 }
 
+#[allow(unknown_lints)]
+#[allow(type_complexity)]
 fn wrap_parse_initial_handshake(
     data: &[u8],
     eph_pub: &[u8],

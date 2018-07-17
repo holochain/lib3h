@@ -81,7 +81,7 @@ impl std::fmt::Debug for Request {
 impl Request {
     pub fn new(rtype: RequestType) -> Self {
         Request {
-            rtype: rtype,
+            rtype,
             method: String::from(""),
             path: String::from(""),
             code: String::from(""),
@@ -109,7 +109,7 @@ impl Request {
                 out.push(format!("HTTP/1.1 {} {}", self.code, self.status));
             }
         }
-        for (key, val) in self.headers.iter() {
+        for (key, val) in &self.headers {
             if key == &String::from("content-length") {
                 continue;
             }
@@ -119,7 +119,7 @@ impl Request {
                 val
             ));
         }
-        if self.body.len() > 0 {
+        if !self.body.is_empty() {
             out.push(format!("Content-Length: {}", self.body.len()));
         }
         let mut out = format!("{}\r\n\r\n", out.join("\r\n")).as_bytes().to_vec();

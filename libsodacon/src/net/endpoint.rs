@@ -11,7 +11,7 @@ impl Endpoint {
     pub fn new(addr: &str, port: u16) -> Self {
         Endpoint {
             addr: addr.to_string(),
-            port: port,
+            port,
         }
     }
 

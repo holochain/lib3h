@@ -69,9 +69,9 @@ impl Node {
             sodacon: node,
             events: Vec::new(),
             published_ready: false,
-            wait_listening: wait_listening,
-            wait_connecting: wait_connecting,
-            tried_connect: tried_connect,
+            wait_listening,
+            wait_connecting,
+            tried_connect,
             last_discovery: std::time::Instant::now(),
         }
     }
@@ -85,7 +85,7 @@ impl Node {
     }
 
     pub fn send(&mut self, dest_node_id: &[u8], data: Vec<u8>) {
-        let data = message::compile(message::Message::UserMessage(Box::new(
+        let data = message::compile(&message::Message::UserMessage(Box::new(
             message::UserMessage::new(data),
         ))).unwrap();
         self.sodacon.send(dest_node_id, data);
@@ -117,7 +117,7 @@ impl Node {
                         });
                     }
                     ServerEvent::OnDataReceived(node_id, data) => {
-                        self.handle_incoming_message(node_id, data);
+                        self.handle_incoming_message(node_id, &data);
                     }
                     _ => (),
                 },
@@ -128,7 +128,7 @@ impl Node {
                         });
                     }
                     ClientEvent::OnDataReceived(node_id, data) => {
-                        self.handle_incoming_message(node_id, data);
+                        self.handle_incoming_message(node_id, &data);
                     }
                     _ => (),
                 },
@@ -136,8 +136,8 @@ impl Node {
         }
 
         if !self.published_ready
-            && self.wait_listening.len() == 0
-            && self.wait_connecting.len() == 0
+            && self.wait_listening.is_empty()
+            && self.wait_connecting.is_empty()
         {
             self.published_ready = true;
             self.events.push(Event::OnReady);
@@ -154,7 +154,7 @@ impl Node {
         let discovery_map = self.sodacon.list_discoverable();
 
         for node_id in self.sodacon.list_connected_nodes() {
-            let data = message::compile(message::Message::DiscoveryReq(Box::new(
+            let data = message::compile(&message::Message::DiscoveryReq(Box::new(
                 message::DiscoveryReq::new(discovery_map.clone()),
             ))).unwrap();
             self.sodacon.send(&node_id, data);
@@ -163,10 +163,10 @@ impl Node {
         self.last_discovery = std::time::Instant::now();
     }
 
-    fn publish_discovery_response(&mut self, node_id: Vec<u8>) {
+    fn publish_discovery_response(&mut self, node_id: &[u8]) {
         let discovery_map = self.sodacon.list_discoverable();
 
-        let data = message::compile(message::Message::DiscoveryRes(Box::new(
+        let data = message::compile(&message::Message::DiscoveryRes(Box::new(
             message::DiscoveryRes::new(discovery_map),
         ))).unwrap();
         self.sodacon.send(&node_id, data);
@@ -175,12 +175,12 @@ impl Node {
     fn handle_discovery(&mut self, d: HashMap<Vec<u8>, Vec<Endpoint>>) {
         let connected = self.sodacon.list_connected_nodes();
         'top: for (node_id, discover_item) in d {
-            for c_node_id in connected.iter() {
+            for c_node_id in &connected {
                 if c_node_id == &node_id {
                     continue 'top;
                 }
             }
-            for c_endpoint in self.tried_connect.iter() {
+            for c_endpoint in &self.tried_connect {
                 if c_endpoint == &discover_item[0] {
                     continue 'top;
                 }
@@ -196,13 +196,13 @@ impl Node {
         }
     }
 
-    fn handle_incoming_message(&mut self, node_id: Vec<u8>, data: Vec<u8>) {
-        match message::parse(data).unwrap() {
+    fn handle_incoming_message(&mut self, node_id: Vec<u8>, data: &[u8]) {
+        match message::parse(&data).unwrap() {
             message::Message::UserMessage(m) => {
                 self.events.push(Event::OnData(node_id, m.data));
             }
             message::Message::DiscoveryReq(r) => {
-                self.publish_discovery_response(node_id);
+                self.publish_discovery_response(&node_id);
                 self.handle_discovery(r.discover);
             }
             message::Message::DiscoveryRes(r) => {
