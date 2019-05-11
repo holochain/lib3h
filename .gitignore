@@ -1,3 +1,11 @@
-
-/target
+Cargo.lock
+target
 **/*.rs.bk
+
+# Environment Cruft
+.idea
+.DS_Store
+.vs
+*~
+.\#*
+\#*\#

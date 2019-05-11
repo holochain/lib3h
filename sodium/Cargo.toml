@@ -1,0 +1,10 @@
+[package]
+name = "holochain_sodium"
+version = "0.0.1-alpha1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+
+[dependencies]
+holochain_logging = { path = "../logging" }
+rust_sodium = { git = "https://github.com/maidsafe/rust_sodium", rev = "34219d904f80702c57f28428bb2257b184829c87" }
+rust_sodium-sys = { git = "https://github.com/maidsafe/rust_sodium", rev = "34219d904f80702c57f28428bb2257b184829c87" }

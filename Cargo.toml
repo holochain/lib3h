@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+  "logging",
+  "sodium",
+  "lib3h_protocol",
+  "lib3h",
+]
