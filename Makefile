@@ -22,7 +22,7 @@ tools:
 		echo "# Makefile # incorrect rust toolchain version"; \
 		echo "# Makefile #    got:" ${RUST_VER_CUR}; \
 		echo "# Makefile #   want:" ${RUST_VER_WANT}; \
-		if which rustup >/dev/null; then \
+		if rustup --version >/dev/null; then \
 			echo "# Makefile # found rustup, setting override"; \
 			rustup override set ${RUST_TAG_WANT}; \
 			rustup component add rustfmt-preview; \
