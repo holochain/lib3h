@@ -5,3 +5,9 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
+log = "0.4.6"
+slog = "2.4.1"
+slog-term = "2.4.0"
+slog-async = "2.3.0"
+slog-scope = "4.1.1"
+chrono = "0.4.6"
