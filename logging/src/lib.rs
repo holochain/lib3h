@@ -1,3 +1,5 @@
+//! Implementation of an asynchronous logger for `lib3h`
+
 use chrono;
 pub use slog_async;
 pub use slog_scope::{crit, debug, error, info, trace, warn};
@@ -9,6 +11,9 @@ pub use slog::{slog_crit, slog_debug, slog_error, slog_info, slog_o, slog_trace,
 // pub struct Logger {
 //     _global_logger_guard: slog_scope::GlobalLoggerGuard,
 // }
+/// This struct is used as a wrapper around the `slog` crate for our customized logger.
+/// This has to be instantiate at the top of the user program in order to keep
+/// the logging thread alive.
 pub struct Logger(slog_scope::GlobalLoggerGuard);
 
 impl Logger {
@@ -16,6 +21,7 @@ impl Logger {
         Logger::term_logger()
     }
 
+    /// Log directly in the terminal.
     fn term_logger() -> Self {
         Self(slog_scope::set_global_logger(Logger::init_log()))
     }
