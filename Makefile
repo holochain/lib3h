@@ -20,10 +20,11 @@ clean:
 tools: tool_rust tool_fmt
 
 tool_rust:
-	@if [ "$$(rustc --version)" != ${RUST_VER_WANT} ]; then \
+	@if [ "$$(rustc --version 2>/dev/null || true)" != ${RUST_VER_WANT} ]; \
+	then \
 		echo "# Makefile # incorrect rust toolchain version"; \
 		echo "# Makefile #   want:" ${RUST_VER_WANT}; \
-		if rustup --version >/dev/null; then \
+		if rustup --version >/dev/null 2>&1; then \
 			echo "# Makefile # found rustup, setting override"; \
 			rustup override set ${RUST_TAG_WANT}; \
 		else \
@@ -37,7 +38,7 @@ tool_rust:
 tool_fmt: tool_rust
 	@if [ "$$(cargo fmt --version 2>/dev/null || true)" != ${FMT_VER_WANT} ]; \
 	then \
-		if rustup --version >/dev/null; then \
+		if rustup --version >/dev/null 2>&1; then \
 			echo "# Makefile # installing rustfmt with rustup"; \
 			rustup component add rustfmt-preview; \
 		else \
