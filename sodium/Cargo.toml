@@ -14,5 +14,5 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 lazy_static = "=1.2.0"
 libc = "=0.2.50"
-rust_sodium = { git = "https://github.com/maidsafe/rust_sodium", rev = "34219d904f80702c57f28428bb2257b184829c87" }
-rust_sodium-sys = { git = "https://github.com/maidsafe/rust_sodium", rev = "34219d904f80702c57f28428bb2257b184829c87" }
+rust_sodium = "=0.10.2"
+rust_sodium-sys = "=0.10.4"
