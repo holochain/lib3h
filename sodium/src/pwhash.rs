@@ -76,8 +76,8 @@ mod tests {
         random_salt.randomize();
         hash(
             &mut password,
-            OPSLIMIT_SENSITIVE,
-            MEMLIMIT_SENSITIVE,
+            OPSLIMIT_INTERACTIVE,
+            MEMLIMIT_INTERACTIVE,
             ALG_ARGON2ID13,
             &mut random_salt,
             &mut pw1_hash,
@@ -85,6 +85,7 @@ mod tests {
         .unwrap();
         assert_eq!(HASHBYTES, password.len());
     }
+
     #[test]
     fn it_should_generate_with_salt() {
         let mut password = SecBuf::with_secure(HASHBYTES);
@@ -97,16 +98,17 @@ mod tests {
         let mut salt = SecBuf::with_insecure(SALTBYTES);
         hash(
             &mut password,
-            OPSLIMIT_SENSITIVE,
-            MEMLIMIT_SENSITIVE,
+            OPSLIMIT_INTERACTIVE,
+            MEMLIMIT_INTERACTIVE,
             ALG_ARGON2ID13,
             &mut salt,
             &mut pw2_hash,
         )
         .unwrap();
         let pw2_hash = pw2_hash.read_lock();
-        assert_eq!("[84, 166, 168, 46, 130, 222, 122, 144, 123, 49, 206, 167, 35, 180, 246, 154, 25, 43, 218, 177, 95, 218, 12, 241, 234, 207, 230, 93, 127, 174, 221, 106]",  format!("{:?}", *pw2_hash));
+        assert_eq!("[243, 52, 246, 116, 155, 113, 127, 79, 150, 21, 250, 222, 215, 252, 119, 37, 34, 141, 76, 32, 99, 33, 241, 45, 187, 121, 83, 31, 108, 28, 160, 7]",  format!("{:?}", *pw2_hash));
     }
+
     #[test]
     fn it_should_generate_consistantly() {
         let mut password = SecBuf::with_secure(HASHBYTES);
@@ -117,8 +119,8 @@ mod tests {
         salt.randomize();
         hash(
             &mut password,
-            OPSLIMIT_SENSITIVE,
-            MEMLIMIT_SENSITIVE,
+            OPSLIMIT_INTERACTIVE,
+            MEMLIMIT_INTERACTIVE,
             ALG_ARGON2ID13,
             &mut salt,
             &mut pw1_hash,
@@ -126,8 +128,8 @@ mod tests {
         .unwrap();
         hash(
             &mut password,
-            OPSLIMIT_SENSITIVE,
-            MEMLIMIT_SENSITIVE,
+            OPSLIMIT_INTERACTIVE,
+            MEMLIMIT_INTERACTIVE,
             ALG_ARGON2ID13,
             &mut salt,
             &mut pw2_hash,
@@ -137,5 +139,4 @@ mod tests {
         let pw2_hash = pw2_hash.read_lock();
         assert_eq!(format!("{:?}", *pw1_hash), format!("{:?}", *pw2_hash));
     }
-
 }
