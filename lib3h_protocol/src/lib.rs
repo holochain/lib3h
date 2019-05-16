@@ -10,4 +10,3 @@ pub mod protocol;
 
 /// Opaque Address Bytes
 pub type Address = Vec<u8>;
-
