@@ -3,8 +3,17 @@ name = "holochain_sodium"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
+description = "holochain libsodium wrapper providing memory secure api access"
+keywords = ["NaCl", "libsodium", "cryptography"]
+categories = ["cryptography"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/holochain_sodium"
+repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
+lazy_static = "=1.2.0"
+libc = "=0.2.50"
 holochain_logging = { path = "../logging" }
 rust_sodium = { git = "https://github.com/maidsafe/rust_sodium", rev = "34219d904f80702c57f28428bb2257b184829c87" }
 rust_sodium-sys = { git = "https://github.com/maidsafe/rust_sodium", rev = "34219d904f80702c57f28428bb2257b184829c87" }
