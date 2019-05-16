@@ -1,4 +1,3 @@
-
 use crate::Address;
 
 /// Tuple holding all the info required for identifying a metadata.

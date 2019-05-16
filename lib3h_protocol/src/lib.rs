@@ -13,4 +13,3 @@ pub type Address = Vec<u8>;
 
 use failure::Error;
 pub type Lib3hResult<T> = Result<T, Error>;
-

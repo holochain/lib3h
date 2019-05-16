@@ -1,8 +1,4 @@
-
-use holochain_lib3h_protocol::{
-    Lib3hResult,
-    protocol::Lib3hProtocol,
-};
+use holochain_lib3h_protocol::{protocol::Lib3hProtocol, Lib3hResult};
 /// Common interface for all types of network modules to be used by the Lib3hWorker
 pub trait NetworkEngine {
     /// Start network communications

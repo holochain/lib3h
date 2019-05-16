@@ -1,16 +1,7 @@
+use std::sync::mpsc;
 
-use std::{
-    sync::mpsc,
-};
-
-use holochain_lib3h_protocol::{
-    Lib3hResult,
-    protocol::Lib3hProtocol,
-};
-use crate::{
-    network_engine::NetworkEngine,
-    p2p_protocol::P2pProtocol,
-};
+use crate::{network_engine::NetworkEngine, p2p_protocol::P2pProtocol};
+use holochain_lib3h_protocol::{protocol::Lib3hProtocol, Lib3hResult};
 
 /// Lib3h's 'mock mode' as a NetworkEngine
 pub struct MockEngine {
@@ -33,7 +24,11 @@ impl MockEngine {
     /// Received message from p2p network.
     /// -> Process it or forward to local client
     fn receive(&self, p2p_msg: P2pProtocol) -> Lib3hResult<()> {
-        println!("(log.d) <<<< '{}' p2p recv: {:?}", self.name.clone(), p2p_msg);
+        println!(
+            "(log.d) <<<< '{}' p2p recv: {:?}",
+            self.name.clone(),
+            p2p_msg
+        );
         // Note: use same order as the enum
         match p2p_msg {
             P2pProtocol::DirectMessage => {
@@ -49,7 +44,7 @@ impl MockEngine {
                 self.tx.send(Lib3hProtocol::SendDirectMessageResult(data))?;
             }
             _ => {
-                panic ! ("unexpected {:?}", &p2p_msg);
+                panic!("unexpected {:?}", &p2p_msg);
             }
         }
         Ok(())
