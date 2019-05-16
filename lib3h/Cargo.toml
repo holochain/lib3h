@@ -8,3 +8,6 @@ edition = "2018"
 holochain_logging = { path = "../logging" }
 holochain_lib3h_protocol = { path = "../lib3h_protocol" }
 holochain_sodium = { path = "../sodium" }
+serde = "=1.0.89"
+serde_derive = "=1.0.89"
+serde_json = { version = "=1.0.39", features = ["preserve_order"] }

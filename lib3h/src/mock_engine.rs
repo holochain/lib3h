@@ -1,16 +1,19 @@
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
-    convert::TryFrom,
-    sync::{mpsc, Mutex},
+    sync::mpsc,
 };
 
-use holochain_lib3h_protocol::protocol::Lib3hProtocol;
-use crate::network_engine::NetworkEngine;
-use p2p_protocol::P2pProtocol;
+use holochain_lib3h_protocol::{
+    Lib3hResult,
+    protocol::Lib3hProtocol,
+};
+use crate::{
+    network_engine::NetworkEngine,
+    p2p_protocol::P2pProtocol,
+};
 
 /// Lib3h's 'mock mode' as a NetworkEngine
-struct MockEngine {
+pub struct MockEngine {
     /// End-user's network config
     config: serde_json::Value,
     /// Sender to the Worker
@@ -20,30 +23,33 @@ struct MockEngine {
 }
 
 impl MockEngine {
-    pub fn new(config: serde_json::Value, tx: mpsc::Sender<Lib3hProtocol>) -> NetResult<Self> {
-        Ok(Lib3hMain {
+    pub fn new(config: serde_json::Value, tx: mpsc::Sender<Lib3hProtocol>) -> Lib3hResult<Self> {
+        Ok(MockEngine {
             config,
             tx,
-            name: "FIXME",
+            name: "FIXME".to_string(),
         })
     }
     /// Received message from p2p network.
     /// -> Process it or forward to local client
-    fn receive(&mut self, data: P2pProtocol) -> NetResult<()> {
-        println!("(log.d) <<<< '{}' p2p recv: {:?}", self.name.clone(), data);
-        // serve only JsonProtocol
-        let maybe_json_msg = Lib3hProtocol::try_from(&data);
-        if maybe_json_msg.is_err() {
-            return Ok(());
-        };
+    fn receive(&self, p2p_msg: P2pProtocol) -> Lib3hResult<()> {
+        println!("(log.d) <<<< '{}' p2p recv: {:?}", self.name.clone(), p2p_msg);
         // Note: use same order as the enum
-        match maybe_json_msg.as_ref().unwrap() {
-            Lib3hProtocol::SendMessageResult(msg) => {
+        match p2p_msg {
+            P2pProtocol::DirectMessage => {
                 // FIXME
-                self.tx.send(msg)?;
+                // For now just send something to local client
+                let data = holochain_lib3h_protocol::data_types::DirectMessageData {
+                    dna_address: vec![42],
+                    request_id: "FIXME".to_string(),
+                    to_agent_id: "FIXME".to_string(),
+                    from_agent_id: "FIXME".to_string(),
+                    content: vec![42],
+                };
+                self.tx.send(Lib3hProtocol::SendDirectMessageResult(data))?;
             }
             _ => {
-                panic ! ("unexpected {:?}", & maybe_json_msg);
+                panic ! ("unexpected {:?}", &p2p_msg);
             }
         }
         Ok(())
@@ -51,15 +57,15 @@ impl MockEngine {
 }
 
 impl NetworkEngine for MockEngine {
-    fn run(&mut self) -> NetResult<()> {
+    fn run(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
-    fn stop(&mut self) -> NetResult<()> {
+    fn stop(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
-    fn terminate(&mut self) -> NetResult<()> {
+    fn terminate(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
@@ -68,69 +74,64 @@ impl NetworkEngine for MockEngine {
     }
 
     /// process a message sent by our local Client
-    fn serve(&mut self, data: Lib3hProtocol) -> NetResult<()> {
-        println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), data);
-        // serve only JsonProtocol
-        let maybe_json_msg = JsonProtocol::try_from(&data);
-        if maybe_json_msg.is_err() {
-            return Ok(());
-        };
+    fn serve(&self, local_msg: Lib3hProtocol) -> Lib3hResult<()> {
+        println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), local_msg);
         // Note: use same order as the enum
-        match maybe_json_msg.as_ref().unwrap() {
-            Lib3hProtocol::SuccessResult(msg) => {
+        match local_msg {
+            Lib3hProtocol::SuccessResult(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::FailureResult(msg) => {
+            Lib3hProtocol::FailureResult(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::TrackDna(msg) => {
+            Lib3hProtocol::TrackDna(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::UntrackDna(msg) => {
+            Lib3hProtocol::UntrackDna(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::SendMessage(msg) => {
+            Lib3hProtocol::SendDirectMessage(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::HandleSendMessageResult(msg) => {
+            Lib3hProtocol::HandleSendDirectMessageResult(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::FetchEntry(msg) => {
+            Lib3hProtocol::FetchEntry(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::HandleFetchEntryResult(msg) => {
+            Lib3hProtocol::HandleFetchEntryResult(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::PublishEntry(msg) => {
+            Lib3hProtocol::PublishEntry(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::FetchMeta(msg) => {
+            Lib3hProtocol::FetchMeta(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::HandleFetchMetaResult(msg) => {
+            Lib3hProtocol::HandleFetchMetaResult(_msg) => {
                 // FIXME
             }
-            Lib3hProtocol::PublishMeta(msg) => {
+            Lib3hProtocol::PublishMeta(_msg) => {
                 // FIXME
             }
             // Our request for the publish_list has returned
-            Lib3hProtocol::HandleGetPublishingEntryListResult(msg) => {
+            Lib3hProtocol::HandleGetPublishingEntryListResult(_msg) => {
                 // FIXME
             }
             // Our request for the hold_list has returned
-            Lib3hProtocol::HandleGetHoldingEntryListResult(msg) => {
+            Lib3hProtocol::HandleGetHoldingEntryListResult(_msg) => {
                 // FIXME
             }
             // Our request for the publish_meta_list has returned
-            Lib3hProtocol::HandleGetPublishingMetaListResult(msg) => {
+            Lib3hProtocol::HandleGetPublishingMetaListResult(_msg) => {
                 // FIXME
             }
             // Our request for the hold_meta_list has returned
-            Lib3hProtocol::HandleGetHoldingMetaListResult(msg) => {
+            Lib3hProtocol::HandleGetHoldingMetaListResult(_msg) => {
                 // FIXME
             }
             _ => {
-                panic!("unexpected {:?}", &maybe_json_msg);
+                panic!("unexpected {:?}", &local_msg);
             }
         }
         Ok(())

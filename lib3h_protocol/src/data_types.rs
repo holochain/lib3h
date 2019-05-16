@@ -47,9 +47,9 @@ pub struct ConnectedData {
     pub request_id: String,
     /// MachineId of the first peer we are connected to
     pub machine_id: String,
-    /// TODO: Add network_id? Or let local client figure it out with the request_id?
-    /// TODO: Maybe add some info on network state?
-    /// pub peer_count: u32,
+    // TODO: Add network_id? Or let local client figure it out with the request_id?
+    // TODO: Maybe add some info on network state?
+    // pub peer_count: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

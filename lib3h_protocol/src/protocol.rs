@@ -90,3 +90,35 @@ pub enum Lib3hProtocol {
     HandleGetHoldingMetaList(GetListData),
     HandleGetHoldingMetaListResult(MetaListData),
 }
+
+///// Conversions
+//use std::convert::TryFrom;
+//impl<'a> TryFrom<&'a Protocol> for Lib3hProtocol {
+//    type Error = Error;
+//    fn try_from(p: &Protocol) -> Result<Self, Error> {
+//        if let Protocol::Json(json) = p {
+//            JsonProtocol::try_from(json).map_err(|e| format_err!("{:?}", e))
+//        } else {
+//            bail!("could not convert into JsonProtocol: {:?}", p);
+//        }
+//    }
+//}
+//
+//impl TryFrom<P2pProtocol> for Lib3hProtocol {
+//    type Error = Error;
+//    fn try_from(p: P2pProtocol) -> Result<Self, Error> {
+//        Lib3hProtocol::try_from(&p)
+//    }
+//}
+//
+//impl<'a> From<&'a Lib3hProtocol> for P2pProtocol {
+//    fn from(w: &Lib3hProtocol) -> Self {
+//        P2pProtocol::Lib3h(JsonString::from(w))
+//    }
+//}
+//
+//impl From<Lib3hProtocol> for P2pProtocol {
+//    fn from(w: Lib3hProtocol) -> Self {
+//        P2pProtocol::from(&w)
+//    }
+//}
