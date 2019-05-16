@@ -3,6 +3,13 @@ name = "holochain_sodium"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
+description = "holochain libsodium wrapper providing memory secure api access"
+keywords = ["NaCl", "libsodium", "cryptography"]
+categories = ["cryptography"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/holochain_sodium"
+repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 lazy_static = "=1.2.0"

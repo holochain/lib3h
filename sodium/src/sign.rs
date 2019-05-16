@@ -1,4 +1,28 @@
 //! This module provides access to libsodium
+//! # Example
+//!
+//! ```
+//! extern crate holochain_sodium;
+//! use holochain_sodium::{secbuf::SecBuf, sign::*};
+//!
+//! fn main() {
+//!     let mut seed = SecBuf::with_secure(32);
+//!     seed.randomize();
+//!
+//!     let mut public_key = SecBuf::with_insecure(PUBLICKEYBYTES);
+//!     let mut secret_key = SecBuf::with_secure(SECRETKEYBYTES);
+//!     seed_keypair(&mut public_key, &mut secret_key, &mut seed).unwrap();
+//!
+//!     let mut message = SecBuf::with_insecure(32);
+//!     message.randomize();
+//!
+//!     let mut signature = SecBuf::with_insecure(64);
+//!     sign(&mut message, &mut secret_key, &mut signature).unwrap();
+//!
+//!     assert!(verify(&mut signature, &mut message, &mut public_key));
+//! }
+//! ```
+
 use super::{check_init, secbuf::SecBuf};
 use crate::error::SodiumError;
 
