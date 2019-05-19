@@ -7,6 +7,7 @@ use holochain_lib3h_protocol::{
 };
 
 /// Struct holding all config settings for the RealEngine
+#[derive(Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {
     pub socket_type: String,
     pub bootstrap_nodes: Vec<String>,
