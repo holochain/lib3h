@@ -1,76 +1,43 @@
-use std::sync::mpsc;
+use std::collections::VecDeque;
 
-use crate::{network_engine::NetworkEngine, p2p_protocol::P2pProtocol};
-use holochain_lib3h_protocol::{protocol::Lib3hProtocol, Lib3hResult};
+use holochain_lib3h_protocol::{
+    network_engine::{DidWork, NetworkEngine},
+    protocol::Lib3hProtocol,
+    Lib3hResult,
+};
 
-/// Lib3h's 'mock mode' as a NetworkEngine
-pub struct MockEngine {
-    /// End-user's network config
-    config: serde_json::Value,
+/// Struct holding all config settings for the RealEngine
+pub struct RealEngineConfig {
+    pub socket_type: String,
+    pub bootstrap_nodes: Vec<String>,
+    pub work_dir: String,
+    pub log_level: char,
+}
+
+/// Lib3h's 'real mode' as a NetworkEngine
+pub struct RealEngine {
+    /// Config settings
+    config: RealEngineConfig,
     /// Sender to the Worker
-    tx: mpsc::Sender<Lib3hProtocol>,
+    inbox: VecDeque<Lib3hProtocol>,
     /// identifier
     name: String,
 }
 
-impl MockEngine {
-    pub fn new(config: serde_json::Value, tx: mpsc::Sender<Lib3hProtocol>) -> Lib3hResult<Self> {
-        Ok(MockEngine {
+impl RealEngine {
+    pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        Ok(RealEngine {
             config,
-            tx,
-            name: "FIXME".to_string(),
+            inbox: VecDeque::new(),
+            name: name.to_string(),
         })
-    }
-    /// Received message from p2p network.
-    /// -> Process it or forward to local client
-    fn receive(&self, p2p_msg: P2pProtocol) -> Lib3hResult<()> {
-        println!(
-            "(log.d) <<<< '{}' p2p recv: {:?}",
-            self.name.clone(),
-            p2p_msg
-        );
-        // Note: use same order as the enum
-        match p2p_msg {
-            P2pProtocol::DirectMessage => {
-                // FIXME
-                // For now just send something to local client
-                let data = holochain_lib3h_protocol::data_types::DirectMessageData {
-                    dna_address: vec![42],
-                    request_id: "FIXME".to_string(),
-                    to_agent_id: "FIXME".to_string(),
-                    from_agent_id: "FIXME".to_string(),
-                    content: vec![42],
-                };
-                self.tx.send(Lib3hProtocol::SendDirectMessageResult(data))?;
-            }
-            _ => {
-                panic!("unexpected {:?}", &p2p_msg);
-            }
-        }
-        Ok(())
-    }
-}
-
-impl NetworkEngine for MockEngine {
-    fn run(&self) -> Lib3hResult<()> {
-        // FIXME
-        Ok(())
-    }
-    fn stop(&self) -> Lib3hResult<()> {
-        // FIXME
-        Ok(())
-    }
-    fn terminate(&self) -> Lib3hResult<()> {
-        // FIXME
-        Ok(())
-    }
-    fn advertise(&self) -> String {
-        "FIXME".to_string()
     }
 
     /// process a message sent by our local Client
-    fn serve(&self, local_msg: Lib3hProtocol) -> Lib3hResult<()> {
+    fn serve(&self, local_msg: Lib3hProtocol) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
         println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), local_msg);
+        let mut outbox = Vec::new();
+        let mut did_work = false;
         // Note: use same order as the enum
         match local_msg {
             Lib3hProtocol::SuccessResult(_msg) => {
@@ -129,6 +96,47 @@ impl NetworkEngine for MockEngine {
                 panic!("unexpected {:?}", &local_msg);
             }
         }
+        Ok((did_work, outbox))
+    }
+}
+
+impl NetworkEngine for RealEngine {
+    fn run(&self) -> Lib3hResult<()> {
+        // FIXME
         Ok(())
+    }
+    fn stop(&self) -> Lib3hResult<()> {
+        // FIXME
+        Ok(())
+    }
+    fn terminate(&self) -> Lib3hResult<()> {
+        // FIXME
+        Ok(())
+    }
+    fn advertise(&self) -> String {
+        "FIXME".to_string()
+    }
+
+    fn post(&mut self, local_msg: Lib3hProtocol) -> Lib3hResult<()> {
+        self.inbox.push_back(local_msg);
+        Ok(())
+    }
+
+    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
+        let mut outbox = Vec::new();
+        let mut did_work = false;
+        // Progressively serve every protocol message in inbox
+        loop {
+            let local_msg = match self.inbox.pop_front() {
+                None => break,
+                Some(msg) => msg,
+            };
+            let (success, mut output) = self.serve(local_msg)?;
+            if success {
+                did_work = success;
+            }
+            outbox.append(&mut output);
+        }
+        Ok((did_work, outbox))
     }
 }
