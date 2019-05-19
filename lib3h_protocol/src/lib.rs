@@ -1,5 +1,3 @@
-#![feature(try_from)]
-
 //! This module provides the api definition for working with lib3h
 
 pub mod data_types;
