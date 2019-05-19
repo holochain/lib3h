@@ -1,6 +1,6 @@
 use crate::data_types::*;
 
-/// Enum holding all message types that serialize as json in the 'hc-core <-> P2P network module' protocol.
+/// Enum holding all message types in the 'hc-core <-> P2P network module' protocol.
 /// There are 4 categories of messages:
 ///  - Command: An order from the local node to the p2p module. Local node expects a reponse. Starts with a verb.
 ///  - Handle-command: An order from the p2p module to the local node. The p2p module expects a response. Start withs 'Handle' followed by a verb.
@@ -8,7 +8,7 @@ use crate::data_types::*;
 ///  - Notification: Notify that something happened. Not expecting any response. Ends with verb in past form, i.e. '-ed'.
 /// Fetch = Request between node and the network (other nodes)
 /// Get   = Request within a node between p2p module and core
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Lib3hProtocol {
     // -- Generic responses -- //
     /// Success response to a request (any Command with an `request_id` field.)

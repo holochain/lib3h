@@ -12,7 +12,7 @@ pub type MetaKey = (Address, String);
 // Generic responses
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResultData {
     pub request_id: String,
     pub dna_address: Address,
@@ -24,7 +24,7 @@ pub struct ResultData {
 // Connection
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConnectData {
     /// Identifier of this request
     pub request_id: String,
@@ -40,7 +40,7 @@ pub struct ConnectData {
     pub network_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
@@ -51,7 +51,7 @@ pub struct ConnectedData {
     // pub peer_count: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DisconnectedData {
     /// Specify to which network to connect to.
     /// Empty string for 'all'
@@ -62,7 +62,7 @@ pub struct DisconnectedData {
 // DNA tracking
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TrackDnaData {
     pub dna_address: Address,
     pub agent_id: String,
@@ -72,7 +72,7 @@ pub struct TrackDnaData {
 // Direct Messaging
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DirectMessageData {
     pub dna_address: Address,
     pub request_id: String,
@@ -86,7 +86,7 @@ pub struct DirectMessageData {
 //--------------------------------------------------------------------------------------------------
 
 /// Identifier of what entry (and its meta?) to drop
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DropEntryData {
     pub dna_address: Address,
     pub request_id: String,
@@ -94,7 +94,7 @@ pub struct DropEntryData {
 }
 
 /// Data Request from some other agent
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FetchEntryData {
     pub dna_address: Address,
     pub request_id: String,
@@ -103,7 +103,7 @@ pub struct FetchEntryData {
 }
 
 /// Generic DHT data message
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct EntryData {
     pub dna_address: Address,
     pub provider_agent_id: String,
@@ -112,7 +112,7 @@ pub struct EntryData {
 }
 
 /// DHT data response from a request
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct FetchEntryResultData {
     pub dna_address: Address,
     pub request_id: String,
@@ -127,7 +127,7 @@ pub struct FetchEntryResultData {
 //--------------------------------------------------------------------------------------------------
 
 /// Metadata Request from another agent
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FetchMetaData {
     pub dna_address: Address,
     pub request_id: String,
@@ -137,7 +137,7 @@ pub struct FetchMetaData {
 }
 
 /// Generic DHT metadata message
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DhtMetaData {
     pub dna_address: Address,
     pub provider_agent_id: String,
@@ -147,7 +147,7 @@ pub struct DhtMetaData {
     pub content_list: Vec<Vec<u8>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FetchMetaResultData {
     pub dna_address: Address,
     pub request_id: String,
@@ -161,7 +161,7 @@ pub struct FetchMetaResultData {
 }
 
 /// Drop some data request from own p2p-module
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DropMetaData {
     pub dna_address: Address,
     pub request_id: String,
@@ -173,20 +173,20 @@ pub struct DropMetaData {
 // Lists (publish & hold)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GetListData {
     pub dna_address: Address,
     pub request_id: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EntryListData {
     pub dna_address: Address,
     pub request_id: String,
     pub entry_address_list: Vec<Address>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MetaListData {
     pub dna_address: Address,
     pub request_id: String,

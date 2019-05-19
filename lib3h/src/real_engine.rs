@@ -18,13 +18,14 @@ pub struct RealEngineConfig {
 pub struct RealEngine {
     /// Config settings
     config: RealEngineConfig,
-    /// Sender to the Worker
+    /// FIFO of messages received from Core
     inbox: VecDeque<Lib3hProtocol>,
-    /// identifier
+    /// Identifier
     name: String,
 }
 
 impl RealEngine {
+    /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         Ok(RealEngine {
             config,
@@ -33,7 +34,7 @@ impl RealEngine {
         })
     }
 
-    /// process a message sent by our local Client
+    /// Process a message sent by Core
     fn serve(&self, local_msg: Lib3hProtocol) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
         println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), local_msg);
         let mut outbox = Vec::new();
@@ -117,11 +118,13 @@ impl NetworkEngine for RealEngine {
         "FIXME".to_string()
     }
 
+    /// Add incoming message in FIFO
     fn post(&mut self, local_msg: Lib3hProtocol) -> Lib3hResult<()> {
         self.inbox.push_back(local_msg);
         Ok(())
     }
 
+    /// Process FIFO and output a list of protocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
         let mut outbox = Vec::new();
         let mut did_work = false;
