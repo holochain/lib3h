@@ -1,7 +1,7 @@
 //! This module provides access to libsodium utility and memory functions
 
 use super::{check_init, secbuf::SecBuf};
-use crate::error::SodiumError;
+use holochain_lib3h_protocol::error::{sodium_error::SodiumError, Lib3hError};
 
 /// Check if length of buffer is of approprate size
 /// it should be either of size 8,16,32 or 64
@@ -48,11 +48,11 @@ impl SecBuf {
     }
 
     /// Load the [u8] into the SecBuf
-    pub fn from_array(&mut self, data: &[u8]) -> Result<(), SodiumError> {
+    pub fn from_array(&mut self, data: &[u8]) -> Result<(), Lib3hError> {
         if (data.len() != self.len()) {
-            return Err(SodiumError::Generic(
-                "Input does not have same size as SecBuf".to_string(),
-            ));
+            return Err(
+                SodiumError::Generic("Input does not have same size as SecBuf".to_string()).into(),
+            );
         }
         self.write(0, data)
     }
