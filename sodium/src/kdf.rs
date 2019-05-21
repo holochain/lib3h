@@ -1,7 +1,7 @@
 //! This module provides access to libsodium
 
 use super::{check_init, secbuf::SecBuf};
-use holochain_lib3h_protocol::error::{sodium_error::SodiumError, Lib3hError};
+use lib3h_crypto_api::CryptoError;
 
 pub const CONTEXTBYTES: usize = rust_sodium_sys::crypto_kdf_CONTEXTBYTES as usize;
 pub const MINBYTES: usize = rust_sodium_sys::crypto_kdf_BYTES_MIN as usize;
@@ -22,7 +22,7 @@ pub fn derive(
     index: u64,
     context: &mut SecBuf,
     parent: &mut SecBuf,
-) -> Result<(), Lib3hError> {
+) -> Result<(), CryptoError> {
     check_init();
     {
         let out = out.read_lock();
@@ -30,15 +30,15 @@ pub fn derive(
         let context = context.read_lock();
         let c = context.len();
         if o < MINBYTES || o > MAXBYTES {
-            return Err(
-                SodiumError::OutputLength(format!("Invalid 'out' Buffer length:{}", o)).into(),
-            );
+            return Err(CryptoError::OutputLength(format!(
+                "Invalid 'out' Buffer length:{}",
+                o
+            )));
         } else if c != CONTEXTBYTES {
-            return Err(SodiumError::OutputLength(format!(
+            return Err(CryptoError::OutputLength(format!(
                 "context must be a Buffer of length: {}.",
                 CONTEXTBYTES
-            ))
-            .into());
+            )));
         }
     }
     let mut out = out.write_lock();

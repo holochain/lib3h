@@ -1,25 +1,25 @@
-//! Lib3h API SodiumError Enum
+//! Lib3h Crypto API CryptoError module
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SodiumError {
+pub enum CryptoError {
     Generic(String),
     OutputLength(String),
     OutOfMemory,
 }
 
-impl SodiumError {
+impl CryptoError {
     pub fn new(msg: &str) -> Self {
-        SodiumError::Generic(msg.to_string())
+        CryptoError::Generic(msg.to_string())
     }
 }
 
-impl std::error::Error for SodiumError {
-    fn description<'a>(&'a self) -> &'a str {
-        "SodiumError"
+impl std::error::Error for CryptoError {
+    fn description(&self) -> &str {
+        "CryptoError"
     }
 }
 
-impl std::fmt::Display for SodiumError {
+impl std::fmt::Display for CryptoError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -33,12 +33,12 @@ mod tests {
     fn it_should_display_types() {
         assert_eq!(
             "Generic(\"bla\")",
-            &format!("{}", SodiumError::Generic("bla".to_string()))
+            &format!("{}", CryptoError::Generic("bla".to_string()))
         );
         assert_eq!(
             "OutputLength(\"bla\")",
-            &format!("{}", SodiumError::OutputLength("bla".to_string()))
+            &format!("{}", CryptoError::OutputLength("bla".to_string()))
         );
-        assert_eq!("OutOfMemory", &format!("{}", SodiumError::OutOfMemory));
+        assert_eq!("OutOfMemory", &format!("{}", CryptoError::OutOfMemory));
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use holochain_lib3h_protocol::{
+use lib3h_protocol::{
     network_engine::{DidWork, NetworkEngine},
     protocol::Lib3hProtocol,
     Lib3hResult,

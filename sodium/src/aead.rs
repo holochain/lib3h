@@ -1,7 +1,7 @@
 //! This module provides access to libsodium
 
 use super::{check_init, secbuf::SecBuf};
-use holochain_lib3h_protocol::error::Lib3hError;
+use lib3h_crypto_api::CryptoError;
 
 /// Used to set the size of nonce var in the enc fns
 pub const NONCEBYTES: usize =
@@ -28,7 +28,7 @@ pub fn enc(
     adata: Option<&mut SecBuf>,
     nonce: &mut SecBuf,
     cipher: &mut SecBuf,
-) -> Result<(), Lib3hError> {
+) -> Result<(), CryptoError> {
     check_init();
     let my_adata_locker;
     let mut my_adata = std::ptr::null();
@@ -78,7 +78,7 @@ pub fn dec(
     adata: Option<&mut SecBuf>,
     nonce: &mut SecBuf,
     cipher: &mut SecBuf,
-) -> Result<(), Lib3hError> {
+) -> Result<(), CryptoError> {
     check_init();
     let my_adata_locker;
     let mut my_adata = std::ptr::null();

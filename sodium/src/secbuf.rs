@@ -4,7 +4,7 @@ use libc::c_void;
 use std::ops::{Deref, DerefMut};
 
 use super::check_init;
-use holochain_lib3h_protocol::error::{sodium_error::SodiumError, Lib3hError};
+use lib3h_crypto_api::CryptoError;
 
 /// a trait for structures that can be used as a backing store for SecBuf
 pub trait Bufferable: Send {
@@ -260,9 +260,9 @@ impl SecBuf {
     }
 
     /// helper for writing data to our internal buffer
-    pub fn write(&mut self, offset: usize, data: &[u8]) -> Result<(), Lib3hError> {
+    pub fn write(&mut self, offset: usize, data: &[u8]) -> Result<(), CryptoError> {
         if offset + data.len() > self.len() {
-            return Err(SodiumError::new("SecBuf write overflow").into());
+            return Err(CryptoError::new("SecBuf write overflow"));
         }
         unsafe {
             let mut b = self.write_lock();
