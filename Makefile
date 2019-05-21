@@ -16,7 +16,7 @@ test: tools
 		-A clippy::nursery -A clippy::style -A clippy::cargo \
 		-A clippy::pedantic -A clippy::restriction \
 		-D clippy::complexity -D clippy::perf -D clippy::correctness
-	RUST_BACKTRACE=1 cargo test
+	RUSTFLAGS=$(RUSTFLAGS) RUST_BACKTRACE=1 cargo test
 
 fmt: tools
 	cargo fmt
