@@ -1,0 +1,14 @@
+version: 2
+
+jobs:
+ # must be called build for local circle cli to work
+ # is actually unit tests
+ build:
+  docker:
+    - image: rust:1.34.2-slim-stretch
+  resource_class: small
+  working_directory: ~/repo
+  steps:
+    - run: apt-get update && apt-get install -y --no-install-recommends git make pkg-config libssl-dev
+    - checkout
+    - run: make test

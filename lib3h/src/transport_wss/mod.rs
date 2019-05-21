@@ -36,7 +36,7 @@ enum WssStreamState<T: Read + Write + std::fmt::Debug> {
     TlsMidHandshake(TlsMidHandshake<T>),
     TlsReady(TlsStream<T>),
     WssMidHandshake(WssMidHandshake<T>),
-    Ready(WssStream<T>),
+    Ready(Box<WssStream<T>>),
 }
 
 /// how often should we send a heartbeat if we have not received msgs
@@ -357,7 +357,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
                 self.event_queue.push(TransportEvent::Connect(id.clone()));
-                Ok(WssStreamState::Ready(socket))
+                Ok(WssStreamState::Ready(Box::new(socket)))
             }
         }
     }
