@@ -7,5 +7,6 @@ pub mod protocol;
 /// Opaque Address Bytes
 pub type Address = Vec<u8>;
 
+/// TODO: To replace with our own custom Error handling
 use failure::Error;
 pub type Lib3hResult<T> = Result<T, Error>;
