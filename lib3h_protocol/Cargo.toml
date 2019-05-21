@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 holochain_logging = { path = "../logging" }
+failure = "=0.1.5"
