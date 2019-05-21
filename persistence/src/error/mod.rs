@@ -27,7 +27,7 @@ use std::{
 /// and back to the Holochain Instance via wasm memory.
 /// Follows the Error + ErrorKind pattern
 /// Holds extra debugging info for indicating where in code ther error occured.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq, Hash)]
 pub struct CoreError {
     pub kind: HolochainError,
     pub file: String,
@@ -53,6 +53,19 @@ impl CoreError {
     }
 }
 
+impl ::std::convert::TryFrom<ZomeApiInternalResult> for CoreError {
+    type Error = HolochainError;
+    fn try_from(zome_api_internal_result: ZomeApiInternalResult) -> Result<Self, Self::Error> {
+        if zome_api_internal_result.ok {
+            Err(HolochainError::ErrorGeneric(
+                "Attempted to deserialize CoreError from a non-error ZomeApiInternalResult".into(),
+            ))
+        } else {
+            CoreError::try_from(JsonString::from_json(&zome_api_internal_result.error))
+        }
+    }
+}
+
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -70,7 +83,7 @@ impl fmt::Display for CoreError {
 /// TODO rename to CoreErrorKind
 /// Enum holding all Holochain Core errors
 #[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord,
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, DefaultJson, Hash, PartialOrd, Ord,
 )]
 pub enum HolochainError {
     ErrorGeneric(String),
@@ -207,7 +220,7 @@ impl From<hcid::HcidError> for HolochainError {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug, DefaultJson)]
 pub struct ZomeApiInternalResult {
     pub ok: bool,
     pub value: String,

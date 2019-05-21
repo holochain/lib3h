@@ -24,8 +24,9 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate regex;
 extern crate snowflake;
+#[macro_use]
+extern crate regex;
 #[cfg(test)]
 #[macro_use]
 extern crate maplit;
@@ -41,6 +42,7 @@ extern crate objekt;
 pub mod bits_n_pieces;
 pub mod hash;
 pub mod json;
+pub mod signature;
 pub mod time;
 
 pub const GIT_HASH: &str = env!(

@@ -12,7 +12,7 @@ use std::{convert::TryFrom, fmt};
 
 // HashString newtype for String
 #[derive(
-    PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
+    PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, DefaultJson, Default, Hash,
 )]
 pub struct HashString(String);
 
@@ -132,7 +132,7 @@ pub mod tests {
     #[test]
     /// known hash for a serializable something
     fn can_serialize_to_b58_hash() {
-        #[derive(Serialize, Deserialize, Debug)]
+        #[derive(Serialize, Deserialize, Debug, DefaultJson)]
         struct Foo {
             foo: u8,
         };

@@ -4,6 +4,7 @@ members = [
   "logging",
   "sodium",
   "persistence",
+  "persistence_derive",
   "lib3h_protocol",
   "lib3h",
 ]

@@ -3,13 +3,14 @@
 
 use chrono::{offset::FixedOffset, DateTime, TimeZone};
 use error::HolochainError;
+use json::JsonString;
 use regex::Regex;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr, time::Duration};
 
 /// Represents a timeout for an HDK function. The usize interface defaults to ms.  Also convertible
 /// to/from a Duration at full precision.
-#[derive(Clone, Deserialize, Debug, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq, Hash, Serialize, DefaultJson)]
 pub struct Timeout(usize);
 
 impl Timeout {
@@ -49,7 +50,7 @@ impl From<usize> for Timeout {
 /// h/hr/hour, m/min/minute, s/sec/second, ms/millis/millisecond, u/μ/micros/microsecond,
 /// n/nanos/nanosecond, singlular or plural.  The humantime and parse_duration crates are complex,
 /// incompatible with each other, depend on crates and/or do not compile to WASM.
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, DefaultJson)]
 pub struct Period(Duration);
 
 /// Serialization w/ serde_json to/from String.  This means that a timestamp will be deserialized to
@@ -372,7 +373,7 @@ impl From<&Period> for Duration {
 ///    Debug:   Iso8601(2018-10-11T03:23:38+00:00)
 ///
 /// More info on the relevant [wikipedia article](https://en.wikipedia.org/wiki/ISO_8601).
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, DefaultJson)]
 pub struct Iso8601(DateTime<FixedOffset>);
 
 /// Infallible conversions into and from an Iso8601.  The only infallible way to create an Iso8601

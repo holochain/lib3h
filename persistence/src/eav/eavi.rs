@@ -4,8 +4,9 @@
 //! See [wikipedia](https://en.wikipedia.org/wiki/Entity%E2%80%93attribute%E2%80%93value_model) to learn more about this pattern.
 
 use crate::{
-    cas::content::{Address, AddressableContent, Content, ExampleAddressableContent},
+    cas::content::{Address, AddressableContent, Content},
     error::{HcResult, HolochainError},
+    json::JsonString,
 };
 use chrono::offset::Utc;
 use eav::{
@@ -26,7 +27,7 @@ pub type Entity = Address;
 
 /// All Attribute values are pre-defined here. If ever a user-defined Attribute is needed,
 /// just add a new Custom variant for it with a String parameter
-#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
 #[serde(rename_all = "snake_case")]
 pub enum Attribute {
     CrudStatus,
@@ -138,7 +139,7 @@ pub type Index = i64;
 // type Source ...
 /// The basic struct for EntityAttributeValue triple, implemented as AddressableContent
 /// including the necessary serialization inherited.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
 pub struct EntityAttributeValueIndex {
     entity: Entity,
     attribute: Attribute,
@@ -237,15 +238,40 @@ impl EntityAttributeValueIndex {
     }
 }
 
-
-pub fn test_entry_a() -> ExampleAddressableContent {
-
-    ExampleAddressableContent
-        { content: String::from("abc") }
-
+#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson)]
+pub struct ExampleEntry {
+    pub data: String,
 }
 
-pub fn test_eav_entity() -> Entry {
+impl AddressableContent for ExampleEntry {
+    fn address(&self) -> Address {
+        Address::from(self.data)
+    }
+
+    fn content(&self) -> Content {
+        self.into()
+    }
+
+    fn try_from_content(content: &Content) -> HcResult<ExampleEntry> {
+        ExampleEntry::try_from(content.to_owned())
+    }
+}
+
+impl ExampleEntry {
+    pub fn new(data: String) -> Self {
+        Self { data }
+    }
+}
+
+pub fn test_entry_a() -> ExampleEntry {
+    ExampleEntry::new("a")
+}
+
+pub fn test_entry_b() -> ExampleEntry {
+    ExampleEntry::new("b")
+}
+
+pub fn test_eav_entity() -> ExampleEntry {
     test_entry_a()
 }
 
@@ -253,7 +279,7 @@ pub fn test_eav_attribute() -> Attribute {
     Attribute::LinkTag("foo-attribute".into())
 }
 
-pub fn test_eav_value() -> Entry {
+pub fn test_eav_value() -> ExampleEntry {
     test_entry_b()
 }
 
@@ -365,11 +391,11 @@ pub mod tests {
     fn example_eav_round_trip() {
         let eav_storage = test_eav_storage();
         let entity =
-            ExampleAddressableContent::try_from_content(String::from("foo"))
+            ExampleAddressableContent::try_from_content(&JsonString::from(RawString::from("foo")))
                 .unwrap();
         let attribute = "favourite-color".to_string();
         let value =
-            ExampleAddressableContent::try_from_content(String::from("blue"))
+            ExampleAddressableContent::try_from_content(&JsonString::from(RawString::from("blue")))
                 .unwrap();
 
         EavTestSuite::test_round_trip(eav_storage, entity, attribute, value)
