@@ -5,11 +5,10 @@ jobs:
  # is actually unit tests
  build:
   docker:
-   - image: holochain/holochain-rust:latest
+    - image: rust:1.34.2-slim-stretch
   resource_class: small
   working_directory: ~/repo
   steps:
-   - checkout
-   - run: nix-shell -p git --run 'git clone https://github.com/holochain/holochain-rust.git'
-   - run: nix-shell holochain-rust/default.nix --run 'cargo install rustfmt-nightly --vers 1.0.1'
-   - run: nix-shell holochain-rust/default.nix --run 'make test'
+    - run: apt-get update && apt-get install -y --no-install-recommends git make pkg-config libssl-dev
+    - checkout
+    - run: make test

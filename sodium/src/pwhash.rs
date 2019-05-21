@@ -53,7 +53,7 @@ pub fn hash(
             raw_ptr_char_immut!(salt),
             ops_limit as libc::c_ulonglong,
             mem_limit,
-            alg as libc::c_int,
+            libc::c_int::from(alg),
         )
     };
     match res {
