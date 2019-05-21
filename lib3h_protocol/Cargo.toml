@@ -5,6 +5,4 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 
 [dependencies]
-serde = "=1.0.89"
-serde_derive = "=1.0.89"
 failure = "=0.1.5"

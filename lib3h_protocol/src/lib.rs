@@ -1,9 +1,5 @@
 //! This module provides the api definition for working with lib3h
 
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-
 pub mod data_types;
 pub mod network_engine;
 pub mod protocol;

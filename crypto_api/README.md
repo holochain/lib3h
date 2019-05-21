@@ -1,4 +1,4 @@
-# holochain_crypto_api
+# lib3h_crypto_api
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,7 +9,7 @@
 
 ## Overview
 
-Holochain abstract cryptography traits and data types.
+Lib3h abstract cryptography traits and data types.
 
 ## Contribute
 
