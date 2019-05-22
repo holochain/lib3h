@@ -1,4 +1,4 @@
-use crate::{protocol::Lib3hProtocol, Lib3hResult};
+use crate::{protocol::Lib3hProtocol, DidWork, Lib3hResult};
 
 /// Common interface for all types of network modules to be used by the Lib3hWorker
 pub trait NetworkEngine {

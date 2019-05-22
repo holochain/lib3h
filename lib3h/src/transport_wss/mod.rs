@@ -3,12 +3,11 @@
 
 mod tcp;
 
-use std::io::{Read, Write};
-
 use crate::transport::{
-    DidWork, Transport, TransportError, TransportEvent, TransportId, TransportIdRef,
-    TransportResult,
+    Transport, TransportError, TransportEvent, TransportId, TransportIdRef, TransportResult,
 };
+use holochain_lib3h_protocol::DidWork;
+use std::io::{Read, Write};
 
 // -- some internal types for readability -- //
 
@@ -142,7 +141,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
 
     /// this should be called frequently on the event loop
     /// looks for incoming messages or processes ping/pong/close events etc
-    fn poll(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+    fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let did_work = self.priv_process_stream_sockets()?;
 
         Ok((did_work, self.event_queue.drain(..).collect()))
@@ -187,7 +186,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
         let mut out = Vec::new();
         let start = std::time::Instant::now();
         while (start.elapsed().as_millis() as usize) < DEFAULT_HEARTBEAT_WAIT_MS {
-            let (_did_work, evt_lst) = self.poll()?;
+            let (_did_work, evt_lst) = self.process()?;
             for evt in evt_lst {
                 match evt {
                     TransportEvent::Connect(id) => {

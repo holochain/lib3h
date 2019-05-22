@@ -2,16 +2,15 @@
 
 mod error;
 
+use holochain_lib3h_protocol::DidWork;
+
 /// a connection identifier
 pub type TransportId = String;
 pub type TransportIdRef = str;
 
 pub use self::error::{TransportError, TransportResult};
 
-/// type name for a bool indicating if work was done during a `poll()`
-pub type DidWork = bool;
-
-/// events that can be generated during a connection `poll()`
+/// events that can be generated during a connection `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportEvent {
     TransportError(TransportId, TransportError),
@@ -35,7 +34,7 @@ pub trait Transport {
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>>;
 
     /// do some work... this should be called very frequently on an event loop
-    fn poll(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)>;
+    fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)>;
 
     /// send a payload to remote nodes
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()>;

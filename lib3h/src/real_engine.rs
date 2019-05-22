@@ -1,24 +1,12 @@
-use std::collections::{VecDeque, HashMap};
+#![allow(non_snake_case)]
+
+use std::collections::{HashMap, VecDeque};
 
 use holochain_lib3h_protocol::{
-    network_engine::NetworkEngine,
-    DidWork, Address,
-    protocol::Lib3hProtocol,
-    Lib3hResult,
+    network_engine::NetworkEngine, protocol::Lib3hProtocol, Address, DidWork, Lib3hResult,
 };
 
-use crate::{
-    dht::{
-        dht_trait::Dht,
-        rrdht::rrdht,
-        dht_event::DhtEvent,
-    },
-    p2p::{
-        p2p_trait::P2p,
-        p2p_event::P2pEvent,
-        p2p_hackmode::P2pHackmode,
-    },
-};
+use crate::p2p::{p2p_event::P2pEvent, p2p_hackmode::P2pHackmode, p2p_trait::P2p};
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Debug, Clone, PartialEq)]
@@ -37,9 +25,10 @@ pub struct RealEngine {
     inbox: VecDeque<Lib3hProtocol>,
     /// Identifier
     name: String,
-    // FIXME,
+    /// P2p interface for the transport layer,
     transport_p2p: Box<P2p>,
-    dna_dht_map: HashMap<Address, Box<P2p>>,
+    /// Map of P2p interface per tracked DNA
+    dna_p2p_map: HashMap<Address, Box<P2p>>,
 }
 
 impl RealEngine {
@@ -50,7 +39,7 @@ impl RealEngine {
             inbox: VecDeque::new(),
             name: name.to_string(),
             transport_p2p: Box::new(P2pHackmode::new()),
-            dna_dht_map: HashMap::new(),
+            dna_p2p_map: HashMap::new(),
         })
     }
 }
@@ -92,18 +81,8 @@ impl NetworkEngine for RealEngine {
             }
         }
         // Process all dna dhts
-        for (dna, mut dht_p2p) in self.dna_dht_map {
-            let (did_work, p2p_event_list) = dht_p2p.process()?;
-            if did_work {
-                for evt in p2p_event_list {
-                    let protocol_output = self.serve_P2pEvent(evt)?;
-                    // Add protocol messages output to self's inbox
-                    for msg in protocol_output {
-                        self.post(msg)?;
-                    }
-                }
-            }
-        }
+        self.process_dna_p2p()?;
+
         // Process all received Lib3hProtocol messages
         let mut outbox = Vec::new();
         let mut did_work = false;
@@ -125,9 +104,32 @@ impl NetworkEngine for RealEngine {
 }
 
 impl RealEngine {
+    fn process_dna_p2p(&mut self) -> Lib3hResult<()> {
+        // Process all dna P2ps and store 'generated' P2pEvents.
+        let mut p2p_events = Vec::new();
+        for (_dna_address, mut dna_p2p) in self.dna_p2p_map.iter_mut() {
+            let (did_work, mut p2p_event_list) = dna_p2p.process()?;
+            if did_work {
+                p2p_events.append(&mut p2p_event_list);
+            }
+        }
+        // Serve all new P2pEvents
+        for evt in p2p_events {
+            let protocol_output = self.serve_P2pEvent(evt)?;
+            // Add protocol messages output to self's inbox
+            for msg in protocol_output {
+                self.post(msg)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Process a Lib3hProtocol message sent to us (by Core)
     /// Return a list of Lib3hProtocol messages to send to others?
-    fn serve_Lib3hProtocol(&self, local_msg: Lib3hProtocol) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
+    fn serve_Lib3hProtocol(
+        &self,
+        local_msg: Lib3hProtocol,
+    ) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
         println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), local_msg);
         let mut outbox = Vec::new();
         let mut did_work = false;
@@ -200,16 +202,16 @@ impl RealEngine {
         match evt {
             P2pEvent::HandleRequest(_data) => {
                 // FIXME
-            },
+            }
             P2pEvent::HandlePublish(_data) => {
                 // FIXME
-            },
+            }
             P2pEvent::PeerConnected(_peer_address) => {
                 // FIXME
-            },
+            }
             P2pEvent::PeerDisconnected(_peer_address) => {
                 // FIXME
-            },
+            }
         };
         Ok(outbox)
     }

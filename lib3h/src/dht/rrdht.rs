@@ -1,12 +1,12 @@
-use holochain_lib3h_protocol::{Lib3hResult, Address, DidWork};
+use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
 
 use crate::dht::{
+    dht_event::{DhtEvent, PeerHoldRequestData},
     dht_trait::Dht,
-    dht_event::{
-        DhtEvent, PeerHoldRequestData,
-    }
 };
 
+/// RoundAndRound DHT implementation
+#[allow(non_camel_case_types)]
 pub struct rrdht {}
 
 impl rrdht {
@@ -16,38 +16,42 @@ impl rrdht {
 }
 
 impl Dht for rrdht {
-    fn init(&self, backend: String/*FIXME*/) -> Lib3hResult<()> {
-        // FIXME
-        Ok(())
-    }
+    // -- Getters -- //
 
     fn this_peer(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
 
-    fn get_peer(&self, peer_address: String) -> Option<PeerHoldRequestData> {
+    // -- Peer -- //
+
+    fn get_peer(&self, _peer_address: String) -> Option<PeerHoldRequestData> {
         // FIXME
         None
     }
-    fn fetch_peer(&self, peer_address: String) -> Option<PeerHoldRequestData> {
+    fn fetch_peer(&self, _peer_address: String) -> Option<PeerHoldRequestData> {
         // FIXME
         None
     }
-    fn drop_peer(&self, peer_address: String) -> Lib3hResult<()> {
+    fn drop_peer(&self, _peer_address: String) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
-    fn get_data(&self, data_address: Address) -> Lib3hResult<Vec<u8>> {
+
+    // -- Data -- //
+
+    fn get_data(&self, _data_address: Address) -> Lib3hResult<Vec<u8>> {
         // FIXME
         Ok(vec![])
     }
-    fn fetch_data(&self, data_address: Address) -> Lib3hResult<Vec<u8>> {
+    fn fetch_data(&self, _data_address: Address) -> Lib3hResult<Vec<u8>> {
         // FIXME
         Ok(vec![])
     }
 
-    fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
+    // -- Processing -- //
+
+    fn post(&mut self, _evt: DhtEvent) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }

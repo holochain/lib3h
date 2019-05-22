@@ -1,27 +1,20 @@
-use std::collections::VecDeque;
-use holochain_lib3h_protocol::{Lib3hResult, Address, DidWork};
-use crate::{
-    dht::{
-        dht_trait::Dht,
-        rrdht::rrdht,
-        dht_event::DhtEvent,
-    },
-    p2p::{
-        p2p_trait::P2p,
-        p2p_event::P2pEvent,
-    },
-};
+#![allow(non_snake_case)]
 
-// tmp
-use crate::transport::*;
+use crate::{
+    dht::{dht_event::DhtEvent, dht_trait::Dht, rrdht::rrdht},
+    p2p::{p2p_event::P2pEvent, p2p_trait::P2p},
+    transport::{Transport, TransportEvent},
+    transport_wss::TransportWss,
+};
+use holochain_lib3h_protocol::{DidWork, Lib3hResult};
+use std::collections::VecDeque;
 
 pub struct P2pHackmode {
     transport_connection: TransportWss<std::net::TcpStream>,
     dht: Box<Dht>,
-    /// FIFO of messages received from ???
+    /// FIFO of P2pEvents received from the transport_connection
     inbox: VecDeque<P2pEvent>,
 }
-
 
 impl P2pHackmode {
     pub fn new() -> Self {
@@ -33,12 +26,10 @@ impl P2pHackmode {
     }
 }
 
-
 impl P2p for P2pHackmode {
-    fn init(&self) {
-        // FIXME
-    }
-    fn id(&self) -> Address {
+    // -- Getters -- //
+
+    fn id(&self) -> String {
         // FIXME
         "FIXME".to_string()
     }
@@ -47,26 +38,30 @@ impl P2p for P2pHackmode {
         "FIXME".to_string()
     }
 
-    fn transportConnect(&self, ipc_uri: String) -> Lib3hResult<()> {
+    // -- Lifecycle -- //
+
+    fn connect(&mut self, ipc_uri: String) -> Lib3hResult<()> {
         // FIXME
-        let transport_id = self.transport_connection.wait_connect(&ipc_uri)?;
+        let _transport_id = self.transport_connection.wait_connect(&ipc_uri)?;
         Ok(())
     }
-    fn close(&self, _peer: Address) -> Lib3hResult<()> {
+    fn close(&self, _peer: String) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
 
-    fn publish_reliable(&self, _peerList: Vec<Address>, _data: Vec<u8>) -> Lib3hResult<()> {
+    // -- Comms -- //
+
+    fn publish_reliable(&self, _peer_list: Vec<String>, _data: Vec<u8>) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
-    fn publish_unreliable(&self, _peerList: Vec<Address>, _data: Vec<u8>) -> Lib3hResult<()> {
+    fn publish_unreliable(&self, _peer_list: Vec<String>, _data: Vec<u8>) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
 
-    fn request_reliable(&self, _peerList: Vec<Address>, _data: Vec<u8>) -> Lib3hResult<()> {
+    fn request_reliable(&self, _peer_list: Vec<String>, _data: Vec<u8>) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
@@ -75,6 +70,8 @@ impl P2p for P2pHackmode {
         Ok(())
     }
 
+    // -- Processing -- //
+
     fn post(&mut self, evt: P2pEvent) -> Lib3hResult<()> {
         self.inbox.push_back(evt);
         Ok(())
@@ -82,7 +79,7 @@ impl P2p for P2pHackmode {
 
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pEvent>)> {
         // Process the transport connection
-        let (did_work, transport_event_list) = self.transport_connection.poll()?;
+        let (did_work, transport_event_list) = self.transport_connection.process()?;
         if did_work {
             for evt in transport_event_list {
                 let p2p_output = self.serve_TransportEvent(evt)?;
@@ -104,9 +101,17 @@ impl P2p for P2pHackmode {
             }
         }
         // Process the P2pEvents
+        let (did_work, outbox) = self.process_inbox()?;
+        // Done
+        Ok((did_work, outbox))
+    }
+}
+
+impl P2pHackmode {
+    /// Progressively serve every event received in inbox
+    fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<P2pEvent>)> {
         let mut outbox = Vec::new();
         let mut did_work = false;
-        // Progressively serve every event received in inbox
         loop {
             let evt = match self.inbox.pop_front() {
                 None => break,
@@ -120,9 +125,7 @@ impl P2p for P2pHackmode {
         }
         Ok((did_work, outbox))
     }
-}
 
-impl P2pHackmode {
     /// Process a P2pEvent sent to us.
     /// Return a list of P2pEvents to send to others.
     fn serve_P2pEvent(&self, evt: P2pEvent) -> Lib3hResult<(DidWork, Vec<P2pEvent>)> {
@@ -133,82 +136,82 @@ impl P2pHackmode {
         match evt {
             P2pEvent::HandleRequest(_data) => {
                 // FIXME
-            },
+            }
             P2pEvent::HandlePublish(_data) => {
                 // FIXME
-            },
+            }
             P2pEvent::PeerConnected(_peer_address) => {
                 // FIXME
-            },
+            }
             P2pEvent::PeerDisconnected(_peer_address) => {
                 // FIXME
-            },
+            }
         };
         Ok((did_work, outbox))
     }
 
-    /// Serve a transportEvent sent to us
-    /// Return a list of P2pEvent to send to owner?
+    /// Serve a transportEvent sent to us.
+    /// Return a list of P2pEvents for us to process.
     // FIXME
     fn serve_TransportEvent(&mut self, evt: TransportEvent) -> Lib3hResult<Vec<P2pEvent>> {
         let mut outbox = Vec::new();
         match evt {
-            TransportEvent::TransportError(_id, e) => {
+            TransportEvent::TransportError(id, _e) => {
                 // FIXME
                 //self.log.e(&format!("ipc ws error {:?}", e));
-                self.transport_connection.close(self.transport_id.clone())?;
-                self.transport_id = self.transport_connection.wait_connect(&self.ipc_uri)?;
+                self.transport_connection.close(id)?;
+                //let _transport_id = self.transport_connection.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::Connect(_id) => {
                 // FIXME
                 // don't need to do anything here
             }
-            TransportEvent::Close(_id) => {
+            TransportEvent::Close(id) => {
                 // FIXME
                 //self.log.e("ipc ws closed");
-                self.transport_connection.close(self.transport_id.clone())?;
-                self.transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
+                self.transport_connection.close(id)?;
+                //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
-            TransportEvent::Message(_id, msg) => {
+            TransportEvent::Message(_id, _msg) => {
                 // FIXME
             }
         };
         Ok(outbox)
     }
 
-    /// Serve a DhtEvent sent to us
-    /// Return a list of P2pEvent to send to owner?
+    /// Serve a DhtEvent sent to us.
+    /// Return a list of P2pEvents for us to process.
     // FIXME
     fn serve_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<Vec<P2pEvent>> {
         let mut outbox = Vec::new();
         match evt {
-            DhtEvent::remoteGossipBundle(_data) => {
+            DhtEvent::RemoteGossipBundle(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::GossipTo(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::UnreliableGossipTo(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::PeerHoldRequest(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::PeerTimedOut(_peer_address) => {
                 // FIXME
-            },
+            }
             DhtEvent::DataHoldRequest(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::DataFetch(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::DataFetchResponse(_data) => {
                 // FIXME
-            },
+            }
             DhtEvent::DataPrune(_peer_address) => {
                 // FIXME
-            },
+            }
         }
         Ok(outbox)
     }

@@ -1,8 +1,10 @@
+use holochain_lib3h_protocol::Address;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtEvent {
     /// We have received a gossip bundle from a remote peer,
     /// pass it along to the dht backend for processing
-    remoteGossipBundle(RemoteGossipBundleData),
+    RemoteGossipBundle(RemoteGossipBundleData),
     /// Instructs implementors to send this binary gossip bundle
     /// to the specified list of peerAddress' in a reliable manner.
     GossipTo(GossipToData),
@@ -31,7 +33,6 @@ pub enum DhtEvent {
     /// locally. Implementors should purge this hash from storage,
     /// but that can, of course, choose not to.
     DataPrune(String),
-
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -57,15 +58,16 @@ pub struct PeerHoldRequestData {
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataHoldRequestData {
     pub data_list: Vec<Vec<u8>>,
-    pub dataAddress: Address,
+    pub data_address: Address,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataFetchData {
     pub msg_id: String,
-    pub dataAddress: Address,
+    pub data_address: Address,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct DataFetchResponseData {
     pub msg_id: String,
     pub data_list: Vec<Vec<u8>>,

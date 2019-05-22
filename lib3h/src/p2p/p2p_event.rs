@@ -1,3 +1,4 @@
+/// Events received or emitted by the P2p trait
 #[derive(Debug, PartialEq, Clone)]
 pub enum P2pEvent {
     HandleRequest(HandleRequestData),
