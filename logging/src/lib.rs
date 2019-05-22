@@ -17,12 +17,12 @@ pub use slog::{slog_crit, slog_debug, slog_error, slog_info, slog_o, slog_trace,
 pub struct Logger(slog_scope::GlobalLoggerGuard);
 
 impl Logger {
-    pub fn new() -> Self {
-        Logger::term_logger()
+    pub fn init() -> Self {
+        Logger::init_terminal_logger()
     }
 
     /// Log directly in the terminal.
-    fn term_logger() -> Self {
+    fn init_terminal_logger() -> Self {
         Self(slog_scope::set_global_logger(Logger::init_log()))
     }
 
@@ -38,6 +38,7 @@ impl Logger {
     fn init_log() -> slog::Logger {
         let decorator = slog_term::TermDecorator::new().build();
         let drain = slog_term::CompactFormat::new(decorator)
+        // let drain = slog_term::FullFormat::new(decorator)
             .use_custom_timestamp(Logger::custom_timestamp_local)
             .build()
             .fuse();
@@ -48,7 +49,7 @@ impl Logger {
 
 impl Default for Logger {
     fn default() -> Self {
-        Self::new()
+        Self::init()
     }
 }
 
@@ -69,7 +70,7 @@ mod tests {
 
     #[test]
     fn init_log_test() {
-        let _guard = Logger::new();
+        let _guard = Logger::init();
 
         trace!("logging a trace message");
         debug!("debug values"; "x" => 1, "y" => -1);

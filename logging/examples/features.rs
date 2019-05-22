@@ -1,7 +1,7 @@
 use holochain_logging::{prelude::*, Logger};
 
 pub fn main() {
-    let _guard = Logger::new();
+    let _guard = Logger::init();
 
     trace!("logging a trace message");
     debug!("debug values"; "x" => 1, "y" => -1);
