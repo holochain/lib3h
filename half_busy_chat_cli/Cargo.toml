@@ -1,0 +1,20 @@
+[package]
+name = "lib3h_half_busy_chat_cli"
+version = "0.0.1-alpha1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+description = "lib3h simulation test framework"
+keywords = ["NaCl", "libsodium", "cryptography"]
+categories = ["cryptography"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_half_busy_chat"
+repository = "https://github.com/holochain/lib3h"
+
+[dependencies]
+lib3h_half_busy_chat = { path = "../half_busy_chat", version = "=0.0.1-alpha1" }
+linefeed = "=0.6.0"
+
+[[bin]]
+name = "lib3h_half_busy_chat_cli"
+path = "src/main.rs"
