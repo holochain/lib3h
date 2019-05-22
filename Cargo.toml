@@ -5,4 +5,6 @@ members = [
   "sodium",
   "lib3h_protocol",
   "lib3h",
+  "half_busy_chat",
+  "half_busy_chat_cli",
 ]
