@@ -7,3 +7,6 @@ edition = "2018"
 [dependencies]
 lib3h_protocol = { path = "../lib3h_protocol" }
 lib3h_sodium = { path = "../sodium" }
+tungstenite = "=0.6.1"
+url = "=1.7.2"
+native-tls = "=0.2.2"
