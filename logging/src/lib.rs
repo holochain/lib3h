@@ -43,6 +43,8 @@ impl Logger {
 
     /// Initializes our log facility by setting it as async with the correct timestamp format.
     fn init_log() -> slog::Logger {
+        // Logging to `FullFormat` drain is thread-safe, since every
+        // line of output is formatted indecently.
         let decorator = slog_term::TermDecorator::new().build();
         let drain = slog_term::FullFormat::new(decorator)
             .use_custom_timestamp(Logger::custom_timestamp_local)
