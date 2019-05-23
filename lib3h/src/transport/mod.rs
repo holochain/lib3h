@@ -33,12 +33,12 @@ pub trait Transport {
     /// get a list of all open transport ids
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>>;
 
-    /// do some work... this should be called very frequently on an event loop
-    fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)>;
-
     /// send a payload to remote nodes
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()>;
 
     /// send a payload to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;
+
+    /// Poll TransportEvents received from the transport / network
+    fn poll(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)>;
 }

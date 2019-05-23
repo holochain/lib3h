@@ -51,8 +51,7 @@ pub struct GossipToData {
 pub struct PeerHoldRequestData {
     pub peer_address: String,
     pub transport: String,
-    pub data: Vec<u8>,
-    pub timestamp: String,
+    pub timestamp: u64,
 }
 
 #[derive(Debug, PartialEq, Clone)]

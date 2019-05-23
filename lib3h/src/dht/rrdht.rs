@@ -1,21 +1,25 @@
-use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
-
 use crate::dht::{
     dht_event::{DhtEvent, PeerHoldRequestData},
     dht_trait::Dht,
 };
+use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
+use std::collections::VecDeque;
 
 /// RoundAndRound DHT implementation
-#[allow(non_camel_case_types)]
-pub struct rrdht {}
+pub struct RrDht {
+    /// FIFO of DhtEvents send to us
+    inbox: VecDeque<DhtEvent>,
+}
 
-impl rrdht {
+impl RrDht {
     pub fn new() -> Self {
-        rrdht {}
+        RrDht {
+            inbox: VecDeque::new(),
+        }
     }
 }
 
-impl Dht for rrdht {
+impl Dht for RrDht {
     // -- Getters -- //
 
     fn this_peer(&self) -> Lib3hResult<()> {
