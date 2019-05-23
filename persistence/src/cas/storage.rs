@@ -15,10 +15,8 @@ use crate::{
 use objekt;
 use std::{
     collections::{BTreeSet, HashMap},
-    convert::TryFrom,
     fmt::Debug,
-    sync::{mpsc::channel, Arc, RwLock},
-    thread,
+    sync::{Arc, RwLock},
 };
 use uuid::Uuid;
 

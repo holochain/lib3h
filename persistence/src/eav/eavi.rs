@@ -245,7 +245,7 @@ pub struct ExampleEntry {
 
 impl AddressableContent for ExampleEntry {
     fn address(&self) -> Address {
-        Address::from(self.data)
+        Address::from(self.data.clone())
     }
 
     fn content(&self) -> Content {

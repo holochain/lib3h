@@ -12,7 +12,7 @@
 #![feature(never_type)]
 #![warn(unused_extern_crates)]
 
-extern crate base64;
+//extern crate base64;
 extern crate chrono;
 extern crate futures;
 #[macro_use]
@@ -20,21 +20,21 @@ extern crate lazy_static;
 extern crate multihash;
 extern crate rust_base58;
 extern crate serde;
-#[macro_use]
+//#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate holochain_persistence_derive;
-extern crate snowflake;
-#[macro_use]
+//extern crate snowflake;
+//#[macro_use]
 extern crate regex;
 #[cfg(test)]
 #[macro_use]
 extern crate maplit;
-extern crate hcid;
+//extern crate hcid;
 extern crate uuid;
-extern crate wasmi;
+//extern crate wasmi;
 
 pub mod cas;
 pub mod eav;
