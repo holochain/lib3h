@@ -264,11 +264,11 @@ impl ExampleEntry {
 }
 
 pub fn test_entry_a() -> ExampleEntry {
-    ExampleEntry::new("a")
+    ExampleEntry::new(String::from("a"))
 }
 
 pub fn test_entry_b() -> ExampleEntry {
-    ExampleEntry::new("b")
+    ExampleEntry::new(String::from("b"))
 }
 
 pub fn test_eav_entity() -> ExampleEntry {
