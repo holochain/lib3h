@@ -8,10 +8,7 @@ pub use slog_term;
 use slog::Drain;
 pub use slog::{slog_crit, slog_debug, slog_error, slog_info, slog_o, slog_trace, slog_warn};
 
-use std::{
-    fs::OpenOptions,
-    path::PathBuf,
-};
+use std::{fs::OpenOptions, path::PathBuf};
 
 /// This struct is used as a wrapper around the `slog` crate for our customized logger.
 /// This has to be instantiate at the top of the user program in order to keep
@@ -30,7 +27,9 @@ impl Logger {
 
     /// Initializes the file logging capabilities.
     pub fn init_file_logger(log_file: &str) -> Self {
-        Self(slog_scope::set_global_logger(Logger::init_log_to_file(log_file)))
+        Self(slog_scope::set_global_logger(Logger::init_log_to_file(
+            log_file,
+        )))
     }
 
     /// Set a custom pretty timestamp format for the logging part.
@@ -56,17 +55,20 @@ impl Logger {
 
     /// Dump all our asynchronous logging to a file.
     fn init_log_to_file(log_file: &str) -> slog::Logger {
-
         // Using PathBuf here should prevent trouble between Windows & Unix
         // file path handling.
         let log_file_path = PathBuf::from(log_file);
         let log_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(&log_file_path)
-                .expect(&format!("Fail to create/open log file: '{:?}", &log_file_path));
-        let decorator = slog_term::PlainSyncDecorator::new(log_file);
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&log_file_path)
+            .expect(&format!(
+                "Fail to create/open log file: '{:?}",
+                &log_file_path
+            ));
+        // let decorator = slog_term::PlainSyncDecorator::new(log_file);
+        let decorator = slog_term::PlainDecorator::new(log_file);
         let drain = slog_term::FullFormat::new(decorator)
             .use_custom_timestamp(Logger::custom_timestamp_local)
             .build()
@@ -120,7 +122,9 @@ mod tests {
 
         let tmp_file = NamedTempFile::new().expect("Fail to create temporary file.");
         let tmp_file_path = tmp_file.into_temp_path();
-        let tmp_file_path = tmp_file_path.to_str().expect("Fail to convert 'PathBuf' to 'String'.");
+        let tmp_file_path = tmp_file_path
+            .to_str()
+            .expect("Fail to convert 'PathBuf' to 'String'.");
 
         // We need to wrap this in its own block to force flush
         {
@@ -135,18 +139,21 @@ mod tests {
                 .write(false)
                 .create(false)
                 .open(&file_path)
-                .expect(&format!("Fail to open temporary file: '{:?}", &tmp_file_path));
+                .expect(&format!(
+                    "Fail to open temporary file: '{:?}",
+                    &tmp_file_path
+                ));
 
             // Seek to start of the temporary log file
             file.seek(SeekFrom::Start(0)).unwrap();
             let mut buf = String::new();
-            file.read_to_string(&mut buf).expect("Fail to read temporary file to string.");
+            file.read_to_string(&mut buf)
+                .expect("Fail to read temporary file to string.");
 
             assert!(
                 buf.len() >= dumped_log_string.len(),
                 "We should have more characters in the log file than in the sentence we compare to it");
-            let s = &buf[buf.len()-1-dumped_log_string.len()..buf.len()-1];
-            println!(">> line = {:?}", &s);
+            let s = (&buf[buf.len() - 1 - dumped_log_string.len()..buf.len()]).trim();
 
             assert_eq!(dumped_log_string, s)
         }
