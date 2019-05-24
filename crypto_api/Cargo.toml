@@ -1,0 +1,16 @@
+[package]
+name = "lib3h_crypto_api"
+version = "0.0.1-alpha1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+description = "lib3h abstract cryptography traits and data types"
+keywords = ["holochain", "holo", "cryptography"]
+categories = ["cryptography"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_crypto_api"
+repository = "https://github.com/holochain/lib3h"
+
+[dependencies]
+serde = "=1.0.89"
+serde_derive = "=1.0.89"

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use holochain_lib3h_protocol::{
+use lib3h_protocol::{
     network_engine::{DidWork, NetworkEngine},
     protocol::Lib3hProtocol,
     Lib3hResult,
@@ -18,7 +18,7 @@ pub struct RealEngineConfig {
 /// Lib3h's 'real mode' as a NetworkEngine
 pub struct RealEngine {
     /// Config settings
-    config: RealEngineConfig,
+    _config: RealEngineConfig,
     /// FIFO of messages received from Core
     inbox: VecDeque<Lib3hProtocol>,
     /// Identifier
@@ -29,7 +29,7 @@ impl RealEngine {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         Ok(RealEngine {
-            config,
+            _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
         })
@@ -38,8 +38,8 @@ impl RealEngine {
     /// Process a message sent by Core
     fn serve(&self, local_msg: Lib3hProtocol) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
         println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), local_msg);
-        let mut outbox = Vec::new();
-        let mut did_work = false;
+        let outbox = Vec::new();
+        let did_work = false;
         // Note: use same order as the enum
         match local_msg {
             Lib3hProtocol::SuccessResult(_msg) => {
