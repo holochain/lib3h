@@ -1,12 +1,12 @@
-use holochain_logging::{prelude::*, Logger};
+use holochain_logging::{prelude::*, Lib3hLogger};
+// use holochain_logging::Lib3hLogger;
 
 pub fn main() {
-    let _guard = Logger::init();
+    let _guard = Lib3hLogger::init();
 
     trace!("logging a trace message");
-    debug!("debug values"; "x" => 1, "y" => -1);
-    info!("some interesting info"; "where" => "right here");
-    warn!("be cautious!"; "why" => "you never know...");
-    error!("wrong {}", "foobar"; "type" => "unknown");
-    crit!("abandoning test");
+    debug!("debug values = {}", 42);
+    info!("some interesting info");
+    warn!("be cautious!");
+    error!("wrong {} here", "stuff");
 }
