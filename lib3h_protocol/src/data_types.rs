@@ -1,12 +1,33 @@
 use crate::Address;
 
-/// Tuple holding all the info required for identifying a metadata.
-/// (entry_address, attribute, content)
-/// TODO: Figure out if we keep this
-pub type MetaTuple = (Address, String, Vec<u8>);
-/// (entry_address, attribute)
-/// TODO: Figure out if we keep this
-pub type MetaKey = (Address, String);
+/// Tuple holding all the info required for identifying an Aspect.
+/// (entry_address, content hash)
+pub type AspectKey = (Address, Address);
+
+//--------------------------------------------------------------------------------------------------
+// Semi-opaque Holochain Entry
+//--------------------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EntryAspectKind {
+    Content, // the actual entry content
+    Header,  // the header for the entry
+    Meta,    // could be EntryWithHeader for links
+    ValidationResult,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntryAspect {
+    pub kind: EntryAspectKind,
+    pub publish_ts: u64,
+    pub data: String, // opaque, but in core would be EntryWithHeader for both Entry and Meta
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntryData {
+    pub aspect_list: Vec<EntryAspect>,
+    pub entry_address: Address,
+}
 
 //--------------------------------------------------------------------------------------------------
 // Generic responses
@@ -85,13 +106,12 @@ pub struct DirectMessageData {
 // DHT Entry
 //--------------------------------------------------------------------------------------------------
 
-/// Entry data message
-#[derive(Debug, Clone, PartialEq, Default)]
+/// Wrapped Entry message
+#[derive(Debug, Clone, PartialEq)]
 pub struct ClaimedEntryData {
     pub dna_address: Address,
     pub provider_agent_id: Address,
-    pub entry_address: Address,
-    pub entry_content: Vec<u8>,
+    pub entry: EntryData,
 }
 
 /// Entry hodled message
@@ -113,7 +133,7 @@ pub struct FetchEntryData {
 }
 
 /// DHT data response from a request
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FetchEntryResultData {
     pub request_id: String,
     pub requester_agent_id: Address,
@@ -126,60 +146,6 @@ pub struct DropEntryData {
     pub dna_address: Address,
     pub request_id: String,
     pub entry_address: Address,
-}
-
-//--------------------------------------------------------------------------------------------------
-// DHT Meta
-//--------------------------------------------------------------------------------------------------
-
-/// DHT Meta message
-#[derive(Debug, Clone, PartialEq)]
-pub struct DhtMetaData {
-    pub dna_address: Address,
-    pub provider_agent_id: Address,
-    pub entry_address: Address,
-    pub attribute: String,
-    pub meta_content: Vec<u8>,
-}
-
-/// Meta hodled message
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct MetaStoredData {
-    pub dna_address: Address,
-    pub provider_agent_id: Address,
-    pub entry_address: Address,
-    pub holder_agent_id: Address,
-    pub attribute: String,
-    pub meta_address: Address,
-}
-
-/// Metadata Request from another agent
-#[derive(Debug, Clone, PartialEq)]
-pub struct FetchMetaData {
-    pub dna_address: Address,
-    pub request_id: String,
-    pub requester_agent_id: Address,
-    pub entry_address: Address,
-    pub attribute: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct FetchMetaResultData {
-    pub request_id: String,
-    pub requester_agent_id: Address,
-    pub dna_address: Address,
-    pub provider_agent_id: Address,
-    pub entry_address: Address,
-    pub attribute: String,
-    pub meta_content_list: Vec<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DropMetaData {
-    pub dna_address: Address,
-    pub request_id: String,
-    pub entry_address: Address,
-    pub attribute: String,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -197,34 +163,4 @@ pub struct EntryListData {
     pub dna_address: Address,
     pub request_id: String,
     pub entry_address_list: Vec<Address>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MetaListData {
-    pub dna_address: Address,
-    pub request_id: String,
-    // List of meta identifiers, a pair: (entry_address, attribute, hashed_content)
-    pub meta_list: Vec<MetaTuple>,
-}
-
-//--------------------------------------------------------------------------------------------------
-// Refactor
-//--------------------------------------------------------------------------------------------------
-
-pub enum EntryAspectKind {
-    Content, // the actual entry content
-    Header,  // the header for the entry
-    Meta,    // could be EntryWithHeader for links
-    ValidationResult,
-}
-
-pub struct EntryAspect {
-    pub kind: EntryAspectKind,
-    pub publish_ts: u64,
-    pub data: String, // opaque, but in core would be EntryWithHeader for both Entry and Meta
-}
-
-pub struct EntryData {
-    pub aspect_list: Vec<EntryAspect>,
-    pub entry_address: Address,
 }
