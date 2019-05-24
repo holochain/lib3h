@@ -7,6 +7,7 @@ use crate::transport::{
 use holochain_lib3h_protocol::DidWork;
 use std::collections::VecDeque;
 
+/// Transport used for the DNA P2pGateway
 pub struct TransportDna {
     inbox: VecDeque<TransportCommand>,
 }
