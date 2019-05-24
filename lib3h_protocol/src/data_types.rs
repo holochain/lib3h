@@ -87,7 +87,7 @@ pub struct DirectMessageData {
 
 /// Entry data message
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct EntryData {
+pub struct ClaimedEntryData {
     pub dna_address: Address,
     pub provider_agent_id: Address,
     pub entry_address: Address,
@@ -117,7 +117,7 @@ pub struct FetchEntryData {
 pub struct FetchEntryResultData {
     pub request_id: String,
     pub requester_agent_id: Address,
-    pub entry: EntryData,
+    pub entry: ClaimedEntryData,
 }
 
 /// Identifier of what entry (and its meta?) to drop
@@ -205,4 +205,26 @@ pub struct MetaListData {
     pub request_id: String,
     // List of meta identifiers, a pair: (entry_address, attribute, hashed_content)
     pub meta_list: Vec<MetaTuple>,
+}
+
+//--------------------------------------------------------------------------------------------------
+// Refactor
+//--------------------------------------------------------------------------------------------------
+
+pub enum EntryAspectKind {
+    Content, // the actual entry content
+    Header,  // the header for the entry
+    Meta,    // could be EntryWithHeader for links
+    ValidationResult,
+}
+
+pub struct EntryAspect {
+    pub kind: EntryAspectKind,
+    pub publish_ts: u64,
+    pub data: String, // opaque, but in core would be EntryWithHeader for both Entry and Meta
+}
+
+pub struct EntryData {
+    pub aspect_list: Vec<EntryAspect>,
+    pub entry_address: Address,
 }

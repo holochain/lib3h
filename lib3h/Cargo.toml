@@ -11,3 +11,4 @@ holochain_sodium = { path = "../sodium" }
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 native-tls = "=0.2.2"
+failure = "=0.1.5"

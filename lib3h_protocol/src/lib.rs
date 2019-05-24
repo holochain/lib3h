@@ -2,7 +2,8 @@
 
 pub mod data_types;
 pub mod network_engine;
-pub mod protocol;
+pub mod protocol_client;
+pub mod protocol_server;
 
 /// Opaque Address Bytes
 pub type Address = Vec<u8>;

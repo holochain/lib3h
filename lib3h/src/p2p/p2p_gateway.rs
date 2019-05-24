@@ -7,7 +7,13 @@ use crate::{
         rrdht::RrDht,
     },
     p2p::p2p_protocol::P2pProtocol,
-    transport::{Transport, TransportEvent, TransportId, TransportIdRef, TransportResult},
+    transport::{
+        error::TransportResult,
+        protocol::{TransportCommand, TransportEvent},
+        transport_trait::Transport,
+        TransportId, TransportIdRef,
+    },
+    transport_dna::TransportDna,
     transport_wss::TransportWss,
 };
 use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
@@ -16,16 +22,22 @@ use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
 /// Enables Connections to many other nodes.
 /// Tracks distributed data for that P2P network.
 pub struct P2pGateway {
-    transport_connection: TransportWss<std::net::TcpStream>,
+    transport: Box<Transport>,
     dht: Box<Dht>,
 }
 
 /// Public interface
 impl P2pGateway {
     /// Constructor
-    pub fn new() -> Self {
+    pub fn new(is_dna: bool) -> Self {
+        let transport: Box<Transport> = if is_dna {
+            Box::new(TransportDna::new())
+        //Box::new(TransportWss::with_std_tcp_stream())
+        } else {
+            Box::new(TransportWss::with_std_tcp_stream())
+        };
         P2pGateway {
-            transport_connection: TransportWss::with_std_tcp_stream(),
+            transport,
             dht: Box::new(RrDht::new()),
         }
     }
@@ -80,49 +92,52 @@ impl Dht for P2pGateway {
 /// Compose Transport
 impl Transport for P2pGateway {
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        self.transport_connection.transport_id_list()
+        // self.transport_connection.transport_id_list()
+        Ok(vec![])
     }
 
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
-        self.transport_connection.wait_connect(&uri)
+        self.transport.connect(&uri)
     }
     fn close(&mut self, id: TransportId) -> TransportResult<()> {
-        self.transport_connection.close(id)
+        self.transport.close(id)
     }
 
     fn close_all(&mut self) -> TransportResult<()> {
-        self.transport_connection.close_all()
+        self.transport.close_all()
     }
 
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
-        self.transport_connection.send(id_list, payload)
+        self.transport.send(id_list, payload)
     }
 
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        self.transport_connection.send_all(payload)
+        self.transport.send_all(payload)
     }
 
-    fn poll(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        Ok(self.transport_connection.poll()?)
+    fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
+        self.transport.post(command)
+    }
+
+    fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+        self.transport.process()
     }
 }
 
 /// Public - specific
 impl P2pGateway {
-    pub fn process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
+    pub fn do_process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
         let mut outbox = Vec::new();
         // Process the transport connection
-        let (did_work, transport_event_list) = self.poll()?;
+        let (did_work, event_list) = self.transport.process()?;
         if did_work {
-            for evt in transport_event_list {
-                let (did_work, mut p2p_output) = self.serve_TransportEvent(&evt)?;
+            for evt in event_list {
+                let mut p2p_output = self.serve_TransportEvent(&evt)?;
                 // Add p2p events to outbox
-                if did_work {
-                    outbox.append(&mut p2p_output);
-                }
+                outbox.append(&mut p2p_output);
             }
         }
-        // Process the transport dht
+        // Process the dht
         let (did_work, dht_event_list) = self.dht.process()?;
         if did_work {
             for evt in dht_event_list {
@@ -142,34 +157,65 @@ impl P2pGateway {
 impl P2pGateway {
     /// Process a transportEvent.
     /// Return a list of P2pProtocol messages to send to others.
-    fn serve_TransportEvent(
-        &mut self,
-        evt: &TransportEvent,
-    ) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
+    fn serve_TransportEvent(&mut self, evt: &TransportEvent) -> Lib3hResult<Vec<P2pProtocol>> {
         println!("(log.d) >>> '(TransportGateway)' recv: {:?}", evt);
-        let mut outbox = Vec::new();
-        let mut did_work = false;
+        let mut outbox: Vec<P2pProtocol> = Vec::new();
         // Note: use same order as the enum
         match evt {
-            TransportEvent::TransportError(id, _e) => {
-                println!("(log.w) Connection Error: {}\n Closing connection.", id);
-                self.transport_connection.close(id.to_string())?;
+            TransportEvent::TransportError(id, e) => {
+                println!(
+                    "(log.e) Connection Error for {}: {}\n Closing connection.",
+                    id, e
+                );
+                self.transport.close(id.to_string())?;
             }
-            TransportEvent::Connect(id) => {
+            TransportEvent::ConnectResult(id) => {
                 // don't need to do anything here
                 println!("(log.i) Connection opened: {}", id);
             }
-            TransportEvent::Close(id) => {
+            TransportEvent::Closed(id) => {
                 // FIXME
                 println!("(log.w) Connection closed: {}", id);
-                self.transport_connection.close(id.to_string())?;
+                self.transport.close(id.to_string())?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
-            TransportEvent::Message(_id, _msg) => {
+            TransportEvent::Received(id, msg) => {
+                println!("(log.d) Received message from: {}", id);
                 // FIXME: Make sense of msg?
+                let p2p_msg = match P2pProtocol::deserialize(msg) {
+                    Err(e) => {
+                        println!("(log.e) Payload failed to deserialize: {:?}", msg);
+                        return Err(e);
+                    }
+                    Ok(obj) => obj,
+                };
+                outbox = self.serve_P2pProtocol(&p2p_msg)?;
             }
         };
-        Ok((did_work, outbox))
+        Ok(outbox)
+    }
+
+    /// Serve a P2pProtocol sent to us.
+    /// Handle it or pass it along.
+    /// Return a list of P2pProtocol messages for others to process.
+    // FIXME
+    fn serve_P2pProtocol(&mut self, p2p_msg: &P2pProtocol) -> Lib3hResult<Vec<P2pProtocol>> {
+        let mut outbox = Vec::new();
+        match p2p_msg {
+            P2pProtocol::Gossip => {
+                // FIXME
+            }
+            P2pProtocol::DirectMessage => {
+                // FIXME
+            }
+            P2pProtocol::FetchData => {
+                // FIXME
+            }
+            P2pProtocol::FetchDataResponse => {
+                // FIXME
+            }
+        };
+        Ok(outbox)
     }
 
     /// Serve a DhtEvent sent to us.
