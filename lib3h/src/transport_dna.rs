@@ -51,13 +51,23 @@ impl Transport for TransportDna {
         Ok(())
     }
 
-    fn post(&mut self, _command: TransportCommand) -> TransportResult<()> {
-        // FIXME
+    fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
+        self.inbox.push_back(command);
         Ok(())
     }
 
+    // FIXME
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        // FIXME
-        Ok((false, vec![]))
+        let outbox = Vec::new();
+        let mut did_work = false;
+        loop {
+            let evt = match self.inbox.pop_front() {
+                None => break,
+                Some(msg) => msg,
+            };
+            did_work = true;
+            println!("(log.t) TransportDna.process(): {:?}", evt)
+        }
+        Ok((did_work, outbox))
     }
 }

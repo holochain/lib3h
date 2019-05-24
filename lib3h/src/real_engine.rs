@@ -133,7 +133,7 @@ impl RealEngine {
     fn process_dna_gateways(&mut self) -> Lib3hResult<Vec<P2pProtocol>> {
         // Process all dna P2ps and store 'generated' P2pProtocol messages.
         let mut output = Vec::new();
-        for (_dna_address, mut dna_p2p) in self.dna_gateway_map.iter_mut() {
+        for (_dna_address, dna_p2p) in self.dna_gateway_map.iter_mut() {
             let (did_work, mut p2p_list) = dna_p2p.do_process()?;
             if did_work {
                 output.append(&mut p2p_list);
@@ -158,7 +158,7 @@ impl RealEngine {
         &mut self,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let mut outbox = Vec::new();
+        let outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip => {
                 // FIXME
@@ -188,7 +188,7 @@ impl RealEngine {
             client_msg
         );
         let mut outbox = Vec::new();
-        let mut did_work = true;
+        let did_work = true;
         // Note: use same order as the enum
         match client_msg {
             Lib3hClientProtocol::SuccessResult(_msg) => {
@@ -249,7 +249,7 @@ impl RealEngine {
         }
         self.dna_gateway_map
             .insert(chain_id.clone(), P2pGateway::new(true));
-        let mut dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();
+        let dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();
         Dht::post(
             dna_p2p,
             DhtEvent::PeerHoldRequest(PeerHoldRequestData {

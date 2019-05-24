@@ -200,7 +200,7 @@ impl P2pGateway {
     /// Return a list of P2pProtocol messages for others to process.
     // FIXME
     fn serve_P2pProtocol(&mut self, p2p_msg: &P2pProtocol) -> Lib3hResult<Vec<P2pProtocol>> {
-        let mut outbox = Vec::new();
+        let outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip => {
                 // FIXME
@@ -222,8 +222,8 @@ impl P2pGateway {
     /// Return a list of P2pProtocol messages for us to process.
     // FIXME
     fn serve_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
-        let mut outbox = Vec::new();
-        let mut did_work = false;
+        let outbox = Vec::new();
+        let did_work = false;
         match evt {
             DhtEvent::RemoteGossipBundle(_data) => {
                 // FIXME

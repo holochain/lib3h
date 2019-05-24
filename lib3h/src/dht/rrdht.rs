@@ -59,9 +59,10 @@ impl Dht for RrDht {
         self.inbox.push_back(evt);
         Ok(())
     }
+
+    // FIXME
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
-        // FIXME
-        let mut outbox = Vec::new();
+        let outbox = Vec::new();
         let mut did_work = false;
         loop {
             let evt = match self.inbox.pop_front() {
