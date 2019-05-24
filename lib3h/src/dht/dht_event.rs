@@ -1,4 +1,4 @@
-use holochain_lib3h_protocol::Address;
+use lib3h_protocol::Address;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtEvent {

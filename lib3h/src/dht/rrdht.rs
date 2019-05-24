@@ -2,7 +2,7 @@ use crate::dht::{
     dht_event::{DhtEvent, PeerHoldRequestData},
     dht_trait::Dht,
 };
-use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, DidWork, Lib3hResult};
 use std::collections::VecDeque;
 
 /// RoundAndRound DHT implementation

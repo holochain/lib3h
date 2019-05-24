@@ -1,11 +1,11 @@
 extern crate holochain_lib3h;
-extern crate holochain_lib3h_protocol;
+extern crate lib3h_protocol;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
 
-use holochain_lib3h_protocol::{
+use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };

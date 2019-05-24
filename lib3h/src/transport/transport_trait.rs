@@ -4,7 +4,7 @@ use crate::transport::{
     TransportId, TransportIdRef,
 };
 
-use holochain_lib3h_protocol::DidWork;
+use lib3h_protocol::DidWork;
 
 /// Represents a pool of connections to remote nodes.
 /// Methods are for synchronous processing.

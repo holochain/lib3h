@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use holochain_lib3h_protocol::{
+use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
 };
@@ -57,15 +57,15 @@ impl RealEngine {
 
 impl NetworkEngine for RealEngine {
     fn run(&self) -> Lib3hResult<()> {
-                // FIXME
+        // FIXME
         Ok(())
-            }
+    }
     fn stop(&self) -> Lib3hResult<()> {
-                // FIXME
+        // FIXME
         Ok(())
-            }
+    }
     fn terminate(&self) -> Lib3hResult<()> {
-                // FIXME
+        // FIXME
         Ok(())
     }
     fn advertise(&self) -> String {
@@ -220,17 +220,17 @@ impl RealEngine {
                 // FIXME
             }
             Lib3hClientProtocol::PublishEntry(_msg) => {
-        // FIXME
-    }
+                // FIXME
+            }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetPublishingEntryListResult(_msg) => {
-        // FIXME
-    }
+                // FIXME
+            }
             // Our request for the hold_list has returned
             Lib3hClientProtocol::HandleGetHoldingEntryListResult(_msg) => {
-        // FIXME
-    }
-    }
+                // FIXME
+            }
+        }
         Ok((did_work, outbox))
     }
 
@@ -242,11 +242,11 @@ impl RealEngine {
             dna_address: track_msg.dna_address.clone(),
             to_agent_id: track_msg.agent_id.clone(),
             result_info: vec![],
-            };
+        };
         if self.dna_gateway_map.contains_key(&chain_id) {
             res.result_info = "Already tracked".to_string().into_bytes();
             return Ok(Lib3hServerProtocol::FailureResult(res));
-            }
+        }
         self.dna_gateway_map
             .insert(chain_id.clone(), P2pGateway::new(true));
         let dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();

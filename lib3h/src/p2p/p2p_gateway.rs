@@ -16,7 +16,7 @@ use crate::{
     transport_dna::TransportDna,
     transport_wss::TransportWss,
 };
-use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, DidWork, Lib3hResult};
 
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.

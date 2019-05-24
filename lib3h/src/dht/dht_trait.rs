@@ -1,5 +1,5 @@
 use crate::dht::dht_event::{DhtEvent, PeerHoldRequestData};
-use holochain_lib3h_protocol::{Address, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, DidWork, Lib3hResult};
 
 /// Allow storage and retrieval of peer info and data
 ///  + events & fns for gossip communication?

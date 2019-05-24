@@ -4,7 +4,7 @@ use crate::transport::{
     transport_trait::Transport,
     TransportId, TransportIdRef,
 };
-use holochain_lib3h_protocol::DidWork;
+use lib3h_protocol::DidWork;
 use std::collections::VecDeque;
 
 /// Transport used for the DNA P2pGateway

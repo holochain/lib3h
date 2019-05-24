@@ -1,4 +1,4 @@
-use holochain_lib3h_protocol::Lib3hResult;
+use lib3h_protocol::Lib3hResult;
 
 /// Enum holding all message types in the 'network module <-> network module' protocol.
 /// TODO
