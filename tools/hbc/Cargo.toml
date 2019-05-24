@@ -1,14 +1,14 @@
 [package]
-name = "lib3h_half_busy_chat"
+name = "lib3h_hbc"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h simulation test framework"
-keywords = ["NaCl", "libsodium", "cryptography"]
-categories = ["cryptography"]
+keywords = ["holochain", "holo"]
+categories = ["development-tools::testing"]
 license = "Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/lib3h_half_busy_chat"
+documentation = "https://docs.rs/lib3h_hbc"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
