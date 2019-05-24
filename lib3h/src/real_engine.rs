@@ -28,7 +28,7 @@ pub struct RealEngineConfig {
 /// Lib3h's 'real mode' as a NetworkEngine
 pub struct RealEngine {
     /// Config settings
-    config: RealEngineConfig,
+    _config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Identifier
@@ -43,7 +43,7 @@ impl RealEngine {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         Ok(RealEngine {
-            config,
+            _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
             transport_gateway: P2pGateway::new(false),

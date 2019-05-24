@@ -1,5 +1,7 @@
 .PHONY: all test fmt clean tools tool_rust tool_fmt
 
+RUSTFLAGS += "-D warnings"
+
 SHELL = /usr/bin/env sh
 RUST_VER_WANT = "rustc 1.33.0-nightly (19f8958f8 2019-01-23)"
 RUST_TAG_WANT = "nightly-2019-01-24"
@@ -9,12 +11,12 @@ CLP_VER_WANT = "clippy 0.0.212 (280069d 2019-01-22)"
 all: test
 
 test: tools
-	cargo fmt -- --check
-	cargo clippy -- \
+	RUSTFLAGS=$(RUSTFLAGS) cargo fmt -- --check
+	RUSTFLAGS=$(RUSTFLAGS) cargo clippy -- \
 		-A clippy::nursery -A clippy::style -A clippy::cargo \
 		-A clippy::pedantic -A clippy::restriction \
 		-D clippy::complexity -D clippy::perf -D clippy::correctness
-	RUST_BACKTRACE=1 cargo test
+	RUSTFLAGS=$(RUSTFLAGS) RUST_BACKTRACE=1 cargo test
 
 fmt: tools
 	cargo fmt
