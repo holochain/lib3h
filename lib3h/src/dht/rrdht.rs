@@ -55,14 +55,22 @@ impl Dht for RrDht {
 
     // -- Processing -- //
 
-    fn post(&mut self, _evt: DhtEvent) -> Lib3hResult<()> {
-        // FIXME
+    fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
+        self.inbox.push_back(evt);
         Ok(())
     }
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // FIXME
         let mut outbox = Vec::new();
         let mut did_work = false;
+        loop {
+            let evt = match self.inbox.pop_front() {
+                None => break,
+                Some(msg) => msg,
+            };
+            did_work = true;
+            println!("(log.t) RrDht.process(): {:?}", evt)
+        }
         Ok((did_work, outbox))
     }
 }

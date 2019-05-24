@@ -247,7 +247,8 @@ impl RealEngine {
             res.result_info = "Already tracked".to_string().into_bytes();
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
-        self.dna_gateway_map.insert(chain_id.clone(), P2pGateway::new(true));
+        self.dna_gateway_map
+            .insert(chain_id.clone(), P2pGateway::new(true));
         let mut dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();
         Dht::post(
             dna_p2p,
