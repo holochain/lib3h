@@ -3,7 +3,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use holochain_lib3h_protocol::{
-    network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
+    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
 };
 
@@ -15,6 +15,9 @@ use crate::{
     p2p::{p2p_gateway::P2pGateway, p2p_protocol::P2pProtocol},
     transport::transport_trait::Transport,
 };
+
+/// Identifier of a source chain: DnaAddress+AgentId
+pub type ChainId = (Address, Address);
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Debug, Clone, PartialEq)]
@@ -36,7 +39,7 @@ pub struct RealEngine {
     /// P2p gateway for the transport layer,
     transport_gateway: P2pGateway,
     /// Map of P2p gateway per tracked DNA (per Agent?)
-    dna_gateway_map: HashMap<Address, P2pGateway>,
+    dna_gateway_map: HashMap<ChainId, P2pGateway>,
 }
 
 impl RealEngine {
@@ -83,7 +86,7 @@ impl NetworkEngine for RealEngine {
         // Process all received Lib3hClientProtocol messages from Core
         let (did_work, mut outbox) = self.process_inbox()?;
         // Process the transport layer
-        let did_work = self.process_transport_gateway()?;
+        let _ = self.process_transport_gateway()?;
         // Process all dna dhts
         let p2p_output = self.process_dna_gateways()?;
         // Process all generated P2pProtocol messages
@@ -185,7 +188,7 @@ impl RealEngine {
             client_msg
         );
         let mut outbox = Vec::new();
-        let mut did_work = false;
+        let mut did_work = true;
         // Note: use same order as the enum
         match client_msg {
             Lib3hClientProtocol::SuccessResult(_msg) => {
@@ -198,20 +201,8 @@ impl RealEngine {
                 self.transport_gateway.connect(&msg.peer_transport)?;
             }
             Lib3hClientProtocol::TrackDna(msg) => {
-                // FIXME
-                if !self.dna_gateway_map.contains_key(&msg.dna_address) {
-                    self.dna_gateway_map
-                        .insert(msg.dna_address.clone(), P2pGateway::new(true));
-                }
-                let mut dna_p2p = self.dna_gateway_map.get_mut(&msg.dna_address).unwrap();
-                Dht::post(
-                    dna_p2p,
-                    DhtEvent::PeerHoldRequest(PeerHoldRequestData {
-                        peer_address: "FIXME".to_string(), // msg.agent_id,
-                        transport: self.transport_gateway.id(),
-                        timestamp: 42,
-                    }),
-                )?;
+                let output = self.serve_TrackDna(&msg)?;
+                outbox.push(output);
             }
             Lib3hClientProtocol::UntrackDna(_msg) => {
                 // FIXME
@@ -241,5 +232,31 @@ impl RealEngine {
             }
         }
         Ok((did_work, outbox))
+    }
+
+    /// Create DNA gateway for this agent if not already tracking
+    fn serve_TrackDna(&mut self, track_msg: &TrackDnaData) -> Lib3hResult<Lib3hServerProtocol> {
+        let chain_id = (track_msg.dna_address.clone(), track_msg.agent_id.clone());
+        let mut res = ResultData {
+            request_id: track_msg.request_id.clone(),
+            dna_address: track_msg.dna_address.clone(),
+            to_agent_id: track_msg.agent_id.clone(),
+            result_info: vec![],
+        };
+        if self.dna_gateway_map.contains_key(&chain_id) {
+            res.result_info = "Already tracked".to_string().into_bytes();
+            return Ok(Lib3hServerProtocol::FailureResult(res));
+        }
+        self.dna_gateway_map.insert(chain_id.clone(), P2pGateway::new(true));
+        let mut dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();
+        Dht::post(
+            dna_p2p,
+            DhtEvent::PeerHoldRequest(PeerHoldRequestData {
+                peer_address: "FIXME".to_string(), // msg.agent_id,
+                transport: self.transport_gateway.id(),
+                timestamp: 42,
+            }),
+        )?;
+        Ok(Lib3hServerProtocol::SuccessResult(res))
     }
 }

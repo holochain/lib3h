@@ -85,6 +85,8 @@ pub struct DisconnectedData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrackDnaData {
+    /// Identifier of this request
+    pub request_id: String,
     pub dna_address: Address,
     pub agent_id: Address,
 }
