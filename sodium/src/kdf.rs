@@ -1,7 +1,7 @@
 //! This module provides access to libsodium
 
 use super::{check_init, secbuf::SecBuf};
-use crate::error::SodiumError;
+use lib3h_crypto_api::CryptoError;
 
 pub const CONTEXTBYTES: usize = rust_sodium_sys::crypto_kdf_CONTEXTBYTES as usize;
 pub const MINBYTES: usize = rust_sodium_sys::crypto_kdf_BYTES_MIN as usize;
@@ -22,7 +22,7 @@ pub fn derive(
     index: u64,
     context: &mut SecBuf,
     parent: &mut SecBuf,
-) -> Result<(), SodiumError> {
+) -> Result<(), CryptoError> {
     check_init();
     {
         let out = out.read_lock();
@@ -30,12 +30,12 @@ pub fn derive(
         let context = context.read_lock();
         let c = context.len();
         if o < MINBYTES || o > MAXBYTES {
-            return Err(SodiumError::OutputLength(format!(
+            return Err(CryptoError::OutputLength(format!(
                 "Invalid 'out' Buffer length:{}",
                 o
             )));
         } else if c != CONTEXTBYTES {
-            return Err(SodiumError::OutputLength(format!(
+            return Err(CryptoError::OutputLength(format!(
                 "context must be a Buffer of length: {}.",
                 CONTEXTBYTES
             )));

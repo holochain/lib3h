@@ -1,3 +1,4 @@
+extern crate lib3h_protocol;
 extern crate native_tls;
 extern crate tungstenite;
 extern crate url;
