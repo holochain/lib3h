@@ -7,6 +7,7 @@ pub mod protocol_server;
 
 /// Opaque Address Bytes
 pub type Address = Vec<u8>;
+pub type AddressRef = [u8];
 
 /// type name for a bool indicating if work was done during a `process()`
 pub type DidWork = bool;

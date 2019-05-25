@@ -16,7 +16,7 @@ use crate::{
     transport_dna::TransportDna,
     transport_wss::TransportWss,
 };
-use lib3h_protocol::{Address, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.
@@ -60,20 +60,20 @@ impl P2pGateway {
 /// Compose DHT
 impl Dht for P2pGateway {
     /// Peer info
-    fn get_peer(&self, peer_address: String) -> Option<PeerHoldRequestData> {
+    fn get_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
         self.dht.get_peer(peer_address)
     }
-    fn fetch_peer(&self, peer_address: String) -> Option<PeerHoldRequestData> {
+    fn fetch_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
         self.dht.fetch_peer(peer_address)
     }
-    fn drop_peer(&self, peer_address: String) -> Lib3hResult<()> {
+    fn drop_peer(&self, peer_address: &str) -> Lib3hResult<()> {
         self.dht.drop_peer(peer_address)
     }
     /// Data
-    fn get_data(&self, data_address: Address) -> Lib3hResult<Vec<u8>> {
+    fn get_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
         self.dht.get_data(data_address)
     }
-    fn fetch_data(&self, data_address: Address) -> Lib3hResult<Vec<u8>> {
+    fn fetch_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
         self.dht.fetch_data(data_address)
     }
     /// Processing

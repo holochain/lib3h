@@ -2,7 +2,7 @@ use crate::dht::{
     dht_event::{DhtEvent, PeerHoldRequestData},
     dht_trait::Dht,
 };
-use lib3h_protocol::{Address, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 use std::collections::VecDeque;
 
 /// RoundAndRound DHT implementation
@@ -29,26 +29,26 @@ impl Dht for RrDht {
 
     // -- Peer -- //
 
-    fn get_peer(&self, _peer_address: String) -> Option<PeerHoldRequestData> {
+    fn get_peer(&self, _peer_address: &str) -> Option<PeerHoldRequestData> {
         // FIXME
         None
     }
-    fn fetch_peer(&self, _peer_address: String) -> Option<PeerHoldRequestData> {
+    fn fetch_peer(&self, _peer_address: &str) -> Option<PeerHoldRequestData> {
         // FIXME
         None
     }
-    fn drop_peer(&self, _peer_address: String) -> Lib3hResult<()> {
+    fn drop_peer(&self, _peer_address: &str) -> Lib3hResult<()> {
         // FIXME
         Ok(())
     }
 
     // -- Data -- //
 
-    fn get_data(&self, _data_address: Address) -> Lib3hResult<Vec<u8>> {
+    fn get_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
         // FIXME
         Ok(vec![])
     }
-    fn fetch_data(&self, _data_address: Address) -> Lib3hResult<Vec<u8>> {
+    fn fetch_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
         // FIXME
         Ok(vec![])
     }

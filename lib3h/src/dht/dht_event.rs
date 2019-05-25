@@ -1,4 +1,4 @@
-use lib3h_protocol::Address;
+use lib3h_protocol::{data_types::EntryData, Address};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtEvent {
@@ -56,8 +56,7 @@ pub struct PeerHoldRequestData {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataHoldRequestData {
-    pub data_list: Vec<Vec<u8>>,
-    pub data_address: Address,
+    pub entry: EntryData,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,5 +68,5 @@ pub struct DataFetchData {
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataFetchResponseData {
     pub msg_id: String,
-    pub data_list: Vec<Vec<u8>>,
+    pub entry: EntryData,
 }
