@@ -11,9 +11,12 @@ use crate::{
     dht::{
         dht_event::{DhtEvent, PeerHoldRequestData},
         dht_trait::Dht,
+        rrdht::RrDht,
     },
     p2p::{p2p_gateway::P2pGateway, p2p_protocol::P2pProtocol},
     transport::transport_trait::Transport,
+    transport_dna::TransportDna,
+    transport_wss::TransportWss,
 };
 
 /// Identifier of a source chain: DnaAddress+AgentId
@@ -37,9 +40,9 @@ pub struct RealEngine {
     /// Identifier
     name: String,
     /// P2p gateway for the transport layer,
-    transport_gateway: P2pGateway,
+    transport_gateway: P2pGateway<TransportWss<std::net::TcpStream>, RrDht>,
     /// Map of P2p gateway per tracked DNA (per Agent?)
-    dna_gateway_map: HashMap<ChainId, P2pGateway>,
+    dna_gateway_map: HashMap<ChainId, P2pGateway<TransportDna, RrDht>>,
 }
 
 impl RealEngine {
@@ -49,7 +52,7 @@ impl RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
-            transport_gateway: P2pGateway::new(false),
+            transport_gateway: P2pGateway::new_with_tcp(),
             dna_gateway_map: HashMap::new(),
         })
     }
@@ -248,7 +251,7 @@ impl RealEngine {
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
         self.dna_gateway_map
-            .insert(chain_id.clone(), P2pGateway::new(true));
+            .insert(chain_id.clone(), P2pGateway::new_with_dna());
         let dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();
         Dht::post(
             dna_p2p,
