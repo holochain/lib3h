@@ -41,10 +41,12 @@ Half Busy Chat Commands:
                     } else if s.starts_with("/help") {
                         help_text();
                     } else {
-                        cli.send(lib3h_half_busy_chat::ChatEvent::Message(lib3h_half_busy_chat::MessageData {
-                            from_address: "[null]".to_string(),
-                            payload: s,
-                        }));
+                        cli.send(lib3h_half_busy_chat::ChatEvent::Message(
+                            lib3h_half_busy_chat::MessageData {
+                                from_address: "[null]".to_string(),
+                                payload: s,
+                            },
+                        ));
                     }
                 }
                 linefeed::reader::ReadResult::Eof => {
