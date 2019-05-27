@@ -2,7 +2,7 @@ use eav::eavi::{Attribute, Entity, EntityAttributeValueIndex, Value};
 use std::collections::BTreeSet;
 
 /// Represents a set of filtering operations on the EAVI store.
-pub struct EaviQuery<'a, A:Attribute> {
+pub struct EaviQuery<'a, A: Attribute> {
     entity: EntityFilter<'a>,
     attribute: AttributeFilter<'a, A>,
     value: ValueFilter<'a>,
@@ -10,10 +10,10 @@ pub struct EaviQuery<'a, A:Attribute> {
 }
 
 type EntityFilter<'a> = EavFilter<'a, Entity>;
-type AttributeFilter<'a, A:Attribute> = EavFilter<'a, A>;
+type AttributeFilter<'a, A: Attribute> = EavFilter<'a, A>;
 type ValueFilter<'a> = EavFilter<'a, Value>;
 
-impl<'a, A:Attribute> Default for EaviQuery<'a, A> {
+impl<'a, A: Attribute> Default for EaviQuery<'a, A> {
     fn default() -> EaviQuery<'a, A> {
         EaviQuery::new(
             Default::default(),
@@ -24,7 +24,7 @@ impl<'a, A:Attribute> Default for EaviQuery<'a, A> {
     }
 }
 
-impl<'a, A:Attribute> EaviQuery<'a, A> {
+impl<'a, A: Attribute> EaviQuery<'a, A> {
     pub fn new(
         entity: EntityFilter<'a>,
         attribute: AttributeFilter<'a, A>,
@@ -75,7 +75,7 @@ impl<'a, A:Attribute> EaviQuery<'a, A> {
         }
     }
 
-    fn eav_check<A:Attribute>(
+    fn eav_check(
         eavi: &EntityAttributeValueIndex<A>,
         e: &EntityFilter<'a>,
         a: &AttributeFilter<'a, A>,

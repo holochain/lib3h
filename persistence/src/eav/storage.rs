@@ -10,7 +10,7 @@ use std::{
 /// This provides a simple and flexible interface to define relationships between AddressableContent.
 /// It does NOT provide storage for AddressableContent.
 /// Use cas::storage::ContentAddressableStorage to store AddressableContent.
-pub trait EntityAttributeValueStorage<A:Attribute>: objekt::Clone + Send + Sync + Debug {
+pub trait EntityAttributeValueStorage<A: Attribute>: objekt::Clone + Send + Sync + Debug {
     /// Adds the given EntityAttributeValue to the EntityAttributeValueStorage
     /// append only storage.
     fn add_eavi(
@@ -37,17 +37,18 @@ pub trait EntityAttributeValueStorage<A:Attribute>: objekt::Clone + Send + Sync 
 clone_trait_object!(<A:Attribute>EntityAttributeValueStorage<A>);
 
 #[derive(Clone, Debug, Default)]
-pub struct ExampleEntityAttributeValueStorage<A:Attribute> {
+pub struct ExampleEntityAttributeValueStorage<A: Attribute> {
     storage: Arc<RwLock<BTreeSet<EntityAttributeValueIndex<A>>>>,
 }
 
-impl<A:Attribute> ExampleEntityAttributeValueStorage<A> {
-    pub fn new() -> ExampleEntityAttributeValueStorage<A> {
+impl<A: Attribute> ExampleEntityAttributeValueStorage<A> {
+    pub fn new() -> ExampleEntityAttributeValueStorage<A> where A : std::default::Default {
         Default::default()
     }
 }
 
-impl<A:Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValueStorage<A> {
+impl<A: Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValueStorage<A> 
+    where A : std::marker::Send + std::marker::Sync {
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
@@ -60,8 +61,8 @@ impl<A:Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValue
 
     fn fetch_eavi(
         &self,
-        query: &EaviQuery,
-    ) -> Result<BTreeSet<EntityAttributeValueIndex>, HolochainError> {
+        query: &EaviQuery<A>,
+    ) -> Result<BTreeSet<EntityAttributeValueIndex<A>>, HolochainError> {
         let lock = self.storage.read()?;
         let set = (*lock).clone();
         let iter = set.iter().cloned();
@@ -69,17 +70,17 @@ impl<A:Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValue
     }
 }
 
-impl PartialEq for EntityAttributeValueStorage {
-    fn eq(&self, other: &EntityAttributeValueStorage) -> bool {
+impl<A:Attribute> PartialEq for EntityAttributeValueStorage<A> {
+    fn eq(&self, other: &EntityAttributeValueStorage<A>) -> bool {
         let query = EaviQuery::default();
         self.fetch_eavi(&query) == other.fetch_eavi(&query)
     }
 }
 
-pub fn increment_key_till_no_collision(
-    mut eav: EntityAttributeValueIndex,
-    map: BTreeSet<EntityAttributeValueIndex>,
-) -> HcResult<EntityAttributeValueIndex> {
+pub fn increment_key_till_no_collision<A:Attribute>(
+    mut eav: EntityAttributeValueIndex<A>,
+    map: BTreeSet<EntityAttributeValueIndex<A>>,
+) -> HcResult<EntityAttributeValueIndex<A>> {
     if map.iter().any(|e| e.index() == eav.index()) {
         let timestamp = eav.clone().index() + 1;
         eav.set_index(timestamp);

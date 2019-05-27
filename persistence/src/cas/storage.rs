@@ -6,8 +6,8 @@
 use crate::{
     cas::content::{Address, AddressableContent, Content},
     eav::{
-        ExampleAttribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
-        IndexFilter,
+        EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
+        ExampleAttribute, IndexFilter,
     },
     error::HolochainError,
     json::RawString,
@@ -241,7 +241,7 @@ pub struct EavTestSuite;
 
 impl EavTestSuite {
     pub fn test_round_trip(
-        mut eav_storage: impl EntityAttributeValueStorage + Clone,
+        mut eav_storage: impl EntityAttributeValueStorage<ExampleAttribute> + Clone,
         entity_content: impl AddressableContent,
         attribute_name: String,
         value_content: impl AddressableContent,
@@ -316,7 +316,7 @@ impl EavTestSuite {
     pub fn test_one_to_many<A, S>(mut eav_storage: S)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage,
+        S: EntityAttributeValueStorage<ExampleAttribute>,
     {
         let foo_content = Content::from(RawString::from("foo"));
         let bar_content = Content::from(RawString::from("bar"));
@@ -397,7 +397,7 @@ impl EavTestSuite {
     pub fn test_range<A, S>(mut eav_storage: S)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage,
+        S: EntityAttributeValueStorage<ExampleAttribute>,
     {
         let foo_content = Content::from(RawString::from("foo"));
         let bar_content = Content::from(RawString::from("bar"));
@@ -493,7 +493,7 @@ impl EavTestSuite {
     pub fn test_multiple_attributes<A, S>(mut eav_storage: S, attributes: Vec<ExampleAttribute>)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage,
+        S: EntityAttributeValueStorage<ExampleAttribute>,
     {
         let foo_content = Content::from(RawString::from("foo"));
 
@@ -549,7 +549,7 @@ impl EavTestSuite {
     pub fn test_many_to_one<A, S>(mut eav_storage: S)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage,
+        S: EntityAttributeValueStorage<ExampleAttribute>,
     {
         let foo_content = Content::from(RawString::from("foo"));
         let bar_content = Content::from(RawString::from("bar"));

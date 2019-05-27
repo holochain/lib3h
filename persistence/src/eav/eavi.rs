@@ -40,6 +40,13 @@ pub enum ExampleAttribute {
     WithPayload(String),
 }
 
+impl Default for ExampleAttribute {
+
+    fn default() -> ExampleAttribute {
+        ExampleAttribute::WithoutPayload
+    }
+}
+
 impl TryFrom<String> for ExampleAttribute {
     type Error = AttributeError;
     fn try_from(s: String) -> Result<Self, AttributeError> {
@@ -103,8 +110,12 @@ pub struct EntityAttributeValueIndex<A: Attribute> {
     // source: Source,
 }
 
-impl<A: Attribute> DefaultJson for EntityAttributeValueIndex<A> {
+impl serde::Serialize for Attribute {
 
+
+    fn serialize<S:serde::Serializer>(&self, serializer: S) -> Result<JsonString, S::Error> {
+        Ok(JsonString::from(self.into()))
+    }
 }
 
 impl<A: Attribute> PartialOrd for EntityAttributeValueIndex<A> {
@@ -113,13 +124,13 @@ impl<A: Attribute> PartialOrd for EntityAttributeValueIndex<A> {
     }
 }
 
-impl<A:Attribute> Ord for EntityAttributeValueIndex<A> {
+impl<A: Attribute> Ord for EntityAttributeValueIndex<A> {
     fn cmp(&self, other: &EntityAttributeValueIndex<A>) -> Ordering {
         self.index.cmp(&other.index())
     }
 }
 
-impl<A:Attribute> AddressableContent for EntityAttributeValueIndex<A> {
+impl<A: Attribute> AddressableContent for EntityAttributeValueIndex<A> {
     fn content(&self) -> Content {
         self.to_owned().into()
     }
@@ -129,7 +140,7 @@ impl<A:Attribute> AddressableContent for EntityAttributeValueIndex<A> {
     }
 }
 
-impl<A:Attribute> EntityAttributeValueIndex<A> {
+impl<A: Attribute> EntityAttributeValueIndex<A> {
     pub fn new(
         entity: &Entity,
         attribute: &A,
@@ -241,11 +252,11 @@ pub fn test_eav_address() -> Address {
     test_eav().address()
 }
 
-pub fn eav_round_trip_test_runner<A:Attribute>(
+pub fn eav_round_trip_test_runner<A: Attribute>(
     entity_content: impl AddressableContent + Clone,
     attribute: A,
     value_content: impl AddressableContent + Clone,
-) {
+) where A : std::default::Default + std::marker::Sync + std::marker::Send {
     let eav = EntityAttributeValueIndex::new(
         &entity_content.address(),
         &attribute,
@@ -323,7 +334,7 @@ pub mod tests {
         json::RawString,
     };
 
-    pub fn test_eav_storage() -> ExampleEntityAttributeValueStorage {
+    pub fn test_eav_storage<A:Attribute>() -> ExampleEntityAttributeValueStorage<A> where A: std::default::Default {
         ExampleEntityAttributeValueStorage::new()
     }
 
@@ -345,7 +356,7 @@ pub mod tests {
     fn example_eav_one_to_many() {
         EavTestSuite::test_one_to_many::<
             ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage,
+            ExampleEntityAttributeValueStorage<ExampleAttribute>,
         >(test_eav_storage());
     }
 
@@ -353,13 +364,13 @@ pub mod tests {
     fn example_eav_many_to_one() {
         EavTestSuite::test_many_to_one::<
             ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage,
+            ExampleEntityAttributeValueStorage<ExampleAttribute>,
         >(test_eav_storage());
     }
 
     #[test]
     fn example_eav_range() {
-        EavTestSuite::test_range::<ExampleAddressableContent, ExampleEntityAttributeValueStorage>(
+        EavTestSuite::test_range::<ExampleAddressableContent, ExampleEntityAttributeValueStorage<ExampleAttribute>>(
             test_eav_storage(),
         );
     }
@@ -368,7 +379,7 @@ pub mod tests {
     fn example_eav_prefixes() {
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage,
+            ExampleEntityAttributeValueStorage<ExampleAttribute>,
         >(test_eav_storage(), {
             let mut attrs: Vec<ExampleAttribute> = vec!["a_", "b_", "c_", "d_"]
                 .into_iter()
@@ -383,11 +394,9 @@ pub mod tests {
     /// show AddressableContent implementation
     fn addressable_content_test() {
         // from_content()
-        AddressableContentTestSuite::addressable_content_trait_test::<EntityAttributeValueIndex<ExampleAttribute>>(
-            test_eav_content(),
-            test_eav(),
-            test_eav_address(),
-        );
+        AddressableContentTestSuite::addressable_content_trait_test::<
+            EntityAttributeValueIndex<ExampleAttribute>,
+        >(test_eav_content(), test_eav(), test_eav_address());
     }
 
     #[test]
