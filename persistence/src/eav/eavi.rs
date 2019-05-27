@@ -29,13 +29,7 @@ pub type Entity = Address;
 //#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
 //#[serde(rename_all = "snake_case")]
 pub trait Attribute:
-    PartialEq
-    + Eq
-    + PartialOrd
-    + std::hash::Hash
-    + Clone
-    + serde::Serialize
-    + fmt::Debug
+    PartialEq + Eq + PartialOrd + std::hash::Hash + Clone + serde::Serialize + fmt::Debug
 //    + TryFrom<String>
 //    + Into<String>
 {
@@ -80,7 +74,6 @@ impl Into<String> for ExampleAttribute {
 impl Attribute for ExampleAttribute {}
 
 impl<'a> Attribute for &'a ExampleAttribute {}
-
 
 #[derive(PartialEq, Debug)]
 pub enum AttributeError {
