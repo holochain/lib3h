@@ -505,8 +505,8 @@ impl EavTestSuite {
         let mut expected = BTreeSet::new();
 
         attributes.iter().for_each(|attribute| {
-            let eav =
-                EntityAttributeValueIndex::new(&many_one.address(), &attribute, &one.address())
+            let eav : EntityAttributeValueIndex<ExampleAttribute> =
+                EntityAttributeValueIndex::new(&many_one.address(), attribute, &one.address())
                     .expect("could not create EAV");
             let eavi = eav_storage
                 .add_eavi(&eav.clone())

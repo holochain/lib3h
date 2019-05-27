@@ -36,8 +36,8 @@ pub trait Attribute:
     + Clone
     + serde::Serialize
     + fmt::Debug
-    + TryFrom<String>
-    + Into<String>
+//    + TryFrom<String>
+//    + Into<String>
 {
 }
 
@@ -78,6 +78,9 @@ impl Into<String> for ExampleAttribute {
     }
 }
 impl Attribute for ExampleAttribute {}
+
+impl<'a> Attribute for &'a ExampleAttribute {}
+
 
 #[derive(PartialEq, Debug)]
 pub enum AttributeError {
@@ -149,7 +152,11 @@ where
 {
     type Error = HolochainError;
     fn try_from(json_string: &JsonString) -> Result<Self, Self::Error> {
-        match ::serde_json::from_str(&String::from(json_string)) {
+        let str = String::from(json_string);
+
+        let from_json = ::serde_json::from_str(&str);
+
+        match from_json {
             Ok(d) => Ok(d),
             Err(e) => Err(HolochainError::SerializationError(e.to_string())),
         }
