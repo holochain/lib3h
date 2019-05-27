@@ -15,12 +15,12 @@ use crate::{
     },
     p2p::{p2p_gateway::P2pGateway, p2p_protocol::P2pProtocol},
     transport::transport_trait::Transport,
-    transport_dna::TransportDna,
+    transport_space::TransportSpace,
     transport_wss::TransportWss,
 };
 
-/// Identifier of a source chain: DnaAddress+AgentId
-pub type ChainId = (Address, Address);
+/// Identifier of a source chain: SpaceAddress+AgentId
+pub type PlayerId = (Address, Address);
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Debug, Clone, PartialEq)]
@@ -41,8 +41,8 @@ pub struct RealEngine {
     name: String,
     /// P2p gateway for the transport layer,
     transport_gateway: P2pGateway<TransportWss<std::net::TcpStream>, RrDht>,
-    /// Map of P2p gateway per tracked DNA (per Agent?)
-    dna_gateway_map: HashMap<ChainId, P2pGateway<TransportDna, RrDht>>,
+    /// Map of P2p gateway per Space+Agent
+    space_gateway_map: HashMap<PlayerId, P2pGateway<TransportSpace, RrDht>>,
 }
 
 impl RealEngine {
@@ -53,7 +53,7 @@ impl RealEngine {
             inbox: VecDeque::new(),
             name: name.to_string(),
             transport_gateway: P2pGateway::new_with_wss(),
-            dna_gateway_map: HashMap::new(),
+            space_gateway_map: HashMap::new(),
         })
     }
 }
@@ -90,8 +90,8 @@ impl NetworkEngine for RealEngine {
         let (did_work, mut outbox) = self.process_inbox()?;
         // Process the transport layer
         let _ = self.process_transport_gateway()?;
-        // Process all dna dhts
-        let p2p_output = self.process_dna_gateways()?;
+        // Process all space dhts
+        let p2p_output = self.process_space_gateways()?;
         // Process all generated P2pProtocol messages
         let mut output = self.process_p2p(&p2p_output)?;
         outbox.append(&mut output);
@@ -132,19 +132,19 @@ impl RealEngine {
         Ok(true)
     }
 
-    /// Process all dna gateways
-    fn process_dna_gateways(&mut self) -> Lib3hResult<Vec<P2pProtocol>> {
-        // Process all dna P2ps and store 'generated' P2pProtocol messages.
+    /// Process all space gateways
+    fn process_space_gateways(&mut self) -> Lib3hResult<Vec<P2pProtocol>> {
+        // Process all space gateways and store 'generated' P2pProtocol messages.
         let mut output = Vec::new();
-        for (_dna_address, dna_p2p) in self.dna_gateway_map.iter_mut() {
-            let (did_work, mut p2p_list) = dna_p2p.do_process()?;
+        for (_space_address, space_gateway) in self.space_gateway_map.iter_mut() {
+            let (did_work, mut p2p_list) = space_gateway.do_process()?;
             if did_work {
                 output.append(&mut p2p_list);
             }
         }
         Ok(output)
     }
-    /// Process all dna gateways
+    /// Process all space gateways
     fn process_p2p(&mut self, input: &Vec<P2pProtocol>) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // Serve all new P2pProtocols
         let mut output = Vec::new();
@@ -203,11 +203,11 @@ impl RealEngine {
             Lib3hClientProtocol::Connect(msg) => {
                 self.transport_gateway.connect(&msg.peer_transport)?;
             }
-            Lib3hClientProtocol::TrackDna(msg) => {
-                let output = self.serve_TrackDna(&msg)?;
+            Lib3hClientProtocol::JoinSpace(msg) => {
+                let output = self.serve_JoinSpace(&msg)?;
                 outbox.push(output);
             }
-            Lib3hClientProtocol::UntrackDna(_msg) => {
+            Lib3hClientProtocol::LeaveSpace(_msg) => {
                 // FIXME
             }
             Lib3hClientProtocol::SendDirectMessage(_msg) => {
@@ -237,24 +237,24 @@ impl RealEngine {
         Ok((did_work, outbox))
     }
 
-    /// Create DNA gateway for this agent if not already tracking
-    fn serve_TrackDna(&mut self, track_msg: &TrackDnaData) -> Lib3hResult<Lib3hServerProtocol> {
-        let chain_id = (track_msg.dna_address.clone(), track_msg.agent_id.clone());
+    /// Create a gateway for this agent in this space, if not already part of it.
+    fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Lib3hServerProtocol> {
+        let player_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         let mut res = ResultData {
-            request_id: track_msg.request_id.clone(),
-            dna_address: track_msg.dna_address.clone(),
-            to_agent_id: track_msg.agent_id.clone(),
+            request_id: join_msg.request_id.clone(),
+            space_address: join_msg.space_address.clone(),
+            to_agent_id: join_msg.agent_id.clone(),
             result_info: vec![],
         };
-        if self.dna_gateway_map.contains_key(&chain_id) {
+        if self.space_gateway_map.contains_key(&player_id) {
             res.result_info = "Already tracked".to_string().into_bytes();
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
-        self.dna_gateway_map
-            .insert(chain_id.clone(), P2pGateway::new_with_dna());
-        let dna_p2p = self.dna_gateway_map.get_mut(&chain_id).unwrap();
+        self.space_gateway_map
+            .insert(player_id.clone(), P2pGateway::new_with_space());
+        let space_gateway = self.space_gateway_map.get_mut(&player_id).unwrap();
         Dht::post(
-            dna_p2p,
+            space_gateway,
             DhtEvent::PeerHoldRequest(PeerHoldRequestData {
                 peer_address: "FIXME".to_string(), // msg.agent_id,
                 transport: self.transport_gateway.id(),

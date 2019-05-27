@@ -21,11 +21,11 @@ pub enum Lib3hClientProtocol {
     /// Connect to the specified multiaddr
     Connect(ConnectData),
 
-    // -- DNA tracking -- //
-    /// Order the p2p module to be part of the network of the specified DNA.
-    TrackDna(TrackDnaData),
-    /// Order the p2p module to leave the network of the specified DNA.
-    UntrackDna(TrackDnaData),
+    // -- Space -- //
+    /// Order the p2p module to be part of the network of the specified space.
+    JoinSpace(SpaceData),
+    /// Order the p2p module to leave the network of the specified space.
+    LeaveSpace(SpaceData),
 
     // -- Direct Messaging -- //
     /// Send a message directly to another agent on the network

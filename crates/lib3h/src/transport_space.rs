@@ -7,21 +7,21 @@ use crate::transport::{
 use lib3h_protocol::DidWork;
 use std::collections::VecDeque;
 
-/// Transport used for the DNA P2pGateway
-pub struct TransportDna {
+/// Transport used for the Space P2pGateway
+pub struct TransportSpace {
     inbox: VecDeque<TransportCommand>,
 }
 
-impl TransportDna {
+impl TransportSpace {
     pub fn new() -> Self {
-        TransportDna {
+        TransportSpace {
             inbox: VecDeque::new(),
         }
     }
 }
 
 /// Compose Transport
-impl Transport for TransportDna {
+impl Transport for TransportSpace {
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
         // FIXME
         Ok(vec![])
@@ -66,7 +66,7 @@ impl Transport for TransportDna {
                 Some(msg) => msg,
             };
             did_work = true;
-            println!("(log.t) TransportDna.process(): {:?}", evt)
+            println!("(log.t) TransportSpace.process(): {:?}", evt)
         }
         Ok((did_work, outbox))
     }
