@@ -13,7 +13,7 @@ use crate::{
         transport_trait::Transport,
         TransportId, TransportIdRef,
     },
-    transport_dna::TransportDna,
+    transport_space::TransportSpace,
     transport_wss::TransportWss,
 };
 use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
@@ -36,11 +36,11 @@ impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
     }
 }
 
-impl P2pGateway<TransportDna, RrDht> {
+impl P2pGateway<TransportSpace, RrDht> {
     /// Constructor
-    pub fn new_with_dna() -> Self {
+    pub fn new_with_space() -> Self {
         P2pGateway {
-            transport: TransportDna::new(),
+            transport: TransportSpace::new(),
             dht: RrDht::new(),
         }
     }

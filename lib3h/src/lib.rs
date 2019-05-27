@@ -9,5 +9,5 @@ pub mod dht;
 pub mod p2p;
 pub mod real_engine;
 pub mod transport;
-pub mod transport_dna;
+pub mod transport_space;
 pub mod transport_wss;
