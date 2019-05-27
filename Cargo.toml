@@ -6,4 +6,5 @@ members = [
   "sodium",
   "lib3h_protocol",
   "lib3h",
+  "mdns",
 ]
