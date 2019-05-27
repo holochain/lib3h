@@ -21,27 +21,33 @@ use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.
 /// Tracks distributed data for that P2P network.
-pub struct P2pGateway {
-    transport: Box<Transport>,
-    dht: Box<Dht>,
+pub struct P2pGateway<T: Transport, D: Dht> {
+    transport: T,
+    dht: D,
+}
+
+impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
+    /// Constructor
+    pub fn new_with_wss() -> Self {
+        P2pGateway {
+            transport: TransportWss::with_std_tcp_stream(),
+            dht: RrDht::new(),
+        }
+    }
+}
+
+impl P2pGateway<TransportDna, RrDht> {
+    /// Constructor
+    pub fn new_with_dna() -> Self {
+        P2pGateway {
+            transport: TransportDna::new(),
+            dht: RrDht::new(),
+        }
+    }
 }
 
 /// Public interface
-impl P2pGateway {
-    /// Constructor
-    pub fn new(is_dna: bool) -> Self {
-        let transport: Box<Transport> = if is_dna {
-            Box::new(TransportDna::new())
-        //Box::new(TransportWss::with_std_tcp_stream())
-        } else {
-            Box::new(TransportWss::with_std_tcp_stream())
-        };
-        P2pGateway {
-            transport,
-            dht: Box::new(RrDht::new()),
-        }
-    }
-
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
     // -- Getters -- //
 
     /// This nodes identifier on the network
@@ -58,7 +64,7 @@ impl P2pGateway {
 }
 
 /// Compose DHT
-impl Dht for P2pGateway {
+impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Peer info
     fn get_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
         self.dht.get_peer(peer_address)
@@ -90,7 +96,7 @@ impl Dht for P2pGateway {
 }
 
 /// Compose Transport
-impl Transport for P2pGateway {
+impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
         // self.transport_connection.transport_id_list()
         Ok(vec![])
@@ -125,7 +131,7 @@ impl Transport for P2pGateway {
 }
 
 /// Public - specific
-impl P2pGateway {
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn do_process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
         let mut outbox = Vec::new();
         // Process the transport connection
@@ -154,7 +160,7 @@ impl P2pGateway {
 }
 
 /// Private internals
-impl P2pGateway {
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Process a transportEvent.
     /// Return a list of P2pProtocol messages to send to others.
     fn serve_TransportEvent(&mut self, evt: &TransportEvent) -> Lib3hResult<Vec<P2pProtocol>> {
