@@ -36,7 +36,7 @@ pub struct EntryData {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResultData {
     pub request_id: String,
-    pub dna_address: Address,
+    pub space_address: Address,
     pub to_agent_id: Address,
     pub result_info: Vec<u8>,
 }
@@ -80,14 +80,14 @@ pub struct DisconnectedData {
 }
 
 //--------------------------------------------------------------------------------------------------
-// DNA tracking
+// Space tracking
 //--------------------------------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TrackDnaData {
+pub struct SpaceData {
     /// Identifier of this request
     pub request_id: String,
-    pub dna_address: Address,
+    pub space_address: Address,
     pub agent_id: Address,
 }
 
@@ -97,7 +97,7 @@ pub struct TrackDnaData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DirectMessageData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
     pub to_agent_id: Address,
     pub from_agent_id: Address,
@@ -111,7 +111,7 @@ pub struct DirectMessageData {
 /// Wrapped Entry message
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClaimedEntryData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub provider_agent_id: Address,
     pub entry: EntryData,
 }
@@ -119,7 +119,7 @@ pub struct ClaimedEntryData {
 /// Entry hodled message
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EntryStoredData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub provider_agent_id: Address,
     pub entry_address: Address,
     pub holder_agent_id: Address,
@@ -128,7 +128,7 @@ pub struct EntryStoredData {
 /// Request for Entry
 #[derive(Debug, Clone, PartialEq)]
 pub struct FetchEntryData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub entry_address: Address,
     pub request_id: String,
     pub requester_agent_id: Address,
@@ -145,7 +145,7 @@ pub struct FetchEntryResultData {
 /// Identifier of what entry (and its meta?) to drop
 #[derive(Debug, Clone, PartialEq)]
 pub struct DropEntryData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
     pub entry_address: Address,
 }
@@ -156,13 +156,13 @@ pub struct DropEntryData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GetListData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntryListData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
     pub entry_address_list: Vec<Address>,
 }
