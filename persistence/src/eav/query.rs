@@ -2,19 +2,19 @@ use eav::eavi::{Attribute, Entity, EntityAttributeValueIndex, Value};
 use std::collections::BTreeSet;
 
 /// Represents a set of filtering operations on the EAVI store.
-pub struct EaviQuery<'a> {
+pub struct EaviQuery<'a, A:Attribute> {
     entity: EntityFilter<'a>,
-    attribute: AttributeFilter<'a>,
+    attribute: AttributeFilter<'a, A>,
     value: ValueFilter<'a>,
     index: IndexFilter,
 }
 
 type EntityFilter<'a> = EavFilter<'a, Entity>;
-type AttributeFilter<'a> = EavFilter<'a, Attribute>;
+type AttributeFilter<'a, A:Attribute> = EavFilter<'a, A>;
 type ValueFilter<'a> = EavFilter<'a, Value>;
 
-impl<'a> Default for EaviQuery<'a> {
-    fn default() -> EaviQuery<'a> {
+impl<'a, A:Attribute> Default for EaviQuery<'a, A> {
+    fn default() -> EaviQuery<'a, A> {
         EaviQuery::new(
             Default::default(),
             Default::default(),
@@ -24,10 +24,10 @@ impl<'a> Default for EaviQuery<'a> {
     }
 }
 
-impl<'a> EaviQuery<'a> {
+impl<'a, A:Attribute> EaviQuery<'a, A> {
     pub fn new(
         entity: EntityFilter<'a>,
-        attribute: AttributeFilter<'a>,
+        attribute: AttributeFilter<'a, A>,
         value: ValueFilter<'a>,
         index: IndexFilter,
     ) -> Self {
@@ -39,9 +39,9 @@ impl<'a> EaviQuery<'a> {
         }
     }
 
-    pub fn run<I>(&self, iter: I) -> BTreeSet<EntityAttributeValueIndex>
+    pub fn run<I>(&self, iter: I) -> BTreeSet<EntityAttributeValueIndex<A>>
     where
-        I: Clone + Iterator<Item = EntityAttributeValueIndex> + 'a,
+        I: Clone + Iterator<Item = EntityAttributeValueIndex<A>> + 'a,
     {
         let iter2 = iter.clone();
         let filtered = iter
@@ -75,10 +75,10 @@ impl<'a> EaviQuery<'a> {
         }
     }
 
-    fn eav_check(
-        eavi: &EntityAttributeValueIndex,
+    fn eav_check<A:Attribute>(
+        eavi: &EntityAttributeValueIndex<A>,
         e: &EntityFilter<'a>,
-        a: &AttributeFilter<'a>,
+        a: &AttributeFilter<'a, A>,
         v: &ValueFilter<'a>,
     ) -> bool {
         e.check(eavi.entity()) && a.check(eavi.attribute()) && v.check(eavi.value())
@@ -87,7 +87,7 @@ impl<'a> EaviQuery<'a> {
     pub fn entity(&self) -> &EntityFilter<'a> {
         &self.entity
     }
-    pub fn attribute(&self) -> &AttributeFilter<'a> {
+    pub fn attribute(&self) -> &AttributeFilter<'a, A> {
         &self.attribute
     }
     pub fn value(&self) -> &ValueFilter<'a> {

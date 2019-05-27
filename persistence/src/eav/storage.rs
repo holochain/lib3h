@@ -1,4 +1,4 @@
-use eav::{eavi::EntityAttributeValueIndex, query::EaviQuery};
+use eav::{eavi::EntityAttributeValueIndex, query::EaviQuery, Attribute};
 use error::{HcResult, HolochainError};
 use objekt;
 use std::{
@@ -10,13 +10,13 @@ use std::{
 /// This provides a simple and flexible interface to define relationships between AddressableContent.
 /// It does NOT provide storage for AddressableContent.
 /// Use cas::storage::ContentAddressableStorage to store AddressableContent.
-pub trait EntityAttributeValueStorage: objekt::Clone + Send + Sync + Debug {
+pub trait EntityAttributeValueStorage<A:Attribute>: objekt::Clone + Send + Sync + Debug {
     /// Adds the given EntityAttributeValue to the EntityAttributeValueStorage
     /// append only storage.
     fn add_eavi(
         &mut self,
-        eav: &EntityAttributeValueIndex,
-    ) -> Result<Option<EntityAttributeValueIndex>, HolochainError>;
+        eav: &EntityAttributeValueIndex<A>,
+    ) -> Result<Option<EntityAttributeValueIndex<A>>, HolochainError>;
 
     /// Fetch the set of EntityAttributeValues that match constraints according to the latest hash version
     /// - None = no constraint
@@ -25,8 +25,8 @@ pub trait EntityAttributeValueStorage: objekt::Clone + Send + Sync + Debug {
     /// - Some(Value) = requires the given value (e.g. all entities referencing an Address)
     fn fetch_eavi(
         &self,
-        query: &EaviQuery,
-    ) -> Result<BTreeSet<EntityAttributeValueIndex>, HolochainError>;
+        query: &EaviQuery<A>,
+    ) -> Result<BTreeSet<EntityAttributeValueIndex<A>>, HolochainError>;
 
     // @TODO: would like to do this, but can't because of the generic type param
     // fn iter<I>(&self) -> I
@@ -34,24 +34,24 @@ pub trait EntityAttributeValueStorage: objekt::Clone + Send + Sync + Debug {
     //     I: Iterator<Item = EntityAttributeValueIndex>;
 }
 
-clone_trait_object!(EntityAttributeValueStorage);
+clone_trait_object!(<A:Attribute>EntityAttributeValueStorage<A>);
 
 #[derive(Clone, Debug, Default)]
-pub struct ExampleEntityAttributeValueStorage {
-    storage: Arc<RwLock<BTreeSet<EntityAttributeValueIndex>>>,
+pub struct ExampleEntityAttributeValueStorage<A:Attribute> {
+    storage: Arc<RwLock<BTreeSet<EntityAttributeValueIndex<A>>>>,
 }
 
-impl ExampleEntityAttributeValueStorage {
-    pub fn new() -> ExampleEntityAttributeValueStorage {
+impl<A:Attribute> ExampleEntityAttributeValueStorage<A> {
+    pub fn new() -> ExampleEntityAttributeValueStorage<A> {
         Default::default()
     }
 }
 
-impl EntityAttributeValueStorage for ExampleEntityAttributeValueStorage {
+impl<A:Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValueStorage<A> {
     fn add_eavi(
         &mut self,
-        eav: &EntityAttributeValueIndex,
-    ) -> Result<Option<EntityAttributeValueIndex>, HolochainError> {
+        eav: &EntityAttributeValueIndex<A>,
+    ) -> Result<Option<EntityAttributeValueIndex<A>>, HolochainError> {
         let mut map = self.storage.write()?;
         let new_eav = increment_key_till_no_collision(eav.clone(), map.clone())?;
         map.insert(new_eav.clone());

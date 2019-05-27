@@ -6,7 +6,7 @@
 use crate::{
     cas::content::{Address, AddressableContent, Content},
     eav::{
-        Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
+        ExampleAttribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
     error::HolochainError,
@@ -248,11 +248,11 @@ impl EavTestSuite {
     ) {
         let eav = EntityAttributeValueIndex::new(
             &entity_content.address(),
-            &Attribute::LinkTag("favourite-color".into()),
+            &ExampleAttribute::WithPayload("favourite-color".into()),
             &value_content.address(),
         )
         .expect("Could create entityAttributeValue");
-        let attribute = Attribute::LinkTag(attribute_name);
+        let attribute = ExampleAttribute::WithPayload(attribute_name);
 
         let two_stores = vec![eav_storage.clone(), eav_storage.clone()];
 
@@ -331,7 +331,7 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_three = A::try_from_content(&baz_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = Attribute::LinkTag("one_to_many".to_string());
+        let attribute = ExampleAttribute::WithPayload("one_to_many".to_string());
 
         let mut expected = BTreeSet::new();
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {
@@ -409,7 +409,7 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_two = A::try_from_content(&bar_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = Attribute::LinkTag("one_to_many".into());
+        let attribute = ExampleAttribute::WithPayload("one_to_many".into());
         let mut expected_many_one = BTreeSet::new();
         let mut expected_many_two = BTreeSet::new();
         let mut expected_all_range = BTreeSet::new();
@@ -490,7 +490,7 @@ impl EavTestSuite {
         );
     }
 
-    pub fn test_multiple_attributes<A, S>(mut eav_storage: S, attributes: Vec<Attribute>)
+    pub fn test_multiple_attributes<A, S>(mut eav_storage: S, attributes: Vec<ExampleAttribute>)
     where
         A: AddressableContent + Clone,
         S: EntityAttributeValueStorage,
@@ -565,7 +565,7 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_three = A::try_from_content(&baz_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = Attribute::LinkTag("many_to_one".into());
+        let attribute = ExampleAttribute::WithPayload("many_to_one".into());
 
         let mut expected = BTreeSet::new();
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {

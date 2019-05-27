@@ -13,7 +13,7 @@ use eav::{
     query::{EaviQuery, IndexFilter},
     storage::{EntityAttributeValueStorage, ExampleEntityAttributeValueStorage},
 };
-use regex::{Regex, RegexBuilder};
+use json::DefaultJson;
 use std::{
     cmp::Ordering,
     collections::BTreeSet,
@@ -27,26 +27,36 @@ pub type Entity = Address;
 
 /// All Attribute values are pre-defined here. If ever a user-defined Attribute is needed,
 /// just add a new Custom variant for it with a String parameter
-#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
-#[serde(rename_all = "snake_case")]
-pub enum Attribute {
-    CrudStatus,
-    CrudLink,
-    EntryHeader,
-    Link,
-    LinkRemove,
-    LinkTag(String),
-    RemovedLink(String),
-    PendingEntry,
-    StorageRole,
+//#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
+//#[serde(rename_all = "snake_case")]
+pub trait Attribute:
+    PartialEq + Eq + PartialOrd + std::hash::Hash + Clone + fmt::Debug + TryFrom<String> + Into<String>
+{
 }
 
-impl Attribute {
-    /// Returns true if the attribute is private and should not be dissimated to other nodes
-    pub fn is_private(&self) -> bool {
-        *self == Attribute::StorageRole
+#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
+pub enum ExampleAttribute {
+    WithoutPayload,
+    WithPayload(String),
+}
+
+impl TryFrom<String> for ExampleAttribute {
+    type Error = AttributeError;
+    fn try_from(s: String) -> Result<Self, AttributeError> {
+        match s.as_str() {
+            "without-payload" => Ok(ExampleAttribute::WithoutPayload),
+            with_payload => {
+                let parts: Vec<&str> = with_payload.split("-").collect();
+                if parts.len() < 2 {
+                    return Err(AttributeError::ParseError);
+                }
+                Ok(ExampleAttribute::WithPayload(String::from(parts[1])))
+            }
+        }
     }
 }
+
+impl Attribute for ExampleAttribute {}
 
 #[derive(PartialEq, Debug)]
 pub enum AttributeError {
@@ -71,61 +81,6 @@ impl From<NoneError> for AttributeError {
     }
 }
 
-impl fmt::Display for Attribute {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Attribute::CrudStatus => write!(f, "crud-status"),
-            Attribute::CrudLink => write!(f, "crud-link"),
-            Attribute::EntryHeader => write!(f, "entry-header"),
-            Attribute::Link => write!(f, "link"),
-            Attribute::LinkRemove => write!(f, "link_remove"),
-            Attribute::LinkTag(tag) => write!(f, "link__{}", tag),
-            Attribute::RemovedLink(tag) => write!(f, "removed_link__{}", tag),
-            Attribute::PendingEntry => write!(f, "pending-entry"),
-            Attribute::StorageRole => write!(f, "storage-role"),
-        }
-    }
-}
-
-lazy_static! {
-    static ref LINK_REGEX: Regex =
-        Regex::new(r"^link__(.*)$").expect("This string literal is a valid regex");
-    static ref REMOVED_LINK_REGEX: Regex =
-        Regex::new(r"^removed_link__(.*)$").expect("This string literal is a valid regex");
-}
-
-impl TryFrom<&str> for Attribute {
-    type Error = AttributeError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        use self::Attribute::*;
-        if LINK_REGEX.is_match(s) {
-            let tag = LINK_REGEX.captures(s)?.get(1)?.as_str().to_string();
-            Ok(LinkTag(tag))
-        } else if REMOVED_LINK_REGEX.is_match(s) {
-            let tag = REMOVED_LINK_REGEX.captures(s)?.get(1)?.as_str().to_string();
-            Ok(RemovedLink(tag))
-        } else {
-            match s {
-                "crud-status" => Ok(CrudStatus),
-                "crud-link" => Ok(CrudLink),
-                "entry-header" => Ok(EntryHeader),
-                "link" => Ok(Link),
-                "link_remove" => Ok(LinkRemove),
-                "pending-entry" => Ok(PendingEntry),
-                "storage-role" => Ok(StorageRole),
-                a => Err(AttributeError::Unrecognized(a.to_string())),
-            }
-        }
-    }
-}
-
-impl TryFrom<String> for Attribute {
-    type Error = AttributeError;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        s.as_str().try_into()
-    }
-}
-
 /// Address of AddressableContent representing the EAV value
 pub type Value = Address;
 
@@ -139,28 +94,32 @@ pub type Index = i64;
 // type Source ...
 /// The basic struct for EntityAttributeValue triple, implemented as AddressableContent
 /// including the necessary serialization inherited.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
-pub struct EntityAttributeValueIndex {
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
+pub struct EntityAttributeValueIndex<A: Attribute> {
     entity: Entity,
-    attribute: Attribute,
+    attribute: A,
     value: Value,
     index: Index,
     // source: Source,
 }
 
-impl PartialOrd for EntityAttributeValueIndex {
-    fn partial_cmp(&self, other: &EntityAttributeValueIndex) -> Option<Ordering> {
+impl<A: Attribute> DefaultJson for EntityAttributeValueIndex<A> {
+
+}
+
+impl<A: Attribute> PartialOrd for EntityAttributeValueIndex<A> {
+    fn partial_cmp(&self, other: &EntityAttributeValueIndex<A>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for EntityAttributeValueIndex {
-    fn cmp(&self, other: &EntityAttributeValueIndex) -> Ordering {
+impl<A:Attribute> Ord for EntityAttributeValueIndex<A> {
+    fn cmp(&self, other: &EntityAttributeValueIndex<A>) -> Ordering {
         self.index.cmp(&other.index())
     }
 }
 
-impl AddressableContent for EntityAttributeValueIndex {
+impl<A:Attribute> AddressableContent for EntityAttributeValueIndex<A> {
     fn content(&self) -> Content {
         self.to_owned().into()
     }
@@ -170,30 +129,12 @@ impl AddressableContent for EntityAttributeValueIndex {
     }
 }
 
-fn validate_attribute(attribute: &Attribute) -> HcResult<()> {
-    if let Attribute::LinkTag(name) | Attribute::RemovedLink(name) = attribute {
-        let regex = RegexBuilder::new(r#"[/:*?<>"'\\|+]"#)
-            .build()
-            .map_err(|_| HolochainError::ErrorGeneric("Could not create regex".to_string()))?;
-        if !regex.is_match(name) {
-            Ok(())
-        } else {
-            Err(HolochainError::ErrorGeneric(
-                "Attribute name invalid".to_string(),
-            ))
-        }
-    } else {
-        Ok(())
-    }
-}
-
-impl EntityAttributeValueIndex {
+impl<A:Attribute> EntityAttributeValueIndex<A> {
     pub fn new(
         entity: &Entity,
-        attribute: &Attribute,
+        attribute: &A,
         value: &Value,
-    ) -> HcResult<EntityAttributeValueIndex> {
-        validate_attribute(attribute)?;
+    ) -> HcResult<EntityAttributeValueIndex<A>> {
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
             attribute: attribute.clone(),
@@ -204,11 +145,10 @@ impl EntityAttributeValueIndex {
 
     pub fn new_with_index(
         entity: &Entity,
-        attribute: &Attribute,
+        attribute: &A,
         value: &Value,
         timestamp: i64,
-    ) -> HcResult<EntityAttributeValueIndex> {
-        validate_attribute(attribute)?;
+    ) -> HcResult<EntityAttributeValueIndex<A>> {
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
             attribute: attribute.clone(),
@@ -221,7 +161,7 @@ impl EntityAttributeValueIndex {
         self.entity.clone()
     }
 
-    pub fn attribute(&self) -> Attribute {
+    pub fn attribute(&self) -> A {
         self.attribute.clone()
     }
 
@@ -275,15 +215,15 @@ pub fn test_eav_entity() -> ExampleEntry {
     test_entry_a()
 }
 
-pub fn test_eav_attribute() -> Attribute {
-    Attribute::LinkTag("foo-attribute".into())
+pub fn test_eav_attribute() -> ExampleAttribute {
+    ExampleAttribute::WithPayload("foo-attribute".into())
 }
 
 pub fn test_eav_value() -> ExampleEntry {
     test_entry_b()
 }
 
-pub fn test_eav() -> EntityAttributeValueIndex {
+pub fn test_eav() -> EntityAttributeValueIndex<ExampleAttribute> {
     EntityAttributeValueIndex::new_with_index(
         &test_eav_entity().address(),
         &test_eav_attribute(),
@@ -301,9 +241,9 @@ pub fn test_eav_address() -> Address {
     test_eav().address()
 }
 
-pub fn eav_round_trip_test_runner(
+pub fn eav_round_trip_test_runner<A:Attribute>(
     entity_content: impl AddressableContent + Clone,
-    attribute: Attribute,
+    attribute: A,
     value_content: impl AddressableContent + Clone,
 ) {
     let eav = EntityAttributeValueIndex::new(
@@ -429,20 +369,21 @@ pub mod tests {
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
             ExampleEntityAttributeValueStorage,
-        >(
-            test_eav_storage(),
-            vec!["a_", "b_", "c_", "d_"]
+        >(test_eav_storage(), {
+            let mut attrs: Vec<ExampleAttribute> = vec!["a_", "b_", "c_", "d_"]
                 .into_iter()
-                .map(|p| Attribute::LinkTag(p.to_string() + "one_to_many"))
-                .collect(),
-        );
+                .map(|p| ExampleAttribute::WithPayload(p.to_string() + "one_to_many"))
+                .collect();
+            attrs.push(ExampleAttribute::WithoutPayload);
+            attrs
+        });
     }
 
     #[test]
     /// show AddressableContent implementation
     fn addressable_content_test() {
         // from_content()
-        AddressableContentTestSuite::addressable_content_trait_test::<EntityAttributeValueIndex>(
+        AddressableContentTestSuite::addressable_content_trait_test::<EntityAttributeValueIndex<ExampleAttribute>>(
             test_eav_content(),
             test_eav(),
             test_eav_address(),
@@ -454,73 +395,9 @@ pub mod tests {
     fn cas_round_trip_test() {
         let addressable_contents = vec![test_eav()];
         AddressableContentTestSuite::addressable_content_round_trip::<
-            EntityAttributeValueIndex,
+            EntityAttributeValueIndex<ExampleAttribute>,
             ExampleContentAddressableStorage,
         >(addressable_contents, test_content_addressable_storage());
-    }
-
-    #[test]
-    fn attribute_try_from_string() {
-        assert_eq!("crud-status".try_into(), Ok(Attribute::CrudStatus));
-        assert_eq!(
-            "link__tagalog".try_into(),
-            Ok(Attribute::LinkTag("tagalog".into()))
-        );
-        assert!(
-            (r"unknown \\and// invalid / attribute".try_into() as Result<Attribute, _>).is_err(),
-        );
-    }
-
-    #[test]
-    fn validate_attribute_paths() {
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("abc".into()),
-            &test_eav_entity().address()
-        )
-        .is_ok());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("abc123".into()),
-            &test_eav_entity().address()
-        )
-        .is_ok());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("123".into()),
-            &test_eav_entity().address()
-        )
-        .is_ok());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("link_:{}".into()),
-            &test_eav_entity().address()
-        )
-        .is_err());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("link_\"".into()),
-            &test_eav_entity().address()
-        )
-        .is_err());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("link_/".into()),
-            &test_eav_entity().address()
-        )
-        .is_err());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("link_\\".into()),
-            &test_eav_entity().address()
-        )
-        .is_err());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::LinkTag("link_?".into()),
-            &test_eav_entity().address()
-        )
-        .is_err());
     }
 
 }
