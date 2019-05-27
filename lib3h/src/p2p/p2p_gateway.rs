@@ -97,11 +97,6 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
-    fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        // self.transport_connection.transport_id_list()
-        Ok(vec![])
-    }
-
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         self.transport.connect(&uri)
     }
@@ -121,12 +116,20 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         self.transport.send_all(payload)
     }
 
+    fn bind(&mut self, url: &str) -> TransportResult<()> {
+        self.transport.bind(url)
+    }
+
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
         self.transport.post(command)
     }
 
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         self.transport.process()
+    }
+
+    fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
+        self.transport.transport_id_list()
     }
 }
 

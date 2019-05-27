@@ -8,6 +8,7 @@ pub enum TransportCommand {
     SendAll(TransportId, Vec<u8>),
     Close(TransportId),
     CloseAll,
+    Bind(String),
 }
 
 /// Events that can be generated during a `process()`

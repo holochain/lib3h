@@ -177,6 +177,11 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         }
         Ok(())
     }
+
+    fn bind(&mut self, _url: &str) -> TransportResult<()> {
+        // FIXME
+        Ok(())
+    }
 }
 
 impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {

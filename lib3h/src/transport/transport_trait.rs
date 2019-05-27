@@ -21,6 +21,8 @@ pub trait Transport {
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()>;
     /// send a payload to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;
+    /// bind to a network interface
+    fn bind(&mut self, url: &str) -> TransportResult<()>;
 
     // -- Asynchronous -- //
     /// Send a command for later processing

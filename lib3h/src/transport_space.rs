@@ -56,6 +56,11 @@ impl Transport for TransportSpace {
         Ok(())
     }
 
+    fn bind(&mut self, _url: &str) -> TransportResult<()> {
+        // FIXME
+        Ok(())
+    }
+
     // FIXME
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let outbox = Vec::new();
