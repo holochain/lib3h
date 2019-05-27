@@ -1,5 +1,5 @@
 [package]
-name = "lib3h_hbc"
+name = "lib3h_half_busy_chat"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
@@ -13,3 +13,12 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 crossbeam-channel = "=0.3.8"
+linefeed = "=0.6.0"
+
+[lib]
+name = "lib3h_half_busy_chat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "half_busy_chat"
+path = "src/main.rs"

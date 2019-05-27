@@ -6,6 +6,5 @@ members = [
   "sodium",
   "lib3h_protocol",
   "lib3h",
-  "tools/hbc",
-  "tools/hbc_cli",
+  "tools/half_busy_chat",
 ]
