@@ -28,7 +28,7 @@ pub struct P2pGateway<T: Transport, D: Dht> {
 
 impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
     /// Constructor
-    pub fn new_with_tcp() -> Self {
+    pub fn new_with_wss() -> Self {
         P2pGateway {
             transport: TransportWss::with_std_tcp_stream(),
             dht: RrDht::new(),

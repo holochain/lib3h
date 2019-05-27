@@ -52,7 +52,7 @@ impl RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
-            transport_gateway: P2pGateway::new_with_tcp(),
+            transport_gateway: P2pGateway::new_with_wss(),
             dna_gateway_map: HashMap::new(),
         })
     }
