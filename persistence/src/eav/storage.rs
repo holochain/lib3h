@@ -42,13 +42,18 @@ pub struct ExampleEntityAttributeValueStorage<A: Attribute> {
 }
 
 impl<A: Attribute> ExampleEntityAttributeValueStorage<A> {
-    pub fn new() -> ExampleEntityAttributeValueStorage<A> where A : std::default::Default {
+    pub fn new() -> ExampleEntityAttributeValueStorage<A>
+    where
+        A: std::default::Default,
+    {
         Default::default()
     }
 }
 
-impl<A: Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValueStorage<A> 
-    where A : std::marker::Send + std::marker::Sync {
+impl<A: Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValueStorage<A>
+where
+    A: std::marker::Send + std::marker::Sync,
+{
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
@@ -70,14 +75,14 @@ impl<A: Attribute> EntityAttributeValueStorage<A> for ExampleEntityAttributeValu
     }
 }
 
-impl<A:Attribute> PartialEq for EntityAttributeValueStorage<A> {
+impl<A: Attribute> PartialEq for EntityAttributeValueStorage<A> {
     fn eq(&self, other: &EntityAttributeValueStorage<A>) -> bool {
         let query = EaviQuery::default();
         self.fetch_eavi(&query) == other.fetch_eavi(&query)
     }
 }
 
-pub fn increment_key_till_no_collision<A:Attribute>(
+pub fn increment_key_till_no_collision<A: Attribute>(
     mut eav: EntityAttributeValueIndex<A>,
     map: BTreeSet<EntityAttributeValueIndex<A>>,
 ) -> HcResult<EntityAttributeValueIndex<A>> {

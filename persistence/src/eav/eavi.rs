@@ -13,7 +13,6 @@ use eav::{
     query::{EaviQuery, IndexFilter},
     storage::{EntityAttributeValueStorage, ExampleEntityAttributeValueStorage},
 };
-use json::DefaultJson;
 use std::{
     cmp::Ordering,
     collections::BTreeSet,
@@ -30,7 +29,15 @@ pub type Entity = Address;
 //#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
 //#[serde(rename_all = "snake_case")]
 pub trait Attribute:
-    PartialEq + Eq + PartialOrd + std::hash::Hash + Clone + fmt::Debug + TryFrom<String> + Into<String>
+    PartialEq
+    + Eq
+    + PartialOrd
+    + std::hash::Hash
+    + Clone
+    + serde::Serialize
+    + fmt::Debug
+    + TryFrom<String>
+    + Into<String>
 {
 }
 
@@ -41,7 +48,6 @@ pub enum ExampleAttribute {
 }
 
 impl Default for ExampleAttribute {
-
     fn default() -> ExampleAttribute {
         ExampleAttribute::WithoutPayload
     }
@@ -53,7 +59,7 @@ impl TryFrom<String> for ExampleAttribute {
         match s.as_str() {
             "without-payload" => Ok(ExampleAttribute::WithoutPayload),
             with_payload => {
-                let parts: Vec<&str> = with_payload.split("-").collect();
+                let parts: Vec<&str> = with_payload.split("_").collect();
                 if parts.len() < 2 {
                     return Err(AttributeError::ParseError);
                 }
@@ -63,6 +69,14 @@ impl TryFrom<String> for ExampleAttribute {
     }
 }
 
+impl Into<String> for ExampleAttribute {
+    fn into(self) -> String {
+        match self {
+            ExampleAttribute::WithoutPayload => String::from("without-payload"),
+            ExampleAttribute::WithPayload(payload) => format!("with-payload_{:}", payload),
+        }
+    }
+}
 impl Attribute for ExampleAttribute {}
 
 #[derive(PartialEq, Debug)]
@@ -110,11 +124,45 @@ pub struct EntityAttributeValueIndex<A: Attribute> {
     // source: Source,
 }
 
-impl serde::Serialize for Attribute {
+impl<A: Attribute> From<&EntityAttributeValueIndex<A>> for JsonString {
+    fn from(v: &EntityAttributeValueIndex<A>) -> JsonString {
+        match ::serde_json::to_string(&v) {
+            Ok(s) => Ok(JsonString::from_json(&s)),
+            Err(e) => {
+                eprintln!("Error serializing to JSON: {:?}", e);
+                Err(HolochainError::SerializationError(e.to_string()))
+            }
+        }
+        .expect(&format!("could not Jsonify {}: {:?}", stringify!(#name), v))
+    }
+}
 
+impl<A: Attribute> From<EntityAttributeValueIndex<A>> for JsonString {
+    fn from(v: EntityAttributeValueIndex<A>) -> JsonString {
+        JsonString::from(&v)
+    }
+}
 
-    fn serialize<S:serde::Serializer>(&self, serializer: S) -> Result<JsonString, S::Error> {
-        Ok(JsonString::from(self.into()))
+impl<'a, A: Attribute> ::std::convert::TryFrom<&'a JsonString> for EntityAttributeValueIndex<A>
+where
+    A: serde::Deserialize<'a>,
+{
+    type Error = HolochainError;
+    fn try_from(json_string: &JsonString) -> Result<Self, Self::Error> {
+        match ::serde_json::from_str(&String::from(json_string)) {
+            Ok(d) => Ok(d),
+            Err(e) => Err(HolochainError::SerializationError(e.to_string())),
+        }
+    }
+}
+
+impl<'a, A: Attribute> ::std::convert::TryFrom<JsonString> for EntityAttributeValueIndex<A>
+where
+    A: serde::Deserialize<'a>,
+{
+    type Error = HolochainError;
+    fn try_from(json_string: JsonString) -> Result<Self, Self::Error> {
+        EntityAttributeValueIndex::try_from(&json_string)
     }
 }
 
@@ -130,7 +178,10 @@ impl<A: Attribute> Ord for EntityAttributeValueIndex<A> {
     }
 }
 
-impl<A: Attribute> AddressableContent for EntityAttributeValueIndex<A> {
+impl<'a, A: Attribute> AddressableContent for EntityAttributeValueIndex<A>
+where
+    A: serde::Deserialize<'a>,
+{
     fn content(&self) -> Content {
         self.to_owned().into()
     }
@@ -256,7 +307,9 @@ pub fn eav_round_trip_test_runner<A: Attribute>(
     entity_content: impl AddressableContent + Clone,
     attribute: A,
     value_content: impl AddressableContent + Clone,
-) where A : std::default::Default + std::marker::Sync + std::marker::Send {
+) where
+    A: std::default::Default + std::marker::Sync + std::marker::Send,
+{
     let eav = EntityAttributeValueIndex::new(
         &entity_content.address(),
         &attribute,
@@ -334,7 +387,10 @@ pub mod tests {
         json::RawString,
     };
 
-    pub fn test_eav_storage<A:Attribute>() -> ExampleEntityAttributeValueStorage<A> where A: std::default::Default {
+    pub fn test_eav_storage<A: Attribute>() -> ExampleEntityAttributeValueStorage<A>
+    where
+        A: std::default::Default,
+    {
         ExampleEntityAttributeValueStorage::new()
     }
 
@@ -370,9 +426,10 @@ pub mod tests {
 
     #[test]
     fn example_eav_range() {
-        EavTestSuite::test_range::<ExampleAddressableContent, ExampleEntityAttributeValueStorage<ExampleAttribute>>(
-            test_eav_storage(),
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleEntityAttributeValueStorage<ExampleAttribute>,
+        >(test_eav_storage());
     }
 
     #[test]
