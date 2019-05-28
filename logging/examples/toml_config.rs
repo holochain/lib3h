@@ -46,4 +46,5 @@ fn main() {
 
     info!("Some info here");
     debug!("Logging set up from `TOML`!");
+    warn!("I warned you Timmy!");
 }

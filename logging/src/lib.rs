@@ -7,6 +7,7 @@
 //! use holochain_logging::{prelude::*, Lib3hLogger};
 //!
 //! fn main() {
+//!     // Default level is `Info`, so it will skip everything lower
 //!     let _guard = Lib3hLogger::init();
 //!
 //!     trace!("logging a trace message");
@@ -197,6 +198,7 @@ impl Lib3hLogger {
             }
         };
 
+        Lib3hLogger::init_terminal_logger(level);
         Ok(Self { level })
     }
 
