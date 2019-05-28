@@ -8,6 +8,9 @@ edition = "2018"
 log = "0.4.6"
 chrono = "0.4.6"
 fern = { version = "0.5.8", features = ["colored"] }
+toml = "0.5.1"
+serde = "1.0.91"
+serde_derive = "1.0.91"
 
 [dev-dependencies]
 tempfile = "3.0.8"
