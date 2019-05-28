@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-// #[cfg(test)]
 use crate::{
     dht::{
         dht_event::{DhtEvent, PeerHoldRequestData},
@@ -29,9 +28,9 @@ pub struct P2pGateway<T: Transport, D: Dht> {
     advertise: String,
 }
 
-// #[cfg(test)]
 impl P2pGateway<TransportMemory, RrDht> {
     /// Constructor
+    /// Bind and set advertise on construction by using the name as URL.
     pub fn new_with_memory(name: &str) -> Self {
         let mut gateway = P2pGateway {
             transport: TransportMemory::new(),
@@ -40,7 +39,7 @@ impl P2pGateway<TransportMemory, RrDht> {
         };
         let binding = gateway
             .bind(name)
-            .expect("TransportMemory.bind() failed. url might not be unique?");
+            .expect("TransportMemory.bind() failed. url/name might not be unique?");
         gateway.advertise = binding;
         gateway
     }

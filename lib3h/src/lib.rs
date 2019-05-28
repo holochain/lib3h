@@ -4,7 +4,6 @@ extern crate tungstenite;
 extern crate url;
 #[macro_use]
 extern crate failure;
-// #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
 
