@@ -3,11 +3,16 @@
 
 mod tcp;
 
-use std::io::{Read, Write};
-
 use crate::transport::{
-    DidWork, Transport, TransportError, TransportEvent, TransportId, TransportIdRef,
-    TransportResult,
+    error::{TransportError, TransportResult},
+    protocol::{TransportCommand, TransportEvent},
+    transport_trait::Transport,
+    TransportId, TransportIdRef,
+};
+use lib3h_protocol::DidWork;
+use std::{
+    collections::VecDeque,
+    io::{Read, Write},
 };
 
 // -- some internal types for readability -- //
@@ -76,6 +81,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
     stream_sockets: SocketMap<T>,
     event_queue: Vec<TransportEvent>,
     n_id: u64,
+    inbox: VecDeque<TransportCommand>,
 }
 
 impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
@@ -140,9 +146,14 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
     }
 
+    fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
+        self.inbox.push_back(command);
+        Ok(())
+    }
+
     /// this should be called frequently on the event loop
     /// looks for incoming messages or processes ping/pong/close events etc
-    fn poll(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+    fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let did_work = self.priv_process_stream_sockets()?;
 
         Ok((did_work, self.event_queue.drain(..).collect()))
@@ -176,6 +187,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
             n_id: 1,
+            inbox: VecDeque::new(),
         }
     }
 
@@ -187,10 +199,10 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
         let mut out = Vec::new();
         let start = std::time::Instant::now();
         while (start.elapsed().as_millis() as usize) < DEFAULT_HEARTBEAT_WAIT_MS {
-            let (_did_work, evt_lst) = self.poll()?;
+            let (_did_work, evt_lst) = self.process()?;
             for evt in evt_lst {
                 match evt {
-                    TransportEvent::Connect(id) => {
+                    TransportEvent::ConnectResult(id) => {
                         if id == transport_id {
                             return Ok(id);
                         }
@@ -229,7 +241,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                     .push(TransportEvent::TransportError(info.id.clone(), e));
             }
             if let WssStreamState::None = info.stateful_socket {
-                self.event_queue.push(TransportEvent::Close(info.id));
+                self.event_queue.push(TransportEvent::Closed(info.id));
                 continue;
             }
             if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_MS {
@@ -237,7 +249,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                     socket.write_message(tungstenite::Message::Ping(vec![]))?;
                 }
             } else if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_WAIT_MS {
-                self.event_queue.push(TransportEvent::Close(info.id));
+                self.event_queue.push(TransportEvent::Closed(info.id));
                 info.stateful_socket = WssStreamState::None;
                 continue;
             }
@@ -320,7 +332,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
 
                         if let Some(msg) = qmsg {
                             self.event_queue
-                                .push(TransportEvent::Message(info.id.clone(), msg));
+                                .push(TransportEvent::Received(info.id.clone(), msg));
                         }
                         info.stateful_socket = WssStreamState::Ready(socket);
                         Ok(())
@@ -356,7 +368,8 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
-                self.event_queue.push(TransportEvent::Connect(id.clone()));
+                self.event_queue
+                    .push(TransportEvent::ConnectResult(id.clone()));
                 Ok(WssStreamState::Ready(Box::new(socket)))
             }
         }

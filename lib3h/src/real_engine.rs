@@ -1,10 +1,26 @@
-use std::collections::VecDeque;
+#![allow(non_snake_case)]
 
-use holochain_lib3h_protocol::{
-    network_engine::{DidWork, NetworkEngine},
-    protocol::Lib3hProtocol,
-    Lib3hResult,
+use std::collections::{HashMap, VecDeque};
+
+use lib3h_protocol::{
+    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
 };
+
+use crate::{
+    dht::{
+        dht_event::{DhtEvent, PeerHoldRequestData},
+        dht_trait::Dht,
+        rrdht::RrDht,
+    },
+    p2p::{p2p_gateway::P2pGateway, p2p_protocol::P2pProtocol},
+    transport::transport_trait::Transport,
+    transport_space::TransportSpace,
+    transport_wss::TransportWss,
+};
+
+/// Identifier of a source chain: SpaceAddress+AgentId
+pub type PlayerId = (Address, Address);
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Debug, Clone, PartialEq)]
@@ -18,87 +34,27 @@ pub struct RealEngineConfig {
 /// Lib3h's 'real mode' as a NetworkEngine
 pub struct RealEngine {
     /// Config settings
-    config: RealEngineConfig,
-    /// FIFO of messages received from Core
-    inbox: VecDeque<Lib3hProtocol>,
+    _config: RealEngineConfig,
+    /// FIFO of Lib3hClientProtocol messages received from Core
+    inbox: VecDeque<Lib3hClientProtocol>,
     /// Identifier
     name: String,
+    /// P2p gateway for the transport layer,
+    transport_gateway: P2pGateway<TransportWss<std::net::TcpStream>, RrDht>,
+    /// Map of P2p gateway per Space+Agent
+    space_gateway_map: HashMap<PlayerId, P2pGateway<TransportSpace, RrDht>>,
 }
 
 impl RealEngine {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         Ok(RealEngine {
-            config,
+            _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
+            transport_gateway: P2pGateway::new_with_wss(),
+            space_gateway_map: HashMap::new(),
         })
-    }
-
-    /// Process a message sent by Core
-    fn serve(&self, local_msg: Lib3hProtocol) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
-        println!("(log.d) >>>> '{}' recv: {:?}", self.name.clone(), local_msg);
-        let mut outbox = Vec::new();
-        let mut did_work = false;
-        // Note: use same order as the enum
-        match local_msg {
-            Lib3hProtocol::SuccessResult(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::FailureResult(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::TrackDna(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::UntrackDna(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::SendDirectMessage(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::HandleSendDirectMessageResult(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::FetchEntry(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::HandleFetchEntryResult(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::PublishEntry(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::FetchMeta(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::HandleFetchMetaResult(_msg) => {
-                // FIXME
-            }
-            Lib3hProtocol::PublishMeta(_msg) => {
-                // FIXME
-            }
-            // Our request for the publish_list has returned
-            Lib3hProtocol::HandleGetPublishingEntryListResult(_msg) => {
-                // FIXME
-            }
-            // Our request for the hold_list has returned
-            Lib3hProtocol::HandleGetHoldingEntryListResult(_msg) => {
-                // FIXME
-            }
-            // Our request for the publish_meta_list has returned
-            Lib3hProtocol::HandleGetPublishingMetaListResult(_msg) => {
-                // FIXME
-            }
-            // Our request for the hold_meta_list has returned
-            Lib3hProtocol::HandleGetHoldingMetaListResult(_msg) => {
-                // FIXME
-            }
-            _ => {
-                panic!("unexpected {:?}", &local_msg);
-            }
-        }
-        Ok((did_work, outbox))
     }
 }
 
@@ -119,28 +75,192 @@ impl NetworkEngine for RealEngine {
         "FIXME".to_string()
     }
 
-    /// Add incoming message in FIFO
-    fn post(&mut self, local_msg: Lib3hProtocol) -> Lib3hResult<()> {
-        self.inbox.push_back(local_msg);
+    /// Add incoming Lib3hClientProtocol message in FIFO
+    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
+        // println!("(log.t) RealEngine.post(): {:?}", client_msg);
+        self.inbox.push_back(client_msg);
         Ok(())
     }
 
-    /// Process FIFO and output a list of protocol messages for Core to handle
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hProtocol>)> {
+    /// Process Lib3hClientProtocol message inbox and
+    /// output a list of Lib3hServerProtocol messages for Core to handle
+    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        // println!("(log.t) RealEngine.process()");
+        // Process all received Lib3hClientProtocol messages from Core
+        let (did_work, mut outbox) = self.process_inbox()?;
+        // Process the transport layer
+        let _ = self.process_transport_gateway()?;
+        // Process all space dhts
+        let p2p_output = self.process_space_gateways()?;
+        // Process all generated P2pProtocol messages
+        let mut output = self.process_p2p(&p2p_output)?;
+        outbox.append(&mut output);
+        // Done
+        Ok((did_work, outbox))
+    }
+}
+
+/// Private
+impl RealEngine {
+    /// Progressively serve every Lib3hClientProtocol received in inbox
+    fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         let mut did_work = false;
-        // Progressively serve every protocol message in inbox
         loop {
-            let local_msg = match self.inbox.pop_front() {
+            let client_msg = match self.inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            let (success, mut output) = self.serve(local_msg)?;
+            let (success, mut output) = self.serve_Lib3hProtocol(client_msg)?;
             if success {
                 did_work = success;
             }
             outbox.append(&mut output);
         }
         Ok((did_work, outbox))
+    }
+
+    /// Progressively serve every P2pProtocol received in inbox
+    fn process_transport_gateway(&mut self) -> Lib3hResult<DidWork> {
+        let (did_work, p2p_list) = self.transport_gateway.do_process()?;
+        if !did_work {
+            return Ok(false);
+        }
+        for p2p_msg in p2p_list {
+            self.serve_P2pProtocol(&p2p_msg)?;
+        }
+        Ok(true)
+    }
+
+    /// Process all space gateways
+    fn process_space_gateways(&mut self) -> Lib3hResult<Vec<P2pProtocol>> {
+        // Process all space gateways and store 'generated' P2pProtocol messages.
+        let mut output = Vec::new();
+        for (_space_address, space_gateway) in self.space_gateway_map.iter_mut() {
+            let (did_work, mut p2p_list) = space_gateway.do_process()?;
+            if did_work {
+                output.append(&mut p2p_list);
+            }
+        }
+        Ok(output)
+    }
+    /// Process all space gateways
+    fn process_p2p(&mut self, input: &Vec<P2pProtocol>) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        // Serve all new P2pProtocols
+        let mut output = Vec::new();
+        for p2p_msg in input {
+            let mut evt_output = self.serve_P2pProtocol(p2p_msg)?;
+            output.append(&mut evt_output);
+        }
+        Ok(output)
+    }
+    /// Serve a transportEvent sent to us.
+    /// Return a list of TransportEvents for us to process.
+    // FIXME
+    fn serve_P2pProtocol(
+        &mut self,
+        p2p_msg: &P2pProtocol,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        let outbox = Vec::new();
+        match p2p_msg {
+            P2pProtocol::Gossip => {
+                // FIXME
+            }
+            P2pProtocol::DirectMessage => {
+                // FIXME
+            }
+            P2pProtocol::FetchData => {
+                // FIXME
+            }
+            P2pProtocol::FetchDataResponse => {
+                // FIXME
+            }
+        };
+        Ok(outbox)
+    }
+
+    /// Process a Lib3hClientProtocol message sent to us (by Core)
+    /// Return a list of Lib3hServerProtocol messages to send back to core or others?
+    fn serve_Lib3hProtocol(
+        &mut self,
+        client_msg: Lib3hClientProtocol,
+    ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        println!(
+            "(log.d) >>>> '{}' recv: {:?}",
+            self.name.clone(),
+            client_msg
+        );
+        let mut outbox = Vec::new();
+        let did_work = true;
+        // Note: use same order as the enum
+        match client_msg {
+            Lib3hClientProtocol::SuccessResult(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::FailureResult(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::Connect(msg) => {
+                self.transport_gateway.connect(&msg.peer_transport)?;
+            }
+            Lib3hClientProtocol::JoinSpace(msg) => {
+                let output = self.serve_JoinSpace(&msg)?;
+                outbox.push(output);
+            }
+            Lib3hClientProtocol::LeaveSpace(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::SendDirectMessage(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::HandleSendDirectMessageResult(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::FetchEntry(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::HandleFetchEntryResult(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::PublishEntry(_msg) => {
+                // FIXME
+            }
+            // Our request for the publish_list has returned
+            Lib3hClientProtocol::HandleGetPublishingEntryListResult(_msg) => {
+                // FIXME
+            }
+            // Our request for the hold_list has returned
+            Lib3hClientProtocol::HandleGetHoldingEntryListResult(_msg) => {
+                // FIXME
+            }
+        }
+        Ok((did_work, outbox))
+    }
+
+    /// Create a gateway for this agent in this space, if not already part of it.
+    fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Lib3hServerProtocol> {
+        let player_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
+        let mut res = ResultData {
+            request_id: join_msg.request_id.clone(),
+            space_address: join_msg.space_address.clone(),
+            to_agent_id: join_msg.agent_id.clone(),
+            result_info: vec![],
+        };
+        if self.space_gateway_map.contains_key(&player_id) {
+            res.result_info = "Already tracked".to_string().into_bytes();
+            return Ok(Lib3hServerProtocol::FailureResult(res));
+        }
+        self.space_gateway_map
+            .insert(player_id.clone(), P2pGateway::new_with_space());
+        let space_gateway = self.space_gateway_map.get_mut(&player_id).unwrap();
+        Dht::post(
+            space_gateway,
+            DhtEvent::PeerHoldRequest(PeerHoldRequestData {
+                peer_address: "FIXME".to_string(), // msg.agent_id,
+                transport: self.transport_gateway.id(),
+                timestamp: 42,
+            }),
+        )?;
+        Ok(Lib3hServerProtocol::SuccessResult(res))
     }
 }

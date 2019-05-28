@@ -2,6 +2,7 @@
 
 members = [
   "logging",
+  "crypto_api",
   "sodium",
   "persistence",
   "lib3h_protocol",
