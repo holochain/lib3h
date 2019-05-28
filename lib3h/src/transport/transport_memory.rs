@@ -10,11 +10,13 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Transport used for the Space P2pGateway
 pub struct TransportMemory {
-    // Commands sent to us by owner for async processing
+    /// Commands sent to us by owner for async processing
     cmd_inbox: VecDeque<TransportCommand>,
-    // url
+    /// All of our servers (by url)
     my_servers: HashSet<String>,
+    /// Mapping of transportId -> serverUrl
     connections: HashMap<TransportId, String>,
+    /// Counter for generating new transportIds
     n_id: u32,
 }
 
@@ -31,10 +33,12 @@ impl TransportMemory {
 
 /// Compose Transport
 impl Transport for TransportMemory {
+    /// Get list of known transportIds
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
         Ok(self.connections.keys().map(|id| id.to_string()).collect())
     }
 
+    /// Get server from the uri and connect to it with a new transportId for ourself.
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(uri);
@@ -52,21 +56,45 @@ impl Transport for TransportMemory {
         Ok(id)
     }
 
-    fn close(&mut self, _id: &TransportIdRef) -> TransportResult<()> {
-        // FIXME
+    /// Notify server on that transportId that we are closing connection and clear that transportId.
+    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+        let maybe_url = self.connections.get(id.clone());
+        if let None = maybe_url {
+            return Err(TransportError::new(format!(
+                "No known connection for TransportId {}",
+                id
+            )));
+        }
+        let url = maybe_url.unwrap();
+        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+        let maybe_server = server_map.get(url);
+        if let None = maybe_server {
+            return Err(TransportError::new(format!(
+                "No Memory server at this url: {}",
+                url,
+            )));
+        }
+        let mut server = maybe_server.unwrap().lock().unwrap();
+        server.close(&id)?;
+        self.connections.remove(id);
         Ok(())
     }
 
+    /// Close all known transportIds
     fn close_all(&mut self) -> TransportResult<()> {
-        // FIXME
+        let id_list = self.transport_id_list()?;
+        for id in id_list {
+            self.close(&id)?;
+        }
         Ok(())
     }
 
+    /// Send payload to known transportIds in `id_list`
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
         for id in id_list {
             let maybe_url = self.connections.get(id.clone());
             if let None = maybe_url {
-                println!("[w] No Connection for TransportId {}", id);
+                println!("[w] No known connection for TransportId {}", id);
                 continue;
             }
             let url = maybe_url.unwrap();
@@ -86,34 +114,40 @@ impl Transport for TransportMemory {
         Ok(())
     }
 
-    fn send_all(&mut self, _payload: &[u8]) -> TransportResult<()> {
-        // FIXME
+    /// Send to all known transportIds
+    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
+        let id_list = self.transport_id_list()?;
+        for id in id_list {
+            self.send(&[id.as_str()], payload)?;
+        }
         Ok(())
     }
 
+    /// Add Command to inbox
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
         self.cmd_inbox.push_back(command);
         Ok(())
     }
 
+    /// Create a new server inbox for myself
     fn bind(&mut self, url: &str) -> TransportResult<()> {
         memory_server::set_server(url)?;
         self.my_servers.insert(url.to_string());
         Ok(())
     }
 
-    // FIXME
+    /// Process my TransportCommand inbox and all my server inboxes
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let mut outbox = Vec::new();
         let mut did_work = false;
-        // Process Commands
+        // Process TransportCommand inbox
         loop {
             let cmd = match self.cmd_inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            let (success, mut output) = self.serve_TransportCommand(&cmd)?;
-            if success {
+            let res = self.serve_TransportCommand(&cmd);
+            if let Ok(mut output) = res {
                 did_work = true;
                 outbox.append(&mut output);
             }
@@ -133,38 +167,37 @@ impl Transport for TransportMemory {
 }
 
 impl TransportMemory {
-    /// Process a transportEvent.
-    /// Return a list of P2pProtocol messages to send to others.
+    /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
+    /// Return a list of TransportEvents to owner.
     #[allow(non_snake_case)]
     fn serve_TransportCommand(
         &mut self,
         cmd: &TransportCommand,
-    ) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+    ) -> TransportResult<Vec<TransportEvent>> {
         println!("(log.d) >>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url) => {
                 let id = self.connect(url)?;
                 let evt = TransportEvent::ConnectResult(id);
-                Ok((true, vec![evt]))
+                Ok(vec![evt])
             }
             TransportCommand::Send(id_list, payload) => {
                 let mut id_ref_list = Vec::with_capacity(id_list.len());
                 for id in id_list {
                     id_ref_list.push(id.as_str());
                 }
-                // let id_list_ref = id_list.as_slice().as_ref();
                 let _id = self.send(&id_ref_list, payload)?;
-                Ok((true, vec![]))
+                Ok(vec![])
             }
             TransportCommand::SendAll(payload) => {
                 let _id = self.send_all(payload)?;
-                Ok((true, vec![]))
+                Ok(vec![])
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
                 let evt = TransportEvent::Closed(id.to_string());
-                Ok((true, vec![evt]))
+                Ok(vec![evt])
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
@@ -173,11 +206,11 @@ impl TransportMemory {
                     let evt = TransportEvent::Closed(id.to_string());
                     outbox.push(evt);
                 }
-                Ok((true, outbox))
+                Ok(outbox)
             }
             TransportCommand::Bind(url) => {
                 self.bind(url)?;
-                Ok((true, vec![]))
+                Ok(vec![])
             }
         }
     }

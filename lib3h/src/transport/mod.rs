@@ -1,10 +1,12 @@
 //! common types and traits for working with Transport instances
 
 pub mod error;
-pub mod memory_server;
 pub mod protocol;
-pub mod transport_memory;
 pub mod transport_trait;
+#[cfg(test)]
+pub mod memory_server;
+#[cfg(test)]
+pub mod transport_memory;
 
 /// a connection identifier
 pub type TransportId = String;
@@ -22,12 +24,12 @@ pub mod tests {
     fn memory_test() {
         let mut node_A = transport_memory::TransportMemory::new();
         let mut node_B = transport_memory::TransportMemory::new();
-        let uri_B = "bidon";
+        let uri_B = "fakeUrl";
 
-        complete_test(&mut node_A, &mut node_B, uri_B);
+        send_test(&mut node_A, &mut node_B, uri_B);
     }
 
-    fn complete_test(node_A: &mut impl Transport, node_B: &mut impl Transport, uri_B: &str) {
+    fn send_test(node_A: &mut impl Transport, node_B: &mut impl Transport, uri_B: &str) {
         node_B.bind(uri_B).unwrap();
         let idAB = node_A.connect(uri_B).unwrap();
         let payload = [1, 2, 3, 4];

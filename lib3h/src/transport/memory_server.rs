@@ -21,6 +21,7 @@ lazy_static! {
     pub(crate) static ref MEMORY_SERVER_MAP: RwLock<MemoryServerMap> = RwLock::new(HashMap::new());
 }
 
+/// Add new MemoryServer to the global server map
 pub fn set_server(url: &str) -> TransportResult<()> {
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
@@ -31,6 +32,7 @@ pub fn set_server(url: &str) -> TransportResult<()> {
     Ok(())
 }
 
+/// Remove a MemoryServer from the global server map
 pub fn unset_server(url: &str) -> TransportResult<()> {
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
@@ -46,11 +48,14 @@ pub fn unset_server(url: &str) -> TransportResult<()> {
 //--------------------------------------------------------------------------------------------------
 
 pub struct MemoryServer {
+    /// Address of this server
     uri: String,
+    /// Inboxes for payloads from each of its connections.
     inbox_map: HashMap<TransportId, VecDeque<Vec<u8>>>,
 }
 
 impl MemoryServer {
+    /// Constructor
     pub fn new(uri: &str) -> Self {
         MemoryServer {
             uri: uri.to_string(),
@@ -58,8 +63,9 @@ impl MemoryServer {
         }
     }
 
+    /// Create new inbox for this new transportId
     pub fn connect(&mut self, id: &TransportIdRef) -> TransportResult<()> {
-        println!("{}.connect({})", self.uri, id);
+        println!("[i] {}.connect({})", self.uri, id);
         if self.inbox_map.contains_key(id) {
             return Err(TransportError::new(format!(
                 "TransportId '{}' already used for server {}",
@@ -73,11 +79,21 @@ impl MemoryServer {
         Ok(())
     }
 
-    pub fn close(&mut self, _id: &TransportIdRef) -> TransportResult<()> {
-        // FIXME
+    /// Delete this transportId's inbox
+    pub fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+        println!("[i] {}.close({})", self.uri, id);
+        let res = self.inbox_map.remove(id);
+        if res.is_none() {
+            return Err(TransportError::new(format!(
+                "TransportId '{}' unknown for server {}",
+                id, self.uri
+            )));
+        }
+        // TODO: Should we process here whatever is left in the inbox?
         Ok(())
     }
 
+    /// Add payload to transportId's inbox
     pub fn post(&mut self, id: &TransportIdRef, payload: &[u8]) -> TransportResult<()> {
         let maybe_inbox = self.inbox_map.get_mut(id);
         if let None = maybe_inbox {
@@ -87,7 +103,8 @@ impl MemoryServer {
         Ok(())
     }
 
-    // FIXME
+    /// Process all inboxes.
+    /// Return a TransportEvent::Received for each payload processed.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let mut outbox = Vec::new();
         let mut did_work = false;
