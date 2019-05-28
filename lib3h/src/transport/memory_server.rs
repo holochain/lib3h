@@ -59,15 +59,17 @@ impl MemoryServer {
     }
 
     pub fn connect(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+        println!("{}.connect({})", self.uri, id);
         if self.inbox_map.contains_key(id) {
             return Err(TransportError::new(format!(
                 "TransportId '{}' already used for server {}",
                 id, self.uri
             )));
         }
-        self.inbox_map
-            .insert(id.to_string(), VecDeque::new())
-            .expect("TransportId should be unique");
+        let res = self.inbox_map.insert(id.to_string(), VecDeque::new());
+        if res.is_some() {
+            return Err(TransportError::new("TransportId already used".to_string()));
+        }
         Ok(())
     }
 

@@ -122,7 +122,11 @@ impl Transport for TransportMemory {
         for server_url in &self.my_servers {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
             let server = server_map.get(server_url).expect("My server should exist.");
-            server.lock().unwrap().process()?;
+            let (success, mut output) = server.lock().unwrap().process()?;
+            if success {
+                did_work = true;
+                outbox.append(&mut output);
+            }
         }
         Ok((did_work, outbox))
     }

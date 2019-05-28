@@ -6,6 +6,8 @@ extern crate url;
 extern crate failure;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate unwrap_to;
 
 pub mod dht;
 pub mod p2p;

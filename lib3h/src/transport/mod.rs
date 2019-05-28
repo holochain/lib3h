@@ -13,29 +13,35 @@ pub type TransportIdRef = str;
 ///
 #[cfg(test)]
 pub mod tests {
+    #![allow(non_snake_case)]
+
     use super::*;
+    use crate::transport::{protocol::TransportEvent, transport_trait::Transport};
 
     #[test]
     fn memory_test() {
         let mut node_A = transport_memory::TransportMemory::new();
         let mut node_B = transport_memory::TransportMemory::new();
-        let uriB = "bidon";
+        let uri_B = "bidon";
 
-        complete_test(node_A, node_B, uriB);
+        complete_test(&mut node_A, &mut node_B, uri_B);
     }
 
-    fn complete_test(node_A: impl T, node_B: impl T, uriB: &str) {
-        node_B.bind(uriB).unwrap();
-        let idAB = node_A.connect(uriB).unwrap();
-        let payload = vec![1, 2, 3, 4];
-        node_A.send(idAB, payload).unwrap();
+    fn complete_test(node_A: &mut impl Transport, node_B: &mut impl Transport, uri_B: &str) {
+        node_B.bind(uri_B).unwrap();
+        let idAB = node_A.connect(uri_B).unwrap();
+        let payload = [1, 2, 3, 4];
+        node_A.send(&[&idAB], &payload).unwrap();
 
         let (did_work, event_list) = node_B.process().unwrap();
         assert!(did_work);
         assert_eq!(event_list.len(), 1);
-        let recv_event = event_list[0];
-        let (recv_id, recv_payload) = unwrap_to!(recv_event => TransportEvent::Received);
+        let recv_event = event_list[0].clone();
+        let (recv_id, recv_payload) = match recv_event {
+            TransportEvent::Received(a, b) => (a, b),
+            _ => panic!("Receice wrong TransportEvent type"),
+        };
         assert_eq!(idAB, recv_id);
-        assert_eq!(payload, recv_payload);
+        assert_eq!(payload, recv_payload.as_slice());
     }
 }
