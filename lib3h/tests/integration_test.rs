@@ -65,14 +65,14 @@ fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>> {
 fn basic_connect_test_mock() {
     // Setup
     let mut engine_a = basic_setup_mock("basic_send_test_mock_node_a");
-    let mut engine_b = basic_setup_mock("basic_send_test_mock_node_b");
+    let engine_b = basic_setup_mock("basic_send_test_mock_node_b");
     engine_a.run().unwrap();
     engine_b.run().unwrap();
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
     // Send Connect Command
-    let mut connect_msg = ConnectData {
+    let connect_msg = ConnectData {
         request_id: "connect_a_1".into(),
         peer_transport: url_b.clone(),
         network_id: NETWORK_A_ID.clone(),
