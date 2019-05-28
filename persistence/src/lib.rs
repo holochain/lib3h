@@ -15,8 +15,6 @@
 //extern crate base64;
 extern crate chrono;
 extern crate futures;
-#[macro_use]
-extern crate lazy_static;
 extern crate multihash;
 extern crate rust_base58;
 extern crate serde;
@@ -30,8 +28,6 @@ extern crate lib3h_persistence_derive;
 //#[macro_use]
 //#[cfg(test)]
 
-extern crate regex;
-
 //extern crate hcid;
 extern crate uuid;
 //extern crate wasmi;
@@ -44,8 +40,6 @@ extern crate objekt;
 pub mod bits_n_pieces;
 pub mod hash;
 pub mod json;
-pub mod signature;
-pub mod time;
 
 pub const GIT_HASH: &str = env!(
     "GIT_HASH",
