@@ -39,8 +39,10 @@ pub use log::{self, debug, error, info, trace, warn, LevelFilter};
 
 use fern::colors::{Color, ColoredLevelConfig};
 use serde_derive::Deserialize;
-use std::sync::mpsc::{channel, Sender};
-use std::thread;
+use std::{
+    sync::mpsc::{channel, Sender},
+    thread,
+};
 use toml;
 
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Info;
