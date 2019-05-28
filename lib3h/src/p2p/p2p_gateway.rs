@@ -100,7 +100,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         self.transport.connect(&uri)
     }
-    fn close(&mut self, id: TransportId) -> TransportResult<()> {
+    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
         self.transport.close(id)
     }
 
@@ -176,7 +176,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     "(log.e) Connection Error for {}: {}\n Closing connection.",
                     id, e
                 );
-                self.transport.close(id.to_string())?;
+                self.transport.close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
                 // don't need to do anything here
@@ -185,7 +185,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportEvent::Closed(id) => {
                 // FIXME
                 println!("(log.w) Connection closed: {}", id);
-                self.transport.close(id.to_string())?;
+                self.transport.close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::Received(id, msg) => {

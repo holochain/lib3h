@@ -14,7 +14,7 @@ pub trait Transport {
     /// establish a connection to a remote node
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId>;
     /// close an existing open connection
-    fn close(&mut self, id: TransportId) -> TransportResult<()>;
+    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()>;
     /// close all existing open connections
     fn close_all(&mut self) -> TransportResult<()>;
     /// send a payload to remote nodes

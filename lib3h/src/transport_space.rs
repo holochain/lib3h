@@ -31,7 +31,7 @@ impl Transport for TransportSpace {
         // FIXME
         Ok("FIXME".to_string())
     }
-    fn close(&mut self, _id: TransportId) -> TransportResult<()> {
+    fn close(&mut self, _id: &TransportIdRef) -> TransportResult<()> {
         // FIXME
         Ok(())
     }
