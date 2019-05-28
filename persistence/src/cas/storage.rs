@@ -248,11 +248,11 @@ impl EavTestSuite {
     ) {
         let eav = EntityAttributeValueIndex::new(
             &entity_content.address(),
-            &Attribute::LinkTag("favourite-color".into()),
+            &String::from("favourite-color"),
             &value_content.address(),
         )
         .expect("Could create entityAttributeValue");
-        let attribute = Attribute::LinkTag(attribute_name);
+        let attribute = attribute_name;
 
         let two_stores = vec![eav_storage.clone(), eav_storage.clone()];
 
@@ -331,7 +331,7 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_three = A::try_from_content(&baz_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = Attribute::LinkTag("one_to_many".to_string());
+        let attribute = Attribute::from("one_to_many");
 
         let mut expected = BTreeSet::new();
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {
@@ -409,7 +409,7 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_two = A::try_from_content(&bar_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = Attribute::LinkTag("one_to_many".into());
+        let attribute = Attribute::from("one_to_many");
         let mut expected_many_one = BTreeSet::new();
         let mut expected_many_two = BTreeSet::new();
         let mut expected_all_range = BTreeSet::new();
@@ -565,7 +565,7 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_three = A::try_from_content(&baz_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = Attribute::LinkTag("many_to_one".into());
+        let attribute = Attribute::from("many_to_one");
 
         let mut expected = BTreeSet::new();
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {

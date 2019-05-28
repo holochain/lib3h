@@ -28,10 +28,10 @@ extern crate serde_derive;
 extern crate holochain_persistence_derive;
 //extern crate snowflake;
 //#[macro_use]
+//#[cfg(test)]
+
 extern crate regex;
-#[cfg(test)]
-#[macro_use]
-extern crate maplit;
+
 //extern crate hcid;
 extern crate uuid;
 //extern crate wasmi;
