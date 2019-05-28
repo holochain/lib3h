@@ -1,4 +1,4 @@
-# lib3h_sodium
+# lib3h_crypto_api
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,31 +9,7 @@
 
 ## Overview
 
-Lib3h libsodium wrapper providing memory secure api access.
-
-## Usage
-
-```rust
-extern crate holochain_sodium;
-use holochain_sodium::{secbuf::SecBuf, sign::*};
-
-fn main() {
-    let mut seed = SecBuf::with_secure(32);
-    seed.randomize();
-
-    let mut public_key = SecBuf::with_insecure(PUBLICKEYBYTES);
-    let mut secret_key = SecBuf::with_secure(SECRETKEYBYTES);
-    seed_keypair(&mut public_key, &mut secret_key, &mut seed).unwrap();
-
-    let mut message = SecBuf::with_insecure(32);
-    message.randomize();
-
-    let mut signature = SecBuf::with_insecure(64);
-    sign(&mut message, &mut secret_key, &mut signature).unwrap();
-
-    assert!(verify(&mut signature, &mut message, &mut public_key));
-}
-```
+Lib3h abstract cryptography traits and data types.
 
 ## Contribute
 
