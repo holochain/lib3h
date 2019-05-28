@@ -1,6 +1,6 @@
 use crate::transport::{
     error::{TransportError, TransportResult},
-    memory_server,
+    memory_mock::memory_server,
     protocol::{TransportCommand, TransportEvent},
     transport_trait::Transport,
     TransportId, TransportIdRef,

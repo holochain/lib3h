@@ -4,10 +4,9 @@ extern crate tungstenite;
 extern crate url;
 #[macro_use]
 extern crate failure;
+#[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate unwrap_to;
 
 pub mod dht;
 pub mod p2p;

@@ -4,9 +4,7 @@ pub mod error;
 pub mod protocol;
 pub mod transport_trait;
 #[cfg(test)]
-pub mod memory_server;
-#[cfg(test)]
-pub mod transport_memory;
+pub mod memory_mock;
 
 /// a connection identifier
 pub type TransportId = String;
@@ -17,11 +15,13 @@ pub type TransportIdRef = str;
 pub mod tests {
     #![allow(non_snake_case)]
 
-    use super::*;
-    use crate::transport::{protocol::TransportEvent, transport_trait::Transport};
+    use crate::transport::{
+        protocol::TransportEvent, transport_trait::Transport,
+        memory_mock::transport_memory,
+    };
 
     #[test]
-    fn memory_test() {
+    fn memory_send_test() {
         let mut node_A = transport_memory::TransportMemory::new();
         let mut node_B = transport_memory::TransportMemory::new();
         let uri_B = "fakeUrl";
@@ -41,7 +41,7 @@ pub mod tests {
         let recv_event = event_list[0].clone();
         let (recv_id, recv_payload) = match recv_event {
             TransportEvent::Received(a, b) => (a, b),
-            _ => panic!("Receice wrong TransportEvent type"),
+            _ => panic!("Received wrong TransportEvent type"),
         };
         assert_eq!(idAB, recv_id);
         assert_eq!(payload, recv_payload.as_slice());
