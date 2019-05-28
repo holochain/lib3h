@@ -1,4 +1,4 @@
-//! Implementation of an non-blocking logger for `lib3h`
+//! Implementation of a non-blocking logger for `lib3h`
 //!
 //! # Basic example:
 //!
