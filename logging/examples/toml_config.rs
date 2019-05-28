@@ -40,11 +40,10 @@ fn main() {
             color = "red"
         "#;
 
-        let _guard = Lib3hLogger::init_log_from_toml(&toml)
-            .expect("Fail to initialize the logging factory.");
-        println!(r#">> "toml_config.rs": {}"#, _guard.level());
+    let _guard =
+        Lib3hLogger::init_log_from_toml(&toml).expect("Fail to initialize the logging factory.");
+    println!(r#">> "toml_config.rs": {}"#, _guard.level());
 
-        info!("Some info here");
-        debug!("Logging set up from `TOML`!");
-
+    info!("Some info here");
+    debug!("Logging set up from `TOML`!");
 }
