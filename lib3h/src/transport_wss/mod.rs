@@ -178,9 +178,9 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         Ok(())
     }
 
-    fn bind(&mut self, _url: &str) -> TransportResult<()> {
+    fn bind(&mut self, _url: &str) -> TransportResult<String> {
         // FIXME
-        Ok(())
+        Ok(String::new())
     }
 }
 

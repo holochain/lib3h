@@ -22,7 +22,7 @@ pub trait Transport {
     /// send a payload to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;
     /// bind to a network interface
-    fn bind(&mut self, url: &str) -> TransportResult<()>;
+    fn bind(&mut self, url: &str) -> TransportResult<String>;
 
     // -- Asynchronous -- //
     /// Send a command for later processing

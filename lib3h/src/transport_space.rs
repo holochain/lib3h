@@ -56,9 +56,9 @@ impl Transport for TransportSpace {
         Ok(())
     }
 
-    fn bind(&mut self, _url: &str) -> TransportResult<()> {
+    fn bind(&mut self, _url: &str) -> TransportResult<String> {
         // FIXME
-        Ok(())
+        Ok(String::new())
     }
 
     // FIXME

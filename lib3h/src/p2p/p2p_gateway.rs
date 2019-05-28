@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+// #[cfg(test)]
 use crate::{
     dht::{
         dht_event::{DhtEvent, PeerHoldRequestData},
@@ -9,6 +10,7 @@ use crate::{
     p2p::p2p_protocol::P2pProtocol,
     transport::{
         error::TransportResult,
+        memory_mock::transport_memory::TransportMemory,
         protocol::{TransportCommand, TransportEvent},
         transport_trait::Transport,
         TransportId, TransportIdRef,
@@ -24,6 +26,24 @@ use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 pub struct P2pGateway<T: Transport, D: Dht> {
     transport: T,
     dht: D,
+    advertise: String,
+}
+
+// #[cfg(test)]
+impl P2pGateway<TransportMemory, RrDht> {
+    /// Constructor
+    pub fn new_with_memory(name: &str) -> Self {
+        let mut gateway = P2pGateway {
+            transport: TransportMemory::new(),
+            dht: RrDht::new(),
+            advertise: String::new(),
+        };
+        let binding = gateway
+            .bind(name)
+            .expect("TransportMemory.bind() failed. url might not be unique?");
+        gateway.advertise = binding;
+        gateway
+    }
 }
 
 impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
@@ -32,6 +52,7 @@ impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
         P2pGateway {
             transport: TransportWss::with_std_tcp_stream(),
             dht: RrDht::new(),
+            advertise: String::new(),
         }
     }
 }
@@ -42,6 +63,7 @@ impl P2pGateway<TransportSpace, RrDht> {
         P2pGateway {
             transport: TransportSpace::new(),
             dht: RrDht::new(),
+            advertise: String::new(),
         }
     }
 }
@@ -53,13 +75,12 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// This nodes identifier on the network
     pub fn id(&self) -> String {
         // FIXME
-        "FIXME".to_string()
+        "FIXME_ID".to_string()
     }
 
     /// This nodes connection address
     pub fn advertise(&self) -> String {
-        // FIXME
-        "FIXME".to_string()
+        self.advertise.clone()
     }
 }
 
@@ -116,7 +137,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         self.transport.send_all(payload)
     }
 
-    fn bind(&mut self, url: &str) -> TransportResult<()> {
+    fn bind(&mut self, url: &str) -> TransportResult<String> {
         self.transport.bind(url)
     }
 

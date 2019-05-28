@@ -1,10 +1,9 @@
 //! common types and traits for working with Transport instances
 
 pub mod error;
+pub mod memory_mock;
 pub mod protocol;
 pub mod transport_trait;
-#[cfg(test)]
-pub mod memory_mock;
 
 /// a connection identifier
 pub type TransportId = String;
@@ -16,8 +15,7 @@ pub mod tests {
     #![allow(non_snake_case)]
 
     use crate::transport::{
-        protocol::TransportEvent, transport_trait::Transport,
-        memory_mock::transport_memory,
+        memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
     };
 
     #[test]

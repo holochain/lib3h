@@ -40,6 +40,7 @@ impl Transport for TransportMemory {
 
     /// Get server from the uri and connect to it with a new transportId for ourself.
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
+        // println!("[d] ---- connect: {}", uri);
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(uri);
         if let None = maybe_server {
@@ -130,10 +131,10 @@ impl Transport for TransportMemory {
     }
 
     /// Create a new server inbox for myself
-    fn bind(&mut self, url: &str) -> TransportResult<()> {
+    fn bind(&mut self, url: &str) -> TransportResult<String> {
         memory_server::set_server(url)?;
         self.my_servers.insert(url.to_string());
-        Ok(())
+        Ok(url.to_string())
     }
 
     /// Process my TransportCommand inbox and all my server inboxes
