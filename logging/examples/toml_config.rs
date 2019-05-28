@@ -1,5 +1,4 @@
 use holochain_logging::{prelude::*, Lib3hLogger};
-use log::LevelFilter;
 
 fn main() {
     // let _guard = Lib3hLogger::init();
@@ -42,7 +41,6 @@ fn main() {
 
     let _guard =
         Lib3hLogger::init_log_from_toml(&toml).expect("Fail to initialize the logging factory.");
-    println!(r#">> "toml_config.rs": {}"#, _guard.level());
 
     info!("Some info here");
     debug!("Logging set up from `TOML`!");
