@@ -6,4 +6,5 @@ members = [
   "crates/sodium",
   "crates/lib3h_protocol",
   "crates/lib3h",
+  "crates/tools/half_busy_chat",
 ]
