@@ -37,7 +37,6 @@ pub mod eav;
 pub mod error;
 #[macro_use]
 extern crate objekt;
-pub mod bits_n_pieces;
 pub mod hash;
 pub mod json;
 

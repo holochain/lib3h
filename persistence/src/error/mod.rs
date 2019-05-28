@@ -2,9 +2,8 @@
 //! which is responsible for mounting and running instances of DNA, and executing WASM code.
 
 mod dna_error;
-mod ribosome_error;
 
-pub use self::{dna_error::*, ribosome_error::*};
+pub use self::dna_error::*;
 
 use self::HolochainError::*;
 use crate::json::*;
@@ -97,7 +96,6 @@ pub enum HolochainError {
     CapabilityCheckFailed,
     ValidationFailed(String),
     ValidationPending,
-    Ribosome(RibosomeErrorCode),
     RibosomeFailed(String),
     ConfigError(String),
     Timeout,
@@ -129,7 +127,6 @@ impl fmt::Display for HolochainError {
             CapabilityCheckFailed => write!(f, "Caller does not have Capability to make that call"),
             ValidationFailed(fail_msg) => write!(f, "{}", fail_msg),
             ValidationPending => write!(f, "Entry validation could not be completed"),
-            Ribosome(err_code) => write!(f, "{}", err_code.as_str()),
             RibosomeFailed(fail_msg) => write!(f, "{}", fail_msg),
             ConfigError(err_msg) => write!(f, "{}", err_msg),
             Timeout => write!(f, "timeout"),
