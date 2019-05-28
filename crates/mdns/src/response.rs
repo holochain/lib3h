@@ -66,9 +66,15 @@ impl RecordKind {
     pub fn from_packet(packet: &dns_parser::RData) -> Self {
         match *packet {
             dns_parser::RData::SRV(dns_parser::rdata::srv::Record {
-                priority, weight, port, ref target
+                priority,
+                weight,
+                port,
+                ref target,
             }) => RecordKind::Srv {
-                priority, weight, port, target: target.to_string()
+                priority,
+                weight,
+                port,
+                target: target.to_string(),
             },
             _ => RecordKind::Unknown,
         }

@@ -2,6 +2,7 @@
 
 #![feature(try_trait)]
 
+extern crate byteorder;
 extern crate dns_parser;
 extern crate net2;
 
@@ -13,46 +14,10 @@ use net2::unix::UnixUdpBuilderExt;
 
 use std::net::ToSocketAddrs;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MulticastDnsError {
-    Generic(String),
-}
+pub mod error;
+pub use error::{MulticastDnsError, MulticastDnsResult};
 
-impl std::error::Error for MulticastDnsError {
-    fn description(&self) -> &str {
-        "MulicastDnsError"
-    }
-}
-
-impl std::fmt::Display for MulticastDnsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl From<std::io::Error> for MulticastDnsError {
-    fn from(error: std::io::Error) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
-    }
-}
-
-impl From<std::option::NoneError> for MulticastDnsError {
-    fn from(error: std::option::NoneError) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
-    }
-}
-
-impl From<std::net::AddrParseError> for MulticastDnsError {
-    fn from(error: std::net::AddrParseError) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
-    }
-}
-
-impl From<dns_parser::Error> for MulticastDnsError {
-    fn from(error: dns_parser::Error) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
-    }
-}
+pub mod dns;
 
 pub mod response;
 pub use response::Response;
@@ -107,7 +72,11 @@ impl MulticastDns {
             &config.bind_address.parse()?,
         )?;
 
-        Ok(MulticastDns { config, socket, read_buf: [0; READ_BUF_SIZE] })
+        Ok(MulticastDns {
+            config,
+            socket,
+            read_buf: [0; READ_BUF_SIZE],
+        })
     }
 
     pub fn send(&mut self) -> Result<(), MulticastDnsError> {
@@ -120,11 +89,31 @@ impl MulticastDns {
             "service_name",
             self.config.unicast,
             dns_parser::QueryType::SRV,
-            dns_parser::QueryClass::Any,
+            dns_parser::QueryClass::IN,
         );
         let data = builder
             .build()
             .map_err(|_| MulticastDnsError::Generic("Dns Packet Truncated".to_string()))?;
+
+        println!("OTH: {:?}", data);
+
+        /*
+        let mut packet = dns::Packet::new();
+        packet.questions.push(dns::Question {
+            name: b"service_name".to_vec(),
+        });
+        let data2 = packet.to_raw()?;
+
+        println!("THS: {:?}", data2);
+
+        let mut packet = dns::Packet::new();
+        packet.answers.push(dns::Answer {
+            name: b"service_name".to_vec(),
+        });
+        let data2 = packet.to_raw()?;
+
+        println!("THA: {:?}", data2);
+        */
 
         self.socket.send_to(&data, &addr)?;
 
