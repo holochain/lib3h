@@ -1,10 +1,6 @@
 //! This module contains Error type definitions that are used throughout Holochain, and the Ribosome in particular,
 //! which is responsible for mounting and running instances of DNA, and executing WASM code.
 
-mod dna_error;
-
-pub use self::dna_error::*;
-
 use self::HolochainError::*;
 use crate::json::*;
 use futures::channel::oneshot::Canceled as FutureCanceled;
@@ -89,7 +85,6 @@ pub enum HolochainError {
     NotImplemented(String),
     LoggingError,
     DnaMissing,
-    Dna(DnaError),
     IoError(String),
     SerializationError(String),
     InvalidOperationOnSysEntry,
@@ -118,7 +113,6 @@ impl fmt::Display for HolochainError {
             NotImplemented(description) => write!(f, "not implemented: {}", description),
             LoggingError => write!(f, "logging failed"),
             DnaMissing => write!(f, "DNA is missing"),
-            Dna(dna_err) => write!(f, "{}", dna_err),
             IoError(err_msg) => write!(f, "{}", err_msg),
             SerializationError(err_msg) => write!(f, "{}", err_msg),
             InvalidOperationOnSysEntry => {
@@ -312,18 +306,6 @@ mod tests {
             (HolochainError::LoggingError, "logging failed"),
             (HolochainError::DnaMissing, "DNA is missing"),
             (HolochainError::ConfigError(String::from("foo")), "foo"),
-            (
-                HolochainError::Dna(DnaError::ZomeNotFound(String::from("foo"))),
-                "foo",
-            ),
-            (
-                HolochainError::Dna(DnaError::TraitNotFound(String::from("foo"))),
-                "foo",
-            ),
-            (
-                HolochainError::Dna(DnaError::ZomeFunctionNotFound(String::from("foo"))),
-                "foo",
-            ),
             (HolochainError::IoError(String::from("foo")), "foo"),
             (
                 HolochainError::SerializationError(String::from("foo")),
