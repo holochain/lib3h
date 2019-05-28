@@ -1,12 +1,33 @@
 use crate::Address;
 
-/// Tuple holding all the info required for identifying a metadata.
-/// (entry_address, attribute, content)
-/// TODO: Figure out if we keep this
-pub type MetaTuple = (Address, String, Vec<u8>);
-/// (entry_address, attribute)
-/// TODO: Figure out if we keep this
-pub type MetaKey = (Address, String);
+/// Tuple holding all the info required for identifying an Aspect.
+/// (entry_address, content hash)
+pub type AspectKey = (Address, Address);
+
+//--------------------------------------------------------------------------------------------------
+// Semi-opaque Holochain Entry
+//--------------------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EntryAspectKind {
+    Content, // the actual entry content
+    Header,  // the header for the entry
+    Meta,    // could be EntryWithHeader for links
+    ValidationResult,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntryAspect {
+    pub kind: EntryAspectKind,
+    pub publish_ts: u64,
+    pub data: String, // opaque, but in core would be EntryWithHeader for both Entry and Meta
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntryData {
+    pub aspect_list: Vec<EntryAspect>,
+    pub entry_address: Address,
+}
 
 //--------------------------------------------------------------------------------------------------
 // Generic responses
@@ -15,8 +36,8 @@ pub type MetaKey = (Address, String);
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResultData {
     pub request_id: String,
-    pub dna_address: Address,
-    pub to_agent_id: String,
+    pub space_address: Address,
+    pub to_agent_id: Address,
     pub result_info: Vec<u8>,
 }
 
@@ -45,7 +66,7 @@ pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
     /// MachineId of the first peer we are connected to
-    pub machine_id: String,
+    pub machine_id: Address,
     // TODO: Add network_id? Or let local client figure it out with the request_id?
     // TODO: Maybe add some info on network state?
     // pub peer_count: u32,
@@ -59,13 +80,15 @@ pub struct DisconnectedData {
 }
 
 //--------------------------------------------------------------------------------------------------
-// DNA tracking
+// Space tracking
 //--------------------------------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TrackDnaData {
-    pub dna_address: Address,
-    pub agent_id: String,
+pub struct SpaceData {
+    /// Identifier of this request
+    pub request_id: String,
+    pub space_address: Address,
+    pub agent_id: Address,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -74,10 +97,10 @@ pub struct TrackDnaData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DirectMessageData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
-    pub to_agent_id: String,
-    pub from_agent_id: String,
+    pub to_agent_id: Address,
+    pub from_agent_id: Address,
     pub content: Vec<u8>,
 }
 
@@ -85,88 +108,46 @@ pub struct DirectMessageData {
 // DHT Entry
 //--------------------------------------------------------------------------------------------------
 
-/// Identifier of what entry (and its meta?) to drop
+/// Wrapped Entry message
 #[derive(Debug, Clone, PartialEq)]
-pub struct DropEntryData {
-    pub dna_address: Address,
-    pub request_id: String,
-    pub entry_address: Address,
+pub struct ClaimedEntryData {
+    pub space_address: Address,
+    pub provider_agent_id: Address,
+    pub entry: EntryData,
 }
 
-/// Data Request from some other agent
+/// Entry hodled message
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct EntryStoredData {
+    pub space_address: Address,
+    pub provider_agent_id: Address,
+    pub entry_address: Address,
+    pub holder_agent_id: Address,
+}
+
+/// Request for Entry
 #[derive(Debug, Clone, PartialEq)]
 pub struct FetchEntryData {
-    pub dna_address: Address,
+    pub space_address: Address,
+    pub entry_address: Address,
     pub request_id: String,
-    pub requester_agent_id: String,
-    pub entry_address: Address,
-}
-
-/// Generic DHT data message
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct EntryData {
-    pub dna_address: Address,
-    pub provider_agent_id: String,
-    pub entry_address: Address,
-    pub entry_content: Vec<u8>,
+    pub requester_agent_id: Address,
 }
 
 /// DHT data response from a request
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FetchEntryResultData {
-    pub dna_address: Address,
     pub request_id: String,
-    pub requester_agent_id: String,
-    pub provider_agent_id: String,
-    pub entry_address: Address,
-    pub entry_content: Vec<u8>,
+    pub requester_agent_id: Address,
+    pub entry: ClaimedEntryData,
 }
 
-//--------------------------------------------------------------------------------------------------
-// DHT Meta
-//--------------------------------------------------------------------------------------------------
-
-/// Metadata Request from another agent
+/// Identifier of what entry (and its meta?) to drop
 #[derive(Debug, Clone, PartialEq)]
-pub struct FetchMetaData {
-    pub dna_address: Address,
-    pub request_id: String,
-    pub requester_agent_id: String,
-    pub entry_address: Address,
-    pub attribute: String,
-}
-
-/// Generic DHT metadata message
-#[derive(Debug, Clone, PartialEq)]
-pub struct DhtMetaData {
-    pub dna_address: Address,
-    pub provider_agent_id: String,
-    pub entry_address: Address,
-    pub attribute: String,
-    // single string or list of hashs
-    pub content_list: Vec<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct FetchMetaResultData {
-    pub dna_address: Address,
-    pub request_id: String,
-    pub requester_agent_id: String,
-    pub provider_agent_id: String,
-    pub entry_address: Address,
-    pub attribute: String,
-    // // List of (hash, content) pairs.
-    // single string or list of hashs
-    pub content_list: Vec<Vec<u8>>,
-}
-
-/// Drop some data request from own p2p-module
-#[derive(Debug, Clone, PartialEq)]
-pub struct DropMetaData {
-    pub dna_address: Address,
+pub struct DropEntryData {
+    pub space_address: Address,
     pub request_id: String,
     pub entry_address: Address,
-    pub attribute: String,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -175,21 +156,13 @@ pub struct DropMetaData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GetListData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntryListData {
-    pub dna_address: Address,
+    pub space_address: Address,
     pub request_id: String,
     pub entry_address_list: Vec<Address>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MetaListData {
-    pub dna_address: Address,
-    pub request_id: String,
-    // List of meta identifiers, a pair: (entry_address, attribute, hashed_content)
-    pub meta_list: Vec<MetaTuple>,
 }
