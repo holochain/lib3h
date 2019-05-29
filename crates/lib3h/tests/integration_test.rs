@@ -1,4 +1,4 @@
-extern crate holochain_lib3h;
+extern crate lib3h;
 extern crate lib3h_protocol;
 #[macro_use]
 extern crate lazy_static;
@@ -14,6 +14,8 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };
+
+use lib3h::real_engine::{RealEngine, RealEngineConfig};
 
 //--------------------------------------------------------------------------------------------------
 // Constants
