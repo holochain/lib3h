@@ -109,8 +109,8 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     /// close a currently tracked connection
-    fn close(&mut self, id: TransportId) -> TransportResult<()> {
-        if let Some(mut info) = self.stream_sockets.remove(&id) {
+    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+        if let Some(mut info) = self.stream_sockets.remove(id) {
             info.close()?;
         }
         Ok(())
@@ -176,6 +176,11 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
             info.send_queue.push(payload.to_vec());
         }
         Ok(())
+    }
+
+    fn bind(&mut self, _url: &str) -> TransportResult<String> {
+        // FIXME
+        Ok(String::new())
     }
 }
 

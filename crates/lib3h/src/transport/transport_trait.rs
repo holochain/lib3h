@@ -14,13 +14,15 @@ pub trait Transport {
     /// establish a connection to a remote node
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId>;
     /// close an existing open connection
-    fn close(&mut self, id: TransportId) -> TransportResult<()>;
+    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()>;
     /// close all existing open connections
     fn close_all(&mut self) -> TransportResult<()>;
     /// send a payload to remote nodes
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()>;
     /// send a payload to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;
+    /// bind to a network interface
+    fn bind(&mut self, url: &str) -> TransportResult<String>;
 
     // -- Asynchronous -- //
     /// Send a command for later processing
