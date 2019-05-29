@@ -3,6 +3,14 @@ name = "lib3h_protocol"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
+# crates.io stuff
+description = "Lib3h Protocol definition for P2P communication."
+keywords = ["holochain", "holo", "p2p", "network"]
+categories = ["network-programming"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_protocol"
+repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 failure = "=0.1.5"
