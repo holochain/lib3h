@@ -5,9 +5,10 @@ use crate::transport::{error::TransportError, TransportId};
 pub enum TransportCommand {
     Connect(String),
     Send(Vec<TransportId>, Vec<u8>),
-    SendAll(TransportId, Vec<u8>),
+    SendAll(Vec<u8>),
     Close(TransportId),
     CloseAll,
+    Bind(String),
 }
 
 /// Events that can be generated during a `process()`

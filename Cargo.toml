@@ -1,10 +1,11 @@
 [workspace]
 
 members = [
-  "logging",
-  "crypto_api",
-  "sodium",
-  "persistence",
-  "lib3h_protocol",
-  "lib3h",
+  "crates/logging",
+  "crates/crypto_api",
+  "crates/sodium",
+  "crates/lib3h_protocol",
+  "crates/lib3h",
+  "crates/tools/half_busy_chat",
+  "crates/persistence"
 ]

@@ -31,7 +31,7 @@ impl Transport for TransportSpace {
         // FIXME
         Ok("FIXME".to_string())
     }
-    fn close(&mut self, _id: TransportId) -> TransportResult<()> {
+    fn close(&mut self, _id: &TransportIdRef) -> TransportResult<()> {
         // FIXME
         Ok(())
     }
@@ -54,6 +54,11 @@ impl Transport for TransportSpace {
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
         self.inbox.push_back(command);
         Ok(())
+    }
+
+    fn bind(&mut self, _url: &str) -> TransportResult<String> {
+        // FIXME
+        Ok(String::new())
     }
 
     // FIXME

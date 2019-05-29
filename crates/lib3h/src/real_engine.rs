@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+//#[cfg(test)]
+use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, VecDeque};
 
 use lib3h_protocol::{
@@ -32,7 +34,7 @@ pub struct RealEngineConfig {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine {
+pub struct RealEngine<T: Transport> {
     /// Config settings
     _config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
@@ -40,12 +42,12 @@ pub struct RealEngine {
     /// Identifier
     name: String,
     /// P2p gateway for the transport layer,
-    transport_gateway: P2pGateway<TransportWss<std::net::TcpStream>, RrDht>,
+    transport_gateway: P2pGateway<T, RrDht>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<PlayerId, P2pGateway<TransportSpace, RrDht>>,
 }
 
-impl RealEngine {
+impl RealEngine<TransportWss<std::net::TcpStream>> {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         Ok(RealEngine {
@@ -58,7 +60,21 @@ impl RealEngine {
     }
 }
 
-impl NetworkEngine for RealEngine {
+/// Constructor
+//#[cfg(test)]
+impl RealEngine<TransportMemory> {
+    pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        Ok(RealEngine {
+            _config: config,
+            inbox: VecDeque::new(),
+            name: name.to_string(),
+            transport_gateway: P2pGateway::new_with_memory(name),
+            space_gateway_map: HashMap::new(),
+        })
+    }
+}
+
+impl<T: Transport> NetworkEngine for RealEngine<T> {
     fn run(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
@@ -72,12 +88,12 @@ impl NetworkEngine for RealEngine {
         Ok(())
     }
     fn advertise(&self) -> String {
-        "FIXME".to_string()
+        self.transport_gateway.advertise()
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
-        // println!("(log.t) RealEngine.post(): {:?}", client_msg);
+        // println!("[t] RealEngine.post(): {:?}", client_msg);
         self.inbox.push_back(client_msg);
         Ok(())
     }
@@ -85,7 +101,7 @@ impl NetworkEngine for RealEngine {
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        // println!("(log.t) RealEngine.process()");
+        // println!("[t] RealEngine.process()");
         // Process all received Lib3hClientProtocol messages from Core
         let (did_work, mut outbox) = self.process_inbox()?;
         // Process the transport layer
@@ -101,7 +117,7 @@ impl NetworkEngine for RealEngine {
 }
 
 /// Private
-impl RealEngine {
+impl<T: Transport> RealEngine<T> {
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
@@ -185,11 +201,7 @@ impl RealEngine {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        println!(
-            "(log.d) >>>> '{}' recv: {:?}",
-            self.name.clone(),
-            client_msg
-        );
+        println!("[d] >>>> '{}' recv: {:?}", self.name.clone(), client_msg);
         let mut outbox = Vec::new();
         let did_work = true;
         // Note: use same order as the enum
