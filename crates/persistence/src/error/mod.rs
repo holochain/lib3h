@@ -25,13 +25,8 @@ use std::{
 )]
 pub enum PersistenceError {
     ErrorGeneric(String),
-    NotImplemented(String),
-    LoggingError,
     IoError(String),
     SerializationError(String),
-    ConfigError(String),
-    Timeout,
-    InitializationFailed(String),
 }
 
 impl PersistenceError {
@@ -46,13 +41,8 @@ impl fmt::Display for PersistenceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ErrorGeneric(err_msg) => write!(f, "{}", err_msg),
-            NotImplemented(description) => write!(f, "not implemented: {}", description),
-            LoggingError => write!(f, "logging failed"),
-            IoError(err_msg) => write!(f, "{}", err_msg),
             SerializationError(err_msg) => write!(f, "{}", err_msg),
-            ConfigError(err_msg) => write!(f, "{}", err_msg),
-            Timeout => write!(f, "timeout"),
-            InitializationFailed(err_msg) => write!(f, "{}", err_msg),
+            IoError(err_msg) => write!(f, "{}", err_msg),
         }
     }
 }
@@ -196,17 +186,10 @@ mod tests {
         for (input, output) in vec![
             (PersistenceError::ErrorGeneric(String::from("foo")), "foo"),
             (
-                PersistenceError::NotImplemented("reason".into()),
-                "not implemented: reason",
-            ),
-            (PersistenceError::LoggingError, "logging failed"),
-            (PersistenceError::ConfigError(String::from("foo")), "foo"),
-            (PersistenceError::IoError(String::from("foo")), "foo"),
-            (
                 PersistenceError::SerializationError(String::from("foo")),
                 "foo",
             ),
-            (PersistenceError::Timeout, "timeout"),
+            (PersistenceError::IoError(String::from("foo")), "foo"),
         ] {
             assert_eq!(output, &input.to_string());
         }
