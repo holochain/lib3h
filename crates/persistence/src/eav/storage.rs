@@ -1,5 +1,5 @@
 use eav::{eavi::EntityAttributeValueIndex, query::EaviQuery};
-use error::{HcResult, HolochainError};
+use error::{PersistenceError, PersistenceResult};
 use objekt;
 use std::{
     collections::BTreeSet,
@@ -16,7 +16,7 @@ pub trait EntityAttributeValueStorage: objekt::Clone + Send + Sync + Debug {
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex,
-    ) -> Result<Option<EntityAttributeValueIndex>, HolochainError>;
+    ) -> Result<Option<EntityAttributeValueIndex>, PersistenceError>;
 
     /// Fetch the set of EntityAttributeValues that match constraints according to the latest hash version
     /// - None = no constraint
@@ -26,7 +26,7 @@ pub trait EntityAttributeValueStorage: objekt::Clone + Send + Sync + Debug {
     fn fetch_eavi(
         &self,
         query: &EaviQuery,
-    ) -> Result<BTreeSet<EntityAttributeValueIndex>, HolochainError>;
+    ) -> Result<BTreeSet<EntityAttributeValueIndex>, PersistenceError>;
 
     // @TODO: would like to do this, but can't because of the generic type param
     // fn iter<I>(&self) -> I
@@ -51,7 +51,7 @@ impl EntityAttributeValueStorage for ExampleEntityAttributeValueStorage {
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex,
-    ) -> Result<Option<EntityAttributeValueIndex>, HolochainError> {
+    ) -> Result<Option<EntityAttributeValueIndex>, PersistenceError> {
         let mut map = self.storage.write()?;
         let new_eav = increment_key_till_no_collision(eav.clone(), map.clone())?;
         map.insert(new_eav.clone());
@@ -61,7 +61,7 @@ impl EntityAttributeValueStorage for ExampleEntityAttributeValueStorage {
     fn fetch_eavi(
         &self,
         query: &EaviQuery,
-    ) -> Result<BTreeSet<EntityAttributeValueIndex>, HolochainError> {
+    ) -> Result<BTreeSet<EntityAttributeValueIndex>, PersistenceError> {
         let lock = self.storage.read()?;
         let set = (*lock).clone();
         let iter = set.iter().cloned();
@@ -79,7 +79,7 @@ impl PartialEq for EntityAttributeValueStorage {
 pub fn increment_key_till_no_collision(
     mut eav: EntityAttributeValueIndex,
     map: BTreeSet<EntityAttributeValueIndex>,
-) -> HcResult<EntityAttributeValueIndex> {
+) -> PersistenceResult<EntityAttributeValueIndex> {
     if map.iter().any(|e| e.index() == eav.index()) {
         let timestamp = eav.clone().index() + 1;
         eav.set_index(timestamp);

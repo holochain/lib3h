@@ -9,7 +9,7 @@ use crate::{
         Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
-    error::HolochainError,
+    error::PersistenceError,
     json::RawString,
 };
 use objekt;
@@ -26,14 +26,14 @@ use uuid::Uuid;
 /// CAS is append only
 pub trait ContentAddressableStorage: objekt::Clone + Send + Sync + Debug {
     /// adds AddressableContent to the ContentAddressableStorage by its Address as Content
-    fn add(&mut self, content: &AddressableContent) -> Result<(), HolochainError>;
+    fn add(&mut self, content: &AddressableContent) -> Result<(), PersistenceError>;
     /// true if the Address is in the Store, false otherwise.
     /// may be more efficient than retrieve depending on the implementation.
-    fn contains(&self, address: &Address) -> Result<bool, HolochainError>;
+    fn contains(&self, address: &Address) -> Result<bool, PersistenceError>;
     /// returns Some AddressableContent if it is in the Store, else None
     /// AddressableContent::from_content() can be used to allow the compiler to infer the type
     /// @see the fetch implementation for ExampleCas in the cas module tests
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, HolochainError>;
+    fn fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError>;
     //needed to find a way to compare two different CAS for partialord derives.
     //easiest solution was to just compare two ids which are based on uuids
     fn get_id(&self) -> Uuid;
@@ -56,7 +56,7 @@ pub struct ExampleContentAddressableStorage {
 }
 
 impl ExampleContentAddressableStorage {
-    pub fn new() -> Result<ExampleContentAddressableStorage, HolochainError> {
+    pub fn new() -> Result<ExampleContentAddressableStorage, PersistenceError> {
         Ok(ExampleContentAddressableStorage {
             content: Arc::new(RwLock::new(ExampleContentAddressableStorageContent::new())),
         })
@@ -68,18 +68,18 @@ pub fn test_content_addressable_storage() -> ExampleContentAddressableStorage {
 }
 
 impl ContentAddressableStorage for ExampleContentAddressableStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), HolochainError> {
+    fn add(&mut self, content: &AddressableContent) -> Result<(), PersistenceError> {
         self.content
             .write()
             .unwrap()
             .unthreadable_add(&content.address(), &content.content())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, HolochainError> {
+    fn contains(&self, address: &Address) -> Result<bool, PersistenceError> {
         self.content.read().unwrap().unthreadable_contains(address)
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, HolochainError> {
+    fn fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError> {
         Ok(self.content.read()?.unthreadable_fetch(address)?)
     }
 
@@ -103,16 +103,16 @@ impl ExampleContentAddressableStorageContent {
         &mut self,
         address: &Address,
         content: &Content,
-    ) -> Result<(), HolochainError> {
+    ) -> Result<(), PersistenceError> {
         self.storage.insert(address.clone(), content.clone());
         Ok(())
     }
 
-    fn unthreadable_contains(&self, address: &Address) -> Result<bool, HolochainError> {
+    fn unthreadable_contains(&self, address: &Address) -> Result<bool, PersistenceError> {
         Ok(self.storage.contains_key(address))
     }
 
-    fn unthreadable_fetch(&self, address: &Address) -> Result<Option<Content>, HolochainError> {
+    fn unthreadable_fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError> {
         Ok(self.storage.get(address).cloned())
     }
 }

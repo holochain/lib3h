@@ -3,7 +3,7 @@
 //! and as a base type for Address to use.
 
 use crate::{
-    error::HolochainError,
+    error::PersistenceError,
     json::{default_try_from_json, JsonString},
 };
 use multihash::{encode, Hash};
@@ -41,7 +41,7 @@ impl<'a> From<&'a str> for HashString {
 }
 
 impl TryFrom<JsonString> for Vec<HashString> {
-    type Error = HolochainError;
+    type Error = PersistenceError;
     fn try_from(j: JsonString) -> Result<Self, Self::Error> {
         default_try_from_json(j)
     }

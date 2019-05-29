@@ -5,7 +5,7 @@
 
 use crate::{
     cas::content::{Address, AddressableContent, Content},
-    error::{HcResult, HolochainError},
+    error::{PersistenceError, PersistenceResult},
     json::JsonString,
 };
 use chrono::offset::Utc;
@@ -31,15 +31,15 @@ pub enum AttributeError {
     ParseError,
 }
 
-impl From<AttributeError> for HolochainError {
-    fn from(err: AttributeError) -> HolochainError {
+impl From<AttributeError> for PersistenceError {
+    fn from(err: AttributeError) -> PersistenceError {
         let msg = match err {
             AttributeError::Unrecognized(a) => format!("Unknown attribute: {}", a),
             AttributeError::ParseError => {
                 String::from("Could not parse attribute, bad regex match")
             }
         };
-        HolochainError::ErrorGeneric(msg)
+        PersistenceError::ErrorGeneric(msg)
     }
 }
 impl From<NoneError> for AttributeError {
@@ -87,14 +87,14 @@ impl AddressableContent for EntityAttributeValueIndex {
         self.to_owned().into()
     }
 
-    fn try_from_content(content: &Content) -> Result<Self, HolochainError> {
+    fn try_from_content(content: &Content) -> Result<Self, PersistenceError> {
         content.to_owned().try_into()
     }
 }
 
-fn validate_attribute(attribute: &Attribute) -> HcResult<()> {
+fn validate_attribute(attribute: &Attribute) -> PersistenceResult<()> {
     if attribute.len() == 0 {
-        Err(HolochainError::ErrorGeneric(
+        Err(PersistenceError::ErrorGeneric(
             "Attribute string must not be empty".into(),
         ))
     } else {
@@ -107,7 +107,7 @@ impl EntityAttributeValueIndex {
         entity: &Entity,
         attribute: &Attribute,
         value: &Value,
-    ) -> HcResult<EntityAttributeValueIndex> {
+    ) -> PersistenceResult<EntityAttributeValueIndex> {
         validate_attribute(attribute)?;
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
@@ -122,7 +122,7 @@ impl EntityAttributeValueIndex {
         attribute: &Attribute,
         value: &Value,
         timestamp: i64,
-    ) -> HcResult<EntityAttributeValueIndex> {
+    ) -> PersistenceResult<EntityAttributeValueIndex> {
         validate_attribute(attribute)?;
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
@@ -167,7 +167,7 @@ impl AddressableContent for ExampleEntry {
         self.into()
     }
 
-    fn try_from_content(content: &Content) -> HcResult<ExampleEntry> {
+    fn try_from_content(content: &Content) -> PersistenceResult<ExampleEntry> {
         ExampleEntry::try_from(content.to_owned())
     }
 }

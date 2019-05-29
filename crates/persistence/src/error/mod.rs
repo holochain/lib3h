@@ -1,10 +1,9 @@
 //! This module contains Error type definitions that are used throughout Holochain, and the Ribosome in particular,
 //! which is responsible for mounting and running instances of DNA, and executing WASM code.
 
-use self::HolochainError::*;
+use self::PersistenceError::*;
 use crate::json::*;
 use futures::channel::oneshot::Canceled as FutureCanceled;
-use hash::HashString;
 use serde_json::Error as SerdeError;
 use std::{
     error::Error,
@@ -17,140 +16,64 @@ use std::{
 // CoreError
 //--------------------------------------------------------------------------------------------------
 
-/// Holochain Core Error struct
-/// Any Error in Core should be wrapped in a CoreError so it can be passed to the Zome
-/// and back to the Holochain Instance via wasm memory.
-/// Follows the Error + ErrorKind pattern
-/// Holds extra debugging info for indicating where in code ther error occured.
-#[derive(Clone, Debug, Serialize, Deserialize, DefaultJson, PartialEq, Eq, Hash)]
-pub struct CoreError {
-    pub kind: HolochainError,
-    pub file: String,
-    pub line: String,
-    // TODO #395 - Add advance error debugging info
-    // pub stack_trace: Backtrace
-}
-
-// Error trait by using the inner Error
-impl Error for CoreError {
-    fn cause(&self) -> Option<&Error> {
-        self.kind.source()
-    }
-}
-
-impl CoreError {
-    pub fn new(hc_err: HolochainError) -> Self {
-        CoreError {
-            kind: hc_err,
-            file: String::new(),
-            line: String::new(),
-        }
-    }
-}
-
-impl ::std::convert::TryFrom<ZomeApiInternalResult> for CoreError {
-    type Error = HolochainError;
-    fn try_from(zome_api_internal_result: ZomeApiInternalResult) -> Result<Self, Self::Error> {
-        if zome_api_internal_result.ok {
-            Err(HolochainError::ErrorGeneric(
-                "Attempted to deserialize CoreError from a non-error ZomeApiInternalResult".into(),
-            ))
-        } else {
-            CoreError::try_from(JsonString::from_json(&zome_api_internal_result.error))
-        }
-    }
-}
-
-impl fmt::Display for CoreError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Holochain Core error: {}\n  --> {}:{}\n",
-            self.kind, self.file, self.line,
-        )
-    }
-}
-
 //--------------------------------------------------------------------------------------------------
-// HolochainError
+// PersistenceError
 //--------------------------------------------------------------------------------------------------
 
-/// TODO rename to CoreErrorKind
-/// Enum holding all Holochain Core errors
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, DefaultJson, Hash, PartialOrd, Ord,
 )]
-pub enum HolochainError {
+pub enum PersistenceError {
     ErrorGeneric(String),
     NotImplemented(String),
     LoggingError,
-    DnaMissing,
     IoError(String),
     SerializationError(String),
-    InvalidOperationOnSysEntry,
-    CapabilityCheckFailed,
-    ValidationFailed(String),
-    ValidationPending,
-    RibosomeFailed(String),
     ConfigError(String),
     Timeout,
     InitializationFailed(String),
-    DnaHashMismatch(HashString, HashString),
 }
 
-pub type HcResult<T> = Result<T, HolochainError>;
-
-impl HolochainError {
-    pub fn new(msg: &str) -> HolochainError {
-        HolochainError::ErrorGeneric(msg.to_string())
+impl PersistenceError {
+    pub fn new(msg: &str) -> PersistenceError {
+        PersistenceError::ErrorGeneric(msg.to_string())
     }
 }
 
-impl fmt::Display for HolochainError {
+pub type PersistenceResult<T> = Result<T, PersistenceError>;
+
+impl fmt::Display for PersistenceError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ErrorGeneric(err_msg) => write!(f, "{}", err_msg),
             NotImplemented(description) => write!(f, "not implemented: {}", description),
             LoggingError => write!(f, "logging failed"),
-            DnaMissing => write!(f, "DNA is missing"),
             IoError(err_msg) => write!(f, "{}", err_msg),
             SerializationError(err_msg) => write!(f, "{}", err_msg),
-            InvalidOperationOnSysEntry => {
-                write!(f, "operation cannot be done on a system entry type")
-            }
-            CapabilityCheckFailed => write!(f, "Caller does not have Capability to make that call"),
-            ValidationFailed(fail_msg) => write!(f, "{}", fail_msg),
-            ValidationPending => write!(f, "Entry validation could not be completed"),
-            RibosomeFailed(fail_msg) => write!(f, "{}", fail_msg),
             ConfigError(err_msg) => write!(f, "{}", err_msg),
             Timeout => write!(f, "timeout"),
             InitializationFailed(err_msg) => write!(f, "{}", err_msg),
-            DnaHashMismatch(hash1, hash2) => write!(
-                f,
-                "Provided DNA hash does not match actual DNA hash! {} != {}",
-                hash1, hash2
-            ),
         }
     }
 }
 
-impl Error for HolochainError {}
+impl Error for PersistenceError {}
 
-impl From<HolochainError> for String {
-    fn from(holochain_error: HolochainError) -> Self {
-        holochain_error.to_string()
+impl From<PersistenceError> for String {
+    fn from(persistence_error: PersistenceError) -> Self {
+        persistence_error.to_string()
     }
 }
 
-impl From<String> for HolochainError {
+impl From<String> for PersistenceError {
     fn from(error: String) -> Self {
-        HolochainError::new(&error)
+        PersistenceError::new(&error)
     }
 }
 
-impl From<&'static str> for HolochainError {
+impl From<&'static str> for PersistenceError {
     fn from(error: &str) -> Self {
-        HolochainError::new(error)
+        PersistenceError::new(error)
     }
 }
 
@@ -163,78 +86,51 @@ fn reason_for_io_error(error: &IoError) -> String {
     }
 }
 
-impl<T> From<::std::sync::PoisonError<T>> for HolochainError {
+impl<T> From<::std::sync::PoisonError<T>> for PersistenceError {
     fn from(error: ::std::sync::PoisonError<T>) -> Self {
-        HolochainError::ErrorGeneric(format!("sync poison error: {}", error))
+        PersistenceError::ErrorGeneric(format!("sync poison error: {}", error))
     }
 }
 
-impl From<IoError> for HolochainError {
+impl From<IoError> for PersistenceError {
     fn from(error: IoError) -> Self {
-        HolochainError::IoError(reason_for_io_error(&error))
+        PersistenceError::IoError(reason_for_io_error(&error))
     }
 }
 
-impl From<SerdeError> for HolochainError {
+impl From<SerdeError> for PersistenceError {
     fn from(error: SerdeError) -> Self {
-        HolochainError::SerializationError(error.to_string())
+        PersistenceError::SerializationError(error.to_string())
     }
 }
 
-impl From<base64::DecodeError> for HolochainError {
+impl From<base64::DecodeError> for PersistenceError {
     fn from(error: base64::DecodeError) -> Self {
-        HolochainError::ErrorGeneric(format!("base64 decode error: {}", error.to_string()))
+        PersistenceError::ErrorGeneric(format!("base64 decode error: {}", error.to_string()))
     }
 }
 
-impl From<std::str::Utf8Error> for HolochainError {
+impl From<std::str::Utf8Error> for PersistenceError {
     fn from(error: std::str::Utf8Error) -> Self {
-        HolochainError::ErrorGeneric(format!("std::str::Utf8Error error: {}", error.to_string()))
+        PersistenceError::ErrorGeneric(format!("std::str::Utf8Error error: {}", error.to_string()))
     }
 }
 
-impl From<FutureCanceled> for HolochainError {
+impl From<FutureCanceled> for PersistenceError {
     fn from(_: FutureCanceled) -> Self {
-        HolochainError::ErrorGeneric("Failed future".to_string())
+        PersistenceError::ErrorGeneric("Failed future".to_string())
     }
 }
 
-impl From<NoneError> for HolochainError {
+impl From<NoneError> for PersistenceError {
     fn from(_: NoneError) -> Self {
-        HolochainError::ErrorGeneric("Expected Some and got None".to_string())
+        PersistenceError::ErrorGeneric("Expected Some and got None".to_string())
     }
 }
 
-impl From<hcid::HcidError> for HolochainError {
+impl From<hcid::HcidError> for PersistenceError {
     fn from(error: hcid::HcidError) -> Self {
-        HolochainError::ErrorGeneric(format!("{:?}", error))
-    }
-}
-
-#[derive(Serialize, Deserialize, Default, Debug, DefaultJson)]
-pub struct ZomeApiInternalResult {
-    pub ok: bool,
-    pub value: String,
-    pub error: String,
-}
-
-impl ZomeApiInternalResult {
-    pub fn success<J: Into<JsonString>>(value: J) -> ZomeApiInternalResult {
-        let json_string: JsonString = value.into();
-        ZomeApiInternalResult {
-            ok: true,
-            value: json_string.into(),
-            error: JsonString::null().into(),
-        }
-    }
-
-    pub fn failure<J: Into<JsonString>>(value: J) -> ZomeApiInternalResult {
-        let json_string: JsonString = value.into();
-        ZomeApiInternalResult {
-            ok: false,
-            value: JsonString::null().into(),
-            error: json_string.into(),
-        }
+        PersistenceError::ErrorGeneric(format!("{:?}", error))
     }
 }
 
@@ -242,9 +138,9 @@ impl ZomeApiInternalResult {
 mod tests {
     use super::*;
     // a test function that returns our error result
-    fn raises_holochain_error(yes: bool) -> Result<(), HolochainError> {
+    fn raises_persistence_error(yes: bool) -> Result<(), PersistenceError> {
         if yes {
-            Err(HolochainError::new("borked"))
+            Err(PersistenceError::new("borked"))
         } else {
             Ok(())
         }
@@ -253,14 +149,14 @@ mod tests {
     #[test]
     /// test that we can convert an error to a string
     fn to_string() {
-        let err = HolochainError::new("foo");
+        let err = PersistenceError::new("foo");
         assert_eq!("foo", err.to_string());
     }
 
     #[test]
     /// test that we can convert an error to valid JSON
     fn test_to_json() {
-        let err = HolochainError::new("foo");
+        let err = PersistenceError::new("foo");
         assert_eq!(
             JsonString::from_json("{\"ErrorGeneric\":\"foo\"}"),
             JsonString::from(err),
@@ -270,84 +166,50 @@ mod tests {
     #[test]
     /// smoke test new errors
     fn can_instantiate() {
-        let err = HolochainError::new("borked");
+        let err = PersistenceError::new("borked");
 
-        assert_eq!(HolochainError::ErrorGeneric("borked".to_string()), err);
+        assert_eq!(PersistenceError::ErrorGeneric("borked".to_string()), err);
     }
 
     #[test]
     /// test errors as a result and destructuring
-    fn can_raise_holochain_error() {
-        let err = raises_holochain_error(true).expect_err("should return an error when yes=true");
+    fn can_raise_persistence_error() {
+        let err = raises_persistence_error(true).expect_err("should return an error when yes=true");
 
         match err {
-            HolochainError::ErrorGeneric(msg) => assert_eq!(msg, "borked"),
-            _ => panic!("raises_holochain_error should return an ErrorGeneric"),
+            PersistenceError::ErrorGeneric(msg) => assert_eq!(msg, "borked"),
+            _ => panic!("raises_persistence_error should return an ErrorGeneric"),
         };
     }
 
     #[test]
     /// test errors as a returned result
     fn can_return_result() {
-        let result = raises_holochain_error(false);
+        let result = raises_persistence_error(false);
 
         assert!(result.is_ok());
     }
 
     #[test]
-    /// show Error implementation for HolochainError
+    /// show Error implementation for PersistenceError
     fn error_test() {
         for (input, output) in vec![
-            (HolochainError::ErrorGeneric(String::from("foo")), "foo"),
+            (PersistenceError::ErrorGeneric(String::from("foo")), "foo"),
             (
-                HolochainError::NotImplemented("reason".into()),
+                PersistenceError::NotImplemented("reason".into()),
                 "not implemented: reason",
             ),
-            (HolochainError::LoggingError, "logging failed"),
-            (HolochainError::DnaMissing, "DNA is missing"),
-            (HolochainError::ConfigError(String::from("foo")), "foo"),
-            (HolochainError::IoError(String::from("foo")), "foo"),
+            (PersistenceError::LoggingError, "logging failed"),
+            (PersistenceError::ConfigError(String::from("foo")), "foo"),
+            (PersistenceError::IoError(String::from("foo")), "foo"),
             (
-                HolochainError::SerializationError(String::from("foo")),
+                PersistenceError::SerializationError(String::from("foo")),
                 "foo",
             ),
-            (
-                HolochainError::InvalidOperationOnSysEntry,
-                "operation cannot be done on a system entry type",
-            ),
-            (
-                HolochainError::CapabilityCheckFailed,
-                "Caller does not have Capability to make that call",
-            ),
-            (HolochainError::Timeout, "timeout"),
-            (
-                HolochainError::ValidationPending,
-                "Entry validation could not be completed",
-            ),
+            (PersistenceError::Timeout, "timeout"),
         ] {
             assert_eq!(output, &input.to_string());
         }
-    }
-
-    #[test]
-    fn core_error_to_string() {
-        let error =
-            HolochainError::ErrorGeneric("This is a unit test error description".to_string());
-        let report = CoreError {
-            kind: error.clone(),
-            file: file!().to_string(),
-            line: line!().to_string(),
-        };
-
-        assert_ne!(
-            report.to_string(),
-            CoreError {
-                kind: error,
-                file: file!().to_string(),
-                line: line!().to_string(),
-            }
-            .to_string(),
-        );
     }
 
 }

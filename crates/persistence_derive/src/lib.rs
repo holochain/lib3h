@@ -19,7 +19,7 @@ fn impl_default_json_macro(ast: &syn::DeriveInput) -> TokenStream {
                     Ok(s) => Ok(JsonString::from_json(&s)),
                     Err(e) => {
                         eprintln!("Error serializing to JSON: {:?}", e);
-                        Err(HolochainError::SerializationError(e.to_string()))
+                        Err(PersistenceError::SerializationError(e.to_string()))
                     },
                 }.expect(&format!("could not Jsonify {}: {:?}", stringify!(#name), v))
             }
@@ -32,17 +32,17 @@ fn impl_default_json_macro(ast: &syn::DeriveInput) -> TokenStream {
         }
 
         impl<'a> ::std::convert::TryFrom<&'a JsonString> for #name {
-            type Error = HolochainError;
+            type Error = PersistenceError;
             fn try_from(json_string: &JsonString) -> Result<Self, Self::Error> {
                 match ::serde_json::from_str(&String::from(json_string)) {
                     Ok(d) => Ok(d),
-                    Err(e) => Err(HolochainError::SerializationError(e.to_string())),
+                    Err(e) => Err(PersistenceError::SerializationError(e.to_string())),
                 }
             }
         }
 
         impl ::std::convert::TryFrom<JsonString> for #name {
-            type Error = HolochainError;
+            type Error = PersistenceError;
             fn try_from(json_string: JsonString) -> Result<Self, Self::Error> {
                 #name::try_from(&json_string)
             }

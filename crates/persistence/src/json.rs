@@ -1,7 +1,7 @@
 //! The JsonString type is defined here. It is used throughout Holochain
 //! to enforce a standardized serialization of data to/from json.
 
-use crate::error::{HcResult, HolochainError};
+use crate::error::{PersistenceError, PersistenceResult};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 use std::{
@@ -85,21 +85,21 @@ impl From<u128> for JsonString {
 }
 
 impl TryFrom<JsonString> for bool {
-    type Error = HolochainError;
+    type Error = PersistenceError;
     fn try_from(j: JsonString) -> Result<Self, Self::Error> {
         default_try_from_json(j)
     }
 }
 
 impl TryFrom<JsonString> for u32 {
-    type Error = HolochainError;
+    type Error = PersistenceError;
     fn try_from(j: JsonString) -> Result<Self, Self::Error> {
         default_try_from_json(j)
     }
 }
 
 impl TryFrom<JsonString> for u64 {
-    type Error = HolochainError;
+    type Error = PersistenceError;
     fn try_from(j: JsonString) -> Result<Self, Self::Error> {
         default_try_from_json(j)
     }
@@ -145,7 +145,7 @@ impl<T: Serialize> From<Vec<T>> for JsonString {
 /// can't use std::error::Error for this because String has Error as a reserved future trait
 pub trait JsonError {}
 
-impl JsonError for HolochainError {}
+impl JsonError for PersistenceError {}
 
 fn result_to_json_string<T: Into<JsonString>, E: Into<JsonString>>(
     result: Result<T, E>,
@@ -191,7 +191,7 @@ impl From<Result<String, String>> for JsonString {
     }
 }
 
-pub type JsonResult = Result<JsonString, HolochainError>;
+pub type JsonResult = Result<JsonString, PersistenceError>;
 
 impl From<()> for JsonString {
     fn from(_: ()) -> Self {
@@ -200,7 +200,7 @@ impl From<()> for JsonString {
 }
 
 impl TryFrom<JsonString> for () {
-    type Error = HolochainError;
+    type Error = PersistenceError;
     fn try_from(j: JsonString) -> Result<Self, Self::Error> {
         default_try_from_json(j)
     }
@@ -225,23 +225,23 @@ impl Display for JsonString {
 pub fn default_to_json<V: Serialize + Debug>(v: V) -> JsonString {
     serde_json::to_string(&v)
         .map(|s| JsonString::from_json(&s))
-        .map_err(|e| HolochainError::SerializationError(e.to_string()))
+        .map_err(|e| PersistenceError::SerializationError(e.to_string()))
         .unwrap_or_else(|_| panic!("could not Jsonify: {:?}", v))
 }
 
 /// if all you want to do is implement the default behaviour then use #[derive(DefaultJson)]
-/// standard boilerplate should include HolochainError as the Error:
+/// standard boilerplate should include PersistenceError as the Error:
 /// impl TryFrom<JsonString> for T {
-///     type Error = HolochainError;
-///     fn try_from(j: JsonString) -> HcResult<Self> {
+///     type Error = PersistenceError;
+///     fn try_from(j: JsonString) -> PersistenceResult<Self> {
 ///         default_try_from_json(j)
 ///     }
 /// }
 pub fn default_try_from_json<D: DeserializeOwned>(
     json_string: JsonString,
-) -> Result<D, HolochainError> {
+) -> Result<D, PersistenceError> {
     serde_json::from_str(&String::from(&json_string))
-        .map_err(|e| HolochainError::SerializationError(e.to_string()))
+        .map_err(|e| PersistenceError::SerializationError(e.to_string()))
 }
 
 pub trait DefaultJson:
@@ -308,8 +308,8 @@ impl From<RawString> for JsonString {
 
 /// converting a JsonString to RawString can fail if the JsonString is not a serialized string
 impl TryFrom<JsonString> for RawString {
-    type Error = HolochainError;
-    fn try_from(j: JsonString) -> HcResult<Self> {
+    type Error = PersistenceError;
+    fn try_from(j: JsonString) -> PersistenceResult<Self> {
         default_try_from_json(j)
     }
 }
@@ -317,7 +317,7 @@ impl TryFrom<JsonString> for RawString {
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        error::HolochainError,
+        error::PersistenceError,
         json::{JsonString, RawString},
     };
     use serde_json;
@@ -358,8 +358,8 @@ pub mod tests {
 
     #[test]
     fn json_result_round_trip_test() {
-        let result: Result<String, HolochainError> =
-            Err(HolochainError::ErrorGeneric("foo".into()));
+        let result: Result<String, PersistenceError> =
+            Err(PersistenceError::ErrorGeneric("foo".into()));
 
         assert_eq!(
             JsonString::from(result),
