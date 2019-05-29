@@ -33,10 +33,4 @@ impl From<std::net::AddrParseError> for MulticastDnsError {
     }
 }
 
-impl From<dns_parser::Error> for MulticastDnsError {
-    fn from(error: dns_parser::Error) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
-    }
-}
-
 pub type MulticastDnsResult<T> = Result<T, MulticastDnsError>;

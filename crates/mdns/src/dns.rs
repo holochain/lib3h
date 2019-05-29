@@ -1,16 +1,18 @@
 //! Encoding utilities for dns packets
 
 use super::error::{MulticastDnsError, MulticastDnsResult};
-use byteorder::{ByteOrder, BigEndian, WriteBytesExt, ReadBytesExt};
+use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 use std::io::Read;
 
+/// SRV record within a question
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SvcDataQ {
+pub struct SrvDataQ {
     pub name: Vec<u8>,
 }
 
+/// SRV record within an answer
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SvcDataA {
+pub struct SrvDataA {
     pub name: Vec<u8>,
     pub ttl_seconds: u32,
     pub priority: u16,
@@ -19,18 +21,21 @@ pub struct SvcDataA {
     pub target: Vec<u8>,
 }
 
+/// query question
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Question {
-    Unknown(Vec<u8>),
-    Svc(SvcDataQ),
+    Unknown,
+    Srv(SrvDataQ),
 }
 
+/// response answer
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answer {
     Unknown(Vec<u8>),
-    Svc(SvcDataA),
+    Srv(SrvDataA),
 }
 
+/// dns packet
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Packet {
     pub id: u16,
@@ -40,6 +45,9 @@ pub struct Packet {
 }
 
 impl Packet {
+    /// create a blank dns packet
+    /// fill it in with questions or
+    /// set is_query to `false` and fill with answers
     pub fn new() -> Self {
         Packet {
             id: 0,
@@ -49,6 +57,7 @@ impl Packet {
         }
     }
 
+    /// parse a dns packet into a Packet struct
     pub fn with_raw(packet: &[u8]) -> MulticastDnsResult<Self> {
         let mut read = std::io::Cursor::new(packet);
         let mut out = Packet::new();
@@ -71,11 +80,10 @@ impl Packet {
             let _class = read.read_u16::<BigEndian>()?;
 
             if kind == 33 {
-                out.questions.push(Question::Svc(SvcDataQ {
-                    name: svc_name,
-                }));
+                out.questions
+                    .push(Question::Srv(SrvDataQ { name: svc_name }));
             } else {
-                out.questions.push(Question::Unknown(vec![]));
+                out.questions.push(Question::Unknown);
             }
         }
 
@@ -92,7 +100,7 @@ impl Packet {
                 let weight = read.read_u16::<BigEndian>()?;
                 let port = read.read_u16::<BigEndian>()?;
                 let target = read_qname(&mut read)?;
-                out.answers.push(Answer::Svc(SvcDataA {
+                out.answers.push(Answer::Srv(SrvDataA {
                     name: svc_name,
                     ttl_seconds,
                     priority,
@@ -101,8 +109,7 @@ impl Packet {
                     target,
                 }));
             } else {
-                let mut raw = Vec::with_capacity(enc_size);
-                raw.resize(enc_size, 0);
+                let mut raw = vec![0; enc_size];
                 read.read_exact(&mut raw)?;
                 out.answers.push(Answer::Unknown(raw));
             }
@@ -111,6 +118,7 @@ impl Packet {
         Ok(out)
     }
 
+    /// encode a Packet struct into a raw dns packet
     pub fn to_raw(&self) -> MulticastDnsResult<Vec<u8>> {
         let mut out = Vec::with_capacity(500);
 
@@ -139,10 +147,12 @@ impl Packet {
         // add questions
         for q in self.questions.iter() {
             match q {
-                Question::Unknown(_) => {
-                    return Err(MulticastDnsError::Generic("unknown question type".to_string()));
-                },
-                Question::Svc(q) => {
+                Question::Unknown => {
+                    return Err(MulticastDnsError::Generic(
+                        "unknown question type".to_string(),
+                    ));
+                }
+                Question::Srv(q) => {
                     write_qname(&mut out, &q.name)?;
 
                     // type SRV
@@ -162,9 +172,11 @@ impl Packet {
         for a in self.answers.iter() {
             match a {
                 Answer::Unknown(_) => {
-                    return Err(MulticastDnsError::Generic("unknown question type".to_string()));
-                },
-                Answer::Svc(a) => {
+                    return Err(MulticastDnsError::Generic(
+                        "unknown question type".to_string(),
+                    ));
+                }
+                Answer::Srv(a) => {
                     write_qname(&mut out, &a.name)?;
 
                     // type SRV
@@ -185,18 +197,18 @@ impl Packet {
                     out.write_u16::<BigEndian>(0)?;
 
                     // priority
-                    out.write_u16::<BigEndian>(0)?;
+                    out.write_u16::<BigEndian>(a.priority)?;
 
                     // weight
-                    out.write_u16::<BigEndian>(0)?;
+                    out.write_u16::<BigEndian>(a.weight)?;
 
                     // port
-                    out.write_u16::<BigEndian>(0)?;
+                    out.write_u16::<BigEndian>(a.port)?;
 
                     // target
-                    let len = write_qname(&mut out, b"wss://bla")?;
+                    let len = write_qname(&mut out, &a.target)?;
 
-                    BigEndian::write_u16(&mut out[len_offset..len_offset+2], len + 6);
+                    BigEndian::write_u16(&mut out[len_offset..len_offset + 2], len + 6);
                 }
             }
         }
@@ -205,6 +217,7 @@ impl Packet {
     }
 }
 
+/// write a dot-notation dns name into bytecode parts
 fn write_qname<T: byteorder::WriteBytesExt>(out: &mut T, data: &[u8]) -> MulticastDnsResult<u16> {
     let mut len = 0;
 
@@ -223,6 +236,7 @@ fn write_qname<T: byteorder::WriteBytesExt>(out: &mut T, data: &[u8]) -> Multica
     Ok(len)
 }
 
+/// read raw dns bytecode part name into dot-notation Vec<u8>
 fn read_qname<T: byteorder::ReadBytesExt>(read: &mut T) -> MulticastDnsResult<Vec<u8>> {
     let mut out = Vec::with_capacity(500);
 
@@ -253,7 +267,7 @@ mod tests {
         let mut packet = Packet::new();
         packet.id = 0xbdbd;
         packet.is_query = true;
-        packet.questions.push(Question::Svc(SvcDataQ {
+        packet.questions.push(Question::Srv(SrvDataQ {
             name: b"svc.name.test".to_vec(),
         }));
         let raw = packet.to_raw().unwrap();
@@ -269,7 +283,7 @@ mod tests {
         let mut packet = Packet::new();
         packet.id = 0xbdbd;
         packet.is_query = false;
-        packet.answers.push(Answer::Svc(SvcDataA {
+        packet.answers.push(Answer::Srv(SrvDataA {
             name: b"svc.name.test".to_vec(),
             ttl_seconds: 0x12345678,
             priority: 0x2222,
@@ -280,19 +294,8 @@ mod tests {
         let raw = packet.to_raw().unwrap();
         assert_eq!(
             &format!("{:?}", raw),
-            "[189, 189, 132, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0, 0, 33, 0, 1, 18, 52, 86, 120, 0, 17, 0, 0, 0, 0, 0, 0, 9, 119, 115, 115, 58, 47, 47, 98, 108, 97, 0]"
+            "[189, 189, 132, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0, 0, 33, 0, 1, 18, 52, 86, 120, 0, 21, 34, 34, 51, 51, 68, 68, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0]"
         );
         assert_eq!(packet, Packet::with_raw(&raw).unwrap());
     }
-
-    /*
-    #[test]
-    fn it_should_gen_and_parse() {
-        let packet = Packet::new();
-
-        let raw = packet.to_raw().unwrap();
-        println!("generated: {:?}", raw);
-        assert_eq!(packet, Packet::with_raw(&raw));
-    }
-    */
 }
