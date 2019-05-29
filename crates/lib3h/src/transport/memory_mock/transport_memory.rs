@@ -59,7 +59,7 @@ impl Transport for TransportMemory {
 
     /// Notify server on that transportId that we are closing connection and clear that transportId.
     fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
-        let maybe_url = self.connections.get(id.clone());
+        let maybe_url = self.connections.get(id);
         if let None = maybe_url {
             return Err(TransportError::new(format!(
                 "No known connection for TransportId {}",
@@ -93,7 +93,7 @@ impl Transport for TransportMemory {
     /// Send payload to known transportIds in `id_list`
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
         for id in id_list {
-            let maybe_url = self.connections.get(id.clone());
+            let maybe_url = self.connections.get(*id);
             if let None = maybe_url {
                 println!("[w] No known connection for TransportId {}", id);
                 continue;

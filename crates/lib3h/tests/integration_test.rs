@@ -5,7 +5,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
 
-use holochain_lib3h::{
+use lib3h::{
     real_engine::{RealEngine, RealEngineConfig},
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::TransportWss,
@@ -14,8 +14,6 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };
-
-use lib3h::real_engine::{RealEngine, RealEngineConfig};
 
 //--------------------------------------------------------------------------------------------------
 // Constants
