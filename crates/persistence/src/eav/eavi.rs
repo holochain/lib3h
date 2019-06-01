@@ -102,16 +102,14 @@ where
     A: serde::de::DeserializeOwned,
 {
     fn from(v: &EntityAttributeValueIndex<A>) -> JsonString {
-        let json = match ::serde_json::to_string(&v) {
+        match ::serde_json::to_string(&v) {
             Ok(s) => Ok(JsonString::from_json(&s)),
             Err(e) => {
                 eprintln!("Error serializing to JSON: {:?}", e);
                 Err(PersistenceError::SerializationError(e.to_string()))
             }
-        };
-
-        json.unwrap()
-        //&format!("could not Jsonify {}: {:?}", stringify!(#name), v):w)
+        }
+        .unwrap_or_else(|_| panic!("could not Jsonify {}: {:?}", "EntityAttributeValueIndex", v))
     }
 }
 
