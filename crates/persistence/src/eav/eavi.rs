@@ -30,6 +30,7 @@ pub type Entity = Address;
 //#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
 //#[serde(rename_all = "snake_case")]
 pub trait Attribute: PartialEq + Eq + PartialOrd + Hash + Clone + serde::Serialize + Debug
+//+ serde::de::DeserializeOwned
 //    + TryFrom<String>
 //    + Into<String>
 {
@@ -47,30 +48,6 @@ impl Default for ExampleAttribute {
     }
 }
 
-impl TryFrom<String> for ExampleAttribute {
-    type Error = AttributeError;
-    fn try_from(s: String) -> Result<Self, AttributeError> {
-        match s.as_str() {
-            "without-payload" => Ok(ExampleAttribute::WithoutPayload),
-            with_payload => {
-                let parts: Vec<&str> = with_payload.split("_").collect();
-                if parts.len() < 2 {
-                    return Err(AttributeError::ParseError);
-                }
-                Ok(ExampleAttribute::WithPayload(String::from(parts[1])))
-            }
-        }
-    }
-}
-
-impl Into<String> for ExampleAttribute {
-    fn into(self) -> String {
-        match self {
-            ExampleAttribute::WithoutPayload => String::from("without-payload"),
-            ExampleAttribute::WithPayload(payload) => format!("with-payload_{:}", payload),
-        }
-    }
-}
 impl Attribute for ExampleAttribute {}
 
 impl<'a> Attribute for &'a ExampleAttribute {}
@@ -120,20 +97,28 @@ pub struct EntityAttributeValueIndex<A: Attribute> {
     // source: Source,
 }
 
-impl<A: Attribute> From<&EntityAttributeValueIndex<A>> for JsonString {
+impl<A: Attribute> From<&EntityAttributeValueIndex<A>> for JsonString
+where
+    A: serde::de::DeserializeOwned,
+{
     fn from(v: &EntityAttributeValueIndex<A>) -> JsonString {
-        match ::serde_json::to_string(&v) {
+        let json = match ::serde_json::to_string(&v) {
             Ok(s) => Ok(JsonString::from_json(&s)),
             Err(e) => {
                 eprintln!("Error serializing to JSON: {:?}", e);
                 Err(PersistenceError::SerializationError(e.to_string()))
             }
-        }
-        .expect(&format!("could not Jsonify {}: {:?}", stringify!(#name), v))
+        };
+
+        json.unwrap()
+        //&format!("could not Jsonify {}: {:?}", stringify!(#name), v):w)
     }
 }
 
-impl<A: Attribute> From<EntityAttributeValueIndex<A>> for JsonString {
+impl<A: Attribute> From<EntityAttributeValueIndex<A>> for JsonString
+where
+    A: serde::de::DeserializeOwned,
+{
     fn from(v: EntityAttributeValueIndex<A>) -> JsonString {
         JsonString::from(&v)
     }
@@ -141,7 +126,7 @@ impl<A: Attribute> From<EntityAttributeValueIndex<A>> for JsonString {
 
 impl<'a, A: Attribute> ::std::convert::TryFrom<&'a JsonString> for EntityAttributeValueIndex<A>
 where
-    A: serde::Deserialize<'a>,
+    A: serde::de::DeserializeOwned,
 {
     type Error = PersistenceError;
     fn try_from(json_string: &JsonString) -> Result<Self, Self::Error> {
@@ -156,9 +141,9 @@ where
     }
 }
 
-impl<'a, A: Attribute> ::std::convert::TryFrom<JsonString> for EntityAttributeValueIndex<A>
+impl<A: Attribute> ::std::convert::TryFrom<JsonString> for EntityAttributeValueIndex<A>
 where
-    A: serde::Deserialize<'a>,
+    A: serde::de::DeserializeOwned,
 {
     type Error = PersistenceError;
     fn try_from(json_string: JsonString) -> Result<Self, Self::Error> {
@@ -180,7 +165,7 @@ impl<A: Attribute> Ord for EntityAttributeValueIndex<A> {
 
 impl<'a, A: Attribute> AddressableContent for EntityAttributeValueIndex<A>
 where
-    A: serde::Deserialize<'a>,
+    A: serde::de::DeserializeOwned,
 {
     fn content(&self) -> Content {
         self.to_owned().into()
@@ -406,7 +391,7 @@ pub mod tests {
         let entity =
             ExampleAddressableContent::try_from_content(&JsonString::from(RawString::from("foo")))
                 .unwrap();
-        let attribute = Attribute::from("favourite-color");
+        let attribute = ExampleAttribute::WithPayload("favourite-color".into());
         let value =
             ExampleAddressableContent::try_from_content(&JsonString::from(RawString::from("blue")))
                 .unwrap();
@@ -476,28 +461,22 @@ pub mod tests {
     fn validate_attribute_paths() {
         assert!(EntityAttributeValueIndex::new(
             &test_eav_entity().address(),
-            &Attribute::from("abc"),
+            &ExampleAttribute::WithPayload("abc".into()),
             &test_eav_entity().address()
         )
         .is_ok());
         assert!(EntityAttributeValueIndex::new(
             &test_eav_entity().address(),
-            &Attribute::from("abc123"),
+            &ExampleAttribute::WithPayload("abc123".into()),
             &test_eav_entity().address()
         )
         .is_ok());
         assert!(EntityAttributeValueIndex::new(
             &test_eav_entity().address(),
-            &Attribute::from("123"),
+            &ExampleAttribute::WithPayload("123".into()),
             &test_eav_entity().address()
         )
         .is_ok());
-        assert!(EntityAttributeValueIndex::new(
-            &test_eav_entity().address(),
-            &Attribute::from(""),
-            &test_eav_entity().address()
-        )
-        .is_err());
     }
 
 }

@@ -243,7 +243,7 @@ impl EavTestSuite {
     pub fn test_round_trip(
         mut eav_storage: impl EntityAttributeValueStorage<ExampleAttribute> + Clone,
         entity_content: impl AddressableContent,
-        attribute_name: String,
+        attribute: ExampleAttribute,
         value_content: impl AddressableContent,
     ) {
         let eav = EntityAttributeValueIndex::new(
@@ -252,7 +252,6 @@ impl EavTestSuite {
             &value_content.address(),
         )
         .expect("Could create entityAttributeValue");
-        let attribute = ExampleAttribute::WithPayload(attribute_name);
 
         let two_stores = vec![eav_storage.clone(), eav_storage.clone()];
 

@@ -10,7 +10,7 @@ pub struct EaviQuery<'a, A: Attribute> {
 }
 
 type EntityFilter<'a> = EavFilter<'a, Entity>;
-type AttributeFilter<'a, A: Attribute> = EavFilter<'a, A>;
+type AttributeFilter<'a, A> = EavFilter<'a, A>;
 type ValueFilter<'a> = EavFilter<'a, Value>;
 
 impl<'a, A: Attribute> Default for EaviQuery<'a, A> {
