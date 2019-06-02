@@ -1,5 +1,5 @@
 //! Holochain Persistence Api
-//! This crate defines apis for a content addressable storage (cas) and a generic 
+//! This crate defines apis for a content addressable storage (cas) and a generic
 //! entity attribute value index (eavi).
 #![feature(try_from)]
 #![feature(try_trait)]
