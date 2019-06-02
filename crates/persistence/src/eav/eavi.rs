@@ -38,7 +38,11 @@ pub enum ExampleAttribute {
 
 impl Display for ExampleAttribute {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        let str = match self {
+            ExampleAttribute::WithoutPayload => "without-payload",
+            ExampleAttribute::WithPayload(payload) => payload,
+        };
+        write!(f, "{}", str)
     }
 }
 

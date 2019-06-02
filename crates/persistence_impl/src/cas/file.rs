@@ -3,7 +3,7 @@ use lib3h_persistence::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::PersistenceError,
+    error::{PersistenceError, PersistenceResult},
     json::JsonString,
 };
 use std::{
@@ -29,7 +29,7 @@ impl PartialEq for FilesystemStorage {
 }
 
 impl FilesystemStorage {
-    pub fn new<P: AsRef<Path>>(dir_path: P) -> Result<FilesystemStorage, PersistenceError> {
+    pub fn new<P: AsRef<Path>>(dir_path: P) -> PersistenceResult<FilesystemStorage> {
         let dir_path = dir_path.as_ref().into();
 
         Ok(FilesystemStorage {
