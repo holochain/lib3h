@@ -17,7 +17,7 @@ use std::{
     cmp::Ordering,
     collections::BTreeSet,
     convert::{TryFrom, TryInto},
-    fmt::Debug,
+    fmt::{Debug, Display, Formatter},
     hash::Hash,
     option::NoneError,
 };
@@ -25,21 +25,21 @@ use std::{
 /// Address of AddressableContent representing the EAV entity
 pub type Entity = Address;
 
-/// All Attribute values are pre-defined here. If ever a user-defined Attribute is needed,
-/// just add a new Custom variant for it with a String parameter
-//#[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
-//#[serde(rename_all = "snake_case")]
-pub trait Attribute: PartialEq + Eq + PartialOrd + Hash + Clone + serde::Serialize + Debug
-//+ serde::de::DeserializeOwned
-//    + TryFrom<String>
-//    + Into<String>
-{
-}
+///  This is the minimal bounds defined for any attribute type. Some storage implementations
+/// may require other traits.
+
+pub trait Attribute: PartialEq + Eq + PartialOrd + Hash + Clone + serde::Serialize + Debug {}
 
 #[derive(PartialEq, Eq, PartialOrd, Hash, Clone, Debug, Serialize, Deserialize, DefaultJson)]
 pub enum ExampleAttribute {
     WithoutPayload,
     WithPayload(String),
+}
+
+impl Display for ExampleAttribute {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl Default for ExampleAttribute {
@@ -48,9 +48,18 @@ impl Default for ExampleAttribute {
     }
 }
 
+impl From<String> for ExampleAttribute {
+    fn from(str: String) -> Self {
+        if str == "without-payload" {
+            ExampleAttribute::WithoutPayload
+        } else {
+            ExampleAttribute::WithPayload(str)
+        }
+    }
+}
 impl Attribute for ExampleAttribute {}
 
-impl<'a> Attribute for &'a ExampleAttribute {}
+impl crate::json::DefaultJson for ExampleAttribute {}
 
 #[derive(PartialEq, Debug)]
 pub enum AttributeError {
@@ -161,7 +170,7 @@ impl<A: Attribute> Ord for EntityAttributeValueIndex<A> {
     }
 }
 
-impl<'a, A: Attribute> AddressableContent for EntityAttributeValueIndex<A>
+impl<A: Attribute> AddressableContent for EntityAttributeValueIndex<A>
 where
     A: serde::de::DeserializeOwned,
 {

@@ -1,9 +1,9 @@
-use holochain_core_types::{
+use lib3h_persistence::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::HolochainError,
+    error::PersistenceError,
 };
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{
@@ -54,23 +54,23 @@ impl PickleStorage {
 }
 
 impl ContentAddressableStorage for PickleStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), HolochainError> {
+    fn add(&mut self, content: &AddressableContent) -> Result<(), PersistenceError> {
         let mut inner = self.db.write().unwrap();
 
         inner
             .set(&content.address().to_string(), &content.content())
-            .map_err(|e| HolochainError::ErrorGeneric(e.to_string()))?;
+            .map_err(|e| PersistenceError::ErrorGeneric(e.to_string()))?;
 
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, HolochainError> {
+    fn contains(&self, address: &Address) -> Result<bool, PersistenceError> {
         let inner = self.db.read().unwrap();
 
         Ok(inner.exists(&address.to_string()))
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, HolochainError> {
+    fn fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError> {
         let inner = self.db.read().unwrap();
 
         Ok(inner.get(&address.to_string()))
@@ -84,7 +84,7 @@ impl ContentAddressableStorage for PickleStorage {
 #[cfg(test)]
 mod tests {
     use crate::cas::pickle::PickleStorage;
-    use holochain_core_types::{
+    use lib3h_persistence::{
         cas::{
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,
