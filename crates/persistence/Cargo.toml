@@ -3,6 +3,13 @@ name = "lib3h_persistence"
 version = "0.0.16-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 build = "build.rs"
+description = "lib3h persistence api for content addressable storage and entity attribute value indexes"
+keywords = ["holochain", "holo", "lib3h_persistence", "persistence", "cas", "eav", "eavi", "database"]
+categories = ["database"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_persistence"
+repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 arrayref = "=0.3.5"
