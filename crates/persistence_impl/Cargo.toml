@@ -1,5 +1,5 @@
 [package]
-name = "lib3_persistence_impl"
+name = "lib3h_persistence_impl"
 version = "0.0.17-alpha2"
 authors = ["Holochain Core Dev Team <devcore@lib3h.org>"]
 edition = "2018"
