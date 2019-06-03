@@ -3,6 +3,14 @@ name = "lib3_persistence_impl"
 version = "0.0.17-alpha2"
 authors = ["Holochain Core Dev Team <devcore@lib3h.org>"]
 edition = "2018"
+description = "lib3h persistence for content addressable storage and entity attribute value indexes. Features file, in memory, and pickle db storage implementations."
+keywords = ["holochain", "holo", "lib3h_persistence", "persistence", "cas", "eav", "eavi", "database"]
+categories = ["database"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_persistence_impl"
+repository = "https://github.com/holochain/lib3h"
+
 
 [dependencies]
 serde = "=1.0.89"
