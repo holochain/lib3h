@@ -1,4 +1,4 @@
-use lib3h_persistence::{
+use lib3h_persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
@@ -84,7 +84,7 @@ impl ContentAddressableStorage for PickleStorage {
 #[cfg(test)]
 mod tests {
     use crate::cas::pickle::PickleStorage;
-    use lib3h_persistence::{
+    use lib3h_persistence_api::{
         cas::{
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,

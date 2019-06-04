@@ -1,4 +1,4 @@
-use lib3h_persistence::{
+use lib3h_persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
@@ -62,7 +62,7 @@ impl ContentAddressableStorage for MemoryStorage {
 #[cfg(test)]
 pub mod tests {
     use crate::cas::memory::MemoryStorage;
-    use lib3h_persistence::{
+    use lib3h_persistence_api::{
         cas::{
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,

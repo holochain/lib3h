@@ -1,4 +1,4 @@
-use lib3h_persistence::{
+use lib3h_persistence_api::{
     eav::{Attribute, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage},
     error::{PersistenceError, PersistenceResult},
 };
@@ -101,7 +101,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::pickle::EavPickleStorage;
-    use lib3h_persistence::{
+    use lib3h_persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
             storage::EavTestSuite,

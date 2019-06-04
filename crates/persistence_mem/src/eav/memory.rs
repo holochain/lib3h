@@ -1,4 +1,4 @@
-use lib3h_persistence::{
+use lib3h_persistence_api::{
     eav::{
         increment_key_till_no_collision, Attribute, EaviQuery, EntityAttributeValueIndex,
         EntityAttributeValueStorage,
@@ -66,7 +66,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::memory::EavMemoryStorage;
-    use lib3h_persistence::{
+    use lib3h_persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
             storage::EavTestSuite,

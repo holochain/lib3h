@@ -1,4 +1,4 @@
-# lib3h_persistence
+# lib3h_persistence_file
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,11 +9,7 @@
 
 ## Overview
 
-Persistence implementations for lib3h and holochain. Provides content addressable storage (CAS) and entity attribute value (index) associative stores in three flavors.
-
- - a pure, thread safe in memory storage
- - file based storage using hiearchical directories to associate and query data
- - [pickledb](https://github.com/seladb/pickledb-rs) for database backed storage
+Filesystem persistence implementations for lib3h and holochain. Provides content addressable storage (CAS) and entity attribute value (index) associations using hiearchical based filesystem storage.
 
 ## Usage
 

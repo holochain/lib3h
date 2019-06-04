@@ -7,6 +7,8 @@ members = [
   "crates/lib3h_protocol",
   "crates/lib3h",
   "crates/tools/half_busy_chat",
-  "crates/persistence",
-  "crates/persistence_impl"
+  "crates/persistence_api",
+  "crates/persistence_mem",
+  "crates/persistence_file",
+  "crates/persistence_pickle"
 ]

@@ -1,5 +1,5 @@
 use glob::glob;
-use lib3h_persistence::{
+use lib3h_persistence_api::{
     cas::content::AddressableContent,
     eav::{
         Attribute, EavFilter, EaviQuery, Entity, EntityAttributeValueIndex,
@@ -159,7 +159,11 @@ where
 
 impl<A: Attribute> EntityAttributeValueStorage<A> for EavFileStorage<A>
 where
-    A: std::string::ToString + From<String> + Sync + Send + lib3h_persistence::json::DefaultJson,
+    A: std::string::ToString
+        + From<String>
+        + Sync
+        + Send
+        + lib3h_persistence_api::json::DefaultJson,
 {
     fn add_eavi(
         &mut self,
@@ -245,7 +249,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::file::EavFileStorage;
-    use lib3h_persistence::{
+    use lib3h_persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
             storage::EavTestSuite,
