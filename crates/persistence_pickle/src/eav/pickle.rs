@@ -13,7 +13,7 @@ use std::{
 };
 use uuid::Uuid;
 
-const PERSISTENCE_INTERVAL: Duration = Duration::from_millis(5000);
+const PERSISTENCE_PERIODICITY_MS: Duration = Duration::from_millis(5000);
 
 #[derive(Clone)]
 pub struct EavPickleStorage<A: Attribute> {
@@ -30,13 +30,13 @@ impl<A: Attribute> EavPickleStorage<A> {
             db: Arc::new(RwLock::new(
                 PickleDb::load(
                     eav_db.clone(),
-                    PickleDbDumpPolicy::PeriodicDump(PERSISTENCE_INTERVAL),
+                    PickleDbDumpPolicy::PeriodicDump(PERSISTENCE_PERIODICITY_MS),
                     SerializationMethod::Cbor,
                 )
                 .unwrap_or_else(|_| {
                     PickleDb::new(
                         eav_db,
-                        PickleDbDumpPolicy::PeriodicDump(PERSISTENCE_INTERVAL),
+                        PickleDbDumpPolicy::PeriodicDump(PERSISTENCE_PERIODICITY_MS),
                         SerializationMethod::Cbor,
                     )
                 }),
