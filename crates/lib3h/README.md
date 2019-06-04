@@ -1,4 +1,4 @@
-# lib3h_half_busy_chat
+# lib3h
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,7 +9,11 @@
 
 ## Overview
 
-Lib3h simulation test framework.
+The lib3h p2p communication rust library.
+
+## Usage
+
+FIXME
 
 ## Contribute
 
