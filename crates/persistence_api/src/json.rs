@@ -135,6 +135,12 @@ impl From<&'static str> for JsonString {
     }
 }
 
+impl<T: Serialize + Debug> From<Option<T>> for JsonString {
+    fn from(maybe_entry: Option<T>) -> Self {
+        default_to_json(maybe_entry)
+    }
+}
+
 impl<T: Serialize> From<Vec<T>> for JsonString {
     fn from(vector: Vec<T>) -> JsonString {
         JsonString::from_json(&serde_json::to_string(&vector).expect("could not Jsonify vector"))
