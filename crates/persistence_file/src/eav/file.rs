@@ -160,10 +160,13 @@ where
 impl<A: Attribute> EntityAttributeValueStorage<A> for EavFileStorage<A>
 where
     A: std::string::ToString
-        + From<String>
+        + TryFrom<String>
         + Sync
         + Send
-        + lib3h_persistence_api::json::DefaultJson,
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + TryFrom<JsonString>
+        + Into<JsonString>
 {
     fn add_eavi(
         &mut self,

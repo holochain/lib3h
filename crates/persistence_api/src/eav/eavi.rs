@@ -63,8 +63,6 @@ impl From<String> for ExampleAttribute {
 }
 impl Attribute for ExampleAttribute {}
 
-impl crate::json::DefaultJson for ExampleAttribute {}
-
 #[derive(PartialEq, Debug)]
 pub enum AttributeError {
     Unrecognized(String),

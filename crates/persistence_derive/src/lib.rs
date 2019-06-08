@@ -8,7 +8,6 @@ extern crate syn;
 extern crate quote;
 
 use proc_macro::TokenStream;
-
 fn impl_default_json_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let gen = quote! {
@@ -47,7 +46,6 @@ fn impl_default_json_macro(ast: &syn::DeriveInput) -> TokenStream {
                 #name::try_from(&json_string)
             }
         }
-
     };
     gen.into()
 }

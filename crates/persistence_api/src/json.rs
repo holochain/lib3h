@@ -250,11 +250,6 @@ pub fn default_try_from_json<D: DeserializeOwned>(
         .map_err(|e| PersistenceError::SerializationError(e.to_string()))
 }
 
-pub trait DefaultJson:
-    Serialize + DeserializeOwned + TryFrom<JsonString> + Into<JsonString>
-{
-}
-
 /// generic type to facilitate Jsonifying values directly
 /// JsonString simply wraps String and str as-is but will Jsonify RawString("foo") as "\"foo\""
 /// RawString must not implement Serialize because it should always convert to JsonString with from
