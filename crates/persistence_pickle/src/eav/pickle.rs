@@ -137,8 +137,9 @@ pub mod tests {
         let eav_storage = EavPickleStorage::new(temp_path);
         EavTestSuite::test_one_to_many::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavPickleStorage<ExampleAttribute>,
-        >(eav_storage);
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -148,8 +149,9 @@ pub mod tests {
         let eav_storage = EavPickleStorage::new(temp_path);
         EavTestSuite::test_many_to_one::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavPickleStorage<ExampleAttribute>,
-        >(eav_storage);
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -157,8 +159,9 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage = EavPickleStorage::new(temp_path);
-        EavTestSuite::test_range::<ExampleAddressableContent, EavPickleStorage<ExampleAttribute>>(
-            eav_storage,
+        EavTestSuite::test_range::<ExampleAddressableContent, ExampleAttribute,
+        EavPickleStorage<ExampleAttribute>>(
+            eav_storage, &ExampleAttribute::default()
         );
     }
 
@@ -169,6 +172,7 @@ pub mod tests {
         let eav_storage = EavPickleStorage::new(temp_path);
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavPickleStorage<ExampleAttribute>,
         >(
             eav_storage,
