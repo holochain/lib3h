@@ -27,7 +27,7 @@ futures-io-preview = "=0.3.0-alpha.12"
 futures-sink-preview = "=0.3.0-alpha.12"
 futures-util-preview = "=0.3.0-alpha.12"
 hcid = "=0.0.6"
-
+shrinkwraprs = "=0.2.1"
 rust-base58 = "=0.0.4"
 objekt= "=0.1.2"
 lib3h_persistence_derive = { path = "../persistence_derive" }
