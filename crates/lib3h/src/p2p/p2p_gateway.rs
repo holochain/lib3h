@@ -247,18 +247,18 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         Ok(outbox)
     }
 
-    /// Serve a DhtEvent sent to us.
-    /// Return a list of P2pProtocol messages for us to process.
+    /// Serve a DhtEvent sent to us by our internal DHT.
+    /// Return a list of P2pProtocol messages for our owner to process.
     // FIXME
     fn serve_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
         let outbox = Vec::new();
         let did_work = false;
         match evt {
             DhtEvent::RemoteGossipBundle(_data) => {
-                // FIXME
+                // FIXME: Ask our owner to gossip data back?
             }
             DhtEvent::GossipTo(_data) => {
-                // FIXME
+                // FIXME: Ask our owner to gossip data
             }
             DhtEvent::UnreliableGossipTo(_data) => {
                 // FIXME

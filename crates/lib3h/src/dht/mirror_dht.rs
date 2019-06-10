@@ -5,10 +5,14 @@ use crate::dht::{
 use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 use std::collections::VecDeque;
 
-/// RoundAndRound DHT implementation
-pub struct RrDht {
+/// Mirror DHT implementation: Reflect everything back
+pub struct MirrorDht {
     /// FIFO of DhtEvents send to us
     inbox: VecDeque<DhtEvent>,
+    /// Storage of PeerHoldRequestData
+    peer_list: HashMap<String, PeerHoldRequestData>,
+
+
 }
 
 impl RrDht {
@@ -19,7 +23,7 @@ impl RrDht {
     }
 }
 
-impl Dht for RrDht {
+impl Dht for MirrorDht {
     // -- Getters -- //
 
     fn this_peer(&self) -> Lib3hResult<()> {
@@ -45,6 +49,7 @@ impl Dht for RrDht {
         // FIXME
         vec![]
     }
+
     // -- Data -- //
 
     fn get_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
@@ -73,7 +78,7 @@ impl Dht for RrDht {
                 Some(msg) => msg,
             };
             did_work = true;
-            println!("(log.t) RrDht.process(): {:?}", evt)
+            println!("(log.t) MirrorDht.process(): {:?}", evt)
         }
         Ok((did_work, outbox))
     }

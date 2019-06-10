@@ -196,6 +196,7 @@ impl<T: Transport> RealEngine<T> {
     }
 
     /// Process a Lib3hClientProtocol message sent to us (by Core)
+    /// Side effects: Might add other messages to sub-components' inboxes.
     /// Return a list of Lib3hServerProtocol messages to send back to core or others?
     fn serve_Lib3hProtocol(
         &mut self,
@@ -222,11 +223,23 @@ impl<T: Transport> RealEngine<T> {
             Lib3hClientProtocol::LeaveSpace(_msg) => {
                 // FIXME
             }
-            Lib3hClientProtocol::SendDirectMessage(_msg) => {
-                // FIXME
+            Lib3hClientProtocol::SendDirectMessage(msg) => {
+                if let Err(res) = self.has_space_or_fail(msg.space_address, msg.from_agent_id, msg.request_id, None) {
+                    outbox.push(res);
+                } else {
+                    // Post a TransportCommand::Send request to the space gateway
+                    let space_gateway = self.space_gateway_map.get(&(msg.space_address, msg.from_agent_id)).unwrap();
+                    space_gateway.post(TransportCommand::Send([msg.to_agent_id], msg.content))?;
+                }
             }
-            Lib3hClientProtocol::HandleSendDirectMessageResult(_msg) => {
-                // FIXME
+            Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
+                if let Err(res) = self.has_space_or_fail(msg.space_address, msg.from_agent_id, msg.request_id, Some(msg.to_agent_id)) {
+                    outbox.push(res);
+                } else {
+                    // Post a TransportCommand::Send request to the space gateway
+                    let space_gateway = self.space_gateway_map.get(&(msg.space_address, msg.from_agent_id)).unwrap();
+                    space_gateway.post(TransportCommand::Send([msg.to_agent_id], msg.content))?;
+                }
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // FIXME
@@ -237,12 +250,28 @@ impl<T: Transport> RealEngine<T> {
             Lib3hClientProtocol::PublishEntry(_msg) => {
                 // FIXME
             }
+            Lib3hClientProtocol::QueryEntry(msg) => {
+                if let Err(res) = self.has_space_or_fail(msg.space_address, msg.requester_agent_id, msg.request_id, None) {
+                    outbox.push(res);
+                } else {
+                    // Post a DhtEvent::FetchData request to the space gateway
+                    let space_gateway = self.space_gateway_map.get(&(msg.space_address, msg.requester_agent_id)).unwrap();
+                    let msg = DataFetchData {
+                        msg_id: msg.request_id,
+                        data_address: msg.entry_address,
+                    };
+                    space_gateway.post(DhtEvent::FetchData(msg));
+                }
+            }
+            Lib3hClientProtocol::HandleQueryEntryResult(_msg) => {
+                // FIXME
+            }
             // Our request for the publish_list has returned
-            Lib3hClientProtocol::HandleGetPublishingEntryListResult(_msg) => {
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(_msg) => {
                 // FIXME
             }
             // Our request for the hold_list has returned
-            Lib3hClientProtocol::HandleGetHoldingEntryListResult(_msg) => {
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(_msg) => {
                 // FIXME
             }
         }
@@ -274,5 +303,18 @@ impl<T: Transport> RealEngine<T> {
             }),
         )?;
         Ok(Lib3hServerProtocol::SuccessResult(res))
+    }
+
+    fn has_space_or_fail(&self, space_address: &str, agent_id: &str, request_id: &str, maybe_sender_agent_id: Option<&str>) -> Result<(), Lib3hServerProtocol> {
+        let has_space = self.space_gateway_map.contains_key(&(space_address, agent_id));
+        if has_space { return Ok(()) }
+        let to_agent_id =  maybe_sender_agent_id.unwrap_or(agent_id);
+        let res = GenericResultData {
+            request_id,
+            space_address,
+            to_agent_id,
+            result_info: format!("Agent {} does not track space {}", agent_id, space_address).to_bytes().to_vec(),
+        };
+        Err(Lib3hServerProtocol::FailureResult(res))
     }
 }
