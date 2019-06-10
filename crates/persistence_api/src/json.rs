@@ -365,10 +365,10 @@ impl TryFrom<JsonString> for RawString {
 pub mod tests {
     use crate::{
         error::PersistenceError,
-        json::{JsonString, RawString},
+        json::{JsonString, RawString, JsonStringOption},
     };
     use serde_json;
-    use std::convert::TryFrom;
+    use std::convert::{TryInto, TryFrom};
 
     #[derive(Serialize, Deserialize, Debug, DefaultJson, PartialEq, Clone)]
     struct DeriveTest {
