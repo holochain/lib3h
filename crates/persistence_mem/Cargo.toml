@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_persistence_mem"
-version = "0.0.17-alpha2"
+version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@lib3h.org>"]
 edition = "2018"
 description = "lib3h persistence for content addressable storage and entity attribute value indexes. A simple, thread-safe in memory store."

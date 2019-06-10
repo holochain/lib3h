@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_persistence_api"
-version = "0.0.16-alpha1"
+version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 build = "build.rs"
 description = "lib3h persistence api for content addressable storage and entity attribute value indexes"
