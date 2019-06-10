@@ -409,26 +409,26 @@ pub mod tests {
     }
 
     #[test]
-    fn example_eav_one_to_many() {
+    fn example_eav_one_to_many<A:Attribute>() {
         EavTestSuite::test_one_to_many::<
             ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage<ExampleAttribute>,
+            ExampleEntityAttributeValueStorage<A>,
         >(test_eav_storage());
     }
 
     #[test]
-    fn example_eav_many_to_one() {
+    fn example_eav_many_to_one<A:Attribute>() {
         EavTestSuite::test_many_to_one::<
             ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage<ExampleAttribute>,
+            ExampleEntityAttributeValueStorage<A>,
         >(test_eav_storage());
     }
 
     #[test]
-    fn example_eav_range() {
+    fn example_eav_range<A:Attribute>() {
         EavTestSuite::test_range::<
             ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage<ExampleAttribute>,
+            ExampleEntityAttributeValueStorage<A>,
         >(test_eav_storage());
     }
 

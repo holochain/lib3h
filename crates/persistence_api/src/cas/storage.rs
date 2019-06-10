@@ -6,8 +6,9 @@
 use crate::{
     cas::content::{Address, AddressableContent, Content},
     eav::{
+        Attribute,
         EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
-        ExampleAttribute, IndexFilter,
+        IndexFilter,
     },
     error::PersistenceError,
     json::RawString,
@@ -240,15 +241,15 @@ where
 pub struct EavTestSuite;
 
 impl EavTestSuite {
-    pub fn test_round_trip(
-        mut eav_storage: impl EntityAttributeValueStorage<ExampleAttribute> + Clone,
+    pub fn test_round_trip<A:Attribute>(
+        mut eav_storage: impl EntityAttributeValueStorage<A> + Clone,
         entity_content: impl AddressableContent,
-        attribute: ExampleAttribute,
+        attribute: A,
         value_content: impl AddressableContent,
     ) {
-        let eav = EntityAttributeValueIndex::new(
+        let eav : EntityAttributeValueIndex<A> = EntityAttributeValueIndex::new(
             &entity_content.address(),
-            &ExampleAttribute::WithPayload("favourite-color".into()),
+            &attribute,
             &value_content.address(),
         )
         .expect("Could create entityAttributeValue");
@@ -312,10 +313,11 @@ impl EavTestSuite {
             }
         }
     }
-    pub fn test_one_to_many<A, S>(mut eav_storage: S)
+    pub fn test_one_to_many<A, AT: Attribute, S>
+        (mut eav_storage: S, attribute:&AT)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage<ExampleAttribute>,
+        S: EntityAttributeValueStorage<AT>,
     {
         let foo_content = Content::from(RawString::from("foo"));
         let bar_content = Content::from(RawString::from("bar"));
@@ -330,11 +332,10 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_three = A::try_from_content(&baz_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = ExampleAttribute::WithPayload("one_to_many".to_string());
 
         let mut expected = BTreeSet::new();
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {
-            let eav = EntityAttributeValueIndex::new(&one.address(), &attribute, &many.address())
+            let eav = EntityAttributeValueIndex::new(&one.address(), attribute, &many.address())
                 .expect("could not create EAV");
             eav_storage
                 .add_eavi(&eav)
@@ -348,7 +349,7 @@ impl EavTestSuite {
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {
             let eavi = eav_storage
                 .add_eavi(
-                    &EntityAttributeValueIndex::new(&two.address(), &attribute, &many.address())
+                    &EntityAttributeValueIndex::new(&two.address(), attribute, &many.address())
                         .expect("Could not create eav"),
                 )
                 .expect("could not add eav")
@@ -393,10 +394,10 @@ impl EavTestSuite {
         }
     }
 
-    pub fn test_range<A, S>(mut eav_storage: S)
+    pub fn test_range<A, AT:Attribute, S>(mut eav_storage: S, attribute:&AT)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage<ExampleAttribute>,
+        S: EntityAttributeValueStorage<AT>,
     {
         let foo_content = Content::from(RawString::from("foo"));
         let bar_content = Content::from(RawString::from("bar"));
@@ -408,7 +409,6 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_two = A::try_from_content(&bar_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = ExampleAttribute::WithPayload("one_to_many".into());
         let mut expected_many_one = BTreeSet::new();
         let mut expected_many_two = BTreeSet::new();
         let mut expected_all_range = BTreeSet::new();
@@ -418,7 +418,7 @@ impl EavTestSuite {
         (0..5).for_each(|s| {
             let alter_index = s % 2;
             let eav =
-                EntityAttributeValueIndex::new(&addresses[alter_index], &attribute, &one.address())
+                EntityAttributeValueIndex::new(&addresses[alter_index], attribute, &one.address())
                     .expect("could not create EAV");
             let eavi = eav_storage
                 .add_eavi(&eav)
@@ -489,10 +489,10 @@ impl EavTestSuite {
         );
     }
 
-    pub fn test_multiple_attributes<A, S>(mut eav_storage: S, attributes: Vec<ExampleAttribute>)
+    pub fn test_multiple_attributes<A, AT:Attribute, S>(mut eav_storage: S, attributes: Vec<AT>)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage<ExampleAttribute>,
+        S: EntityAttributeValueStorage<AT>,
     {
         let foo_content = Content::from(RawString::from("foo"));
 
@@ -504,7 +504,7 @@ impl EavTestSuite {
         let mut expected = BTreeSet::new();
 
         attributes.iter().for_each(|attribute| {
-            let eav: EntityAttributeValueIndex<ExampleAttribute> =
+            let eav: EntityAttributeValueIndex<AT> =
                 EntityAttributeValueIndex::new(&many_one.address(), attribute, &one.address())
                     .expect("could not create EAV");
             let eavi = eav_storage
@@ -545,10 +545,10 @@ impl EavTestSuite {
         assert_eq!(&new_eavi.unwrap().unwrap(), results.iter().last().unwrap())
     }
 
-    pub fn test_many_to_one<A, S>(mut eav_storage: S)
+    pub fn test_many_to_one<A, AT:Attribute, S>(mut eav_storage: S, attribute:&AT)
     where
         A: AddressableContent + Clone,
-        S: EntityAttributeValueStorage<ExampleAttribute>,
+        S: EntityAttributeValueStorage<AT>,
     {
         let foo_content = Content::from(RawString::from("foo"));
         let bar_content = Content::from(RawString::from("bar"));
@@ -564,11 +564,10 @@ impl EavTestSuite {
             .expect("could not create AddressableContent from Content");
         let many_three = A::try_from_content(&baz_content)
             .expect("could not create AddressableContent from Content");
-        let attribute = ExampleAttribute::WithPayload("many_to_one".into());
 
         let mut expected = BTreeSet::new();
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {
-            let eav = EntityAttributeValueIndex::new(&many.address(), &attribute, &one.address())
+            let eav = EntityAttributeValueIndex::new(&many.address(), attribute, &one.address())
                 .expect("could not create EAV");
             eav_storage
                 .add_eavi(&eav)
@@ -582,7 +581,7 @@ impl EavTestSuite {
         for many in vec![many_one.clone(), many_two.clone(), many_three.clone()] {
             let eavi = eav_storage
                 .add_eavi(
-                    &EntityAttributeValueIndex::new(&many.address(), &attribute, &two.address())
+                    &EntityAttributeValueIndex::new(&many.address(), attribute, &two.address())
                         .expect("Could not create eav"),
                 )
                 .expect("could not add eav")
