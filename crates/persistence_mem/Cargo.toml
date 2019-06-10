@@ -25,5 +25,4 @@ pickledb = "=0.4.0"
 
 
 [dev-dependencies]
-lib3h_persistence_api = { path = "../persistence_api" }
 tempfile = "=3.0.7"
