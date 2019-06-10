@@ -3,7 +3,7 @@
 #![warn(unused_extern_crates)]
 
 extern crate proc_macro;
-extern crate syn;
+use syn;
 #[macro_use]
 extern crate quote;
 
