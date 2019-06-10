@@ -285,9 +285,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage: EavFileStorage<ExampleAttribute> = EavFileStorage::new(temp_path).unwrap();
-        EavTestSuite::test_one_to_many::<ExampleAddressableContent, ExampleAttribute, EavFileStorage<ExampleAttribute>>(
-            eav_storage, &ExampleAttribute::default()
-        );
+        EavTestSuite::test_one_to_many::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavFileStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -295,9 +297,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage = EavFileStorage::new(temp_path).unwrap();
-        EavTestSuite::test_many_to_one::<ExampleAddressableContent, ExampleAttribute, EavFileStorage<ExampleAttribute>>(
-            eav_storage, &ExampleAttribute::default()
-        );
+        EavTestSuite::test_many_to_one::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavFileStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -305,9 +309,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage = EavFileStorage::new(temp_path).unwrap();
-        EavTestSuite::test_range::<ExampleAddressableContent, ExampleAttribute, EavFileStorage<ExampleAttribute>>(
-            eav_storage, &ExampleAttribute::default()
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavFileStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]

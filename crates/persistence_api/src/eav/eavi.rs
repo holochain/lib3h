@@ -428,9 +428,11 @@ pub mod tests {
 
     #[test]
     fn example_eav_range() {
-        EavTestSuite::test_range::<ExampleAddressableContent, ExampleAttribute, ExampleEntityAttributeValueStorage<ExampleAttribute>>(
-            test_eav_storage(), &ExampleAttribute::default()
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            ExampleEntityAttributeValueStorage<ExampleAttribute>,
+        >(test_eav_storage(), &ExampleAttribute::default());
     }
 
     #[test]

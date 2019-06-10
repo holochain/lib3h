@@ -113,9 +113,11 @@ pub mod tests {
     #[test]
     fn example_eav_range() {
         let eav_storage = EavMemoryStorage::new();
-        EavTestSuite::test_range::<ExampleAddressableContent, ExampleAttribute, EavMemoryStorage<ExampleAttribute>>(
-            eav_storage, &ExampleAttribute::default()
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavMemoryStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]

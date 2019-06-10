@@ -159,10 +159,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage = EavPickleStorage::new(temp_path);
-        EavTestSuite::test_range::<ExampleAddressableContent, ExampleAttribute,
-        EavPickleStorage<ExampleAttribute>>(
-            eav_storage, &ExampleAttribute::default()
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavPickleStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
