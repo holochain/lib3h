@@ -6,8 +6,7 @@
 use crate::{
     cas::content::{Address, AddressableContent, Content},
     eav::{
-        Attribute,
-        EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
+        Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
     error::PersistenceError,
@@ -241,13 +240,13 @@ where
 pub struct EavTestSuite;
 
 impl EavTestSuite {
-    pub fn test_round_trip<A:Attribute>(
+    pub fn test_round_trip<A: Attribute>(
         mut eav_storage: impl EntityAttributeValueStorage<A> + Clone,
         entity_content: impl AddressableContent,
         attribute: A,
         value_content: impl AddressableContent,
     ) {
-        let eav : EntityAttributeValueIndex<A> = EntityAttributeValueIndex::new(
+        let eav: EntityAttributeValueIndex<A> = EntityAttributeValueIndex::new(
             &entity_content.address(),
             &attribute,
             &value_content.address(),
@@ -313,8 +312,7 @@ impl EavTestSuite {
             }
         }
     }
-    pub fn test_one_to_many<A, AT: Attribute, S>
-        (mut eav_storage: S, attribute:&AT)
+    pub fn test_one_to_many<A, AT: Attribute, S>(mut eav_storage: S, attribute: &AT)
     where
         A: AddressableContent + Clone,
         S: EntityAttributeValueStorage<AT>,
@@ -394,7 +392,7 @@ impl EavTestSuite {
         }
     }
 
-    pub fn test_range<A, AT:Attribute, S>(mut eav_storage: S, attribute:&AT)
+    pub fn test_range<A, AT: Attribute, S>(mut eav_storage: S, attribute: &AT)
     where
         A: AddressableContent + Clone,
         S: EntityAttributeValueStorage<AT>,
@@ -489,7 +487,7 @@ impl EavTestSuite {
         );
     }
 
-    pub fn test_multiple_attributes<A, AT:Attribute, S>(mut eav_storage: S, attributes: Vec<AT>)
+    pub fn test_multiple_attributes<A, AT: Attribute, S>(mut eav_storage: S, attributes: Vec<AT>)
     where
         A: AddressableContent + Clone,
         S: EntityAttributeValueStorage<AT>,
@@ -545,7 +543,7 @@ impl EavTestSuite {
         assert_eq!(&new_eavi.unwrap().unwrap(), results.iter().last().unwrap())
     }
 
-    pub fn test_many_to_one<A, AT:Attribute, S>(mut eav_storage: S, attribute:&AT)
+    pub fn test_many_to_one<A, AT: Attribute, S>(mut eav_storage: S, attribute: &AT)
     where
         A: AddressableContent + Clone,
         S: EntityAttributeValueStorage<AT>,

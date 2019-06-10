@@ -166,7 +166,7 @@ where
         + serde::Serialize
         + serde::de::DeserializeOwned
         + TryFrom<JsonString>
-        + Into<JsonString>
+        + Into<JsonString>,
 {
     fn add_eavi(
         &mut self,

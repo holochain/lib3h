@@ -409,7 +409,7 @@ pub mod tests {
     }
 
     #[test]
-    fn example_eav_one_to_many<A:Attribute>() {
+    fn example_eav_one_to_many<A: Attribute>() {
         EavTestSuite::test_one_to_many::<
             ExampleAddressableContent,
             ExampleEntityAttributeValueStorage<A>,
@@ -417,7 +417,7 @@ pub mod tests {
     }
 
     #[test]
-    fn example_eav_many_to_one<A:Attribute>() {
+    fn example_eav_many_to_one<A: Attribute>() {
         EavTestSuite::test_many_to_one::<
             ExampleAddressableContent,
             ExampleEntityAttributeValueStorage<A>,
@@ -425,11 +425,10 @@ pub mod tests {
     }
 
     #[test]
-    fn example_eav_range<A:Attribute>() {
-        EavTestSuite::test_range::<
-            ExampleAddressableContent,
-            ExampleEntityAttributeValueStorage<A>,
-        >(test_eav_storage());
+    fn example_eav_range<A: Attribute>() {
+        EavTestSuite::test_range::<ExampleAddressableContent, ExampleEntityAttributeValueStorage<A>>(
+            test_eav_storage(),
+        );
     }
 
     #[test]
