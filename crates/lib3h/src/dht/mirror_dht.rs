@@ -1,9 +1,14 @@
 use crate::dht::{
-    dht_event::{DhtEvent, PeerHoldRequestData},
+    dht_event::*,
     dht_trait::Dht,
 };
 use lib3h_protocol::{AddressRef, DidWork, Lib3hResult,Address, data_types::EntryData};
-use std::collections::VecDeque;
+use std::collections::{
+    VecDeque, HashMap,
+};
+
+use serde::{Deserialize, Serialize};
+use rmps::{Deserializer, Serializer};
 
 /// Mirror DHT implementation: Holds and reflect everything back to other nodes (fullsync)
 ///  - On *HoldRequest, store and gossip data back to every known peer.
@@ -30,7 +35,7 @@ impl MirrorDht {
             this_peer: PeerHoldRequestData {
                 peer_address: peer_address.to_string(),
                 transport: peer_transport.to_string(),
-                timestamp: 0.0,
+                timestamp: 0,
             },
         }
     }
@@ -41,36 +46,51 @@ impl Dht for MirrorDht {
     // -- Getters -- //
 
     fn this_peer(&self) -> Lib3hResult<&str> {
-        Ok((self.this_peer.peer_address))
+        Ok(&self.this_peer.peer_address)
     }
 
     // -- Peer -- //
 
     fn get_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
-        self.peer_list.get(peer_address)
+        let res = self.peer_list.get(peer_address);
+        if let Some(pd) = res {
+            return Some(pd.clone());
+        }
+        None
     }
     fn fetch_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
         // FIXME: wait 200ms
-        self.get_peer(data_address)
+        self.get_peer(peer_address)
     }
     fn drop_peer(&self, peer_address: &str) -> Lib3hResult<()> {
-        self.peer_list.remove(peer_address)
+        let res = self.peer_list.remove(peer_address);
+        match res {
+            None => Err(format_err!("unknown peer: {}", peer_address)),
+            Some(_) => Ok(())
+        }
     }
     fn get_peer_list(&self) -> Vec<PeerHoldRequestData> {
-        self.peer_list.iter().collect()
+        let mut res = Vec::new();
+        for (_, peer) in self.peer_list.iter() {
+            res.push(peer.clone());
+        }
+        res
     }
 
     // -- Data -- //
 
-    fn get_data(&self, data_address: &AddressRef) -> Option<EntryData> {
-        self.data_list
-            .get(data_address)
+    fn get_entry(&self, data_address: &AddressRef) -> Option<EntryData> {
+        let res = self.data_list.get(data_address);
+        if let Some(entry) = res {
+            return Some(entry.clone());
+        }
+        None
     }
 
     /// Same as get_data with artificial wait
-    fn fetch_data(&self, data_address: &AddressRef) -> Option<EntryData> {
+    fn fetch_entry(&self, data_address: &AddressRef) -> Option<EntryData> {
         // FIXME: wait 200ms
-        self.get_data(data_address)
+        self.get_entry(data_address)
     }
 
     // -- Processing -- //
@@ -103,10 +123,10 @@ impl Dht for MirrorDht {
 impl MirrorDht {
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerHoldRequestData) -> bool {
-        let mut maybe_peer = self.peer_list.get_mut(peer_info.peer_address);
+        let mut maybe_peer = self.peer_list.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
-                self.peer_list.insert(peer_info.peer_address, msg);
+                self.peer_list.insert(peer_info.peer_address, peer_info.clone());
                 true
             }
             Some(mut peer) => {
@@ -122,10 +142,10 @@ impl MirrorDht {
     /// Add entry to our local storage
     /// Return true if new data was successfully added
     fn add_data(&mut self, entry: &EntryData) -> bool {
-        let maybe_entry = self.data_list.get_mut(entry.entry_address);
+        let maybe_entry = self.data_list.get_mut(&entry.entry_address);
         match maybe_entry {
             None => {
-                self.data_list.insert(entry.entry_address, msg.entry);
+                self.data_list.insert(entry.entry_address, entry.clone());
                 true
             }
             Some(mut prev_entry) => {
@@ -140,27 +160,27 @@ impl MirrorDht {
     fn serve_DhtEvent(
         &mut self,
         evt: &DhtEvent,
-    ) -> Result<Vec<DhtEvent>> {
+    ) -> Lib3hResult<Vec<DhtEvent>> {
         println!("(log.d) >>> '(MirrorDht)' recv evt: {:?}", evt);
         // Note: use same order as the enum
         match evt {
-            /// Received gossip from remote node. Bundle must be one of the following:
-            /// - DataHoldRequestData
-            /// - PeerHoldRequestData
+            // Received gossip from remote node. Bundle must be one of the following:
+            // - DataHoldRequestData
+            // - PeerHoldRequestData
             DhtEvent::RemoteGossipBundle(msg) => {
                 let evt;
                 let mut de = Deserializer::new(&msg.bundle[..]);
-                let maybe_data: Result<DataHoldRequestData> = Deserialize::deserialize(&mut de)();
-                if let Ok(data) = maybe_data {
-                    let is_new = self.add_data(data);
+                let maybe_entry: Result<EntryData, Self::Error> = Deserialize::deserialize(&mut de)();
+                if let Ok(entry) = maybe_entry {
+                    let is_new = self.add_data(&entry);
                     if is_new {
-                        return Ok(vec![DhtEvent::DataHoldRequest(data)]);
+                        return Ok(vec![DhtEvent::EntryHoldRequest(entry)]);
                     }
                     return Ok(vec![]);
                 }
                 let maybe_peer: Result<PeerHoldRequestData> = Deserialize::deserialize(&mut de)();
                 if let Ok(peer) = maybe_peer {
-                    let is_new = self.add_peer(peer);
+                    let is_new = self.add_peer(&peer);
                     if is_new {
                         return Ok(vec![DhtEvent::PeerHoldRequest(peer)]);
                     }
@@ -171,68 +191,61 @@ impl MirrorDht {
             // N/A
             DhtEvent::GossipTo(_) => {
                 panic!("Should not receive this?");
-                Ok(vec![])
             }
             // N/A
             DhtEvent::UnreliableGossipTo(_) => {
                 panic!("Should not receive this?");
-                Ok(vec![])
             }
-            /// Owner is asking us to hold peer info
+            // Owner is asking us to hold peer info
             DhtEvent::PeerHoldRequest(msg) => {
                 // Store it
                 let received_new_content = self.add_peer(msg);
                 // Bail if did not receive new content
                 if !received_new_content {
-                    Ok(vec![])
+                    return Ok(vec![]);
                 }
                 // Gossip to everyone to also hold it
-                let peer = self.peer_list.get(msg.peer_address).expect("Should have peer by now");
+                let peer = self.peer_list.get(&msg.peer_address).expect("Should have peer by now");
                 let mut buf = Vec::new();
                 peer.serialize(&mut Serializer::new(&mut buf)).unwrap();
                 let gossip_evt = GossipToData {
-                    peer_address_list: self.get_peer_list(),
+                    peer_address_list: self.get_peer_list(), // FIXME serialize PeerHoldData
                     bundle: buf,
                 };
-                gossip_list.push(DhtEvent::GossipTo(gossip_evt));
                 // Done
-                Ok(vec![gossip_evt])
+                Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
             // ???
             DhtEvent::PeerTimedOut(_) => {Ok(vec![])}
-            /// Owner asks us to hold some data. Store it and gossip to every known peer.
-            DhtEvent::DataHoldRequest(msg) => {
+            // Owner asks us to hold some data. Store it and gossip to every known peer.
+            DhtEvent::EntryHoldRequest(entry) => {
                 // Local asks us to hold data.
                 // Store it
-                let received_new_content = self.add_data(msg.entry);
+                let received_new_content = self.add_data(entry);
                 // Bail if did not receive new content
                 if !received_new_content {
-                    Ok(vec![])
+                    return Ok(vec![]);
                 }
                 // Gossip new data to all known peers
-                let entry = self.data_list.get(msg.entry.entry_address).expect("Should have content at this point");
+                let entry = self.data_list.get(&entry.entry_address).expect("Should have content at this point");
                 let mut buf = Vec::new();
                 entry.serialize(&mut Serializer::new(&mut buf)).unwrap();
                 let gossip_evt = GossipToData {
-                    peer_address_list: self.get_peer_list(),
+                    peer_address_list: self.get_peer_list(), // FIXME serialize PeerHoldData
                     bundle: buf,
                 };
-                gossip_list.push(DhtEvent::GossipTo(gossip_evt));
                 // Done
-                Ok(vec![gossip_evt])
+                Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
-            DhtEvent::DataFetch(_) => {
+            DhtEvent::EntryFetch(_) => {
                 panic!("Should not receive this?");
-                Ok(vec![])
             }
-            DhtEvent::DataFetchResponse(_) => {
+            DhtEvent::EntryFetchResponse(_) => {
                 panic!("Should not receive this?");
-                Ok(vec![])
             }
             // Monotonic fullsync dht for now
-            DhtEvent::DataPrune(_) => {
+            DhtEvent::EntryPrune(_) => {
                 panic!("Should not receive this?");
-                Ok(vec![])
             }
         }
     }

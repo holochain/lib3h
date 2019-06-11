@@ -1,24 +1,37 @@
 pub mod dht_event;
 pub mod dht_trait;
 pub mod rrdht;
-
+pub mod mirror_dht;
 
 #[cfg(test)]
 pub mod tests {
 
+    #[macro_use]
+    extern crate unwrap_to;
+
+    use lib3h_protocol::{
+        Address, AddressRef,
+        data_types::{EntryData, EntryAspectData},
+    };
+    use crate::dht::{
+        dht_event::*,
+        mirror_dht::MirrorDht,
+        rrdht::RrDht,
+    };
+
     /// CONSTS
     lazy_static! {
         /// Entries
-        pub static ref ENTRY_ADDRESS_1: Address = HashString::from("entry_addr_1");
-        pub static ref ENTRY_ADDRESS_2: Address = HashString::from("entry_addr_2");
-        pub static ref ENTRY_ADDRESS_3: Address = HashString::from("entry_addr_3");
+        pub static ref ENTRY_ADDRESS_1: Address = vec!["entry_addr_1"];
+        pub static ref ENTRY_ADDRESS_2: Address = vec!["entry_addr_2"];
+        pub static ref ENTRY_ADDRESS_3: Address = vec!["entry_addr_3"];
         /// Aspects
         pub static ref ASPECT_CONTENT_1: Vec<u8> = "hello-1".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_2: Vec<u8> = "l-2".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_3: Vec<u8> = "ChainHeader-3".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_1: Address = HashString::from("aspect_addr_1");
-        pub static ref ASPECT_ADDRESS_2: Address = HashString::from("aspect_addr_2");
-        pub static ref ASPECT_ADDRESS_3: Address = HashString::from("aspect_addr_3");
+        pub static ref ASPECT_ADDRESS_1: Address = vec!["aspect_addr_1"];
+        pub static ref ASPECT_ADDRESS_2: Address = vec!["aspect_addr_2"];
+        pub static ref ASPECT_ADDRESS_3: Address = vec!["aspect_addr_3"];
     }
 
     const PEER_A: &str = "alex";
@@ -49,7 +62,7 @@ pub mod tests {
             entry_address,
             aspect_list: vec![aspect],
         };
-        DhtEvent::DataHoldRequest(DataHoldRequestData { entry })
+        DhtEvent::DataHoldRequest(EntryHoldRequestData { entry })
     }
 
     fn new_dht(is_mirror: bool, peer_address: &str) -> impl Dht {
