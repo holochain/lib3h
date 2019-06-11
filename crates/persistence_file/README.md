@@ -13,7 +13,19 @@ Filesystem persistence implementations for lib3h and holochain. Provides content
 
 ## Usage
 
-FIXME
+Add `lib3h_persistence_file` crate to your `Cargo.toml`. Below is a stub for creating a storage unit and adding some content.
+
+```rust
+use lib3h_persistence_file::cas::file::FilesystemStorage;
+use tempfile::tempdir;
+
+pub fn init() -> FilesystemStorage {
+  let dir = tempdir().expect("Could not create a tempdir for CAS.");
+  let store = FilesystemStorage::new(dir.path()).unwrap();
+  store.add(<some_content>).expect("added some content");
+  store
+}
+```
 
 ## Contribute
 
