@@ -13,7 +13,7 @@ A persistence api for lib3h and holochain. Provides abstractions for content add
 
 ## Usage
 
-FIXME
+This library should be added to `Cargo.toml` as crate `lib3h_persistence_api` in conjunction with a persistence implementation such as `lib3h_persistence_mem`, `lib3h_persistence_file`, or `lib3h_persistence_pickle`.
 
 ## Contribute
 

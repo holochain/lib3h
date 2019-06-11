@@ -160,10 +160,13 @@ where
 impl<A: Attribute> EntityAttributeValueStorage<A> for EavFileStorage<A>
 where
     A: std::string::ToString
-        + From<String>
+        + TryFrom<String>
         + Sync
         + Send
-        + lib3h_persistence_api::json::DefaultJson,
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + TryFrom<JsonString>
+        + Into<JsonString>,
 {
     fn add_eavi(
         &mut self,
@@ -282,9 +285,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage: EavFileStorage<ExampleAttribute> = EavFileStorage::new(temp_path).unwrap();
-        EavTestSuite::test_one_to_many::<ExampleAddressableContent, EavFileStorage<ExampleAttribute>>(
-            eav_storage,
-        );
+        EavTestSuite::test_one_to_many::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavFileStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -292,9 +297,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage = EavFileStorage::new(temp_path).unwrap();
-        EavTestSuite::test_many_to_one::<ExampleAddressableContent, EavFileStorage<ExampleAttribute>>(
-            eav_storage,
-        );
+        EavTestSuite::test_many_to_one::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavFileStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -302,9 +309,11 @@ pub mod tests {
         let temp = tempdir().expect("test was supposed to create temp dir");
         let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
         let eav_storage = EavFileStorage::new(temp_path).unwrap();
-        EavTestSuite::test_range::<ExampleAddressableContent, EavFileStorage<ExampleAttribute>>(
-            eav_storage,
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavFileStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -314,6 +323,7 @@ pub mod tests {
         let eav_storage = EavFileStorage::new(temp_path).unwrap();
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavFileStorage<ExampleAttribute>,
         >(
             eav_storage,

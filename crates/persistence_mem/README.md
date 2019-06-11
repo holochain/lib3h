@@ -13,7 +13,17 @@ Pure rust, thread safe in memory persistence implementations for lib3h and holoc
 
 ## Usage
 
-FIXME
+Add `lib3h_persistence_mem` crate to your `Cargo.toml`. Below is a stub for creating a storage unit and adding some content.
+
+```rust
+use lib3h_persistence_mem::cas::memory::MemoryStore;
+
+fn init() -> MemoryStore {
+  let store = MemoryStore::new();
+  store.add(<some_content>);
+  store
+}
+```
 
 ## Contribute
 
