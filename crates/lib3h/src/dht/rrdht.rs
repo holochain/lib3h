@@ -47,11 +47,11 @@ impl Dht for RrDht {
     }
     // -- Data -- //
 
-    fn get_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
+    fn get_data(&self, _data_address: &AddressRef) -> Option<EntryData> {
         // FIXME
         Ok(vec![])
     }
-    fn fetch_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
+    fn fetch_data(&self, _data_address: &AddressRef) -> Option<EntryData> {
         // FIXME
         Ok(vec![])
     }

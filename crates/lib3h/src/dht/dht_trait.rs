@@ -10,8 +10,8 @@ pub trait Dht {
     fn drop_peer(&self, peer_address: &str) -> Lib3hResult<()>;
     fn get_peer_list(&self) -> Vec<PeerHoldRequestData>;
     /// Data
-    fn get_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>>;
-    fn fetch_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>>;
+    fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData>;
+    fn fetch_entry(&self, entry_address: &AddressRef) -> Option<EntryData>;
     /// Processing
     fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()>;
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)>;

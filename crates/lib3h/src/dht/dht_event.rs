@@ -4,16 +4,6 @@ use serde::{Deserialize, Serialize};
 use rmps::{Deserializer, Serializer};
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum DhtOwnerToDht {}
-pub enum DhtDhtToOwner {}
-pub enum DhtDhtToDht {
-    PeerHoldRequest,
-    PeerTimedOut,
-    DataHoldRequest,
-    DataFetch,
-}
-
-#[derive(Debug, PartialEq, Clone)]
 pub enum DhtEvent {
     /// We have received a gossip bundle from a remote peer,
     /// pass it along to the dht backend for processing
@@ -31,21 +21,21 @@ pub enum DhtEvent {
     PeerHoldRequest(PeerHoldRequestData),
     /// Tell implementors that gossip believes a peer has dropped
     PeerTimedOut(String),
-    /// Tell implementors that gossip is requesting we hold a data item.
+    /// Tell implementors that gossip is requesting we hold an entry.
     /// Note that this dht tracker has not actually marked this item
     /// for holding until the implementors pass this event back in.
-    DataHoldRequest(DataHoldRequestData),
-    /// This dht tracker requires access to the data associated with a data hash.
+    EntryHoldRequest(EntryData),
+    /// This dht tracker requires access to the entry associated with a entry address.
     /// This event should cause implementors to respond with a dataFetchResponse
     /// event.
-    DataFetch(DataFetchData),
-    /// Response to a `dataFetch` event. Set `data` to `null` to indicate the
-    /// requested data is not available (it will be removed from gossip).
-    DataFetchResponse(DataFetchResponseData),
-    /// Tell our implementors that we are no longer tracking this data
-    /// locally. Implementors should purge this hash from storage,
+    EntryFetch(EntryFetchData),
+    /// Response to a `EntryFetch` event. Set `entry` to `null` to indicate the
+    /// requested entry is not available (it will be removed from gossip).
+    EntryFetchResponse(EntryFetchResponseData),
+    /// Tell our implementors that we are no longer tracking this entry
+    /// locally. Implementors should purge this address from storage,
     /// but that can, of course, choose not to.
-    DataPrune(String),
+    EntryPrune(Address),
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -68,18 +58,13 @@ pub struct PeerHoldRequestData {
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct DataHoldRequestData {
-    pub entry: EntryData,
-}
-
-#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct DataFetchData {
+pub struct EntryFetchData {
     pub msg_id: String,
-    pub data_address: Address,
+    pub entry_address: Address,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct DataFetchResponseData {
+pub struct EntryFetchResponseData {
     pub msg_id: String,
     pub entry: EntryData,
 }
