@@ -13,7 +13,14 @@ Lib3h rust derive macros for persistence capabilities.a
 
 ## Usage
 
-FIXME
+```rust
+use lib3h_persistence_api::{json::JsonString, error::PersistenceError};
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, DefaultJson)]
+pub struct SomeData(String);
+
+
+```
 
 ## Contribute
 
