@@ -1,7 +1,7 @@
 //! The JsonString type is defined here. It is used throughout Holochain
 //! to enforce a standardized serialization of data to/from json.
 
-use crate::error::{PersistenceResult, PersistenceError};
+use crate::error::{PersistenceError, PersistenceResult};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 use std::{
