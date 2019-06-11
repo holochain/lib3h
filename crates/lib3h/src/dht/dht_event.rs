@@ -1,8 +1,5 @@
 use lib3h_protocol::{data_types::EntryData, Address};
 
-use serde::{Deserialize, Serialize};
-use rmps::{Deserializer, Serializer};
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtEvent {
     /// We have received a gossip bundle from a remote peer,

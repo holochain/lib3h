@@ -1,17 +1,19 @@
 #![allow(non_snake_case)]
 
 //#[cfg(test)]
-use crate::transport::memory_mock::transport_memory::TransportMemory;
+use crate::transport::{
+    memory_mock::transport_memory::TransportMemory
+};
 use std::collections::{HashMap, VecDeque};
 
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
+    protocol_server::Lib3hServerProtocol, Address,     AddressRef, DidWork, Lib3hResult,
 };
 
 use crate::{
     dht::{
-        dht_event::{DhtEvent, PeerHoldRequestData},
+        dht_event::{DhtEvent, PeerHoldRequestData, EntryFetchData},
         dht_trait::Dht,
         rrdht::RrDht,
     },
@@ -19,6 +21,7 @@ use crate::{
     transport::transport_trait::Transport,
     transport_space::TransportSpace,
     transport_wss::TransportWss,
+    transport::protocol::TransportCommand,
 };
 
 /// Identifier of a source chain: SpaceAddress+AgentId
@@ -88,7 +91,7 @@ impl<T: Transport> NetworkEngine for RealEngine<T> {
         Ok(())
     }
     fn advertise(&self) -> String {
-        self.transport_gateway.advertise()
+        self.transport_gateway.advertise().expect("Should always have an advertise")
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -182,7 +185,7 @@ impl<T: Transport> RealEngine<T> {
             P2pProtocol::Gossip => {
                 // FIXME
             }
-            P2pProtocol::DirectMessage => {
+            P2pProtocol::DirectMessage(_) => {
                 // FIXME
             }
             P2pProtocol::FetchData => {
@@ -224,21 +227,23 @@ impl<T: Transport> RealEngine<T> {
                 // FIXME
             }
             Lib3hClientProtocol::SendDirectMessage(msg) => {
-                if let Err(res) = self.has_space_or_fail(msg.space_address, msg.from_agent_id, msg.request_id, None) {
+                if let Err(res) = self.has_space_or_fail(&msg.space_address, &msg.from_agent_id, &msg.request_id, None) {
                     outbox.push(res);
                 } else {
                     // Post a TransportCommand::Send request to the space gateway
-                    let space_gateway = self.space_gateway_map.get(&(msg.space_address, msg.from_agent_id)).unwrap();
-                    space_gateway.post(TransportCommand::Send([msg.to_agent_id], msg.content))?;
+                    let mut space_gateway = self.space_gateway_map.get_mut(&(msg.space_address, msg.from_agent_id)).unwrap();
+                    let transport_id = std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+                    Transport::post(space_gateway, TransportCommand::Send(vec![transport_id], msg.content))?;
                 }
             }
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
-                if let Err(res) = self.has_space_or_fail(msg.space_address, msg.from_agent_id, msg.request_id, Some(msg.to_agent_id)) {
+                if let Err(res) = self.has_space_or_fail(&msg.space_address, &msg.from_agent_id, &msg.request_id, Some(&msg.to_agent_id)) {
                     outbox.push(res);
                 } else {
                     // Post a TransportCommand::Send request to the space gateway
-                    let space_gateway = self.space_gateway_map.get(&(msg.space_address, msg.from_agent_id)).unwrap();
-                    space_gateway.post(TransportCommand::Send([msg.to_agent_id], msg.content))?;
+                    let mut space_gateway = self.space_gateway_map.get_mut(&(msg.space_address, msg.from_agent_id)).unwrap();
+                    let transport_id = std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+                    Transport::post(space_gateway, TransportCommand::Send(vec![transport_id], msg.content))?;
                 }
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
@@ -251,16 +256,16 @@ impl<T: Transport> RealEngine<T> {
                 // FIXME
             }
             Lib3hClientProtocol::QueryEntry(msg) => {
-                if let Err(res) = self.has_space_or_fail(msg.space_address, msg.requester_agent_id, msg.request_id, None) {
+                if let Err(res) = self.has_space_or_fail(&msg.space_address, &msg.requester_agent_id, &msg.request_id, None) {
                     outbox.push(res);
                 } else {
                     // Post a DhtEvent::FetchData request to the space gateway
-                    let space_gateway = self.space_gateway_map.get(&(msg.space_address, msg.requester_agent_id)).unwrap();
-                    let msg = DataFetchData {
+                    let mut space_gateway = self.space_gateway_map.get_mut(&(msg.space_address, msg.requester_agent_id)).unwrap();
+                    let msg = EntryFetchData {
                         msg_id: msg.request_id,
-                        data_address: msg.entry_address,
+                        entry_address: msg.entry_address,
                     };
-                    space_gateway.post(DhtEvent::FetchData(msg));
+                    Dht::post(space_gateway, DhtEvent::EntryFetch(msg));
                 }
             }
             Lib3hClientProtocol::HandleQueryEntryResult(_msg) => {
@@ -281,7 +286,7 @@ impl<T: Transport> RealEngine<T> {
     /// Create a gateway for this agent in this space, if not already part of it.
     fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Lib3hServerProtocol> {
         let player_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
-        let mut res = ResultData {
+        let mut res = GenericResultData {
             request_id: join_msg.request_id.clone(),
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
@@ -305,15 +310,18 @@ impl<T: Transport> RealEngine<T> {
         Ok(Lib3hServerProtocol::SuccessResult(res))
     }
 
-    fn has_space_or_fail(&self, space_address: &str, agent_id: &str, request_id: &str, maybe_sender_agent_id: Option<&str>) -> Result<(), Lib3hServerProtocol> {
-        let has_space = self.space_gateway_map.contains_key(&(space_address, agent_id));
+    fn has_space_or_fail(&self, space_address: &AddressRef, agent_id: &AddressRef, request_id: &str, maybe_sender_agent_id: Option<&AddressRef>) -> Result<(), Lib3hServerProtocol> {
+        let has_space = self.space_gateway_map.contains_key(&(space_address.to_owned(), agent_id.to_owned()));
         if has_space { return Ok(()) }
         let to_agent_id =  maybe_sender_agent_id.unwrap_or(agent_id);
         let res = GenericResultData {
-            request_id,
-            space_address,
-            to_agent_id,
-            result_info: format!("Agent {} does not track space {}", agent_id, space_address).to_bytes().to_vec(),
+            request_id: request_id.to_string(),
+            space_address: space_address.to_owned(),
+            to_agent_id: to_agent_id.to_owned(),
+            result_info: format!("Agent {} does not track space {}",
+            std::string::String::from_utf8_lossy(&agent_id).into_owned(),
+                                 std::string::String::from_utf8_lossy(&space_address).into_owned(),
+            ).as_bytes().to_vec(),
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }

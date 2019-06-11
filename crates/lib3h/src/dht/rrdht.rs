@@ -2,7 +2,7 @@ use crate::dht::{
     dht_event::{DhtEvent, PeerHoldRequestData},
     dht_trait::Dht,
 };
-use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult, data_types::EntryData};
 use std::collections::VecDeque;
 
 /// RoundAndRound DHT implementation
@@ -47,13 +47,13 @@ impl Dht for RrDht {
     }
     // -- Data -- //
 
-    fn get_data(&self, _data_address: &AddressRef) -> Option<EntryData> {
+    fn get_entry(&self, _data_address: &AddressRef) -> Option<EntryData> {
         // FIXME
-        Ok(vec![])
+        None
     }
-    fn fetch_data(&self, _data_address: &AddressRef) -> Option<EntryData> {
+    fn fetch_entry(&self, _data_address: &AddressRef) -> Option<EntryData> {
         // FIXME
-        Ok(vec![])
+        None
     }
 
     // -- Processing -- //

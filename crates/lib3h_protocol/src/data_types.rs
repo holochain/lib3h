@@ -8,7 +8,7 @@ pub type AspectKey = (Address, Address);
 // Entry (Semi-opaque Holochain entry type)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryAspectData {
     pub aspect_address: Address,
     pub type_hint: String,
@@ -16,7 +16,7 @@ pub struct EntryAspectData {
     pub publish_ts: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryData {
     pub entry_address: Address,
     pub aspect_list: Vec<EntryAspectData>,
@@ -35,16 +35,19 @@ impl EntryData {
 
     /// Return true if we added new content from other
     pub fn merge(&mut self, other: &EntryData) -> bool {
+        // Must be same entry address
         if self.entry_address != other.entry_address {
             return false;
         }
+        // Get all new aspects
         let mut to_append = Vec::new();
         for aspect in other.aspect_list.iter() {
-            if self.aspect_list.find(|a| a.aspect_address == aspect.aspect_address) {
+            if self.aspect_list.iter().find(|a| a.aspect_address == aspect.aspect_address).is_some() {
                 continue;
             }
-            to_append.push(aspect);
+            to_append.push(aspect.clone());
         }
+        // append new aspects
         if to_append.len() == 0 {
             return false;
         }

@@ -17,7 +17,7 @@ use crate::{
     transport_space::TransportSpace,
     transport_wss::TransportWss,
 };
-use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult, data_types::EntryData};
 
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.
@@ -45,7 +45,7 @@ impl P2pGateway<TransportMemory, RrDht> {
     }
 }
 
-impl<D: Dht> P2pGateway<TransportWss<std::net::TcpStream>, D> {
+impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
     /// Constructor
     pub fn new_with_wss() -> Self {
         P2pGateway {
@@ -56,7 +56,7 @@ impl<D: Dht> P2pGateway<TransportWss<std::net::TcpStream>, D> {
     }
 }
 
-impl<D: Dht> P2pGateway<TransportSpace, D> {
+impl P2pGateway<TransportSpace, RrDht> {
     /// Constructor
     pub fn new_with_space() -> Self {
         P2pGateway {
@@ -72,11 +72,11 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     // -- Getters -- //
     /// This nodes identifier on the network
     pub fn id(&self) -> String {
-        self.dht.this_peer().expect("P2pGateway's DHT should have 'this_peer'")
+        self.dht.this_peer().expect("P2pGateway's DHT should have 'this_peer'").to_string()
     }
     /// This nodes connection address
     pub fn advertise(&self) -> Option<String> {
-        self.maybe_advertise
+        self.maybe_advertise.clone()
     }
 }
 
@@ -92,12 +92,12 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn drop_peer(&self, peer_address: &str) -> Lib3hResult<()> {
         self.dht.drop_peer(peer_address)
     }
-    /// Data
-    fn get_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
-        self.dht.get_data(data_address)
+    /// Entry
+    fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
+        self.dht.get_entry(entry_address)
     }
-    fn fetch_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
-        self.dht.fetch_data(data_address)
+    fn fetch_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
+        self.dht.fetch_entry(entry_address)
     }
     /// Processing
     fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
@@ -107,8 +107,11 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         self.dht.process()
     }
     /// Getters
-    fn this_peer(&self) -> Lib3hResult<()> {
+    fn this_peer(&self) -> Lib3hResult<&str> {
         self.dht.this_peer()
+    }
+    fn get_peer_list(&self) -> Vec<PeerHoldRequestData> {
+        self.dht.get_peer_list()
     }
 }
 
@@ -135,7 +138,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     fn bind(&mut self, url: &str) -> TransportResult<String> {
         let res = self.connection.bind(url);
-        if let Some(adv) = res {
+        if let Ok(adv) = res.clone() {
             self.maybe_advertise = Some(adv);
         }
         res
@@ -235,7 +238,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             P2pProtocol::Gossip => {
                 // FIXME
             }
-            P2pProtocol::DirectMessage => {
+            P2pProtocol::DirectMessage(_) => {
                 // FIXME
             }
             P2pProtocol::FetchData => {
@@ -270,16 +273,16 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             DhtEvent::PeerTimedOut(_peer_address) => {
                 // FIXME
             }
-            DhtEvent::DataHoldRequest(_data) => {
+            DhtEvent::EntryHoldRequest(_data) => {
                 // FIXME
             }
-            DhtEvent::DataFetch(_data) => {
+            DhtEvent::EntryFetch(_data) => {
                 // FIXME
             }
-            DhtEvent::DataFetchResponse(_data) => {
+            DhtEvent::EntryFetchResponse(_data) => {
                 // FIXME
             }
-            DhtEvent::DataPrune(_peer_address) => {
+            DhtEvent::EntryPrune(_address) => {
                 // FIXME
             }
         }

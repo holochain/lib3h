@@ -44,7 +44,16 @@ impl P2pProtocol {
         }
         let protocol = match data[0] {
             0 => P2pProtocol::Gossip,
-            1 => P2pProtocol::DirectMessage,
+            1 => {
+                let dummy = DirectMessageData {
+                    space_address: vec![],
+                    request_id: String::new(),
+                    to_agent_id: vec![],
+                    from_agent_id: vec![],
+                    content: vec![],
+                };
+                P2pProtocol::DirectMessage(dummy)
+            },
             2 => P2pProtocol::FetchData,
             3 => P2pProtocol::FetchDataResponse,
             _ => unreachable!(),
