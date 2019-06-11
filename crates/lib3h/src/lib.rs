@@ -7,6 +7,13 @@ extern crate failure;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate rmp_serde as rmps;
+
+// -- mod -- //
+
 pub mod dht;
 pub mod p2p;
 pub mod real_engine;

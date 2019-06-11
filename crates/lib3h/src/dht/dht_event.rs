@@ -1,5 +1,18 @@
 use lib3h_protocol::{data_types::EntryData, Address};
 
+use serde::{Deserialize, Serialize};
+use rmps::{Deserializer, Serializer};
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum DhtOwnerToDht {}
+pub enum DhtDhtToOwner {}
+pub enum DhtDhtToDht {
+    PeerHoldRequest,
+    PeerTimedOut,
+    DataHoldRequest,
+    DataFetch,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtEvent {
     /// We have received a gossip bundle from a remote peer,
@@ -26,7 +39,7 @@ pub enum DhtEvent {
     /// This event should cause implementors to respond with a dataFetchResponse
     /// event.
     DataFetch(DataFetchData),
-    /// Response to a dataFetch event. Set `data` to `null` to indicate the
+    /// Response to a `dataFetch` event. Set `data` to `null` to indicate the
     /// requested data is not available (it will be removed from gossip).
     DataFetchResponse(DataFetchResponseData),
     /// Tell our implementors that we are no longer tracking this data
@@ -35,37 +48,37 @@ pub enum DhtEvent {
     DataPrune(String),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct RemoteGossipBundleData {
     pub from_peer_address: String,
     pub bundle: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct GossipToData {
     pub peer_address_list: Vec<String>,
     pub bundle: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct PeerHoldRequestData {
     pub peer_address: String,
     pub transport: String,
     pub timestamp: u64,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct DataHoldRequestData {
     pub entry: EntryData,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct DataFetchData {
     pub msg_id: String,
     pub data_address: Address,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct DataFetchResponseData {
     pub msg_id: String,
     pub entry: EntryData,

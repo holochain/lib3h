@@ -22,9 +22,9 @@ impl RrDht {
 impl Dht for RrDht {
     // -- Getters -- //
 
-    fn this_peer(&self) -> Lib3hResult<()> {
+    fn this_peer(&self) -> Lib3hResult<&str> {
         // FIXME
-        Ok(())
+        Ok("FIXME")
     }
 
     // -- Peer -- //

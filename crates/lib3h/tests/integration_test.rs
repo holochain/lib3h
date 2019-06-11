@@ -205,7 +205,7 @@ fn basic_two_setup<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngin
     // Connect A to B
     let req_connect = ConnectData {
         request_id: "connect",
-        peer_transport: billy.advertise(),
+        peer_transport: billy.advertise().unwrap(),
         network_id: NETWORK_A_ID.clone(),
     };
     alex

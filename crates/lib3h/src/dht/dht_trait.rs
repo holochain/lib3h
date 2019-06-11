@@ -16,5 +16,6 @@ pub trait Dht {
     fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()>;
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)>;
     /// Getters
-    fn this_peer(&self) -> Lib3hResult<()>;
+    /// Get peer address used on the DHT
+    fn this_peer(&self) -> Lib3hResult<&str>;
 }

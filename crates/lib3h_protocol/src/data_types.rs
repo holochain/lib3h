@@ -22,6 +22,37 @@ pub struct EntryData {
     pub aspect_list: Vec<EntryAspectData>,
 }
 
+impl EntryData {
+    /// get an EntryAspectData from an EntryData
+    pub fn get(&self, aspect_address: &Address) -> Option<EntryAspectData> {
+        for aspect in self.aspect_list.iter() {
+            if aspect.aspect_address == *aspect_address {
+                return Some(aspect.clone());
+            }
+        }
+        None
+    }
+
+    /// Return true if we added new content from other
+    pub fn merge(&mut self, other: &EntryData) -> bool {
+        if self.entry_address != other.entry_address {
+            return false;
+        }
+        let mut to_append = Vec::new();
+        for aspect in other.aspect_list.iter() {
+            if self.aspect_list.find(|a| a.aspect_address == aspect.aspect_address) {
+                continue;
+            }
+            to_append.push(aspect);
+        }
+        if to_append.len() == 0 {
+            return false;
+        }
+        self.aspect_list.append(&mut to_append);
+        true
+    }
+}
+
 //--------------------------------------------------------------------------------------------------
 // Generic responses
 //--------------------------------------------------------------------------------------------------
