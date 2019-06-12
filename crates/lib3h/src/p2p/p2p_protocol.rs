@@ -1,20 +1,5 @@
 use lib3h_protocol::{data_types::DirectMessageData, Lib3hResult};
 
-////--------------------------------------------------------------------------------------------------
-//// Data types
-////--------------------------------------------------------------------------------------------------
-//
-//#[derive(Debug, Clone, PartialEq)]
-//pub struct DirectMessageData {
-//    pub request_id: String,
-//    pub content: Vec<u8>,
-//    pub is_response: bool,
-//}
-
-//--------------------------------------------------------------------------------------------------
-// Enum
-//--------------------------------------------------------------------------------------------------
-
 /// Enum holding all message types in the 'network module <-> network module' protocol.
 /// TODO
 #[derive(Debug, Clone, PartialEq)]

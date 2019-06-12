@@ -54,32 +54,23 @@ impl Dht for MirrorDht {
         None
     }
     fn fetch_peer(&self, peer_address: &str) -> Option<PeerData> {
-        // FIXME: wait 200ms
+        // FIXME: wait 200ms?
         self.get_peer(peer_address)
     }
 
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.peer_list.values().map(|v| v.clone()).collect()
-        //        let mut res = Vec::new();
-        //        for (_, peer) in self.peer_list.iter() {
-        //            res.push(peer.clone());
-        //        }
-        //        res
     }
 
     // -- Data -- //
 
     fn get_entry(&self, data_address: &AddressRef) -> Option<EntryData> {
-        let res = self.entry_list.get(data_address);
-        if let Some(entry) = res {
-            return Some(entry.clone());
-        }
-        None
+        self.entry_list.get(data_address).map(|e| e.clone())
     }
 
     /// Same as get_data with artificial wait
     fn fetch_entry(&self, data_address: &AddressRef) -> Option<EntryData> {
-        // FIXME: wait 200ms
+        // FIXME: wait 200ms?
         self.get_entry(data_address)
     }
 
@@ -239,15 +230,22 @@ impl MirrorDht {
                 // Done
                 Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
-            DhtCommand::FetchEntry(_) => {
-                // FIXME
-                Ok(vec![])
+            // Respond with internal query
+            DhtCommand::FetchEntry(msg) => {
+                let maybe_entry = self.fetch_entry(&msg.entry_address);
+                match maybe_entry {
+                    None => Ok(vec![]),
+                    Some(entry) => {
+                        let response = FetchEntryResponseData {
+                            msg_id: msg.msg_id.clone(),
+                            entry,
+                        };
+                        Ok(vec![DhtEvent::FetchEntryResponse(response)])
+                    }
+                }
             }
             // Monotonic fullsync dht for now
-            DhtCommand::DropEntry(_) => {
-                // FIXME
-                Ok(vec![])
-            }
+            DhtCommand::DropEntry(_) => Ok(vec![]),
         }
     }
 }
