@@ -10,5 +10,6 @@ members = [
   "crates/persistence_api",
   "crates/persistence_mem",
   "crates/persistence_file",
-  "crates/persistence_pickle"
+  "crates/persistence_pickle",
+  "crates/persistence_derive"
 ]

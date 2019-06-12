@@ -5,7 +5,7 @@ use crate::error::{PersistenceError, PersistenceResult};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 use std::{
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     fmt::{Debug, Display, Formatter, Result as FmtResult},
 };
 
@@ -135,6 +135,12 @@ impl From<&'static str> for JsonString {
     }
 }
 
+impl<T: Serialize + Debug> From<Option<T>> for JsonString {
+    fn from(maybe_entry: Option<T>) -> Self {
+        default_to_json(maybe_entry)
+    }
+}
+
 impl<T: Serialize> From<Vec<T>> for JsonString {
     fn from(vector: Vec<T>) -> JsonString {
         JsonString::from_json(&serde_json::to_string(&vector).expect("could not Jsonify vector"))
@@ -212,6 +218,52 @@ impl Display for JsonString {
     }
 }
 
+// ## Conversions from Option types ##
+
+// Options are a special case for several reasons. Firstly they are handled
+// in a special way by serde:
+
+//     "Users tend to have different expectations around the Option enum compared to other enums.
+//     Serde JSON will serialize Option::None as null and Option::Some as just the contained value."
+
+// The other issue is that option implements generic From<T> so you can do calls like
+// `let s: Option<&str> = "hi".into()`
+// To get around this we need to go through an intermediate type JsonStringOption
+
+#[derive(Shrinkwrap, Deserialize)]
+pub struct JsonStringOption<T>(Option<T>);
+
+impl<T> JsonStringOption<T> {
+    pub fn to_option(self) -> Option<T> {
+        self.0
+    }
+}
+
+impl<T> Into<Option<T>> for JsonStringOption<T> {
+    fn into(self) -> Option<T> {
+        self.to_option()
+    }
+}
+
+impl<T> TryInto<JsonStringOption<T>> for JsonString
+where
+    T: Into<JsonString> + DeserializeOwned,
+{
+    type Error = PersistenceError;
+    fn try_into(self) -> Result<JsonStringOption<T>, Self::Error> {
+        let o: Option<T> = default_try_from_json(self)?;
+        Ok(JsonStringOption(o))
+    }
+}
+
+impl TryInto<JsonStringOption<String>> for JsonString {
+    type Error = PersistenceError;
+    fn try_into(self) -> Result<JsonStringOption<String>, Self::Error> {
+        let o: Option<String> = default_try_from_json(self)?;
+        Ok(JsonStringOption(o))
+    }
+}
+
 /// if all you want to do is implement the default behaviour then use #[derive(DefaultJson)]
 /// should only be used with From<S> for JsonString
 /// i.e. when failure should be impossible so an expect is ok
@@ -242,11 +294,6 @@ pub fn default_try_from_json<D: DeserializeOwned>(
 ) -> Result<D, PersistenceError> {
     serde_json::from_str(&String::from(&json_string))
         .map_err(|e| PersistenceError::SerializationError(e.to_string()))
-}
-
-pub trait DefaultJson:
-    Serialize + DeserializeOwned + TryFrom<JsonString> + Into<JsonString>
-{
 }
 
 /// generic type to facilitate Jsonifying values directly
@@ -318,10 +365,10 @@ impl TryFrom<JsonString> for RawString {
 pub mod tests {
     use crate::{
         error::PersistenceError,
-        json::{JsonString, RawString},
+        json::{JsonString, JsonStringOption, RawString},
     };
     use serde_json;
-    use std::convert::TryFrom;
+    use std::convert::{TryFrom, TryInto};
 
     #[derive(Serialize, Deserialize, Debug, DefaultJson, PartialEq, Clone)]
     struct DeriveTest {
@@ -448,5 +495,36 @@ pub mod tests {
             String::from("1.0"),
             String::from(JsonString::from(RawString::from(1))),
         );
+    }
+
+    #[test]
+    fn options_are_converted_to_null_or_value_respectively() {
+        let o: Option<u32> = None;
+        let j: JsonString = o.into();
+        assert_eq!(j, JsonString::from_json("null"));
+
+        let o: Option<u32> = Some(10);
+        let j: JsonString = o.into();
+        assert_eq!(j, JsonString::from_json("10"));
+
+        let o: Option<String> = Some("test".to_string());
+        let j: JsonString = o.into();
+        assert_eq!(j, JsonString::from_json("\"test\""));
+    }
+
+    #[test]
+    fn json_string_to_option() {
+        let j = JsonString::from("10");
+        let o: JsonStringOption<u32> = j.try_into().expect("failed conversion from JsonString");
+        assert_eq!(o.to_option(), Some(10));
+
+        let j = JsonString::from("null");
+        let o: JsonStringOption<u32> = j.try_into().expect("failed conversion from JsonString");
+        assert_eq!(o.to_option(), None);
+
+        // tricky!
+        let j = JsonString::from("\"null\"");
+        let o: JsonStringOption<String> = j.try_into().expect("failed conversion from JsonString");
+        assert_eq!(o.to_option(), Some("null".to_string()));
     }
 }

@@ -18,7 +18,8 @@ extern crate serde_json;
 extern crate serde_derive;
 #[macro_use]
 extern crate lib3h_persistence_derive;
-
+#[macro_use]
+extern crate shrinkwraprs;
 extern crate uuid;
 
 pub mod cas;

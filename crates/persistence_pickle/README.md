@@ -12,7 +12,20 @@
 [pickledb](https://github.com/seladb/pickledb-rs) persistence implementation for lib3h and holochain. Provides content addressable storage (CAS) and entity attribute value (index) using pickledb's key/value store.
 
 ## Usage
-FIXME
+Add `lib3h_persistence_pickle` crate to your `Cargo.toml`. Below is a stub for creating a storage unit and adding some content.
+
+```rust
+use lib3h_persistence_file::cas::pickle::PickleStorage;
+use tempfile::tempdir;
+
+pub fn init() -> PickleStorage {
+  let dir = tempdir().expect("Could not create a tempdir for CAS.");
+  let store = PickleStorage::new(dir.path()).unwrap();
+  store.add(<some_content>).expect("added some content");
+  store
+}
+```
+
 
 ## Contribute
 
