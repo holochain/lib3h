@@ -38,7 +38,6 @@ lazy_static! {
     //];
 }
 
-
 //--------------------------------------------------------------------------------------------------
 // Setup
 //--------------------------------------------------------------------------------------------------
@@ -162,14 +161,16 @@ fn basic_track_test<T: Transport>(engine: &mut RealEngine<T>) {
 #[test]
 fn basic_two_nodes_mock() {
     // Launch tests on each setup
-//    for test_fn in test_fns {
-//        launch_two_nodes_test_with_memory_network(test_fn).unwrap();
-//    }
+    //    for test_fn in test_fns {
+    //        launch_two_nodes_test_with_memory_network(test_fn).unwrap();
+    //    }
 }
 
 // Do general test with config
 #[cfg_attr(tarpaulin, skip)]
-fn launch_two_nodes_test_with_memory_network<T: Transport>(test_fn: TwoNodesTestFn<T>) -> Result<(), ()> {
+fn launch_two_nodes_test_with_memory_network<T: Transport>(
+    test_fn: TwoNodesTestFn<T>,
+) -> Result<(), ()> {
     //log_i!("");
     //print_two_nodes_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
     //log_i!("=======================");
@@ -208,8 +209,7 @@ fn basic_two_setup<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngin
         peer_transport: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
-    alex
-        .post(Lib3hClientProtocol::Connect(req_connect))
+    alex.post(Lib3hClientProtocol::Connect(req_connect))
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
@@ -224,8 +224,7 @@ fn basic_two_setup<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngin
         space_address: SPACE_ADDRESS_A.clone(),
         agent_id: ALEX_AGENT_ID.clone(),
     };
-    alex
-        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     // Billy
@@ -234,20 +233,18 @@ fn basic_two_setup<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngin
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
-
 }
 
 //
 fn basic_two_send_message<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngine<T>) {
     let req_dm = DirectMessageData {
         space_address: SPACE_ADDRESS_A.clone(),
-    request_id: "dm_1".to_string(),
-    to_agent_id: BILLY_AGENT_ID.clone(),
-    from_agent_id: ALEX_AGENT_ID.clone(),
-    content: "wah".as_bytes().to_vec(),
+        request_id: "dm_1".to_string(),
+        to_agent_id: BILLY_AGENT_ID.clone(),
+        from_agent_id: ALEX_AGENT_ID.clone(),
+        content: "wah".as_bytes().to_vec(),
     };
-    alex
-        .post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
+    alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);

@@ -1,6 +1,4 @@
-use lib3h_protocol::{
-    Lib3hResult, data_types::DirectMessageData,
-};
+use lib3h_protocol::{data_types::DirectMessageData, Lib3hResult};
 
 ////--------------------------------------------------------------------------------------------------
 //// Data types
@@ -53,7 +51,7 @@ impl P2pProtocol {
                     content: vec![],
                 };
                 P2pProtocol::DirectMessage(dummy)
-            },
+            }
             2 => P2pProtocol::FetchData,
             3 => P2pProtocol::FetchDataResponse,
             _ => unreachable!(),

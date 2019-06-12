@@ -1,11 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{
-        dht_event::{DhtEvent, PeerHoldRequestData},
-        dht_trait::Dht,
-        rrdht::RrDht,
-    },
+    dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
     p2p::p2p_protocol::P2pProtocol,
     transport::{
         error::TransportResult,
@@ -17,7 +13,7 @@ use crate::{
     transport_space::TransportSpace,
     transport_wss::TransportWss,
 };
-use lib3h_protocol::{AddressRef, DidWork, Lib3hResult, data_types::EntryData};
+use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.
@@ -72,7 +68,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     // -- Getters -- //
     /// This nodes identifier on the network
     pub fn id(&self) -> String {
-        self.dht.this_peer().expect("P2pGateway's DHT should have 'this_peer'").to_string()
+        self.dht
+            .this_peer()
+            .expect("P2pGateway's DHT should have 'this_peer'")
+            .to_string()
     }
     /// This nodes connection address
     pub fn advertise(&self) -> Option<String> {
@@ -83,14 +82,11 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
 /// Compose DHT
 impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Peer info
-    fn get_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
+    fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.dht.get_peer(peer_address)
     }
-    fn fetch_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
+    fn fetch_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.dht.fetch_peer(peer_address)
-    }
-    fn drop_peer(&self, peer_address: &str) -> Lib3hResult<()> {
-        self.dht.drop_peer(peer_address)
     }
     /// Entry
     fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
@@ -100,8 +96,8 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         self.dht.fetch_entry(entry_address)
     }
     /// Processing
-    fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        self.dht.post(evt)
+    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        self.dht.post(cmd)
     }
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         self.dht.process()
@@ -110,7 +106,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn this_peer(&self) -> Lib3hResult<&str> {
         self.dht.this_peer()
     }
-    fn get_peer_list(&self) -> Vec<PeerHoldRequestData> {
+    fn get_peer_list(&self) -> Vec<PeerData> {
         self.dht.get_peer_list()
     }
 }
@@ -254,35 +250,29 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Serve a DhtEvent sent to us by our internal DHT.
     /// Return a list of P2pProtocol messages for our owner to process.
     // FIXME
-    fn serve_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
+    fn serve_DhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
         let outbox = Vec::new();
         let did_work = false;
-        match evt {
-            DhtEvent::RemoteGossipBundle(_data) => {
-                // FIXME: Ask our owner to gossip data back?
-            }
+        match cmd {
             DhtEvent::GossipTo(_data) => {
-                // FIXME: Ask our owner to gossip data
-            }
-            DhtEvent::UnreliableGossipTo(_data) => {
                 // FIXME
             }
-            DhtEvent::PeerHoldRequest(_data) => {
+            DhtEvent::GossipUnreliablyTo(_data) => {
                 // FIXME
             }
-            DhtEvent::PeerTimedOut(_peer_address) => {
+            DhtEvent::HoldPeerRequested(_peer_address) => {
                 // FIXME
             }
-            DhtEvent::EntryHoldRequest(_data) => {
+            DhtEvent::PeerTimedOut(_data) => {
                 // FIXME
             }
-            DhtEvent::EntryFetch(_data) => {
+            DhtEvent::HoldEntryRequested(_data) => {
                 // FIXME
             }
-            DhtEvent::EntryFetchResponse(_data) => {
+            DhtEvent::FetchEntryResponse(_data) => {
                 // FIXME
             }
-            DhtEvent::EntryPrune(_address) => {
+            DhtEvent::EntryPruned(_address) => {
                 // FIXME
             }
         }

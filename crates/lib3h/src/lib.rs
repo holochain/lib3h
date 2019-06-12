@@ -6,7 +6,9 @@ extern crate url;
 extern crate failure;
 #[macro_use]
 extern crate lazy_static;
-
+#[cfg(test)]
+#[macro_use]
+extern crate unwrap_to;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

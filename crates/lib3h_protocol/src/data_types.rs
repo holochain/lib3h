@@ -42,7 +42,12 @@ impl EntryData {
         // Get all new aspects
         let mut to_append = Vec::new();
         for aspect in other.aspect_list.iter() {
-            if self.aspect_list.iter().find(|a| a.aspect_address == aspect.aspect_address).is_some() {
+            if self
+                .aspect_list
+                .iter()
+                .find(|a| a.aspect_address == aspect.aspect_address)
+                .is_some()
+            {
                 continue;
             }
             to_append.push(aspect.clone());
