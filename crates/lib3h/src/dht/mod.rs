@@ -25,11 +25,16 @@ pub mod tests {
         pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".as_bytes().to_vec();
         pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".as_bytes().to_vec();
         pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".as_bytes().to_vec();
+
     }
 
     const PEER_A: &str = "alex";
     const PEER_B: &str = "billy";
     const PEER_C: &str = "camille";
+
+    // Request counters
+    static mut FETCH_COUNT: u32 = 0;
+
 
     fn create_test_transport(peer_address: &str) -> String {
         format!("test://{}", peer_address)
@@ -59,6 +64,17 @@ pub mod tests {
         EntryData {
             entry_address: entry_address.to_owned(),
             aspect_list: vec![aspect],
+        }
+    }
+
+    #[allow(non_snake_case)]
+    fn create_FetchEntry(entry_address: &AddressRef) -> FetchEntryData {
+        unsafe {
+            FETCH_COUNT += 1;
+            FetchEntryData {
+                msg_id: format!("fetch_{}", FETCH_COUNT),
+                entry_address: entry_address.to_owned(),
+            }
         }
     }
 
@@ -194,6 +210,15 @@ pub mod tests {
         // DHT B should have the data
         let entry = dht_b.get_entry(&ENTRY_ADDRESS_1).unwrap();
         assert_eq!(entry, entry_data.clone());
+        // DHT B should have the data with a Fetch
+        let fetch_data = create_FetchEntry(&ENTRY_ADDRESS_1);
+        let entry = dht_b.post(DhtCommand::FetchEntry(fetch_data.clone())).unwrap();
+        let (did_work, events) = dht_b.process().unwrap();
+        assert!(did_work);
+        assert_eq!(events.len(), 1);
+        let fetch_response = unwrap_to!(events[0] => DhtEvent::FetchEntryResponse);
+        assert_eq!(fetch_response.msg_id, fetch_data.msg_id);
+        assert_eq!(fetch_response.entry, entry_data.clone());
     }
 
     #[test]
