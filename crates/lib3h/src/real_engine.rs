@@ -47,7 +47,7 @@ impl RealEngine<TransportWss<std::net::TcpStream>> {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         let mut transport_gateway = P2pGateway::new_with_wss();
-        transport_gateway.bind("FIXME")?;
+        transport_gateway.bind(name)?; // FIXME: Should be an URI in config
         Ok(RealEngine {
             _config: config,
             inbox: VecDeque::new(),
@@ -62,13 +62,11 @@ impl RealEngine<TransportWss<std::net::TcpStream>> {
 //#[cfg(test)]
 impl RealEngine<TransportMemory> {
     pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
-        let mut transport_gateway = P2pGateway::new_with_memory(name);
-        transport_gateway.bind("FIXME")?;
         Ok(RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
-            transport_gateway,
+            transport_gateway: P2pGateway::new_with_memory(name),
             space_gateway_map: HashMap::new(),
         })
     }

@@ -27,9 +27,8 @@ impl TransportSpace {
 impl Transport for TransportSpace {
     /// transport_id are agentId here
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        //let agent_list = self.dht.get_peer_list().map(|peer_info| peer_info.peer_address.clone());
-        let agent_list = vec![];
-        Ok(agent_list)
+        // FIXME
+        Ok(vec![])
     }
 
     fn connect(&mut self, _uri: &str) -> TransportResult<TransportId> {

@@ -23,6 +23,7 @@ lazy_static! {
 
 /// Add new MemoryServer to the global server map
 pub fn set_server(url: &str) -> TransportResult<()> {
+    // println!("(log.d) set_server: {}", url);
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if server_map.contains_key(url) {
