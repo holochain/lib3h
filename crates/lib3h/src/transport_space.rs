@@ -10,6 +10,23 @@ use crate::{
 use lib3h_protocol::DidWork;
 use std::collections::VecDeque;
 
+///// Transport used for the Space P2pGateway
+//pub struct TransportSpace<'a, 'b> {
+//    inbox: VecDeque<TransportCommand>,
+//    transport_gateway: &'a P2pGateway,
+//    dht: &'b impl Dht,
+//}
+//
+//impl<'a, 'b>  TransportSpace<'a, 'b>  {
+//    pub fn new(transport_gateway: &'a P2pGateway, dht: &'b impl Dht) -> Self {
+//        TransportSpace {
+//            inbox: VecDeque::new(),
+//            transport_gateway,
+//            dht,
+//        }
+//    }
+//}
+
 /// Transport used for the Space P2pGateway
 pub struct TransportSpace {
     inbox: VecDeque<TransportCommand>,
@@ -27,8 +44,9 @@ impl TransportSpace {
 impl Transport for TransportSpace {
     /// transport_id are agentId here
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        // FIXME
-        Ok(vec![])
+        //let agent_list = self.dht.get_peer_list().map(|peer_info| peer_info.peer_address.clone());
+        let agent_list = vec![];
+        Ok(agent_list)
     }
 
     fn connect(&mut self, _uri: &str) -> TransportResult<TransportId> {
@@ -48,13 +66,19 @@ impl Transport for TransportSpace {
     /// Get MachineId out of agentId by asking the DHT's peer info
     /// If one agentId is unknown, will not send to any peer
     fn send(&mut self, _id_list: &[&TransportIdRef], _payload: &[u8]) -> TransportResult<()> {
-        // FIXME
+        // Get all machineIds
+        //let mut machine_list = self.get_peer_info(id_list)?.map(|peer_info| peer_info.transport.clone());
+        // Send payload to all peers via transport_gateway
+        //self.transport_gateway.post(TransportCommand::Send(&machine_list, payload))?;
         Ok(())
     }
 
     /// Get all known peers from DHT and send them the payload
     fn send_all(&mut self, _payload: &[u8]) -> TransportResult<()> {
-        // FIXME
+        // Get all machineIds
+        //let mut machine_list = self.dht.get_peer_list().map(|peer_info| peer_info.transport.clone());
+        // Send payload to all peers via transport_gateway
+        //self.transport_gateway.post(TransportCommand::Send(&machine_list, payload))?;
         Ok(())
     }
 
@@ -91,10 +115,14 @@ impl Transport for TransportSpace {
 }
 
 impl TransportSpace {
-    fn _get_peer_info(&self, _id_list: &[&TransportIdRef]) -> TransportResult<Vec<PeerData>> {
+    fn get_peer_info(&self, _id_list: &[&TransportIdRef]) -> TransportResult<Vec<PeerData>> {
         // Get all machineIds
         let peer_info_list = Vec::new();
-        // FIXME
+        //        for agent_id in id_list {
+        //            let peer_info = self.dht.get_peer(agent_id).ok_or(
+        //                Err(format_err!("AgentId is unknown")))?;
+        //            peer_info_list.push(peer_info);
+        //        }
         Ok(peer_info_list)
     }
 
@@ -133,7 +161,10 @@ impl TransportSpace {
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let outbox = Vec::new();
-                // FIXME
+                //                for (id, _url) in &self.connections {
+                //                    let evt = TransportEvent::Closed(id.to_string());
+                //                    outbox.push(evt);
+                //                }
                 Ok(outbox)
             }
             TransportCommand::Bind(url) => {
