@@ -45,8 +45,7 @@ impl EntryData {
             if self
                 .aspect_list
                 .iter()
-                .find(|a| a.aspect_address == aspect.aspect_address)
-                .is_some()
+                .any(|a| a.aspect_address == aspect.aspect_address)
             {
                 continue;
             }
