@@ -234,7 +234,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             P2pProtocol::Gossip => {
                 // FIXME
             }
-            P2pProtocol::DirectMessage(_) => {
+            P2pProtocol::DirectMessage => {
                 // FIXME
             }
             P2pProtocol::FetchData => {

@@ -35,7 +35,6 @@ pub mod tests {
     // Request counters
     static mut FETCH_COUNT: u32 = 0;
 
-
     fn create_test_transport(peer_address: &str) -> String {
         format!("test://{}", peer_address)
     }
@@ -212,7 +211,9 @@ pub mod tests {
         assert_eq!(entry, entry_data.clone());
         // DHT B should have the data with a Fetch
         let fetch_data = create_FetchEntry(&ENTRY_ADDRESS_1);
-        let entry = dht_b.post(DhtCommand::FetchEntry(fetch_data.clone())).unwrap();
+        let _ = dht_b
+            .post(DhtCommand::FetchEntry(fetch_data.clone()))
+            .unwrap();
         let (did_work, events) = dht_b.process().unwrap();
         assert!(did_work);
         assert_eq!(events.len(), 1);
