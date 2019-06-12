@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_persistence_pickle"
-version = "0.0.1-alpha1"
+version = "0.0.1-alpha2"
 authors = ["Holochain Core Dev Team <devcore@lib3h.org>"]
 edition = "2018"
 description = "lib3h persistence for content addressable storage and entity attribute value indexes backed by pickledb-rs."
@@ -17,7 +17,7 @@ serde = "=1.0.89"
 serde_derive = "=1.0.89"
 serde_test = "=1.0.89"
 multihash = "=0.8.0"
-lib3h_persistence_api = "=0.0.1-alpha1"
+lib3h_persistence_api = "=0.0.1-alpha2"
 lazy_static = "=1.2.0"
 glob = "=0.3.0"
 uuid = { version = "=0.7.1", features = ["v4"] }

@@ -135,12 +135,6 @@ impl From<&'static str> for JsonString {
     }
 }
 
-impl<T: Serialize + Debug> From<Option<T>> for JsonString {
-    fn from(maybe_entry: Option<T>) -> Self {
-        default_to_json(maybe_entry)
-    }
-}
-
 impl<T: Serialize> From<Vec<T>> for JsonString {
     fn from(vector: Vec<T>) -> JsonString {
         JsonString::from_json(&serde_json::to_string(&vector).expect("could not Jsonify vector"))
@@ -152,6 +146,8 @@ impl<T: Serialize> From<Vec<T>> for JsonString {
 pub trait JsonError {}
 
 impl JsonError for PersistenceError {}
+
+// conversions from result types
 
 fn result_to_json_string<T: Into<JsonString>, E: Into<JsonString>>(
     result: Result<T, E>,
@@ -169,19 +165,29 @@ fn result_to_json_string<T: Into<JsonString>, E: Into<JsonString>>(
     ))
 }
 
-impl<T: Into<JsonString>, E: Into<JsonString> + JsonError> From<Result<T, E>> for JsonString {
+impl<T, E> From<Result<T, E>> for JsonString
+where
+    T: Into<JsonString>,
+    E: Into<JsonString>,
+{
     fn from(result: Result<T, E>) -> JsonString {
         result_to_json_string(result)
     }
 }
 
-impl<T: Into<JsonString>> From<Result<T, String>> for JsonString {
+impl<T> From<Result<T, String>> for JsonString
+where
+    T: Into<JsonString>,
+{
     fn from(result: Result<T, String>) -> JsonString {
         result_to_json_string(result.map_err(|e| RawString::from(e)))
     }
 }
 
-impl<E: Into<JsonString>> From<Result<String, E>> for JsonString {
+impl<E> From<Result<String, E>> for JsonString
+where
+    E: Into<JsonString>,
+{
     fn from(result: Result<String, E>) -> JsonString {
         result_to_json_string(result.map(|v| RawString::from(v)))
     }
@@ -194,6 +200,46 @@ impl From<Result<String, String>> for JsonString {
                 .map(|v| RawString::from(v))
                 .map_err(|e| RawString::from(e)),
         )
+    }
+}
+
+// conversions to result types
+
+impl<T, E> TryInto<Result<T, E>> for JsonString
+where
+    T: Into<JsonString> + DeserializeOwned,
+    E: Into<JsonString> + DeserializeOwned,
+{
+    type Error = PersistenceError;
+    fn try_into(self) -> Result<Result<T, E>, Self::Error> {
+        default_try_from_json(self)
+    }
+}
+
+impl<T> TryInto<Result<T, String>> for JsonString
+where
+    T: Into<JsonString> + DeserializeOwned,
+{
+    type Error = PersistenceError;
+    fn try_into(self) -> Result<Result<T, String>, Self::Error> {
+        default_try_from_json(self)
+    }
+}
+
+impl<E> TryInto<Result<String, E>> for JsonString
+where
+    E: Into<JsonString> + DeserializeOwned,
+{
+    type Error = PersistenceError;
+    fn try_into(self) -> Result<Result<String, E>, Self::Error> {
+        default_try_from_json(self)
+    }
+}
+
+impl TryInto<Result<String, String>> for JsonString {
+    type Error = PersistenceError;
+    fn try_into(self) -> Result<Result<String, String>, Self::Error> {
+        default_try_from_json(self)
     }
 }
 
@@ -264,6 +310,23 @@ impl TryInto<JsonStringOption<String>> for JsonString {
     }
 }
 
+// conversions from options to JsonString
+
+impl<T> From<Option<T>> for JsonString
+where
+    T: Debug + Serialize + Into<JsonString>,
+{
+    fn from(o: Option<T>) -> JsonString {
+        default_to_json(o)
+    }
+}
+
+impl From<Option<String>> for JsonString {
+    fn from(o: Option<String>) -> JsonString {
+        default_to_json(o)
+    }
+}
+
 /// if all you want to do is implement the default behaviour then use #[derive(DefaultJson)]
 /// should only be used with From<S> for JsonString
 /// i.e. when failure should be impossible so an expect is ok
@@ -294,6 +357,11 @@ pub fn default_try_from_json<D: DeserializeOwned>(
 ) -> Result<D, PersistenceError> {
     serde_json::from_str(&String::from(&json_string))
         .map_err(|e| PersistenceError::SerializationError(e.to_string()))
+}
+
+pub trait DefaultJson:
+    Serialize + DeserializeOwned + TryFrom<JsonString> + Into<JsonString>
+{
 }
 
 /// generic type to facilitate Jsonifying values directly
@@ -495,6 +563,26 @@ pub mod tests {
             String::from("1.0"),
             String::from(JsonString::from(RawString::from(1))),
         );
+    }
+
+    #[test]
+    fn result_from_json_string() {
+        let j = JsonString::from_json(r#"{"Ok":"raw-string-content"}"#);
+        let r: Result<RawString, PersistenceError> = j
+            .try_into()
+            .expect("Could not convert json string to result type");
+
+        assert_eq!(r.unwrap(), RawString::from("raw-string-content"),);
+    }
+
+    #[test]
+    fn result_from_json_string_with_strings() {
+        let j = JsonString::from_json(r#"{"Ok":"string-content"}"#);
+        let r: Result<String, String> = j
+            .try_into()
+            .expect("Could not convert json string to result type");
+
+        assert_eq!(r.unwrap(), String::from("string-content"),);
     }
 
     #[test]
