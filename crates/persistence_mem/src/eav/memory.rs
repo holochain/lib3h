@@ -95,8 +95,9 @@ pub mod tests {
         let eav_storage = EavMemoryStorage::new();
         EavTestSuite::test_one_to_many::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavMemoryStorage<ExampleAttribute>,
-        >(eav_storage)
+        >(eav_storage, &ExampleAttribute::default())
     }
 
     #[test]
@@ -104,16 +105,19 @@ pub mod tests {
         let eav_storage = EavMemoryStorage::new();
         EavTestSuite::test_many_to_one::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavMemoryStorage<ExampleAttribute>,
-        >(eav_storage)
+        >(eav_storage, &ExampleAttribute::default())
     }
 
     #[test]
     fn example_eav_range() {
         let eav_storage = EavMemoryStorage::new();
-        EavTestSuite::test_range::<ExampleAddressableContent, EavMemoryStorage<ExampleAttribute>>(
-            eav_storage,
-        );
+        EavTestSuite::test_range::<
+            ExampleAddressableContent,
+            ExampleAttribute,
+            EavMemoryStorage<ExampleAttribute>,
+        >(eav_storage, &ExampleAttribute::default());
     }
 
     #[test]
@@ -121,6 +125,7 @@ pub mod tests {
         let eav_storage = EavMemoryStorage::new();
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
+            ExampleAttribute,
             EavMemoryStorage<ExampleAttribute>,
         >(
             eav_storage,

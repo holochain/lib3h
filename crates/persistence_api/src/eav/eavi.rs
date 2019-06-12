@@ -63,8 +63,6 @@ impl From<String> for ExampleAttribute {
 }
 impl Attribute for ExampleAttribute {}
 
-impl crate::json::DefaultJson for ExampleAttribute {}
-
 #[derive(PartialEq, Debug)]
 pub enum AttributeError {
     Unrecognized(String),
@@ -414,30 +412,34 @@ pub mod tests {
     fn example_eav_one_to_many() {
         EavTestSuite::test_one_to_many::<
             ExampleAddressableContent,
+            ExampleAttribute,
             ExampleEntityAttributeValueStorage<ExampleAttribute>,
-        >(test_eav_storage());
+        >(test_eav_storage(), &ExampleAttribute::default());
     }
 
     #[test]
     fn example_eav_many_to_one() {
         EavTestSuite::test_many_to_one::<
             ExampleAddressableContent,
+            ExampleAttribute,
             ExampleEntityAttributeValueStorage<ExampleAttribute>,
-        >(test_eav_storage());
+        >(test_eav_storage(), &ExampleAttribute::default());
     }
 
     #[test]
     fn example_eav_range() {
         EavTestSuite::test_range::<
             ExampleAddressableContent,
+            ExampleAttribute,
             ExampleEntityAttributeValueStorage<ExampleAttribute>,
-        >(test_eav_storage());
+        >(test_eav_storage(), &ExampleAttribute::default());
     }
 
     #[test]
     fn example_eav_prefixes() {
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
+            ExampleAttribute,
             ExampleEntityAttributeValueStorage<ExampleAttribute>,
         >(test_eav_storage(), {
             let mut attrs: Vec<ExampleAttribute> = vec!["a_", "b_", "c_", "d_"]
