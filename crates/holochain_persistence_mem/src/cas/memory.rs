@@ -63,13 +63,11 @@ impl ContentAddressableStorage for MemoryStorage {
 #[cfg(test)]
 pub mod tests {
     use crate::cas::memory::MemoryStorage;
-    use holochain_persistence_api::{
-        cas::{
-            content::{ExampleAddressableContent, OtherExampleAddressableContent},
-            storage::StorageTestSuite,
-        },
-    };
     use holochain_json_api::json::RawString;
+    use holochain_persistence_api::cas::{
+        content::{ExampleAddressableContent, OtherExampleAddressableContent},
+        storage::StorageTestSuite,
+    };
 
     pub fn test_memory_storage() -> MemoryStorage {
         MemoryStorage::new()

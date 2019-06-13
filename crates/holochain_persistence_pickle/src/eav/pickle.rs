@@ -103,6 +103,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::pickle::EavPickleStorage;
+    use holochain_json_api::json::RawString;
     use holochain_persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
@@ -110,7 +111,6 @@ pub mod tests {
         },
         eav::ExampleAttribute,
     };
-    use holochain_json_api::json::RawString;
     use tempfile::tempdir;
 
     #[test]

@@ -169,13 +169,11 @@ impl AddressableContentTestSuite {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
-        cas::content::{
-            Address, AddressableContent, AddressableContentTestSuite, ExampleAddressableContent,
-            OtherExampleAddressableContent,
-        },
-   };
-   use holochain_json_api::json::{JsonString, RawString};
+    use crate::cas::content::{
+        Address, AddressableContent, AddressableContentTestSuite, ExampleAddressableContent,
+        OtherExampleAddressableContent,
+    };
+    use holochain_json_api::json::{JsonString, RawString};
 
     #[test]
     /// test the first example

@@ -66,6 +66,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::memory::EavMemoryStorage;
+    use holochain_json_api::json::RawString;
     use holochain_persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
@@ -73,7 +74,6 @@ pub mod tests {
         },
         eav::ExampleAttribute,
     };
-    use holochain_json_api::json::RawString;
 
     #[test]
     fn memory_eav_round_trip() {

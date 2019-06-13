@@ -89,13 +89,11 @@ impl ContentAddressableStorage for FilesystemStorage {
 #[cfg(test)]
 pub mod tests {
     use crate::cas::file::FilesystemStorage;
-    use holochain_persistence_api::{
-        cas::{
-            content::{ExampleAddressableContent, OtherExampleAddressableContent},
-            storage::StorageTestSuite,
-        },
-    };
     use holochain_json_api::json::RawString;
+    use holochain_persistence_api::cas::{
+        content::{ExampleAddressableContent, OtherExampleAddressableContent},
+        storage::StorageTestSuite,
+    };
     use tempfile::{tempdir, TempDir};
 
     pub fn test_file_cas() -> (FilesystemStorage, TempDir) {

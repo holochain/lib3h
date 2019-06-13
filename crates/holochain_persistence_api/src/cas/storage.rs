@@ -630,13 +630,11 @@ impl EavTestSuite {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::{
-        cas::{
-            content::{ExampleAddressableContent, OtherExampleAddressableContent},
-            storage::{test_content_addressable_storage, StorageTestSuite},
-        },
-   };
-   use holochain_json_api::json::{JsonString, RawString};
+    use crate::cas::{
+        content::{ExampleAddressableContent, OtherExampleAddressableContent},
+        storage::{test_content_addressable_storage, StorageTestSuite},
+    };
+    use holochain_json_api::json::{JsonString, RawString};
 
     /// show that content of different types can round trip through the same storage
     #[test]

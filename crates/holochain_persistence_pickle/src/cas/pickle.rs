@@ -86,13 +86,11 @@ impl ContentAddressableStorage for PickleStorage {
 #[cfg(test)]
 mod tests {
     use crate::cas::pickle::PickleStorage;
-    use holochain_persistence_api::{
-        cas::{
-            content::{ExampleAddressableContent, OtherExampleAddressableContent},
-            storage::StorageTestSuite,
-        },
-    };
     use holochain_json_api::json::RawString;
+    use holochain_persistence_api::cas::{
+        content::{ExampleAddressableContent, OtherExampleAddressableContent},
+        storage::StorageTestSuite,
+    };
     use tempfile::{tempdir, TempDir};
 
     pub fn test_pickle_cas() -> (PickleStorage, TempDir) {
