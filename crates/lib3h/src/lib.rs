@@ -12,7 +12,7 @@ extern crate unwrap_to;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate rmp_serde as rmps;
+extern crate rmp_serde;
 
 // -- mod -- //
 

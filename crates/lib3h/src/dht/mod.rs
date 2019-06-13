@@ -126,7 +126,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_get_own_data() {
+    fn test_get_own_entry() {
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
         let result = dht.get_entry(&ENTRY_ADDRESS_1);
@@ -177,7 +177,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_mirror_gossip_data() {
+    fn test_mirror_gossip_entry() {
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer

@@ -3,7 +3,7 @@
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate rmp_serde as rmps;
+extern crate rmp_serde;
 
 pub mod data_types;
 pub mod network_engine;
