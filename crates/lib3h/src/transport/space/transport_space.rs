@@ -30,12 +30,14 @@ use std::collections::VecDeque;
 /// Transport used for the Space P2pGateway
 pub struct TransportSpace {
     inbox: VecDeque<TransportCommand>,
+    recv: crossbeam_channel::Sender<SpaceProtocol>, // Channel from NetworkEngine
 }
 
 impl TransportSpace {
-    pub fn new() -> Self {
+    pub fn new(recv: crossbeam_channel::Sender<SpaceProtocol>) -> Self {
         TransportSpace {
             inbox: VecDeque::new(),
+            recv,
         }
     }
 }
@@ -115,7 +117,7 @@ impl Transport for TransportSpace {
 }
 
 impl TransportSpace {
-    fn get_peer_info(&self, _id_list: &[&TransportIdRef]) -> TransportResult<Vec<PeerData>> {
+    fn _get_peer_info(&self, _id_list: &[&TransportIdRef]) -> TransportResult<Vec<PeerData>> {
         // Get all machineIds
         let peer_info_list = Vec::new();
         //        for agent_id in id_list {

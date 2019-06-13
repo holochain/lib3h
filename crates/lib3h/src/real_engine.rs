@@ -15,7 +15,7 @@ use crate::{
         dht_trait::Dht,
         rrdht::RrDht,
     },
-    p2p::{p2p_gateway::P2pGateway, p2p_protocol::P2pProtocol},
+    p2p::{gateway::P2pGateway, p2p_protocol::P2pProtocol},
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_space::TransportSpace,
     transport_wss::TransportWss,
@@ -34,7 +34,7 @@ pub struct RealEngineConfig {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport> {
+pub struct RealEngine<'t, T: Transport, D: DHT> {
     /// Config settings
     _config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
@@ -42,12 +42,12 @@ pub struct RealEngine<T: Transport> {
     /// Identifier
     name: String,
     /// P2p gateway for the transport layer,
-    transport_gateway: P2pGateway<T, RrDht>,
+    transport_gateway: P2pGateway<'t, T, D>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<PlayerId, P2pGateway<TransportSpace, RrDht>>,
+    space_gateway_map: HashMap<PlayerId, P2pGateway<'t, P2pGateway<'t, T, D>, D>>,
 }
 
-impl RealEngine<TransportWss<std::net::TcpStream>> {
+impl RealEngine<TransportWss<std::net::TcpStream>, RrDht> {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         let mut transport_gateway = P2pGateway::new_with_wss();
@@ -64,7 +64,7 @@ impl RealEngine<TransportWss<std::net::TcpStream>> {
 
 /// Constructor
 //#[cfg(test)]
-impl RealEngine<TransportMemory> {
+impl RealEngine<TransportMemory, RrDht> {
     pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
         let mut transport_gateway = P2pGateway::new_with_memory(name);
         transport_gateway.bind("FIXME")?;
@@ -78,7 +78,7 @@ impl RealEngine<TransportMemory> {
     }
 }
 
-impl<T: Transport> NetworkEngine for RealEngine<T> {
+impl<T: Transport, D: DHT> NetworkEngine for RealEngine<T, D> {
     fn run(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
@@ -123,7 +123,7 @@ impl<T: Transport> NetworkEngine for RealEngine<T> {
 }
 
 /// Private
-impl<T: Transport> RealEngine<T> {
+impl<T: Transport, D: DHT> RealEngine<T, D> {
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
@@ -230,47 +230,35 @@ impl<T: Transport> RealEngine<T> {
                 // FIXME
             }
             Lib3hClientProtocol::SendDirectMessage(msg) => {
-                if let Err(res) = self.has_space_or_fail(
+                let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.from_agent_id,
                     &msg.request_id,
                     None,
-                ) {
-                    outbox.push(res);
-                } else {
-                    // Post a TransportCommand::Send request to the space gateway
-                    let space_gateway = self
-                        .space_gateway_map
-                        .get_mut(&(msg.space_address, msg.from_agent_id))
-                        .unwrap();
-                    let transport_id =
-                        std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                    Transport::post(
-                        space_gateway,
-                        TransportCommand::Send(vec![transport_id], msg.content),
-                    )?;
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Some(space_gateway) => {
+                        let transport_id =
+                            std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+                        // FIXME
+                    },
                 }
             }
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
-                if let Err(res) = self.has_space_or_fail(
+                let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.from_agent_id,
                     &msg.request_id,
                     Some(&msg.to_agent_id),
-                ) {
-                    outbox.push(res);
-                } else {
-                    // Post a TransportCommand::Send request to the space gateway
-                    let space_gateway = self
-                        .space_gateway_map
-                        .get_mut(&(msg.space_address, msg.from_agent_id))
-                        .unwrap();
-                    let transport_id =
-                        std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                    Transport::post(
-                        space_gateway,
-                        TransportCommand::Send(vec![transport_id], msg.content),
-                    )?;
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Some(space_gateway) => {
+                        let transport_id =
+                            std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+                        // FIXME
+                    }
                 }
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
@@ -279,11 +267,23 @@ impl<T: Transport> RealEngine<T> {
             Lib3hClientProtocol::HandleFetchEntryResult(_msg) => {
                 // FIXME
             }
-            Lib3hClientProtocol::PublishEntry(_msg) => {
-                // FIXME
+            Lib3hClientProtocol::PublishEntry(msg) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.from_agent_id,
+                    &format!("PublishEntry_{}", msg.entry.entry_address),
+                    None,
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Some(space_gateway) => {
+                                               // FIXME
+                        // HoldEntry command
+                    }
+                }
             }
             Lib3hClientProtocol::QueryEntry(msg) => {
-                if let Err(res) = self.has_space_or_fail(
+                if let Err(res) = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.requester_agent_id,
                     &msg.request_id,
@@ -345,18 +345,18 @@ impl<T: Transport> RealEngine<T> {
         Ok(Lib3hServerProtocol::SuccessResult(res))
     }
 
-    fn has_space_or_fail(
+    fn get_space_or_fail(
         &self,
         space_address: &AddressRef,
         agent_id: &AddressRef,
         request_id: &str,
         maybe_sender_agent_id: Option<&AddressRef>,
-    ) -> Result<(), Lib3hServerProtocol> {
-        let has_space = self
+    ) -> Result<&P2pGateway<TransportSpace, D>, Lib3hServerProtocol> {
+        let maybe_space = self
             .space_gateway_map
-            .contains_key(&(space_address.to_owned(), agent_id.to_owned()));
-        if has_space {
-            return Ok(());
+            .get(&(space_address.to_owned(), agent_id.to_owned()));
+        if let Some(space_gateway) = maybe_space {
+            return Ok(space_gateway);
         }
         let to_agent_id = maybe_sender_agent_id.unwrap_or(agent_id);
         let res = GenericResultData {

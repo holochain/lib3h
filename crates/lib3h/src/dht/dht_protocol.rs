@@ -10,6 +10,8 @@ pub enum DhtCommand {
     HoldPeer(PeerData),
     /// Owner wants us to hold an entry.
     HoldEntry(EntryData),
+    /// Owner wants us to hold an entry and broadcast it to neighbors
+    BroadcastEntry(EntryData),
     /// Owner wants us to drop an entry.
     DropEntry(Address),
 }

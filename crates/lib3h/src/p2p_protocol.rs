@@ -6,6 +6,7 @@ use lib3h_protocol::{data_types::DirectMessageData, Lib3hResult};
 pub enum P2pProtocol {
     Gossip,
     DirectMessage(DirectMessageData),
+    SendDirectMessage,
     FetchData,
     FetchDataResponse,
     // FIXME
