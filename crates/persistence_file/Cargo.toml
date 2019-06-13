@@ -1,6 +1,6 @@
 [package]
 name = "persistence_file"
-version = "0.0.1-alpha3"
+version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@lib3h.org>"]
 edition = "2018"
 description = "lib3h persistence for content addressable storage and entity attribute value indexes. A file system based implementation using directory hieraarchies to navigate data."
