@@ -2,7 +2,7 @@ use persistence_api::{
     eav::{Attribute, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage},
     error::PersistenceResult
 };
-use json_api::error::{JsonError};
+use holochain_json_api::error::{JsonError};
 
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{

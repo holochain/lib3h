@@ -5,7 +5,7 @@ use persistence_api::{
     },
     error::PersistenceResult
 };
-use json_api::error::JsonError;
+use holochain_json_api::error::JsonError;
 
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{

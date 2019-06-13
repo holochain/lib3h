@@ -3,8 +3,8 @@
 //! and as a base type for Address to use.
 
 use crate::{
-    json_api::error::JsonError,
-    json_api::json::{JsonString},
+    holochain_json_api::error::JsonError,
+    holochain_json_api::json::{JsonString},
 };
 use multihash::{encode, Hash};
 use rust_base58::ToBase58;

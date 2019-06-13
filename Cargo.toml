@@ -11,6 +11,6 @@ members = [
   "crates/persistence_mem",
   "crates/persistence_file",
   "crates/persistence_pickle",
-  "crates/json_api",
+  "crates/holochain_json_api",
   "crates/json_derive"
 ]

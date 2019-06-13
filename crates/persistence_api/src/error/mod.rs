@@ -1,7 +1,7 @@
 //! This module contains Error type definitions that are used throughout persistence.
 
 use self::PersistenceError::*;
-use json_api::{error::JsonError, json::*};
+use holochain_json_api::{error::JsonError, json::*};
 use futures::channel::oneshot::Canceled as FutureCanceled;
 use serde_json::Error as SerdeError;
 use std::{

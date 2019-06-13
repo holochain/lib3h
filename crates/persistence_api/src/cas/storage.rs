@@ -9,7 +9,7 @@ use crate::{
         Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
-    json_api::{error::JsonError, json::RawString},
+    holochain_json_api::{error::JsonError, json::RawString},
     error::{PersistenceError, PersistenceResult}
 };
 use objekt;

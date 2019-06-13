@@ -1,5 +1,5 @@
 [package]
-name = "json_api"
+name = "holochain_json_api"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 build = "build.rs"

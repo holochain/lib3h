@@ -7,7 +7,7 @@ use persistence_api::{
     },
     error::{PersistenceError, PersistenceResult}
 };
-use json_api::{
+use holochain_json_api::{
     error::{JsonError, JsonResult},
     json::JsonString,
 };

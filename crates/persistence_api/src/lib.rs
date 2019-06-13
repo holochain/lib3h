@@ -18,7 +18,7 @@ extern crate serde_json;
 extern crate serde_derive;
 #[macro_use]
 extern crate json_derive;
-extern crate json_api;
+extern crate holochain_json_api;
 extern crate uuid;
 
 pub mod cas;

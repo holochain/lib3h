@@ -18,7 +18,7 @@ serde_derive = "=1.0.89"
 serde_test = "=1.0.89"
 multihash = "=0.8.0"
 persistence_api = { path = "../persistence_api" }
-json_api = { path = "../json_api" }
+holochain_json_api = { path = "../holochain_json_api" }
 lazy_static = "=1.2.0"
 glob = "=0.3.0"
 uuid = { version = "=0.7.1", features = ["v4"] }

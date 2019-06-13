@@ -6,7 +6,7 @@
 use crate::{
     cas::content::{Address, AddressableContent, Content},
 };
-use json_api::{json::JsonString, error::{JsonResult, JsonError}};
+use holochain_json_api::{json::JsonString, error::{JsonResult, JsonError}};
 use chrono::offset::Utc;
 use eav::{
     query::{EaviQuery, IndexFilter},

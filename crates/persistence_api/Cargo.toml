@@ -30,7 +30,7 @@ hcid = "=0.0.6"
 shrinkwraprs = "=0.2.1"
 rust-base58 = "=0.0.4"
 objekt= "=0.1.2"
-json_api = { path = "../json_api" }
+holochain_json_api = { path = "../holochain_json_api" }
 json_derive = { path = "../json_derive" }
 uuid = { version = "=0.7.1", features = ["v4"] }
 

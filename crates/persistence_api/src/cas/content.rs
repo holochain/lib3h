@@ -7,7 +7,7 @@ use crate::{
     cas::storage::ContentAddressableStorage,
     hash::HashString
 };
-use json_api::{error::JsonError, json::*};
+use holochain_json_api::{error::JsonError, json::*};
 
 use multihash::Hash;
 use std::fmt::{Debug, Write};
