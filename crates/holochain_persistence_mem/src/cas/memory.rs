@@ -68,8 +68,8 @@ pub mod tests {
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,
         },
-        json::RawString,
     };
+    use holochain_json_api::json::RawString;
 
     pub fn test_memory_storage() -> MemoryStorage {
         MemoryStorage::new()

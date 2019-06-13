@@ -72,8 +72,8 @@ pub mod tests {
             storage::EavTestSuite,
         },
         eav::ExampleAttribute,
-        json::RawString,
     };
+    use holochain_json_api::json::RawString;
 
     #[test]
     fn memory_eav_round_trip() {
