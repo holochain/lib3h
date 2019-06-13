@@ -46,8 +46,8 @@ impl fmt::Display for JsonError {
 impl Error for JsonError {}
 
 impl From<JsonError> for String {
-    fn from(persistence_error: JsonError) -> Self {
-        persistence_error.to_string()
+    fn from(holochain_json_error: JsonError) -> Self {
+        holochain_json_error.to_string()
     }
 }
 
@@ -124,7 +124,7 @@ impl From<hcid::HcidError> for JsonError {
 mod tests {
     use super::*;
     // a test function that returns our error result
-    fn raises_persistence_error(yes: bool) -> Result<(), JsonError> {
+    fn raises_json_error(yes: bool) -> JsonResult<()> {
         if yes {
             Err(JsonError::new("borked"))
         } else {
@@ -159,19 +159,19 @@ mod tests {
 
     #[test]
     /// test errors as a result and destructuring
-    fn can_raise_persistence_error() {
-        let err = raises_persistence_error(true).expect_err("should return an error when yes=true");
+    fn can_raise_json_error() {
+        let err = raises_json_error(true).expect_err("should return an error when yes=true");
 
         match err {
             JsonError::ErrorGeneric(msg) => assert_eq!(msg, "borked"),
-            _ => panic!("raises_persistence_error should return an ErrorGeneric"),
+            _ => panic!("raises_json_error should return an ErrorGeneric"),
         };
     }
 
     #[test]
     /// test errors as a returned result
     fn can_return_result() {
-        let result = raises_persistence_error(false);
+        let result = raises_json_error(false);
 
         assert!(result.is_ok());
     }

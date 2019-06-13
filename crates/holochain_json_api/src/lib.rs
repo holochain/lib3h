@@ -12,7 +12,7 @@ extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate json_derive;
+extern crate holochain_json_derive;
 #[macro_use]
 extern crate shrinkwraprs;
 pub mod json;
