@@ -4,9 +4,11 @@
 //! A test suite for AddressableContent is also implemented here.
 
 use crate::{
-    cas::storage::ContentAddressableStorage, error::PersistenceError, hash::HashString,
-    json::JsonString,
+    cas::storage::ContentAddressableStorage,
+    hash::HashString
 };
+use json_api::{error::JsonError, json::*};
+
 use multihash::Hash;
 use std::fmt::{Debug, Write};
 
@@ -39,7 +41,7 @@ pub trait AddressableContent {
 
     /// restore/deserialize the original struct/type from serialized Content
     /// the default implementation covers anything that implements From<JsonString> for Foo
-    fn try_from_content(content: &Content) -> Result<Self, PersistenceError>
+    fn try_from_content(content: &Content) -> Result<Self, JsonError>
     where
         Self: Sized;
 }
@@ -49,7 +51,7 @@ impl AddressableContent for Content {
         self.clone()
     }
 
-    fn try_from_content(content: &Content) -> Result<Self, PersistenceError> {
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
         Ok(content.clone())
     }
 }
@@ -66,7 +68,7 @@ impl AddressableContent for ExampleAddressableContent {
         self.content.clone()
     }
 
-    fn try_from_content(content: &Content) -> Result<Self, PersistenceError> {
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
         Ok(ExampleAddressableContent {
             content: content.clone(),
         })
@@ -91,7 +93,7 @@ impl AddressableContent for OtherExampleAddressableContent {
         self.content.clone()
     }
 
-    fn try_from_content(content: &Content) -> Result<Self, PersistenceError> {
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
         Ok(OtherExampleAddressableContent {
             content: content.clone(),
             address: Address::encode_from_str(&String::from(content), Hash::SHA2256),

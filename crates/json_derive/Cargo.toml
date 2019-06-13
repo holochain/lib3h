@@ -1,5 +1,5 @@
 [package]
-name = "lib3h_persistence_derive"
+name = "json_derive"
 version = "0.0.1-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 description = "Provides derive macros for lib3h/holochain persistence."
@@ -8,7 +8,7 @@ keywords = ["holochain", "holo", "json", "persistence", "derive"]
 categories = ["serde"]
 license = "Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/lib3h_persistence_derive"
+documentation = "https://docs.rs/json_derive"
 repository = "https://github.com/holochain/lib3h"
 
 [lib]

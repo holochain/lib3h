@@ -1,10 +1,11 @@
-use lib3h_persistence_api::{
+use persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::PersistenceError,
 };
+use json_api::error::JsonError;
+
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{
     fmt::{Debug, Error, Formatter},
@@ -54,23 +55,23 @@ impl PickleStorage {
 }
 
 impl ContentAddressableStorage for PickleStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), PersistenceError> {
+    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
         let mut inner = self.db.write().unwrap();
 
         inner
             .set(&content.address().to_string(), &content.content())
-            .map_err(|e| PersistenceError::ErrorGeneric(e.to_string()))?;
+            .map_err(|e| JsonError::ErrorGeneric(e.to_string()))?;
 
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, PersistenceError> {
+    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
         let inner = self.db.read().unwrap();
 
         Ok(inner.exists(&address.to_string()))
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError> {
+    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
         let inner = self.db.read().unwrap();
 
         Ok(inner.get(&address.to_string()))
@@ -84,7 +85,7 @@ impl ContentAddressableStorage for PickleStorage {
 #[cfg(test)]
 mod tests {
     use crate::cas::pickle::PickleStorage;
-    use lib3h_persistence_api::{
+    use persistence_api::{
         cas::{
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,

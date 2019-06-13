@@ -3,12 +3,12 @@
 //! and as a base type for Address to use.
 
 use crate::{
-    error::PersistenceError,
-    json::{default_try_from_json, JsonString},
+    json_api::error::JsonError,
+    json_api::json::{JsonString},
 };
 use multihash::{encode, Hash};
 use rust_base58::ToBase58;
-use std::{convert::TryFrom, fmt};
+use std::{fmt};
 
 // HashString newtype for String
 #[derive(
@@ -37,13 +37,6 @@ impl From<HashString> for String {
 impl<'a> From<&'a str> for HashString {
     fn from(s: &str) -> HashString {
         HashString::from(s.to_string())
-    }
-}
-
-impl TryFrom<JsonString> for Vec<HashString> {
-    type Error = PersistenceError;
-    fn try_from(j: JsonString) -> Result<Self, Self::Error> {
-        default_try_from_json(j)
     }
 }
 

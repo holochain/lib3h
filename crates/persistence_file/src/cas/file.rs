@@ -1,11 +1,14 @@
-use lib3h_persistence_api::{
+use persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::{PersistenceError, PersistenceResult},
+};
+use json_api::{
+    error::{JsonError, JsonResult},
     json::JsonString,
 };
+
 use std::{
     fs::{create_dir_all, read_to_string, write},
     path::{Path, PathBuf},
@@ -29,7 +32,7 @@ impl PartialEq for FilesystemStorage {
 }
 
 impl FilesystemStorage {
-    pub fn new<P: AsRef<Path>>(dir_path: P) -> PersistenceResult<FilesystemStorage> {
+    pub fn new<P: AsRef<Path>>(dir_path: P) -> JsonResult<FilesystemStorage> {
         let dir_path = dir_path.as_ref().into();
 
         Ok(FilesystemStorage {
@@ -50,7 +53,7 @@ impl FilesystemStorage {
 }
 
 impl ContentAddressableStorage for FilesystemStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), PersistenceError> {
+    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
         let _guard = self.lock.write()?;
         // @TODO be more efficient here
         // @see https://github.com/holochain/holochain-rust/issues/248
@@ -64,12 +67,12 @@ impl ContentAddressableStorage for FilesystemStorage {
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, PersistenceError> {
+    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
         let _guard = self.lock.read()?;
         Ok(Path::new(&self.address_to_path(address)).is_file())
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError> {
+    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
         let _guard = self.lock.read()?;
         if self.contains(&address)? {
             Ok(Some(JsonString::from_json(&read_to_string(
@@ -88,7 +91,7 @@ impl ContentAddressableStorage for FilesystemStorage {
 #[cfg(test)]
 pub mod tests {
     use crate::cas::file::FilesystemStorage;
-    use lib3h_persistence_api::{
+    use persistence_api::{
         cas::{
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,

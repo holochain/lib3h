@@ -1,7 +1,8 @@
-use lib3h_persistence_api::{
+use persistence_api::{
     eav::{Attribute, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage},
-    error::{PersistenceError, PersistenceResult},
 };
+use json_api::error::{JsonError, JsonResult};
+
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{
     collections::BTreeSet,
@@ -61,7 +62,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
         let mut inner = self.db.write().unwrap();
 
         //hate to introduce mutability but it is saved by the immutable clones at the end
@@ -76,14 +77,14 @@ where
         }
         inner
             .set(&*index_str, &new_eav)
-            .map_err(|e| PersistenceError::ErrorGeneric(e.to_string()))?;
+            .map_err(|e| JsonError::ErrorGeneric(e.to_string()))?;
         Ok(Some(new_eav.clone()))
     }
 
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> Result<BTreeSet<EntityAttributeValueIndex<A>>, PersistenceError> {
+    ) -> Result<BTreeSet<EntityAttributeValueIndex<A>>, JsonError> {
         let inner = self.db.read()?;
 
         //this not too bad because it is lazy evaluated
@@ -101,7 +102,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::pickle::EavPickleStorage;
-    use lib3h_persistence_api::{
+    use persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
             storage::EavTestSuite,

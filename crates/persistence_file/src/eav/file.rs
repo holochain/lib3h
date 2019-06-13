@@ -1,11 +1,13 @@
 use glob::glob;
-use lib3h_persistence_api::{
+use persistence_api::{
     cas::content::AddressableContent,
     eav::{
         Attribute, EavFilter, EaviQuery, Entity, EntityAttributeValueIndex,
         EntityAttributeValueStorage, Value,
     },
-    error::{PersistenceError, PersistenceResult},
+};
+use json_api::{
+    error::{JsonError, JsonResult},
     json::JsonString,
 };
 use std::{
@@ -38,25 +40,25 @@ impl<A: Attribute> PartialEq for EavFileStorage<A> {
 }
 
 #[warn(unused_must_use)]
-pub fn read_eav(parent_path: PathBuf) -> PersistenceResult<Vec<String>> {
+pub fn read_eav(parent_path: PathBuf) -> JsonResult<Vec<String>> {
     //glob all  files
     let full_path = parent_path.join("*").join("*.txt");
 
     let paths = glob(full_path.to_str().unwrap())
-        .map_err(|_| PersistenceError::ErrorGeneric("Could not get form path".to_string()))?;
+        .map_err(|_| JsonError::ErrorGeneric("Could not get form path".to_string()))?;
 
-    // let path_result = paths.last().ok_or(PersistenceError::ErrorGeneric("Could not get form path".to_string()))?;
+    // let path_result = paths.last().ok_or(JsonError::ErrorGeneric("Could not get form path".to_string()))?;
     let (eav, error): (BTreeSet<_>, BTreeSet<_>) = paths
         .filter_map(Result::ok)
         .map(|path| {
             fs::read_to_string(&path).map_err(|_| {
-                PersistenceError::ErrorGeneric("Could not read from string".to_string())
+                JsonError::ErrorGeneric("Could not read from string".to_string())
             })
         })
         .partition(Result::is_ok);
 
     if !error.is_empty() {
-        Err(PersistenceError::ErrorGeneric(
+        Err(JsonError::ErrorGeneric(
             "Could not read from string".to_string(),
         ))
     } else {
@@ -68,7 +70,7 @@ impl<A: Attribute> EavFileStorage<A>
 where
     A: std::string::ToString + serde::de::DeserializeOwned,
 {
-    pub fn new<P: AsRef<Path>>(dir_path: P) -> PersistenceResult<EavFileStorage<A>> {
+    pub fn new<P: AsRef<Path>>(dir_path: P) -> JsonResult<EavFileStorage<A>> {
         let dir_path = dir_path.as_ref().into();
 
         Ok(EavFileStorage {
@@ -83,7 +85,7 @@ where
         &self,
         subscript: String,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> PersistenceResult<()> {
+    ) -> JsonResult<()> {
         let address: String = match &*subscript {
             ENTITY_DIR => eav.entity().to_string(),
             ATTRIBUTE_DIR => eav.attribute().to_string(),
@@ -112,7 +114,7 @@ where
         &self,
         subscript: String,
         eav_filter: &EavFilter<T>,
-    ) -> PersistenceResult<BTreeSet<String>>
+    ) -> JsonResult<BTreeSet<String>>
     where
         T: Eq + ToString + TryFrom<String>,
     {
@@ -122,7 +124,7 @@ where
             let full_path = path.join("*");
 
             let paths = glob(full_path.to_str().unwrap()).map_err(|_| {
-                PersistenceError::ErrorGeneric("Could not get form path".to_string())
+                JsonError::ErrorGeneric("Could not get form path".to_string())
             })?;
 
             let (paths, errors): (Vec<_>, Vec<_>) = paths.partition(Result::is_ok);
@@ -145,7 +147,7 @@ where
                 })
                 .map(|pathbuf| read_eav(pathbuf.clone()));
             if !errors.is_empty() {
-                Err(PersistenceError::ErrorGeneric(
+                Err(JsonError::ErrorGeneric(
                     "Could not read eavs from directory".to_string(),
                 ))
             } else {
@@ -171,7 +173,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
         let _guard = self.lock.write()?;
         let wild_card = Path::new("*");
         //create glob path to query file system parentdir/*/*/*/{address}.txt
@@ -199,7 +201,7 @@ where
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>> {
+    ) -> JsonResult<BTreeSet<EntityAttributeValueIndex<A>>> {
         let _guard = self.lock.read()?;
 
         let entity_set = self.read_from_dir::<Entity>(ENTITY_DIR.to_string(), query.entity())?;
@@ -227,7 +229,7 @@ where
             .partition(Result::is_ok);
         if !errors.is_empty() {
             // not all EAVs were converted
-            Err(PersistenceError::ErrorGeneric(
+            Err(JsonError::ErrorGeneric(
                 "Error Converting EAVs".to_string(),
             ))
         } else {
@@ -252,7 +254,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::file::EavFileStorage;
-    use lib3h_persistence_api::{
+    use persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
             storage::EavTestSuite,

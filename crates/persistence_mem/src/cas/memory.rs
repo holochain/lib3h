@@ -1,10 +1,11 @@
-use lib3h_persistence_api::{
+use persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::PersistenceError,
 };
+use json_api::error::JsonError;
+
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
@@ -38,18 +39,18 @@ impl MemoryStorage {
 }
 
 impl ContentAddressableStorage for MemoryStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), PersistenceError> {
+    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
         let mut map = self.storage.write()?;
         map.insert(content.address().clone(), content.content().clone());
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, PersistenceError> {
+    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
         let map = self.storage.read()?;
         Ok(map.contains_key(address))
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, PersistenceError> {
+    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
         let map = self.storage.read()?;
         Ok(map.get(address).cloned())
     }
@@ -62,7 +63,7 @@ impl ContentAddressableStorage for MemoryStorage {
 #[cfg(test)]
 pub mod tests {
     use crate::cas::memory::MemoryStorage;
-    use lib3h_persistence_api::{
+    use persistence_api::{
         cas::{
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,

@@ -8,27 +8,23 @@
 
 //extern crate base64;
 extern crate chrono;
-extern crate futures;
 extern crate multihash;
 extern crate rust_base58;
-extern crate serde;
 //#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate lib3h_persistence_derive;
-#[macro_use]
-extern crate shrinkwraprs;
+extern crate json_derive;
+extern crate json_api;
 extern crate uuid;
 
 pub mod cas;
 pub mod eav;
-pub mod error;
+pub mod hash;
+
 #[macro_use]
 extern crate objekt;
-pub mod hash;
-pub mod json;
 
 pub const GIT_HASH: &str = env!(
     "GIT_HASH",

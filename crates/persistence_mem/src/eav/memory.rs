@@ -1,10 +1,10 @@
-use lib3h_persistence_api::{
+use persistence_api::{
     eav::{
         increment_key_till_no_collision, Attribute, EaviQuery, EntityAttributeValueIndex,
         EntityAttributeValueStorage,
     },
-    error::PersistenceResult,
 };
+use json_api::error::JsonResult;
 use std::{
     collections::BTreeSet,
     sync::{Arc, RwLock},
@@ -46,7 +46,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
         let mut map = self.storage.write()?;
         let new_eav = increment_key_till_no_collision(eav.clone(), map.clone())?;
         map.insert(new_eav.clone());
@@ -56,7 +56,7 @@ where
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>> {
+    ) -> JsonResult<BTreeSet<EntityAttributeValueIndex<A>>> {
         let map = self.storage.read()?;
         let iter = map.iter().cloned();
         Ok(query.run(iter))
@@ -66,7 +66,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::eav::memory::EavMemoryStorage;
-    use lib3h_persistence_api::{
+    use persistence_api::{
         cas::{
             content::{AddressableContent, ExampleAddressableContent},
             storage::EavTestSuite,

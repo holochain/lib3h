@@ -1,7 +1,7 @@
 //! This module contains Error type definitions that are used throughout Holochain, and the Ribosome in particular,
 //! which is responsible for mounting and running instances of DNA, and executing WASM code.
 
-use self::PersistenceError::*;
+use self::JsonError::*;
 use crate::json::*;
 use futures::channel::oneshot::Canceled as FutureCanceled;
 use serde_json::Error as SerdeError;
@@ -13,27 +13,27 @@ use std::{
 };
 
 //--------------------------------------------------------------------------------------------------
-// PersistenceError
+// JsonError
 //--------------------------------------------------------------------------------------------------
 
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, DefaultJson, Hash, PartialOrd, Ord,
 )]
-pub enum PersistenceError {
+pub enum JsonError {
     ErrorGeneric(String),
     IoError(String),
     SerializationError(String),
 }
 
-impl PersistenceError {
-    pub fn new(msg: &str) -> PersistenceError {
-        PersistenceError::ErrorGeneric(msg.to_string())
+impl JsonError {
+    pub fn new(msg: &str) -> JsonError {
+        JsonError::ErrorGeneric(msg.to_string())
     }
 }
 
-pub type PersistenceResult<T> = Result<T, PersistenceError>;
+pub type JsonResult<T> = Result<T, JsonError>;
 
-impl fmt::Display for PersistenceError {
+impl fmt::Display for JsonError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ErrorGeneric(err_msg) => write!(f, "{}", err_msg),
@@ -43,23 +43,23 @@ impl fmt::Display for PersistenceError {
     }
 }
 
-impl Error for PersistenceError {}
+impl Error for JsonError {}
 
-impl From<PersistenceError> for String {
-    fn from(persistence_error: PersistenceError) -> Self {
+impl From<JsonError> for String {
+    fn from(persistence_error: JsonError) -> Self {
         persistence_error.to_string()
     }
 }
 
-impl From<String> for PersistenceError {
+impl From<String> for JsonError {
     fn from(error: String) -> Self {
-        PersistenceError::new(&error)
+        JsonError::new(&error)
     }
 }
 
-impl From<&'static str> for PersistenceError {
+impl From<&'static str> for JsonError {
     fn from(error: &str) -> Self {
-        PersistenceError::new(error)
+        JsonError::new(error)
     }
 }
 
@@ -72,51 +72,51 @@ fn reason_for_io_error(error: &IoError) -> String {
     }
 }
 
-impl<T> From<::std::sync::PoisonError<T>> for PersistenceError {
+impl<T> From<::std::sync::PoisonError<T>> for JsonError {
     fn from(error: ::std::sync::PoisonError<T>) -> Self {
-        PersistenceError::ErrorGeneric(format!("sync poison error: {}", error))
+        JsonError::ErrorGeneric(format!("sync poison error: {}", error))
     }
 }
 
-impl From<IoError> for PersistenceError {
+impl From<IoError> for JsonError {
     fn from(error: IoError) -> Self {
-        PersistenceError::IoError(reason_for_io_error(&error))
+        JsonError::IoError(reason_for_io_error(&error))
     }
 }
 
-impl From<SerdeError> for PersistenceError {
+impl From<SerdeError> for JsonError {
     fn from(error: SerdeError) -> Self {
-        PersistenceError::SerializationError(error.to_string())
+        JsonError::SerializationError(error.to_string())
     }
 }
 
-impl From<base64::DecodeError> for PersistenceError {
+impl From<base64::DecodeError> for JsonError {
     fn from(error: base64::DecodeError) -> Self {
-        PersistenceError::ErrorGeneric(format!("base64 decode error: {}", error.to_string()))
+        JsonError::ErrorGeneric(format!("base64 decode error: {}", error.to_string()))
     }
 }
 
-impl From<std::str::Utf8Error> for PersistenceError {
+impl From<std::str::Utf8Error> for JsonError {
     fn from(error: std::str::Utf8Error) -> Self {
-        PersistenceError::ErrorGeneric(format!("std::str::Utf8Error error: {}", error.to_string()))
+        JsonError::ErrorGeneric(format!("std::str::Utf8Error error: {}", error.to_string()))
     }
 }
 
-impl From<FutureCanceled> for PersistenceError {
+impl From<FutureCanceled> for JsonError {
     fn from(_: FutureCanceled) -> Self {
-        PersistenceError::ErrorGeneric("Failed future".to_string())
+        JsonError::ErrorGeneric("Failed future".to_string())
     }
 }
 
-impl From<NoneError> for PersistenceError {
+impl From<NoneError> for JsonError {
     fn from(_: NoneError) -> Self {
-        PersistenceError::ErrorGeneric("Expected Some and got None".to_string())
+        JsonError::ErrorGeneric("Expected Some and got None".to_string())
     }
 }
 
-impl From<hcid::HcidError> for PersistenceError {
+impl From<hcid::HcidError> for JsonError {
     fn from(error: hcid::HcidError) -> Self {
-        PersistenceError::ErrorGeneric(format!("{:?}", error))
+        JsonError::ErrorGeneric(format!("{:?}", error))
     }
 }
 
@@ -124,9 +124,9 @@ impl From<hcid::HcidError> for PersistenceError {
 mod tests {
     use super::*;
     // a test function that returns our error result
-    fn raises_persistence_error(yes: bool) -> Result<(), PersistenceError> {
+    fn raises_persistence_error(yes: bool) -> Result<(), JsonError> {
         if yes {
-            Err(PersistenceError::new("borked"))
+            Err(JsonError::new("borked"))
         } else {
             Ok(())
         }
@@ -135,14 +135,14 @@ mod tests {
     #[test]
     /// test that we can convert an error to a string
     fn to_string() {
-        let err = PersistenceError::new("foo");
+        let err = JsonError::new("foo");
         assert_eq!("foo", err.to_string());
     }
 
     #[test]
     /// test that we can convert an error to valid JSON
     fn test_to_json() {
-        let err = PersistenceError::new("foo");
+        let err = JsonError::new("foo");
         assert_eq!(
             JsonString::from_json("{\"ErrorGeneric\":\"foo\"}"),
             JsonString::from(err),
@@ -152,9 +152,9 @@ mod tests {
     #[test]
     /// smoke test new errors
     fn can_instantiate() {
-        let err = PersistenceError::new("borked");
+        let err = JsonError::new("borked");
 
-        assert_eq!(PersistenceError::ErrorGeneric("borked".to_string()), err);
+        assert_eq!(JsonError::ErrorGeneric("borked".to_string()), err);
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
         let err = raises_persistence_error(true).expect_err("should return an error when yes=true");
 
         match err {
-            PersistenceError::ErrorGeneric(msg) => assert_eq!(msg, "borked"),
+            JsonError::ErrorGeneric(msg) => assert_eq!(msg, "borked"),
             _ => panic!("raises_persistence_error should return an ErrorGeneric"),
         };
     }
@@ -177,15 +177,15 @@ mod tests {
     }
 
     #[test]
-    /// show Error implementation for PersistenceError
+    /// show Error implementation for JsonError
     fn error_test() {
         for (input, output) in vec![
-            (PersistenceError::ErrorGeneric(String::from("foo")), "foo"),
+            (JsonError::ErrorGeneric(String::from("foo")), "foo"),
             (
-                PersistenceError::SerializationError(String::from("foo")),
+                JsonError::SerializationError(String::from("foo")),
                 "foo",
             ),
-            (PersistenceError::IoError(String::from("foo")), "foo"),
+            (JsonError::IoError(String::from("foo")), "foo"),
         ] {
             assert_eq!(output, &input.to_string());
         }

@@ -5,9 +5,8 @@
 
 use crate::{
     cas::content::{Address, AddressableContent, Content},
-    error::{PersistenceError, PersistenceResult},
-    json::JsonString,
 };
+use json_api::{json::JsonString, error::{JsonResult, JsonError}};
 use chrono::offset::Utc;
 use eav::{
     query::{EaviQuery, IndexFilter},
@@ -15,8 +14,8 @@ use eav::{
 };
 use std::{
     cmp::Ordering,
-    collections::BTreeSet,
     convert::{TryFrom, TryInto},
+    collections::BTreeSet,
     fmt::{Debug, Display, Formatter},
     hash::Hash,
     option::NoneError,
@@ -69,15 +68,15 @@ pub enum AttributeError {
     ParseError,
 }
 
-impl From<AttributeError> for PersistenceError {
-    fn from(err: AttributeError) -> PersistenceError {
+impl From<AttributeError> for JsonError {
+    fn from(err: AttributeError) -> JsonError {
         let msg = match err {
             AttributeError::Unrecognized(a) => format!("Unknown attribute: {}", a),
             AttributeError::ParseError => {
                 String::from("Could not parse attribute, bad regex match")
             }
         };
-        PersistenceError::ErrorGeneric(msg)
+        JsonError::ErrorGeneric(msg)
     }
 }
 impl From<NoneError> for AttributeError {
@@ -117,7 +116,7 @@ where
             Ok(s) => Ok(JsonString::from_json(&s)),
             Err(e) => {
                 eprintln!("Error serializing to JSON: {:?}", e);
-                Err(PersistenceError::SerializationError(e.to_string()))
+                Err(JsonError::SerializationError(e.to_string()))
             }
         }
         .unwrap_or_else(|_| panic!("could not Jsonify {}: {:?}", "EntityAttributeValueIndex", v))
@@ -137,7 +136,7 @@ impl<'a, A: Attribute> ::std::convert::TryFrom<&'a JsonString> for EntityAttribu
 where
     A: serde::de::DeserializeOwned,
 {
-    type Error = PersistenceError;
+    type Error = JsonError;
     fn try_from(json_string: &JsonString) -> Result<Self, Self::Error> {
         let str = String::from(json_string);
 
@@ -145,7 +144,7 @@ where
 
         match from_json {
             Ok(d) => Ok(d),
-            Err(e) => Err(PersistenceError::SerializationError(e.to_string())),
+            Err(e) => Err(JsonError::SerializationError(e.to_string())),
         }
     }
 }
@@ -154,7 +153,7 @@ impl<A: Attribute> ::std::convert::TryFrom<JsonString> for EntityAttributeValueI
 where
     A: serde::de::DeserializeOwned,
 {
-    type Error = PersistenceError;
+    type Error = JsonError;
     fn try_from(json_string: JsonString) -> Result<Self, Self::Error> {
         EntityAttributeValueIndex::try_from(&json_string)
     }
@@ -180,12 +179,12 @@ where
         self.to_owned().into()
     }
 
-    fn try_from_content(content: &Content) -> Result<Self, PersistenceError> {
+    fn try_from_content(content: &Content) -> Result<Self, JsonError> {
         content.to_owned().try_into()
     }
 }
 
-fn validate_attribute<A: Attribute>(_attribute: &A) -> PersistenceResult<()> {
+fn validate_attribute<A: Attribute>(_attribute: &A) -> JsonResult<()> {
     Ok(())
 }
 
@@ -194,7 +193,7 @@ impl<A: Attribute> EntityAttributeValueIndex<A> {
         entity: &Entity,
         attribute: &A,
         value: &Value,
-    ) -> PersistenceResult<EntityAttributeValueIndex<A>> {
+    ) -> JsonResult<EntityAttributeValueIndex<A>> {
         validate_attribute(attribute)?;
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
@@ -209,7 +208,7 @@ impl<A: Attribute> EntityAttributeValueIndex<A> {
         attribute: &A,
         value: &Value,
         timestamp: i64,
-    ) -> PersistenceResult<EntityAttributeValueIndex<A>> {
+    ) -> JsonResult<EntityAttributeValueIndex<A>> {
         validate_attribute(attribute)?;
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
@@ -254,7 +253,7 @@ impl AddressableContent for ExampleEntry {
         self.into()
     }
 
-    fn try_from_content(content: &Content) -> PersistenceResult<ExampleEntry> {
+    fn try_from_content(content: &Content) -> JsonResult<ExampleEntry> {
         ExampleEntry::try_from(content.to_owned())
     }
 }
