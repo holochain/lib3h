@@ -91,8 +91,8 @@ mod tests {
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::StorageTestSuite,
         },
-        json::RawString,
     };
+    use holochain_json_api::json::RawString;
     use tempfile::{tempdir, TempDir};
 
     pub fn test_pickle_cas() -> (PickleStorage, TempDir) {
