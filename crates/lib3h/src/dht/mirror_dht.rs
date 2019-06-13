@@ -2,8 +2,15 @@ use crate::dht::{dht_protocol::*, dht_trait::Dht};
 use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
 use std::collections::{HashMap, VecDeque};
 
-use rmps::{Deserializer, Serializer};
+use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+
+/// Enum holding all types of gossip messages used by MirrorDht
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+enum MirrorGossip {
+    Entry(EntryData),
+    Peer(PeerData),
+}
 
 /// Mirror DHT implementation: Holds and reflect everything back to other nodes (fullsync)
 ///  - On *HoldRequest, store and gossip data back to every known peer.
@@ -147,32 +154,31 @@ impl MirrorDht {
         println!("(log.d) --- '(MirrorDht)' serving cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
-            // Received gossip from remote node. Bundle must be one of the following:
-            // - EntryData
-            // - PeerData
+            // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtCommand::HandleGossip(msg) => {
                 println!("Deserializer msg.bundle: {:?}", msg.bundle);
                 let mut de = Deserializer::new(&msg.bundle[..]);
-                let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
+                let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
-                if let Ok(entry) = maybe_entry {
-                    let is_new = self.add_entry(&entry);
-                    if is_new {
-                        return Ok(vec![DhtEvent::HoldEntryRequested(entry)]);
-                    }
-                    return Ok(vec![]);
+                if let Err(e) = maybe_gossip {
+                    return Err(format_err!("Failed deserializing gossip: {:?}", e));
                 }
-                de = Deserializer::new(&msg.bundle[..]);
-                let maybe_peer: Result<PeerData, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                if let Ok(peer) = maybe_peer {
-                    let is_new = self.add_peer(&peer);
-                    if is_new {
-                        return Ok(vec![DhtEvent::HoldPeerRequested(peer)]);
+                match maybe_gossip.unwrap() {
+                    MirrorGossip::Entry(entry) => {
+                        let is_new = self.add_entry(&entry);
+                        if is_new {
+                            return Ok(vec![DhtEvent::HoldEntryRequested(entry)]);
+                        }
+                        return Ok(vec![]);
                     }
-                    return Ok(vec![]);
+                    MirrorGossip::Peer(peer) => {
+                        let is_new = self.add_peer(&peer);
+                        if is_new {
+                            return Ok(vec![DhtEvent::HoldPeerRequested(peer)]);
+                        }
+                        return Ok(vec![]);
+                    }
                 }
-                Err(format_err!("HandleGossip bundle is of unknown type"))
             }
             // Owner is asking us to hold peer info
             DhtCommand::HoldPeer(msg) => {
@@ -193,8 +199,11 @@ impl MirrorDht {
                     .peer_list
                     .get(&msg.peer_address)
                     .expect("Should have peer by now");
+                let peer_gossip = MirrorGossip::Peer(peer.clone());
                 let mut buf = Vec::new();
-                peer.serialize(&mut Serializer::new(&mut buf)).unwrap();
+                peer_gossip
+                    .serialize(&mut Serializer::new(&mut buf))
+                    .unwrap();
                 println!("gossiping peer: {:?} | {:?}", peer, buf);
                 let gossip_evt = GossipToData {
                     peer_address_list,
@@ -217,8 +226,11 @@ impl MirrorDht {
                     .entry_list
                     .get(&entry.entry_address)
                     .expect("Should have content at this point");
+                let entry_gossip = MirrorGossip::Entry(entry.clone());
                 let mut buf = Vec::new();
-                entry.serialize(&mut Serializer::new(&mut buf)).unwrap();
+                entry_gossip
+                    .serialize(&mut Serializer::new(&mut buf))
+                    .unwrap();
                 let gossip_evt = GossipToData {
                     peer_address_list: self
                         .get_peer_list()
