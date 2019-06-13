@@ -1,4 +1,4 @@
-# lib3h_persistence_derive
+# persistence_derive
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,12 +9,12 @@
 
 ## Overview
 
-Lib3h rust derive macros for persistence capabilities.a
+Derive macros for json capabilities.
 
 ## Usage
 
 ```rust
-use lib3h_persistence_api::{json::JsonString, error::PersistenceError};
+use persistence_api::{json::JsonString, error::JsonError};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, DefaultJson)]
 pub struct SomeData(String);
