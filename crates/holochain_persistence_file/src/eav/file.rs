@@ -260,8 +260,8 @@ pub mod tests {
             storage::EavTestSuite,
         },
         eav::ExampleAttribute,
-        json::RawString,
     };
+    use holochain_json_api::json::RawString;
     use tempfile::tempdir;
 
     #[test]
