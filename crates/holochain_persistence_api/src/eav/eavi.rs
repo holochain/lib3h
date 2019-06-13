@@ -384,8 +384,8 @@ pub mod tests {
             },
         },
         eav::EntityAttributeValueIndex,
-        json::RawString,
-    };
+   };
+   use holochain_json_api::json::RawString;
 
     pub fn test_eav_storage<A: Attribute>() -> ExampleEntityAttributeValueStorage<A>
     where

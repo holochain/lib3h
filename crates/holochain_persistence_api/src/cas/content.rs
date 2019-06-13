@@ -174,8 +174,8 @@ pub mod tests {
             Address, AddressableContent, AddressableContentTestSuite, ExampleAddressableContent,
             OtherExampleAddressableContent,
         },
-        json::{JsonString, RawString},
-    };
+   };
+   use holochain_json_api::json::{JsonString, RawString};
 
     #[test]
     /// test the first example

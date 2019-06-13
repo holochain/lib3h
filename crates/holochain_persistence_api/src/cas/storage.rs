@@ -635,8 +635,8 @@ pub mod tests {
             content::{ExampleAddressableContent, OtherExampleAddressableContent},
             storage::{test_content_addressable_storage, StorageTestSuite},
         },
-        json::{JsonString, RawString},
-    };
+   };
+   use holochain_json_api::json::{JsonString, RawString};
 
     /// show that content of different types can round trip through the same storage
     #[test]
