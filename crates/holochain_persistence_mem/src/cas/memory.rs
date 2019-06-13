@@ -3,7 +3,7 @@ use holochain_persistence_api::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::{PersistenceResult}
+    error::PersistenceResult,
 };
 
 use std::{

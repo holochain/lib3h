@@ -344,9 +344,7 @@ pub fn default_to_json<V: Serialize + Debug>(v: V) -> JsonString {
 ///         default_try_from_json(j)
 ///     }
 /// }
-pub fn default_try_from_json<D: DeserializeOwned>(
-    json_string: JsonString,
-) -> Result<D, JsonError> {
+pub fn default_try_from_json<D: DeserializeOwned>(json_string: JsonString) -> Result<D, JsonError> {
     serde_json::from_str(&String::from(&json_string))
         .map_err(|e| JsonError::SerializationError(e.to_string()))
 }
@@ -465,8 +463,7 @@ pub mod tests {
 
     #[test]
     fn json_result_round_trip_test() {
-        let result: Result<String, JsonError> =
-            Err(JsonError::ErrorGeneric("foo".into()));
+        let result: Result<String, JsonError> = Err(JsonError::ErrorGeneric("foo".into()));
 
         assert_eq!(
             JsonString::from(result),

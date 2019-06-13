@@ -3,19 +3,20 @@
 //! being used to define relationships between AddressableContent values.
 //! See [wikipedia](https://en.wikipedia.org/wiki/Entity%E2%80%93attribute%E2%80%93value_model) to learn more about this pattern.
 
-use crate::{
-    cas::content::{Address, AddressableContent, Content},
-};
-use holochain_json_api::{json::JsonString, error::{JsonResult, JsonError}};
+use crate::cas::content::{Address, AddressableContent, Content};
 use chrono::offset::Utc;
 use eav::{
     query::{EaviQuery, IndexFilter},
     storage::{EntityAttributeValueStorage, ExampleEntityAttributeValueStorage},
 };
+use holochain_json_api::{
+    error::{JsonError, JsonResult},
+    json::JsonString,
+};
 use std::{
     cmp::Ordering,
-    convert::{TryFrom, TryInto},
     collections::BTreeSet,
+    convert::{TryFrom, TryInto},
     fmt::{Debug, Display, Formatter},
     hash::Hash,
     option::NoneError,

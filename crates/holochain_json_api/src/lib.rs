@@ -6,14 +6,14 @@
 #![feature(never_type)]
 #![warn(unused_extern_crates)]
 
+extern crate futures;
 extern crate serde;
 extern crate serde_json;
-extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate holochain_json_derive;
 #[macro_use]
 extern crate shrinkwraprs;
-pub mod json;
 pub mod error;
+pub mod json;

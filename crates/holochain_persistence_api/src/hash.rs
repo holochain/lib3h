@@ -2,13 +2,10 @@
 //! to keep track of places where a string is the product of a hash function,
 //! and as a base type for Address to use.
 
-use crate::{
-    holochain_json_api::error::JsonError,
-    holochain_json_api::json::{JsonString},
-};
+use crate::holochain_json_api::{error::JsonError, json::JsonString};
 use multihash::{encode, Hash};
 use rust_base58::ToBase58;
-use std::{fmt};
+use std::fmt;
 
 // HashString newtype for String
 #[derive(

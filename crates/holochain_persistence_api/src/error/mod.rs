@@ -1,8 +1,8 @@
 //! This module contains Error type definitions that are used throughout persistence.
 
 use self::PersistenceError::*;
-use holochain_json_api::{error::JsonError, json::*};
 use futures::channel::oneshot::Canceled as FutureCanceled;
+use holochain_json_api::{error::JsonError, json::*};
 use serde_json::Error as SerdeError;
 use std::{
     error::Error,
@@ -31,15 +31,12 @@ impl PersistenceError {
 }
 
 impl From<JsonError> for PersistenceError {
-    fn from(json_error:JsonError) -> PersistenceError {
-     match json_error {
-         JsonError::ErrorGeneric(s) =>
-             PersistenceError::ErrorGeneric(s),
-         JsonError::IoError(s) =>
-             PersistenceError::IoError(s),
-         JsonError::SerializationError(s) =>
-             PersistenceError::SerializationError(s)
-     }
+    fn from(json_error: JsonError) -> PersistenceError {
+        match json_error {
+            JsonError::ErrorGeneric(s) => PersistenceError::ErrorGeneric(s),
+            JsonError::IoError(s) => PersistenceError::IoError(s),
+            JsonError::SerializationError(s) => PersistenceError::SerializationError(s),
+        }
     }
 }
 pub type PersistenceResult<T> = Result<T, PersistenceError>;
@@ -171,7 +168,8 @@ mod tests {
     #[test]
     /// test errors as a result and destructuring
     fn can_raise_holochain_persistence_error() {
-        let err = raises_holochain_persistence_error(true).expect_err("should return an error when yes=true");
+        let err = raises_holochain_persistence_error(true)
+            .expect_err("should return an error when yes=true");
 
         match err {
             PersistenceError::ErrorGeneric(msg) => assert_eq!(msg, "borked"),

@@ -1,8 +1,8 @@
+use holochain_json_api::error::JsonError;
 use holochain_persistence_api::{
     eav::{Attribute, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage},
-    error::PersistenceResult
+    error::PersistenceResult,
 };
-use holochain_json_api::error::{JsonError};
 
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{

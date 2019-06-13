@@ -3,10 +3,7 @@
 //! meaning that it can be implemented for other structs.
 //! A test suite for AddressableContent is also implemented here.
 
-use crate::{
-    cas::storage::ContentAddressableStorage,
-    hash::HashString
-};
+use crate::{cas::storage::ContentAddressableStorage, hash::HashString};
 use holochain_json_api::{error::JsonError, json::*};
 
 use multihash::Hash;

@@ -181,10 +181,7 @@ mod tests {
     fn error_test() {
         for (input, output) in vec![
             (JsonError::ErrorGeneric(String::from("foo")), "foo"),
-            (
-                JsonError::SerializationError(String::from("foo")),
-                "foo",
-            ),
+            (JsonError::SerializationError(String::from("foo")), "foo"),
             (JsonError::IoError(String::from("foo")), "foo"),
         ] {
             assert_eq!(output, &input.to_string());

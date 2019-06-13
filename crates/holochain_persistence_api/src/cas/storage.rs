@@ -9,8 +9,8 @@ use crate::{
         Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
+    error::{PersistenceError, PersistenceResult},
     holochain_json_api::{error::JsonError, json::RawString},
-    error::{PersistenceError, PersistenceResult}
 };
 use objekt;
 use std::{
@@ -73,12 +73,17 @@ impl ContentAddressableStorage for ExampleContentAddressableStorage {
             .write()
             .unwrap()
             .unthreadable_add(&content.address(), &content.content())
-            .map_err(|err|
-                 { let e : PersistenceError = err.into(); e })
+            .map_err(|err| {
+                let e: PersistenceError = err.into();
+                e
+            })
     }
 
     fn contains(&self, address: &Address) -> PersistenceResult<bool> {
-        self.content.read().unwrap().unthreadable_contains(address)
+        self.content
+            .read()
+            .unwrap()
+            .unthreadable_contains(address)
             .map_err(|err| err.into())
     }
 
@@ -102,11 +107,7 @@ impl ExampleContentAddressableStorageContent {
         Default::default()
     }
 
-    fn unthreadable_add(
-        &mut self,
-        address: &Address,
-        content: &Content,
-    ) -> Result<(), JsonError> {
+    fn unthreadable_add(&mut self, address: &Address, content: &Content) -> Result<(), JsonError> {
         self.storage.insert(address.clone(), content.clone());
         Ok(())
     }

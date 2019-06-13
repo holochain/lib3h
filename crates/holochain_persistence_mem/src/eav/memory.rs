@@ -3,7 +3,7 @@ use holochain_persistence_api::{
         increment_key_till_no_collision, Attribute, EaviQuery, EntityAttributeValueIndex,
         EntityAttributeValueStorage,
     },
-    error::PersistenceResult
+    error::PersistenceResult,
 };
 use std::{
     collections::BTreeSet,

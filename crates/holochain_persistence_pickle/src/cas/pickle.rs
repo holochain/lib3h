@@ -1,11 +1,11 @@
+use holochain_json_api::error::JsonError;
 use holochain_persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::PersistenceResult
+    error::PersistenceResult,
 };
-use holochain_json_api::error::JsonError;
 
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{

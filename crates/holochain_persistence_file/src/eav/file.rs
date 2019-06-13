@@ -1,15 +1,15 @@
 use glob::glob;
+use holochain_json_api::{
+    error::{JsonError, JsonResult},
+    json::JsonString,
+};
 use holochain_persistence_api::{
     cas::content::AddressableContent,
     eav::{
         Attribute, EavFilter, EaviQuery, Entity, EntityAttributeValueIndex,
         EntityAttributeValueStorage, Value,
     },
-    error::{PersistenceError, PersistenceResult}
-};
-use holochain_json_api::{
-    error::{JsonError, JsonResult},
-    json::JsonString,
+    error::{PersistenceError, PersistenceResult},
 };
 use std::{
     collections::BTreeSet,
@@ -52,9 +52,8 @@ pub fn read_eav(parent_path: PathBuf) -> JsonResult<Vec<String>> {
     let (eav, error): (BTreeSet<_>, BTreeSet<_>) = paths
         .filter_map(Result::ok)
         .map(|path| {
-            fs::read_to_string(&path).map_err(|_| {
-                JsonError::ErrorGeneric("Could not read from string".to_string())
-            })
+            fs::read_to_string(&path)
+                .map_err(|_| JsonError::ErrorGeneric("Could not read from string".to_string()))
         })
         .partition(Result::is_ok);
 
@@ -124,9 +123,8 @@ where
         if path.exists() {
             let full_path = path.join("*");
 
-            let paths = glob(full_path.to_str().unwrap()).map_err(|_| {
-                JsonError::ErrorGeneric("Could not get form path".to_string())
-            })?;
+            let paths = glob(full_path.to_str().unwrap())
+                .map_err(|_| JsonError::ErrorGeneric("Could not get form path".to_string()))?;
 
             let (paths, errors): (Vec<_>, Vec<_>) = paths.partition(Result::is_ok);
             let eavs = paths

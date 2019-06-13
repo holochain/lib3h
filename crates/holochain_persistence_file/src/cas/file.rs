@@ -1,12 +1,10 @@
+use holochain_json_api::json::JsonString;
 use holochain_persistence_api::{
     cas::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
-    error::PersistenceResult
-};
-use holochain_json_api::{
-    json::JsonString,
+    error::PersistenceResult,
 };
 
 use std::{
