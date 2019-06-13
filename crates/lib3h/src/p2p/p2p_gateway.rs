@@ -1,11 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{
-        dht_event::{DhtEvent, PeerHoldRequestData},
-        dht_trait::Dht,
-        rrdht::RrDht,
-    },
+    dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
     p2p::p2p_protocol::P2pProtocol,
     transport::{
         error::TransportResult,
@@ -17,15 +13,15 @@ use crate::{
     transport_space::TransportSpace,
     transport_wss::TransportWss,
 };
-use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.
 /// Tracks distributed data for that P2P network.
 pub struct P2pGateway<T: Transport, D: Dht> {
-    transport: T,
+    connection: T,
     dht: D,
-    advertise: String,
+    maybe_advertise: Option<String>,
 }
 
 impl P2pGateway<TransportMemory, RrDht> {
@@ -33,14 +29,14 @@ impl P2pGateway<TransportMemory, RrDht> {
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new_with_memory(name: &str) -> Self {
         let mut gateway = P2pGateway {
-            transport: TransportMemory::new(),
+            connection: TransportMemory::new(),
             dht: RrDht::new(),
-            advertise: String::new(),
+            maybe_advertise: None,
         };
         let binding = gateway
             .bind(name)
             .expect("TransportMemory.bind() failed. url/name might not be unique?");
-        gateway.advertise = binding;
+        gateway.maybe_advertise = Some(binding);
         gateway
     }
 }
@@ -49,9 +45,9 @@ impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
     /// Constructor
     pub fn new_with_wss() -> Self {
         P2pGateway {
-            transport: TransportWss::with_std_tcp_stream(),
+            connection: TransportWss::with_std_tcp_stream(),
             dht: RrDht::new(),
-            advertise: String::new(),
+            maybe_advertise: None,
         }
     }
 }
@@ -60,9 +56,9 @@ impl P2pGateway<TransportSpace, RrDht> {
     /// Constructor
     pub fn new_with_space() -> Self {
         P2pGateway {
-            transport: TransportSpace::new(),
+            connection: TransportSpace::new(),
             dht: RrDht::new(),
-            advertise: String::new(),
+            maybe_advertise: None,
         }
     }
 }
@@ -70,86 +66,90 @@ impl P2pGateway<TransportSpace, RrDht> {
 /// Public interface
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     // -- Getters -- //
-
     /// This nodes identifier on the network
     pub fn id(&self) -> String {
-        // FIXME
-        "FIXME_ID".to_string()
+        self.dht
+            .this_peer()
+            .expect("P2pGateway's DHT should have 'this_peer'")
+            .to_string()
     }
-
     /// This nodes connection address
-    pub fn advertise(&self) -> String {
-        self.advertise.clone()
+    pub fn advertise(&self) -> Option<String> {
+        self.maybe_advertise.clone()
     }
 }
 
 /// Compose DHT
 impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Peer info
-    fn get_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
+    fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.dht.get_peer(peer_address)
     }
-    fn fetch_peer(&self, peer_address: &str) -> Option<PeerHoldRequestData> {
+    fn fetch_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.dht.fetch_peer(peer_address)
     }
-    fn drop_peer(&self, peer_address: &str) -> Lib3hResult<()> {
-        self.dht.drop_peer(peer_address)
+    /// Entry
+    fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
+        self.dht.get_entry(entry_address)
     }
-    /// Data
-    fn get_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
-        self.dht.get_data(data_address)
-    }
-    fn fetch_data(&self, data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
-        self.dht.fetch_data(data_address)
+    fn fetch_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
+        self.dht.fetch_entry(entry_address)
     }
     /// Processing
-    fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        self.dht.post(evt)
+    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        self.dht.post(cmd)
     }
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         self.dht.process()
     }
     /// Getters
-    fn this_peer(&self) -> Lib3hResult<()> {
+    fn this_peer(&self) -> Lib3hResult<&str> {
         self.dht.this_peer()
+    }
+    fn get_peer_list(&self) -> Vec<PeerData> {
+        self.dht.get_peer_list()
     }
 }
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
-        self.transport.connect(&uri)
+        self.connection.connect(&uri)
     }
     fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
-        self.transport.close(id)
+        self.connection.close(id)
     }
 
     fn close_all(&mut self) -> TransportResult<()> {
-        self.transport.close_all()
+        self.connection.close_all()
     }
 
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
-        self.transport.send(id_list, payload)
+        self.connection.send(id_list, payload)
     }
 
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        self.transport.send_all(payload)
+        self.connection.send_all(payload)
     }
 
     fn bind(&mut self, url: &str) -> TransportResult<String> {
-        self.transport.bind(url)
+        let res = self.connection.bind(url);
+        if let Ok(adv) = res.clone() {
+            self.maybe_advertise = Some(adv);
+        }
+        res
     }
 
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
-        self.transport.post(command)
+        self.connection.post(command)
     }
 
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        self.transport.process()
+        self.connection.process()
     }
 
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        self.transport.transport_id_list()
+        self.connection.transport_id_list()
     }
 }
 
@@ -158,7 +158,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn do_process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
         let mut outbox = Vec::new();
         // Process the transport connection
-        let (did_work, event_list) = self.transport.process()?;
+        let (did_work, event_list) = self.connection.process()?;
         if did_work {
             for evt in event_list {
                 let mut p2p_output = self.serve_TransportEvent(&evt)?;
@@ -196,7 +196,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     "(log.e) Connection Error for {}: {}\n Closing connection.",
                     id, e
                 );
-                self.transport.close(id)?;
+                self.connection.close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
                 // don't need to do anything here
@@ -205,7 +205,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportEvent::Closed(id) => {
                 // FIXME
                 println!("(log.w) Connection closed: {}", id);
-                self.transport.close(id)?;
+                self.connection.close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::Received(id, msg) => {
@@ -247,38 +247,32 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         Ok(outbox)
     }
 
-    /// Serve a DhtEvent sent to us.
-    /// Return a list of P2pProtocol messages for us to process.
+    /// Serve a DhtEvent sent to us by our internal DHT.
+    /// Return a list of P2pProtocol messages for our owner to process.
     // FIXME
-    fn serve_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
+    fn serve_DhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
         let outbox = Vec::new();
         let did_work = false;
-        match evt {
-            DhtEvent::RemoteGossipBundle(_data) => {
-                // FIXME
-            }
+        match cmd {
             DhtEvent::GossipTo(_data) => {
                 // FIXME
             }
-            DhtEvent::UnreliableGossipTo(_data) => {
+            DhtEvent::GossipUnreliablyTo(_data) => {
                 // FIXME
             }
-            DhtEvent::PeerHoldRequest(_data) => {
+            DhtEvent::HoldPeerRequested(_peer_address) => {
                 // FIXME
             }
-            DhtEvent::PeerTimedOut(_peer_address) => {
+            DhtEvent::PeerTimedOut(_data) => {
                 // FIXME
             }
-            DhtEvent::DataHoldRequest(_data) => {
+            DhtEvent::HoldEntryRequested(_data) => {
                 // FIXME
             }
-            DhtEvent::DataFetch(_data) => {
+            DhtEvent::FetchEntryResponse(_data) => {
                 // FIXME
             }
-            DhtEvent::DataFetchResponse(_data) => {
-                // FIXME
-            }
-            DhtEvent::DataPrune(_peer_address) => {
+            DhtEvent::EntryPruned(_address) => {
                 // FIXME
             }
         }
