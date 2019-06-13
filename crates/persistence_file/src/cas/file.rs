@@ -3,9 +3,9 @@ use persistence_api::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
+    error::PersistenceResult
 };
 use json_api::{
-    error::{JsonError, JsonResult},
     json::JsonString,
 };
 
@@ -32,7 +32,7 @@ impl PartialEq for FilesystemStorage {
 }
 
 impl FilesystemStorage {
-    pub fn new<P: AsRef<Path>>(dir_path: P) -> JsonResult<FilesystemStorage> {
+    pub fn new<P: AsRef<Path>>(dir_path: P) -> PersistenceResult<FilesystemStorage> {
         let dir_path = dir_path.as_ref().into();
 
         Ok(FilesystemStorage {
@@ -53,7 +53,7 @@ impl FilesystemStorage {
 }
 
 impl ContentAddressableStorage for FilesystemStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
+    fn add(&mut self, content: &AddressableContent) -> PersistenceResult<()> {
         let _guard = self.lock.write()?;
         // @TODO be more efficient here
         // @see https://github.com/holochain/holochain-rust/issues/248
@@ -67,12 +67,12 @@ impl ContentAddressableStorage for FilesystemStorage {
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
+    fn contains(&self, address: &Address) -> PersistenceResult<bool> {
         let _guard = self.lock.read()?;
         Ok(Path::new(&self.address_to_path(address)).is_file())
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
+    fn fetch(&self, address: &Address) -> PersistenceResult<Option<Content>> {
         let _guard = self.lock.read()?;
         if self.contains(&address)? {
             Ok(Some(JsonString::from_json(&read_to_string(

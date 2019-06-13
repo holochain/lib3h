@@ -1,5 +1,5 @@
 use eav::{eavi::EntityAttributeValueIndex, query::EaviQuery, Attribute};
-use json_api::error::JsonResult;
+use error::PersistenceResult;
 use objekt;
 use std::{
     collections::BTreeSet,
@@ -16,7 +16,7 @@ pub trait EntityAttributeValueStorage<A: Attribute>: objekt::Clone + Send + Sync
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>>;
+    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>>;
 
     /// Fetch the set of EntityAttributeValues that match constraints according to the latest hash version
     /// - None = no constraint
@@ -26,7 +26,7 @@ pub trait EntityAttributeValueStorage<A: Attribute>: objekt::Clone + Send + Sync
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> JsonResult<BTreeSet<EntityAttributeValueIndex<A>>>;
+    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>>;
 
     // @TODO: would like to do this, but can't because of the generic type param
     // fn iter<I>(&self) -> I
@@ -57,7 +57,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
         let mut map = self.storage.write()?;
         let new_eav = increment_key_till_no_collision(eav.clone(), map.clone())?;
         map.insert(new_eav.clone());
@@ -67,7 +67,7 @@ where
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> JsonResult<BTreeSet<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>> {
         let lock = self.storage.read()?;
         let set = (*lock).clone();
         let iter = set.iter().cloned();
@@ -85,7 +85,7 @@ impl<A: Attribute> PartialEq for EntityAttributeValueStorage<A> {
 pub fn increment_key_till_no_collision<A: Attribute>(
     mut eav: EntityAttributeValueIndex<A>,
     map: BTreeSet<EntityAttributeValueIndex<A>>,
-) -> JsonResult<EntityAttributeValueIndex<A>> {
+) -> PersistenceResult<EntityAttributeValueIndex<A>> {
     if map.iter().any(|e| e.index() == eav.index()) {
         let timestamp = eav.clone().index() + 1;
         eav.set_index(timestamp);

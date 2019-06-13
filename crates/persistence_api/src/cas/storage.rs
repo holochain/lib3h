@@ -10,6 +10,7 @@ use crate::{
         IndexFilter,
     },
     json_api::{error::JsonError, json::RawString},
+    error::{PersistenceError, PersistenceResult}
 };
 use objekt;
 use std::{
@@ -25,14 +26,14 @@ use uuid::Uuid;
 /// CAS is append only
 pub trait ContentAddressableStorage: objekt::Clone + Send + Sync + Debug {
     /// adds AddressableContent to the ContentAddressableStorage by its Address as Content
-    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError>;
+    fn add(&mut self, content: &AddressableContent) -> PersistenceResult<()>;
     /// true if the Address is in the Store, false otherwise.
     /// may be more efficient than retrieve depending on the implementation.
-    fn contains(&self, address: &Address) -> Result<bool, JsonError>;
+    fn contains(&self, address: &Address) -> PersistenceResult<bool>;
     /// returns Some AddressableContent if it is in the Store, else None
     /// AddressableContent::from_content() can be used to allow the compiler to infer the type
     /// @see the fetch implementation for ExampleCas in the cas module tests
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError>;
+    fn fetch(&self, address: &Address) -> PersistenceResult<Option<Content>>;
     //needed to find a way to compare two different CAS for partialord derives.
     //easiest solution was to just compare two ids which are based on uuids
     fn get_id(&self) -> Uuid;
@@ -67,18 +68,21 @@ pub fn test_content_addressable_storage() -> ExampleContentAddressableStorage {
 }
 
 impl ContentAddressableStorage for ExampleContentAddressableStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
+    fn add(&mut self, content: &AddressableContent) -> PersistenceResult<()> {
         self.content
             .write()
             .unwrap()
             .unthreadable_add(&content.address(), &content.content())
+            .map_err(|err|
+                 { let e : PersistenceError = err.into(); e })
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
+    fn contains(&self, address: &Address) -> PersistenceResult<bool> {
         self.content.read().unwrap().unthreadable_contains(address)
+            .map_err(|err| err.into())
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
+    fn fetch(&self, address: &Address) -> PersistenceResult<Option<Content>> {
         Ok(self.content.read()?.unthreadable_fetch(address)?)
     }
 

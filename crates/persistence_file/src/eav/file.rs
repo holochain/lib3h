@@ -5,6 +5,7 @@ use persistence_api::{
         Attribute, EavFilter, EaviQuery, Entity, EntityAttributeValueIndex,
         EntityAttributeValueStorage, Value,
     },
+    error::{PersistenceError, PersistenceResult}
 };
 use json_api::{
     error::{JsonError, JsonResult},
@@ -173,7 +174,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
         let _guard = self.lock.write()?;
         let wild_card = Path::new("*");
         //create glob path to query file system parentdir/*/*/*/{address}.txt
@@ -196,12 +197,13 @@ where
             .and_then(|_| self.write_to_file(ATTRIBUTE_DIR.to_string(), &eav))
             .and_then(|_| self.write_to_file(VALUE_DIR.to_string(), &eav))
             .map(|_| Some(eav.clone()))
+            .map_err(|err| err.into())
     }
 
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> JsonResult<BTreeSet<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>> {
         let _guard = self.lock.read()?;
 
         let entity_set = self.read_from_dir::<Entity>(ENTITY_DIR.to_string(), query.entity())?;
@@ -229,7 +231,7 @@ where
             .partition(Result::is_ok);
         if !errors.is_empty() {
             // not all EAVs were converted
-            Err(JsonError::ErrorGeneric(
+            Err(PersistenceError::ErrorGeneric(
                 "Error Converting EAVs".to_string(),
             ))
         } else {

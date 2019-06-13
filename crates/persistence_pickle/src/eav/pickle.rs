@@ -1,7 +1,8 @@
 use persistence_api::{
     eav::{Attribute, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage},
+    error::PersistenceResult
 };
-use json_api::error::{JsonError, JsonResult};
+use json_api::error::{JsonError};
 
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use std::{
@@ -62,7 +63,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
         let mut inner = self.db.write().unwrap();
 
         //hate to introduce mutability but it is saved by the immutable clones at the end
@@ -84,7 +85,7 @@ where
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> Result<BTreeSet<EntityAttributeValueIndex<A>>, JsonError> {
+    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>> {
         let inner = self.db.read()?;
 
         //this not too bad because it is lazy evaluated

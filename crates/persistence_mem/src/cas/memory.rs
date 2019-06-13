@@ -3,8 +3,8 @@ use persistence_api::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
+    error::{PersistenceResult}
 };
-use json_api::error::JsonError;
 
 use std::{
     collections::HashMap,
@@ -39,18 +39,18 @@ impl MemoryStorage {
 }
 
 impl ContentAddressableStorage for MemoryStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
+    fn add(&mut self, content: &AddressableContent) -> PersistenceResult<()> {
         let mut map = self.storage.write()?;
         map.insert(content.address().clone(), content.content().clone());
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
+    fn contains(&self, address: &Address) -> PersistenceResult<bool> {
         let map = self.storage.read()?;
         Ok(map.contains_key(address))
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
+    fn fetch(&self, address: &Address) -> PersistenceResult<Option<Content>> {
         let map = self.storage.read()?;
         Ok(map.get(address).cloned())
     }

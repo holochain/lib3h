@@ -3,8 +3,8 @@ use persistence_api::{
         increment_key_till_no_collision, Attribute, EaviQuery, EntityAttributeValueIndex,
         EntityAttributeValueStorage,
     },
+    error::PersistenceResult
 };
-use json_api::error::JsonResult;
 use std::{
     collections::BTreeSet,
     sync::{Arc, RwLock},
@@ -46,7 +46,7 @@ where
     fn add_eavi(
         &mut self,
         eav: &EntityAttributeValueIndex<A>,
-    ) -> JsonResult<Option<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<Option<EntityAttributeValueIndex<A>>> {
         let mut map = self.storage.write()?;
         let new_eav = increment_key_till_no_collision(eav.clone(), map.clone())?;
         map.insert(new_eav.clone());
@@ -56,7 +56,7 @@ where
     fn fetch_eavi(
         &self,
         query: &EaviQuery<A>,
-    ) -> JsonResult<BTreeSet<EntityAttributeValueIndex<A>>> {
+    ) -> PersistenceResult<BTreeSet<EntityAttributeValueIndex<A>>> {
         let map = self.storage.read()?;
         let iter = map.iter().cloned();
         Ok(query.run(iter))

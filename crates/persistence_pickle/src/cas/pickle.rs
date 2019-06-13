@@ -3,6 +3,7 @@ use persistence_api::{
         content::{Address, AddressableContent, Content},
         storage::ContentAddressableStorage,
     },
+    error::PersistenceResult
 };
 use json_api::error::JsonError;
 
@@ -55,7 +56,7 @@ impl PickleStorage {
 }
 
 impl ContentAddressableStorage for PickleStorage {
-    fn add(&mut self, content: &AddressableContent) -> Result<(), JsonError> {
+    fn add(&mut self, content: &AddressableContent) -> PersistenceResult<()> {
         let mut inner = self.db.write().unwrap();
 
         inner
@@ -65,13 +66,13 @@ impl ContentAddressableStorage for PickleStorage {
         Ok(())
     }
 
-    fn contains(&self, address: &Address) -> Result<bool, JsonError> {
+    fn contains(&self, address: &Address) -> PersistenceResult<bool> {
         let inner = self.db.read().unwrap();
 
         Ok(inner.exists(&address.to_string()))
     }
 
-    fn fetch(&self, address: &Address) -> Result<Option<Content>, JsonError> {
+    fn fetch(&self, address: &Address) -> PersistenceResult<Option<Content>> {
         let inner = self.db.read().unwrap();
 
         Ok(inner.get(&address.to_string()))

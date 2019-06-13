@@ -10,6 +10,8 @@
 extern crate chrono;
 extern crate multihash;
 extern crate rust_base58;
+extern crate futures;
+
 //#[macro_use]
 extern crate serde_json;
 #[macro_use]
@@ -22,6 +24,7 @@ extern crate uuid;
 pub mod cas;
 pub mod eav;
 pub mod hash;
+pub mod error;
 
 #[macro_use]
 extern crate objekt;
