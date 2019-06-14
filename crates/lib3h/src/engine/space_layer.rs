@@ -1,21 +1,13 @@
 #![allow(non_snake_case)]
 
-//#[cfg(test)]
-use crate::transport::memory_mock::transport_memory::TransportMemory;
-use std::collections::{HashMap, VecDeque};
-
 use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::Dht,
-        rrdht::RrDht,
     },
-    engine::{self::*, real_engine::RealEngine},
+    engine::{p2p_protocol::P2pProtocol, real_engine::RealEngine, ChainId, RealEngineConfig},
     gateway::p2p_gateway::P2pGateway,
-    p2p_protocol::P2pProtocol,
     transport::{protocol::*, transport_trait::Transport},
-    transport_space::TransportSpace,
-    transport_wss::TransportWss,
 };
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
@@ -24,7 +16,7 @@ use lib3h_protocol::{
 use rmp_serde::{Deserializer, Serializer};
 
 /// Private
-impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
+impl<'t, T: Transport, D: Dht> RealEngine<'t, T, D> {
     /// Process all space gateways
     pub(crate) fn process_space_gateways(&mut self) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // Process all gateways' DHT
@@ -33,8 +25,8 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
             let (did_work, mut event_list) = Dht::process(space_gateway)?;
             if did_work {
                 for evt in event_list {
-                    let output = self.handle_spaceDhtEvent(chain_id, evt)?;
-                    outbox.append(&output);
+                    let mut output = self.handle_spaceDhtEvent(chain_id, evt)?;
+                    outbox.append(&mut output);
                 }
             }
         }

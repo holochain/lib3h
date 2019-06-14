@@ -1,48 +1,43 @@
 #![allow(non_snake_case)]
 
-//#[cfg(test)]
-use crate::transport::memory_mock::transport_memory::TransportMemory;
-use std::collections::{HashMap, VecDeque};
-
 use crate::{
-    dht::{
-        dht_protocol::{self, *},
-        dht_trait::Dht,
-        rrdht::RrDht,
+    dht::{dht_protocol::*, dht_trait::Dht},
+    engine::{p2p_protocol::P2pProtocol, real_engine::RealEngine, ChainId, RealEngineConfig},
+    gateway::{
+        gateway_dht::{self, *},
+        gateway_transport,
+        p2p_gateway::P2pGateway,
     },
-    engine::{self::*, p2p_protocol::P2pProtocol, real_engine::RealEngine},
-    gateway::p2p_gateway::P2pGateway,
     transport::{protocol::*, transport_trait::Transport},
-    transport_space::TransportSpace,
-    transport_wss::TransportWss,
 };
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
 };
 use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// Private
-impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
+impl<'t, T: Transport, D: Dht> RealEngine<'t, T, D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network's transport
-        let (tranport_did_work, event_list) = Transport::process(&self.network_gateway)?;
+        let (tranport_did_work, event_list) = Transport::process(&mut self.network_gateway)?;
         if tranport_did_work {
             for evt in event_list {
                 let mut output = self.handle_netTransportEvent(&evt)?;
-                outbox.append(&output);
+                outbox.append(&mut output);
             }
         }
         // Process the network's DHT
-        let (dht_did_work, mut event_list) = Dht::process(&self.network_gateway)?;
+        let (dht_did_work, mut event_list) = Dht::process(&mut self.network_gateway)?;
         if dht_did_work {
             for evt in event_list {
-                let output = self.handle_netDhtEvent(evt)?;
-                outbox.append(&output);
+                let mut output = self.handle_netDhtEvent(evt)?;
+                outbox.append(&mut output);
             }
         }
         Ok((tranport_did_work || dht_did_work, outbox))
@@ -106,7 +101,7 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
                 }
                 let p2p_msg = maybe_msg.unwrap();
                 let mut output = self.serve_P2pProtocol(&p2p_msg)?;
-                outbox.append(&output);
+                outbox.append(&mut output);
             }
         };
         Ok(outbox)
@@ -122,15 +117,19 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
         let mut outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
-                let space_gateway = self
+                let mut space_gateway = self
                     .space_gateway_map
-                    .get(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))?;
+                    .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
+                    .ok_or(format_err!("space_gateway not found"))?;
                 // Post it as a remoteGossipTo
+                let from_peer_address =
+                    std::string::String::from_utf8_lossy(&msg.from_peer_address).into_owned();
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
-                    from_peer_address: msg.from_peer_address.to_string(),
+                    from_peer_address,
                     bundle: msg.bundle.clone(),
                 });
-                Dht::post(&space_gateway, cmd);
+                space_gateway.post_dht(cmd)?;
+                // Dht::post(&mut space_gateway, cmd);
             }
             P2pProtocol::DirectMessage(data) => {
                 // FIXME: check with space gateway first?

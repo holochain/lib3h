@@ -1,22 +1,21 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
+    dht::dht_trait::Dht,
+    engine::p2p_protocol::P2pProtocol,
     gateway::p2p_gateway::P2pGateway,
-    p2p_protocol::P2pProtocol,
     transport::{
-        error::TransportResult,
+        error::{TransportError, TransportResult},
         memory_mock::transport_memory::TransportMemory,
         protocol::{TransportCommand, TransportEvent},
         transport_trait::Transport,
         TransportId, TransportIdRef,
     },
-    transport_wss::TransportWss,
 };
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
 /// Compose Transport
-impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
+impl<'t, T: Transport, D: Dht> Transport for P2pGateway<'t, T, D> {
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         self.inner_transport.connect(&uri)
     }
@@ -30,11 +29,16 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
         // get peer transport from dht first
-        let mut transport_list = Vec::with_capacity(id_list.len);
+        let mut transport_list = Vec::with_capacity(id_list.len());
         for transportId in id_list {
             let maybe_peer = self.inner_dht.get_peer(transportId);
             match maybe_peer {
-                None => return Err(format_err!("Unknown transportId: {}", transportId)),
+                None => {
+                    return Err(TransportError::new(format!(
+                        "Unknown transportId: {}",
+                        transportId
+                    )));
+                }
                 Some(peer) => transport_list.push(peer.transport.as_str()),
             }
         }
@@ -76,11 +80,10 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 }
 
 /// Private internals
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
+impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
     /// Process a transportEvent received from our internal connection.
-    fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> Lib3hResult<Vec<transportEvent>> {
+    pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
         println!("(log.d) >>> '(TransportGateway)' recv: {:?}", evt);
-        let mut outbox: Vec<P2pProtocol> = Vec::new();
         // Note: use same order as the enum
         match evt {
             TransportEvent::TransportError(id, e) => {
@@ -102,17 +105,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportEvent::Received(id, msg) => {
                 println!("(log.d) Received message from: {}", id);
-                // FIXME: Make sense of msg?
-                //                let p2p_msg = match P2pProtocol::deserialize(msg) {
-                //                    Err(e) => {
-                //                        println!("(log.e) Payload failed to deserialize: {:?}", msg);
-                //                        return Err(e);
-                //                    }
-                //                    Ok(obj) => obj,
-                //                };
-                //                outbox = self.serve_P2pProtocol(&p2p_msg)?;
             }
         };
-        Ok(outbox)
+        Ok(())
     }
 }

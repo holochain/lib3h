@@ -2,9 +2,10 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
-    p2p_protocol::P2pProtocol,
+    engine::p2p_protocol::P2pProtocol,
+    gateway::{gateway_dht, gateway_transport},
     transport::{
-        error::TransportResult,
+        error::{TransportError, TransportResult},
         memory_mock::transport_memory::TransportMemory,
         protocol::{TransportCommand, TransportEvent},
         transport_trait::Transport,
@@ -26,10 +27,10 @@ pub struct P2pGateway<'t, T: Transport, D: Dht> {
     pub(crate) maybe_advertise: Option<String>,
 }
 
-impl<'t, T: Transport, RrDht> P2pGateway<'t, T, RrDht> {
+impl<'t, T: Transport> P2pGateway<'t, T, RrDht> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
-    pub fn new(inner_transport: &T) -> Self {
+    pub fn new(inner_transport: &'t T) -> Self {
         P2pGateway {
             inner_transport,
             inner_dht: RrDht::new(),
@@ -38,12 +39,12 @@ impl<'t, T: Transport, RrDht> P2pGateway<'t, T, RrDht> {
     }
 }
 
-impl P2pGateway<TransportMemory, RrDht> {
+impl<'t> P2pGateway<'t, TransportMemory, RrDht> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new_with_memory(name: &str) -> Self {
         let mut gateway = P2pGateway {
-            inner_transport: TransportMemory::new(),
+            inner_transport: &TransportMemory::new(),
             inner_dht: RrDht::new(),
             maybe_advertise: None,
         };
@@ -55,30 +56,34 @@ impl P2pGateway<TransportMemory, RrDht> {
     }
 }
 
-impl P2pGateway<TransportWss<std::net::TcpStream>, RrDht> {
+impl<'t> P2pGateway<'t, TransportWss<std::net::TcpStream>, RrDht> {
     /// Constructor
     pub fn new_with_wss() -> Self {
         P2pGateway {
-            inner_transport: TransportWss::with_std_tcp_stream(),
+            inner_transport: &TransportWss::with_std_tcp_stream(),
             inner_dht: RrDht::new(),
             maybe_advertise: None,
         }
     }
 }
 
-impl<T: Transport, D: DHT> P2pGateway<P2pGateway<T, D>, RrDht> {
+impl<'t, T: Transport, D: Dht> P2pGateway<'t, P2pGateway<'t, T, D>, RrDht> {
     /// Constructors
-    pub fn new_with_space(network_gateway: &P2pGateway<T, D>, space_address: &AddressRef) -> Self {
+    pub fn new_with_space(
+        network_gateway: &'t P2pGateway<'t, T, D>,
+        space_address: &AddressRef,
+    ) -> Self {
+        let advertise = std::string::String::from_utf8_lossy(space_address).to_string();
         P2pGateway {
             inner_transport: network_gateway,
             inner_dht: RrDht::new(),
-            maybe_advertise: Some(space_address.to_string()),
+            maybe_advertise: Some(advertise),
         }
     }
 }
 
 /// Public interface
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
+impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
     // -- Getters -- //
     /// This nodes identifier on the network
     pub fn id(&self) -> String {
@@ -91,55 +96,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn advertise(&self) -> Option<String> {
         self.maybe_advertise.clone()
     }
+
+    /// Hack dumb rust compiler
+    pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        self.inner_dht.post(cmd)
+    }
 }
-
-///// Public - specific
-//impl<T: Transport, D: Dht> P2pGateway<T, D> {
-//    pub fn do_process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {
-//        let mut outbox = Vec::new();
-////        // Process the transport connection
-////        let (did_work, event_list) = self.inner_transport.process()?;
-////        if did_work {
-////            for evt in event_list {
-////                let mut p2p_output = self.handle_TransportEvent(&evt)?;
-////                // Add p2p events to outbox
-////                outbox.append(&mut p2p_output);
-////            }
-////        }
-//        // Process the dht
-//        let (did_work, dht_event_list) = self.inner_dht.process()?;
-//        if did_work {
-//            for evt in dht_event_list {
-//                self.handle_DhtEvent(evt)?;
-//            }
-//        }
-//        // Done
-//        Ok((did_work, outbox))
-//    }
-//}
-
-///// Private internals
-//impl<T: Transport, D: Dht> P2pGateway<T, D> {
-//    /// Serve a P2pProtocol sent to us.
-//    /// Handle it or pass it along.
-//    /// Return a list of P2pProtocol messages for others to process.
-//    // FIXME
-//    fn serve_P2pProtocol(&mut self, p2p_msg: &P2pProtocol) -> Lib3hResult<Vec<P2pProtocol>> {
-//        let outbox = Vec::new();
-//        match p2p_msg {
-//            P2pProtocol::Gossip(_) => {
-//                // FIXME
-//            }
-//            P2pProtocol::DirectMessage(_) => {
-//                // FIXME
-//            }
-//            P2pProtocol::FetchData => {
-//                // FIXME
-//            }
-//            P2pProtocol::FetchDataResponse => {
-//                // FIXME
-//            }
-//        };
-//        Ok(outbox)
-//    }
-//}
