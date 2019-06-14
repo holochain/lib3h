@@ -9,7 +9,7 @@ pub struct RrDht {
 }
 
 impl RrDht {
-    pub fn new() -> RrDht {
+    pub fn new() -> Self {
         RrDht {
             inbox: VecDeque::new(),
         }
