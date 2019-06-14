@@ -30,7 +30,7 @@ pub enum DhtEvent {
     /// Notify owner that we believe a peer has dropped
     PeerTimedOut(String),
     /// Notify owner that gossip is requesting we hold an entry.
-    HoldEntryRequested(EntryData),
+    HoldEntryRequested(String, EntryData),
     /// Response to a `FetchEntry` command.
     FetchEntryResponse(FetchEntryResponseData),
     /// Notify owner that we are no longer tracking this entry internally.

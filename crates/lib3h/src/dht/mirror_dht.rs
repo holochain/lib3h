@@ -167,7 +167,7 @@ impl MirrorDht {
                     MirrorGossip::Entry(entry) => {
                         let is_new = self.add_entry(&entry);
                         if is_new {
-                            return Ok(vec![DhtEvent::HoldEntryRequested(entry)]);
+                            return Ok(vec![DhtEvent::HoldEntryRequested(self.this_peer.peer_address, entry)]);
                         }
                         return Ok(vec![]);
                     }
@@ -212,8 +212,14 @@ impl MirrorDht {
                 // Done
                 Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
-            // Owner asks us to hold some entry. Store it and gossip to every known peer.
+            // Owner asks us to hold some entry. Store it.
             DhtCommand::HoldEntry(entry) => {
+                // Store it
+                let _received_new_content = self.add_entry(entry);
+                Ok(vec![])
+            }
+            // Owner asks us to hold some entry. Store it and gossip to every known peer.
+            DhtCommand::BroadcastEntry(entry) => {
                 // Local asks us to hold entry.
                 // Store it
                 let received_new_content = self.add_entry(entry);

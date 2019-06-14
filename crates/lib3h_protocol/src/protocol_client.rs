@@ -42,8 +42,8 @@ pub enum Lib3hClientProtocol {
     HandleFetchEntryResult(FetchEntryResultData),
     /// Publish data to the dht.
     PublishEntry(ProvidedEntryData),
-    ///
-    HoldAspect(EntryAspectData),
+    /// Tell network module Core is holding this entry
+    HoldEntry(ProvidedEntryData),
     /// Request some info / data from a Entry
     QueryEntry(QueryEntryData),
     /// Response to a `HandleQueryEntry` request

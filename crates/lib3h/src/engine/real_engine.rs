@@ -16,36 +16,28 @@ use crate::{
         rrdht::RrDht,
     },
     gateway::p2p_gateway::P2pGateway,
-    p2p_protocol::P2pProtocol,
-    transport::{protocol::TransportCommand, transport_trait::Transport},
+    transport::{protocol::*, transport_trait::Transport},
     transport_space::TransportSpace,
     transport_wss::TransportWss,
+    engine::{
+        self::*,
+        network_layer, space_layer,
+        p2p_protocol::P2pProtocol,
+    }
 };
-
-/// Identifier of a source chain: SpaceAddress+AgentId
-pub type ChainId = (Address, Address);
-
-/// Struct holding all config settings for the RealEngine
-#[derive(Debug, Clone, PartialEq)]
-pub struct RealEngineConfig {
-    pub socket_type: String,
-    pub bootstrap_nodes: Vec<String>,
-    pub work_dir: String,
-    pub log_level: char,
-}
 
 /// Lib3h's 'real mode' as a NetworkEngine
 pub struct RealEngine<'t, T: Transport, D: DHT> {
     /// Config settings
-    _config: RealEngineConfig,
+    pub(crate) _config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
-    inbox: VecDeque<Lib3hClientProtocol>,
+    pub(crate) inbox: VecDeque<Lib3hClientProtocol>,
     /// Identifier
-    name: String,
+    pub(crate) name: String,
     /// P2p gateway for the transport layer,
-    network_gateway: P2pGateway<'t, T, D>,
+    pub(crate) network_gateway: P2pGateway<'t, T, D>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, P2pGateway<'t, P2pGateway<'t, T, D>, D>>,
+    pub(crate) space_gateway_map: HashMap<ChainId, P2pGateway<'t, P2pGateway<'t, T, D>, D>>,
 }
 
 impl RealEngine<TransportWss<std::net::TcpStream>, RrDht> {
@@ -108,23 +100,21 @@ impl<T: Transport, D: DHT> NetworkEngine for RealEngine<T, D> {
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        // println!("[t] RealEngine.process()");
+        println!("[t] RealEngine.process()");
         // Process all received Lib3hClientProtocol messages from Core
         let (did_work, mut outbox) = self.process_inbox()?;
-        // Process the transport layer
-        let _ = self.process_network_gateway()?;
-        // Process all space dhts
+        // Process the network layer
+        let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
+        outbox.append(&mut net_outbox);
+        // Process the space layer
         let p2p_output = self.process_space_gateways()?;
-        // Process all generated P2pProtocol messages
-        let mut output = self.process_p2p(&p2p_output)?;
-        outbox.append(&mut output);
         // Done
         Ok((did_work, outbox))
     }
 }
 
 /// Private
-impl<T: Transport, D: DHT> RealEngine<T, D> {
+impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
@@ -134,7 +124,7 @@ impl<T: Transport, D: DHT> RealEngine<T, D> {
                 None => break,
                 Some(msg) => msg,
             };
-            let (success, mut output) = self.serve_Lib3hProtocol(client_msg)?;
+            let (success, mut output) = self.serve_Lib3hClientProtocol(client_msg)?;
             if success {
                 did_work = success;
             }
@@ -143,69 +133,10 @@ impl<T: Transport, D: DHT> RealEngine<T, D> {
         Ok((did_work, outbox))
     }
 
-    /// Progressively serve every P2pProtocol received in inbox
-    fn process_network_gateway(&mut self) -> Lib3hResult<DidWork> {
-        let (did_work, p2p_list) = self.network_gateway.do_process()?;
-        if !did_work {
-            return Ok(false);
-        }
-        for p2p_msg in p2p_list {
-            self.serve_P2pProtocol(&p2p_msg)?;
-        }
-        Ok(true)
-    }
-
-    /// Process all space gateways
-    fn process_space_gateways(&mut self) -> Lib3hResult<Vec<P2pProtocol>> {
-        // Process all space gateways and store 'generated' P2pProtocol messages.
-        let mut output = Vec::new();
-        for (_space_address, space_gateway) in self.space_gateway_map.iter_mut() {
-            let (did_work, mut p2p_list) = space_gateway.do_process()?;
-            if did_work {
-                output.append(&mut p2p_list);
-            }
-        }
-        Ok(output)
-    }
-    /// Process P2pProtocol
-    fn process_p2p(&mut self, input: &Vec<P2pProtocol>) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        // Serve all new P2pProtocols
-        let mut output = Vec::new();
-        for p2p_msg in input {
-            let mut evt_output = self.serve_P2pProtocol(p2p_msg)?;
-            output.append(&mut evt_output);
-        }
-        Ok(output)
-    }
-    /// Serve a transportEvent sent to us.
-    /// Return a list of TransportEvents for us to process.
-    // FIXME
-    fn serve_P2pProtocol(
-        &mut self,
-        p2p_msg: &P2pProtocol,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let outbox = Vec::new();
-        match p2p_msg {
-            P2pProtocol::Gossip => {
-                // FIXME
-            }
-            P2pProtocol::DirectMessage(_) => {
-                // FIXME
-            }
-            P2pProtocol::FetchData => {
-                // FIXME
-            }
-            P2pProtocol::FetchDataResponse => {
-                // FIXME
-            }
-        };
-        Ok(outbox)
-    }
-
     /// Process a Lib3hClientProtocol message sent to us (by Core)
     /// Side effects: Might add other messages to sub-components' inboxes.
     /// Return a list of Lib3hServerProtocol messages to send back to core or others?
-    fn serve_Lib3hProtocol(
+    fn serve_Lib3hClientProtocol(
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
@@ -264,7 +195,13 @@ impl<T: Transport, D: DHT> RealEngine<T, D> {
                     Some(space_gateway) => {
                         let transport_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        // FIXME
+                        // Change into P2pProtocol
+                        let net_msg = P2pProtocol::DirectMessageResult(msg);
+                        // Serialize
+                        let mut payload = Vec::new();
+                        net_msg.serialize(&mut Serializer::new(&mut payload)).unwrap();
+                        // Send
+                        space_gateway.send(&[transport_id], payload)?;
                     }
                 }
             }
@@ -277,37 +214,52 @@ impl<T: Transport, D: DHT> RealEngine<T, D> {
             Lib3hClientProtocol::PublishEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
-                    &msg.from_agent_id,
+                    &msg.provider_agent_id,
                     &format!("PublishEntry_{}", msg.entry.entry_address),
                     None,
                 );
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Some(space_gateway) => {
-                                               // FIXME
-                        // HoldEntry command
+                    Some(mut space_gateway) => {
+                        // Post BroadcastEntry command
+                        let cmd = DhtCommand::BroadcastEntry(msg.entry);
+                        Dht::post(&space_gateway, cmd)?;
+                    }
+                }
+            }
+            Lib3hClientProtocol::HoldEntry(aspect) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.provider_agent_id,
+                    &format!("HoldEntry_{}", msg.entry.entry_address),
+                    None,
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Some(mut space_gateway) => {
+                        // Post BroadcastEntry command
+                        let cmd = DhtCommand::HoldEntry(msg.entry);
+                        Dht::post(&space_gateway, cmd)?;
                     }
                 }
             }
             Lib3hClientProtocol::QueryEntry(msg) => {
-                if let Err(res) = self.get_space_or_fail(
+                let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.requester_agent_id,
                     &msg.request_id,
                     None,
-                ) {
-                    outbox.push(res);
-                } else {
-                    // Post a DhtCommand::FetchEntry request to the space gateway
-                    let space_gateway = self
-                        .space_gateway_map
-                        .get_mut(&(msg.space_address, msg.requester_agent_id))
-                        .unwrap();
-                    let msg = dht_protocol::FetchEntryData {
-                        msg_id: msg.request_id,
-                        entry_address: msg.entry_address,
-                    };
-                    Dht::post(space_gateway, DhtCommand::FetchEntry(msg))?;
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Some(mut space_gateway) => {
+                        // Post BroadcastEntry command
+                        let msg = dht_protocol::FetchEntryData {
+                            msg_id: msg.request_id,
+                            entry_address: msg.entry_address,
+                        };
+                        Dht::post(space_gateway, DhtCommand::FetchEntry(msg))?;
+                    }
                 }
             }
             Lib3hClientProtocol::HandleQueryEntryResult(_msg) => {
@@ -339,7 +291,7 @@ impl<T: Transport, D: DHT> RealEngine<T, D> {
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
         self.space_gateway_map
-            .insert(player_id.clone(), P2pGateway::new_with_space(&self.network_gateway));
+            .insert(player_id.clone(), P2pGateway::new_with_space(&self.network_gateway, &join_msg.space_address));
         let space_gateway = self.space_gateway_map.get_mut(&player_id).unwrap();
         Dht::post(
             space_gateway,
@@ -358,7 +310,7 @@ impl<T: Transport, D: DHT> RealEngine<T, D> {
         agent_id: &AddressRef,
         request_id: &str,
         maybe_sender_agent_id: Option<&AddressRef>,
-    ) -> Result<&P2pGateway<TransportSpace, D>, Lib3hServerProtocol> {
+    ) -> Result<&P2pGateway<'t, P2pGateway<'t, T, D>, D>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get(&(space_address.to_owned(), agent_id.to_owned()));
