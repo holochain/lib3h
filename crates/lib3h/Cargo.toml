@@ -18,6 +18,9 @@ lib3h_sodium = { path = "../sodium", version = "=0.0.1-alpha1" }
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 native-tls = "=0.2.2"
+rmp-serde = "=0.13.7"
+serde = "=1.0.89"
+serde_derive = "=1.0.89"
 failure = "=0.1.5"
 # Should be dev only
 lazy_static = "=1.2.0"

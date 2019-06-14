@@ -12,10 +12,10 @@ use crate::data_types::*;
 pub enum Lib3hClientProtocol {
     // -- Generic responses -- //
     /// Success response to a request (any Command with an `request_id` field.)
-    SuccessResult(ResultData),
+    SuccessResult(GenericResultData),
     /// Failure response to a request (any Command with an `request_id` field.)
     /// Can also be a response to a mal-formed request.
-    FailureResult(ResultData),
+    FailureResult(GenericResultData),
 
     // -- Connection -- //
     /// Connect to the specified multiaddr
@@ -36,13 +36,16 @@ pub enum Lib3hClientProtocol {
     // -- Entry -- //
     /// Request an Entry (and its meta?) from the dht network
     FetchEntry(FetchEntryData),
-    /// Successful data response for a `HandleFetchDhtData` request
+    /// Successful data response for a `HandleFetchEntryData` request
     HandleFetchEntryResult(FetchEntryResultData),
-
     /// Publish data to the dht.
-    PublishEntry(ClaimedEntryData),
+    PublishEntry(ProvidedEntryData),
+    /// Request some info / data from a Entry
+    QueryEntry(QueryEntryData),
+    /// Response to a `HandleQueryEntry` request
+    HandleQueryEntryResult(QueryEntryResultData),
 
     // -- Entry lists -- //
-    HandleGetPublishingEntryListResult(EntryListData),
-    HandleGetHoldingEntryListResult(EntryListData),
+    HandleGetAuthoringEntryListResult(EntryListData),
+    HandleGetGossipingEntryListResult(EntryListData),
 }

@@ -14,3 +14,6 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 failure = "=0.1.5"
+rmp-serde = "=0.13.7"
+serde = "=1.0.89"
+serde_derive = "=1.0.89"

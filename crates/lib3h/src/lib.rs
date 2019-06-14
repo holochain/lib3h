@@ -6,6 +6,15 @@ extern crate url;
 extern crate failure;
 #[macro_use]
 extern crate lazy_static;
+#[cfg(test)]
+#[macro_use]
+extern crate unwrap_to;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate rmp_serde;
+
+// -- mod -- //
 
 pub mod dht;
 pub mod p2p;
