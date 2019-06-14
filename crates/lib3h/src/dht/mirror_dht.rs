@@ -167,7 +167,10 @@ impl MirrorDht {
                     MirrorGossip::Entry(entry) => {
                         let is_new = self.add_entry(&entry);
                         if is_new {
-                            return Ok(vec![DhtEvent::HoldEntryRequested(self.this_peer.peer_address, entry)]);
+                            return Ok(vec![DhtEvent::HoldEntryRequested(
+                                self.this_peer.peer_address,
+                                entry,
+                            )]);
                         }
                         return Ok(vec![]);
                     }

@@ -2,6 +2,7 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
+    gateway::p2p_gateway::P2pGateway,
     p2p_protocol::P2pProtocol,
     transport::{
         error::TransportResult,
@@ -11,7 +12,6 @@ use crate::{
         TransportId, TransportIdRef,
     },
     transport_wss::TransportWss,
-    gateway::p2p_gateway::P2pGateway,
 };
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
@@ -103,14 +103,14 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportEvent::Received(id, msg) => {
                 println!("(log.d) Received message from: {}", id);
                 // FIXME: Make sense of msg?
-//                let p2p_msg = match P2pProtocol::deserialize(msg) {
-//                    Err(e) => {
-//                        println!("(log.e) Payload failed to deserialize: {:?}", msg);
-//                        return Err(e);
-//                    }
-//                    Ok(obj) => obj,
-//                };
-//                outbox = self.serve_P2pProtocol(&p2p_msg)?;
+                //                let p2p_msg = match P2pProtocol::deserialize(msg) {
+                //                    Err(e) => {
+                //                        println!("(log.e) Payload failed to deserialize: {:?}", msg);
+                //                        return Err(e);
+                //                    }
+                //                    Ok(obj) => obj,
+                //                };
+                //                outbox = self.serve_P2pProtocol(&p2p_msg)?;
             }
         };
         Ok(outbox)

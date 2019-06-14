@@ -17,7 +17,7 @@ extern crate rmp_serde;
 // -- mod -- //
 
 pub mod dht;
-pub mod gateway;
 pub mod engine;
+pub mod gateway;
 pub mod transport;
 pub mod transport_wss;

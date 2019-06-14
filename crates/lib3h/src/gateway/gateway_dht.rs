@@ -2,6 +2,7 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
+    gateway::p2p_gateway::P2pGateway,
     p2p_protocol::*,
     transport::{
         error::TransportResult,
@@ -11,7 +12,6 @@ use crate::{
         TransportId, TransportIdRef,
     },
     transport_wss::TransportWss,
-    gateway::p2p_gateway::P2pGateway,
 };
 use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
 use rmp_serde::{Deserializer, Serializer};
@@ -59,11 +59,12 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
-
     /// For space gateway, space_address is stored in the advertise field.
     /// This function does this conversion.
     fn space_address(&self) -> Address {
-        let advertise = self.maybe_advertise.expect("Advertise for space gateway should be set at construction");
+        let advertise = self
+            .maybe_advertise
+            .expect("Advertise for space gateway should be set at construction");
         return advertise.as_bytes().to_vec();
     }
 
@@ -74,7 +75,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 // DHT should give us the peer_transport
                 for to_peer_address in data.peer_address_list {
                     // get peer address
-                    let peer_transport = self.inner_dht
+                    let peer_transport = self
+                        .inner_dht
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
                         .transport;

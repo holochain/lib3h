@@ -4,27 +4,23 @@
 use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, VecDeque};
 
-use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
-};
-use rmp_serde::{Deserializer, Serializer};
 use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::Dht,
         rrdht::RrDht,
     },
+    engine::{self::*, network_layer, p2p_protocol::P2pProtocol, space_layer},
     gateway::p2p_gateway::P2pGateway,
     transport::{protocol::*, transport_trait::Transport},
     transport_space::TransportSpace,
     transport_wss::TransportWss,
-    engine::{
-        self::*,
-        network_layer, space_layer,
-        p2p_protocol::P2pProtocol,
-    }
 };
+use lib3h_protocol::{
+    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
+};
+use rmp_serde::{Deserializer, Serializer};
 
 /// Lib3h's 'real mode' as a NetworkEngine
 pub struct RealEngine<'t, T: Transport, D: DHT> {
@@ -177,10 +173,12 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
                         let net_msg = P2pProtocol::DirectMessage(msg);
                         // Serialize
                         let mut payload = Vec::new();
-                        net_msg.serialize(&mut Serializer::new(&mut payload)).unwrap();
+                        net_msg
+                            .serialize(&mut Serializer::new(&mut payload))
+                            .unwrap();
                         // Send
                         space_gateway.send(&[transport_id], payload)?;
-                    },
+                    }
                 }
             }
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
@@ -199,7 +197,9 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
                         let net_msg = P2pProtocol::DirectMessageResult(msg);
                         // Serialize
                         let mut payload = Vec::new();
-                        net_msg.serialize(&mut Serializer::new(&mut payload)).unwrap();
+                        net_msg
+                            .serialize(&mut Serializer::new(&mut payload))
+                            .unwrap();
                         // Send
                         space_gateway.send(&[transport_id], payload)?;
                     }
@@ -290,8 +290,10 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
             res.result_info = "Already tracked".to_string().into_bytes();
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
-        self.space_gateway_map
-            .insert(player_id.clone(), P2pGateway::new_with_space(&self.network_gateway, &join_msg.space_address));
+        self.space_gateway_map.insert(
+            player_id.clone(),
+            P2pGateway::new_with_space(&self.network_gateway, &join_msg.space_address),
+        );
         let space_gateway = self.space_gateway_map.get_mut(&player_id).unwrap();
         Dht::post(
             space_gateway,

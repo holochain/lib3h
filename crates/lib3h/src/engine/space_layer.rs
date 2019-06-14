@@ -4,24 +4,24 @@
 use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, VecDeque};
 
-use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
-};
-use rmp_serde::{Deserializer, Serializer};
 use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::Dht,
         rrdht::RrDht,
     },
+    engine::{self::*, real_engine::RealEngine},
     gateway::p2p_gateway::P2pGateway,
     p2p_protocol::P2pProtocol,
     transport::{protocol::*, transport_trait::Transport},
     transport_space::TransportSpace,
     transport_wss::TransportWss,
-    engine::{self::*, real_engine::RealEngine},
 };
+use lib3h_protocol::{
+    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
+};
+use rmp_serde::{Deserializer, Serializer};
 
 /// Private
 impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
@@ -42,7 +42,11 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
     }
 
     /// Handle a DhtEvent sent to us by our internal DHT.
-    fn handle_spaceDhtEvent(&mut self, chain_id: &ChainId, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_spaceDhtEvent(
+        &mut self,
+        chain_id: &ChainId,
+        cmd: DhtEvent,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(data) => {
@@ -60,13 +64,14 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
             DhtEvent::HoldEntryRequested(from, entry) => {
                 // Send each aspect to Core for validation
                 for aspect in entry.aspect_list {
-                    let lib3h_msg = Lib3hServerProtocol::HandleStoreEntryAspect( StoreEntryAspectData {
-                        request_id: "FIXME".to_string(),
-                        space_address: chain_id.0,
-                        provider_agent_id: from.as_bytes().to_vec(),
-                        entry_address: entry.entry_address,
-                        entry_aspect: aspect,
-                    });
+                    let lib3h_msg =
+                        Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData {
+                            request_id: "FIXME".to_string(),
+                            space_address: chain_id.0,
+                            provider_agent_id: from.as_bytes().to_vec(),
+                            entry_address: entry.entry_address,
+                            entry_aspect: aspect,
+                        });
                     outbox.push(lib3h_msg)
                 }
             }

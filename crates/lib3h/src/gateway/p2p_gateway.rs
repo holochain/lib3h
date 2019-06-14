@@ -93,8 +93,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     }
 }
 
-
-
 ///// Public - specific
 //impl<T: Transport, D: Dht> P2pGateway<T, D> {
 //    pub fn do_process(&mut self) -> Lib3hResult<(DidWork, Vec<P2pProtocol>)> {

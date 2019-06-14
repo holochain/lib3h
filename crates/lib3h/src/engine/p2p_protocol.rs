@@ -1,4 +1,4 @@
-use lib3h_protocol::{data_types::DirectMessageData, Lib3hResult, Address};
+use lib3h_protocol::{data_types::DirectMessageData, Address, Lib3hResult};
 
 /// Enum holding all message types in the 'network module <-> network module' protocol.
 /// TODO

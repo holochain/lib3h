@@ -4,28 +4,30 @@
 use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, VecDeque};
 
-use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
-};
-use rmp_serde::{Deserializer, Serializer};
 use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::Dht,
         rrdht::RrDht,
     },
+    engine::{self::*, p2p_protocol::P2pProtocol, real_engine::RealEngine},
     gateway::p2p_gateway::P2pGateway,
     transport::{protocol::*, transport_trait::Transport},
     transport_space::TransportSpace,
     transport_wss::TransportWss,
-    engine::{self::*, real_engine::RealEngine, p2p_protocol::P2pProtocol},
 };
+use lib3h_protocol::{
+    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
+};
+use rmp_serde::{Deserializer, Serializer};
 
 /// Private
 impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
     /// Process whatever the network has in for us.
-    pub(crate) fn process_network_gateway(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    pub(crate) fn process_network_gateway(
+        &mut self,
+    ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network's transport
         let (tranport_did_work, event_list) = Transport::process(&self.network_gateway)?;
@@ -76,7 +78,10 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
     }
 
     ///
-    fn handle_netTransportEvent(&mut self, evt: &TransportEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_netTransportEvent(
+        &mut self,
+        evt: &TransportEvent,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
@@ -107,7 +112,6 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
         Ok(outbox)
     }
 
-
     /// Serve a P2pProtocol sent to us by the network.
     /// Return a list of Lib3hServerProtocol to send to Core.
     // FIXME
@@ -118,8 +122,9 @@ impl<'t, T: Transport, D: DHT> RealEngine<'t, T, D> {
         let mut outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
-                let space_gateway = self.space_gateway_map
-                                        .get(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))?;
+                let space_gateway = self
+                    .space_gateway_map
+                    .get(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))?;
                 // Post it as a remoteGossipTo
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
                     from_peer_address: msg.from_peer_address.to_string(),

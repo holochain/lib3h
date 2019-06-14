@@ -1,7 +1,7 @@
+mod network_layer;
 pub mod p2p_protocol;
 pub mod real_engine;
 mod space_layer;
-mod network_layer;
 
 use lib3h_protocol::Address;
 
