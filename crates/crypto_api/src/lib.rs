@@ -5,5 +5,7 @@ extern crate serde;
 extern crate serde_derive;
 
 pub mod error;
+pub use error::*;
 
-pub use error::CryptoError;
+pub mod sign;
+pub use sign::*;
