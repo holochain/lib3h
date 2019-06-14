@@ -3,7 +3,11 @@
 //! being used to define relationships between AddressableContent values.
 //! See [wikipedia](https://en.wikipedia.org/wiki/Entity%E2%80%93attribute%E2%80%93value_model) to learn more about this pattern.
 
-use crate::cas::content::{Address, AddressableContent, Content};
+use crate::{
+    error::PersistenceResult,
+    cas::content::{Address, AddressableContent, Content}
+};
+
 use chrono::offset::Utc;
 use eav::{
     query::{EaviQuery, IndexFilter},
@@ -194,7 +198,7 @@ impl<A: Attribute> EntityAttributeValueIndex<A> {
         entity: &Entity,
         attribute: &A,
         value: &Value,
-    ) -> JsonResult<EntityAttributeValueIndex<A>> {
+    ) -> PersistenceResult<EntityAttributeValueIndex<A>> {
         validate_attribute(attribute)?;
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
@@ -209,7 +213,7 @@ impl<A: Attribute> EntityAttributeValueIndex<A> {
         attribute: &A,
         value: &Value,
         timestamp: i64,
-    ) -> JsonResult<EntityAttributeValueIndex<A>> {
+    ) -> PersistenceResult<EntityAttributeValueIndex<A>> {
         validate_attribute(attribute)?;
         Ok(EntityAttributeValueIndex {
             entity: entity.clone(),
