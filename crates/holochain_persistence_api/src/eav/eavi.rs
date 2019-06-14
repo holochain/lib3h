@@ -4,8 +4,8 @@
 //! See [wikipedia](https://en.wikipedia.org/wiki/Entity%E2%80%93attribute%E2%80%93value_model) to learn more about this pattern.
 
 use crate::{
+    cas::content::{Address, AddressableContent, Content},
     error::PersistenceResult,
-    cas::content::{Address, AddressableContent, Content}
 };
 
 use chrono::offset::Utc;
