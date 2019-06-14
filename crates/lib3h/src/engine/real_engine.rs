@@ -33,7 +33,7 @@ pub struct RealEngine<'t, T: Transport, D: Dht> {
     /// P2p gateway for the transport layer,
     pub(crate) network_gateway: P2pGateway<'t, T, D>,
     /// Map of P2p gateway per Space+Agent
-    pub(crate) space_gateway_map: HashMap<ChainId, P2pGateway<'t, P2pGateway<'t, T, D>, RrDht>>,
+    pub(crate) space_gateway_map: HashMap<ChainId, P2pGateway<'t, P2pGateway<'t, T, D>, D>>,
 }
 
 impl<'t> RealEngine<'t, TransportWss<std::net::TcpStream>, RrDht> {
@@ -318,7 +318,7 @@ impl<'t, T: Transport, D: Dht> RealEngine<'t, T, D> {
         agent_id: &AddressRef,
         request_id: &str,
         maybe_sender_agent_id: Option<&AddressRef>,
-    ) -> Result<&P2pGateway<'t, P2pGateway<'t, T, D>, RrDht>, Lib3hServerProtocol> {
+    ) -> Result<&P2pGateway<'t, P2pGateway<'t, T, D>, D>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get(&(space_address.to_owned(), agent_id.to_owned()));
