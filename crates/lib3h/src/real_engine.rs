@@ -10,11 +10,7 @@ use lib3h_protocol::{
 };
 
 use crate::{
-    dht::{
-        dht_event::{DhtEvent, PeerHoldRequestData},
-        dht_trait::Dht,
-        rrdht::RrDht,
-    },
+    dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
     p2p::{p2p_gateway::P2pGateway, p2p_protocol::P2pProtocol},
     transport::transport_trait::Transport,
     transport_space::TransportSpace,
@@ -50,11 +46,13 @@ pub struct RealEngine<T: Transport> {
 impl RealEngine<TransportWss<std::net::TcpStream>> {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        let mut transport_gateway = P2pGateway::new_with_wss();
+        transport_gateway.bind(name)?; // FIXME: Should be an URI in config
         Ok(RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
-            transport_gateway: P2pGateway::new_with_wss(),
+            transport_gateway,
             space_gateway_map: HashMap::new(),
         })
     }
@@ -88,7 +86,9 @@ impl<T: Transport> NetworkEngine for RealEngine<T> {
         Ok(())
     }
     fn advertise(&self) -> String {
-        self.transport_gateway.advertise()
+        self.transport_gateway
+            .advertise()
+            .expect("Should always have an advertise")
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -196,6 +196,7 @@ impl<T: Transport> RealEngine<T> {
     }
 
     /// Process a Lib3hClientProtocol message sent to us (by Core)
+    /// Side effects: Might add other messages to sub-components' inboxes.
     /// Return a list of Lib3hServerProtocol messages to send back to core or others?
     fn serve_Lib3hProtocol(
         &mut self,
@@ -237,12 +238,18 @@ impl<T: Transport> RealEngine<T> {
             Lib3hClientProtocol::PublishEntry(_msg) => {
                 // FIXME
             }
+            Lib3hClientProtocol::QueryEntry(_msg) => {
+                // FIXME
+            }
+            Lib3hClientProtocol::HandleQueryEntryResult(_msg) => {
+                // FIXME
+            }
             // Our request for the publish_list has returned
-            Lib3hClientProtocol::HandleGetPublishingEntryListResult(_msg) => {
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(_msg) => {
                 // FIXME
             }
             // Our request for the hold_list has returned
-            Lib3hClientProtocol::HandleGetHoldingEntryListResult(_msg) => {
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(_msg) => {
                 // FIXME
             }
         }
@@ -252,7 +259,7 @@ impl<T: Transport> RealEngine<T> {
     /// Create a gateway for this agent in this space, if not already part of it.
     fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Lib3hServerProtocol> {
         let player_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
-        let mut res = ResultData {
+        let mut res = GenericResultData {
             request_id: join_msg.request_id.clone(),
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
@@ -267,7 +274,7 @@ impl<T: Transport> RealEngine<T> {
         let space_gateway = self.space_gateway_map.get_mut(&player_id).unwrap();
         Dht::post(
             space_gateway,
-            DhtEvent::PeerHoldRequest(PeerHoldRequestData {
+            DhtCommand::HoldPeer(PeerData {
                 peer_address: "FIXME".to_string(), // msg.agent_id,
                 transport: self.transport_gateway.id(),
                 timestamp: 42,
