@@ -18,6 +18,8 @@ use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 /// Gateway to a P2P network.
 /// Enables Connections to many other nodes.
 /// Tracks distributed data for that P2P network.
+/// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
+/// Composite pattern for Transport and Dht
 pub struct P2pGateway<'t, T: Transport, D: Dht> {
     inner_transport: &'t T,
     inner_dht: D,
@@ -111,6 +113,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inner_dht.post(cmd)
     }
+    /// FIXME: should P2pGateway `post() & process()` its inner dht?
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // Process the dht
         let (did_work, dht_event_list) = self.inner_dht.process()?;
@@ -140,7 +143,15 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
         // FIXME: query peer in dht first
-        self.inner_transport.send(id_list, payload)
+        let mut transport_list = Vec::with_capacity(id_list.len);
+        for transportId in id_list {
+            let maybe_peer = self.inner_dht.get_peer(transportId);
+            match maybe_peer {
+                None => return Err(format_err!("Unknown transportId: {}", transportId)),
+                Some(peer) => transport_list.push(peer.transport.as_str()),
+            }
+        }
+        self.inner_transport.send(&transport_list, payload)
     }
 
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
@@ -159,8 +170,10 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         self.inner_transport.post(command)
     }
 
+    /// FIXME: should P2pGateway `post() & process()` its inner transport?
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        self.inner_transport.process()
+        // self.inner_transport.process()
+        Ok((false, vec![]))
     }
 
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
@@ -270,9 +283,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         let did_work = false;
         match cmd {
             DhtEvent::GossipTo(_data) => {
-                // FIXME: DHT should give use the peer_transport
-                // Forward gossip to the connection
-                // If no connection to that peer_transport is open, open one first.
+                // FIXME: DHT should give us the peer_transport
+                // Forward gossip to the inner_transport
+                // If no connection to that transportId is open, open one first.
                 self.inner_transport.send();
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
