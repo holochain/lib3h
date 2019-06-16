@@ -29,7 +29,7 @@ impl<'a, A: Attribute> Default for EaviQuery<'a, A> {
             Default::default(),
             Default::default(),
             IndexFilter::LatestByAttribute,
-            None
+            None,
         )
     }
 }
@@ -41,7 +41,7 @@ impl<'a, A: Attribute> EaviQuery<'a, A> {
         attribute: AttributeFilter<'a, A>,
         value: ValueFilter<'a>,
         index: IndexFilter,
-        tombstone : Option<AttributeFilter<'a, A>>,
+        tombstone: Option<AttributeFilter<'a, A>>,
     ) -> Self {
         Self {
             entity,
@@ -52,8 +52,8 @@ impl<'a, A: Attribute> EaviQuery<'a, A> {
         }
     }
 
-  /// This runs the query based the query configuration we have given.
-  pub fn run<I>(&self, iter: I) -> BTreeSet<EntityAttributeValueIndex<A>>
+    /// This runs the query based the query configuration we have given.
+    pub fn run<I>(&self, iter: I) -> BTreeSet<EntityAttributeValueIndex<A>>
     where
         I: Clone + Iterator<Item = EntityAttributeValueIndex<A>> + 'a,
     {
