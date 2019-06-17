@@ -2,21 +2,14 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
-    engine::p2p_protocol::P2pProtocol,
-    gateway::{gateway_dht, gateway_transport, P2pGateway},
-    transport::{
-        error::{TransportError, TransportResult},
-        memory_mock::transport_memory::TransportMemory,
-        protocol::{TransportCommand, TransportEvent},
-        transport_trait::Transport,
-        TransportId, TransportIdRef,
-    },
-    transport_wss::TransportWss,
+    gateway::P2pGateway,
+    transport::transport_trait::Transport,
 };
-use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, Lib3hResult};
+use std::{cell::RefCell, rc::Rc};
 
 /// Public interface
-impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
     // -- Getters -- //
     /// This nodes identifier on the network
     pub fn id(&self) -> String {
@@ -45,10 +38,11 @@ impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
 //--------------------------------------------------------------------------------------------------
 
 /// any Transport
-impl<'t, T: Transport> P2pGateway<'t, T, RrDht> {
+impl<T: Transport> P2pGateway<T, RrDht> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
-    pub fn new(inner_transport: &'t T) -> Self {
+    // pub fn new(inner_transport: &'t mut T) -> Self {
+    pub fn new(inner_transport: Rc<RefCell<T>>) -> Self {
         P2pGateway {
             inner_transport,
             inner_dht: RrDht::new(),
@@ -57,41 +51,12 @@ impl<'t, T: Transport> P2pGateway<'t, T, RrDht> {
     }
 }
 
-///// TransportMemory
-//impl<'t> P2pGateway<'t, TransportMemory, RrDht> {
-//    /// Constructor
-//    /// Bind and set advertise on construction by using the name as URL.
-//    pub fn new_with_memory(name: &str) -> Self {
-//        let mut gateway = P2pGateway {
-//            inner_transport: &TransportMemory::new(),
-//            inner_dht: RrDht::new(),
-//            maybe_advertise: None,
-//        };
-//        let binding = gateway
-//            .bind(name)
-//            .expect("TransportMemory.bind() failed. url/name might not be unique?");
-//        gateway.maybe_advertise = Some(binding);
-//        gateway
-//    }
-//}
-
-///// TransportWss
-//impl<'t> P2pGateway<'t, TransportWss<std::net::TcpStream>, RrDht> {
-//    /// Constructor
-//    pub fn new_with_wss() -> Self {
-//        P2pGateway {
-//            inner_transport: &TransportWss::with_std_tcp_stream(),
-//            inner_dht: RrDht::new(),
-//            maybe_advertise: None,
-//        }
-//    }
-//}
-
 /// P2pGateway
-impl<'t, T: Transport, D: Dht> P2pGateway<'t, P2pGateway<'t, T, D>, RrDht> {
+impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, RrDht> {
     /// Constructors
     pub fn new_with_space(
-        network_gateway: &'t P2pGateway<'t, T, D>,
+        // network_gateway: &'t mut P2pGateway<'t, T, D>,
+        network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
         // dht: &'t D,
         space_address: &AddressRef,
     ) -> Self {

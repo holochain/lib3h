@@ -168,7 +168,7 @@ impl MirrorDht {
                         let is_new = self.add_entry(&entry);
                         if is_new {
                             return Ok(vec![DhtEvent::HoldEntryRequested(
-                                self.this_peer.peer_address,
+                                self.this_peer.peer_address.clone(),
                                 entry,
                             )]);
                         }

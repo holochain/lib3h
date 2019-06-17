@@ -6,21 +6,12 @@ mod space_layer;
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    dht::{
-        dht_protocol::{self, *},
-        dht_trait::Dht,
-        rrdht::RrDht,
-    },
-    gateway::{gateway_dht, P2pGateway},
-    transport::{protocol::*, transport_trait::Transport},
-    transport_wss::TransportWss,
+    dht::{dht_trait::Dht, rrdht::RrDht},
+    gateway::P2pGateway,
+    transport::transport_trait::Transport,
 };
-use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
-};
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
+use std::{cell::RefCell, rc::Rc};
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
@@ -35,16 +26,15 @@ pub struct RealEngineConfig {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'t, T: Transport, D: Dht> {
+pub struct RealEngine<T: Transport, D: Dht> {
+    /// Identifier
+    name: String,
     /// Config settings
     _config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
-    /// Identifier
-    name: String,
-    network_transport: T,
-    /// P2p gateway for the transport layer,
-    network_gateway: P2pGateway<'t, T, D>,
+    /// P2p gateway for the network layer,
+    network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, P2pGateway<'t, P2pGateway<'t, T, D>, RrDht>>,
+    space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, RrDht>>,
 }

@@ -1,18 +1,17 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
+    dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 
 /// Compose DHT
-impl<'t, T: Transport, D: Dht> Dht for P2pGateway<'t, T, D> {
-    //impl<'t, T: Transport, D: Dht> Dht for P2pGateway<'t, P2pGateway<'t, T, D>, D> {
+impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Peer info
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht.get_peer(peer_address)
@@ -37,7 +36,7 @@ impl<'t, T: Transport, D: Dht> Dht for P2pGateway<'t, T, D> {
         let (did_work, dht_event_list) = self.inner_dht.process()?;
         // Handle events directly
         if did_work {
-            for evt in dht_event_list {
+            for evt in dht_event_list.clone() {
                 self.handle_DhtEvent(evt)?;
             }
         }
@@ -53,12 +52,13 @@ impl<'t, T: Transport, D: Dht> Dht for P2pGateway<'t, T, D> {
 }
 
 /// Private internals
-impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// For space gateway, space_address is stored in the advertise field.
     /// This function does this conversion.
     fn space_address(&self) -> Address {
         let advertise = self
             .maybe_advertise
+            .clone()
             .expect("Advertise for space gateway should be set at construction");
         return advertise.as_bytes().to_vec();
     }
@@ -74,8 +74,7 @@ impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
                         .inner_dht
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
-                        .transport
-                        .as_str();
+                        .transport;
                     // Change into P2pProtocol
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
                         space_address: self.space_address(),
@@ -89,7 +88,9 @@ impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
                         .unwrap();
                     // Forward gossip to the inner_transport
                     // If no connection to that transportId is open, open one first.
-                    self.inner_transport.send(&[peer_transport], &payload)?;
+                    self.inner_transport
+                        .borrow_mut()
+                        .send(&[peer_transport.as_str()], &payload)?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

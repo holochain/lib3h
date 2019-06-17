@@ -1,9 +1,9 @@
-use lib3h_protocol::{data_types::DirectMessageData, Address, Lib3hResult};
+use lib3h_protocol::{data_types::DirectMessageData, Address};
 
 /// Enum holding all message types in the 'network module <-> network module' protocol.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum P2pProtocol {
-    Broadcast(Vec<u8>), // spike
+    // Broadcast(Vec<u8>), // spike
     Gossip(GossipData),
     DirectMessage(DirectMessageData),
     DirectMessageResult(DirectMessageData),
