@@ -73,6 +73,7 @@ impl<'a, T: Buffer> std::ops::DerefMut for WriteLocker<'a, T> {
     }
 }
 
+/// This is a thunk so we don't have to type these trait bounds over and over
 pub trait BufferType:
     Sized + Send + Clone + std::fmt::Debug + std::ops::Deref<Target = [u8]> + std::ops::DerefMut<Target = [u8]>
 {
@@ -140,32 +141,137 @@ impl Buffer for InsecureBuffer {
     fn set_writable(&self) {}
 }
 
-pub trait CanPasswordHash<S, C> {
-    fn calc_hash(input: &mut S, output: &mut S, config: &C) -> CryptoResult<()>;
+pub trait CryptoSystem {
+    type SigPrivKey;
+    type EncPrivKey;
+    type PwHashConfig;
+
+    const SIG_SEED_SIZE: usize;
+    const SIG_SIZE: usize;
+    const ENC_SEED_SIZE: usize;
+
+    fn random<OutputBuffer: Buffer>(&self, buffer: &mut OutputBuffer) -> CryptoResult<()>;
+
+    fn signature_from_seed<SeedBuffer: Buffer>(&self, seed: &SeedBuffer) -> CryptoResult<Self::SigPrivKey>;
+
+    fn encryption_from_seed<SeedBuffer: Buffer>(&self, seed: &SeedBuffer) -> CryptoResult<Self::EncPrivKey>;
+
+    fn password_hash<InputBuffer: Buffer, OutputBuffer: Buffer>(&self, input: &InputBuffer, output: &mut OutputBuffer, config: &Self::PwHashConfig) -> CryptoResult<()>;
 }
 
-pub trait CanEncryptSymmetric<S, C> {
-    fn encrypt_symmetric(input: &mut S, output: &mut S, config: &C) -> CryptoResult<()>;
+pub trait SignaturePublicKey: Sized {
+    fn get_id(&self) -> CryptoResult<&str>;
+    fn verify<SigBuffer: Buffer, DataBuffer: Buffer>(&self, signature: &SigBuffer, data: &DataBuffer) -> CryptoResult<bool>;
 }
 
-pub trait CanDecryptSymmetric<S, C> {
-    fn decrypt_symmetric(input: &mut S, output: &mut S, config: &C) -> CryptoResult<()>;
+pub trait SignaturePrivateKey: Sized {
+    type SigPubKey;
+
+    fn get_public_key(&self) -> CryptoResult<Self::SigPubKey>;
+    fn sign<SigBuffer: Buffer, DataBuffer: Buffer>(&self, signature: &mut SigBuffer, data: &DataBuffer) -> CryptoResult<()>;
 }
 
-pub type Signature = Vec<u8>;
-pub type SignatureRef = [u8];
-
-pub type SignatureData = Vec<u8>;
-pub type SignatureDataRef = [u8];
-
-pub trait SignatureSeed<PRIV: CanSign, PUB: CanVerify> {
-    fn derive_keypair(&self) -> CryptoResult<(PRIV, PUB)>;
+pub trait EncryptionPublicKey: Sized {
+    fn get_id(&self) -> CryptoResult<&str>;
 }
 
-pub trait CanVerify {
-    fn verify(signature: &SignatureRef, data: &SignatureDataRef) -> CryptoResult<bool>;
+pub trait EncryptionPrivateKey: Sized {
+    type EncPubKey;
+
+    fn get_public_key(&self) -> CryptoResult<Self::EncPubKey>;
 }
 
-pub trait CanSign {
-    fn sign(data: &SignatureDataRef) -> CryptoResult<Signature>;
+// -- Fake -- //
+
+#[derive(Clone)]
+pub struct FakeSignaturePublicKey(pub String);
+
+impl SignaturePublicKey for FakeSignaturePublicKey {
+    fn get_id(&self) -> CryptoResult<&str> {
+        Ok(&self.0)
+    }
+
+    fn verify<SigBuffer: Buffer, DataBuffer: Buffer>(&self, _signature: &SigBuffer, _data: &DataBuffer) -> CryptoResult<bool> {
+        Ok(true)
+    }
+}
+
+pub struct FakeSignaturePrivateKey {
+    public_key: FakeSignaturePublicKey,
+}
+
+impl SignaturePrivateKey for FakeSignaturePrivateKey {
+    type SigPubKey = FakeSignaturePublicKey;
+
+    fn get_public_key(&self) -> CryptoResult<Self::SigPubKey> {
+        Ok(self.public_key.clone())
+    }
+
+    fn sign<SigBuffer: Buffer, DataBuffer: Buffer>(&self, signature: &mut SigBuffer, _data: &DataBuffer) -> CryptoResult<()> {
+        {
+            let mut signature = signature.write_lock();
+            signature[0] = 1;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct FakeEncryptionPublicKey(pub String);
+
+impl EncryptionPublicKey for FakeEncryptionPublicKey {
+    fn get_id(&self) -> CryptoResult<&str> {
+        Ok(&self.0)
+    }
+}
+
+pub struct FakeEncryptionPrivateKey {
+    public_key: FakeEncryptionPublicKey,
+}
+
+impl EncryptionPrivateKey for FakeEncryptionPrivateKey {
+    type EncPubKey = FakeEncryptionPublicKey;
+
+    fn get_public_key(&self) -> CryptoResult<Self::EncPubKey> {
+        Ok(self.public_key.clone())
+    }
+}
+
+pub struct FakePwHashConfig();
+
+pub struct FakeCryptoSystem {}
+
+impl CryptoSystem for FakeCryptoSystem {
+    type SigPrivKey = FakeSignaturePrivateKey;
+    type EncPrivKey = FakeEncryptionPrivateKey;
+    type PwHashConfig = FakePwHashConfig;
+
+    const SIG_SEED_SIZE: usize = 8;
+    const SIG_SIZE: usize = 8;
+    const ENC_SEED_SIZE: usize = 8;
+
+    fn random<OutputBuffer: Buffer>(&self, buffer: &mut OutputBuffer) -> CryptoResult<()> {
+        {
+            let mut buffer = buffer.write_lock();
+            buffer[0] = 1;
+        }
+
+        Ok(())
+    }
+
+    fn signature_from_seed<SeedBuffer: Buffer>(&self, _seed: &SeedBuffer) -> CryptoResult<Self::SigPrivKey> {
+        Ok(FakeSignaturePrivateKey {
+            public_key: FakeSignaturePublicKey("fake".to_string()),
+        })
+    }
+
+    fn encryption_from_seed<SeedBuffer: Buffer>(&self, _seed: &SeedBuffer) -> CryptoResult<Self::EncPrivKey> {
+        Ok(FakeEncryptionPrivateKey {
+            public_key: FakeEncryptionPublicKey("fake".to_string()),
+        })
+    }
+
+    fn password_hash<InputBuffer: Buffer, OutputBuffer: Buffer>(&self, _input: &InputBuffer, _output: &mut OutputBuffer, _config: &Self::PwHashConfig) -> CryptoResult<()> {
+        Ok(())
+    }
 }
