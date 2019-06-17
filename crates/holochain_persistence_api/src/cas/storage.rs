@@ -9,20 +9,19 @@ use crate::{
         Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
-    regex::Regex,
     error::{PersistenceError, PersistenceResult},
     holochain_json_api::{
         error::JsonError,
         json::{JsonString, RawString},
     },
+    regex::Regex,
 };
 use objekt;
 use std::{
-    fmt,
     collections::{BTreeSet, HashMap},
-    fmt::Debug,
+    convert::{TryFrom, TryInto},
+    fmt::{self, Debug},
     sync::{Arc, RwLock},
-    convert::{TryFrom, TryInto}
 };
 use uuid::Uuid;
 
@@ -258,8 +257,7 @@ pub enum ExampleLink {
 impl std::fmt::Display for ExampleLink {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ExampleLink::LinkTag(link_type, tag) =>
-                write!(f, "link__{}__{}", link_type, tag),
+            ExampleLink::LinkTag(link_type, tag) => write!(f, "link__{}__{}", link_type, tag),
             ExampleLink::RemovedLink(link_type, tag) => {
                 write!(f, "removed_link__{}__{}", link_type, tag)
             }
@@ -287,7 +285,10 @@ impl TryFrom<&str> for ExampleLink {
             let link_tag = REMOVED_LINK_REGEX.captures(s)?.get(2)?.as_str().to_string();
             Ok(ExampleLink::RemovedLink(link_type, link_tag))
         } else {
-            Err(PersistenceError::SerializationError(format!("Not a properly example link: {}", s.to_string())))
+            Err(PersistenceError::SerializationError(format!(
+                "Not a properly example link: {}",
+                s.to_string()
+            )))
         }
     }
 }

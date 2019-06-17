@@ -11,8 +11,8 @@ extern crate lazy_static;
 extern crate chrono;
 extern crate futures;
 extern crate multihash;
-extern crate rust_base58;
 extern crate regex;
+extern crate rust_base58;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
