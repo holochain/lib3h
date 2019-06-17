@@ -1,6 +1,6 @@
 [package]
 name = "holochain_persistence_pickle"
-version = "0.0.1-alpha3"
+version = "0.0.1-alpha4"
 authors = ["Holochain Core Dev Team <devcore@lib3h.org>"]
 edition = "2018"
 description = "lib3h persistence for content addressable storage and entity attribute value indexes backed by pickledb-rs."
