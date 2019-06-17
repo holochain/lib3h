@@ -94,7 +94,6 @@ impl<'a, A: Attribute> EaviQuery<'a, A> {
                                         .as_ref()
                                         .map(|s| s.check(eavi_fold.attribute()))
                                         .unwrap_or(true)
-                                        .clone()
                                     {
                                         //if attrribute is found return the value plus the tombstone boolean set to true
                                         (
@@ -102,8 +101,7 @@ impl<'a, A: Attribute> EaviQuery<'a, A> {
                                             self.tombstone()
                                                 .as_ref()
                                                 .map(|_| true)
-                                                .unwrap_or(false)
-                                                .clone(),
+                                                .unwrap_or(false),
                                         )
                                     } else {
                                         //return value that signifies value has been found but tombstone has not been found

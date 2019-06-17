@@ -733,10 +733,11 @@ impl EavTestSuite {
         let mut expected_tombstone_not_found = BTreeSet::new();
         //this is our test data
         vec!["a", "b", "c", "d", "e"].iter().for_each(|s| {
+            let str = String::from(*s);
             //for each test data that comes through, we should create an EAV with link_tag over it
             let eav = EntityAttributeValueIndex::new(
                 &one.address(),
-                &ExampleLink::LinkTag(String::from(s.clone()), String::from(s.clone())),
+                &ExampleLink::LinkTag(str.clone(), str.clone()),
                 &two.address(),
             )
             .expect("could not create EAV");
@@ -750,7 +751,7 @@ impl EavTestSuite {
                 //when we reach C we are going to add a remove_link EAVI
                 let eav_remove = EntityAttributeValueIndex::new(
                     &one.address(),
-                    &ExampleLink::RemovedLink(String::from(s.clone()), String::from(s.clone())),
+                    &ExampleLink::RemovedLink(str.clone(), str),
                     &two.address(),
                 )
                 .expect("could not create EAV");
