@@ -1,11 +1,4 @@
-use crate::{
-    Buffer,
-    CryptoResult,
-    CryptoSystem,
-    CryptoRandom,
-    CryptoSignature,
-};
-
+use crate::{Buffer, CryptoRandom, CryptoResult, CryptoSignature, CryptoSystem};
 
 pub struct FakeCryptoSystem {}
 
