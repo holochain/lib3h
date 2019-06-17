@@ -138,6 +138,23 @@ mod tests {
     }
 
     #[test]
+    fn it_should_randomize_vec_u8() {
+        let mut buf1 = vec![0; 8];
+
+        assert_eq!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", buf1));
+
+        FakeCryptoSystem::get().random(&mut buf1).unwrap();
+
+        assert_ne!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", buf1));
+
+        let mut buf2 = vec![0; 8];
+
+        FakeCryptoSystem::get().random(&mut buf2).unwrap();
+
+        assert_ne!(&format!("{:?}", buf1), &format!("{:?}", buf2));
+    }
+
+    #[test]
     fn it_should_sign_and_verify() {
         let crypto = FakeCryptoSystem::get();
 

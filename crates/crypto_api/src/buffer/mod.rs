@@ -54,3 +54,19 @@ pub trait Buffer: BufferType {
         Ok(())
     }
 }
+
+impl BufferType for Vec<u8> {}
+
+impl Buffer for Vec<u8> {
+    fn new(size: usize) -> CryptoResult<Self> {
+        Ok(vec![0; size])
+    }
+
+    fn len(&self) -> usize {
+        Vec::len(self)
+    }
+
+    fn set_no_access(&self) {}
+    fn set_readable(&self) {}
+    fn set_writable(&self) {}
+}
