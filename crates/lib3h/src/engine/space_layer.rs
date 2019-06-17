@@ -5,8 +5,7 @@ use crate::{
         dht_protocol::{self, *},
         dht_trait::Dht,
     },
-    engine::{p2p_protocol::P2pProtocol, real_engine::RealEngine, ChainId, RealEngineConfig},
-    // gateway::p2p_gateway::P2pGateway,
+    engine::{p2p_protocol::P2pProtocol, ChainId, RealEngine, RealEngineConfig},
     gateway::P2pGateway,
     transport::{protocol::*, transport_trait::Transport},
 };

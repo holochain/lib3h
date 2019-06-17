@@ -10,11 +10,11 @@ use crate::{
         dht_trait::Dht,
         rrdht::RrDht,
     },
-    engine::{network_layer, p2p_protocol::P2pProtocol, space_layer, ChainId, RealEngineConfig},
-    gateway::{gateway_dht,
-              // p2p_gateway::P2pGateway,
-              P2pGateway,
+    engine::{
+        network_layer, p2p_protocol::P2pProtocol, space_layer, ChainId, RealEngine,
+        RealEngineConfig,
     },
+    gateway::{gateway_dht, P2pGateway},
     transport::{protocol::*, transport_trait::Transport},
     transport_wss::TransportWss,
 };
@@ -25,29 +25,17 @@ use lib3h_protocol::{
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
-/// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'t, T: Transport, D: Dht> {
-    /// Config settings
-    pub(crate) _config: RealEngineConfig,
-    /// FIFO of Lib3hClientProtocol messages received from Core
-    pub(crate) inbox: VecDeque<Lib3hClientProtocol>,
-    /// Identifier
-    pub(crate) name: String,
-    /// P2p gateway for the transport layer,
-    pub(crate) network_gateway: P2pGateway<'t, T, D>,
-    /// Map of P2p gateway per Space+Agent
-    pub(crate) space_gateway_map: HashMap<ChainId, P2pGateway<'t, P2pGateway<'t, T, D>, D>>,
-}
-
 impl<'t> RealEngine<'t, TransportWss<std::net::TcpStream>, RrDht> {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
-        let mut network_gateway = P2pGateway::new_with_wss();
+        let network_transport = TransportWss::with_std_tcp_stream();
+        let mut network_gateway = P2pGateway::new(&network_transport);
         network_gateway.bind("FIXME")?;
         Ok(RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
+            network_transport,
             network_gateway,
             space_gateway_map: HashMap::new(),
         })
@@ -58,12 +46,17 @@ impl<'t> RealEngine<'t, TransportWss<std::net::TcpStream>, RrDht> {
 //#[cfg(test)]
 impl<'t> RealEngine<'t, TransportMemory, RrDht> {
     pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
-        let mut network_gateway = P2pGateway::new_with_memory(name);
+        let network_transport = TransportMemory::new();
+        let mut network_gateway = P2pGateway::new(&network_transport);
+        let binding = network_gateway
+            .bind(name)
+            .expect("TransportMemory.bind() failed. url/name might not be unique?");
         network_gateway.bind("FIXME")?;
         Ok(RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
+            network_transport,
             network_gateway,
             space_gateway_map: HashMap::new(),
         })
@@ -321,7 +314,7 @@ impl<'t, T: Transport, D: Dht> RealEngine<'t, T, D> {
         agent_id: &AddressRef,
         request_id: &str,
         maybe_sender_agent_id: Option<&AddressRef>,
-    ) -> Result<&P2pGateway<'t, P2pGateway<'t, T, D>, D>, Lib3hServerProtocol> {
+    ) -> Result<&P2pGateway<'t, P2pGateway<'t, T, D>, RrDht>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get(&(space_address.to_owned(), agent_id.to_owned()));

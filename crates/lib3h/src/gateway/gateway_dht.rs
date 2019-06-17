@@ -3,7 +3,6 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
     engine::p2p_protocol::*,
-    //gateway::p2p_gateway::P2pGateway,
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };

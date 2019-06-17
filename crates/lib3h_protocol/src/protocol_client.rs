@@ -1,7 +1,5 @@
 use crate::data_types::*;
 
-use serde::{Deserialize, Serialize};
-
 /// Enum holding all message types in the 'hc-core -> P2P network module' protocol.
 /// There are 4 categories of messages:
 ///  - Command: An order from the local node to the p2p module. Local node expects a reponse. Starts with a verb.

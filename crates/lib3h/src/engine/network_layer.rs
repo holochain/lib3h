@@ -2,12 +2,10 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
-    engine::{p2p_protocol::P2pProtocol, real_engine::RealEngine, ChainId, RealEngineConfig},
+    engine::{p2p_protocol::P2pProtocol, ChainId, RealEngine, RealEngineConfig},
     gateway::{
         gateway_dht::{self, *},
-        gateway_transport,
-        P2pGateway,
-        // p2p_gateway::P2pGateway,
+        gateway_transport, P2pGateway,
     },
     transport::{protocol::*, transport_trait::Transport},
 };

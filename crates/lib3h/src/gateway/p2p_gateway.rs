@@ -15,7 +15,6 @@ use crate::{
 };
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
-
 /// Public interface
 impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
     // -- Getters -- //
@@ -35,8 +34,17 @@ impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
     pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inner_dht.post(cmd)
     }
+
+    pub fn set_advertise(&mut self, binding: &str) {
+        self.maybe_advertise = Some(binding.to_string());
+    }
 }
 
+//--------------------------------------------------------------------------------------------------
+// Constructors
+//--------------------------------------------------------------------------------------------------
+
+/// any Transport
 impl<'t, T: Transport> P2pGateway<'t, T, RrDht> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
@@ -49,45 +57,48 @@ impl<'t, T: Transport> P2pGateway<'t, T, RrDht> {
     }
 }
 
-impl<'t> P2pGateway<'t, TransportMemory, RrDht> {
-    /// Constructor
-    /// Bind and set advertise on construction by using the name as URL.
-    pub fn new_with_memory(name: &str) -> Self {
-        let mut gateway = P2pGateway {
-            inner_transport: &TransportMemory::new(),
-            inner_dht: RrDht::new(),
-            maybe_advertise: None,
-        };
-        let binding = gateway
-            .bind(name)
-            .expect("TransportMemory.bind() failed. url/name might not be unique?");
-        gateway.maybe_advertise = Some(binding);
-        gateway
-    }
-}
+///// TransportMemory
+//impl<'t> P2pGateway<'t, TransportMemory, RrDht> {
+//    /// Constructor
+//    /// Bind and set advertise on construction by using the name as URL.
+//    pub fn new_with_memory(name: &str) -> Self {
+//        let mut gateway = P2pGateway {
+//            inner_transport: &TransportMemory::new(),
+//            inner_dht: RrDht::new(),
+//            maybe_advertise: None,
+//        };
+//        let binding = gateway
+//            .bind(name)
+//            .expect("TransportMemory.bind() failed. url/name might not be unique?");
+//        gateway.maybe_advertise = Some(binding);
+//        gateway
+//    }
+//}
 
-impl<'t> P2pGateway<'t, TransportWss<std::net::TcpStream>, RrDht> {
-    /// Constructor
-    pub fn new_with_wss() -> Self {
-        P2pGateway {
-            inner_transport: &TransportWss::with_std_tcp_stream(),
-            inner_dht: RrDht::new(),
-            maybe_advertise: None,
-        }
-    }
-}
+///// TransportWss
+//impl<'t> P2pGateway<'t, TransportWss<std::net::TcpStream>, RrDht> {
+//    /// Constructor
+//    pub fn new_with_wss() -> Self {
+//        P2pGateway {
+//            inner_transport: &TransportWss::with_std_tcp_stream(),
+//            inner_dht: RrDht::new(),
+//            maybe_advertise: None,
+//        }
+//    }
+//}
 
-impl<'t, T: Transport, D: Dht> P2pGateway<'t, P2pGateway<'t, T, D>, D> {
+/// P2pGateway
+impl<'t, T: Transport, D: Dht> P2pGateway<'t, P2pGateway<'t, T, D>, RrDht> {
     /// Constructors
     pub fn new_with_space(
         network_gateway: &'t P2pGateway<'t, T, D>,
-        dht: &'t D,
+        // dht: &'t D,
         space_address: &AddressRef,
     ) -> Self {
         let advertise = std::string::String::from_utf8_lossy(space_address).to_string();
         P2pGateway {
             inner_transport: network_gateway,
-            inner_dht: dht,
+            inner_dht: RrDht::new(),
             maybe_advertise: Some(advertise),
         }
     }
