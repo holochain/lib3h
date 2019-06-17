@@ -89,7 +89,7 @@ impl<'a, A: Attribute> EaviQuery<'a, A> {
                                     &fold_query.value,
                                 ) {
                                     //check if tombstone condition is met
-                                    if *&self
+                                    if self
                                         .tombstone()
                                         .as_ref()
                                         .map(|s| s.check(eavi_fold.attribute()))
@@ -99,8 +99,7 @@ impl<'a, A: Attribute> EaviQuery<'a, A> {
                                         //if attrribute is found return the value plus the tombstone boolean set to true
                                         (
                                             Some(eavi_fold),
-                                            *&self
-                                                .tombstone()
+                                            self.tombstone()
                                                 .as_ref()
                                                 .map(|_| true)
                                                 .unwrap_or(false)
