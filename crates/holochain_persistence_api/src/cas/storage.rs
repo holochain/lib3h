@@ -9,6 +9,7 @@ use crate::{
         Attribute, EavFilter, EaviQuery, EntityAttributeValueIndex, EntityAttributeValueStorage,
         IndexFilter,
     },
+    regex::Regex,
     error::{PersistenceError, PersistenceResult},
     holochain_json_api::{
         error::JsonError,
@@ -17,9 +18,11 @@ use crate::{
 };
 use objekt;
 use std::{
+    fmt,
     collections::{BTreeSet, HashMap},
     fmt::Debug,
     sync::{Arc, RwLock},
+    convert::{TryFrom, TryInto}
 };
 use uuid::Uuid;
 
@@ -251,6 +254,66 @@ pub enum ExampleLink {
     RemovedLink(String, String),
     LinkTag(String, String),
 }
+
+impl std::fmt::Display for ExampleLink {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExampleLink::LinkTag(link_type, tag) =>
+                write!(f, "link__{}__{}", link_type, tag),
+            ExampleLink::RemovedLink(link_type, tag) => {
+                write!(f, "removed_link__{}__{}", link_type, tag)
+            }
+        }
+    }
+}
+
+lazy_static! {
+    static ref LINK_REGEX: Regex =
+        Regex::new(r"^link__(.*)__(.*)$").expect("This string literal is a valid regex");
+    static ref REMOVED_LINK_REGEX: Regex =
+        Regex::new(r"^removed_link__(.*)__(.*)$").expect("This string literal is a valid regex");
+}
+
+impl TryFrom<&str> for ExampleLink {
+    type Error = PersistenceError;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        if LINK_REGEX.is_match(s) {
+            let link_type = LINK_REGEX.captures(s)?.get(1)?.as_str().to_string();
+            let link_tag = LINK_REGEX.captures(s)?.get(2)?.as_str().to_string();
+
+            Ok(ExampleLink::LinkTag(link_type, link_tag))
+        } else if REMOVED_LINK_REGEX.is_match(s) {
+            let link_type = REMOVED_LINK_REGEX.captures(s)?.get(1)?.as_str().to_string();
+            let link_tag = REMOVED_LINK_REGEX.captures(s)?.get(2)?.as_str().to_string();
+            Ok(ExampleLink::RemovedLink(link_type, link_tag))
+        } else {
+            Err(PersistenceError::SerializationError(format!("Not a properly example link: {}", s.to_string())))
+        }
+    }
+}
+
+impl TryFrom<String> for ExampleLink {
+    type Error = PersistenceError;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        s.as_str().try_into()
+    }
+}
+
+/*
+impl From<String> for ExampleLink {
+
+    fn from(s:String) -> Self {
+        JsonString::from(RawString::from(s)).try_into().expect("example link as json")
+    }
+}
+
+impl Into<String> for ExampleLink {
+
+    fn into(self) -> String {
+       let json = JsonString::try_from(self);
+       json.expect("json form of example link").to_string()
+    }
+}*/
 
 impl Attribute for ExampleLink {}
 

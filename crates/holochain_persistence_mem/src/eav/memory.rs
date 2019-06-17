@@ -121,7 +121,7 @@ pub mod tests {
     }
 
     #[test]
-    fn file_eav_prefixes() {
+    fn memory_eav_prefixes() {
         let eav_storage = EavMemoryStorage::new();
         EavTestSuite::test_multiple_attributes::<
             ExampleAddressableContent,
@@ -136,4 +136,9 @@ pub mod tests {
         );
     }
 
+    #[test]
+    fn memory_tombstone() {
+         let eav_storage = EavMemoryStorage::new();
+         EavTestSuite::test_tombstone::<ExampleAddressableContent, EavMemoryStorage<_>>(eav_storage)
+    }
 }
