@@ -3,7 +3,10 @@
 use crate::{
     dht::dht_trait::Dht,
     engine::p2p_protocol::P2pProtocol,
-    gateway::p2p_gateway::P2pGateway,
+    gateway::{
+        P2pGateway,
+        // p2p_gateway::P2pGateway,
+    },
     transport::{
         error::{TransportError, TransportResult},
         memory_mock::transport_memory::TransportMemory,

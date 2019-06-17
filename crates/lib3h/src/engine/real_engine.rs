@@ -11,7 +11,10 @@ use crate::{
         rrdht::RrDht,
     },
     engine::{network_layer, p2p_protocol::P2pProtocol, space_layer, ChainId, RealEngineConfig},
-    gateway::{gateway_dht, p2p_gateway::P2pGateway},
+    gateway::{gateway_dht,
+              // p2p_gateway::P2pGateway,
+              P2pGateway,
+    },
     transport::{protocol::*, transport_trait::Transport},
     transport_wss::TransportWss,
 };

@@ -6,7 +6,8 @@ use crate::{
         dht_trait::Dht,
     },
     engine::{p2p_protocol::P2pProtocol, real_engine::RealEngine, ChainId, RealEngineConfig},
-    gateway::p2p_gateway::P2pGateway,
+    // gateway::p2p_gateway::P2pGateway,
+    gateway::P2pGateway,
     transport::{protocol::*, transport_trait::Transport},
 };
 use lib3h_protocol::{

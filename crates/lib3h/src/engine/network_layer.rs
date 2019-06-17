@@ -6,7 +6,8 @@ use crate::{
     gateway::{
         gateway_dht::{self, *},
         gateway_transport,
-        p2p_gateway::P2pGateway,
+        P2pGateway,
+        // p2p_gateway::P2pGateway,
     },
     transport::{protocol::*, transport_trait::Transport},
 };

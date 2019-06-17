@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
     engine::p2p_protocol::P2pProtocol,
-    gateway::{gateway_dht, gateway_transport},
+    gateway::{gateway_dht, gateway_transport, P2pGateway},
     transport::{
         error::{TransportError, TransportResult},
         memory_mock::transport_memory::TransportMemory,
@@ -15,16 +15,26 @@ use crate::{
 };
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
-/// Gateway to a P2P network.
-/// Enables Connections to many other nodes.
-/// Tracks distributed data for that P2P network.
-/// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
-/// Composite pattern for Transport and Dht
-pub struct P2pGateway<'t, T: Transport, D: Dht> {
-    pub(crate) inner_transport: &'t T,
-    pub(crate) inner_dht: D,
-    ///
-    pub(crate) maybe_advertise: Option<String>,
+
+/// Public interface
+impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
+    // -- Getters -- //
+    /// This nodes identifier on the network
+    pub fn id(&self) -> String {
+        self.inner_dht
+            .this_peer()
+            .expect("P2pGateway's DHT should have 'this_peer'")
+            .to_string()
+    }
+    /// This nodes connection address
+    pub fn advertise(&self) -> Option<String> {
+        self.maybe_advertise.clone()
+    }
+
+    /// Hack dumb rust compiler
+    pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        self.inner_dht.post(cmd)
+    }
 }
 
 impl<'t, T: Transport> P2pGateway<'t, T, RrDht> {
@@ -67,38 +77,18 @@ impl<'t> P2pGateway<'t, TransportWss<std::net::TcpStream>, RrDht> {
     }
 }
 
-impl<'t, T: Transport, D: Dht> P2pGateway<'t, P2pGateway<'t, T, D>, RrDht> {
+impl<'t, T: Transport, D: Dht> P2pGateway<'t, P2pGateway<'t, T, D>, D> {
     /// Constructors
     pub fn new_with_space(
         network_gateway: &'t P2pGateway<'t, T, D>,
+        dht: &'t D,
         space_address: &AddressRef,
     ) -> Self {
         let advertise = std::string::String::from_utf8_lossy(space_address).to_string();
         P2pGateway {
             inner_transport: network_gateway,
-            inner_dht: RrDht::new(),
+            inner_dht: dht,
             maybe_advertise: Some(advertise),
         }
-    }
-}
-
-/// Public interface
-impl<'t, T: Transport, D: Dht> P2pGateway<'t, T, D> {
-    // -- Getters -- //
-    /// This nodes identifier on the network
-    pub fn id(&self) -> String {
-        self.inner_dht
-            .this_peer()
-            .expect("P2pGateway's DHT should have 'this_peer'")
-            .to_string()
-    }
-    /// This nodes connection address
-    pub fn advertise(&self) -> Option<String> {
-        self.maybe_advertise.clone()
-    }
-
-    /// Hack dumb rust compiler
-    pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        self.inner_dht.post(cmd)
     }
 }
