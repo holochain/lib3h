@@ -12,6 +12,12 @@ enum MirrorGossip {
     Peer(PeerData),
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct MirrorDhtConfig {
+    pub peer_address: String,
+    pub peer_transport: String,
+}
+
 /// Mirror DHT implementation: Holds and reflect everything back to other nodes (fullsync)
 ///  - On *HoldRequest, store and gossip data back to every known peer.
 ///  - Gossip can only be a *HoldRequest
@@ -27,7 +33,7 @@ pub struct MirrorDht {
     this_peer: PeerData,
 }
 
-/// Constructor
+/// Constructors
 impl MirrorDht {
     pub fn new(peer_address: &str, peer_transport: &str) -> Self {
         MirrorDht {
@@ -40,6 +46,16 @@ impl MirrorDht {
                 timestamp: 0,
             },
         }
+    }
+
+    pub fn new_with_config(config: &MirrorDhtConfig) -> Self {
+        Self::new(&config.peer_address, &config.peer_transport)
+    }
+
+    pub fn new_with_raw_config(config: &[u8]) -> Lib3hResult<Self> {
+        let mut de = Deserializer::new(&config[..]);
+        let config = Deserialize::deserialize(&mut de)?;
+        Ok(Self::new_with_config(&config))
     }
 }
 

@@ -1,7 +1,11 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht, rrdht::RrDht},
+    dht::{
+        dht_protocol::*,
+        dht_trait::{Dht, DhtFactory},
+        rrdht::RrDht,
+    },
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
@@ -38,32 +42,36 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
 //--------------------------------------------------------------------------------------------------
 
 /// any Transport
-impl<T: Transport> P2pGateway<T, RrDht> {
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     // pub fn new(inner_transport: &'t mut T) -> Self {
-    pub fn new(inner_transport: Rc<RefCell<T>>) -> Self {
+    pub fn new(
+        inner_transport: Rc<RefCell<T>>,
+        dht_factory: DhtFactory<D>,
+        dht_config: &[u8],
+    ) -> Self {
         P2pGateway {
             inner_transport,
-            inner_dht: RrDht::new(),
+            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             maybe_advertise: None,
         }
     }
 }
 
 /// P2pGateway
-impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, RrDht> {
+impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
     /// Constructors
     pub fn new_with_space(
-        // network_gateway: &'t mut P2pGateway<'t, T, D>,
         network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
-        // dht: &'t D,
         space_address: &AddressRef,
+        dht_factory: DhtFactory<D>,
+        dht_config: &[u8],
     ) -> Self {
         let advertise = std::string::String::from_utf8_lossy(space_address).to_string();
         P2pGateway {
             inner_transport: network_gateway,
-            inner_dht: RrDht::new(),
+            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             maybe_advertise: Some(advertise),
         }
     }

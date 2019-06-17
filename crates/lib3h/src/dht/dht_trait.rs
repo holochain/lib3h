@@ -1,6 +1,8 @@
 use crate::dht::dht_protocol::{DhtCommand, DhtEvent, PeerData};
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 
+pub type DhtFactory<D: Dht> = fn(config: &[u8]) -> Lib3hResult<D>;
+
 /// Allow storage and retrieval of peer & entry data.
 /// Trait API is for query
 /// DhtEvent is for mutating storage

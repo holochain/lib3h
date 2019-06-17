@@ -6,7 +6,11 @@ extern crate lazy_static;
 extern crate unwrap_to;
 
 use lib3h::{
-    real_engine::{RealEngine, RealEngineConfig},
+    dht::{
+        dht_trait::Dht,
+        mirror_dht::{MirrorDht, MirrorDhtConfig},
+    },
+    engine::{RealEngine, RealEngineConfig},
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::TransportWss,
 };
@@ -14,12 +18,15 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };
+use rmp_serde::Serializer;
+use serde::Serialize;
 
 //--------------------------------------------------------------------------------------------------
 // Typedefs
 //--------------------------------------------------------------------------------------------------
 
-type TwoNodesTestFn<T: Transport> = fn(alex: &mut RealEngine<T>, billy: &mut RealEngine<T>);
+type TwoNodesTestFn<T: Transport, D: Dht> =
+    fn(alex: &mut RealEngine<T, D>, billy: &mut RealEngine<T, D>);
 
 //--------------------------------------------------------------------------------------------------
 // Constants
@@ -42,27 +49,44 @@ lazy_static! {
 // Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory> {
+fn build_mirror_dht_config(name: &str) -> Vec<u8> {
+    let config = MirrorDhtConfig {
+        peer_address: name.to_string(),
+        peer_transport: name.to_string(),
+    };
+    let mut raw = Vec::new();
+    config.serialize(&mut Serializer::new(&mut raw)).unwrap();
+    raw
+}
+
+fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
+        dht_config: build_mirror_dht_config(name),
     };
-    let engine = RealEngine::new_mock(config, name.into()).unwrap();
+    let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_raw_config).unwrap();
     let p2p_binding = engine.advertise();
     println!("test_engine advertise: {}", p2p_binding);
     engine
 }
 
-fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>> {
+fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht> {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
+        dht_config: build_mirror_dht_config("FIXME wss config"),
     };
-    let engine = RealEngine::new(config, "test_engine_wss".into()).unwrap();
+    let engine = RealEngine::new(
+        config,
+        "test_engine_wss".into(),
+        MirrorDht::new_with_raw_config,
+    )
+    .unwrap();
     let p2p_binding = engine.advertise();
     println!("test_engine advertise: {}", p2p_binding);
     engine
@@ -113,7 +137,7 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<T: Transport>(engine: &mut RealEngine<T>) {
+fn basic_track_test<T: Transport, D: Dht>(engine: &mut RealEngine<T, D>) {
     // Start
     engine.run().unwrap();
 
@@ -168,8 +192,8 @@ fn basic_two_nodes_mock() {
 
 // Do general test with config
 #[cfg_attr(tarpaulin, skip)]
-fn launch_two_nodes_test_with_memory_network<T: Transport>(
-    test_fn: TwoNodesTestFn<T>,
+fn launch_two_nodes_test_with_memory_network<T: Transport, D: Dht>(
+    test_fn: TwoNodesTestFn<T, D>,
 ) -> Result<(), ()> {
     //log_i!("");
     //print_two_nodes_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
@@ -193,12 +217,15 @@ fn launch_two_nodes_test_with_memory_network<T: Transport>(
     Ok(())
 }
 
-fn setup_only<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngine<T>) {
+fn setup_only<T: Transport, D: Dht>(alex: &mut RealEngine<T, D>, billy: &mut RealEngine<T, D>) {
     // N/a
 }
 
 ///
-fn basic_two_setup<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngine<T>) {
+fn basic_two_setup<T: Transport, D: Dht>(
+    alex: &mut RealEngine<T, D>,
+    billy: &mut RealEngine<T, D>,
+) {
     // Start
     alex.run().unwrap();
     billy.run().unwrap();
@@ -236,7 +263,10 @@ fn basic_two_setup<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngin
 }
 
 //
-fn basic_two_send_message<T: Transport>(alex: &mut RealEngine<T>, billy: &mut RealEngine<T>) {
+fn basic_two_send_message<T: Transport, D: Dht>(
+    alex: &mut RealEngine<T, D>,
+    billy: &mut RealEngine<T, D>,
+) {
     let req_dm = DirectMessageData {
         space_address: SPACE_ADDRESS_A.clone(),
         request_id: "dm_1".to_string(),

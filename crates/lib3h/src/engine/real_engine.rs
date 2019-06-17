@@ -7,7 +7,8 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     dht::{
         dht_protocol::{self, *},
-        dht_trait::Dht,
+        dht_trait::{Dht, DhtFactory},
+        mirror_dht::MirrorDht,
         rrdht::RrDht,
     },
     engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig},
@@ -23,16 +24,25 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
-impl RealEngine<TransportWss<std::net::TcpStream>, RrDht> {
+impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
     /// Constructor
-    pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+    pub fn new(
+        config: RealEngineConfig,
+        name: &str,
+        dht_factory: DhtFactory<D>,
+    ) -> Lib3hResult<Self> {
         let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream()));
-        let network_gateway = Rc::new(RefCell::new(P2pGateway::new(network_transport)));
+        let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
+            network_transport,
+            dht_factory,
+            &config.dht_config,
+        )));
         network_gateway.borrow_mut().bind("FIXME")?;
         Ok(RealEngine {
-            _config: config,
+            config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
+            dht_factory,
             network_gateway,
             space_gateway_map: HashMap::new(),
         })
@@ -41,19 +51,28 @@ impl RealEngine<TransportWss<std::net::TcpStream>, RrDht> {
 
 /// Constructor
 //#[cfg(test)]
-impl RealEngine<TransportMemory, RrDht> {
-    pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+impl<D: Dht> RealEngine<TransportMemory, D> {
+    pub fn new_mock(
+        config: RealEngineConfig,
+        name: &str,
+        dht_factory: DhtFactory<D>,
+    ) -> Lib3hResult<Self> {
         let network_transport = Rc::new(RefCell::new(TransportMemory::new()));
-        let network_gateway = Rc::new(RefCell::new(P2pGateway::new(network_transport)));
+        let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
+            network_transport,
+            dht_factory,
+            &config.dht_config,
+        )));
         let binding = network_gateway
             .borrow_mut()
             .bind(name)
             .expect("TransportMemory.bind() failed. url/name might not be unique?");
         network_gateway.borrow_mut().set_advertise(&binding);
         Ok(RealEngine {
-            _config: config,
+            config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
+            dht_factory,
             network_gateway,
             space_gateway_map: HashMap::new(),
         })
@@ -291,8 +310,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             res.result_info = "Already tracked".to_string().into_bytes();
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
-        let new_space_gateway =
-            P2pGateway::new_with_space(Rc::clone(&self.network_gateway), &join_msg.space_address);
+        let new_space_gateway = P2pGateway::new_with_space(
+            Rc::clone(&self.network_gateway),
+            &join_msg.space_address,
+            self.dht_factory,
+            &self.config.dht_config,
+        );
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
@@ -313,7 +336,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         agent_id: &AddressRef,
         request_id: &str,
         maybe_sender_agent_id: Option<&AddressRef>,
-    ) -> Result<&mut P2pGateway<P2pGateway<T, D>, RrDht>, Lib3hServerProtocol> {
+    ) -> Result<&mut P2pGateway<P2pGateway<T, D>, D>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));

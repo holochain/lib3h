@@ -14,6 +14,10 @@ impl RrDht {
             inbox: VecDeque::new(),
         }
     }
+
+    pub fn new_with_raw_config(_config: &[u8]) -> Lib3hResult<Self> {
+        Ok(Self::new())
+    }
 }
 
 impl Dht for RrDht {
