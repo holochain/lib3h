@@ -4,7 +4,6 @@ use crate::{
     dht::{
         dht_protocol::*,
         dht_trait::{Dht, DhtFactory},
-        rrdht::RrDht,
     },
     gateway::P2pGateway,
     transport::transport_trait::Transport,

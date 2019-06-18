@@ -38,6 +38,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         chain_id: &ChainId,
         cmd: DhtEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        println!(
+            "[d] {} << handle_spaceDhtEvent: [{:?}] - {:?}",
+            self.name.clone(),
+            chain_id,
+            cmd
+        );
         let mut outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {

@@ -70,7 +70,7 @@ impl Dht for RrDht {
                 Some(msg) => msg,
             };
             did_work = true;
-            println!("(log.t) RrDht.process(): {:?}", cmd)
+            println!("[t] RrDht.process(): {:?}", cmd)
         }
         Ok((did_work, outbox))
     }

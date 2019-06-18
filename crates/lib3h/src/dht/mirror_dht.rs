@@ -43,7 +43,7 @@ impl MirrorDht {
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 transport: peer_transport.to_string(),
-                timestamp: 0,
+                timestamp: 0, // FIXME
             },
         }
     }
@@ -119,7 +119,7 @@ impl Dht for MirrorDht {
                 did_work = true;
                 outbox.append(&mut output);
             } else {
-                println!("(log.e) serve_DhtCommand() failed: {:?}", res);
+                println!("[e] serve_DhtCommand() failed: {:?}", res);
             }
         }
         Ok((did_work, outbox))
@@ -167,7 +167,7 @@ impl MirrorDht {
     /// Return a list of DhtEvent to owner.
     #[allow(non_snake_case)]
     fn serve_DhtCommand(&mut self, cmd: &DhtCommand) -> Lib3hResult<Vec<DhtEvent>> {
-        println!("(log.d) --- '(MirrorDht)' serving cmd: {:?}", cmd);
+        println!("[d] --- '(MirrorDht)' serving cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip

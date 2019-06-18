@@ -82,28 +82,28 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
-        println!("(log.d) >>> '(TransportGateway)' recv: {:?}", evt);
+        println!("[d] <<< '(TransportGateway)' recv: {:?}", evt);
         // Note: use same order as the enum
         match evt {
             TransportEvent::TransportError(id, e) => {
                 println!(
-                    "(log.e) Connection Error for {}: {}\n Closing connection.",
+                    "[e] Connection Error for {}: {}\n Closing connection.",
                     id, e
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
                 // don't need to do anything here
-                println!("(log.i) Connection opened: {}", id);
+                println!("[i] Connection opened: {}", id);
             }
             TransportEvent::Closed(id) => {
                 // FIXME
-                println!("(log.w) Connection closed: {}", id);
+                println!("[w] Connection closed: {}", id);
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::Received(id, _msg) => {
-                println!("(log.d) Received message from: {}", id);
+                println!("[d] Received message from: {}", id);
             }
         };
         Ok(())

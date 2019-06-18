@@ -6,10 +6,7 @@ mod space_layer;
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    dht::{
-        dht_trait::{Dht, DhtFactory},
-        rrdht::RrDht,
-    },
+    dht::dht_trait::{Dht, DhtFactory},
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
@@ -37,7 +34,7 @@ pub struct RealEngine<T: Transport, D: Dht> {
     config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
-    ///
+    /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
     /// P2p gateway for the network layer,
     network_gateway: Rc<RefCell<P2pGateway<T, D>>>,

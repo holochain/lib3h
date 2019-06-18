@@ -175,7 +175,7 @@ impl TransportMemory {
         &mut self,
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
-        println!("(log.d) >>> '(TransportMemory)' recv cmd: {:?}", cmd);
+        println!("[d] >>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url) => {

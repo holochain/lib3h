@@ -4,6 +4,7 @@ extern crate lib3h_protocol;
 extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
+extern crate backtrace;
 
 use lib3h::{
     dht::{
@@ -25,8 +26,7 @@ use serde::Serialize;
 // Typedefs
 //--------------------------------------------------------------------------------------------------
 
-type TwoNodesTestFn<T: Transport, D: Dht> =
-    fn(alex: &mut RealEngine<T, D>, billy: &mut RealEngine<T, D>);
+type TwoNodesTestFn = fn(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>);
 
 //--------------------------------------------------------------------------------------------------
 // Constants
@@ -38,15 +38,15 @@ lazy_static! {
     pub static ref BILLY_AGENT_ID: Address = "billy".to_string().into_bytes();
     pub static ref SPACE_ADDRESS_A: Address = "SPACE_A".to_string().into_bytes();
 
-    //// List of tests
-    //pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<TwoNodesTestFn> = vec![
-    //setup_only,
-    //basic_two_send_message,
-    //];
+    // List of tests
+    pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<TwoNodesTestFn> = vec![
+        // setup_only,
+        basic_two_send_message,
+    ];
 }
 
 //--------------------------------------------------------------------------------------------------
-// Setup
+// Engine Setup
 //--------------------------------------------------------------------------------------------------
 
 fn build_mirror_dht_config(name: &str) -> Vec<u8> {
@@ -93,7 +93,25 @@ fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht>
 }
 
 //--------------------------------------------------------------------------------------------------
-// Tests
+// Utils
+//--------------------------------------------------------------------------------------------------
+
+fn print_two_nodes_test_name(print_str: &str, test_fn: TwoNodesTestFn) {
+    print_test_name(print_str, test_fn as *mut std::os::raw::c_void);
+}
+
+/// Print name of test function
+fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
+    backtrace::resolve(test_fn, |symbol| {
+        let mut full_name = symbol.name().unwrap().as_str().unwrap().to_string();
+        let mut test_name = full_name.split_off("integration_test::".to_string().len());
+        test_name.push_str("()");
+        println!("{}{}", print_str, test_name);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+// Custom tests
 //--------------------------------------------------------------------------------------------------
 
 #[test]
@@ -185,31 +203,28 @@ fn basic_track_test<T: Transport, D: Dht>(engine: &mut RealEngine<T, D>) {
 #[test]
 fn basic_two_nodes_mock() {
     // Launch tests on each setup
-    //    for test_fn in test_fns {
-    //        launch_two_nodes_test_with_memory_network(test_fn).unwrap();
-    //    }
+    for test_fn in TWO_NODES_BASIC_TEST_FNS.iter() {
+        launch_two_nodes_test_with_memory_network(*test_fn).unwrap();
+    }
 }
 
 // Do general test with config
-#[cfg_attr(tarpaulin, skip)]
-fn launch_two_nodes_test_with_memory_network<T: Transport, D: Dht>(
-    test_fn: TwoNodesTestFn<T, D>,
-) -> Result<(), ()> {
-    //log_i!("");
-    //print_two_nodes_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
-    //log_i!("=======================");
+fn launch_two_nodes_test_with_memory_network(test_fn: TwoNodesTestFn) -> Result<(), ()> {
+    println!("");
+    print_two_nodes_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
+    println!("=======================");
 
     // Setup
-    let mut alex = basic_setup_mock("alex");
-    let mut billy = basic_setup_mock("billy");
+    let mut alex: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("alex"));
+    let mut billy: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("billy"));
     basic_two_setup(&mut alex, &mut billy);
 
     // Execute test
-    //test_fn(&mut alex, &mut billy);
+    test_fn(&mut alex, &mut billy);
 
     // Wrap-up test
-    //log_i!("==================");
-    //print_two_nodes_test_name("IN-MEMORY TEST END: ", test_fn);
+    println!("==================");
+    print_two_nodes_test_name("IN-MEMORY TEST END: ", test_fn);
     // Terminate nodes
     alex.terminate().unwrap();
     billy.terminate().unwrap();
@@ -217,15 +232,13 @@ fn launch_two_nodes_test_with_memory_network<T: Transport, D: Dht>(
     Ok(())
 }
 
-fn setup_only<T: Transport, D: Dht>(alex: &mut RealEngine<T, D>, billy: &mut RealEngine<T, D>) {
-    // N/a
+/// Empty function that triggers the test suite
+fn setup_only(_alex: &mut Box<dyn NetworkEngine>, _billy: &mut Box<dyn NetworkEngine>) {
+    // n/a
 }
 
 ///
-fn basic_two_setup<T: Transport, D: Dht>(
-    alex: &mut RealEngine<T, D>,
-    billy: &mut RealEngine<T, D>,
-) {
+fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
     // Start
     alex.run().unwrap();
     billy.run().unwrap();
@@ -242,7 +255,7 @@ fn basic_two_setup<T: Transport, D: Dht>(
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
+    assert!(!did_work);
     assert_eq!(srv_msg_list.len(), 0);
 
     // A joins space
@@ -253,20 +266,17 @@ fn basic_two_setup<T: Transport, D: Dht>(
     };
     alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
     // Billy
     track_space.agent_id = BILLY_AGENT_ID.clone();
     billy
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 }
 
 //
-fn basic_two_send_message<T: Transport, D: Dht>(
-    alex: &mut RealEngine<T, D>,
-    billy: &mut RealEngine<T, D>,
-) {
+fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
     let req_dm = DirectMessageData {
         space_address: SPACE_ADDRESS_A.clone(),
         request_id: "dm_1".to_string(),

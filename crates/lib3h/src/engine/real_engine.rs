@@ -8,8 +8,6 @@ use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::{Dht, DhtFactory},
-        mirror_dht::MirrorDht,
-        rrdht::RrDht,
     },
     engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig},
     gateway::P2pGateway,
@@ -109,7 +107,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        println!("[t] RealEngine.process()");
+        println!("[t] {} - RealEngine.process()", self.name);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -150,7 +148,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        println!("[d] >>>> '{}' recv: {:?}", self.name.clone(), client_msg);
+        println!("[d] {} >> recv: {:?}", self.name.clone(), client_msg);
         let mut outbox = Vec::new();
         let did_work = true;
         // Note: use same order as the enum
@@ -185,6 +183,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Ok(space_gateway) => {
                         let transport_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+                        println!("[d] - transport_id: {:?}", transport_id);
                         // Change into P2pProtocol
                         let net_msg = P2pProtocol::DirectMessage(msg);
                         // Serialize
@@ -298,33 +297,43 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     }
 
     /// Create a gateway for this agent in this space, if not already part of it.
+    /// Must not already be part of this space.
     fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Lib3hServerProtocol> {
-        let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
+        // Prepare response
         let mut res = GenericResultData {
             request_id: join_msg.request_id.clone(),
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
             result_info: vec![],
         };
+        // Bail if space already joined by agent
+        let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
-            res.result_info = "Already tracked".to_string().into_bytes();
+            res.result_info = "Already joined space".to_string().into_bytes();
             return Ok(Lib3hServerProtocol::FailureResult(res));
         }
+        // Create new space gateway for this ChainId
         let new_space_gateway = P2pGateway::new_with_space(
             Rc::clone(&self.network_gateway),
             &join_msg.space_address,
             self.dht_factory,
             &self.config.dht_config,
         );
+        // Add it to space map
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
+        // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         Dht::post(
             space_gateway,
             DhtCommand::HoldPeer(PeerData {
-                peer_address: "FIXME".to_string(), // msg.agent_id,
-                transport: self.network_gateway.borrow().id(),
-                timestamp: 42,
+                peer_address: self.network_gateway.borrow().id(), //"FIXME".to_string(), // msg.agent_id,
+                transport: self
+                    .network_gateway
+                    .borrow()
+                    .advertise()
+                    .unwrap_or(String::new()),
+                timestamp: 42, // FIXME
             }),
         )?;
         Ok(Lib3hServerProtocol::SuccessResult(res))

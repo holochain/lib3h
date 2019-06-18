@@ -38,6 +38,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     /// Handle a DhtEvent sent to us by our internal DHT.
     fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        println!("[d] {} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
         let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {
@@ -70,6 +71,11 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         evt: &TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        println!(
+            "[d] {} << handle_netTransportEvent: {:?}",
+            self.name.clone(),
+            evt
+        );
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
@@ -83,7 +89,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // FIXME
             }
             TransportEvent::Received(id, payload) => {
-                println!("(log.d) Received message from: {}", id);
+                println!("[d] Received message from: {}", id);
                 // FIXME: Make sense of msg? (i.e. deserialize)
                 println!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
