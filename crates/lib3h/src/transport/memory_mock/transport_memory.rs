@@ -8,25 +8,29 @@ use crate::transport::{
 use lib3h_protocol::DidWork;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-/// Transport used for the Space P2pGateway
+/// Transport for mocking network layer in-memory
+/// Binding creates a MemoryServer at url that can be accessed by other nodes
 pub struct TransportMemory {
     /// Commands sent to us by owner for async processing
     cmd_inbox: VecDeque<TransportCommand>,
-    /// All of our servers (by url)
+    /// Addresses (url-ish) of all our servers
     my_servers: HashSet<String>,
     /// Mapping of transportId -> serverUrl
     connections: HashMap<TransportId, String>,
     /// Counter for generating new transportIds
     n_id: u32,
+    /// My peer address on the network layer
+    machine_id: String,
 }
 
 impl TransportMemory {
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         TransportMemory {
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
             connections: HashMap::new(),
             n_id: 0,
+            machine_id: format!("{}_mId", name),
         }
     }
 }
@@ -38,6 +42,7 @@ impl Transport for TransportMemory {
         Ok(self.connections.keys().map(|id| id.to_string()).collect())
     }
 
+    /// Connect to another node's "bind".
     /// Get server from the uri and connect to it with a new transportId for ourself.
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         // println!("[d] ---- connect: {}", uri);
@@ -49,12 +54,17 @@ impl Transport for TransportMemory {
                 uri
             )));
         }
-        let mut server = maybe_server.unwrap().lock().unwrap();
+        // Generate ConnectionId
         self.n_id += 1;
-        let id = format!("{}__{}", uri, self.n_id);
-        server.connect(&id)?;
-        self.connections.insert(id.clone(), uri.to_string());
-        Ok(id)
+        let id = format!("mem_conn_{}", self.n_id);
+        // Get other's server and connect us to it by using our new ConnectionId.
+        let mut server = maybe_server.unwrap().lock().unwrap();
+        let mId = server.connect(&id)?;
+        // // Store ConnectionId
+        // self.connections.insert(id.clone(), uri.to_string());
+        // Store machine Id
+        self.connections.insert(mId.clone(), uri.to_string());
+        Ok(mId)
     }
 
     /// Notify server on that transportId that we are closing connection and clear that transportId.
@@ -67,6 +77,7 @@ impl Transport for TransportMemory {
             )));
         }
         let url = maybe_url.unwrap();
+        // Get other node's server
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(url);
         if let None = maybe_server {
@@ -76,7 +87,9 @@ impl Transport for TransportMemory {
             )));
         }
         let mut server = maybe_server.unwrap().lock().unwrap();
+        // Tell it to close connection
         server.close(&id)?;
+        // Locally remove connection
         self.connections.remove(id);
         Ok(())
     }
@@ -132,13 +145,15 @@ impl Transport for TransportMemory {
 
     /// Create a new server inbox for myself
     fn bind(&mut self, url: &str) -> TransportResult<String> {
-        memory_server::set_server(url)?;
-        self.my_servers.insert(url.to_string());
-        Ok(url.to_string())
+        let bounded_url = format!("{}_bound", url);
+        memory_server::set_server(&self.machine_id, &bounded_url)?;
+        self.my_servers.insert(bounded_url.to_string());
+        Ok(bounded_url.to_string())
     }
 
     /// Process my TransportCommand inbox and all my server inboxes
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+        // println!("[t] (TransportMemory).process()");
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process TransportCommand inbox
@@ -164,6 +179,18 @@ impl Transport for TransportMemory {
             }
         }
         Ok((did_work, outbox))
+    }
+}
+
+impl Drop for TransportMemory {
+    fn drop(&mut self) {
+        // Close all connections
+        self.close_all().ok();
+        // Drop my servers
+        for bounded_url in &self.my_servers {
+            memory_server::unset_server(&bounded_url)
+                .expect("unset_server() during drop should never fail");
+        }
     }
 }
 

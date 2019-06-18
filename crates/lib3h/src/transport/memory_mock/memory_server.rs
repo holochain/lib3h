@@ -22,14 +22,15 @@ lazy_static! {
 }
 
 /// Add new MemoryServer to the global server map
-pub fn set_server(url: &str) -> TransportResult<()> {
+pub fn set_server(owner_machine_id: &TransportIdRef, url: &str) -> TransportResult<()> {
     // println!("(log.d) set_server: {}", url);
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if server_map.contains_key(url) {
         return Err(TransportError::new("Server already exist".to_string()));
     }
-    server_map.insert(url.to_string(), Mutex::new(MemoryServer::new(url)));
+    let server = MemoryServer::new(owner_machine_id, url);
+    server_map.insert(url.to_string(), Mutex::new(server));
     Ok(())
 }
 
@@ -49,6 +50,8 @@ pub fn unset_server(url: &str) -> TransportResult<()> {
 //--------------------------------------------------------------------------------------------------
 
 pub struct MemoryServer {
+    /// My peer address on the network layer
+    owner_machine_id: TransportId,
     /// Address of this server
     uri: String,
     /// Inboxes for payloads from each of its connections.
@@ -57,32 +60,42 @@ pub struct MemoryServer {
 
 impl MemoryServer {
     /// Constructor
-    pub fn new(uri: &str) -> Self {
+    pub fn new(owner_machine_id: &TransportIdRef, uri: &str) -> Self {
         MemoryServer {
+            owner_machine_id: owner_machine_id.to_owned(),
             uri: uri.to_string(),
             inbox_map: HashMap::new(),
         }
     }
 
-    /// Create new inbox for this new transportId
-    pub fn connect(&mut self, id: &TransportIdRef) -> TransportResult<()> {
-        println!("[i] {}.connect({})", self.uri, id);
-        if self.inbox_map.contains_key(id) {
+    /// Create new inbox for this new transportId sender
+    /// Return our transportId
+    pub fn connect(
+        &mut self,
+        requester_machine_id: &TransportIdRef,
+    ) -> TransportResult<TransportId> {
+        println!(
+            "[i] (MemoryServer {}).connect({})",
+            self.uri, requester_machine_id
+        );
+        if self.inbox_map.contains_key(requester_machine_id) {
             return Err(TransportError::new(format!(
-                "TransportId '{}' already used for server {}",
-                id, self.uri
+                "Server {}, owned by {}, is already connected to {}",
+                self.uri, self.owner_machine_id, requester_machine_id,
             )));
         }
-        let res = self.inbox_map.insert(id.to_string(), VecDeque::new());
+        let res = self
+            .inbox_map
+            .insert(requester_machine_id.to_string(), VecDeque::new());
         if res.is_some() {
             return Err(TransportError::new("TransportId already used".to_string()));
         }
-        Ok(())
+        Ok(self.owner_machine_id.clone())
     }
 
     /// Delete this transportId's inbox
     pub fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
-        println!("[i] {}.close({})", self.uri, id);
+        println!("[i] (MemoryServer {}).close({})", self.uri, id);
         let res = self.inbox_map.remove(id);
         if res.is_none() {
             return Err(TransportError::new(format!(
@@ -95,10 +108,13 @@ impl MemoryServer {
     }
 
     /// Add payload to transportId's inbox
-    pub fn post(&mut self, id: &TransportIdRef, payload: &[u8]) -> TransportResult<()> {
-        let maybe_inbox = self.inbox_map.get_mut(id);
+    pub fn post(&mut self, from_id: &TransportIdRef, payload: &[u8]) -> TransportResult<()> {
+        let maybe_inbox = self.inbox_map.get_mut(from_id);
         if let None = maybe_inbox {
-            return Err(TransportError::new(format!("Unknown TransportId {}", id)));
+            return Err(TransportError::new(format!(
+                "(MemoryServer {}) Unknown TransportId {}",
+                self.uri, from_id
+            )));
         }
         maybe_inbox.unwrap().push_back(payload.to_vec());
         Ok(())
@@ -107,6 +123,7 @@ impl MemoryServer {
     /// Process all inboxes.
     /// Return a TransportEvent::Received for each payload processed.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+        println!("[t] (MemoryServer {}).process()", self.uri);
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process inboxes
@@ -117,6 +134,7 @@ impl MemoryServer {
                     Some(msg) => msg,
                 };
                 did_work = true;
+                println!("[t] (MemoryServer {}) received: {:?}", self.uri, payload);
                 let evt = TransportEvent::Received(id.clone(), payload);
                 outbox.push(evt);
             }

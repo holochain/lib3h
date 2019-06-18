@@ -8,7 +8,8 @@ use crate::{
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
 use std::collections::HashMap;
 
-/// Private
+/// Space layer related private methods
+/// Engine does not process a space gateway's Transport because it is shared with the network layer
 impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Process all space gateways
     pub(crate) fn process_space_gateways(&mut self) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
@@ -32,7 +33,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         Ok(outbox)
     }
 
-    /// Handle a DhtEvent sent to us by our internal DHT.
+    /// Handle a DhtEvent sent to us by a space gateway
     fn handle_spaceDhtEvent(
         &mut self,
         chain_id: &ChainId,
@@ -45,15 +46,21 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             cmd
         );
         let mut outbox = Vec::new();
+        let space_gateway = self
+            .space_gateway_map
+            .get_mut(chain_id)
+            .expect("Should have the space gateway we receive an event from.");
         match cmd {
-            DhtEvent::GossipTo(_data) => {
-                // FIXME
+            DhtEvent::GossipTo(_gossip_data) => {
+                // n/a - should have been handled by gateway
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
-                // FIXME
+                // n/a - should have been handled by gateway
             }
-            DhtEvent::HoldPeerRequested(_peer_address) => {
-                // FIXME
+            DhtEvent::HoldPeerRequested(peer_data) => {
+                // For now accept all request
+                let hold_cmd = DhtCommand::HoldPeer(peer_data);
+                space_gateway.post_dht(hold_cmd)?;
             }
             DhtEvent::PeerTimedOut(_data) => {
                 // FIXME

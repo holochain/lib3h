@@ -51,9 +51,9 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     fn bind(&mut self, url: &str) -> TransportResult<String> {
         let res = self.inner_transport.borrow_mut().bind(url);
-        if let Ok(adv) = res.clone() {
-            self.maybe_advertise = Some(adv);
-        }
+        //        if let Ok(adv) = res.clone() {
+        //            self.maybe_advertise = Some(adv);
+        //        }
         res
     }
 

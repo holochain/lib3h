@@ -90,8 +90,8 @@ pub mod tests {
     #[test]
     fn test_this_peer() {
         let dht = new_dht(true, PEER_A);
-        let this = dht.this_peer().unwrap();
-        assert_eq!(this, PEER_A);
+        let this = dht.this_peer();
+        assert_eq!(this.peer_address, PEER_A);
     }
 
     #[test]

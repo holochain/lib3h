@@ -8,8 +8,8 @@ extern crate backtrace;
 
 use lib3h::{
     dht::{
-        dht_trait::Dht,
-        mirror_dht::{MirrorDht, MirrorDhtConfig},
+        dht_trait::{Dht, DhtConfig},
+        mirror_dht::MirrorDht,
     },
     engine::{RealEngine, RealEngineConfig},
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
@@ -49,27 +49,28 @@ lazy_static! {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn build_mirror_dht_config(name: &str) -> Vec<u8> {
-    let config = MirrorDhtConfig {
-        peer_address: name.to_string(),
-        peer_transport: name.to_string(),
-    };
-    let mut raw = Vec::new();
-    config.serialize(&mut Serializer::new(&mut raw)).unwrap();
-    raw
-}
+//fn build_mirror_dht_config(name: &str) -> Vec<u8> {
+//    let config = DhtConfig {
+//        peer_address: name.to_string(),
+//        peer_transport: name.to_string(),
+//    };
+//    let mut raw = Vec::new();
+//    config.serialize(&mut Serializer::new(&mut raw)).unwrap();
+//    raw
+//}
 
 fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     let config = RealEngineConfig {
-        socket_type: "ws".into(),
+        socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        dht_config: build_mirror_dht_config(name),
+        bind_url: format!("mem://{}", name),
+        dht_custom_config: vec![],
     };
-    let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_raw_config).unwrap();
+    let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
-    println!("test_engine advertise: {}", p2p_binding);
+    println!("test engine for {}, advertise: {}", name, p2p_binding);
     engine
 }
 
@@ -79,14 +80,11 @@ fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht>
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        dht_config: build_mirror_dht_config("FIXME wss config"),
+        bind_url: format!("FIXME"),
+        dht_custom_config: vec![],
     };
-    let engine = RealEngine::new(
-        config,
-        "test_engine_wss".into(),
-        MirrorDht::new_with_raw_config,
-    )
-    .unwrap();
+    let engine =
+        RealEngine::new(config, "test_engine_wss".into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
     println!("test_engine advertise: {}", p2p_binding);
     engine
@@ -273,6 +271,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    println!("DONE basic_two_setup DONE \n\n\n");
 }
 
 //

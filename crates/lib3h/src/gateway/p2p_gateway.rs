@@ -3,7 +3,7 @@
 use crate::{
     dht::{
         dht_protocol::*,
-        dht_trait::{Dht, DhtFactory},
+        dht_trait::{Dht, DhtConfig, DhtFactory},
     },
     gateway::P2pGateway,
     transport::transport_trait::Transport,
@@ -13,17 +13,18 @@ use std::{cell::RefCell, rc::Rc};
 
 /// Public interface
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    // -- Getters -- //
-    /// This nodes identifier on the network
-    pub fn id(&self) -> String {
-        self.inner_dht
-            .this_peer()
-            .expect("P2pGateway's DHT should have 'this_peer'")
-            .to_string()
-    }
-    /// This nodes connection address
-    pub fn advertise(&self) -> Option<String> {
-        self.maybe_advertise.clone()
+    //    // -- Getters -- //
+    //    /// This nodes identifier on the network
+    //    pub fn id(&self) -> String {
+    //        self.inner_dht
+    //            .this_peer()
+    //            .expect("P2pGateway's DHT should have 'this_peer'")
+    //            .to_string()
+    //    }
+
+    /// This Gateways identifier
+    pub fn identifier(&self) -> &str {
+        self.identifier.as_str()
     }
 
     /// Hack dumb rust compiler
@@ -31,9 +32,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         self.inner_dht.post(cmd)
     }
 
-    pub fn set_advertise(&mut self, binding: &str) {
-        self.maybe_advertise = Some(binding.to_string());
-    }
+    //    pub fn set_advertise(&mut self, binding: &str) {
+    //        self.maybe_advertise = Some(binding.to_string());
+    //    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -44,16 +45,16 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
-    // pub fn new(inner_transport: &'t mut T) -> Self {
     pub fn new(
+        identifier: &str,
         inner_transport: Rc<RefCell<T>>,
         dht_factory: DhtFactory<D>,
-        dht_config: &[u8],
+        dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
             inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
-            maybe_advertise: None,
+            identifier: identifier.to_owned(),
         }
     }
 }
@@ -65,13 +66,13 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
         network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
         space_address: &AddressRef,
         dht_factory: DhtFactory<D>,
-        dht_config: &[u8],
+        dht_config: &DhtConfig,
     ) -> Self {
-        let advertise = std::string::String::from_utf8_lossy(space_address).to_string();
+        let identifier = std::string::String::from_utf8_lossy(space_address).to_string();
         P2pGateway {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
-            maybe_advertise: Some(advertise),
+            identifier,
         }
     }
 }

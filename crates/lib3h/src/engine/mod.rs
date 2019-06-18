@@ -3,12 +3,12 @@ pub mod p2p_protocol;
 pub mod real_engine;
 mod space_layer;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
     gateway::P2pGateway,
-    transport::transport_trait::Transport,
+    transport::{transport_trait::Transport, TransportId},
 };
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
 use std::{cell::RefCell, rc::Rc};
@@ -23,7 +23,8 @@ pub struct RealEngineConfig {
     pub bootstrap_nodes: Vec<String>,
     pub work_dir: String,
     pub log_level: char,
-    pub dht_config: Vec<u8>,
+    pub bind_url: String,
+    pub dht_custom_config: Vec<u8>,
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
@@ -38,6 +39,10 @@ pub struct RealEngine<T: Transport, D: Dht> {
     dht_factory: DhtFactory<D>,
     /// P2p gateway for the network layer,
     network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
+    /// Store active connections?
+    network_connections: HashSet<TransportId>,
+    /// Store requests to network layer
+    //network_request_map: HashMap<String, TransportCommand>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
 }

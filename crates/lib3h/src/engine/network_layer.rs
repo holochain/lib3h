@@ -5,11 +5,11 @@ use crate::{
     engine::{p2p_protocol::P2pProtocol, RealEngine},
     transport::{protocol::*, transport_trait::Transport},
 };
-use lib3h_protocol::{protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
-/// Private
+/// Network layer realted private methods
 impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
@@ -36,7 +36,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         Ok((tranport_did_work || dht_did_work, outbox))
     }
 
-    /// Handle a DhtEvent sent to us by our internal DHT.
+    /// Handle a DhtEvent sent to us by our network gateway
     fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         println!("[d] {} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
         let outbox = Vec::new();
@@ -66,7 +66,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         Ok(outbox)
     }
 
-    ///
+    /// Handle a TransportEvent sent to us by our network gateway
     fn handle_netTransportEvent(
         &mut self,
         evt: &TransportEvent,
@@ -79,14 +79,42 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
-            TransportEvent::TransportError(_id, _e) => {
-                // FIXME
+            TransportEvent::TransportError(id, e) => {
+                self.network_connections.remove(id);
+                eprintln!(
+                    "[e] {} Network error from {} : {:?}",
+                    self.name.clone(),
+                    id,
+                    e
+                );
+                // Output a Lib3hServerProtocol::Disconnected if it was the connection
+                if self.network_connections.is_empty() {
+                    let data = DisconnectedData {
+                        network_id: "FIXME".to_string(),
+                    };
+                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+                }
             }
-            TransportEvent::ConnectResult(_id) => {
-                // FIXME
+            TransportEvent::ConnectResult(id) => {
+                // Output a Lib3hServerProtocol::Connected if its the first connection
+                if self.network_connections.is_empty() {
+                    let data = ConnectedData {
+                        request_id: "FIXME".to_string(),
+                        machine_id: id.as_bytes().to_vec(),
+                    };
+                    outbox.push(Lib3hServerProtocol::Connected(data));
+                }
+                let _ = self.network_connections.insert(id.to_owned());
             }
-            TransportEvent::Closed(_id) => {
-                // FIXME
+            TransportEvent::Closed(id) => {
+                self.network_connections.remove(id);
+                // Output a Lib3hServerProtocol::Disconnected if it was the connection
+                if self.network_connections.is_empty() {
+                    let data = DisconnectedData {
+                        network_id: "FIXME".to_string(),
+                    };
+                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+                }
             }
             TransportEvent::Received(id, payload) => {
                 println!("[d] Received message from: {}", id);
@@ -108,7 +136,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     /// Serve a P2pProtocol sent to us by the network.
     /// Return a list of Lib3hServerProtocol to send to Core.
-    // FIXME
     fn serve_P2pProtocol(
         &mut self,
         p2p_msg: &P2pProtocol,

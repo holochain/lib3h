@@ -1,4 +1,7 @@
-use crate::dht::{dht_protocol::*, dht_trait::Dht};
+use crate::dht::{
+    dht_protocol::*,
+    dht_trait::{Dht, DhtConfig},
+};
 use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
 use std::collections::{HashMap, VecDeque};
 
@@ -10,12 +13,6 @@ use serde::{Deserialize, Serialize};
 enum MirrorGossip {
     Entry(EntryData),
     Peer(PeerData),
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct MirrorDhtConfig {
-    pub peer_address: String,
-    pub peer_transport: String,
 }
 
 /// Mirror DHT implementation: Holds and reflect everything back to other nodes (fullsync)
@@ -48,23 +45,26 @@ impl MirrorDht {
         }
     }
 
-    pub fn new_with_config(config: &MirrorDhtConfig) -> Self {
-        Self::new(&config.peer_address, &config.peer_transport)
+    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
+        Ok(Self::new(
+            &config.this_peer_address,
+            &config.this_peer_transport,
+        ))
     }
 
-    pub fn new_with_raw_config(config: &[u8]) -> Lib3hResult<Self> {
-        let mut de = Deserializer::new(&config[..]);
-        let config = Deserialize::deserialize(&mut de)?;
-        Ok(Self::new_with_config(&config))
-    }
+    //    pub fn new_with_raw_config(config: &[u8]) -> Lib3hResult<Self> {
+    //        let mut de = Deserializer::new(&config[..]);
+    //        let config = Deserialize::deserialize(&mut de)?;
+    //        Ok(Self::new_with_config(&config))
+    //    }
 }
 
 /// Impl Dht interface
 impl Dht for MirrorDht {
     // -- Getters -- //
 
-    fn this_peer(&self) -> Lib3hResult<&str> {
-        Ok(&self.this_peer.peer_address)
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
 
     // -- Peer -- //

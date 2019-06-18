@@ -6,7 +6,7 @@ use crate::{
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
@@ -43,7 +43,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         Ok((did_work, dht_event_list))
     }
     /// Getters
-    fn this_peer(&self) -> Lib3hResult<&str> {
+    fn this_peer(&self) -> &PeerData {
         self.inner_dht.this_peer()
     }
     fn get_peer_list(&self) -> Vec<PeerData> {
@@ -53,16 +53,6 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    /// For space gateway, space_address is stored in the advertise field.
-    /// This function does this conversion.
-    fn space_address(&self) -> Address {
-        let advertise = self
-            .maybe_advertise
-            .clone()
-            .expect("Advertise for space gateway should be set at construction");
-        return advertise.as_bytes().to_vec();
-    }
-
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<()> {
         match cmd {
@@ -77,9 +67,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .transport;
                     // Change into P2pProtocol
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
-                        space_address: self.space_address(),
+                        space_address: self.identifier().as_bytes().to_vec(),
                         to_peer_address: to_peer_address.as_bytes().to_vec(),
-                        from_peer_address: self.id().as_bytes().to_vec(),
+                        from_peer_address: self.this_peer().peer_address.as_bytes().to_vec(),
                         bundle: data.bundle.clone(),
                     });
                     let mut payload = Vec::new();
@@ -97,13 +87,13 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 // FIXME
             }
             DhtEvent::HoldPeerRequested(_peer_address) => {
-                // FIXME
+                // FIXME or have engine handle it?
             }
             DhtEvent::PeerTimedOut(_data) => {
                 // FIXME
             }
             DhtEvent::HoldEntryRequested(_from, _data) => {
-                // FIXME: N/A? Have engine handle it?
+                // N/A - Have engine handle it
             }
             DhtEvent::FetchEntryResponse(_data) => {
                 // FIXME

@@ -6,12 +6,19 @@ use std::collections::VecDeque;
 pub struct RrDht {
     /// FIFO of DhtCommands send to us
     inbox: VecDeque<DhtCommand>,
+    ///
+    this_peer: PeerData,
 }
 
 impl RrDht {
     pub fn new() -> Self {
         RrDht {
             inbox: VecDeque::new(),
+            this_peer: PeerData {
+                peer_address: "FIXME".to_string(),
+                transport: "FIXME".to_string(),
+                timestamp: 0, // FIXME
+            },
         }
     }
 
@@ -23,9 +30,8 @@ impl RrDht {
 impl Dht for RrDht {
     // -- Getters -- //
 
-    fn this_peer(&self) -> Lib3hResult<&str> {
-        // FIXME
-        Ok("FIXME")
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
 
     // -- Peer -- //

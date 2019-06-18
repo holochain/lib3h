@@ -12,5 +12,6 @@ use std::{cell::RefCell, rc::Rc};
 pub struct P2pGateway<T: Transport, D: Dht> {
     inner_transport: Rc<RefCell<T>>,
     inner_dht: D,
-    maybe_advertise: Option<String>,
+    /// Used for distinguishing gateways
+    identifier: String,
 }
