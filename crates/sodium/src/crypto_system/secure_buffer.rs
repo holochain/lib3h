@@ -3,6 +3,8 @@ use lib3h_crypto_api::{Buffer, BufferType, CryptoError, CryptoResult, ProtectSta
 use crate::check_init;
 use libc::c_void;
 
+/// A secure buffer implementation of lib3h_crypto_api::Buffer
+/// making use of libsodium's implementation of mlock and mprotect.
 pub struct SecureBuffer {
     z: *mut c_void,
     s: usize,
@@ -44,7 +46,7 @@ impl std::ops::Deref for SecureBuffer {
         if *self.p.borrow() == ProtectState::NoAccess {
             panic!("Deref, but state is NoAccess");
         }
-        unsafe { std::slice::from_raw_parts(self.z as *const u8, self.s) }
+        unsafe { &std::slice::from_raw_parts(self.z as *const u8, self.s)[..self.s] }
     }
 }
 
@@ -53,7 +55,7 @@ impl std::ops::DerefMut for SecureBuffer {
         if *self.p.borrow() != ProtectState::ReadWrite {
             panic!("DerefMut, but state is not ReadWrite");
         }
-        unsafe { std::slice::from_raw_parts_mut(self.z as *mut u8, self.s) }
+        unsafe { &mut std::slice::from_raw_parts_mut(self.z as *mut u8, self.s)[..self.s] }
     }
 }
 
@@ -63,9 +65,11 @@ impl Buffer for SecureBuffer {
     fn new(size: usize) -> CryptoResult<Self> {
         check_init();
         let z = unsafe {
-            let z = rust_sodium_sys::sodium_malloc(size);
+            // round up to nearest 8
+            let align_size = (size + 7) & !7;
+            let z = rust_sodium_sys::sodium_malloc(align_size);
             if z.is_null() {
-                return Err(CryptoError::new("memory error"));
+                return Err(CryptoError::OutOfMemory);
             }
             rust_sodium_sys::sodium_mprotect_noaccess(z);
             z
@@ -101,5 +105,26 @@ impl Buffer for SecureBuffer {
             rust_sodium_sys::sodium_mprotect_readwrite(self.z);
         }
         *self.p.borrow_mut() = ProtectState::ReadWrite;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_handles_alignment() {
+        // the underlying memory should be 8,
+        // but every function should treat it as 1.
+        let mut b = SecureBuffer::new(1).unwrap();
+        assert_eq!(1, b.len());
+        {
+            let r: &[u8] = &b.read_lock()[..];
+            assert_eq!(1, r.len());
+        }
+        {
+            let w: &mut [u8] = &mut b.write_lock()[..];
+            assert_eq!(1, w.len());
+        }
     }
 }

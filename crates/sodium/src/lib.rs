@@ -58,4 +58,8 @@ pub mod secbuf_random;
 pub mod secbuf_util;
 pub mod sign;
 
-pub mod crypto_system;
+mod crypto_system;
+pub use crypto_system::{
+    SecureBuffer,
+    SodiumCryptoSystem,
+};
