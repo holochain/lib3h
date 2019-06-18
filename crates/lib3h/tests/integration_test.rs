@@ -10,6 +10,7 @@ use lib3h::{
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::TransportWss,
 };
+use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
@@ -30,7 +31,7 @@ lazy_static! {
 // Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory> {
+fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
@@ -43,7 +44,8 @@ fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory> {
     engine
 }
 
-fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>> {
+fn basic_setup_wss(
+) -> RealEngine<TransportWss<std::net::TcpStream>, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
@@ -101,7 +103,7 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<T: Transport>(engine: &mut RealEngine<T>) {
+fn basic_track_test<T: Transport>(engine: &mut RealEngine<T, InsecureBuffer, FakeCryptoSystem>) {
     // Start
     engine.run().unwrap();
 

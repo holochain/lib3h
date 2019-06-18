@@ -42,6 +42,33 @@ impl CryptoSignature for SodiumCryptoSystem {
         Ok(())
     }
 
+    fn sign_keypair<PublicKeyBuffer: Buffer, SecretKeyBuffer: Buffer>(
+        public_key: &mut PublicKeyBuffer,
+        secret_key: &mut SecretKeyBuffer,
+    ) -> CryptoResult<()> {
+        check_init();
+
+        if public_key.len() != SodiumCryptoSystem::SIGN_PUBLIC_KEY_BYTES {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if secret_key.len() != SodiumCryptoSystem::SIGN_SECRET_KEY_BYTES {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let mut public_key = public_key.write_lock();
+        let mut secret_key = secret_key.write_lock();
+
+        unsafe {
+            rust_sodium_sys::crypto_sign_keypair(
+                raw_ptr_char!(public_key),
+                raw_ptr_char!(secret_key),
+            );
+        }
+
+        Ok(())
+    }
+
     fn sign<SignatureBuffer: Buffer, MessageBuffer: Buffer, SecretKeyBuffer: Buffer>(
         signature: &mut SignatureBuffer,
         message: &MessageBuffer,

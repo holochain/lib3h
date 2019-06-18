@@ -23,6 +23,13 @@ pub trait CryptoSignature {
         secret_key: &mut SecretKeyBuffer,
     ) -> CryptoResult<()>;
 
+    /// Produce a public key of SIGN_PUBLIC_KEY_BYTES length,
+    /// and an associated secret key of SIGN_SECRET_KEY_BYTES length.
+    fn sign_keypair<PublicKeyBuffer: Buffer, SecretKeyBuffer: Buffer>(
+        public_key: &mut PublicKeyBuffer,
+        secret_key: &mut SecretKeyBuffer,
+    ) -> CryptoResult<()>;
+
     /// Generate a cryptographic / digital signature for a message with the
     /// given secret key.
     /// The signature bytes are placed in the `signature` parameter.

@@ -17,6 +17,8 @@ use crate::{
     transport_wss::TransportWss,
 };
 
+use lib3h_crypto_api::{Buffer, CryptoSystem};
+
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type PlayerId = (Address, Address);
 
@@ -30,7 +32,7 @@ pub struct RealEngineConfig {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport> {
+pub struct RealEngine<T: Transport, SecBuf: Buffer, Crypto: CryptoSystem> {
     /// Config settings
     _config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
@@ -41,11 +43,24 @@ pub struct RealEngine<T: Transport> {
     transport_gateway: P2pGateway<T, RrDht>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<PlayerId, P2pGateway<TransportSpace, RrDht>>,
+    /// Our TransportId (aka MachineId)
+    _transport_id: String,
+    /// The TransportId public key
+    _transport_public_key: Vec<u8>,
+    /// The TransportId secret key
+    _transport_secret_key: SecBuf,
+    /// needed to accept the Crypto trait generic
+    _phantom_crypto: std::marker::PhantomData<Crypto>,
 }
 
-impl RealEngine<TransportWss<std::net::TcpStream>> {
+impl<SecBuf: Buffer, Crypto: CryptoSystem>
+    RealEngine<TransportWss<std::net::TcpStream>, SecBuf, Crypto>
+{
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
+        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
+        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
         let mut transport_gateway = P2pGateway::new_with_wss();
         transport_gateway.bind(name)?; // FIXME: Should be an URI in config
         Ok(RealEngine {
@@ -54,25 +69,38 @@ impl RealEngine<TransportWss<std::net::TcpStream>> {
             name: name.to_string(),
             transport_gateway,
             space_gateway_map: HashMap::new(),
+            _transport_id: "fake".to_string(),
+            _transport_public_key: public_key,
+            _transport_secret_key: secret_key,
+            _phantom_crypto: std::marker::PhantomData,
         })
     }
 }
 
 /// Constructor
 //#[cfg(test)]
-impl RealEngine<TransportMemory> {
+impl<SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, SecBuf, Crypto> {
     pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
+        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
+        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(RealEngine {
             _config: config,
             inbox: VecDeque::new(),
             name: name.to_string(),
             transport_gateway: P2pGateway::new_with_memory(name),
             space_gateway_map: HashMap::new(),
+            _transport_id: "fake".to_string(),
+            _transport_public_key: public_key,
+            _transport_secret_key: secret_key,
+            _phantom_crypto: std::marker::PhantomData,
         })
     }
 }
 
-impl<T: Transport> NetworkEngine for RealEngine<T> {
+impl<T: Transport, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
+    for RealEngine<T, SecBuf, Crypto>
+{
     fn run(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
@@ -117,7 +145,7 @@ impl<T: Transport> NetworkEngine for RealEngine<T> {
 }
 
 /// Private
-impl<T: Transport> RealEngine<T> {
+impl<T: Transport, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, SecBuf, Crypto> {
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();

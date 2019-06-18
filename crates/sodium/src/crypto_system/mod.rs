@@ -13,12 +13,12 @@ pub use secure_buffer::SecureBuffer;
 /// use lib3h_sodium::SecureBuffer;
 ///
 /// // It is recommended to use CryptoSystem as a Generic Trait like this:
-/// fn test<Crypto: lib3h_crypto_api::CryptoSystem>() {
-///     let mut seed = SecureBuffer::new(Crypto::SIGN_SEED_BYTES).unwrap();
+/// fn test<SecBuf: lib3h_crypto_api::Buffer, Crypto: lib3h_crypto_api::CryptoSystem>() {
+///     let mut seed = SecBuf::new(Crypto::SIGN_SEED_BYTES).unwrap();
 ///     Crypto::randombytes_buf(&mut seed).unwrap();
 ///
 ///     let mut pubkey = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
-///     let mut seckey = SecureBuffer::new(Crypto::SIGN_SECRET_KEY_BYTES).unwrap();
+///     let mut seckey = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES).unwrap();
 ///
 ///     Crypto::sign_seed_keypair(&seed, &mut pubkey, &mut seckey).unwrap();
 ///
@@ -31,12 +31,14 @@ pub use secure_buffer::SecureBuffer;
 /// }
 ///
 /// fn main() {
-///     test::<lib3h_sodium::SodiumCryptoSystem>();
+///     test::<lib3h_sodium::SecureBuffer, lib3h_sodium::SodiumCryptoSystem>();
 /// }
 /// ```
 pub struct SodiumCryptoSystem {}
 
 mod random;
 mod sign;
+
+use lib3h_crypto_api::Buffer;
 
 impl lib3h_crypto_api::CryptoSystem for SodiumCryptoSystem {}

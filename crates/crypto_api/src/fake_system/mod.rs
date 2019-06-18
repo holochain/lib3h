@@ -53,6 +53,17 @@ impl CryptoSignature for FakeCryptoSystem {
         Ok(())
     }
 
+    fn sign_keypair<PublicKeyBuffer: Buffer, SecretKeyBuffer: Buffer>(
+        public_key: &mut PublicKeyBuffer,
+        secret_key: &mut SecretKeyBuffer,
+    ) -> CryptoResult<()> {
+        let mut rnd = vec![0; 8];
+        FakeCryptoSystem::randombytes_buf(&mut rnd)?;
+        public_key.write_lock().write(0, &rnd)?;
+        secret_key.write_lock().write(0, &rnd)?;
+        Ok(())
+    }
+
     fn sign<SignatureBuffer: Buffer, MessageBuffer: Buffer, SecretKeyBuffer: Buffer>(
         signature: &mut SignatureBuffer,
         message: &MessageBuffer,

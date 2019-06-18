@@ -6,12 +6,12 @@
 //! extern crate lib3h_crypto_api;
 //!
 //! // It is recommended to use CryptoSystem as a Generic Trait like this:
-//! fn test<Crypto: lib3h_crypto_api::CryptoSystem>() {
-//!     let mut seed = vec![0; Crypto::SIGN_SEED_BYTES];
+//! fn test<SecBuf: lib3h_crypto_api::Buffer, Crypto: lib3h_crypto_api::CryptoSystem>() {
+//!     let mut seed = SecBuf::new(Crypto::SIGN_SEED_BYTES).unwrap();
 //!     Crypto::randombytes_buf(&mut seed).unwrap();
 //!
 //!     let mut pubkey = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
-//!     let mut seckey = vec![0; Crypto::SIGN_SECRET_KEY_BYTES];
+//!     let mut seckey = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES).unwrap();
 //!
 //!     Crypto::sign_seed_keypair(&seed, &mut pubkey, &mut seckey).unwrap();
 //!
@@ -24,7 +24,7 @@
 //! }
 //!
 //! fn main() {
-//!     test::<lib3h_crypto_api::FakeCryptoSystem>();
+//!     test::<lib3h_crypto_api::InsecureBuffer, lib3h_crypto_api::FakeCryptoSystem>();
 //! }
 //! ```
 
