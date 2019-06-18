@@ -5,14 +5,14 @@
 #![feature(try_trait)]
 #![feature(never_type)]
 #![warn(unused_extern_crates)]
+#[macro_use]
+extern crate lazy_static;
 
-//extern crate base64;
 extern crate chrono;
 extern crate futures;
 extern crate multihash;
+extern crate regex;
 extern crate rust_base58;
-
-//#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
