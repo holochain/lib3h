@@ -6,20 +6,23 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub mod error;
-pub use error::*;
+mod error;
+pub use error::{CryptoError, CryptoResult};
 
-pub mod buffer;
-pub use buffer::*;
+mod buffer;
+pub use buffer::{
+    insecure_buffer::InsecureBuffer, read_lock::ReadLocker, write_lock::WriteLocker, Buffer,
+    BufferType, ProtectState,
+};
 
-pub mod random;
-pub use random::*;
+mod random;
+pub use random::CryptoRandom;
 
-pub mod sign;
-pub use sign::*;
+mod sign;
+pub use sign::CryptoSignature;
 
-pub mod system;
-pub use system::*;
+mod system;
+pub use system::CryptoSystem;
 
-pub mod fake_system;
-pub use fake_system::*;
+mod fake_system;
+pub use fake_system::FakeCryptoSystem;

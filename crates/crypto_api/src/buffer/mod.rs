@@ -1,13 +1,12 @@
 use super::{CryptoError, CryptoResult};
 
 pub mod read_lock;
-pub use read_lock::*;
+use read_lock::ReadLocker;
 
 pub mod write_lock;
-pub use write_lock::*;
+use write_lock::WriteLocker;
 
 pub mod insecure_buffer;
-pub use insecure_buffer::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProtectState {
