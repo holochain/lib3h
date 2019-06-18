@@ -6,6 +6,10 @@ pub enum CryptoError {
     Generic(String),
     OutputLength(String),
     OutOfMemory,
+    BadSeedSize,
+    BadPublicKeySize,
+    BadSecretKeySize,
+    BadSignatureSize,
 }
 
 impl CryptoError {

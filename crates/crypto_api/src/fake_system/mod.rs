@@ -15,7 +15,7 @@ lazy_static! {
 const FAKE_SEQ: [u32; 4] = [0x30698bae, 0x47984c92, 0x901d24fb, 0x91fba506];
 
 impl CryptoRandom for FakeCryptoSystem {
-    fn random<OutputBuffer: Buffer>(&self, buffer: &mut OutputBuffer) -> CryptoResult<()> {
+    fn randombytes_buf<OutputBuffer: Buffer>(&self, buffer: &mut OutputBuffer) -> CryptoResult<()> {
         let mut buffer = buffer.write_lock();
 
         let mut idx = 4;
@@ -42,70 +42,73 @@ impl CryptoRandom for FakeCryptoSystem {
 
 impl CryptoSignature for FakeCryptoSystem {
     #[inline]
-    fn sig_seed_size(&self) -> usize {
-        8
-    }
-    #[inline]
-    fn sig_pub_size(&self) -> usize {
-        8
-    }
-    #[inline]
-    fn sig_priv_size(&self) -> usize {
-        8
-    }
-    #[inline]
-    fn sig_size(&self) -> usize {
+    fn sign_seed_bytes(&self) -> usize {
         8
     }
 
-    fn sig_keypair_from_seed<SeedBuffer: Buffer, PubBuffer: Buffer, PrivBuffer: Buffer>(
+    #[inline]
+    fn sign_public_key_bytes(&self) -> usize {
+        8
+    }
+
+    #[inline]
+    fn sign_secret_key_bytes(&self) -> usize {
+        8
+    }
+
+    #[inline]
+    fn sign_bytes(&self) -> usize {
+        8
+    }
+
+    fn sign_seed_keypair<SeedBuffer: Buffer, PublicKeyBuffer: Buffer, SecretKeyBuffer: Buffer>(
         &self,
         seed: &SeedBuffer,
-        public_key: &mut PubBuffer,
-        private_key: &mut PrivBuffer,
+        public_key: &mut PublicKeyBuffer,
+        secret_key: &mut SecretKeyBuffer,
     ) -> CryptoResult<()> {
         public_key.write_lock().write(0, &seed.read_lock())?;
-        private_key.write_lock().write(0, &seed.read_lock())?;
+        secret_key.write_lock().write(0, &seed.read_lock())?;
         Ok(())
     }
 
-    fn sig_sign<PrivBuffer: Buffer, DataBuffer: Buffer, SigBuffer: Buffer>(
+    fn sign<SignatureBuffer: Buffer, MessageBuffer: Buffer, SecretKeyBuffer: Buffer>(
         &self,
-        private_key: &PrivBuffer,
-        data: &DataBuffer,
-        signature: &mut SigBuffer,
+        signature: &mut SignatureBuffer,
+        message: &MessageBuffer,
+        secret_key: &SecretKeyBuffer,
     ) -> CryptoResult<()> {
         let mut signature = signature.write_lock();
-        signature[0] = private_key.read_lock()[0];
-        signature[1] = data.read_lock()[0];
+        signature[0] = secret_key.read_lock()[0];
+        signature[1] = message.read_lock()[0];
         signature[2] = 0xff;
         signature[3] = 0xff;
         Ok(())
     }
 
-    fn sig_verify<PubBuffer: Buffer, DataBuffer: Buffer, SigBuffer: Buffer>(
+    fn sign_verify<SignatureBuffer: Buffer, MessageBuffer: Buffer, PublicKeyBuffer: Buffer>(
         &self,
-        public_key: &PubBuffer,
-        data: &DataBuffer,
-        signature: &SigBuffer,
+        signature: &SignatureBuffer,
+        message: &MessageBuffer,
+        public_key: &PublicKeyBuffer,
     ) -> CryptoResult<bool> {
         let public_key = public_key.read_lock();
-        let data = data.read_lock();
+        let message = message.read_lock();
         let signature = signature.read_lock();
         Ok(signature[0] == public_key[0]
-            && signature[1] == data[0]
+            && signature[1] == message[0]
             && signature[2] == 0xff
             && signature[3] == 0xff)
     }
 }
 
 lazy_static! {
-    static ref FAKE: FakeCryptoSystem = FakeCryptoSystem {};
+    static ref FAKE_CRYPTO_SYSTEM: FakeCryptoSystem = FakeCryptoSystem {};
 }
 
 impl CryptoSystem for FakeCryptoSystem {
     fn get() -> &'static Self {
-        &FAKE
+        &FAKE_CRYPTO_SYSTEM
     }
 }
 
@@ -123,7 +126,7 @@ mod tests {
             &format!("{:?}", buf1)
         );
 
-        FakeCryptoSystem::get().random(&mut buf1).unwrap();
+        FakeCryptoSystem::get().randombytes_buf(&mut buf1).unwrap();
 
         assert_ne!(
             "InsecureBuffer { b: [0, 0, 0, 0, 0, 0, 0, 0], p: RefCell { value: NoAccess } }",
@@ -132,7 +135,7 @@ mod tests {
 
         let mut buf2 = InsecureBuffer::new(8).unwrap();
 
-        FakeCryptoSystem::get().random(&mut buf2).unwrap();
+        FakeCryptoSystem::get().randombytes_buf(&mut buf2).unwrap();
 
         assert_ne!(&format!("{:?}", buf1), &format!("{:?}", buf2));
     }
@@ -143,13 +146,13 @@ mod tests {
 
         assert_eq!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", buf1));
 
-        FakeCryptoSystem::get().random(&mut buf1).unwrap();
+        FakeCryptoSystem::get().randombytes_buf(&mut buf1).unwrap();
 
         assert_ne!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", buf1));
 
         let mut buf2 = vec![0; 8];
 
-        FakeCryptoSystem::get().random(&mut buf2).unwrap();
+        FakeCryptoSystem::get().randombytes_buf(&mut buf2).unwrap();
 
         assert_ne!(&format!("{:?}", buf1), &format!("{:?}", buf2));
     }
@@ -160,22 +163,22 @@ mod tests {
 
         let data = InsecureBuffer::new(8).unwrap();
 
-        let mut seed = InsecureBuffer::new(crypto.sig_seed_size()).unwrap();
-        crypto.random(&mut seed).unwrap();
+        let mut seed = InsecureBuffer::new(crypto.sign_seed_bytes()).unwrap();
+        crypto.randombytes_buf(&mut seed).unwrap();
 
-        let mut pub_key = InsecureBuffer::new(crypto.sig_pub_size()).unwrap();
-        let mut priv_key = InsecureBuffer::new(crypto.sig_priv_size()).unwrap();
+        let mut pub_key = InsecureBuffer::new(crypto.sign_public_key_bytes()).unwrap();
+        let mut priv_key = InsecureBuffer::new(crypto.sign_secret_key_bytes()).unwrap();
 
         crypto
-            .sig_keypair_from_seed(&seed, &mut pub_key, &mut priv_key)
+            .sign_seed_keypair(&seed, &mut pub_key, &mut priv_key)
             .unwrap();
 
-        let mut sig = InsecureBuffer::new(crypto.sig_size()).unwrap();
+        let mut sig = InsecureBuffer::new(crypto.sign_bytes()).unwrap();
 
-        assert!(!crypto.sig_verify(&pub_key, &data, &sig).unwrap());
+        assert!(!crypto.sign_verify(&sig, &data, &pub_key).unwrap());
 
-        crypto.sig_sign(&priv_key, &data, &mut sig).unwrap();
+        crypto.sign(&mut sig, &data, &priv_key).unwrap();
 
-        assert!(crypto.sig_verify(&pub_key, &data, &sig).unwrap());
+        assert!(crypto.sign_verify(&sig, &data, &pub_key).unwrap());
     }
 }

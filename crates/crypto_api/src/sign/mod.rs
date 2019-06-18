@@ -1,29 +1,29 @@
 use crate::{Buffer, CryptoResult};
 
 pub trait CryptoSignature {
-    fn sig_seed_size(&self) -> usize;
-    fn sig_pub_size(&self) -> usize;
-    fn sig_priv_size(&self) -> usize;
-    fn sig_size(&self) -> usize;
+    fn sign_seed_bytes(&self) -> usize;
+    fn sign_public_key_bytes(&self) -> usize;
+    fn sign_secret_key_bytes(&self) -> usize;
+    fn sign_bytes(&self) -> usize;
 
-    fn sig_keypair_from_seed<SeedBuffer: Buffer, PubBuffer: Buffer, PrivBuffer: Buffer>(
+    fn sign_seed_keypair<SeedBuffer: Buffer, PublicKeyBuffer: Buffer, SecretKeyBuffer: Buffer>(
         &self,
         seed: &SeedBuffer,
-        public_key: &mut PubBuffer,
-        private_key: &mut PrivBuffer,
+        public_key: &mut PublicKeyBuffer,
+        secret_key: &mut SecretKeyBuffer,
     ) -> CryptoResult<()>;
 
-    fn sig_sign<PrivBuffer: Buffer, DataBuffer: Buffer, SigBuffer: Buffer>(
+    fn sign<SignatureBuffer: Buffer, MessageBuffer: Buffer, SecretKeyBuffer: Buffer>(
         &self,
-        private_key: &PrivBuffer,
-        data: &DataBuffer,
-        signature: &mut SigBuffer,
+        signature: &mut SignatureBuffer,
+        message: &MessageBuffer,
+        secret_key: &SecretKeyBuffer,
     ) -> CryptoResult<()>;
 
-    fn sig_verify<PubBuffer: Buffer, DataBuffer: Buffer, SigBuffer: Buffer>(
+    fn sign_verify<SignatureBuffer: Buffer, MessageBuffer: Buffer, PublicKeyBuffer: Buffer>(
         &self,
-        public_key: &PubBuffer,
-        data: &DataBuffer,
-        signature: &SigBuffer,
+        signature: &SignatureBuffer,
+        message: &MessageBuffer,
+        public_key: &PublicKeyBuffer,
     ) -> CryptoResult<bool>;
 }
