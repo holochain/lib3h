@@ -39,7 +39,7 @@ impl CryptoRandom for FakeCryptoSystem {
 
 impl CryptoSignature for FakeCryptoSystem {
     const SIGN_SEED_BYTES: usize = 8;
-    const SIGN_PUBLIC_KEY_BYTES: usize = 8;
+    const SIGN_PUBLIC_KEY_BYTES: usize = 32;
     const SIGN_SECRET_KEY_BYTES: usize = 8;
     const SIGN_BYTES: usize = 8;
 

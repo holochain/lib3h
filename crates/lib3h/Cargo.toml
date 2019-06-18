@@ -13,6 +13,7 @@ documentation = "https://docs.rs/lib3h"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
+hcid = "=0.0.6"
 lib3h_protocol = { path = "../lib3h_protocol", version = "=0.0.1-alpha1" }
 lib3h_crypto_api = { path = "../crypto_api", version = "=0.0.1-alpha1" }
 tungstenite = "=0.6.1"

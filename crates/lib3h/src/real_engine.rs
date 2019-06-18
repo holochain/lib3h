@@ -43,7 +43,7 @@ pub struct RealEngine<T: Transport, SecBuf: Buffer, Crypto: CryptoSystem> {
     transport_gateway: P2pGateway<T, RrDht>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<PlayerId, P2pGateway<TransportSpace, RrDht>>,
-    /// Our TransportId (aka MachineId)
+    /// Our TransportId (aka MachineId, "HcMyadayada")
     _transport_id: String,
     /// The TransportId public key
     _transport_public_key: Vec<u8>,
@@ -58,6 +58,7 @@ impl<SecBuf: Buffer, Crypto: CryptoSystem>
 {
     /// Constructor
     pub fn new(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
         let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
         let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
         Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
@@ -69,7 +70,7 @@ impl<SecBuf: Buffer, Crypto: CryptoSystem>
             name: name.to_string(),
             transport_gateway,
             space_gateway_map: HashMap::new(),
-            _transport_id: "fake".to_string(),
+            _transport_id: hcm0.encode(&public_key)?,
             _transport_public_key: public_key,
             _transport_secret_key: secret_key,
             _phantom_crypto: std::marker::PhantomData,
@@ -81,6 +82,7 @@ impl<SecBuf: Buffer, Crypto: CryptoSystem>
 //#[cfg(test)]
 impl<SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, SecBuf, Crypto> {
     pub fn new_mock(config: RealEngineConfig, name: &str) -> Lib3hResult<Self> {
+        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
         let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
         let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
         Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
@@ -90,7 +92,7 @@ impl<SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, SecBuf, C
             name: name.to_string(),
             transport_gateway: P2pGateway::new_with_memory(name),
             space_gateway_map: HashMap::new(),
-            _transport_id: "fake".to_string(),
+            _transport_id: hcm0.encode(&public_key)?,
             _transport_public_key: public_key,
             _transport_secret_key: secret_key,
             _phantom_crypto: std::marker::PhantomData,
