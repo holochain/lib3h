@@ -1,39 +1,36 @@
 use crate::{Buffer, CryptoRandom, CryptoResult, CryptoSignature, CryptoSystem};
 
+/// WARNING THIS IS NOT SECURE!!
+/// This is a fake crypto system to give hints for implementing real systems.
+/// The functions here mimic a real crypto system, but are doing trivial things.
+/// Do not use this for any real systems.
+/// Even the random functions are fake, and produce poor results.
 pub struct FakeCryptoSystem {}
-
-lazy_static! {
-    static ref FAKE_SEED: std::sync::Arc<std::sync::Mutex<u32>> =
-        std::sync::Arc::new(std::sync::Mutex::new(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .subsec_nanos()
-        ));
-}
 
 const FAKE_SEQ: [u32; 4] = [0x30698bae, 0x47984c92, 0x901d24fb, 0x91fba506];
 
 impl CryptoRandom for FakeCryptoSystem {
-    fn randombytes_buf<OutputBuffer: Buffer>(&self, buffer: &mut OutputBuffer) -> CryptoResult<()> {
+    // rust doesn't supply any random functions in std
+    // and we don't want to import another crate just for this
+    // mimic randomness using subsec_nanos() BUT DON'T RELY ON THIS!
+    fn randombytes_buf<OutputBuffer: Buffer>(buffer: &mut OutputBuffer) -> CryptoResult<()> {
         let mut buffer = buffer.write_lock();
 
-        let mut idx = 4;
-        let mut seed = FAKE_SEED.lock().unwrap();
+        let mut idx = 0;
+        let mut seed = 0;
 
         for i in 0..buffer.len() {
+            seed = seed
+                ^ FAKE_SEQ[idx]
+                ^ std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .subsec_nanos();
+            idx += 1;
             if idx >= FAKE_SEQ.len() {
                 idx = 0;
-                *seed = *seed
-                    ^ std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .subsec_nanos();
-            } else {
-                *seed = *seed ^ FAKE_SEQ[idx];
-                idx += 1;
             }
-            buffer[i] = (*seed % 256) as u8;
+            buffer[i] = (seed % 256) as u8;
         }
 
         Ok(())
@@ -41,28 +38,12 @@ impl CryptoRandom for FakeCryptoSystem {
 }
 
 impl CryptoSignature for FakeCryptoSystem {
-    #[inline]
-    fn sign_seed_bytes(&self) -> usize {
-        8
-    }
-
-    #[inline]
-    fn sign_public_key_bytes(&self) -> usize {
-        8
-    }
-
-    #[inline]
-    fn sign_secret_key_bytes(&self) -> usize {
-        8
-    }
-
-    #[inline]
-    fn sign_bytes(&self) -> usize {
-        8
-    }
+    const SIGN_SEED_BYTES: usize = 8;
+    const SIGN_PUBLIC_KEY_BYTES: usize = 8;
+    const SIGN_SECRET_KEY_BYTES: usize = 8;
+    const SIGN_BYTES: usize = 8;
 
     fn sign_seed_keypair<SeedBuffer: Buffer, PublicKeyBuffer: Buffer, SecretKeyBuffer: Buffer>(
-        &self,
         seed: &SeedBuffer,
         public_key: &mut PublicKeyBuffer,
         secret_key: &mut SecretKeyBuffer,
@@ -73,7 +54,6 @@ impl CryptoSignature for FakeCryptoSystem {
     }
 
     fn sign<SignatureBuffer: Buffer, MessageBuffer: Buffer, SecretKeyBuffer: Buffer>(
-        &self,
         signature: &mut SignatureBuffer,
         message: &MessageBuffer,
         secret_key: &SecretKeyBuffer,
@@ -87,7 +67,6 @@ impl CryptoSignature for FakeCryptoSystem {
     }
 
     fn sign_verify<SignatureBuffer: Buffer, MessageBuffer: Buffer, PublicKeyBuffer: Buffer>(
-        &self,
         signature: &SignatureBuffer,
         message: &MessageBuffer,
         public_key: &PublicKeyBuffer,
@@ -102,15 +81,7 @@ impl CryptoSignature for FakeCryptoSystem {
     }
 }
 
-lazy_static! {
-    static ref FAKE_CRYPTO_SYSTEM: FakeCryptoSystem = FakeCryptoSystem {};
-}
-
-impl CryptoSystem for FakeCryptoSystem {
-    fn get() -> &'static Self {
-        &FAKE_CRYPTO_SYSTEM
-    }
-}
+impl CryptoSystem for FakeCryptoSystem {}
 
 #[cfg(test)]
 mod tests {
@@ -126,7 +97,7 @@ mod tests {
             &format!("{:?}", buf1)
         );
 
-        FakeCryptoSystem::get().randombytes_buf(&mut buf1).unwrap();
+        FakeCryptoSystem::randombytes_buf(&mut buf1).unwrap();
 
         assert_ne!(
             "InsecureBuffer { b: [0, 0, 0, 0, 0, 0, 0, 0], p: RefCell { value: NoAccess } }",
@@ -135,7 +106,7 @@ mod tests {
 
         let mut buf2 = InsecureBuffer::new(8).unwrap();
 
-        FakeCryptoSystem::get().randombytes_buf(&mut buf2).unwrap();
+        FakeCryptoSystem::randombytes_buf(&mut buf2).unwrap();
 
         assert_ne!(&format!("{:?}", buf1), &format!("{:?}", buf2));
     }
@@ -146,39 +117,35 @@ mod tests {
 
         assert_eq!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", buf1));
 
-        FakeCryptoSystem::get().randombytes_buf(&mut buf1).unwrap();
+        FakeCryptoSystem::randombytes_buf(&mut buf1).unwrap();
 
         assert_ne!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", buf1));
 
         let mut buf2 = vec![0; 8];
 
-        FakeCryptoSystem::get().randombytes_buf(&mut buf2).unwrap();
+        FakeCryptoSystem::randombytes_buf(&mut buf2).unwrap();
 
         assert_ne!(&format!("{:?}", buf1), &format!("{:?}", buf2));
     }
 
     #[test]
     fn it_should_sign_and_verify() {
-        let crypto = FakeCryptoSystem::get();
-
         let data = InsecureBuffer::new(8).unwrap();
 
-        let mut seed = InsecureBuffer::new(crypto.sign_seed_bytes()).unwrap();
-        crypto.randombytes_buf(&mut seed).unwrap();
+        let mut seed = InsecureBuffer::new(FakeCryptoSystem::SIGN_SEED_BYTES).unwrap();
+        FakeCryptoSystem::randombytes_buf(&mut seed).unwrap();
 
-        let mut pub_key = InsecureBuffer::new(crypto.sign_public_key_bytes()).unwrap();
-        let mut priv_key = InsecureBuffer::new(crypto.sign_secret_key_bytes()).unwrap();
+        let mut pub_key = InsecureBuffer::new(FakeCryptoSystem::SIGN_PUBLIC_KEY_BYTES).unwrap();
+        let mut priv_key = InsecureBuffer::new(FakeCryptoSystem::SIGN_SECRET_KEY_BYTES).unwrap();
 
-        crypto
-            .sign_seed_keypair(&seed, &mut pub_key, &mut priv_key)
-            .unwrap();
+        FakeCryptoSystem::sign_seed_keypair(&seed, &mut pub_key, &mut priv_key).unwrap();
 
-        let mut sig = InsecureBuffer::new(crypto.sign_bytes()).unwrap();
+        let mut sig = InsecureBuffer::new(FakeCryptoSystem::SIGN_BYTES).unwrap();
 
-        assert!(!crypto.sign_verify(&sig, &data, &pub_key).unwrap());
+        assert!(!FakeCryptoSystem::sign_verify(&sig, &data, &pub_key).unwrap());
 
-        crypto.sign(&mut sig, &data, &priv_key).unwrap();
+        FakeCryptoSystem::sign(&mut sig, &data, &priv_key).unwrap();
 
-        assert!(crypto.sign_verify(&sig, &data, &pub_key).unwrap());
+        assert!(FakeCryptoSystem::sign_verify(&sig, &data, &pub_key).unwrap());
     }
 }

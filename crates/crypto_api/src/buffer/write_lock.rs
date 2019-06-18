@@ -1,6 +1,6 @@
 use crate::Buffer;
 
-/// a helper object that will automatically secure a SecBuf when dropped
+/// Helper object that will automatically secure a Buffer when dropped
 pub struct WriteLocker<'a, T: Buffer>(&'a mut T);
 
 impl<'a, T: Buffer> WriteLocker<'a, T> {

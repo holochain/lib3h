@@ -1,5 +1,7 @@
 use crate::{Buffer, CryptoResult};
 
+/// Provides functions dealing with cryptographic randomness
 pub trait CryptoRandom {
-    fn randombytes_buf<OutputBuffer: Buffer>(&self, buffer: &mut OutputBuffer) -> CryptoResult<()>;
+    /// Fill the output buffer with cryptographicly secure random bytes
+    fn randombytes_buf<OutputBuffer: Buffer>(buffer: &mut OutputBuffer) -> CryptoResult<()>;
 }

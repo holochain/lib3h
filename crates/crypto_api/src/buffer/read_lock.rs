@@ -1,6 +1,6 @@
 use crate::Buffer;
 
-/// a helper object that will automatically secure a SecBuf when dropped
+/// Helper object that will automatically secure a Buffer when dropped
 pub struct ReadLocker<'a, T: Buffer>(&'a T);
 
 impl<'a, T: Buffer> ReadLocker<'a, T> {

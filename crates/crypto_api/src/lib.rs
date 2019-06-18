@@ -1,7 +1,33 @@
 //! lib3h abstract cryptography traits and data types
+//!
+//! # Examples
+//!
+//! ```
+//! extern crate lib3h_crypto_api;
+//!
+//! // It is recommended to use CryptoSystem as a Generic Trait like this:
+//! fn test<Crypto: lib3h_crypto_api::CryptoSystem>() {
+//!     let mut seed = vec![0; Crypto::SIGN_SEED_BYTES];
+//!     Crypto::randombytes_buf(&mut seed).unwrap();
+//!
+//!     let mut pubkey = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
+//!     let mut seckey = vec![0; Crypto::SIGN_SECRET_KEY_BYTES];
+//!
+//!     Crypto::sign_seed_keypair(&seed, &mut pubkey, &mut seckey).unwrap();
+//!
+//!     let mut signature = vec![0; Crypto::SIGN_BYTES];
+//!
+//!     Crypto::sign(&mut signature, &vec![1, 2, 3, 4], &seckey).unwrap();
+//!
+//!     assert!(Crypto::sign_verify(&signature, &vec![1, 2, 3, 4], &pubkey).unwrap());
+//!     assert!(!Crypto::sign_verify(&signature, &vec![4, 3, 2, 1], &pubkey).unwrap());
+//! }
+//!
+//! fn main() {
+//!     test::<lib3h_crypto_api::FakeCryptoSystem>();
+//! }
+//! ```
 
-#[macro_use]
-extern crate lazy_static;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

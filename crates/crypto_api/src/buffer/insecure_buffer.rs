@@ -1,5 +1,7 @@
 use crate::{Buffer, BufferType, CryptoResult, ProtectState};
 
+/// You probably just want to use Vec<u8> directly rather than this.
+/// This is a class is mainly an implementation reference for SecureBuffers.
 #[derive(Debug, Clone)]
 pub struct InsecureBuffer {
     b: Box<[u8]>,
