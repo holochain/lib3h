@@ -1,19 +1,27 @@
+use crate::transport::{
+    error::TransportResult,
+    protocol::{TransportCommand, TransportEvent},
+    transport_trait::Transport,
+    TransportId, TransportIdRef,
+};
+use lib3h_protocol::DidWork;
+
 /// Wraps any transport and adds cryptography
-pub struct transportCrypto<T: Transport> {
+pub struct TransportCrypto<T: Transport> {
     inner_transport: T,
 }
 
 /// Constructor
 /// FIXME: Consume inner_tranport or have it be a reference?
-impl<T: Transport> transportCrypto<T> {
+impl<T: Transport> TransportCrypto<T> {
     pub fn new(inner_transport: T) -> Self {
-        transportCrypto { inner_transport }
+        TransportCrypto { inner_transport }
     }
 }
 
 /// Implement Transport trait by composing inner transport
 /// FIXME passthrough for now
-impl<T: Transport> Transport for transportCrypto<T> {
+impl<T: Transport> Transport for TransportCrypto<T> {
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         self.inner_transport.connect(&uri)
     }
@@ -47,5 +55,9 @@ impl<T: Transport> Transport for transportCrypto<T> {
 
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
         self.inner_transport.transport_id_list()
+    }
+
+    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+        self.inner_transport.get_uri(id)
     }
 }
