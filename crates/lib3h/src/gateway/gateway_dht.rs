@@ -59,12 +59,21 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
                 for to_peer_address in data.peer_address_list {
+                    // HACK: (should not gossip to self in the first place)
+                    let me = &self.inner_dht.this_peer().peer_address;
+                    if &to_peer_address == me {
+                        continue;
+                    }
                     // get peer address
                     let peer_transport = self
                         .inner_dht
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
                         .transport;
+                    println!(
+                        "(GatewayDht) GossipTo: {} {}",
+                        to_peer_address, peer_transport
+                    );
                     // Change into P2pProtocol
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
                         space_address: self.identifier().as_bytes().to_vec(),

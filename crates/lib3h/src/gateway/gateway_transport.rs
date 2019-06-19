@@ -28,25 +28,17 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         self.inner_transport.borrow_mut().close_all()
     }
 
+    //    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
+    //        // get peer transport from dht first
+    //        let mut transport_list = self.address_to_transport_list(id_list);
+    //        // send
+    //        println!("[t] (Gateway).send() {:?} | {}", id_list, payload.len());
+    //        let ref_list: Vec<&str> = transport_list.iter().map(|v| &**v).collect();
+    //        self.inner_transport.borrow_mut().send(&ref_list, payload)
+    //    }
+
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
-        // get peer transport from dht first
-        let mut transport_list = Vec::with_capacity(id_list.len());
-        for transportId in id_list {
-            let maybe_peer = self.inner_dht.get_peer(transportId);
-            match maybe_peer {
-                None => {
-                    return Err(TransportError::new(format!(
-                        "Unknown transportId: {}",
-                        transportId
-                    )));
-                }
-                Some(peer) => transport_list.push(peer.transport.to_string()),
-            }
-        }
-        // send
-        println!("[t] (Gateway).send() {:?} | {}", id_list, payload.len());
-        let ref_list: Vec<&str> = transport_list.iter().map(|v| &**v).collect();
-        self.inner_transport.borrow_mut().send(&ref_list, payload)
+        self.inner_transport.borrow_mut().send(&id_list, payload)
     }
 
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
@@ -54,11 +46,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     }
 
     fn bind(&mut self, url: &str) -> TransportResult<String> {
-        let res = self.inner_transport.borrow_mut().bind(url);
-        //        if let Ok(adv) = res.clone() {
-        //            self.maybe_advertise = Some(adv);
-        //        }
-        res
+        self.inner_transport.borrow_mut().bind(url)
     }
 
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {

@@ -6,7 +6,11 @@ use crate::{
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
     gateway::P2pGateway,
-    transport::transport_trait::Transport,
+    transport::{
+        error::{TransportError, TransportResult},
+        transport_trait::Transport,
+        TransportIdRef,
+    },
 };
 use lib3h_protocol::{AddressRef, Lib3hResult};
 use std::{cell::RefCell, rc::Rc};
@@ -28,7 +32,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
 // Constructors
 //--------------------------------------------------------------------------------------------------
 
-/// any Transport
+/// any Transport Constructor
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
@@ -46,7 +50,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     }
 }
 
-/// P2pGateway
+/// P2pGateway Constructor
 impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
     /// Constructors
     pub fn new_with_space(
@@ -61,5 +65,30 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
         }
+    }
+}
+
+/// Private
+impl<T: Transport, D: Dht> P2pGateway<T, D> {
+    /// Get Transports from the DHT
+    pub(crate) fn address_to_transport_list(
+        &self,
+        id_list: &[&TransportIdRef],
+    ) -> TransportResult<Vec<String>> {
+        // get peer transport from dht first
+        let mut transport_list = Vec::with_capacity(id_list.len());
+        for transportId in id_list {
+            let maybe_peer = self.inner_dht.get_peer(transportId);
+            match maybe_peer {
+                None => {
+                    return Err(TransportError::new(format!(
+                        "Unknown transportId: {}",
+                        transportId
+                    )));
+                }
+                Some(peer) => transport_list.push(peer.transport.to_string()),
+            }
+        }
+        Ok(transport_list)
     }
 }

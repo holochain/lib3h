@@ -283,7 +283,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     // More process?
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    //let (_did_work, _srv_msg_list) = billy.process().unwrap();
     // More process?
 
     println!("DONE basic_two_setup DONE \n\n\n");

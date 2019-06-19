@@ -211,6 +211,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // FIXME
             }
             Lib3hClientProtocol::SendDirectMessage(msg) => {
+                let my_name = self.name.clone();
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.from_agent_id,
@@ -222,7 +223,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Ok(space_gateway) => {
                         let transport_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        println!("[d] - transport_id: {:?}", transport_id);
+                        println!("[d] {} -- transport_id: {:?}", my_name, transport_id);
                         // Change into P2pProtocol
                         let net_msg = P2pProtocol::DirectMessage(msg);
                         // Serialize

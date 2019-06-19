@@ -189,13 +189,13 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             // FIXME: Get all gateways for that space regardless of agent_id
             P2pProtocol::JoinSpace(gateway_id, peer_data) => {
                 println!("[d] Received JoinSpace: {} {:?}", gateway_id, peer_data);
-                let maybe_space_gateway = self
-                    .space_gateway_map
-                    .get_mut(&(gateway_id.as_bytes().to_vec(), from_id.as_bytes().to_vec()));
-                if let Some(space_gateway) = maybe_space_gateway {
-                    println!("[d] JoinSpace OK");
-                    Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data.clone()))
-                        .expect("FIXME");
+                //                let maybe_space_gateway = self
+                //                    .space_gateway_map
+                //                    .get_mut(&(gateway_id.as_bytes().to_vec(), from_id.as_bytes().to_vec()));
+                //                if let Some(space_gateway) = maybe_space_gateway {
+                //                    println!("[d] JoinSpace OK");
+                for (_, mut space_gateway) in self.space_gateway_map.iter_mut() {
+                    space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()));
                 }
             }
         };

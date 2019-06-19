@@ -221,7 +221,7 @@ impl MirrorDht {
                 peer_gossip
                     .serialize(&mut Serializer::new(&mut buf))
                     .unwrap();
-                println!("gossiping peer: {:?}", peer);
+                println!("@MirrorDht@ gossiping peer: {:?}", peer);
                 let gossip_evt = GossipToData {
                     peer_address_list,
                     bundle: buf,
