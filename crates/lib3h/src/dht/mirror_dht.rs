@@ -51,12 +51,6 @@ impl MirrorDht {
             &config.this_peer_transport,
         ))
     }
-
-    //    pub fn new_with_raw_config(config: &[u8]) -> Lib3hResult<Self> {
-    //        let mut de = Deserializer::new(&config[..]);
-    //        let config = Deserialize::deserialize(&mut de)?;
-    //        Ok(Self::new_with_config(&config))
-    //    }
 }
 
 /// Impl Dht interface
@@ -130,17 +124,21 @@ impl Dht for MirrorDht {
 impl MirrorDht {
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
+        println!("@MirrorDht@ Adding peer: {:?}", peer_info);
         let maybe_peer = self.peer_list.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
+                println!("@MirrorDht@ Adding peer - OK NEW");
                 self.peer_list
                     .insert(peer_info.peer_address.clone(), peer_info.clone());
                 true
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
+                    println!("@MirrorDht@ Adding peer - BAD");
                     return false;
                 }
+                println!("@MirrorDht@ Adding peer - OK UPDATED");
                 peer.timestamp = peer_info.timestamp;
                 true
             }
@@ -223,7 +221,7 @@ impl MirrorDht {
                 peer_gossip
                     .serialize(&mut Serializer::new(&mut buf))
                     .unwrap();
-                println!("gossiping peer: {:?} | {:?}", peer, buf);
+                println!("gossiping peer: {:?}", peer);
                 let gossip_evt = GossipToData {
                     peer_address_list,
                     bundle: buf,

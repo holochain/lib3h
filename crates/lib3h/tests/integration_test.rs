@@ -70,7 +70,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     };
     let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
-    println!("test engine for {}, advertise: {}", name, p2p_binding);
+    // println!("test engine for {}, advertise: {}", name, p2p_binding);
     engine
 }
 
@@ -247,14 +247,17 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
         peer_transport: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
-    alex.post(Lib3hClientProtocol::Connect(req_connect))
+    alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(!did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
+    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
+    println!("connected_msg = {:?}", connected_msg);
+    assert_eq!(connected_msg.network_transport, req_connect.peer_transport);
+    // More process: Have Billy process P2p::PeerAddress of alex
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     // A joins space
     let mut track_space = SpaceData {
@@ -265,12 +268,24 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    // More process?
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    // More process?
+
     // Billy
     track_space.agent_id = BILLY_AGENT_ID.clone();
     billy
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    // More process?
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    // More process?
+
     println!("DONE basic_two_setup DONE \n\n\n");
 }
 

@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::dht_trait::Dht,
+    dht::{dht_protocol::*, dht_trait::Dht},
+    engine::p2p_protocol::P2pProtocol,
     gateway::P2pGateway,
     transport::{
         error::{TransportError, TransportResult},
@@ -11,6 +12,8 @@ use crate::{
     },
 };
 use lib3h_protocol::DidWork;
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
@@ -41,6 +44,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             }
         }
         // send
+        println!("[t] (Gateway).send() {:?} | {}", id_list, payload.len());
         let ref_list: Vec<&str> = transport_list.iter().map(|v| &**v).collect();
         self.inner_transport.borrow_mut().send(&ref_list, payload)
     }
@@ -76,13 +80,17 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
         self.inner_transport.borrow().transport_id_list()
     }
+
+    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+        self.inner_transport.borrow().get_uri(id)
+    }
 }
 
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
-        println!("[d] <<< '(TransportGateway)' recv: {:?}", evt);
+        println!("[d] <<< '(GatewayTransport)' recv: {:?}", evt);
         // Note: use same order as the enum
         match evt {
             TransportEvent::TransportError(id, e) => {
@@ -93,8 +101,26 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                // don't need to do anything here
-                println!("[i] Connection opened: {}", id);
+                println!("[i] Connection opened id: {}", id);
+                if let Some(uri) = self.get_uri(id) {
+                    println!("[i] Connection opened uri: {}", uri);
+
+                    // Send it our PeerAddress
+                    let our_peer_address = P2pProtocol::PeerAddress(
+                        self.identifier().to_string(),
+                        self.this_peer().clone().peer_address,
+                    );
+                    let mut buf = Vec::new();
+                    our_peer_address
+                        .serialize(&mut Serializer::new(&mut buf))
+                        .unwrap();
+                    println!(
+                        "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
+                        our_peer_address, id
+                    );
+                    // Send our PeerAddress to other side
+                    self.inner_transport.borrow_mut().send(&[&id], &buf)?;
+                }
             }
             TransportEvent::Closed(id) => {
                 // FIXME
@@ -102,8 +128,28 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
-            TransportEvent::Received(id, _msg) => {
+            TransportEvent::Received(id, payload) => {
                 println!("[d] Received message from: {}", id);
+                // println!("Deserialize msg: {:?}", payload);
+                let mut de = Deserializer::new(&payload[..]);
+                let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                    Deserialize::deserialize(&mut de);
+                if let Ok(p2p_msg) = maybe_p2p_msg {
+                    if let P2pProtocol::PeerAddress(gateway_id, peer_address) = p2p_msg {
+                        println!(
+                            "[d] Received PeerAddress: {} | {} ({})",
+                            peer_address, gateway_id, self.identifier
+                        );
+                        if self.identifier == gateway_id {
+                            let peer = PeerData {
+                                peer_address,
+                                transport: id.clone(),
+                                timestamp: 42, // FIXME
+                            };
+                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");
+                        }
+                    }
+                }
             }
         };
         Ok(())

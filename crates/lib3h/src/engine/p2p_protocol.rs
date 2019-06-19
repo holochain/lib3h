@@ -1,4 +1,5 @@
-use lib3h_protocol::{data_types::DirectMessageData, Address};
+use crate::dht::dht_protocol::PeerData;
+use lib3h_protocol::{data_types::DirectMessageData, Address}; // HACK
 
 /// Enum holding all message types in the 'network module <-> network module' protocol.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -7,9 +8,12 @@ pub enum P2pProtocol {
     Gossip(GossipData),
     DirectMessage(DirectMessageData),
     DirectMessageResult(DirectMessageData),
-    FetchData, // TODO
+    FetchData,         // TODO
     FetchDataResponse, // TODO
-               // FIXME
+    PeerAddress(String, String),
+    // HACK
+    JoinSpace(String, PeerData),
+    // FIXME
 }
 
 /// DHT gossip data

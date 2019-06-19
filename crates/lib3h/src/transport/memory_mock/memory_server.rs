@@ -22,15 +22,15 @@ lazy_static! {
 }
 
 /// Add new MemoryServer to the global server map
-pub fn set_server(owner_machine_id: &TransportIdRef, url: &str) -> TransportResult<()> {
-    // println!("(log.d) set_server: {}", url);
+pub fn set_server(uri: &str) -> TransportResult<()> {
+    // println!("[d] MemoryServer::set_server: {}", uri);
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if server_map.contains_key(url) {
+    if server_map.contains_key(uri) {
         return Err(TransportError::new("Server already exist".to_string()));
     }
-    let server = MemoryServer::new(owner_machine_id, url);
-    server_map.insert(url.to_string(), Mutex::new(server));
+    let server = MemoryServer::new(uri);
+    server_map.insert(uri.to_string(), Mutex::new(server));
     Ok(())
 }
 
@@ -50,47 +50,47 @@ pub fn unset_server(url: &str) -> TransportResult<()> {
 //--------------------------------------------------------------------------------------------------
 
 pub struct MemoryServer {
-    /// My peer address on the network layer
-    owner_machine_id: TransportId,
     /// Address of this server
     uri: String,
     /// Inboxes for payloads from each of its connections.
     inbox_map: HashMap<TransportId, VecDeque<Vec<u8>>>,
+    /// Inbox of new inbound connections
+    new_conn_inbox: Vec<TransportId>,
 }
 
 impl MemoryServer {
     /// Constructor
-    pub fn new(owner_machine_id: &TransportIdRef, uri: &str) -> Self {
+    pub fn new(uri: &str) -> Self {
         MemoryServer {
-            owner_machine_id: owner_machine_id.to_owned(),
             uri: uri.to_string(),
             inbox_map: HashMap::new(),
+            new_conn_inbox: Vec::new(),
         }
     }
 
-    /// Create new inbox for this new transportId sender
+    /// Create an inbox for this new sender
+    /// Will connect the other way.
     /// Return our transportId
-    pub fn connect(
-        &mut self,
-        requester_machine_id: &TransportIdRef,
-    ) -> TransportResult<TransportId> {
+    pub fn connect(&mut self, requester_uri: &TransportIdRef) -> TransportResult<()> {
         println!(
-            "[i] (MemoryServer {}).connect({})",
-            self.uri, requester_machine_id
+            "[i] (MemoryServer) {} creates inbox for {}",
+            self.uri, requester_uri
         );
-        if self.inbox_map.contains_key(requester_machine_id) {
+        if self.inbox_map.contains_key(requester_uri) {
             return Err(TransportError::new(format!(
-                "Server {}, owned by {}, is already connected to {}",
-                self.uri, self.owner_machine_id, requester_machine_id,
+                "Server {}, is already connected to {}",
+                self.uri, requester_uri,
             )));
         }
         let res = self
             .inbox_map
-            .insert(requester_machine_id.to_string(), VecDeque::new());
+            .insert(requester_uri.to_string(), VecDeque::new());
         if res.is_some() {
             return Err(TransportError::new("TransportId already used".to_string()));
         }
-        Ok(self.owner_machine_id.clone())
+        // Notify our TransportMemory to connect back
+        self.new_conn_inbox.push(requester_uri.to_string());
+        Ok(())
     }
 
     /// Delete this transportId's inbox
@@ -126,7 +126,13 @@ impl MemoryServer {
         println!("[t] (MemoryServer {}).process()", self.uri);
         let mut outbox = Vec::new();
         let mut did_work = false;
-        // Process inboxes
+        // Process connexion inbox
+        for uri in self.new_conn_inbox.iter() {
+            outbox.push(TransportEvent::ConnectResult(uri.to_string()));
+            did_work = true;
+        }
+        self.new_conn_inbox.clear();
+        // Process msg inboxes
         for (id, inbox) in self.inbox_map.iter_mut() {
             loop {
                 let payload = match inbox.pop_front() {

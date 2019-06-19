@@ -19,18 +19,26 @@ pub struct TransportMemory {
     connections: HashMap<TransportId, String>,
     /// Counter for generating new transportIds
     n_id: u32,
-    /// My peer address on the network layer
-    machine_id: String,
+    ///// My peer address on the network layer
+    /// My peer transport
+    maybe_my_uri: Option<String>,
 }
 
 impl TransportMemory {
-    pub fn new(name: &str) -> Self {
+    pub fn new() -> Self {
         TransportMemory {
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
             connections: HashMap::new(),
             n_id: 0,
-            machine_id: format!("{}_mId", name),
+            maybe_my_uri: None,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match &self.maybe_my_uri {
+            None => "",
+            Some(uri) => uri,
         }
     }
 }
@@ -42,10 +50,26 @@ impl Transport for TransportMemory {
         Ok(self.connections.keys().map(|id| id.to_string()).collect())
     }
 
+    /// get uri from a transportId
+    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+        let res = self.connections.get(&id.to_string());
+        res.map(|url| url.to_string())
+    }
+
     /// Connect to another node's "bind".
     /// Get server from the uri and connect to it with a new transportId for ourself.
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
-        // println!("[d] ---- connect: {}", uri);
+        // Self must have uri
+        let my_uri = match &self.maybe_my_uri {
+            None => {
+                return Err(TransportError::new(
+                    "Must bind before connecting".to_string(),
+                ));
+            }
+            Some(u) => u,
+        };
+
+        // println!("[d] ---- connect: {} -> {}", my_uri, uri);
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(uri);
         if let None = maybe_server {
@@ -59,12 +83,15 @@ impl Transport for TransportMemory {
         let id = format!("mem_conn_{}", self.n_id);
         // Get other's server and connect us to it by using our new ConnectionId.
         let mut server = maybe_server.unwrap().lock().unwrap();
-        let mId = server.connect(&id)?;
-        // // Store ConnectionId
-        // self.connections.insert(id.clone(), uri.to_string());
-        // Store machine Id
-        self.connections.insert(mId.clone(), uri.to_string());
-        Ok(mId)
+        server.connect(&my_uri)?;
+
+        // Store ConnectionId
+        self.connections.insert(id.clone(), uri.to_string());
+        Ok(id)
+
+        //        // Store machine Id
+        //        self.connections.insert(mId.clone(), uri.to_string());
+        //        Ok(mId)
     }
 
     /// Notify server on that transportId that we are closing connection and clear that transportId.
@@ -106,23 +133,25 @@ impl Transport for TransportMemory {
     /// Send payload to known transportIds in `id_list`
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
         for id in id_list {
-            let maybe_url = self.connections.get(*id);
-            if let None = maybe_url {
+            let maybe_uri = self.connections.get(*id);
+            if let None = maybe_uri {
                 println!("[w] No known connection for TransportId {}", id);
                 continue;
             }
-            let url = maybe_url.unwrap();
+            let uri = maybe_uri.unwrap();
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let maybe_server = server_map.get(url);
+            let maybe_server = server_map.get(uri);
             if let None = maybe_server {
                 return Err(TransportError::new(format!(
                     "No Memory server at this url address: {}",
-                    url
+                    uri
                 )));
             }
+            println!("[t] (TransportMemory).send() {} | {}", uri, payload.len());
+            // let uri = self.get_uri(id).unwrap();
             let mut server = maybe_server.unwrap().lock().unwrap();
             server
-                .post(id, payload)
+                .post(&self.maybe_my_uri.clone().unwrap(), payload)
                 .expect("Post on memory server should work");
         }
         Ok(())
@@ -144,11 +173,12 @@ impl Transport for TransportMemory {
     }
 
     /// Create a new server inbox for myself
-    fn bind(&mut self, url: &str) -> TransportResult<String> {
-        let bounded_url = format!("{}_bound", url);
-        memory_server::set_server(&self.machine_id, &bounded_url)?;
-        self.my_servers.insert(bounded_url.to_string());
-        Ok(bounded_url.to_string())
+    fn bind(&mut self, uri: &str) -> TransportResult<String> {
+        let bounded_uri = format!("{}_bound", uri);
+        self.maybe_my_uri = Some(bounded_uri.clone());
+        memory_server::set_server(&bounded_uri)?;
+        self.my_servers.insert(bounded_uri.to_string());
+        Ok(bounded_uri.to_string())
     }
 
     /// Process my TransportCommand inbox and all my server inboxes
@@ -169,13 +199,31 @@ impl Transport for TransportMemory {
             }
         }
         // Process my Servers
-        for server_url in &self.my_servers {
+        let mut to_connect_list = Vec::new();
+        for server_uri in &self.my_servers {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let server = server_map.get(server_url).expect("My server should exist.");
+            let server = server_map.get(server_uri).expect("My server should exist.");
             let (success, mut output) = server.lock().unwrap().process()?;
             if success {
                 did_work = true;
-                outbox.append(&mut output);
+                for event in &output {
+                    if let TransportEvent::ConnectResult(uri) = event {
+                        to_connect_list.push(uri.clone());
+                    } else {
+                        outbox.push(event.clone());
+                    }
+                }
+            }
+        }
+        // Connect back to received connections if not already connected to them
+        for uri in to_connect_list {
+            println!(
+                "[t] (TransportMemory) {} <- {}",
+                uri,
+                self.maybe_my_uri.clone().unwrap()
+            );
+            if let Ok(id) = self.connect(&uri) {
+                outbox.push(TransportEvent::ConnectResult(id));
             }
         }
         Ok((did_work, outbox))

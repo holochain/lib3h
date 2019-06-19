@@ -63,7 +63,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let network_transport = Rc::new(RefCell::new(TransportMemory::new(name)));
+        let network_transport = Rc::new(RefCell::new(TransportMemory::new()));
         // Bind & create DhtConfig
         let binding = network_transport
             .borrow_mut()
@@ -129,7 +129,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        println!("[t] {} - RealEngine.process() START", self.name);
+        println!("\n[t] {} - RealEngine.process() START", self.name);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -138,7 +138,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
-        println!("[t] {} - RealEngine.process END", self.name);
+        println!("[t] {} - RealEngine.process() END\n", self.name);
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }
@@ -185,16 +185,27 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             Lib3hClientProtocol::Connect(msg) => {
                 // Convert into TransportCommand & post to network gateway
                 let cmd = TransportCommand::Connect(msg.peer_transport);
-                // let net_gateway = self.network_gateway.borrow_mut();
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
-                //                let connection_id = self.network_gateway
-                //                    .borrow_mut()
-                //                    .connect(&msg.peer_transport)?;
-                //                println!("[d] - connection_id: {:?}", connection_id);
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let output = self.serve_JoinSpace(&msg)?;
                 outbox.push(output);
+                // HACK: Send JoinSpace to all known peers
+                let space_address =
+                    std::string::String::from_utf8_lossy(&msg.space_address).into_owned();
+                let agent_id = std::string::String::from_utf8_lossy(&msg.agent_id).into_owned();
+                // let this_peer = self.network_gateway.borrow().this_peer();
+                let space_gateway = self
+                    .space_gateway_map
+                    .get_mut(&(msg.space_address.to_owned(), msg.agent_id.to_owned()))
+                    .ok_or(format_err!("space_gateway not found during JoinSpace HACK"))?;
+                let peer = space_gateway.this_peer().to_owned();
+                let mut payload = Vec::new();
+                let p2p_msg = P2pProtocol::JoinSpace(space_address, peer);
+                p2p_msg
+                    .serialize(&mut Serializer::new(&mut payload))
+                    .unwrap();
+                self.network_gateway.borrow_mut().send_all(&payload).ok();
             }
             Lib3hClientProtocol::LeaveSpace(_msg) => {
                 // FIXME

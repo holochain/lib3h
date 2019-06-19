@@ -146,6 +146,12 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
     }
 
+    /// get uri from a transportId
+    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+        let res = self.stream_sockets.get(&id.to_string());
+        res.map(|info| info.url.as_str().to_string())
+    }
+
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
         self.inbox.push_back(command);
         Ok(())

@@ -13,15 +13,6 @@ use std::{cell::RefCell, rc::Rc};
 
 /// Public interface
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    //    // -- Getters -- //
-    //    /// This nodes identifier on the network
-    //    pub fn id(&self) -> String {
-    //        self.inner_dht
-    //            .this_peer()
-    //            .expect("P2pGateway's DHT should have 'this_peer'")
-    //            .to_string()
-    //    }
-
     /// This Gateways identifier
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
@@ -31,10 +22,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inner_dht.post(cmd)
     }
-
-    //    pub fn set_advertise(&mut self, binding: &str) {
-    //        self.maybe_advertise = Some(binding.to_string());
-    //    }
 }
 
 //--------------------------------------------------------------------------------------------------

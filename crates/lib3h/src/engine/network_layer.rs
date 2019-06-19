@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine},
-    transport::{protocol::*, transport_trait::Transport},
+    transport::{protocol::*, transport_trait::Transport, TransportIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
 use rmp_serde::Deserializer;
@@ -96,15 +96,21 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             TransportEvent::ConnectResult(id) => {
-                // Output a Lib3hServerProtocol::Connected if its the first connection
-                if self.network_connections.is_empty() {
-                    let data = ConnectedData {
-                        request_id: "FIXME".to_string(),
-                        machine_id: id.as_bytes().to_vec(),
-                    };
-                    outbox.push(Lib3hServerProtocol::Connected(data));
+                // Send our PeerData to other node??
+                let network_gateway = self.network_gateway.borrow();
+                if let Some(uri) = network_gateway.get_uri(id) {
+                    println!("[i] Network Connection opened: {} ({})", id, uri);
+
+                    // Output a Lib3hServerProtocol::Connected if its the first connection
+                    if self.network_connections.is_empty() {
+                        let data = ConnectedData {
+                            request_id: "FIXME".to_string(),
+                            network_transport: uri.to_string(),
+                        };
+                        outbox.push(Lib3hServerProtocol::Connected(data));
+                    }
+                    let _ = self.network_connections.insert(id.to_owned());
                 }
-                let _ = self.network_connections.insert(id.to_owned());
             }
             TransportEvent::Closed(id) => {
                 self.network_connections.remove(id);
@@ -127,7 +133,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     return Err(format_err!("Failed deserializing msg: {:?}", e));
                 }
                 let p2p_msg = maybe_msg.unwrap();
-                let mut output = self.serve_P2pProtocol(&p2p_msg)?;
+                let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
                 outbox.append(&mut output);
             }
         };
@@ -138,6 +144,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Return a list of Lib3hServerProtocol to send to Core.
     fn serve_P2pProtocol(
         &mut self,
+        from_id: &TransportIdRef,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
@@ -174,6 +181,22 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             P2pProtocol::FetchDataResponse => {
                 // FIXME
+            }
+            P2pProtocol::PeerAddress(_, _) => {
+                // FIXME
+            }
+            // HACK
+            // FIXME: Get all gateways for that space regardless of agent_id
+            P2pProtocol::JoinSpace(gateway_id, peer_data) => {
+                println!("[d] Received JoinSpace: {} {:?}", gateway_id, peer_data);
+                let maybe_space_gateway = self
+                    .space_gateway_map
+                    .get_mut(&(gateway_id.as_bytes().to_vec(), from_id.as_bytes().to_vec()));
+                if let Some(space_gateway) = maybe_space_gateway {
+                    println!("[d] JoinSpace OK");
+                    Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data.clone()))
+                        .expect("FIXME");
+                }
             }
         };
         Ok(outbox)
