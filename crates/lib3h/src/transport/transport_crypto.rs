@@ -1,4 +1,3 @@
-
 /// Wraps any transport and adds cryptography
 pub struct transportCrypto<T: Transport> {
     inner_transport: T,

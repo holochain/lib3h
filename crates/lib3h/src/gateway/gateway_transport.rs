@@ -43,18 +43,18 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     /// id_list =
     ///   - Network : machine_id
     ///   - space   : agent_id
-    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
-        // get peer transport from dht first
-        let dht_transport_list = self.address_to_dht_transport_list(id_list)?;
+    fn send(&mut self, dht_id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
+        // get transportId from the inner dht first
+        let dht_transport_list = self.address_to_dht_transport_list(dht_id_list)?;
         // send
         println!(
             "[t] ({}).send() {:?} -> {:?} | {}",
             self.identifier.clone(),
-            id_list,
+            dht_id_list,
             dht_transport_list,
             payload.len()
         );
-        // Get conn_id from uri
+        // Get transportIds for the inner Transport.
         let mut net_transport_list = Vec::new();
         for dht_transport in dht_transport_list {
             let net_transport = self
@@ -64,6 +64,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             net_transport_list.push(net_transport);
         }
         let ref_list: Vec<&str> = net_transport_list.iter().map(|v| v.as_str()).collect();
+        // Send on the inner Transport
         self.inner_transport.borrow_mut().send(&ref_list, payload)
     }
 
@@ -135,7 +136,6 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     /// A Gateway uses as transportId its inner_dht's peerData.peer_address
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        // self.inner_transport.borrow().transport_id_list()
         let peer_data_list = self.inner_dht.get_peer_list();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
@@ -144,6 +144,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         Ok(id_list)
     }
 
+    /// TODO?
     fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
         self.inner_transport.borrow().get_uri(id)
         //let maybe_peer_data = self.inner_dht.get_peer(id);

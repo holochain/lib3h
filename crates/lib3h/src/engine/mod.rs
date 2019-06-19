@@ -44,8 +44,6 @@ pub struct RealEngine<T: Transport, D: Dht> {
     network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
     /// Store active connections?
     network_connections: HashSet<TransportId>,
-    /// Store requests to network layer
-    //network_request_map: HashMap<String, TransportCommand>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
 }

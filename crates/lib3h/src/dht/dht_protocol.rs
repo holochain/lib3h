@@ -1,4 +1,5 @@
 use lib3h_protocol::{data_types::EntryData, Address};
+pub type FromPeerAddress = String;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtCommand {
@@ -31,7 +32,7 @@ pub enum DhtEvent {
     PeerTimedOut(String),
     /// Notify owner that gossip is requesting we hold an entry.
     /// String argument is: from_peer_address
-    HoldEntryRequested(String, EntryData),
+    HoldEntryRequested(FromPeerAddress, EntryData),
     /// Response to a `FetchEntry` command.
     FetchEntryResponse(FetchEntryResponseData),
     /// Notify owner that we are no longer tracking this entry internally.

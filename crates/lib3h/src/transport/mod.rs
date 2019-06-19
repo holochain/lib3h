@@ -3,6 +3,7 @@
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
+pub mod transport_crypto;
 pub mod transport_trait;
 
 /// a connection identifier

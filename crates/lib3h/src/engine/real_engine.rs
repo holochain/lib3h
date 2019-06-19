@@ -32,7 +32,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
         let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream()));
         let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
         let dht_config = DhtConfig {
-            this_peer_address: format!("{}_mId", name), // FIXME: create machineId here?
+            this_peer_address: format!("{}_mId", name), // TODO: get or create machineId instead
             this_peer_transport: binding,
             custom: config.dht_custom_config.clone(),
         };
@@ -357,11 +357,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         // HACK: Send JoinSpace to all known peers
         let space_address =
             std::string::String::from_utf8_lossy(&join_msg.space_address).into_owned();
-        //        let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
-        //        let space_gateway = self
-        //            .space_gateway_map
-        //            .get_mut(&(msg.space_address.to_owned(), msg.agent_id.to_owned()))
-        //            .ok_or(format_err!("space_gateway not found during JoinSpace HACK"))?;
         let peer = new_space_gateway.this_peer().to_owned();
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::JoinSpace(space_address.clone(), peer.clone());

@@ -88,10 +88,6 @@ impl Transport for TransportMemory {
         // Store ConnectionId
         self.connections.insert(id.clone(), uri.to_string());
         Ok(id)
-
-        //        // Store machine Id
-        //        self.connections.insert(mId.clone(), uri.to_string());
-        //        Ok(mId)
     }
 
     /// Notify server on that transportId that we are closing connection and clear that transportId.
