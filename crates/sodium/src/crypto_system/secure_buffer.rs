@@ -42,7 +42,7 @@ impl std::fmt::Debug for SecureBuffer {
 impl std::ops::Deref for SecureBuffer {
     type Target = [u8];
 
-    fn deref(&self) -> &[u8] {
+    fn deref(&self) -> &Self::Target {
         if *self.p.borrow() == ProtectState::NoAccess {
             panic!("Deref, but state is NoAccess");
         }
@@ -51,7 +51,7 @@ impl std::ops::Deref for SecureBuffer {
 }
 
 impl std::ops::DerefMut for SecureBuffer {
-    fn deref_mut(&mut self) -> &mut [u8] {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         if *self.p.borrow() != ProtectState::ReadWrite {
             panic!("DerefMut, but state is not ReadWrite");
         }
@@ -65,7 +65,8 @@ impl Buffer for SecureBuffer {
     fn new(size: usize) -> CryptoResult<Self> {
         check_init();
         let z = unsafe {
-            // round up to nearest 8
+            // sodium_malloc requires memory-aligned sizes,
+            // round up to the nearest 8 bytes.
             let align_size = (size + 7) & !7;
             let z = rust_sodium_sys::sodium_malloc(align_size);
             if z.is_null() {

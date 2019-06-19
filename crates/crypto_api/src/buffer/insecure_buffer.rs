@@ -11,7 +11,7 @@ pub struct InsecureBuffer {
 impl std::ops::Deref for InsecureBuffer {
     type Target = [u8];
 
-    fn deref(&self) -> &[u8] {
+    fn deref(&self) -> &Self::Target {
         if *self.p.borrow() == ProtectState::NoAccess {
             panic!("Deref, but state is NoAccess");
         }
@@ -20,7 +20,7 @@ impl std::ops::Deref for InsecureBuffer {
 }
 
 impl std::ops::DerefMut for InsecureBuffer {
-    fn deref_mut(&mut self) -> &mut [u8] {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         if *self.p.borrow() != ProtectState::ReadWrite {
             panic!("DerefMut, but state is not ReadWrite");
         }
