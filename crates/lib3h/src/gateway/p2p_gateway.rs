@@ -6,11 +6,7 @@ use crate::{
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
     gateway::P2pGateway,
-    transport::{
-        error::{TransportError, TransportResult},
-        transport_trait::Transport,
-        TransportIdRef,
-    },
+    transport::transport_trait::Transport,
 };
 use lib3h_protocol::{AddressRef, Lib3hResult};
 use std::{
@@ -21,7 +17,7 @@ use std::{
 
 /// Public interface
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    /// This Gateways identifier
+    /// This Gateway's identifier
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
     }

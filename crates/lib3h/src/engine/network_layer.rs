@@ -16,15 +16,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
-        //        // Process the network's transport
-        //        let (inner_transport_did_work, event_list) =
-        //            self.network_transport.borrow_mut().process()?;
-        //        if inner_transport_did_work {
-        //            for evt in event_list {
-        //                let mut output = self.handle_netTransportEvent(&evt)?;
-        //                outbox.append(&mut output);
-        //            }
-        //        }
         // Process the network gateway as a transport
         let (tranport_did_work, event_list) =
             Transport::process(&mut *self.network_gateway.borrow_mut())?;
@@ -139,8 +130,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             TransportEvent::Received(id, payload) => {
                 println!("[d] Received message from: {} | {}", id, payload.len());
-                // FIXME: Make sense of msg? (i.e. deserialize)
-                // println!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -159,7 +148,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Return a list of Lib3hServerProtocol to send to Core.
     fn serve_P2pProtocol(
         &mut self,
-        from_id: &TransportIdRef,
+        _from_id: &TransportIdRef,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
@@ -201,15 +190,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // FIXME
             }
             // HACK
-            // FIXME: Get all gateways for that space regardless of agent_id
             P2pProtocol::JoinSpace(gateway_id, peer_data) => {
                 println!("[d] Received JoinSpace: {} {:?}", gateway_id, peer_data);
-                //                let maybe_space_gateway = self
-                //                    .space_gateway_map
-                //                    .get_mut(&(gateway_id.as_bytes().to_vec(), from_id.as_bytes().to_vec()));
-                //                if let Some(space_gateway) = maybe_space_gateway {
-                //                    println!("[d] JoinSpace OK");
-                for (_, mut space_gateway) in self.space_gateway_map.iter_mut() {
+                for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
                 }
             }

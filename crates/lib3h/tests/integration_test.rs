@@ -7,10 +7,7 @@ extern crate unwrap_to;
 extern crate backtrace;
 
 use lib3h::{
-    dht::{
-        dht_trait::{Dht, DhtConfig},
-        mirror_dht::MirrorDht,
-    },
+    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::TransportWss,
@@ -19,8 +16,6 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };
-use rmp_serde::Serializer;
-use serde::Serialize;
 
 //--------------------------------------------------------------------------------------------------
 // Typedefs
@@ -40,7 +35,7 @@ lazy_static! {
 
     // List of tests
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<TwoNodesTestFn> = vec![
-        // setup_only,
+        setup_only,
         basic_two_send_message,
     ];
 }
@@ -48,16 +43,6 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
-
-//fn build_mirror_dht_config(name: &str) -> Vec<u8> {
-//    let config = DhtConfig {
-//        peer_address: name.to_string(),
-//        peer_transport: name.to_string(),
-//    };
-//    let mut raw = Vec::new();
-//    config.serialize(&mut Serializer::new(&mut raw)).unwrap();
-//    raw
-//}
 
 fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     let config = RealEngineConfig {
@@ -70,7 +55,10 @@ fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     };
     let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
-    // println!("test engine for {}, advertise: {}", name, p2p_binding);
+    println!(
+        "basic_setup_mock(): test engine for {}, advertise: {}",
+        name, p2p_binding
+    );
     engine
 }
 
@@ -283,8 +271,8 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     // More process?
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    //    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    //    let (_did_work, _srv_msg_list) = alex.process().unwrap();
     // More process?
 
     println!("DONE basic_two_setup DONE \n\n\n");

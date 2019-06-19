@@ -203,7 +203,7 @@ impl Transport for TransportMemory {
         for server_uri in &self.my_servers {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
             let server = server_map.get(server_uri).expect("My server should exist.");
-            let (success, mut output) = server.lock().unwrap().process()?;
+            let (success, output) = server.lock().unwrap().process()?;
             if success {
                 did_work = true;
                 for event in &output {
