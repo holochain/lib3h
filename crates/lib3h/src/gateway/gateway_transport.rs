@@ -17,81 +17,217 @@ use serde::{Deserialize, Serialize};
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
+    /// WARNING: Not called by `process()` when a post TransportCommand has been received
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
-        self.inner_transport.borrow_mut().connect(&uri)
+        println!("[t] ({}).connect() {}", self.identifier.clone(), uri);
+        let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
+        self.reverse_map
+            .insert(uri.to_string(), transport_id.clone());
+        Ok(transport_id)
     }
+
+    /// WARNING: Not called by `process()` when a post TransportCommand has been received
     fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+        // FIXME remove conn id conn_map??
         self.inner_transport.borrow_mut().close(id)
     }
 
+    /// WARNING: Not called by `process()` when a post TransportCommand has been received
     fn close_all(&mut self) -> TransportResult<()> {
         self.inner_transport.borrow_mut().close_all()
     }
 
+    /// id_list =
+    ///   - Network : machine_id
+    ///   - space   : agent_id
+    /// WARNING: Not called by `process()` when a post TransportCommand has been received
+    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
+        // get peer transport from dht first
+        let mut dht_transport_list = self.address_to_dht_transport_list(id_list)?;
+        // send
+        println!(
+            "[t] ({}).send() {:?} -> {:?} | {}",
+            self.identifier.clone(),
+            id_list,
+            dht_transport_list,
+            payload.len()
+        );
+        // Get conn_id from uri
+        let mut net_transport_list = Vec::new();
+        for dht_transport in dht_transport_list {
+            let net_transport = self
+                .reverse_map
+                .get(&dht_transport)
+                .expect(&format!("unknown dht_transport: {}", dht_transport));
+            net_transport_list.push(net_transport);
+        }
+        let ref_list: Vec<&str> = net_transport_list.iter().map(|v| v.as_str()).collect();
+        // let ref_list: Vec<&str> = conn_list.iter().map(|v| &**v).collect();
+        self.inner_transport.borrow_mut().send(&ref_list, payload)
+    }
+
+    /// transport_list =
+    ///   - Network : machine_id
+    ///   - space   : agent_id
+    /// WARNING: Not called by `process()` when a post TransportCommand has been received
+    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
+        let transport_list = self.transport_id_list()?;
+        let transport_list: Vec<&str> = transport_list.iter().map(|v| &**v).collect();
+        println!(
+            "[t] ({}) send_all() {:?}",
+            self.identifier.clone(),
+            transport_list
+        );
+        self.send(&transport_list, payload)
+        //self.inner_transport.borrow_mut().send(&transport_list, payload)
+
+        //        let mut id_list = Vec::with_capacity(conn_list.len());
+        //        for connection_id in conn_list {
+        //            let transport = self.get_uri(&connection_id).expect("gateway.send_all() failed");
+        //            id_list.push(transport);
+        //        }
+        //        let id_list: Vec<&str> = id_list.iter().map(|v| &**v).collect();
+        //        println!("[t] (GatewayTransport) send_all: {:?}", id_list);
+        //        // self.send(&id_list, payload)
+        //        self.inner_transport.borrow_mut().send(&id_list, payload)
+    }
+
+    //// Passthrough sends
     //    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
-    //        // get peer transport from dht first
-    //        let mut transport_list = self.address_to_transport_list(id_list);
-    //        // send
-    //        println!("[t] (Gateway).send() {:?} | {}", id_list, payload.len());
-    //        let ref_list: Vec<&str> = transport_list.iter().map(|v| &**v).collect();
-    //        self.inner_transport.borrow_mut().send(&ref_list, payload)
+    //        self.inner_transport.borrow_mut().send(&id_list, payload)
+    //    }
+    //
+    //    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
+    //        self.inner_transport.borrow_mut().send_all(payload)
     //    }
 
-    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
-        self.inner_transport.borrow_mut().send(&id_list, payload)
-    }
-
-    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        self.inner_transport.borrow_mut().send_all(payload)
-    }
-
+    /// WARNING: Not called by `process()` when a post TransportCommand has been received
     fn bind(&mut self, url: &str) -> TransportResult<String> {
+        println!("[t] ({}) bind() {}", self.identifier.clone(), url);
         self.inner_transport.borrow_mut().bind(url)
     }
 
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
-        self.inner_transport.borrow_mut().post(command)
+        // self.inner_transport.borrow_mut().post(command)
+        self.transport_inbox.push_back(command);
+        Ok(())
     }
 
-    /// FIXME: Should P2pGateway handle TransportEvents directly?
+    /// Handle TransportEvents directly
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        //self.inner_transport.process()
-        let (did_work, event_list) = self.inner_transport.borrow_mut().process()?;
-        if did_work {
-            for evt in event_list.clone() {
-                self.handle_TransportEvent(&evt)?;
+        let mut outbox = Vec::new();
+        let mut did_work = false;
+        // Process TransportCommand inbox
+        loop {
+            let cmd = match self.transport_inbox.pop_front() {
+                None => break,
+                Some(msg) => msg,
+            };
+            let res = self.serve_TransportCommand(&cmd);
+            if let Ok(mut output) = res {
+                did_work = true;
+                outbox.append(&mut output);
             }
         }
-        Ok((did_work, event_list))
+        println!(
+            "[t] ({}).Transport.process() - output: {} {}",
+            self.identifier.clone(),
+            did_work,
+            outbox.len()
+        );
+        //// ?? Don't process inner transport because we are not the owner and are not responsable for that??
+        // Process inner transport
+        let (inner_did_work, mut event_list) = self.inner_transport.borrow_mut().process()?;
+        println!(
+            "[t] ({}).Transport.inner_process() - output: {} {}",
+            self.identifier.clone(),
+            inner_did_work,
+            event_list.len()
+        );
+        if inner_did_work {
+            did_work = true;
+            outbox.append(&mut event_list);
+        }
+        // Handle TransportEvents
+        for evt in outbox.clone() {
+            self.handle_TransportEvent(&evt)?;
+        }
+        Ok((did_work, outbox))
     }
 
+    /// A Gateway uses as transportId its inner_dht's peerData.peer_address
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        self.inner_transport.borrow().transport_id_list()
+        // self.inner_transport.borrow().transport_id_list()
+        let peer_data_list = self.inner_dht.get_peer_list();
+        let mut id_list = Vec::new();
+        for peer_data in peer_data_list {
+            id_list.push(peer_data.peer_address);
+        }
+        Ok(id_list)
     }
 
     fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
         self.inner_transport.borrow().get_uri(id)
+        //let maybe_peer_data = self.inner_dht.get_peer(id);
+        //maybe_peer_data.map(|pd| pd.peer_address)
     }
 }
 
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
+    /// Get Transports from DHT peer_address'
+    pub(crate) fn address_to_dht_transport_list(
+        &self,
+        id_list: &[&TransportIdRef],
+    ) -> TransportResult<Vec<String>> {
+        // get peer transport from dht first
+        let mut transport_list = Vec::with_capacity(id_list.len());
+        for transportId in id_list {
+            let maybe_peer = self.inner_dht.get_peer(transportId);
+            match maybe_peer {
+                None => {
+                    return Err(TransportError::new(format!(
+                        "Unknown transportId: {}",
+                        transportId
+                    )));
+                }
+                Some(peer) => transport_list.push(peer.transport.to_string()),
+            }
+        }
+        Ok(transport_list)
+    }
+
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
-        println!("[d] <<< '(GatewayTransport)' recv: {:?}", evt);
+        println!(
+            "[d] <<< '({})' recv transport event: {:?}",
+            self.identifier.clone(),
+            evt
+        );
         // Note: use same order as the enum
         match evt {
             TransportEvent::TransportError(id, e) => {
                 println!(
-                    "[e] Connection Error for {}: {}\n Closing connection.",
+                    "[e] (GatewayTransport) Connection Error for {}: {}\n Closing connection.",
                     id, e
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                println!("[i] Connection opened id: {}", id);
+                println!(
+                    "[i] ({}) Connection opened id: {}",
+                    self.identifier.clone(),
+                    id
+                );
                 if let Some(uri) = self.get_uri(id) {
-                    println!("[i] Connection opened uri: {}", uri);
+                    println!("[i] (GatewayTransport) Connection opened uri: {}", uri);
+
+                    println!(
+                        "[t] (GatewayTransport).ConnectResult: mapping {} -> {}",
+                        uri, id
+                    );
+                    self.reverse_map.insert(uri.to_string(), id.clone());
+                    // Ok(conn_id)
 
                     // Send it our PeerAddress
                     let our_peer_address = P2pProtocol::PeerAddress(
@@ -130,7 +266,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         );
                         if self.identifier == gateway_id {
                             let peer = PeerData {
-                                peer_address,
+                                peer_address: peer_address.clone(),
                                 transport: id.clone(),
                                 timestamp: 42, // FIXME
                             };
@@ -141,5 +277,58 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
         };
         Ok(())
+    }
+
+    /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
+    /// Return a list of TransportEvents to owner.
+    #[allow(non_snake_case)]
+    fn serve_TransportCommand(
+        &mut self,
+        cmd: &TransportCommand,
+    ) -> TransportResult<Vec<TransportEvent>> {
+        println!(
+            "[d] >>> '({})' recv transport cmd: {:?}",
+            self.identifier.clone(),
+            cmd
+        );
+        // Note: use same order as the enum
+        match cmd {
+            TransportCommand::Connect(url) => {
+                let id = self.connect(url)?;
+                let evt = TransportEvent::ConnectResult(id);
+                Ok(vec![evt])
+            }
+            TransportCommand::Send(id_list, payload) => {
+                let mut id_ref_list = Vec::with_capacity(id_list.len());
+                for id in id_list {
+                    id_ref_list.push(id.as_str());
+                }
+                let _id = self.send(&id_ref_list, payload)?;
+                Ok(vec![])
+            }
+            TransportCommand::SendAll(payload) => {
+                let _id = self.send_all(payload)?;
+                Ok(vec![])
+            }
+            TransportCommand::Close(id) => {
+                self.close(id)?;
+                let evt = TransportEvent::Closed(id.to_string());
+                Ok(vec![evt])
+            }
+            TransportCommand::CloseAll => {
+                self.close_all()?;
+                let mut outbox = Vec::new();
+                // FIXME
+                //                for (id, _url) in &self.connections {
+                //                    let evt = TransportEvent::Closed(id.to_string());
+                //                    outbox.push(evt);
+                //                }
+                Ok(outbox)
+            }
+            TransportCommand::Bind(url) => {
+                self.bind(url)?;
+                Ok(vec![])
+            }
+        }
     }
 }

@@ -96,7 +96,7 @@ pub struct ConnectData {
 pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
-    /// The first network transport address we are connected to
+    /// The first network transport address we are connected to (e.g. url)
     pub network_transport: String,
     // TODO: Add network_id? Or let local client figure it out with the request_id?
     // TODO: Maybe add some info on network state?

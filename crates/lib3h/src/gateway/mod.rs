@@ -2,8 +2,15 @@ pub mod gateway_dht;
 pub mod gateway_transport;
 pub mod p2p_gateway;
 
-use crate::{dht::dht_trait::Dht, transport::transport_trait::Transport};
-use std::{cell::RefCell, rc::Rc};
+use crate::{
+    dht::dht_trait::Dht,
+    transport::{protocol::TransportCommand, transport_trait::Transport, TransportId},
+};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
 
 /// Gateway to a P2P network.
 /// Combines a transport and a DHT.
@@ -14,4 +21,8 @@ pub struct P2pGateway<T: Transport, D: Dht> {
     inner_dht: D,
     /// Used for distinguishing gateways
     identifier: String,
+    /// uri -> transport_id
+    reverse_map: HashMap<String, TransportId>,
+    ///
+    transport_inbox: VecDeque<TransportCommand>,
 }

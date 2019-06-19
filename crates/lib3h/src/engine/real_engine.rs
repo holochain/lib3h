@@ -38,7 +38,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
         };
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             "__physical_network__",
-            network_transport,
+            Rc::clone(&network_transport),
             dht_factory,
             &dht_config,
         )));
@@ -47,6 +47,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
+            network_transport,
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
@@ -77,7 +78,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             "__memory_network__",
-            network_transport,
+            Rc::clone(&network_transport),
             dht_factory,
             &dht_config,
         )));
@@ -91,6 +92,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
+            network_transport,
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
@@ -190,22 +192,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let output = self.serve_JoinSpace(&msg)?;
                 outbox.push(output);
-                // HACK: Send JoinSpace to all known peers
-                let space_address =
-                    std::string::String::from_utf8_lossy(&msg.space_address).into_owned();
-                let agent_id = std::string::String::from_utf8_lossy(&msg.agent_id).into_owned();
-                // let this_peer = self.network_gateway.borrow().this_peer();
-                let space_gateway = self
-                    .space_gateway_map
-                    .get_mut(&(msg.space_address.to_owned(), msg.agent_id.to_owned()))
-                    .ok_or(format_err!("space_gateway not found during JoinSpace HACK"))?;
-                let peer = space_gateway.this_peer().to_owned();
-                let mut payload = Vec::new();
-                let p2p_msg = P2pProtocol::JoinSpace(space_address, peer);
-                p2p_msg
-                    .serialize(&mut Serializer::new(&mut payload))
-                    .unwrap();
-                self.network_gateway.borrow_mut().send_all(&payload).ok();
             }
             Lib3hClientProtocol::LeaveSpace(_msg) => {
                 // FIXME
@@ -367,6 +353,30 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             self.dht_factory,
             &dht_config,
         );
+
+        // HACK: Send JoinSpace to all known peers
+        let space_address =
+            std::string::String::from_utf8_lossy(&join_msg.space_address).into_owned();
+        //        let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
+        //        let space_gateway = self
+        //            .space_gateway_map
+        //            .get_mut(&(msg.space_address.to_owned(), msg.agent_id.to_owned()))
+        //            .ok_or(format_err!("space_gateway not found during JoinSpace HACK"))?;
+        let peer = new_space_gateway.this_peer().to_owned();
+        let mut payload = Vec::new();
+        let p2p_msg = P2pProtocol::JoinSpace(space_address.clone(), peer.clone());
+        p2p_msg
+            .serialize(&mut Serializer::new(&mut payload))
+            .unwrap();
+        println!(
+            "[t] {} - Broadcasting JoinSpace: {}, {}",
+            self.name.clone(),
+            space_address,
+            peer.peer_address
+        );
+        self.network_gateway.borrow_mut().send_all(&payload).ok();
+        // HACK END
+
         // Add it to space map
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
@@ -380,6 +390,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 timestamp: 42, // FIXME
             }),
         )?;
+        // Done
         Ok(Lib3hServerProtocol::SuccessResult(res))
     }
 

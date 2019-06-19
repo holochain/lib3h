@@ -13,7 +13,11 @@ use crate::{
     },
 };
 use lib3h_protocol::{AddressRef, Lib3hResult};
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
 
 /// Public interface
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
@@ -22,8 +26,15 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         self.identifier.as_str()
     }
 
-    /// Hack dumb rust compiler
+    /// Hack: explicit post because of dumb rust compiler
     pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        // HACK: Add fake reverse on HoldPeer
+        if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
+            // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
+            self.reverse_map
+                .insert(peer_data.transport.clone(), peer_data.transport.clone());
+        }
+        // HACK END
         self.inner_dht.post(cmd)
     }
 }
@@ -46,6 +57,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
+            reverse_map: HashMap::new(),
+            transport_inbox: VecDeque::new(),
         }
     }
 }
@@ -64,31 +77,8 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
+            reverse_map: HashMap::new(),
+            transport_inbox: VecDeque::new(),
         }
-    }
-}
-
-/// Private
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    /// Get Transports from the DHT
-    pub(crate) fn address_to_transport_list(
-        &self,
-        id_list: &[&TransportIdRef],
-    ) -> TransportResult<Vec<String>> {
-        // get peer transport from dht first
-        let mut transport_list = Vec::with_capacity(id_list.len());
-        for transportId in id_list {
-            let maybe_peer = self.inner_dht.get_peer(transportId);
-            match maybe_peer {
-                None => {
-                    return Err(TransportError::new(format!(
-                        "Unknown transportId: {}",
-                        transportId
-                    )));
-                }
-                Some(peer) => transport_list.push(peer.transport.to_string()),
-            }
-        }
-        Ok(transport_list)
     }
 }

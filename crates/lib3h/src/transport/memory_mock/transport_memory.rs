@@ -135,7 +135,7 @@ impl Transport for TransportMemory {
         for id in id_list {
             let maybe_uri = self.connections.get(*id);
             if let None = maybe_uri {
-                println!("[w] No known connection for TransportId {}", id);
+                println!("[w] No known connection for TransportId: {}", id);
                 continue;
             }
             let uri = maybe_uri.unwrap();

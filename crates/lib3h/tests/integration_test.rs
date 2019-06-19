@@ -271,7 +271,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     // More process?
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    //let (_did_work, _srv_msg_list) = alex.process().unwrap();
     // More process?
 
     // Billy
@@ -283,7 +283,8 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     // More process?
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    //let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
     // More process?
 
     println!("DONE basic_two_setup DONE \n\n\n");
@@ -306,10 +307,26 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
-    let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
-    assert_eq!(res_msg, &req_dm);
-    println!(
-        "HandleSendDirectMessage: {}",
-        std::str::from_utf8(res_msg.content.as_slice()).unwrap()
-    );
+    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
+    assert_eq!(msg, &req_dm);
+    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    println!("HandleSendDirectMessage: {}", content);
+
+    // TODO: Post response
+    //    let mut res_dm = req_dm.clone();
+    //    res_dm.to_agent_id = req_dm.from_agent_id.clone();
+    //    res_dm.from_agent_id = req_dm.to_agent_id.clone();
+    //    res_dm.content = format!("echo: {}", content).as_bytes().to_vec();
+    //    billy.post(Lib3hClientProtocol::HandleSendDirectMessageResult(res_dm.clone()))
+    //        .unwrap();
+    //    let (did_work, srv_msg_list) = billy.process().unwrap();
+    //    assert!(did_work);
+    //    assert_eq!(srv_msg_list.len(), 0);
+    //    let (did_work, srv_msg_list) = alex.process().unwrap();
+    //    assert!(did_work);
+    //    assert_eq!(srv_msg_list.len(), 1);
+    //    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
+    //    assert_eq!(msg, &res_dm);
+    //    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    //    println!("SendDirectMessageResult: {}", content);
 }

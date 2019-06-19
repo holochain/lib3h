@@ -34,6 +34,12 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // Process the dht
         let (did_work, dht_event_list) = self.inner_dht.process()?;
+        println!(
+            "[t] ({}).Dht.process() - output: {} {}",
+            self.identifier.clone(),
+            did_work,
+            dht_event_list.len()
+        );
         // Handle events directly
         if did_work {
             for evt in dht_event_list.clone() {
@@ -54,8 +60,13 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
-    pub(crate) fn handle_DhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<()> {
-        match cmd {
+    pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
+        println!(
+            "[t] ({}).handle_DhtEvent() {:?}",
+            self.identifier.clone(),
+            evt
+        );
+        match evt {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
                 for to_peer_address in data.peer_address_list {
@@ -71,8 +82,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .expect("Should gossip to a known peer")
                         .transport;
                     println!(
-                        "(GatewayDht) GossipTo: {} {}",
-                        to_peer_address, peer_transport
+                        "({}) GossipTo: {} {}",
+                        self.identifier.clone(),
+                        to_peer_address,
+                        peer_transport
                     );
                     // Change into P2pProtocol
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {

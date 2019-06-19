@@ -37,7 +37,9 @@ pub struct RealEngine<T: Transport, D: Dht> {
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
-    /// P2p gateway for the network layer,
+    /// Transport used by the network gateway
+    network_transport: Rc<RefCell<T>>,
+    /// P2p gateway for the network layer
     network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
     /// Store active connections?
     network_connections: HashSet<TransportId>,

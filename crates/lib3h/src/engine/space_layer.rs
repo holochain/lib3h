@@ -58,6 +58,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // n/a - should have been handled by gateway
             }
             DhtEvent::HoldPeerRequested(peer_data) => {
+                println!(
+                    "[d] {} -- ({}).post() HoldPeer {:?}",
+                    self.name.clone(),
+                    space_gateway.identifier(),
+                    peer_data
+                );
                 // For now accept all request
                 let hold_cmd = DhtCommand::HoldPeer(peer_data);
                 space_gateway.post_dht(hold_cmd)?;
