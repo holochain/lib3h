@@ -21,7 +21,8 @@ pub trait Transport {
     fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()>;
     /// send a payload to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;
-    /// bind to a network interface
+    /// Bind to a network interface
+    /// Return the advertise
     fn bind(&mut self, url: &str) -> TransportResult<String>;
 
     // -- Asynchronous -- //
@@ -34,4 +35,6 @@ pub trait Transport {
     // -- Getters -- //
     /// get a list of all open transport ids
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>>;
+    /// get uri from a transportId
+    fn get_uri(&self, id: &TransportIdRef) -> Option<String>;
 }

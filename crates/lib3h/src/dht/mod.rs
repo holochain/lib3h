@@ -90,8 +90,8 @@ pub mod tests {
     #[test]
     fn test_this_peer() {
         let dht = new_dht(true, PEER_A);
-        let this = dht.this_peer().unwrap();
-        assert_eq!(this, PEER_A);
+        let this = dht.this_peer();
+        assert_eq!(this.peer_address, PEER_A);
     }
 
     #[test]
@@ -177,7 +177,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_mirror_gossip_entry() {
+    fn test_mirror_broadcast_entry() {
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer
@@ -189,7 +189,7 @@ pub mod tests {
         // Add a data item
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a
-            .post(DhtCommand::HoldEntry(entry_data.clone()))
+            .post(DhtCommand::BroadcastEntry(entry_data.clone()))
             .unwrap();
         let (did_work, gossip_list) = dht_a.process().unwrap();
         assert!(did_work);

@@ -64,7 +64,7 @@ impl EntryData {
 // Generic responses
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GenericResultData {
     pub request_id: String,
     pub space_address: Address,
@@ -76,7 +76,7 @@ pub struct GenericResultData {
 // Connection
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConnectData {
     /// Identifier of this request
     pub request_id: String,
@@ -92,18 +92,18 @@ pub struct ConnectData {
     pub network_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
-    /// MachineId of the first peer we are connected to
-    pub machine_id: Address,
+    /// The first network transport address we are connected to (e.g. url)
+    pub network_transport: String,
     // TODO: Add network_id? Or let local client figure it out with the request_id?
     // TODO: Maybe add some info on network state?
     // pub peer_count: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DisconnectedData {
     /// Specify to which network to connect to.
     /// Empty string for 'all'
@@ -114,7 +114,7 @@ pub struct DisconnectedData {
 // Space tracking
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SpaceData {
     /// Identifier of this request
     pub request_id: String,
@@ -126,7 +126,7 @@ pub struct SpaceData {
 // Direct Messaging
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DirectMessageData {
     pub space_address: Address,
     pub request_id: String,
@@ -139,7 +139,7 @@ pub struct DirectMessageData {
 // Query
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryData {
     pub space_address: Address,
     pub entry_address: Address,
@@ -148,7 +148,7 @@ pub struct QueryEntryData {
     pub query: Vec<u8>, // opaque query struct
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryResultData {
     pub space_address: Address,
     pub entry_address: Address,
@@ -163,14 +163,14 @@ pub struct QueryEntryResultData {
 //--------------------------------------------------------------------------------------------------
 
 /// Wrapped Entry message
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ProvidedEntryData {
     pub space_address: Address,
     pub provider_agent_id: Address,
     pub entry: EntryData,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StoreEntryAspectData {
     pub request_id: String,
     pub space_address: Address,
@@ -180,7 +180,7 @@ pub struct StoreEntryAspectData {
 }
 
 /// Identifier of what entry (and its meta?) to drop
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DropEntryData {
     pub space_address: Address,
     pub request_id: String,
@@ -192,7 +192,7 @@ pub struct DropEntryData {
 //--------------------------------------------------------------------------------------------------
 
 /// Request for Entry
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FetchEntryData {
     pub space_address: Address,
     pub entry_address: Address,
@@ -202,7 +202,7 @@ pub struct FetchEntryData {
 }
 
 /// DHT data response from a request
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FetchEntryResultData {
     pub space_address: Address,
     pub provider_agent_id: Address,
@@ -214,7 +214,7 @@ pub struct FetchEntryResultData {
 // Lists (publish & hold)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GetListData {
     pub space_address: Address,
     /// Request List from a specific Agent
@@ -222,7 +222,7 @@ pub struct GetListData {
     pub request_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryListData {
     pub space_address: Address,
     pub provider_agent_id: Address,
