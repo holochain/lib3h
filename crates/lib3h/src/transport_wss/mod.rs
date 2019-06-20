@@ -335,12 +335,9 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                     TlsConfig::Unencrypted => unimplemented!(),
                     TlsConfig::FakeServer => {
                         native_tls::Identity::from_pkcs12(FAKE_PKCS12, FAKE_PASS)?
-                    },
+                    }
                     TlsConfig::SuppliedCertificate(cert) => {
-                        native_tls::Identity::from_pkcs12(
-                            &cert.pkcs12_data,
-                            &cert.passphrase,
-                        )?
+                        native_tls::Identity::from_pkcs12(&cert.pkcs12_data, &cert.passphrase)?
                     }
                 };
                 let acceptor = native_tls::TlsAcceptor::builder(ident)

@@ -1,10 +1,7 @@
 //! Connection Error struct and TransportResult type
 
 use tungstenite::handshake::{
-    server::{
-        ServerHandshake,
-        NoCallback,
-    },
+    server::{NoCallback, ServerHandshake},
     HandshakeError,
 };
 
@@ -57,11 +54,12 @@ impl From<tungstenite::Error> for TransportError {
     }
 }
 
-impl<S:std::fmt::Debug + std::io::Read + std::io::Write> From<HandshakeError<ServerHandshake<S, NoCallback>>> for TransportError {
+impl<S: std::fmt::Debug + std::io::Read + std::io::Write>
+    From<HandshakeError<ServerHandshake<S, NoCallback>>> for TransportError
+{
     fn from(error: HandshakeError<ServerHandshake<S, NoCallback>>) -> Self {
         Self(format!("{:?}", error))
     }
-
 }
 impl From<native_tls::Error> for TransportError {
     fn from(error: native_tls::Error) -> Self {
