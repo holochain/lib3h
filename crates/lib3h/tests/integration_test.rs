@@ -4,9 +4,11 @@ extern crate lib3h_protocol;
 extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
+extern crate backtrace;
 
 use lib3h::{
-    real_engine::{RealEngine, RealEngineConfig},
+    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
+    engine::{RealEngine, RealEngineConfig},
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::TransportWss,
 };
@@ -17,6 +19,12 @@ use lib3h_protocol::{
 };
 
 //--------------------------------------------------------------------------------------------------
+// Typedefs
+//--------------------------------------------------------------------------------------------------
+
+type TwoNodesTestFn = fn(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>);
+
+//--------------------------------------------------------------------------------------------------
 // Constants
 //--------------------------------------------------------------------------------------------------
 
@@ -25,41 +33,75 @@ lazy_static! {
     pub static ref ALEX_AGENT_ID: Address = "alex".to_string().into_bytes();
     pub static ref BILLY_AGENT_ID: Address = "billy".to_string().into_bytes();
     pub static ref SPACE_ADDRESS_A: Address = "SPACE_A".to_string().into_bytes();
+
+    // List of tests
+    pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<TwoNodesTestFn> = vec![
+        setup_only,
+        basic_two_send_message,
+    ];
 }
 
 //--------------------------------------------------------------------------------------------------
-// Setup
+// Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, InsecureBuffer, FakeCryptoSystem> {
+fn basic_setup_mock(
+    name: &str,
+) -> RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
-        socket_type: "ws".into(),
+        socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
+        bind_url: format!("mem://{}", name),
+        dht_custom_config: vec![],
     };
-    let engine = RealEngine::new_mock(config, name.into()).unwrap();
+    let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
-    println!("test_engine advertise: {}", p2p_binding);
+    println!(
+        "basic_setup_mock(): test engine for {}, advertise: {}",
+        name, p2p_binding
+    );
     engine
 }
 
 fn basic_setup_wss(
-) -> RealEngine<TransportWss<std::net::TcpStream>, InsecureBuffer, FakeCryptoSystem> {
+) -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
+        bind_url: format!("FIXME"),
+        dht_custom_config: vec![],
     };
-    let engine = RealEngine::new(config, "test_engine_wss".into()).unwrap();
+    let engine =
+        RealEngine::new(config, "test_engine_wss".into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
     println!("test_engine advertise: {}", p2p_binding);
     engine
 }
 
 //--------------------------------------------------------------------------------------------------
-// Tests
+// Utils
+//--------------------------------------------------------------------------------------------------
+
+fn print_two_nodes_test_name(print_str: &str, test_fn: TwoNodesTestFn) {
+    print_test_name(print_str, test_fn as *mut std::os::raw::c_void);
+}
+
+/// Print name of test function
+fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
+    backtrace::resolve(test_fn, |symbol| {
+        let mut full_name = symbol.name().unwrap().as_str().unwrap().to_string();
+        let mut test_name = full_name.split_off("integration_test::".to_string().len());
+        test_name.push_str("()");
+        println!("{}{}", print_str, test_name);
+    });
+}
+
+//--------------------------------------------------------------------------------------------------
+// Custom tests
 //--------------------------------------------------------------------------------------------------
 
 #[test]
@@ -103,7 +145,9 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<T: Transport>(engine: &mut RealEngine<T, InsecureBuffer, FakeCryptoSystem>) {
+fn basic_track_test<T: Transport, D: Dht>(
+    engine: &mut RealEngine<T, D, InsecureBuffer, FakeCryptoSystem>,
+) {
     // Start
     engine.run().unwrap();
 
@@ -146,4 +190,137 @@ fn basic_track_test<T: Transport>(engine: &mut RealEngine<T, InsecureBuffer, Fak
     );
     // Done
     engine.terminate().unwrap();
+}
+
+#[test]
+fn basic_two_nodes_mock() {
+    // Launch tests on each setup
+    for test_fn in TWO_NODES_BASIC_TEST_FNS.iter() {
+        launch_two_nodes_test_with_memory_network(*test_fn).unwrap();
+    }
+}
+
+// Do general test with config
+fn launch_two_nodes_test_with_memory_network(test_fn: TwoNodesTestFn) -> Result<(), ()> {
+    println!("");
+    print_two_nodes_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
+    println!("=======================");
+
+    // Setup
+    let mut alex: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("alex"));
+    let mut billy: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("billy"));
+    basic_two_setup(&mut alex, &mut billy);
+
+    // Execute test
+    test_fn(&mut alex, &mut billy);
+
+    // Wrap-up test
+    println!("==================");
+    print_two_nodes_test_name("IN-MEMORY TEST END: ", test_fn);
+    // Terminate nodes
+    alex.terminate().unwrap();
+    billy.terminate().unwrap();
+
+    Ok(())
+}
+
+/// Empty function that triggers the test suite
+fn setup_only(_alex: &mut Box<dyn NetworkEngine>, _billy: &mut Box<dyn NetworkEngine>) {
+    // n/a
+}
+
+///
+fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
+    // Start
+    alex.run().unwrap();
+    billy.run().unwrap();
+
+    // Connect A to B
+    let req_connect = ConnectData {
+        request_id: "connect".to_string(),
+        peer_transport: billy.advertise(),
+        network_id: NETWORK_A_ID.clone(),
+    };
+    alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
+        .unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
+    println!("connected_msg = {:?}", connected_msg);
+    assert_eq!(connected_msg.network_transport, req_connect.peer_transport);
+    // More process: Have Billy process P2p::PeerAddress of alex
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    // A joins space
+    let mut track_space = SpaceData {
+        request_id: "track_a_1".into(),
+        space_address: SPACE_ADDRESS_A.clone(),
+        agent_id: ALEX_AGENT_ID.clone(),
+    };
+    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    // More process?
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    //let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    // More process?
+
+    // Billy
+    track_space.agent_id = BILLY_AGENT_ID.clone();
+    billy
+        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    // More process?
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    //    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    //    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    // More process?
+
+    println!("DONE basic_two_setup DONE \n\n\n");
+}
+
+//
+fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
+    let req_dm = DirectMessageData {
+        space_address: SPACE_ADDRESS_A.clone(),
+        request_id: "dm_1".to_string(),
+        to_agent_id: BILLY_AGENT_ID.clone(),
+        from_agent_id: ALEX_AGENT_ID.clone(),
+        content: "wah".as_bytes().to_vec(),
+    };
+    alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
+        .unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
+    assert_eq!(msg, &req_dm);
+    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    println!("HandleSendDirectMessage: {}", content);
+
+    // TODO: Post response
+    //    let mut res_dm = req_dm.clone();
+    //    res_dm.to_agent_id = req_dm.from_agent_id.clone();
+    //    res_dm.from_agent_id = req_dm.to_agent_id.clone();
+    //    res_dm.content = format!("echo: {}", content).as_bytes().to_vec();
+    //    billy.post(Lib3hClientProtocol::HandleSendDirectMessageResult(res_dm.clone()))
+    //        .unwrap();
+    //    let (did_work, srv_msg_list) = billy.process().unwrap();
+    //    assert!(did_work);
+    //    assert_eq!(srv_msg_list.len(), 0);
+    //    let (did_work, srv_msg_list) = alex.process().unwrap();
+    //    assert!(did_work);
+    //    assert_eq!(srv_msg_list.len(), 1);
+    //    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
+    //    assert_eq!(msg, &res_dm);
+    //    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    //    println!("SendDirectMessageResult: {}", content);
 }

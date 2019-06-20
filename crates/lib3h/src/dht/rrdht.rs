@@ -6,22 +6,32 @@ use std::collections::VecDeque;
 pub struct RrDht {
     /// FIFO of DhtCommands send to us
     inbox: VecDeque<DhtCommand>,
+    ///
+    this_peer: PeerData,
 }
 
 impl RrDht {
     pub fn new() -> Self {
         RrDht {
             inbox: VecDeque::new(),
+            this_peer: PeerData {
+                peer_address: "FIXME".to_string(),
+                transport: "FIXME".to_string(),
+                timestamp: 0, // FIXME
+            },
         }
+    }
+
+    pub fn new_with_raw_config(_config: &[u8]) -> Lib3hResult<Self> {
+        Ok(Self::new())
     }
 }
 
 impl Dht for RrDht {
     // -- Getters -- //
 
-    fn this_peer(&self) -> Lib3hResult<&str> {
-        // FIXME
-        Ok("FIXME")
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
 
     // -- Peer -- //
@@ -66,7 +76,7 @@ impl Dht for RrDht {
                 Some(msg) => msg,
             };
             did_work = true;
-            println!("(log.t) RrDht.process(): {:?}", cmd)
+            println!("[t] RrDht.process(): {:?}", cmd)
         }
         Ok((did_work, outbox))
     }
