@@ -225,6 +225,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     self.inner_transport.borrow_mut().send(&[&id], &buf)?;
                 }
             }
+            TransportEvent::Connection(_id) => {
+                // TODO!!
+                unimplemented!();
+            }
             TransportEvent::Closed(id) => {
                 // FIXME
                 println!("[w] Connection closed: {}", id);

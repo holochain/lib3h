@@ -118,6 +118,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     let _ = self.network_connections.insert(id.to_owned());
                 }
             }
+            TransportEvent::Connection(_id) => {
+                // TODO!!!
+                unimplemented!();
+            }
             TransportEvent::Closed(id) => {
                 self.network_connections.remove(id);
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection

@@ -15,7 +15,10 @@ pub enum TransportCommand {
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportEvent {
     TransportError(TransportId, TransportError),
+    /// an outgoing connection has been established
     ConnectResult(TransportId),
+    /// we have received an incoming connection
+    Connection(TransportId),
     Received(TransportId, Vec<u8>),
     Closed(TransportId),
 }
