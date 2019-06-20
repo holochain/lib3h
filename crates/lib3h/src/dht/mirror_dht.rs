@@ -1,4 +1,7 @@
-use crate::dht::{dht_protocol::*, dht_trait::Dht};
+use crate::dht::{
+    dht_protocol::*,
+    dht_trait::{Dht, DhtConfig},
+};
 use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
 use std::collections::{HashMap, VecDeque};
 
@@ -27,7 +30,7 @@ pub struct MirrorDht {
     this_peer: PeerData,
 }
 
-/// Constructor
+/// Constructors
 impl MirrorDht {
     pub fn new(peer_address: &str, peer_transport: &str) -> Self {
         MirrorDht {
@@ -37,9 +40,16 @@ impl MirrorDht {
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 transport: peer_transport.to_string(),
-                timestamp: 0,
+                timestamp: 0, // FIXME
             },
         }
+    }
+
+    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
+        Ok(Self::new(
+            &config.this_peer_address,
+            &config.this_peer_transport,
+        ))
     }
 }
 
@@ -47,8 +57,8 @@ impl MirrorDht {
 impl Dht for MirrorDht {
     // -- Getters -- //
 
-    fn this_peer(&self) -> Lib3hResult<&str> {
-        Ok(&self.this_peer.peer_address)
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
 
     // -- Peer -- //
@@ -103,7 +113,7 @@ impl Dht for MirrorDht {
                 did_work = true;
                 outbox.append(&mut output);
             } else {
-                println!("(log.e) serve_DhtCommand() failed: {:?}", res);
+                println!("[e] serve_DhtCommand() failed: {:?}", res);
             }
         }
         Ok((did_work, outbox))
@@ -114,17 +124,21 @@ impl Dht for MirrorDht {
 impl MirrorDht {
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
+        println!("[t] @MirrorDht@ Adding peer: {:?}", peer_info);
         let maybe_peer = self.peer_list.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
+                println!("[t] @MirrorDht@ Adding peer - OK NEW");
                 self.peer_list
                     .insert(peer_info.peer_address.clone(), peer_info.clone());
                 true
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
+                    println!("[t] @MirrorDht@ Adding peer - BAD");
                     return false;
                 }
+                println!("[t] @MirrorDht@ Adding peer - OK UPDATED");
                 peer.timestamp = peer_info.timestamp;
                 true
             }
@@ -151,7 +165,7 @@ impl MirrorDht {
     /// Return a list of DhtEvent to owner.
     #[allow(non_snake_case)]
     fn serve_DhtCommand(&mut self, cmd: &DhtCommand) -> Lib3hResult<Vec<DhtEvent>> {
-        println!("(log.d) --- '(MirrorDht)' serving cmd: {:?}", cmd);
+        println!("[d] @MirrorDht@ serving cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
@@ -167,7 +181,10 @@ impl MirrorDht {
                     MirrorGossip::Entry(entry) => {
                         let is_new = self.add_entry(&entry);
                         if is_new {
-                            return Ok(vec![DhtEvent::HoldEntryRequested(entry)]);
+                            return Ok(vec![DhtEvent::HoldEntryRequested(
+                                self.this_peer.peer_address.clone(),
+                                entry,
+                            )]);
                         }
                         return Ok(vec![]);
                     }
@@ -204,7 +221,7 @@ impl MirrorDht {
                 peer_gossip
                     .serialize(&mut Serializer::new(&mut buf))
                     .unwrap();
-                println!("gossiping peer: {:?} | {:?}", peer, buf);
+                println!("[t] @MirrorDht@ gossiping peer: {:?}", peer);
                 let gossip_evt = GossipToData {
                     peer_address_list,
                     bundle: buf,
@@ -212,8 +229,14 @@ impl MirrorDht {
                 // Done
                 Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
-            // Owner asks us to hold some entry. Store it and gossip to every known peer.
+            // Owner asks us to hold some entry. Store it.
             DhtCommand::HoldEntry(entry) => {
+                // Store it
+                let _received_new_content = self.add_entry(entry);
+                Ok(vec![])
+            }
+            // Owner asks us to hold some entry. Store it and gossip to every known peer.
+            DhtCommand::BroadcastEntry(entry) => {
                 // Local asks us to hold entry.
                 // Store it
                 let received_new_content = self.add_entry(entry);

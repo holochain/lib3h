@@ -8,7 +8,7 @@ use crate::data_types::*;
 ///  - Notification: Notify that something happened. Not expecting any response. Ends with verb in past form, i.e. '-ed'.
 /// Fetch = Request between node and the network (other nodes)
 /// Get   = Request within a node between p2p module and core
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Lib3hServerProtocol {
     // -- Generic responses -- //
     /// Success response to a request (any Command with an `request_id` field.)
