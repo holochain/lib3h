@@ -21,6 +21,14 @@ static FAKE_PASS: &'static str = "hello";
 // -- some internal types for readability -- //
 
 type TlsConnectResult<T> = Result<TlsStream<T>, native_tls::HandshakeError<T>>;
+type WsHandshakeError<T> =
+    tungstenite::handshake::HandshakeError<tungstenite::handshake::client::ClientHandshake<T>>;
+type WsConnectResult<T> =
+    Result<(WsStream<T>, tungstenite::handshake::client::Response), WsHandshakeError<T>>;
+type WsSrvHandshakeError<T> = tungstenite::handshake::HandshakeError<
+    tungstenite::handshake::server::ServerHandshake<T, tungstenite::handshake::server::NoCallback>,
+>;
+type WsSrvAcceptResult<T> = Result<WsStream<T>, WsSrvHandshakeError<T>>;
 type WssHandshakeError<T> = tungstenite::handshake::HandshakeError<
     tungstenite::handshake::client::ClientHandshake<TlsStream<T>>,
 >;
@@ -38,18 +46,23 @@ type BaseStream<T> = T;
 type TlsMidHandshake<T> = native_tls::MidHandshakeTlsStream<BaseStream<T>>;
 type TlsSrvMidHandshake<T> = native_tls::MidHandshakeTlsStream<BaseStream<T>>;
 type TlsStream<T> = native_tls::TlsStream<BaseStream<T>>;
+type WsMidHandshake<T> = tungstenite::handshake::MidHandshake<tungstenite::ClientHandshake<T>>;
+type WsSrvMidHandshake<T> = tungstenite::handshake::MidHandshake<
+    tungstenite::ServerHandshake<T, tungstenite::handshake::server::NoCallback>,
+>;
 type WssMidHandshake<T> =
     tungstenite::handshake::MidHandshake<tungstenite::ClientHandshake<TlsStream<T>>>;
 type WssSrvMidHandshake<T> = tungstenite::handshake::MidHandshake<
     tungstenite::ServerHandshake<TlsStream<T>, tungstenite::handshake::server::NoCallback>,
 >;
+type WsStream<T> = tungstenite::protocol::WebSocket<T>;
 type WssStream<T> = tungstenite::protocol::WebSocket<TlsStream<T>>;
 
 type SocketMap<T> = std::collections::HashMap<String, TransportInfo<T>>;
 
 // an internal state sequence for stream building
 #[derive(Debug)]
-enum WssStreamState<T: Read + Write + std::fmt::Debug> {
+enum WebsocketStreamState<T: Read + Write + std::fmt::Debug> {
     None,
     Connecting(BaseStream<T>),
     #[allow(dead_code)]
@@ -58,9 +71,12 @@ enum WssStreamState<T: Read + Write + std::fmt::Debug> {
     TlsSrvMidHandshake(TlsSrvMidHandshake<T>),
     TlsReady(TlsStream<T>),
     TlsSrvReady(TlsStream<T>),
+    WsMidHandshake(WsMidHandshake<T>),
+    WsSrvMidHandshake(WsSrvMidHandshake<T>),
     WssMidHandshake(WssMidHandshake<T>),
     WssSrvMidHandshake(WssSrvMidHandshake<T>),
-    Ready(Box<WssStream<T>>),
+    ReadyWs(Box<WsStream<T>>),
+    ReadyWss(Box<WssStream<T>>),
 }
 
 /// how often should we send a heartbeat if we have not received msgs
@@ -76,16 +92,16 @@ struct TransportInfo<T: Read + Write + std::fmt::Debug> {
     url: url::Url,
     last_msg: std::time::Instant,
     send_queue: Vec<Vec<u8>>,
-    stateful_socket: WssStreamState<T>,
+    stateful_socket: WebsocketStreamState<T>,
 }
 
 impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
     pub fn close(&mut self) -> TransportResult<()> {
-        if let WssStreamState::Ready(socket) = &mut self.stateful_socket {
+        if let WebsocketStreamState::ReadyWss(socket) = &mut self.stateful_socket {
             socket.close(None)?;
             socket.write_pending()?;
         }
-        self.stateful_socket = WssStreamState::None;
+        self.stateful_socket = WebsocketStreamState::None;
         Ok(())
     }
 }
@@ -133,7 +149,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
             url: uri,
             last_msg: std::time::Instant::now(),
             send_queue: Vec::new(),
-            stateful_socket: WssStreamState::Connecting(socket),
+            stateful_socket: WebsocketStreamState::Connecting(socket),
         };
         self.stream_sockets.insert(id.clone(), info);
         Ok(id)
@@ -283,17 +299,20 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                 self.event_queue
                     .push(TransportEvent::TransportError(info.id.clone(), e));
             }
-            if let WssStreamState::None = info.stateful_socket {
+            if let WebsocketStreamState::None = info.stateful_socket {
                 self.event_queue.push(TransportEvent::Closed(info.id));
                 continue;
             }
             if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_MS {
-                if let WssStreamState::Ready(socket) = &mut info.stateful_socket {
+                if let WebsocketStreamState::ReadyWss(socket) = &mut info.stateful_socket {
+                    socket.write_message(tungstenite::Message::Ping(vec![]))?;
+                }
+                if let WebsocketStreamState::ReadyWs(socket) = &mut info.stateful_socket {
                     socket.write_message(tungstenite::Message::Ping(vec![]))?;
                 }
             } else if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_WAIT_MS {
                 self.event_queue.push(TransportEvent::Closed(info.id));
-                info.stateful_socket = WssStreamState::None;
+                info.stateful_socket = WebsocketStreamState::None;
                 continue;
             }
             self.stream_sockets.insert(id, info);
@@ -309,28 +328,43 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
         info: &mut TransportInfo<T>,
     ) -> TransportResult<()> {
         // move the socket out, to be replaced
-        let socket = std::mem::replace(&mut info.stateful_socket, WssStreamState::None);
+        let socket = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
 
         match socket {
-            WssStreamState::None => {
+            WebsocketStreamState::None => {
                 // stream must have closed, do nothing
                 Ok(())
             }
-            WssStreamState::Connecting(socket) => {
+            WebsocketStreamState::Connecting(socket) => {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
-                let connector = native_tls::TlsConnector::builder()
-                    .danger_accept_invalid_certs(true)
-                    .danger_accept_invalid_hostnames(true)
-                    .build()
-                    .expect("failed to build TlsConnector");
-                info.stateful_socket =
-                    self.priv_tls_handshake(connector.connect(info.url.as_str(), socket))?;
+                match &self.tls_config {
+                    TlsConfig::Unencrypted => {
+                        info.stateful_socket = self.priv_ws_handshake(
+                            &info.id,
+                            tungstenite::client(info.url.clone(), socket),
+                        )?;
+                    }
+                    _ => {
+                        let connector = native_tls::TlsConnector::builder()
+                            .danger_accept_invalid_certs(true)
+                            .danger_accept_invalid_hostnames(true)
+                            .build()
+                            .expect("failed to build TlsConnector");
+                        info.stateful_socket =
+                            self.priv_tls_handshake(connector.connect(info.url.as_str(), socket))?;
+                    }
+                }
                 Ok(())
             }
-            WssStreamState::ConnectingSrv(socket) => {
+            WebsocketStreamState::ConnectingSrv(socket) => {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
+                if let &TlsConfig::Unencrypted = &self.tls_config {
+                    info.stateful_socket =
+                        self.priv_ws_srv_handshake(&info.id, tungstenite::accept(socket))?;
+                    return Ok(());
+                }
                 let ident = match &self.tls_config {
                     TlsConfig::Unencrypted => unimplemented!(),
                     TlsConfig::FakeServer => {
@@ -346,37 +380,45 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                 info.stateful_socket = self.priv_tls_srv_handshake(acceptor.accept(socket))?;
                 Ok(())
             }
-            WssStreamState::TlsMidHandshake(socket) => {
+            WebsocketStreamState::TlsMidHandshake(socket) => {
                 info.stateful_socket = self.priv_tls_handshake(socket.handshake())?;
                 Ok(())
             }
-            WssStreamState::TlsSrvMidHandshake(socket) => {
+            WebsocketStreamState::TlsSrvMidHandshake(socket) => {
                 info.stateful_socket = self.priv_tls_srv_handshake(socket.handshake())?;
                 Ok(())
             }
-            WssStreamState::TlsReady(socket) => {
+            WebsocketStreamState::TlsReady(socket) => {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
                 info.stateful_socket = self
-                    .priv_ws_handshake(&info.id, tungstenite::client(info.url.clone(), socket))?;
+                    .priv_wss_handshake(&info.id, tungstenite::client(info.url.clone(), socket))?;
                 Ok(())
             }
-            WssStreamState::TlsSrvReady(socket) => {
+            WebsocketStreamState::TlsSrvReady(socket) => {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
                 info.stateful_socket =
-                    self.priv_ws_srv_handshake(&info.id, tungstenite::accept(socket))?;
+                    self.priv_wss_srv_handshake(&info.id, tungstenite::accept(socket))?;
                 Ok(())
             }
-            WssStreamState::WssMidHandshake(socket) => {
+            WebsocketStreamState::WsMidHandshake(socket) => {
                 info.stateful_socket = self.priv_ws_handshake(&info.id, socket.handshake())?;
                 Ok(())
             }
-            WssStreamState::WssSrvMidHandshake(socket) => {
+            WebsocketStreamState::WsSrvMidHandshake(socket) => {
                 info.stateful_socket = self.priv_ws_srv_handshake(&info.id, socket.handshake())?;
                 Ok(())
             }
-            WssStreamState::Ready(mut socket) => {
+            WebsocketStreamState::WssMidHandshake(socket) => {
+                info.stateful_socket = self.priv_wss_handshake(&info.id, socket.handshake())?;
+                Ok(())
+            }
+            WebsocketStreamState::WssSrvMidHandshake(socket) => {
+                info.stateful_socket = self.priv_wss_srv_handshake(&info.id, socket.handshake())?;
+                Ok(())
+            }
+            WebsocketStreamState::ReadyWs(mut socket) => {
                 // This seems to be wrong. Messages shouldn't be drained.
                 let msgs: Vec<Vec<u8>> = info.send_queue.drain(..).collect();
                 for msg in msgs {
@@ -387,7 +429,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                 match socket.read_message() {
                     Err(tungstenite::error::Error::Io(e)) => {
                         if e.kind() == std::io::ErrorKind::WouldBlock {
-                            info.stateful_socket = WssStreamState::Ready(socket);
+                            info.stateful_socket = WebsocketStreamState::ReadyWs(socket);
                             return Ok(());
                         }
                         Err(e.into())
@@ -410,7 +452,46 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                             self.event_queue
                                 .push(TransportEvent::Received(info.id.clone(), msg));
                         }
-                        info.stateful_socket = WssStreamState::Ready(socket);
+                        info.stateful_socket = WebsocketStreamState::ReadyWs(socket);
+                        Ok(())
+                    }
+                }
+            }
+            WebsocketStreamState::ReadyWss(mut socket) => {
+                // This seems to be wrong. Messages shouldn't be drained.
+                let msgs: Vec<Vec<u8>> = info.send_queue.drain(..).collect();
+                for msg in msgs {
+                    // TODO: fix this line! if there is an error, all the remaining messages will be lost!
+                    socket.write_message(tungstenite::Message::Binary(msg))?;
+                }
+
+                match socket.read_message() {
+                    Err(tungstenite::error::Error::Io(e)) => {
+                        if e.kind() == std::io::ErrorKind::WouldBlock {
+                            info.stateful_socket = WebsocketStreamState::ReadyWss(socket);
+                            return Ok(());
+                        }
+                        Err(e.into())
+                    }
+                    Err(tungstenite::error::Error::ConnectionClosed(_)) => {
+                        // close event will be published
+                        Ok(())
+                    }
+                    Err(e) => Err(e.into()),
+                    Ok(msg) => {
+                        info.last_msg = std::time::Instant::now();
+                        *did_work = true;
+                        let qmsg = match msg {
+                            tungstenite::Message::Text(s) => Some(s.into_bytes()),
+                            tungstenite::Message::Binary(b) => Some(b),
+                            _ => None,
+                        };
+
+                        if let Some(msg) = qmsg {
+                            self.event_queue
+                                .push(TransportEvent::Received(info.id.clone(), msg));
+                        }
+                        info.stateful_socket = WebsocketStreamState::ReadyWss(socket);
                         Ok(())
                     }
                 }
@@ -422,13 +503,13 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     fn priv_tls_handshake(
         &mut self,
         res: TlsConnectResult<T>,
-    ) -> TransportResult<WssStreamState<T>> {
+    ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
             Err(native_tls::HandshakeError::WouldBlock(socket)) => {
-                Ok(WssStreamState::TlsMidHandshake(socket))
+                Ok(WebsocketStreamState::TlsMidHandshake(socket))
             }
             Err(e) => Err(e.into()),
-            Ok(socket) => Ok(WssStreamState::TlsReady(socket)),
+            Ok(socket) => Ok(WebsocketStreamState::TlsReady(socket)),
         }
     }
 
@@ -436,13 +517,13 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     fn priv_tls_srv_handshake(
         &mut self,
         res: TlsConnectResult<T>,
-    ) -> TransportResult<WssStreamState<T>> {
+    ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
             Err(native_tls::HandshakeError::WouldBlock(socket)) => {
-                Ok(WssStreamState::TlsSrvMidHandshake(socket))
+                Ok(WebsocketStreamState::TlsSrvMidHandshake(socket))
             }
             Err(e) => Err(e.into()),
-            Ok(socket) => Ok(WssStreamState::TlsSrvReady(socket)),
+            Ok(socket) => Ok(WebsocketStreamState::TlsSrvReady(socket)),
         }
     }
 
@@ -450,17 +531,36 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     fn priv_ws_handshake(
         &mut self,
         id: &TransportId,
-        res: WssConnectResult<T>,
-    ) -> TransportResult<WssStreamState<T>> {
+        res: WsConnectResult<T>,
+    ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
             Err(tungstenite::HandshakeError::Interrupted(socket)) => {
-                Ok(WssStreamState::WssMidHandshake(socket))
+                Ok(WebsocketStreamState::WsMidHandshake(socket))
             }
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
                 self.event_queue
                     .push(TransportEvent::ConnectResult(id.clone()));
-                Ok(WssStreamState::Ready(Box::new(socket)))
+                Ok(WebsocketStreamState::ReadyWs(Box::new(socket)))
+            }
+        }
+    }
+
+    // process websocket handshaking
+    fn priv_wss_handshake(
+        &mut self,
+        id: &TransportId,
+        res: WssConnectResult<T>,
+    ) -> TransportResult<WebsocketStreamState<T>> {
+        match res {
+            Err(tungstenite::HandshakeError::Interrupted(socket)) => {
+                Ok(WebsocketStreamState::WssMidHandshake(socket))
+            }
+            Err(e) => Err(e.into()),
+            Ok((socket, _response)) => {
+                self.event_queue
+                    .push(TransportEvent::ConnectResult(id.clone()));
+                Ok(WebsocketStreamState::ReadyWss(Box::new(socket)))
             }
         }
     }
@@ -469,17 +569,36 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     fn priv_ws_srv_handshake(
         &mut self,
         id: &TransportId,
-        res: WssSrvAcceptResult<T>,
-    ) -> TransportResult<WssStreamState<T>> {
+        res: WsSrvAcceptResult<T>,
+    ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
             Err(tungstenite::HandshakeError::Interrupted(socket)) => {
-                Ok(WssStreamState::WssSrvMidHandshake(socket))
+                Ok(WebsocketStreamState::WsSrvMidHandshake(socket))
             }
             Err(e) => Err(e.into()),
             Ok(socket) => {
                 self.event_queue
                     .push(TransportEvent::Connection(id.clone()));
-                Ok(WssStreamState::Ready(Box::new(socket)))
+                Ok(WebsocketStreamState::ReadyWs(Box::new(socket)))
+            }
+        }
+    }
+
+    // process websocket srv handshaking
+    fn priv_wss_srv_handshake(
+        &mut self,
+        id: &TransportId,
+        res: WssSrvAcceptResult<T>,
+    ) -> TransportResult<WebsocketStreamState<T>> {
+        match res {
+            Err(tungstenite::HandshakeError::Interrupted(socket)) => {
+                Ok(WebsocketStreamState::WssSrvMidHandshake(socket))
+            }
+            Err(e) => Err(e.into()),
+            Ok(socket) => {
+                self.event_queue
+                    .push(TransportEvent::Connection(id.clone()));
+                Ok(WebsocketStreamState::ReadyWss(Box::new(socket)))
             }
         }
     }
