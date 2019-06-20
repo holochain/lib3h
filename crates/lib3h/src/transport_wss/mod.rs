@@ -15,6 +15,9 @@ use std::{
     io::{Read, Write},
 };
 
+static FAKE_PKCS12: &'static [u8] = include_bytes!("fake_key.p12");
+static FAKE_PASS: &'static str = "hello";
+
 // -- some internal types for readability -- //
 
 type TlsConnectResult<T> = Result<TlsStream<T>, native_tls::HandshakeError<T>>;
@@ -87,12 +90,24 @@ impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
     }
 }
 
+pub struct TlsCertificate {
+    pkcs12_data: Vec<u8>,
+    passphrase: String,
+}
+
+pub enum TlsConfig {
+    Unencrypted,
+    FakeServer,
+    SuppliedCertificate(TlsCertificate),
+}
+
 /// a factory callback for generating base streams of type T
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
 
 /// A "Transport" implementation based off the websocket protocol
 /// any rust io Read/Write stream should be able to serve as the base
 pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
+    tls_config: TlsConfig,
     stream_factory: StreamFactory<T>,
     stream_sockets: SocketMap<T>,
     event_queue: Vec<TransportEvent>,
@@ -210,6 +225,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     /// create a new websocket "Transport" instance of type T
     pub fn new(stream_factory: StreamFactory<T>) -> Self {
         TransportWss {
+            tls_config: TlsConfig::FakeServer,
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
@@ -315,7 +331,18 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
             WssStreamState::ConnectingSrv(socket) => {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
-                let ident = native_tls::Identity::from_pkcs12(&[], "")?;
+                let ident = match &self.tls_config {
+                    TlsConfig::Unencrypted => unimplemented!(),
+                    TlsConfig::FakeServer => {
+                        native_tls::Identity::from_pkcs12(FAKE_PKCS12, FAKE_PASS)?
+                    },
+                    TlsConfig::SuppliedCertificate(cert) => {
+                        native_tls::Identity::from_pkcs12(
+                            &cert.pkcs12_data,
+                            &cert.passphrase,
+                        )?
+                    }
+                };
                 let acceptor = native_tls::TlsAcceptor::builder(ident)
                     .build()
                     .expect("failed to build TlsAcceptor");
