@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
-    ///
+    /// TODO: return a higher-level uri instead
     fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
         println!("[t] ({}).connect() {}", self.identifier.clone(), uri);
         // Connect
@@ -60,7 +60,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             let net_transport = self
                 .reverse_map
                 .get(&dht_transport)
-                .expect(&format!("unknown dht_transport: {}", dht_transport));
+                .expect("unknown dht_transport");
             net_transport_list.push(net_transport);
         }
         let ref_list: Vec<&str> = net_transport_list.iter().map(|v| v.as_str()).collect();
@@ -144,7 +144,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         Ok(id_list)
     }
 
-    /// TODO?
+    /// TODO: return a higher-level uri instead
     fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
         self.inner_transport.borrow().get_uri(id)
         //let maybe_peer_data = self.inner_dht.get_peer(id);

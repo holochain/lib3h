@@ -157,7 +157,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let space_gateway = self
                     .space_gateway_map
                     .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                    .ok_or(format_err!("space_gateway not found"))?;
+                    .ok_or_else(|| format_err!("space_gateway not found"))?;
                 // Post it as a remoteGossipTo
                 let from_peer_address =
                     std::string::String::from_utf8_lossy(&msg.from_peer_address).into_owned();
