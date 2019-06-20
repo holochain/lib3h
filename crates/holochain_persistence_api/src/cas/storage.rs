@@ -10,12 +10,17 @@ use crate::{
         IndexFilter,
     },
     error::{PersistenceError, PersistenceResult},
-    holochain_json_api::{error::JsonError, json::RawString},
+    holochain_json_api::{
+        error::JsonError,
+        json::{JsonString, RawString},
+    },
+    regex::Regex,
 };
 use objekt;
 use std::{
     collections::{BTreeSet, HashMap},
-    fmt::Debug,
+    convert::{TryFrom, TryInto},
+    fmt::{self, Debug},
     sync::{Arc, RwLock},
 };
 use uuid::Uuid;
@@ -243,6 +248,76 @@ where
 
 pub struct EavTestSuite;
 
+#[derive(Debug, Hash, Clone, Serialize, Deserialize, DefaultJson, Eq, PartialEq, PartialOrd)]
+pub enum ExampleLink {
+    RemovedLink(String, String),
+    LinkTag(String, String),
+}
+
+impl std::fmt::Display for ExampleLink {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExampleLink::LinkTag(link_type, tag) => write!(f, "link__{}__{}", link_type, tag),
+            ExampleLink::RemovedLink(link_type, tag) => {
+                write!(f, "removed_link__{}__{}", link_type, tag)
+            }
+        }
+    }
+}
+
+lazy_static! {
+    static ref LINK_REGEX: Regex =
+        Regex::new(r"^link__(.*)__(.*)$").expect("This string literal is a valid regex");
+    static ref REMOVED_LINK_REGEX: Regex =
+        Regex::new(r"^removed_link__(.*)__(.*)$").expect("This string literal is a valid regex");
+}
+
+impl TryFrom<&str> for ExampleLink {
+    type Error = PersistenceError;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        if LINK_REGEX.is_match(s) {
+            let link_type = LINK_REGEX.captures(s)?.get(1)?.as_str().to_string();
+            let link_tag = LINK_REGEX.captures(s)?.get(2)?.as_str().to_string();
+
+            Ok(ExampleLink::LinkTag(link_type, link_tag))
+        } else if REMOVED_LINK_REGEX.is_match(s) {
+            let link_type = REMOVED_LINK_REGEX.captures(s)?.get(1)?.as_str().to_string();
+            let link_tag = REMOVED_LINK_REGEX.captures(s)?.get(2)?.as_str().to_string();
+            Ok(ExampleLink::RemovedLink(link_type, link_tag))
+        } else {
+            Err(PersistenceError::SerializationError(format!(
+                "Not a properly example link: {}",
+                s.to_string()
+            )))
+        }
+    }
+}
+
+impl TryFrom<String> for ExampleLink {
+    type Error = PersistenceError;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        s.as_str().try_into()
+    }
+}
+
+/*
+impl From<String> for ExampleLink {
+
+    fn from(s:String) -> Self {
+        JsonString::from(RawString::from(s)).try_into().expect("example link as json")
+    }
+}
+
+impl Into<String> for ExampleLink {
+
+    fn into(self) -> String {
+       let json = JsonString::try_from(self);
+       json.expect("json form of example link").to_string()
+    }
+}*/
+
+impl Attribute for ExampleLink {}
+
 impl EavTestSuite {
     pub fn test_round_trip<A: Attribute>(
         mut eav_storage: impl EntityAttributeValueStorage<A> + Clone,
@@ -265,6 +340,7 @@ impl EavTestSuite {
                 Some(attribute.clone()).into(),
                 Some(value_content.address()).into(),
                 IndexFilter::LatestByAttribute,
+                None,
             );
             assert_eq!(
                 BTreeSet::new(),
@@ -309,7 +385,8 @@ impl EavTestSuite {
                             e.into(),
                             a.into(),
                             v.into(),
-                            IndexFilter::LatestByAttribute
+                            IndexFilter::LatestByAttribute,
+                            None
                         ))
                         .expect("could not fetch eav")
                 );
@@ -367,7 +444,8 @@ impl EavTestSuite {
                     Some(one.address()).into(),
                     Some(attribute.clone()).into(),
                     None.into(),
-                    IndexFilter::LatestByAttribute
+                    IndexFilter::LatestByAttribute,
+                    None
                 ))
                 .expect("could not fetch eav")
         );
@@ -385,6 +463,7 @@ impl EavTestSuite {
                     Some(attribute.clone()).into(),
                     Some(many.address()).into(),
                     IndexFilter::LatestByAttribute,
+                    None,
                 ))
                 .expect("could not fetch eav");
             assert_eq!(fetch_set.clone().len(), expected_one.clone().len());
@@ -451,7 +530,8 @@ impl EavTestSuite {
                     Some(many_one.address()).into(),
                     Some(attribute.clone()).into(),
                     Some(one.address()).into(),
-                    index_query_many_one
+                    index_query_many_one,
+                    None
                 ))
                 .unwrap()
         );
@@ -468,7 +548,8 @@ impl EavTestSuite {
                     Some(many_two.address()).into(),
                     Some(attribute.clone()).into(),
                     Some(one.address()).into(),
-                    index_query_many_two
+                    index_query_many_two,
+                    None
                 ))
                 .unwrap()
         );
@@ -485,7 +566,8 @@ impl EavTestSuite {
                     None.into(),
                     Some(attribute.clone()).into(),
                     Some(one.address()).into(),
-                    index_query_all
+                    index_query_all,
+                    None
                 ))
                 .unwrap()
         );
@@ -521,6 +603,7 @@ impl EavTestSuite {
             attributes.into(),
             EavFilter::default(),
             IndexFilter::LatestByAttribute,
+            None,
         );
 
         // get only last value in set of prefix query
@@ -596,6 +679,7 @@ impl EavTestSuite {
             EavFilter::single(attribute.clone()),
             EavFilter::single(one.address()),
             IndexFilter::LatestByAttribute,
+            None,
         );
         // show the many referencing one
         assert_eq!(
@@ -616,6 +700,7 @@ impl EavTestSuite {
                     Some(attribute.clone()).into(),
                     None.into(),
                     IndexFilter::LatestByAttribute,
+                    None,
                 ))
                 .expect("could not fetch eav");
             assert_eq!(fetch_set.clone().len(), expected_one.clone().len());
@@ -625,6 +710,101 @@ impl EavTestSuite {
                 assert_eq!(a.value(), a.value());
             });
         }
+    }
+
+    //this tests tombstone functionality in the sense of , if there is a tombstone variable set that matches the predicate it should take precedent over everything else that is found
+    //and if there isn't it should get the latest. This test will test both scenarios in which a tombstone is set and a match is found and a tombstone is set and a match is not found.
+    //no need to test the case in which a tombstone is not set because it is has been applied in previous tests already
+    pub fn test_tombstone<A, S>(mut eav_storage: S)
+    where
+        A: AddressableContent + Clone,
+        S: EntityAttributeValueStorage<ExampleLink>,
+    {
+        let foo_content = Content::from(RawString::from("foo"));
+        let bar_content = Content::from(RawString::from("bar"));
+
+        let one = A::try_from_content(&foo_content)
+            .expect("could not create AddressableContent from Content");
+        let two = A::try_from_content(&bar_content)
+            .expect("could not create AddressableContent from Content");
+        //set the value that should take precedence over everything when we set our tombstone
+        let tombstone_attribute = ExampleLink::RemovedLink("c".into(), "c".into());
+        let mut expected_tombstone = BTreeSet::new();
+        let mut expected_tombstone_not_found = BTreeSet::new();
+        //this is our test data
+        vec!["a", "b", "c", "d", "e"].iter().for_each(|s| {
+            let str = String::from(*s);
+            //for each test data that comes through, we should create an EAV with link_tag over it
+            let eav = EntityAttributeValueIndex::new(
+                &one.address(),
+                &ExampleLink::LinkTag(str.clone(), str.clone()),
+                &two.address(),
+            )
+            .expect("could not create EAV");
+
+            //add to our EAV storage
+            let expected_eav = eav_storage
+                .add_eavi(&eav)
+                .expect("could not add eav")
+                .expect("Could not get eavi option");
+            if *s == "c" {
+                //when we reach C we are going to add a remove_link EAVI
+                let eav_remove = EntityAttributeValueIndex::new(
+                    &one.address(),
+                    &ExampleLink::RemovedLink(str.clone(), str),
+                    &two.address(),
+                )
+                .expect("could not create EAV");
+
+                //right after we are also going to add a LinkTag with the same C data just to diversify the data
+                let new_remove_eav = eav_storage
+                    .add_eavi(&eav_remove)
+                    .expect("could not add eav")
+                    .expect("Could not get eavi option");
+                expected_tombstone.insert(new_remove_eav);
+                eav_storage
+                    .add_eavi(&eav)
+                    .expect("could not add eav")
+                    .expect("Could not get eavi option");
+            } else if *s == "e" {
+                //this is the last value we expect out of query
+                expected_tombstone_not_found.insert(expected_eav);
+            } else {
+                ()
+            }
+        });
+
+        //get from the eavi, if tombstone is found return that as priority
+        let expected_attribute = Some(tombstone_attribute.clone());
+
+        //this assert is supposed to return RemovedLink::("c","c") as since we have set it in our tombstone it should take precedence over everything
+        assert_eq!(
+            expected_tombstone,
+            eav_storage
+                .fetch_eavi(&EaviQuery::new(
+                    Some(one.address()).into(),
+                    None.into(),
+                    Some(two.address()).into(),
+                    IndexFilter::LatestByAttribute,
+                    Some(expected_attribute.into())
+                )) // this fetch eavi sets a tombstone on remove_link(c,c) which means It will catch the tombstone on remove_link
+                .unwrap()
+        );
+
+        //this assert willnot return RemovedLink("C","C") because even though the tombstone was set it was not found so we default to the latest
+        let expected_last_attribute = Some(ExampleLink::RemovedLink("e".into(), "e".into()));
+        assert_eq!(
+            expected_tombstone_not_found,
+            eav_storage
+                .fetch_eavi(&EaviQuery::new(
+                    Some(one.address()).into(),
+                    None.into(),
+                    Some(two.address()).into(),
+                    IndexFilter::LatestByAttribute,
+                    Some(expected_last_attribute.into())
+                ))
+                .unwrap()
+        );
     }
 }
 

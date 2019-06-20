@@ -233,19 +233,11 @@ where
                 "Error Converting EAVs".to_string(),
             ))
         } else {
-            // Build a query that only filters by Index, to be run on the collection that was already filtered
-            // by the above code
-            let index_query = EaviQuery::new(
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                query.index().clone(),
-            );
             let it = eavis.iter().map(|e| {
                 e.clone()
                     .expect("no problem here since we have filtered out all bad conversions")
             });
-            let results = index_query.run(it);
+            let results = query.run(it);
             Ok(results)
         }
     }
@@ -336,4 +328,11 @@ pub mod tests {
         );
     }
 
+    #[test]
+    fn file_tombstone() {
+        let temp = tempdir().expect("test was supposed to create temp dir");
+        let temp_path = String::from(temp.path().to_str().expect("temp dir could not be string"));
+        let eav_storage = EavFileStorage::new(temp_path).unwrap();
+        EavTestSuite::test_tombstone::<ExampleAddressableContent, EavFileStorage<_>>(eav_storage)
+    }
 }
