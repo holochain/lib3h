@@ -322,15 +322,35 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     // -- private -- //
 
     // generate a unique id for
-    fn priv_next_id(&mut self) -> String {
+    fn priv_next_id(&mut self) -> TransportId {
         let out = format!("ws{}", self.n_id);
         self.n_id += 1;
         out
     }
 
+    fn priv_process_accept(&mut self) {
+        let next_id = self.priv_next_id();
+        // TODO this is hack to eliminate a lifetime trait constraint error
+        let next_id_fn = Box::new(move || next_id.clone());
+
+        match &mut self.acceptor {
+            Err(err) => println!("acceptor in error state: {:?}", err),
+            Ok(acceptor) => (acceptor)(next_id_fn)
+                .map(move |transport_info| {
+                    let id = transport_info.id.clone();
+                    let _insert_result = self.stream_sockets.insert(id, transport_info);
+                    ()
+                })
+                .unwrap_or_else(|err| println!("did not accept any connections: {:?}", err)),
+        }
+    }
+
     // see if any work needs to be done on our stream sockets
     fn priv_process_stream_sockets(&mut self) -> TransportResult<bool> {
         let mut did_work = false;
+
+        // accept some incoming connections
+        self.priv_process_accept();
 
         // take sockets out, so we can mut ref into self and it at same time
         let sockets: Vec<(String, TransportInfo<T>)> = self.stream_sockets.drain().collect();
