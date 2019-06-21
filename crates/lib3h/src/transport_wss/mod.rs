@@ -30,9 +30,9 @@ type WssSrvHandshakeError<T> = tungstenite::handshake::HandshakeError<
     >,
 >;
 type WssSrvAcceptResult<T> = Result<WssStream<T>, WssSrvHandshakeError<T>>;
+type TlsMidHandshake<T> = native_tls::MidHandshakeTlsStream<BaseStream<T>>;
 
 type BaseStream<T> = T;
-type TlsMidHandshake<T> = native_tls::MidHandshakeTlsStream<BaseStream<T>>;
 type TlsSrvMidHandshake<T> = native_tls::MidHandshakeTlsStream<BaseStream<T>>;
 type TlsStream<T> = native_tls::TlsStream<BaseStream<T>>;
 type WssMidHandshake<T> =
@@ -68,7 +68,7 @@ pub const DEFAULT_HEARTBEAT_WAIT_MS: usize = 5000;
 
 /// Represents an individual connection
 #[derive(Debug)]
-struct TransportInfo<T: Read + Write + std::fmt::Debug> {
+pub struct TransportInfo<T: Read + Write + std::fmt::Debug> {
     id: TransportId,
     url: url::Url,
     last_msg: std::time::Instant,
@@ -85,10 +85,52 @@ impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
         self.stateful_socket = WssStreamState::None;
         Ok(())
     }
+
+    pub fn new(id: TransportId, url: url::Url, socket: BaseStream<T>) -> Self {
+        TransportInfo {
+            id: id.clone(),
+            url,
+            last_msg: std::time::Instant::now(),
+            send_queue: Vec::new(),
+            stateful_socket: WssStreamState::Connecting(socket),
+        }
+    }
 }
 
 /// a factory callback for generating base streams of type T
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
+
+pub type TransportIdFactory = Box<FnMut() -> TransportId>;
+pub type Acceptor<T> = Box<FnMut(TransportIdFactory) -> TransportResult<TransportInfo<T>>>;
+pub type Bind<T> = Box<FnMut(&str) -> TransportResult<Acceptor<T>>>;
+
+/*
+pub trait ServerStreamFactory<T:std::io::Read + std::io::Write + std::fmt::Debug + std::marker::Sized> : std::marker::Sized {
+    fn bind(&mut self, url: &str) -> TransportResult<()>;
+    fn accept(&self, transport_id: Box<FnMut() -> TransportId>) -> TransportResult<TransportInfo<T>>;
+}
+*/
+
+//struct NoOpServer();
+/*
+impl<T:std::io::Read + std::io::Write + std::fmt::Debug> ServerStreamFactory<T> for NoOpServer {
+    fn bind(&mut self, url: &str) -> TransportResult<()> {
+        Err(TransportError("bind not supported for noop server".into()))
+    }
+
+    fn accept(&self, transport_id: Box<FnMut() -> TransportId>) -> TransportResult<TransportInfo<T>> {
+        Err(TransportError("accept not supported for noop server".into()))
+    }
+}
+*/
+
+fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(
+    _url: &str,
+) -> TransportResult<Acceptor<T>> {
+    Err(TransportError(
+        "bind not configured (this is a noop impl)".into(),
+    ))
+}
 
 /// A "Transport" implementation based off the websocket protocol
 /// any rust io Read/Write stream should be able to serve as the base
@@ -98,6 +140,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
     event_queue: Vec<TransportEvent>,
     n_id: u64,
     inbox: VecDeque<TransportCommand>,
+    pub bind: Bind<T>,
 }
 
 impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
@@ -201,21 +244,33 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     fn bind(&mut self, _url: &str) -> TransportResult<String> {
-        // FIXME
-        Ok(String::new())
+        Err(TransportError("bind: unimplemented".into()))
     }
 }
 
-impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
-    /// create a new websocket "Transport" instance of type T
-    pub fn new(stream_factory: StreamFactory<T>) -> Self {
+impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
+    pub fn new(stream_factory: StreamFactory<T>, bind: Bind<T>) -> Self {
         TransportWss {
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
             n_id: 1,
             inbox: VecDeque::new(),
+            bind,
         }
+    }
+
+    /// create a new websocket "Transport" instance of type T for client connections
+    pub fn client(stream_factory: StreamFactory<T>) -> Self {
+        let bind: Bind<T> = Box::new(|url| noop_bind(url));
+        Self::new(stream_factory, bind)
+    }
+
+    pub fn server(bind: Bind<T>) -> Self {
+        Self::new(
+            |_url| Err(TransportError("client connections unsupported".into())),
+            bind,
+        )
     }
 
     /// connect and wait for a Connect event response
