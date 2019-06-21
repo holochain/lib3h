@@ -134,26 +134,6 @@ pub type TransportIdFactory = Box<FnMut() -> TransportId>;
 pub type Acceptor<T> = Box<FnMut(TransportIdFactory) -> TransportResult<TransportInfo<T>>>;
 pub type Bind<T> = Box<FnMut(&str) -> TransportResult<Acceptor<T>>>;
 
-/*
-pub trait ServerStreamFactory<T:std::io::Read + std::io::Write + std::fmt::Debug + std::marker::Sized> : std::marker::Sized {
-    fn bind(&mut self, url: &str) -> TransportResult<()>;
-    fn accept(&self, transport_id: Box<FnMut() -> TransportId>) -> TransportResult<TransportInfo<T>>;
-}
-*/
-
-//struct NoOpServer();
-/*
-impl<T:std::io::Read + std::io::Write + std::fmt::Debug> ServerStreamFactory<T> for NoOpServer {
-    fn bind(&mut self, url: &str) -> TransportResult<()> {
-        Err(TransportError("bind not supported for noop server".into()))
-    }
-
-    fn accept(&self, transport_id: Box<FnMut() -> TransportId>) -> TransportResult<TransportInfo<T>> {
-        Err(TransportError("accept not supported for noop server".into()))
-    }
-}
-*/
-
 fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(
     _url: &str,
 ) -> TransportResult<Acceptor<T>> {
@@ -171,7 +151,8 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
     event_queue: Vec<TransportEvent>,
     n_id: u64,
     inbox: VecDeque<TransportCommand>,
-    pub bind: Bind<T>,
+    bind: Bind<T>,
+    acceptor: TransportResult<Acceptor<T>>,
 }
 
 impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
@@ -274,8 +255,12 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         Ok(())
     }
 
-    fn bind(&mut self, _url: &str) -> TransportResult<String> {
-        Err(TransportError("bind: unimplemented".into()))
+    fn bind(&mut self, url: &str) -> TransportResult<String> {
+        let acceptor = (self.bind)(url);
+        acceptor.map(|acceptor| {
+            self.acceptor = Ok(acceptor);
+            String::from(url)
+        })
     }
 }
 
@@ -289,6 +274,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             n_id: 1,
             inbox: VecDeque::new(),
             bind,
+            acceptor: Err(TransportError("acceptor not initialized".into())),
         }
     }
 
