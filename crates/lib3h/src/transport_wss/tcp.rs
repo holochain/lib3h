@@ -29,15 +29,15 @@ impl TransportWss<std::net::TcpStream> {
                         let acceptor: Acceptor<TcpStream> =
                             Box::new(move |mut transport_id_factory: TransportIdFactory| {
                                 let transport_id = transport_id_factory();
-                                listener
-                                    .accept()
-                                    .map(|(tcp_stream, socket_address)| {
-                                        let sa: std::net::SocketAddr = socket_address;
-                                        let url =
-                                            url::Url::parse(format!("{}", sa).as_str()).expect("");
-                                        TransportInfo::new(transport_id, url, tcp_stream)
-                                    })
-                                    .map_err(|err| err.into())
+                                listener.accept().map_err(|err| err.into()).and_then(
+                                    |(tcp_stream, socket_address)| {
+                                        url::Url::parse(format!("{}", socket_address).as_str())
+                                            .map(|url| {
+                                                TransportInfo::new(transport_id, url, tcp_stream)
+                                            })
+                                            .map_err(|err| err.into())
+                                    },
+                                )
                             });
                         acceptor
                     })
