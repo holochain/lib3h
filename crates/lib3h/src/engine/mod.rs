@@ -17,7 +17,7 @@ use std::{cell::RefCell, rc::Rc};
 pub type ChainId = (Address, Address);
 
 /// Struct holding all config settings for the RealEngine
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {
     pub socket_type: String,
     pub bootstrap_nodes: Vec<String>,
