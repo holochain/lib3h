@@ -9,7 +9,7 @@ use crate::{
         dht_protocol::{self, *},
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig},
+    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys},
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
@@ -22,6 +22,21 @@ use lib3h_protocol::{
 use rmp_serde::Serializer;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
+
+impl<SecBuf: Buffer, Crypto: CryptoSystem> TransportKeys<SecBuf, Crypto> {
+    pub fn new() -> Lib3hResult<Self> {
+        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
+        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
+        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
+        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
+        Ok(Self {
+            transport_id: hcm0.encode(&public_key)?,
+            transport_public_key: public_key,
+            transport_secret_key: secret_key,
+            phantom_crypto: std::marker::PhantomData,
+        })
+    }
+}
 
 impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
     RealEngine<TransportWss<std::net::TcpStream>, D, SecBuf, Crypto>
@@ -45,10 +60,6 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
             dht_factory,
             &dht_config,
         )));
-        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
-        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
-        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
-        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(RealEngine {
             config: config,
             inbox: VecDeque::new(),
@@ -58,10 +69,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
-            _transport_id: hcm0.encode(&public_key)?,
-            _transport_public_key: public_key,
-            _transport_secret_key: secret_key,
-            _phantom_crypto: std::marker::PhantomData,
+            transport_id: TransportKeys::new()?,
         })
     }
 }
@@ -98,10 +106,6 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             name,
             network_gateway.borrow().this_peer()
         );
-        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
-        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
-        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
-        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(RealEngine {
             config: config,
             inbox: VecDeque::new(),
@@ -111,10 +115,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
-            _transport_id: hcm0.encode(&public_key)?,
-            _transport_public_key: public_key,
-            _transport_secret_key: secret_key,
-            _phantom_crypto: std::marker::PhantomData,
+            transport_id: TransportKeys::new()?,
         })
     }
 }
