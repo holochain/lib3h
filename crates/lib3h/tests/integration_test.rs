@@ -68,7 +68,7 @@ fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht>
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: format!("FIXME"),
+        bind_url: "127.0.0.1:64519".into(),
         dht_custom_config: vec![],
     };
     let engine =

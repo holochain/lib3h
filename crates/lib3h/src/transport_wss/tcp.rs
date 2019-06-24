@@ -11,11 +11,15 @@ impl TransportWss<std::net::TcpStream> {
     /// convenience constructor for creating a websocket "Transport"
     /// instance that is based of the rust std TcpStream
     pub fn with_std_tcp_stream() -> Self {
-        TransportWss::client(|uri| {
-            let socket = std::net::TcpStream::connect(uri)?;
-            socket.set_nonblocking(true)?;
-            Ok(socket)
-        })
+        let bind: Bind<TcpStream> = Box::new(move |url| Self::tcp_bind(url));
+        TransportWss::new(
+            |uri| {
+                let socket = std::net::TcpStream::connect(uri)?;
+                socket.set_nonblocking(true)?;
+                Ok(socket)
+            },
+            bind,
+        )
     }
 
     fn tcp_bind(url: &str) -> TransportResult<Acceptor<TcpStream>> {
@@ -42,10 +46,5 @@ impl TransportWss<std::net::TcpStream> {
                         acceptor
                     })
             })
-    }
-
-    pub fn with_std_tcp_bind() -> Self {
-        let bind: Bind<TcpStream> = Box::new(move |url| Self::tcp_bind(url));
-        TransportWss::server(bind)
     }
 }
