@@ -13,6 +13,7 @@ use lib3h_protocol::DidWork;
 use std::{
     collections::VecDeque,
     io::{Read, Write},
+    sync::{Arc, Mutex},
 };
 
 static FAKE_PKCS12: &'static [u8] = include_bytes!("fake_key.p12");
@@ -130,7 +131,25 @@ pub enum TlsConfig {
 /// a factory callback for generating base streams of type T
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
 
-pub type TransportIdFactory = Box<FnMut() -> TransportId>;
+pub trait IdGenerator {
+    fn next_id(&mut self) -> TransportId;
+}
+#[derive(Clone)]
+pub struct TransportIdFactory(Arc<Mutex<u64>>);
+impl IdGenerator for TransportIdFactory {
+    fn next_id(&mut self) -> TransportId {
+        let mut n_id = self.0.lock().expect("could not lock mutex");
+        let out = format!("ws{}", *n_id);
+        *n_id += 1;
+        out
+    }
+}
+impl TransportIdFactory {
+    pub fn new() -> Self {
+        TransportIdFactory(Arc::new(Mutex::new(1)))
+    }
+}
+
 pub type Acceptor<T> = Box<FnMut(TransportIdFactory) -> TransportResult<TransportInfo<T>>>;
 pub type Bind<T> = Box<FnMut(&str) -> TransportResult<Acceptor<T>>>;
 
@@ -149,7 +168,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
     stream_factory: StreamFactory<T>,
     stream_sockets: SocketMap<T>,
     event_queue: Vec<TransportEvent>,
-    n_id: u64,
+    n_id: TransportIdFactory,
     inbox: VecDeque<TransportCommand>,
     bind: Bind<T>,
     acceptor: TransportResult<Acceptor<T>>,
@@ -271,7 +290,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
-            n_id: 1,
+            n_id: TransportIdFactory::new(),
             inbox: VecDeque::new(),
             bind,
             acceptor: Err(TransportError("acceptor not initialized".into())),
@@ -323,19 +342,13 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
 
     // generate a unique id for
     fn priv_next_id(&mut self) -> TransportId {
-        let out = format!("ws{}", self.n_id);
-        self.n_id += 1;
-        out
+        self.n_id.next_id()
     }
 
     fn priv_process_accept(&mut self) {
-        let next_id = self.priv_next_id();
-        // TODO this is hack to eliminate a lifetime trait constraint error
-        let next_id_fn = Box::new(move || next_id.clone());
-
         match &mut self.acceptor {
             Err(err) => println!("acceptor in error state: {:?}", err),
-            Ok(acceptor) => (acceptor)(next_id_fn)
+            Ok(acceptor) => (acceptor)(self.n_id.clone())
                 .map(move |transport_info| {
                     let id = transport_info.id.clone();
                     let _insert_result = self.stream_sockets.insert(id, transport_info);

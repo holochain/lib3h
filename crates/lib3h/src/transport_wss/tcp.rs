@@ -2,7 +2,7 @@
 //! TcpStream specific functions
 
 use crate::transport_wss::{
-    Acceptor, Bind, TransportIdFactory, TransportInfo, TransportResult, TransportWss,
+    Acceptor, Bind, IdGenerator, TransportIdFactory, TransportInfo, TransportResult, TransportWss,
 };
 
 use std::net::{TcpListener, TcpStream};
@@ -32,7 +32,7 @@ impl TransportWss<std::net::TcpStream> {
                     .map(|()| {
                         let acceptor: Acceptor<TcpStream> =
                             Box::new(move |mut transport_id_factory: TransportIdFactory| {
-                                let transport_id = transport_id_factory();
+                                let transport_id = transport_id_factory.next_id();
                                 listener.accept().map_err(|err| err.into()).and_then(
                                     |(tcp_stream, socket_address)| {
                                         url::Url::parse(format!("{}", socket_address).as_str())
