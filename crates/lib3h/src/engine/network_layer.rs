@@ -5,12 +5,13 @@ use crate::{
     engine::{p2p_protocol::P2pProtocol, RealEngine},
     transport::{protocol::*, transport_trait::Transport, TransportIdRef},
 };
+use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
 /// Network layer realted private methods
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,

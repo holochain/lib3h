@@ -1,3 +1,5 @@
+extern crate hcid;
+extern crate lib3h_crypto_api;
 extern crate lib3h_protocol;
 extern crate native_tls;
 extern crate tungstenite;
