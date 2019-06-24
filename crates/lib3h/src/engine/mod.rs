@@ -10,6 +10,7 @@ use crate::{
     gateway::P2pGateway,
     transport::{transport_trait::Transport, TransportId},
 };
+use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
 use std::{cell::RefCell, rc::Rc};
 
@@ -27,8 +28,20 @@ pub struct RealEngineConfig {
     pub dht_custom_config: Vec<u8>,
 }
 
+#[allow(dead_code)]
+pub struct TransportKeys<SecBuf: Buffer, Crypto: CryptoSystem> {
+    /// Our TransportId (aka MachineId, "HcMyadayada")
+    pub transport_id: String,
+    /// The TransportId public key
+    pub transport_public_key: Vec<u8>,
+    /// The TransportId secret key
+    pub transport_secret_key: SecBuf,
+    /// needed to accept the Crypto trait generic
+    pub phantom_crypto: std::marker::PhantomData<Crypto>,
+}
+
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport, D: Dht> {
+pub struct RealEngine<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> {
     /// Identifier
     name: String,
     /// Config settings
@@ -46,4 +59,7 @@ pub struct RealEngine<T: Transport, D: Dht> {
     network_connections: HashSet<TransportId>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
+    #[allow(dead_code)]
+    /// transport_id data, public/private keys, etc
+    transport_id: TransportKeys<SecBuf, Crypto>,
 }
