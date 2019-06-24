@@ -1,6 +1,6 @@
 [package]
 name = "lib3h"
-version = "0.0.1-alpha1"
+version = "0.0.2-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
@@ -13,8 +13,8 @@ documentation = "https://docs.rs/lib3h"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-lib3h_protocol = { path = "../lib3h_protocol", version = "=0.0.1-alpha1" }
-lib3h_sodium = { path = "../sodium", version = "=0.0.1-alpha1" }
+lib3h_protocol = { path = "../lib3h_protocol", version = "=0.0.2-alpha1" }
+lib3h_sodium = { path = "../sodium", version = "=0.0.2-alpha1" }
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 native-tls = "=0.2.2"
@@ -27,3 +27,4 @@ lazy_static = "=1.2.0"
 
 [dev-dependencies]
 unwrap_to = "=0.1.0"
+backtrace = "=0.3.14"
