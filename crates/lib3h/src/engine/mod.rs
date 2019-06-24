@@ -10,9 +10,11 @@ use crate::{
     gateway::P2pGateway,
     transport::{transport_trait::Transport, TransportId},
 };
+
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
 use std::{cell::RefCell, rc::Rc};
+use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
@@ -24,7 +26,8 @@ pub struct RealEngineConfig {
     pub bootstrap_nodes: Vec<String>,
     pub work_dir: String,
     pub log_level: char,
-    pub bind_url: String,
+    #[serde(with = "url_serde")]
+    pub bind_url: Url,
     pub dht_custom_config: Vec<u8>,
 }
 

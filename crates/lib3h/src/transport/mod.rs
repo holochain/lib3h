@@ -1,4 +1,5 @@
 //! common types and traits for working with Transport instances
+use url::Url;
 
 pub mod error;
 pub mod memory_mock;
@@ -8,6 +9,16 @@ pub mod transport_trait;
 
 /// a connection identifier
 pub type TransportId = String;
+
+// TODO make a struct for transport id and make these trait converters
+pub fn transport_id_to_url(id: TransportId) -> Url {
+    Url::parse(id.as_str()).expect("transport_id_to_url: transport id is not a well formed url")
+}
+
+pub fn url_to_transport_id(url: &Url) -> TransportId {
+    url.to_string()
+}
+
 pub type TransportIdRef = str;
 
 ///
@@ -19,21 +30,33 @@ pub mod tests {
         memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
     };
 
+    use url::Url;
+
     #[test]
     fn memory_send_test() {
         let mut node_A = transport_memory::TransportMemory::new();
         let mut node_B = transport_memory::TransportMemory::new();
-        let uri_A = "mem://a";
-        let uri_B = "mem://b";
+        let uri_A = Url::parse("mem://a").unwrap();
+        let uri_B = Url::parse("mem://b").unwrap();
 
-        send_test(&mut node_A, &mut node_B, uri_A, uri_B);
+        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
+    }
+
+    #[test]
+    fn wss_send_test() {
+        let mut node_A = crate::transport_wss::TransportWss::with_std_tcp_stream();
+        let mut node_B = crate::transport_wss::TransportWss::with_std_tcp_stream();
+        let uri_A = Url::parse("wss://localhost:64529").unwrap();
+        let uri_B = Url::parse("wss://localhost:64530").unwrap();
+
+        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
 
     fn send_test(
         node_A: &mut impl Transport,
         node_B: &mut impl Transport,
-        uri_A: &str,
-        uri_B: &str,
+        uri_A: &Url,
+        uri_B: &Url,
     ) {
         // Connect
         let actual_uri_a = node_A.bind(uri_A).unwrap();
@@ -55,7 +78,7 @@ pub mod tests {
             TransportEvent::Received(a, b) => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
-        assert_eq!(actual_uri_a, recv_id);
+        assert_eq!(actual_uri_a.as_str(), recv_id);
         assert_eq!(payload, recv_payload.as_slice());
         let (_did_work, _event_list) = node_A.process().unwrap();
 
@@ -72,7 +95,7 @@ pub mod tests {
             TransportEvent::Received(a, b) => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
-        assert_eq!(actual_uri_b, recv_id);
+        assert_eq!(actual_uri_b.as_str(), recv_id);
         assert_eq!(payload, recv_payload.as_slice());
     }
 }

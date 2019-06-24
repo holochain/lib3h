@@ -7,6 +7,7 @@ use crate::{
     transport::{
         error::{TransportError, TransportResult},
         protocol::{TransportCommand, TransportEvent},
+        transport_id_to_url,
         transport_trait::Transport,
         TransportId, TransportIdRef,
     },
@@ -14,17 +15,17 @@ use crate::{
 use lib3h_protocol::DidWork;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     /// TODO: return a higher-level uri instead
-    fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
+    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
         println!("[t] ({}).connect() {}", self.identifier.clone(), uri);
         // Connect
         let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in reverse map
-        self.reverse_map
-            .insert(uri.to_string(), transport_id.clone());
+        self.reverse_map.insert(uri.clone(), transport_id.clone());
         // Done
         Ok(transport_id)
     }
@@ -81,7 +82,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     }
 
     /// TODO?
-    fn bind(&mut self, url: &str) -> TransportResult<String> {
+    fn bind(&mut self, url: &Url) -> TransportResult<Url> {
         println!("[t] ({}) bind() {}", self.identifier.clone(), url);
         self.inner_transport.borrow_mut().bind(url)
     }
@@ -145,7 +146,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     }
 
     /// TODO: return a higher-level uri instead
-    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
         self.inner_transport.borrow().get_uri(id)
         //let maybe_peer_data = self.inner_dht.get_peer(id);
         //maybe_peer_data.map(|pd| pd.peer_address)
@@ -158,7 +159,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub(crate) fn address_to_dht_transport_list(
         &self,
         id_list: &[&TransportIdRef],
-    ) -> TransportResult<Vec<String>> {
+    ) -> TransportResult<Vec<Url>> {
         // get peer transport from dht first
         let mut transport_list = Vec::with_capacity(id_list.len());
         for transportId in id_list {
@@ -170,7 +171,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         transportId
                     )));
                 }
-                Some(peer) => transport_list.push(peer.transport.to_string()),
+                Some(peer) => transport_list.push(peer.transport),
             }
         }
         Ok(transport_list)
@@ -205,7 +206,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         "[t] (GatewayTransport).ConnectResult: mapping {} -> {}",
                         uri, id
                     );
-                    self.reverse_map.insert(uri.to_string(), id.clone());
+                    self.reverse_map.insert(uri, id.clone());
                     // Ok(conn_id)
 
                     // Send it our PeerAddress
@@ -250,7 +251,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         if self.identifier == gateway_id {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
-                                transport: id.clone(),
+                                transport: transport_id_to_url(id.clone()),
                                 timestamp: 42, // FIXME
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");

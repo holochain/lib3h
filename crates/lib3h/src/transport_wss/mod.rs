@@ -16,6 +16,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use url::Url;
+
 static FAKE_PKCS12: &'static [u8] = include_bytes!("fake_key.p12");
 static FAKE_PASS: &'static str = "hello";
 
@@ -151,10 +153,10 @@ impl TransportIdFactory {
 }
 
 pub type Acceptor<T> = Box<FnMut(TransportIdFactory) -> TransportResult<TransportInfo<T>>>;
-pub type Bind<T> = Box<FnMut(&str) -> TransportResult<Acceptor<T>>>;
+pub type Bind<T> = Box<FnMut(&Url) -> TransportResult<Acceptor<T>>>;
 
 fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(
-    _url: &str,
+    _url: &Url,
 ) -> TransportResult<Acceptor<T>> {
     Err(TransportError(
         "bind not configured (this is a noop impl)".into(),
@@ -176,8 +178,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
 
 impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     /// connect to a remote websocket service
-    fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
-        let uri = url::Url::parse(uri)?;
+    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
         let host_port = format!(
             "{}:{}",
             uri.host_str()
@@ -189,7 +190,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         let id = self.priv_next_id();
         let info = TransportInfo {
             id: id.clone(),
-            url: uri,
+            url: uri.clone(),
             last_msg: std::time::Instant::now(),
             send_queue: Vec::new(),
             stateful_socket: WebsocketStreamState::Connecting(socket),
@@ -237,9 +238,9 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     /// get uri from a transportId
-    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
         let res = self.stream_sockets.get(&id.to_string());
-        res.map(|info| info.url.as_str().to_string())
+        res.map(|info| info.url.clone())
     }
 
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
@@ -274,11 +275,11 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         Ok(())
     }
 
-    fn bind(&mut self, url: &str) -> TransportResult<String> {
-        let acceptor = (self.bind)(url);
+    fn bind(&mut self, url: &Url) -> TransportResult<Url> {
+        let acceptor = (self.bind)(&url.clone());
         acceptor.map(|acceptor| {
             self.acceptor = Ok(acceptor);
-            String::from(url)
+            url.clone()
         })
     }
 }
@@ -311,9 +312,9 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     }
 
     /// connect and wait for a Connect event response
-    pub fn wait_connect(&mut self, uri: &str) -> TransportResult<TransportId> {
+    pub fn wait_connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
         // Launch connection attempt
-        let transport_id = self.connect(&uri)?;
+        let transport_id = self.connect(uri)?;
         // Wait for a successful response
         let mut out = Vec::new();
         let start = std::time::Instant::now();

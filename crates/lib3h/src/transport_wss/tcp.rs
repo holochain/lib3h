@@ -22,8 +22,12 @@ impl TransportWss<std::net::TcpStream> {
         )
     }
 
-    fn tcp_bind(url: &str) -> TransportResult<Acceptor<TcpStream>> {
-        TcpListener::bind(url)
+    fn tcp_bind(url: &url::Url) -> TransportResult<Acceptor<TcpStream>> {
+        let host = url.host_str().expect("host name must be supplie");
+        let port = url.port().unwrap_or(80);
+        let formatted_url = format!("{}:{}", host, port);
+
+        TcpListener::bind(formatted_url)
             .map_err(|err| err.into())
             .and_then(move |listener: TcpListener| {
                 listener

@@ -1,14 +1,15 @@
 use crate::transport::{error::TransportError, TransportId};
+use url::Url;
 
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportCommand {
-    Connect(String),
+    Connect(Url),
     Send(Vec<TransportId>, Vec<u8>),
     SendAll(Vec<u8>),
     Close(TransportId),
     CloseAll,
-    Bind(String),
+    Bind(Url),
 }
 
 /// Events that can be generated during a `process()`

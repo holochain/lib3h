@@ -1,4 +1,5 @@
 use crate::Address;
+use url::Url;
 
 /// Tuple holding all the info required for identifying an Aspect.
 /// (entry_address, aspect_address)
@@ -85,7 +86,8 @@ pub struct ConnectData {
     /// Ex:
     ///  - `wss://192.168.0.102:58081/`
     ///  - `holorelay://x.x.x.x`
-    pub peer_transport: String,
+    #[serde(with = "url_serde")]
+    pub peer_transport: Url,
     /// TODO: Add a machine Id?
     /// Specify to which network to connect to.
     /// Empty string for 'any'
@@ -97,7 +99,8 @@ pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
     /// The first network transport address we are connected to (e.g. url)
-    pub network_transport: String,
+    #[serde(with = "url_serde")]
+    pub network_transport: Url,
     // TODO: Add network_id? Or let local client figure it out with the request_id?
     // TODO: Maybe add some info on network state?
     // pub peer_count: u32,
