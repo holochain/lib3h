@@ -63,7 +63,7 @@ impl TransportWss<std::net::TcpStream> {
                                                     "transport_wss::tcp accepted for url {}",
                                                     url.clone()
                                                 );
-                                                TransportInfo::new(
+                                                TransportInfo::server(
                                                     transport_id,
                                                     url.clone(),
                                                     tcp_stream,

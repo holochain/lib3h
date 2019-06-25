@@ -108,14 +108,25 @@ impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
         Ok(())
     }
 
-    pub fn new(id: TransportId, url: url::Url, socket: BaseStream<T>) -> Self {
+    pub fn new(id: TransportId, url: url::Url, socket: BaseStream<T>, is_server: bool) -> Self {
         TransportInfo {
             id: id.clone(),
             url,
             last_msg: std::time::Instant::now(),
             send_queue: Vec::new(),
-            stateful_socket: WebsocketStreamState::Connecting(socket),
+            stateful_socket: match is_server {
+                false => WebsocketStreamState::Connecting(socket),
+                true => WebsocketStreamState::ConnectingSrv(socket),
+            },
         }
+    }
+
+    pub fn client(id: TransportId, url: url::Url, socket: BaseStream<T>) -> Self {
+        Self::new(id, url, socket, false)
+    }
+
+    pub fn server(id: TransportId, url: url::Url, socket: BaseStream<T>) -> Self {
+        Self::new(id, url, socket, true)
     }
 }
 
@@ -188,13 +199,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         );
         let socket = (self.stream_factory)(&host_port)?;
         let id = self.priv_next_id();
-        let info = TransportInfo {
-            id: id.clone(),
-            url: uri.clone(),
-            last_msg: std::time::Instant::now(),
-            send_queue: Vec::new(),
-            stateful_socket: WebsocketStreamState::Connecting(socket),
-        };
+        let info = TransportInfo::client(id.clone(), uri.clone(), socket);
         self.stream_sockets.insert(id.clone(), info);
         Ok(id)
     }
@@ -411,6 +416,8 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         // move the socket out, to be replaced
         let socket = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
 
+        println!("transport_wss: socket={:?}", socket);
+        std::io::stdout().flush().ok().expect("flush stdout");
         match socket {
             WebsocketStreamState::None => {
                 // stream must have closed, do nothing

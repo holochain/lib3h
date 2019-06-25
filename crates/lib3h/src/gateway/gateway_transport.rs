@@ -25,6 +25,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // Connect
         let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in reverse map
+        println!("[t] ({}).connect() reverse mapping uri {} to {}", self.identifier.clone(),
+            uri, transport_id);
         self.reverse_map.insert(uri.clone(), transport_id.clone());
         // Done
         Ok(transport_id)
