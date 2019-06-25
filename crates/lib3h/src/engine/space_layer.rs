@@ -5,12 +5,13 @@ use crate::{
     engine::{ChainId, RealEngine},
     transport::transport_trait::Transport,
 };
+use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
 use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
     /// Process all space gateways
     pub(crate) fn process_space_gateways(&mut self) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // Process all gateways' DHT
