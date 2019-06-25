@@ -1,6 +1,7 @@
 use crate::dht::{dht_protocol::*, dht_trait::Dht};
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 use std::collections::VecDeque;
+use url::Url;
 
 /// RedRibbon DHT implementation
 pub struct RrDht {
@@ -16,7 +17,7 @@ impl RrDht {
             inbox: VecDeque::new(),
             this_peer: PeerData {
                 peer_address: "FIXME".to_string(),
-                transport: "FIXME".to_string(),
+                transport: Url::parse("fixme://host:123").expect("a valid transport url"),
                 timestamp: 0, // FIXME
             },
         }

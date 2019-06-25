@@ -17,6 +17,7 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };
+use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Typedefs
@@ -53,7 +54,7 @@ fn basic_setup_mock(
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: format!("mem://{}", name),
+        bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
         dht_custom_config: vec![],
     };
     let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
@@ -72,7 +73,7 @@ fn basic_setup_wss(
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: format!("FIXME"),
+        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
         dht_custom_config: vec![],
     };
     let engine =

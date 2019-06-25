@@ -8,13 +8,14 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{Mutex, RwLock},
 };
+use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Memory Server MAP
 //--------------------------------------------------------------------------------------------------
 
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<String, Mutex<MemoryServer>>;
+type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
 
 /// this is the actual memory space for our in-memory servers
 lazy_static! {
@@ -22,7 +23,7 @@ lazy_static! {
 }
 
 /// Add new MemoryServer to the global server map
-pub fn set_server(uri: &str) -> TransportResult<()> {
+pub fn set_server(uri: &Url) -> TransportResult<()> {
     // println!("[d] MemoryServer::set_server: {}", uri);
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
@@ -30,12 +31,12 @@ pub fn set_server(uri: &str) -> TransportResult<()> {
         return Err(TransportError::new("Server already exist".to_string()));
     }
     let server = MemoryServer::new(uri);
-    server_map.insert(uri.to_string(), Mutex::new(server));
+    server_map.insert(uri.clone(), Mutex::new(server));
     Ok(())
 }
 
 /// Remove a MemoryServer from the global server map
-pub fn unset_server(url: &str) -> TransportResult<()> {
+pub fn unset_server(url: &Url) -> TransportResult<()> {
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if !server_map.contains_key(url) {
@@ -51,7 +52,7 @@ pub fn unset_server(url: &str) -> TransportResult<()> {
 
 pub struct MemoryServer {
     /// Address of this server
-    uri: String,
+    uri: Url,
     /// Inboxes for payloads from each of its connections.
     inbox_map: HashMap<TransportId, VecDeque<Vec<u8>>>,
     /// Inbox of new inbound connections
@@ -60,9 +61,9 @@ pub struct MemoryServer {
 
 impl MemoryServer {
     /// Constructor
-    pub fn new(uri: &str) -> Self {
+    pub fn new(uri: &Url) -> Self {
         MemoryServer {
-            uri: uri.to_string(),
+            uri: uri.clone(),
             inbox_map: HashMap::new(),
             new_conn_inbox: Vec::new(),
         }
