@@ -79,7 +79,7 @@ pub mod tests {
         assert_eq!(event_list.len(), 1);
         let recv_event = event_list[0].clone();
         let (recv_id, recv_payload) = match recv_event {
-        TransportEvent::Received(a, b) => (a, b),
+            TransportEvent::Received(a, b) => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
         assert_eq!(actual_uri_a.as_str(), recv_id);

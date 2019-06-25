@@ -33,35 +33,47 @@ impl TransportWss<std::net::TcpStream> {
                 listener
                     .set_nonblocking(true)
                     .map_err(|err| {
-                       println!("transport_wss::tcp listener error: {:?}", err);
-                       err.into()
+                        println!("transport_wss::tcp listener error: {:?}", err);
+                        err.into()
                     })
                     .map(|()| {
                         let acceptor: Acceptor<TcpStream> =
                             Box::new(move |mut transport_id_factory: TransportIdFactory| {
                                 let transport_id = transport_id_factory.next_id();
-                                listener.accept().map_err(|err| 
-                                {
-                                    println!("transport_wss::tcp accept error: {:?}", err);
-                                    err.into()
-                                }).and_then(
-                                    |(tcp_stream, socket_address)| {
-                                        let v4_socket_address = format!("wss://{}:{}", socket_address.ip(), 
-                                            socket_address.port());
+                                listener
+                                    .accept()
+                                    .map_err(|err| {
+                                        println!("transport_wss::tcp accept error: {:?}", err);
+                                        err.into()
+                                    })
+                                    .and_then(|(tcp_stream, socket_address)| {
+                                        let v4_socket_address = format!(
+                                            "wss://{}:{}",
+                                            socket_address.ip(),
+                                            socket_address.port()
+                                        );
 
-                                        println!("transport_wss::tcp v4 socket_address: {}", v4_socket_address);
+                                        println!(
+                                            "transport_wss::tcp v4 socket_address: {}",
+                                            v4_socket_address
+                                        );
                                         url::Url::parse(v4_socket_address.as_str())
                                             .map(|url| {
-                                                println!("transport_wss::tcp accepted for url {}", url.clone());
-                                                TransportInfo::new(transport_id, url.clone(), tcp_stream)
+                                                println!(
+                                                    "transport_wss::tcp accepted for url {}",
+                                                    url.clone()
+                                                );
+                                                TransportInfo::new(
+                                                    transport_id,
+                                                    url.clone(),
+                                                    tcp_stream,
+                                                )
                                             })
-                                            .map_err(|err|  
-                                            {
+                                            .map_err(|err| {
                                                 println!("transport_wss::tcp url error: {:?}", err);
                                                 err.into()
                                             })
-                                    },
-                                )
+                                    })
                             });
                         acceptor
                     })

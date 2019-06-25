@@ -348,15 +348,20 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
 
     fn priv_process_accept(&mut self) -> DidWork {
         match &mut self.acceptor {
-            Err(err) => { println!("acceptor in error state: {:?}", err); false },
+            Err(err) => {
+                println!("acceptor in error state: {:?}", err);
+                false
+            }
             Ok(acceptor) => (acceptor)(self.n_id.clone())
                 .map(move |transport_info| {
                     let id = transport_info.id.clone();
                     let _insert_result = self.stream_sockets.insert(id, transport_info);
                     true
                 })
-                .unwrap_or_else(|err| 
-                    { println!("did not accept any connections: {:?}", err); false }),
+                .unwrap_or_else(|err| {
+                    println!("did not accept any connections: {:?}", err);
+                    false
+                }),
         }
     }
 
