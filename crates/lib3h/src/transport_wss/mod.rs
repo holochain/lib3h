@@ -346,25 +346,26 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         self.n_id.next_id()
     }
 
-    fn priv_process_accept(&mut self) {
+    fn priv_process_accept(&mut self) -> DidWork {
         match &mut self.acceptor {
-            Err(err) => println!("acceptor in error state: {:?}", err),
+            Err(err) => { println!("acceptor in error state: {:?}", err); false },
             Ok(acceptor) => (acceptor)(self.n_id.clone())
                 .map(move |transport_info| {
                     let id = transport_info.id.clone();
                     let _insert_result = self.stream_sockets.insert(id, transport_info);
-                    ()
+                    true
                 })
-                .unwrap_or_else(|err| println!("did not accept any connections: {:?}", err)),
+                .unwrap_or_else(|err| 
+                    { println!("did not accept any connections: {:?}", err); false }),
         }
     }
 
     // see if any work needs to be done on our stream sockets
-    fn priv_process_stream_sockets(&mut self) -> TransportResult<bool> {
+    fn priv_process_stream_sockets(&mut self) -> TransportResult<DidWork> {
         let mut did_work = false;
 
         // accept some incoming connections
-        self.priv_process_accept();
+        did_work |= self.priv_process_accept();
 
         // take sockets out, so we can mut ref into self and it at same time
         let sockets: Vec<(String, TransportInfo<T>)> = self.stream_sockets.drain().collect();
