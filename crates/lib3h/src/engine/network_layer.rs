@@ -6,8 +6,9 @@ use crate::{
     transport::{protocol::*, transport_trait::Transport, TransportIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
-use rmp_serde::Deserializer;
-use serde::Deserialize;
+
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// Network layer realted private methods
 impl<T: Transport, D: Dht> RealEngine<T, D> {
@@ -102,10 +103,22 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             TransportEvent::ConnectResult(id) => {
-                // Send our PeerData to other node??
-                let network_gateway = self.network_gateway.borrow();
+                let mut network_gateway = self.network_gateway.borrow_mut();
                 if let Some(uri) = network_gateway.get_uri(id) {
                     println!("[i] Network Connection opened: {} ({})", id, uri);
+
+                    // Send to other node our Joined Spaces
+                    let space_list = self.get_all_spaces();
+                    let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+                    let mut buf = Vec::new();
+                    our_joined_space_list
+                        .serialize(&mut Serializer::new(&mut buf))
+                        .unwrap();
+                    println!(
+                        "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
+                        our_joined_space_list, id
+                    );
+                    network_gateway.send(&[&id], &buf)?;
 
                     // Output a Lib3hServerProtocol::Connected if its the first connection
                     if self.network_connections.is_empty() {
@@ -190,10 +203,20 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // FIXME
             }
             // HACK
-            P2pProtocol::JoinSpace(gateway_id, peer_data) => {
+            P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 println!("[d] Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
+                }
+            }
+            // HACK
+            P2pProtocol::AllJoinedSpaceList(join_list) => {
+                println!("[d] Received AllJoinedSpaceList: {:?}", join_list);
+                for (space_address, peer_data) in join_list {
+                    let maybe_space_gateway = self.get_first_space_mut(space_address);
+                    if let Some(space_gateway) = maybe_space_gateway {
+                        space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
+                    }
                 }
             }
         };

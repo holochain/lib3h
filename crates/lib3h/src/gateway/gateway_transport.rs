@@ -23,7 +23,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // Connect
         let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in reverse map
-        self.reverse_map
+        self.connection_map
             .insert(uri.to_string(), transport_id.clone());
         // Done
         Ok(transport_id)
@@ -58,7 +58,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         let mut net_transport_list = Vec::new();
         for dht_transport in dht_transport_list {
             let net_transport = self
-                .reverse_map
+                .connection_map
                 .get(&dht_transport)
                 .expect("unknown dht_transport");
             net_transport_list.push(net_transport);
@@ -199,16 +199,14 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     id
                 );
                 if let Some(uri) = self.get_uri(id) {
-                    println!("[i] (GatewayTransport) Connection opened uri: {}", uri);
-
                     println!(
                         "[t] (GatewayTransport).ConnectResult: mapping {} -> {}",
                         uri, id
                     );
-                    self.reverse_map.insert(uri.to_string(), id.clone());
+                    self.connection_map.insert(uri.to_string(), id.clone());
                     // Ok(conn_id)
 
-                    // Send it our PeerAddress
+                    // Send to other node our PeerAddress
                     let our_peer_address = P2pProtocol::PeerAddress(
                         self.identifier().to_string(),
                         self.this_peer().clone().peer_address,
@@ -221,7 +219,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
                         our_peer_address, id
                     );
-                    // Send our PeerAddress to other side
                     self.inner_transport.borrow_mut().send(&[&id], &buf)?;
                 }
             }
@@ -266,7 +263,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
         println!(
-            "[d] >>> '({})' recv transport cmd: {:?}",
+            "[t]'({})' serving transport cmd: {:?}",
             self.identifier.clone(),
             cmd
         );

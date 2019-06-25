@@ -301,20 +301,23 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     println!("HandleSendDirectMessage: {}", content);
 
     // TODO: Post response
-    //    let mut res_dm = req_dm.clone();
-    //    res_dm.to_agent_id = req_dm.from_agent_id.clone();
-    //    res_dm.from_agent_id = req_dm.to_agent_id.clone();
-    //    res_dm.content = format!("echo: {}", content).as_bytes().to_vec();
-    //    billy.post(Lib3hClientProtocol::HandleSendDirectMessageResult(res_dm.clone()))
-    //        .unwrap();
-    //    let (did_work, srv_msg_list) = billy.process().unwrap();
-    //    assert!(did_work);
-    //    assert_eq!(srv_msg_list.len(), 0);
-    //    let (did_work, srv_msg_list) = alex.process().unwrap();
-    //    assert!(did_work);
-    //    assert_eq!(srv_msg_list.len(), 1);
-    //    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
-    //    assert_eq!(msg, &res_dm);
-    //    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
-    //    println!("SendDirectMessageResult: {}", content);
+    let mut res_dm = req_dm.clone();
+    res_dm.to_agent_id = req_dm.from_agent_id.clone();
+    res_dm.from_agent_id = req_dm.to_agent_id.clone();
+    res_dm.content = format!("echo: {}", content).as_bytes().to_vec();
+    billy
+        .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
+            res_dm.clone(),
+        ))
+        .unwrap();
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
+    assert_eq!(msg, &res_dm);
+    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    println!("SendDirectMessageResult: {}", content);
 }
