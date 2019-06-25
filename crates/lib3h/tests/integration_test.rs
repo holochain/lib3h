@@ -300,7 +300,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("HandleSendDirectMessage: {}", content);
 
-    // TODO: Post response
+    // Post response
     let mut res_dm = req_dm.clone();
     res_dm.to_agent_id = req_dm.from_agent_id.clone();
     res_dm.from_agent_id = req_dm.to_agent_id.clone();
