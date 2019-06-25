@@ -65,6 +65,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
                 .get(&dht_transport)
                 .expect("unknown dht_transport");
             net_transport_list.push(net_transport);
+            println!("[t] ({}).send() reversed mapped dht_transport {:?} to net_transport {:?}",
+                self.identifier.clone(), dht_transport, net_transport)
         }
         let ref_list: Vec<&str> = net_transport_list.iter().map(|v| v.as_str()).collect();
         // Send on the inner Transport

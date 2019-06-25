@@ -242,6 +242,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                             .serialize(&mut Serializer::new(&mut payload))
                             .unwrap();
                         // Send
+                        println!("[t] {} sending payload to transport id {}", my_name, transport_id);
                         space_gateway.send(&[transport_id.as_str()], &payload)?;
                     }
                 }

@@ -73,7 +73,7 @@ fn basic_setup_wss(
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: Url::parse("127.0.0.1:64519").unwrap(),
+        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
         dht_custom_config: vec![],
     };
     let engine =

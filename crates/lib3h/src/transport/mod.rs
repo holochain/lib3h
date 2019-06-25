@@ -16,7 +16,7 @@ pub fn transport_id_to_url(id: TransportId) -> Url {
 }
 
 pub fn url_to_transport_id(url: &Url) -> TransportId {
-    url.to_string()
+    String::from(url.path())
 }
 
 pub type TransportIdRef = str;
