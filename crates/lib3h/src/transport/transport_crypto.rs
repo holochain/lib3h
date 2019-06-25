@@ -6,6 +6,8 @@ use crate::transport::{
 };
 use lib3h_protocol::DidWork;
 
+use url::Url;
+
 /// Wraps any transport and adds cryptography
 pub struct TransportCrypto<T: Transport> {
     inner_transport: T,
@@ -22,7 +24,7 @@ impl<T: Transport> TransportCrypto<T> {
 /// Implement Transport trait by composing inner transport
 /// FIXME passthrough for now
 impl<T: Transport> Transport for TransportCrypto<T> {
-    fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
+    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
         self.inner_transport.connect(&uri)
     }
     fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
@@ -41,7 +43,7 @@ impl<T: Transport> Transport for TransportCrypto<T> {
         self.inner_transport.send_all(payload)
     }
 
-    fn bind(&mut self, url: &str) -> TransportResult<String> {
+    fn bind(&mut self, url: &Url) -> TransportResult<Url> {
         self.inner_transport.bind(url)
     }
 
@@ -57,7 +59,7 @@ impl<T: Transport> Transport for TransportCrypto<T> {
         self.inner_transport.transport_id_list()
     }
 
-    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
         self.inner_transport.get_uri(id)
     }
 }

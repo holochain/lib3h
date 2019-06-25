@@ -3,6 +3,7 @@
 //#[cfg(test)]
 use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, HashSet, VecDeque};
+use url::Url;
 
 use crate::{
     dht::{
@@ -135,7 +136,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
         // FIXME
         Ok(())
     }
-    fn advertise(&self) -> String {
+
+    fn advertise(&self) -> Url {
         self.network_gateway
             .borrow()
             .this_peer()
@@ -240,6 +242,10 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                             .serialize(&mut Serializer::new(&mut payload))
                             .unwrap();
                         // Send
+                        println!(
+                            "[t] {} sending payload to transport id {}",
+                            my_name, transport_id
+                        );
                         space_gateway.send(&[transport_id.as_str()], &payload)?;
                     }
                 }
@@ -363,9 +369,12 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         // First create DhtConfig for space gateway
         let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
+        let this_peer_transport =
+            // TODO encapsulate this conversion logic
+            Url::parse(format!("hc:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
-            this_peer_transport: this_net_peer.peer_address.clone(),
+            this_peer_transport,
             custom: self.config.dht_custom_config.clone(),
         };
         // Create new space gateway for this ChainId

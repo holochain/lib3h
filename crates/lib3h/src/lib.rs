@@ -3,7 +3,7 @@ extern crate lib3h_crypto_api;
 extern crate lib3h_protocol;
 extern crate native_tls;
 extern crate tungstenite;
-extern crate url;
+extern crate url_serde;
 #[macro_use]
 extern crate failure;
 #[macro_use]

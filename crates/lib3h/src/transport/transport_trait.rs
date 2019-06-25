@@ -4,6 +4,8 @@ use crate::transport::{
     TransportId, TransportIdRef,
 };
 
+use url::Url;
+
 use lib3h_protocol::DidWork;
 
 /// Represents a pool of connections to remote nodes.
@@ -12,7 +14,7 @@ use lib3h_protocol::DidWork;
 pub trait Transport {
     // -- Synchronous -- //
     /// establish a connection to a remote node
-    fn connect(&mut self, uri: &str) -> TransportResult<TransportId>;
+    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId>;
     /// close an existing open connection
     fn close(&mut self, id: &TransportIdRef) -> TransportResult<()>;
     /// close all existing open connections
@@ -23,7 +25,7 @@ pub trait Transport {
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;
     /// Bind to a network interface
     /// Return the advertise
-    fn bind(&mut self, url: &str) -> TransportResult<String>;
+    fn bind(&mut self, url: &url::Url) -> TransportResult<Url>;
 
     // -- Asynchronous -- //
     /// Send a command for later processing
@@ -36,5 +38,5 @@ pub trait Transport {
     /// get a list of all open transport ids
     fn transport_id_list(&self) -> TransportResult<Vec<TransportId>>;
     /// get uri from a transportId
-    fn get_uri(&self, id: &TransportIdRef) -> Option<String>;
+    fn get_uri(&self, id: &TransportIdRef) -> Option<Url>;
 }
