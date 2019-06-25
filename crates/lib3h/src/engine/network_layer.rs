@@ -118,7 +118,16 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
                         our_joined_space_list, id
                     );
-                    network_gateway.send(&[&id], &buf)?;
+                    // id is connection_id but we need a machine_id, so search for it in the DHT
+                    let peer_list = network_gateway.get_peer_list();
+                    let maybe_peer_data = peer_list.iter().find(|pd| pd.transport == uri);
+                    if let Some(peer_data) = maybe_peer_data {
+                        println!(
+                            "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
+                            peer_data,
+                        );
+                        network_gateway.send(&[&peer_data.peer_address], &buf)?;
+                    }
 
                     // Output a Lib3hServerProtocol::Connected if its the first connection
                     if self.network_connections.is_empty() {

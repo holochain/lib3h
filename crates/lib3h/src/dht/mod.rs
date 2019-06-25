@@ -238,9 +238,14 @@ pub mod tests {
             .unwrap();
         let (did_work, gossip_list) = dht_a.process().unwrap();
         assert!(did_work);
-        // Should return a gossipTo
+        // Should return gossipTos
         println!("gossip_list: {:?}", gossip_list);
-        assert_eq!(gossip_list.len(), 1);
+        assert_eq!(gossip_list.len(), 2);
+        // 2nd gossip should be a response
+        let gossip_to = unwrap_to!(gossip_list[1] => DhtEvent::GossipTo);
+        assert_eq!(gossip_to.peer_address_list.len(), 1);
+        assert_eq!(gossip_to.peer_address_list[0], PEER_C);
+        // 1st gossip should be propagation
         let gossip_to = unwrap_to!(gossip_list[0] => DhtEvent::GossipTo);
         assert_eq!(gossip_to.peer_address_list.len(), 1);
         assert_eq!(gossip_to.peer_address_list[0], PEER_B);
