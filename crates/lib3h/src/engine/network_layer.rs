@@ -107,7 +107,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 if let Some(uri) = network_gateway.get_uri(id) {
                     println!("[i] Network Connection opened: {} ({})", id, uri);
 
-                    // HACK: FIXME Do this on next process
+                    // FIXME: Do this in next process instead
                     // Send to other node our Joined Spaces
                     let space_list = self.get_all_spaces();
                     let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
@@ -133,6 +133,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         );
                         network_gateway.send(&[&peer_data.peer_address], &buf)?;
                     }
+                    // FIXME END
 
                     // Output a Lib3hServerProtocol::Connected if its the first connection
                     if self.network_connections.is_empty() {
