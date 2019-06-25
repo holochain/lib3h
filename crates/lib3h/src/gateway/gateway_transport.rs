@@ -25,8 +25,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // Connect
         let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in reverse map
-        println!("[t] ({}).connect() reverse mapping uri {} to {}", self.identifier.clone(),
-            uri, transport_id);
+        println!(
+            "[t] ({}).connect() reverse mapping uri {} to {}",
+            self.identifier.clone(),
+            uri,
+            transport_id
+        );
         self.reverse_map.insert(uri.clone(), transport_id.clone());
         // Done
         Ok(transport_id)
@@ -65,8 +69,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
                 .get(&dht_transport)
                 .expect("unknown dht_transport");
             net_transport_list.push(net_transport);
-            println!("[t] ({}).send() reversed mapped dht_transport {:?} to net_transport {:?}",
-                self.identifier.clone(), dht_transport, net_transport)
+            println!(
+                "[t] ({}).send() reversed mapped dht_transport {:?} to net_transport {:?}",
+                self.identifier.clone(),
+                dht_transport,
+                net_transport
+            )
         }
         let ref_list: Vec<&str> = net_transport_list.iter().map(|v| v.as_str()).collect();
         // Send on the inner Transport
