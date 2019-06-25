@@ -370,6 +370,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport =
+            // TODO encapsulate this conversion logic
             Url::parse(format!("hc:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,

@@ -141,12 +141,13 @@ pub enum TlsConfig {
     SuppliedCertificate(TlsCertificate),
 }
 
-/// a factory callback for generating base streams of type T
+/// A factory callback for generating base streams of type T
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
 
 pub trait IdGenerator {
     fn next_id(&mut self) -> TransportId;
 }
+
 #[derive(Clone)]
 pub struct TransportIdFactory(Arc<Mutex<u64>>);
 impl IdGenerator for TransportIdFactory {
@@ -157,15 +158,20 @@ impl IdGenerator for TransportIdFactory {
         out
     }
 }
+
 impl TransportIdFactory {
     pub fn new() -> Self {
         TransportIdFactory(Arc::new(Mutex::new(1)))
     }
 }
 
+/// A function that produces accepted sockets of type R wrapped in a TransportInfo
 pub type Acceptor<T> = Box<FnMut(TransportIdFactory) -> TransportResult<TransportInfo<T>>>;
+
+/// A function that binds to a url and produces sockt acceptors of type T
 pub type Bind<T> = Box<FnMut(&Url) -> TransportResult<Acceptor<T>>>;
 
+/// An implememtation of Bind that accepts no connections.
 fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(
     _url: &Url,
 ) -> TransportResult<Acceptor<T>> {
