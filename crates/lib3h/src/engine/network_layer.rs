@@ -107,6 +107,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 if let Some(uri) = network_gateway.get_uri(id) {
                     println!("[i] Network Connection opened: {} ({})", id, uri);
 
+                    // HACK: FIXME Do this on next process
                     // Send to other node our Joined Spaces
                     let space_list = self.get_all_spaces();
                     let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
@@ -120,6 +121,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     );
                     // id is connection_id but we need a machine_id, so search for it in the DHT
                     let peer_list = network_gateway.get_peer_list();
+                    println!(
+                        "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
+                        peer_list
+                    );
                     let maybe_peer_data = peer_list.iter().find(|pd| pd.transport == uri);
                     if let Some(peer_data) = maybe_peer_data {
                         println!(

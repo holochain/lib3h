@@ -32,11 +32,13 @@ lazy_static! {
     pub static ref ALEX_AGENT_ID: Address = "alex".to_string().into_bytes();
     pub static ref BILLY_AGENT_ID: Address = "billy".to_string().into_bytes();
     pub static ref SPACE_ADDRESS_A: Address = "SPACE_A".to_string().into_bytes();
+    pub static ref SPACE_ADDRESS_B: Address = "SPACE_B".to_string().into_bytes();
 
     // List of tests
-    pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<TwoNodesTestFn> = vec![
-        setup_only,
-        basic_two_send_message,
+    pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
+        (setup_only, true),
+        (basic_two_send_message, true),
+        (basic_two_join_first, false),
     ];
 }
 
@@ -189,13 +191,16 @@ fn basic_track_test<T: Transport, D: Dht>(engine: &mut RealEngine<T, D>) {
 #[test]
 fn basic_two_nodes_mock() {
     // Launch tests on each setup
-    for test_fn in TWO_NODES_BASIC_TEST_FNS.iter() {
-        launch_two_nodes_test_with_memory_network(*test_fn).unwrap();
+    for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
+        launch_two_nodes_test_with_memory_network(*test_fn, *can_setup).unwrap();
     }
 }
 
 // Do general test with config
-fn launch_two_nodes_test_with_memory_network(test_fn: TwoNodesTestFn) -> Result<(), ()> {
+fn launch_two_nodes_test_with_memory_network(
+    test_fn: TwoNodesTestFn,
+    can_setup: bool,
+) -> Result<(), ()> {
     println!("");
     print_two_nodes_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
     println!("=======================");
@@ -203,7 +208,9 @@ fn launch_two_nodes_test_with_memory_network(test_fn: TwoNodesTestFn) -> Result<
     // Setup
     let mut alex: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("alex"));
     let mut billy: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("billy"));
-    basic_two_setup(&mut alex, &mut billy);
+    if can_setup {
+        basic_two_setup(&mut alex, &mut billy);
+    }
 
     // Execute test
     test_fn(&mut alex, &mut billy);
@@ -320,4 +327,53 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     assert_eq!(msg, &res_dm);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
+}
+
+//
+fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
+    // Start
+    alex.run().unwrap();
+    billy.run().unwrap();
+
+    // Setup: Track before connecting
+
+    // A joins space
+    let mut track_space = SpaceData {
+        request_id: "track_a_1".into(),
+        space_address: SPACE_ADDRESS_A.clone(),
+        agent_id: ALEX_AGENT_ID.clone(),
+    };
+    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    // Billy joins space
+    track_space.agent_id = BILLY_AGENT_ID.clone();
+    billy
+        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    // Connect Alex to Billy
+    let req_connect = ConnectData {
+        request_id: "connect".to_string(),
+        peer_transport: billy.advertise(),
+        network_id: NETWORK_A_ID.clone(),
+    };
+    alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
+        .unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
+    println!("connected_msg = {:?}", connected_msg);
+    assert_eq!(connected_msg.network_transport, req_connect.peer_transport);
+    // More process: Have Billy process P2p::PeerAddress of alex
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
+
+    // Do Send DM test
+    basic_two_send_message(alex, billy);
 }

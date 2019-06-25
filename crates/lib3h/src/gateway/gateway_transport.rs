@@ -247,6 +247,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                                 timestamp: 42, // FIXME
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");
+                            // HACK
+                            Dht::process(self).expect("HACK");
                         }
                     }
                 }
