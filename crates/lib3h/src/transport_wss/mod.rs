@@ -360,7 +360,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     fn priv_process_accept(&mut self) -> DidWork {
         match &mut self.acceptor {
             Err(err) => {
-                println!("acceptor in error state: {:?}", err);
+                println!("[e] acceptor in error state: {:?}", err);
                 false
             }
             Ok(acceptor) => (acceptor)(self.n_id.clone())
@@ -370,7 +370,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                     true
                 })
                 .unwrap_or_else(|err| {
-                    println!("did not accept any connections: {:?}", err);
+                    println!("[t] did not accept any connections: {:?}", err);
                     false
                 }),
         }
@@ -471,14 +471,17 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 let acceptor = native_tls::TlsAcceptor::builder(ident)
                     .build()
                     .expect("failed to build TlsAcceptor");
+                println!("[t] about to invoke tls acceptor");
                 info.stateful_socket = self.priv_tls_srv_handshake(acceptor.accept(socket))?;
+                println!("[t] invoked tls acceptor");
                 Ok(())
             }
             WebsocketStreamState::TlsMidHandshake(socket) => {
-                info.stateful_socket = self.priv_tls_handshake(socket.handshake())?;
+               info.stateful_socket = self.priv_tls_handshake(socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::TlsSrvMidHandshake(socket) => {
+                println!("[t] tls srv mid handshake");
                 info.stateful_socket = self.priv_tls_srv_handshake(socket.handshake())?;
                 Ok(())
             }
@@ -497,7 +500,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 Ok(())
             }
             WebsocketStreamState::WsMidHandshake(socket) => {
-                info.stateful_socket = self.priv_ws_handshake(&info.id, socket.handshake())?;
+               info.stateful_socket = self.priv_ws_handshake(&info.id, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::WsSrvMidHandshake(socket) => {
@@ -612,6 +615,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         &mut self,
         res: TlsConnectResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
+        println!("[t] processing tls connect result: {:?}", res);
         match res {
             Err(native_tls::HandshakeError::WouldBlock(socket)) => {
                 Ok(WebsocketStreamState::TlsSrvMidHandshake(socket))

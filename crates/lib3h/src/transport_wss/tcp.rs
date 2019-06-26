@@ -47,6 +47,7 @@ impl TransportWss<std::net::TcpStream> {
                                         err.into()
                                     })
                                     .and_then(|(tcp_stream, socket_address)| {
+                                        tcp_stream.set_nonblocking(true)?;
                                         let v4_socket_address = format!(
                                             "wss://{}:{}",
                                             socket_address.ip(),
