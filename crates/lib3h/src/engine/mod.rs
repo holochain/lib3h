@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
     gateway::P2pGateway,
-    transport::{transport_trait::Transport, TransportId},
+    transport::{transport_trait::Transport, ConnectionId},
 };
 
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -33,8 +33,8 @@ pub struct RealEngineConfig {
 
 #[allow(dead_code)]
 pub struct TransportKeys<SecBuf: Buffer, Crypto: CryptoSystem> {
-    /// Our TransportId (aka MachineId, "HcMyadayada")
-    pub transport_id: String,
+    /// Our TransportId (e.g. "HcMyadayada")
+    pub transport_id: ConnectionId,
     /// The TransportId public key
     pub transport_public_key: Vec<u8>,
     /// The TransportId secret key
@@ -53,16 +53,17 @@ pub struct RealEngine<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
-    /// Transport used by the network gateway
+    /// Remove this if we have a full functionning mock without having to use it.
     #[allow(dead_code)]
+    /// Transport used by the network gateway
     network_transport: Rc<RefCell<T>>,
     /// P2p gateway for the network layer
     network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
     /// Store active connections?
-    network_connections: HashSet<TransportId>,
+    network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
     #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
-    transport_id: TransportKeys<SecBuf, Crypto>,
+    transport_keys: TransportKeys<SecBuf, Crypto>,
 }

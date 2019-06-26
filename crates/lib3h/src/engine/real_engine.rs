@@ -50,9 +50,10 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
     ) -> Lib3hResult<Self> {
         let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream()));
         let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
+        let transport_keys = TransportKeys::new()?;
         let dht_config = DhtConfig {
-            this_peer_address: format!("{}_mId", name), // TODO: get or create machineId instead
-            this_peer_transport: binding,
+            this_peer_address: transport_keys.transport_id.clone(),
+            this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
         };
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
@@ -70,7 +71,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
-            transport_id: TransportKeys::new()?,
+            transport_keys,
         })
     }
 }
@@ -92,7 +93,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             .expect("TransportMemory.bind() failed. bind-url might not be unique?");
         let dht_config = DhtConfig {
             this_peer_address: format!("{}_mId", name),
-            this_peer_transport: binding,
+            this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
         };
         // Create network gateway
@@ -116,7 +117,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
-            transport_id: TransportKeys::new()?,
+            transport_keys: TransportKeys::new()?,
         })
     }
 }
@@ -141,7 +142,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
         self.network_gateway
             .borrow()
             .this_peer()
-            .transport
+            .peer_uri
             .to_owned()
     }
 
@@ -210,7 +211,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             }
             Lib3hClientProtocol::Connect(msg) => {
                 // Convert into TransportCommand & post to network gateway
-                let cmd = TransportCommand::Connect(msg.peer_transport);
+                let cmd = TransportCommand::Connect(msg.peer_uri);
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
@@ -371,10 +372,10 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport =
             // TODO encapsulate this conversion logic
-            Url::parse(format!("machine:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
+            Url::parse(format!("transport:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
-            this_peer_transport,
+            this_peer_uri: this_peer_transport,
             custom: self.config.dht_custom_config.clone(),
         };
         // Create new space gateway for this ChainId
@@ -412,7 +413,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             space_gateway,
             DhtCommand::HoldPeer(PeerData {
                 peer_address: dht_config.this_peer_address,
-                transport: dht_config.this_peer_transport,
+                peer_uri: dht_config.this_peer_uri,
                 timestamp: 42, // FIXME
             }),
         )?;

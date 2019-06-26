@@ -3,7 +3,7 @@ use crate::transport::{
     memory_mock::memory_server,
     protocol::{TransportCommand, TransportEvent},
     transport_trait::Transport,
-    TransportId, TransportIdRef,
+    ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -16,9 +16,9 @@ pub struct TransportMemory {
     cmd_inbox: VecDeque<TransportCommand>,
     /// Addresses (url-ish) of all our servers
     my_servers: HashSet<Url>,
-    /// Mapping of transportId -> serverUrl
-    connections: HashMap<TransportId, Url>,
-    /// Counter for generating new transportIds
+    /// Mapping of connectionId -> serverUrl
+    connections: HashMap<ConnectionId, Url>,
+    /// Counter for generating new connectionIds
     n_id: u32,
     ///// My peer address on the network layer
     /// My peer transport
@@ -46,20 +46,20 @@ impl TransportMemory {
 
 /// Compose Transport
 impl Transport for TransportMemory {
-    /// Get list of known transportIds
-    fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
+    /// Get list of known connectionIds
+    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
         Ok(self.connections.keys().map(|id| id.to_string()).collect())
     }
 
-    /// get uri from a transportId
-    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
+    /// get uri from a connectionId
+    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
         let res = self.connections.get(&id.to_string());
         res.map(|url| url.clone())
     }
 
     /// Connect to another node's "bind".
-    /// Get server from the uri and connect to it with a new transportId for ourself.
-    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
+    /// Get server from the uri and connect to it with a new connectionId for ourself.
+    fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         // Self must have uri
         let my_uri = match &self.maybe_my_uri {
             None => {
@@ -91,12 +91,12 @@ impl Transport for TransportMemory {
         Ok(id)
     }
 
-    /// Notify server on that transportId that we are closing connection and clear that transportId.
-    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+    /// Notify server on that connectionId that we are closing connection and clear that connectionId.
+    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         let maybe_url = self.connections.get(id);
         if let None = maybe_url {
             return Err(TransportError::new(format!(
-                "No known connection for TransportId {}",
+                "No known connection for connectionId {}",
                 id
             )));
         }
@@ -118,21 +118,21 @@ impl Transport for TransportMemory {
         Ok(())
     }
 
-    /// Close all known transportIds
+    /// Close all known connectionIds
     fn close_all(&mut self) -> TransportResult<()> {
-        let id_list = self.transport_id_list()?;
+        let id_list = self.connection_id_list()?;
         for id in id_list {
             self.close(&id)?;
         }
         Ok(())
     }
 
-    /// Send payload to known transportIds in `id_list`
-    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
+    /// Send payload to known connectionIds in `id_list`
+    fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         for id in id_list {
             let maybe_uri = self.connections.get(*id);
             if let None = maybe_uri {
-                println!("[w] No known connection for TransportId: {}", id);
+                println!("[w] No known connection for connectionId: {}", id);
                 continue;
             }
             let uri = maybe_uri.unwrap();
@@ -154,9 +154,9 @@ impl Transport for TransportMemory {
         Ok(())
     }
 
-    /// Send to all known transportIds
+    /// Send to all known connectionIds
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        let id_list = self.transport_id_list()?;
+        let id_list = self.connection_id_list()?;
         for id in id_list {
             self.send(&[id.as_str()], payload)?;
         }
