@@ -371,7 +371,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport =
             // TODO encapsulate this conversion logic
-            Url::parse(format!("hc:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
+            Url::parse(format!("machine:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
             this_peer_transport,
