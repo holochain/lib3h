@@ -23,12 +23,13 @@ pub mod dns;
 pub use dns::*;
 
 /// mdns configuration
+#[derive(Clone, Debug)]
 pub struct Config {
-    bind_address: String,
-    bind_port: u16,
-    multicast_loop: bool,
-    multicast_ttl: u32,
-    multicast_addr: String,
+    pub bind_address: String,
+    pub bind_port: u16,
+    pub multicast_loop: bool,
+    pub multicast_ttl: u32,
+    pub multicast_address: String,
 }
 
 /// mdns builder
@@ -45,20 +46,44 @@ impl Builder {
                 bind_port: 5353,
                 multicast_loop: true,
                 multicast_ttl: 255,
-                multicast_addr: "224.0.0.251".to_string(),
+                multicast_address: "224.0.0.251".to_string(),
             },
         }
     }
 
+    /// specify the network interface to bind to
+    pub fn set_bind_address(&mut self, address: &str) -> &mut Self {
+        self.config.bind_address = address.to_string();
+        self
+    }
+
     /// specify the udp port to listen on
-    pub fn set_bind_port(mut self, port: u16) -> Self {
+    pub fn set_bind_port(&mut self, port: u16) -> &mut Self {
         self.config.bind_port = port;
         self
     }
 
+    /// should we loop broadcasts back to self?
+    pub fn set_multicast_loop(&mut self, should_loop: bool) -> &mut Self {
+        self.config.multicast_loop = should_loop;
+        self
+    }
+
+    /// set the multicast ttl
+    pub fn set_multicast_ttl(&mut self, ttl: u32) -> &mut Self {
+        self.config.multicast_ttl = ttl;
+        self
+    }
+
+    /// set the multicast address
+    pub fn set_multicast_address(&mut self, address: &str) -> &mut Self {
+        self.config.multicast_address = address.to_string();
+        self
+    }
+
     /// construct the actual mdns struct
-    pub fn build(self) -> Result<MulticastDns, MulticastDnsError> {
-        MulticastDns::new(self.config)
+    pub fn build(&mut self) -> Result<MulticastDns, MulticastDnsError> {
+        MulticastDns::new(self.config.clone())
     }
 }
 
@@ -78,7 +103,7 @@ impl MulticastDns {
         socket.set_multicast_loop_v4(config.multicast_loop)?;
         socket.set_multicast_ttl_v4(config.multicast_ttl)?;
         socket.join_multicast_v4(
-            &config.multicast_addr.parse()?,
+            &config.multicast_address.parse()?,
             &config.bind_address.parse()?,
         )?;
 
@@ -91,7 +116,10 @@ impl MulticastDns {
 
     /// broadcast a dns packet
     pub fn send(&mut self, packet: &Packet) -> Result<(), MulticastDnsError> {
-        let addr = (self.config.multicast_addr.as_ref(), self.config.bind_port)
+        let addr = (
+            self.config.multicast_address.as_ref(),
+            self.config.bind_port,
+        )
             .to_socket_addrs()?
             .next()?;
 
@@ -148,7 +176,11 @@ mod tests {
     #[test]
     fn it_should_loop_question() {
         let mut mdns = Builder::new()
+            .set_bind_address("0.0.0.0")
             .set_bind_port(55000)
+            .set_multicast_loop(true)
+            .set_multicast_ttl(255)
+            .set_multicast_address("224.0.0.251")
             .build()
             .expect("build fail");
 
@@ -173,7 +205,11 @@ mod tests {
     #[test]
     fn it_should_loop_answer() {
         let mut mdns = Builder::new()
+            .set_bind_address("0.0.0.0")
             .set_bind_port(55001)
+            .set_multicast_loop(true)
+            .set_multicast_ttl(255)
+            .set_multicast_address("224.0.0.251")
             .build()
             .expect("build fail");
 
