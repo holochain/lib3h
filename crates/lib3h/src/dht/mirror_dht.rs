@@ -212,6 +212,7 @@ impl MirrorDht {
                 if !received_new_content {
                     return Ok(vec![]);
                 }
+                let mut event_list = Vec::new();
                 // Gossip to everyone to also hold it
                 let peer = self
                     .peer_list
@@ -227,8 +228,28 @@ impl MirrorDht {
                     peer_address_list,
                     bundle: buf,
                 };
+                event_list.push(DhtEvent::GossipTo(gossip_evt));
+
+                // Gossip back your own PeerData
+                let peer = self.this_peer();
+                if msg.peer_address != peer.peer_address {
+                    let peer_gossip = MirrorGossip::Peer(peer.clone());
+                    let mut buf = Vec::new();
+                    peer_gossip
+                        .serialize(&mut Serializer::new(&mut buf))
+                        .unwrap();
+                    println!(
+                        "[t] @MirrorDht@ gossiping peer back: {:?} | to: {}",
+                        peer, msg.peer_address
+                    );
+                    let gossip_evt = GossipToData {
+                        peer_address_list: vec![msg.peer_address.clone()],
+                        bundle: buf,
+                    };
+                    event_list.push(DhtEvent::GossipTo(gossip_evt));
+                }
                 // Done
-                Ok(vec![DhtEvent::GossipTo(gossip_evt)])
+                Ok(event_list)
             }
             // Owner asks us to hold some entry. Store it.
             DhtCommand::HoldEntry(entry) => {

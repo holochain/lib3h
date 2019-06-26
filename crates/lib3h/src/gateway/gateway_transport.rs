@@ -24,14 +24,9 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         println!("[t] ({}).connect() {}", self.identifier.clone(), uri);
         // Connect
         let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
-        // Store result in reverse map
-        println!(
-            "[t] ({}).connect() reverse mapping uri {} to {}",
-            self.identifier.clone(),
-            uri,
-            transport_id
-        );
-        self.reverse_map.insert(uri.clone(), transport_id.clone());
+        // Store result in connection map
+        self.connection_map
+            .insert(uri.clone(), transport_id.clone());
         // Done
         Ok(transport_id)
     }
@@ -65,7 +60,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         let mut net_transport_list = Vec::new();
         for dht_transport in dht_transport_list {
             let net_transport = self
-                .reverse_map
+                .connection_map
                 .get(&dht_transport)
                 .expect("unknown dht_transport");
             net_transport_list.push(net_transport);
@@ -212,16 +207,14 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     id
                 );
                 if let Some(uri) = self.get_uri(id) {
-                    println!("[i] (GatewayTransport) Connection opened uri: {}", uri);
-
                     println!(
                         "[t] (GatewayTransport).ConnectResult: mapping {} -> {}",
                         uri, id
                     );
-                    self.reverse_map.insert(uri, id.clone());
+                    self.connection_map.insert(uri, id.clone());
                     // Ok(conn_id)
 
-                    // Send it our PeerAddress
+                    // Send to other node our PeerAddress
                     let our_peer_address = P2pProtocol::PeerAddress(
                         self.identifier().to_string(),
                         self.this_peer().clone().peer_address,
@@ -234,7 +227,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
                         our_peer_address, id
                     );
-                    // Send our PeerAddress to other side
                     self.inner_transport.borrow_mut().send(&[&id], &buf)?;
                 }
             }
@@ -267,6 +259,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                                 timestamp: 42, // FIXME
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");
+                            // FIXME: Should not call process manually
+                            Dht::process(self).expect("HACK");
                         }
                     }
                 }
@@ -283,7 +277,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
         println!(
-            "[d] >>> '({})' recv transport cmd: {:?}",
+            "[t]'({})' serving transport cmd: {:?}",
             self.identifier.clone(),
             cmd
         );

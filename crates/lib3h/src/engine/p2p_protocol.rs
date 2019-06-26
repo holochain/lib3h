@@ -17,7 +17,10 @@ pub enum P2pProtocol {
     /// Notify another node's our identify in a specific gateway/dht
     PeerAddress(GatewayId, PeerAddress),
     // HACK
-    JoinSpace(SpaceAddress, PeerData),
+    /// Broadcast JoinSpace to all when joining a space
+    BroadcastJoinSpace(SpaceAddress, PeerData),
+    /// For sending a peer's 'JoinSpace' info to a newly connected peer
+    AllJoinedSpaceList(Vec<(SpaceAddress, PeerData)>),
     // FIXME
 }
 

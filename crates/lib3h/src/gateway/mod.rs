@@ -24,7 +24,7 @@ pub struct P2pGateway<T: Transport, D: Dht> {
     /// Used for distinguishing gateways
     identifier: String,
     /// Map holding the reversed mapping between connection url and transportId response
-    reverse_map: HashMap<Url, TransportId>,
+    connection_map: HashMap<Url, TransportId>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
 }

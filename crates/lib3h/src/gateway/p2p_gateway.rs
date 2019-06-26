@@ -27,7 +27,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         // HACK: Add fake reverse on HoldPeer
         if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
             // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
-            self.reverse_map.insert(
+            self.connection_map.insert(
                 peer_data.transport.clone(),
                 url_to_transport_id(&peer_data.transport.clone()),
             );
@@ -55,7 +55,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
-            reverse_map: HashMap::new(),
+            connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
         }
     }
@@ -75,7 +75,7 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
-            reverse_map: HashMap::new(),
+            connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
         }
     }
