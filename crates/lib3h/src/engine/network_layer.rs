@@ -5,13 +5,14 @@ use crate::{
     engine::{p2p_protocol::P2pProtocol, RealEngine},
     transport::{protocol::*, transport_trait::Transport, TransportIdRef},
 };
+use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer realted private methods
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
@@ -139,12 +140,16 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     if self.network_connections.is_empty() {
                         let data = ConnectedData {
                             request_id: "FIXME".to_string(),
-                            network_transport: uri.to_string(),
+                            network_transport: uri,
                         };
                         outbox.push(Lib3hServerProtocol::Connected(data));
                     }
                     let _ = self.network_connections.insert(id.to_owned());
                 }
+            }
+            TransportEvent::Connection(_id) => {
+                // TODO!!!
+                unimplemented!();
             }
             TransportEvent::Closed(id) => {
                 self.network_connections.remove(id);

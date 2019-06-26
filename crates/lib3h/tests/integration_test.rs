@@ -12,10 +12,12 @@ use lib3h::{
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::TransportWss,
 };
+use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address,
 };
+use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Typedefs
@@ -46,13 +48,15 @@ lazy_static! {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
+fn basic_setup_mock(
+    name: &str,
+) -> RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: format!("mem://{}", name),
+        bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
         dht_custom_config: vec![],
     };
     let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
@@ -64,13 +68,14 @@ fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     engine
 }
 
-fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht> {
+fn basic_setup_wss(
+) -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: format!("FIXME"),
+        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
         dht_custom_config: vec![],
     };
     let engine =
@@ -143,7 +148,9 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<T: Transport, D: Dht>(engine: &mut RealEngine<T, D>) {
+fn basic_track_test<T: Transport, D: Dht>(
+    engine: &mut RealEngine<T, D, InsecureBuffer, FakeCryptoSystem>,
+) {
     // Start
     engine.run().unwrap();
 

@@ -7,6 +7,7 @@ use crate::transport::{
 };
 use lib3h_protocol::DidWork;
 use std::collections::{HashMap, HashSet, VecDeque};
+use url::Url;
 
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
@@ -14,14 +15,14 @@ pub struct TransportMemory {
     /// Commands sent to us by owner for async processing
     cmd_inbox: VecDeque<TransportCommand>,
     /// Addresses (url-ish) of all our servers
-    my_servers: HashSet<String>,
+    my_servers: HashSet<Url>,
     /// Mapping of transportId -> serverUrl
-    connections: HashMap<TransportId, String>,
+    connections: HashMap<TransportId, Url>,
     /// Counter for generating new transportIds
     n_id: u32,
     ///// My peer address on the network layer
     /// My peer transport
-    maybe_my_uri: Option<String>,
+    maybe_my_uri: Option<Url>,
 }
 
 impl TransportMemory {
@@ -38,7 +39,7 @@ impl TransportMemory {
     pub fn name(&self) -> &str {
         match &self.maybe_my_uri {
             None => "",
-            Some(uri) => uri,
+            Some(uri) => uri.as_str(),
         }
     }
 }
@@ -51,14 +52,14 @@ impl Transport for TransportMemory {
     }
 
     /// get uri from a transportId
-    fn get_uri(&self, id: &TransportIdRef) -> Option<String> {
+    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
         let res = self.connections.get(&id.to_string());
-        res.map(|url| url.to_string())
+        res.map(|url| url.clone())
     }
 
     /// Connect to another node's "bind".
     /// Get server from the uri and connect to it with a new transportId for ourself.
-    fn connect(&mut self, uri: &str) -> TransportResult<TransportId> {
+    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
         // Self must have uri
         let my_uri = match &self.maybe_my_uri {
             None => {
@@ -83,10 +84,10 @@ impl Transport for TransportMemory {
         let id = format!("mem_conn_{}", self.n_id);
         // Get other's server and connect us to it by using our new ConnectionId.
         let mut server = maybe_server.unwrap().lock().unwrap();
-        server.connect(&my_uri)?;
+        server.connect(&my_uri.as_str())?;
 
         // Store ConnectionId
-        self.connections.insert(id.clone(), uri.to_string());
+        self.connections.insert(id.clone(), uri.clone());
         Ok(id)
     }
 
@@ -147,7 +148,7 @@ impl Transport for TransportMemory {
             // let uri = self.get_uri(id).unwrap();
             let mut server = maybe_server.unwrap().lock().unwrap();
             server
-                .post(&self.maybe_my_uri.clone().unwrap(), payload)
+                .post(&self.maybe_my_uri.clone().unwrap().to_string(), payload)
                 .expect("Post on memory server should work");
         }
         Ok(())
@@ -169,12 +170,12 @@ impl Transport for TransportMemory {
     }
 
     /// Create a new server inbox for myself
-    fn bind(&mut self, uri: &str) -> TransportResult<String> {
-        let bounded_uri = format!("{}_bound", uri);
+    fn bind(&mut self, uri: &Url) -> TransportResult<Url> {
+        let bounded_uri = Url::parse(format!("{}_bound", uri).as_str()).unwrap();
         self.maybe_my_uri = Some(bounded_uri.clone());
         memory_server::set_server(&bounded_uri)?;
-        self.my_servers.insert(bounded_uri.to_string());
-        Ok(bounded_uri.to_string())
+        self.my_servers.insert(bounded_uri.clone());
+        Ok(bounded_uri.clone())
     }
 
     /// Process my TransportCommand inbox and all my server inboxes
@@ -195,7 +196,7 @@ impl Transport for TransportMemory {
             }
         }
         // Process my Servers
-        let mut to_connect_list = Vec::new();
+        let mut to_connect_list: Vec<Url> = Vec::new();
         for server_uri in &self.my_servers {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
             let server = server_map.get(server_uri).expect("My server should exist.");
@@ -204,7 +205,8 @@ impl Transport for TransportMemory {
                 did_work = true;
                 for event in &output {
                     if let TransportEvent::ConnectResult(uri) = event {
-                        to_connect_list.push(uri.clone());
+                        let to_connect = Url::parse(uri).unwrap();
+                        to_connect_list.push(to_connect);
                     } else {
                         outbox.push(event.clone());
                     }

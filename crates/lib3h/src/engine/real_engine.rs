@@ -3,17 +3,19 @@
 //#[cfg(test)]
 use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, HashSet, VecDeque};
+use url::Url;
 
 use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig},
+    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys},
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
 };
+use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, AddressRef, DidWork, Lib3hResult,
@@ -22,7 +24,24 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
-impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
+impl<SecBuf: Buffer, Crypto: CryptoSystem> TransportKeys<SecBuf, Crypto> {
+    pub fn new() -> Lib3hResult<Self> {
+        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
+        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
+        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
+        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
+        Ok(Self {
+            transport_id: hcm0.encode(&public_key)?,
+            transport_public_key: public_key,
+            transport_secret_key: secret_key,
+            phantom_crypto: std::marker::PhantomData,
+        })
+    }
+}
+
+impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
+    RealEngine<TransportWss<std::net::TcpStream>, D, SecBuf, Crypto>
+{
     /// Constructor
     pub fn new(
         config: RealEngineConfig,
@@ -51,13 +70,14 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
+            transport_id: TransportKeys::new()?,
         })
     }
 }
 
 /// Constructor
 //#[cfg(test)]
-impl<D: Dht> RealEngine<TransportMemory, D> {
+impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D, SecBuf, Crypto> {
     pub fn new_mock(
         config: RealEngineConfig,
         name: &str,
@@ -96,11 +116,14 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
+            transport_id: TransportKeys::new()?,
         })
     }
 }
 
-impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
+impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
+    for RealEngine<T, D, SecBuf, Crypto>
+{
     fn run(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
@@ -113,7 +136,8 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         // FIXME
         Ok(())
     }
-    fn advertise(&self) -> String {
+
+    fn advertise(&self) -> Url {
         self.network_gateway
             .borrow()
             .this_peer()
@@ -147,7 +171,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
 }
 
 /// Private
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
@@ -218,6 +242,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                             .serialize(&mut Serializer::new(&mut payload))
                             .unwrap();
                         // Send
+                        println!(
+                            "[t] {} sending payload to transport id {}",
+                            my_name, transport_id
+                        );
                         space_gateway.send(&[transport_id.as_str()], &payload)?;
                     }
                 }
@@ -341,9 +369,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         // First create DhtConfig for space gateway
         let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
+        let this_peer_transport =
+            // TODO encapsulate this conversion logic
+            Url::parse(format!("hc:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
-            this_peer_transport: this_net_peer.peer_address.clone(),
+            this_peer_transport,
             custom: self.config.dht_custom_config.clone(),
         };
         // Create new space gateway for this ChainId

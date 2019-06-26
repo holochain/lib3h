@@ -1,4 +1,6 @@
 use lib3h_protocol::{data_types::EntryData, Address};
+use url::Url;
+
 pub type FromPeerAddress = String;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -55,7 +57,8 @@ pub struct GossipToData {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct PeerData {
     pub peer_address: String,
-    pub transport: String,
+    #[serde(with = "url_serde")]
+    pub transport: Url,
     pub timestamp: u64,
 }
 

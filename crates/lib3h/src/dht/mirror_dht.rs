@@ -7,6 +7,7 @@ use std::collections::{HashMap, VecDeque};
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 /// Enum holding all types of gossip messages used by MirrorDht
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -32,14 +33,14 @@ pub struct MirrorDht {
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(peer_address: &str, peer_transport: &str) -> Self {
+    pub fn new(peer_address: &str, peer_transport: &Url) -> Self {
         MirrorDht {
             inbox: VecDeque::new(),
             peer_list: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
-                transport: peer_transport.to_string(),
+                transport: peer_transport.clone(),
                 timestamp: 0, // FIXME
             },
         }

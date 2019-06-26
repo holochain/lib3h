@@ -12,6 +12,8 @@ use std::{
     rc::Rc,
 };
 
+use url::Url;
+
 /// Gateway to a P2P network.
 /// Combines a transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -22,7 +24,7 @@ pub struct P2pGateway<T: Transport, D: Dht> {
     /// Used for distinguishing gateways
     identifier: String,
     /// Map holding the reversed mapping between connection url and transportId response
-    connection_map: HashMap<String, TransportId>,
+    connection_map: HashMap<Url, TransportId>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
 }

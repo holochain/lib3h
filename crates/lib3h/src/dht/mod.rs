@@ -11,6 +11,7 @@ pub mod tests {
         data_types::{EntryAspectData, EntryData},
         Address, AddressRef,
     };
+    use url::Url;
 
     /// CONSTS
     lazy_static! {
@@ -35,8 +36,8 @@ pub mod tests {
     // Request counters
     static mut FETCH_COUNT: u32 = 0;
 
-    fn create_test_transport(peer_address: &str) -> String {
-        format!("test://{}", peer_address)
+    fn create_test_transport(peer_address: &str) -> Url {
+        Url::parse(format!("test://{}", peer_address).as_str()).unwrap()
     }
 
     #[allow(non_snake_case)]

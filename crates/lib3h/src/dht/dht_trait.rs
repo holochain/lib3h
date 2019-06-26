@@ -1,10 +1,12 @@
 use crate::dht::dht_protocol::{DhtCommand, DhtEvent, PeerData};
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
+use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DhtConfig {
     pub this_peer_address: String,
-    pub this_peer_transport: String,
+    #[serde(with = "url_serde")]
+    pub this_peer_transport: Url,
     pub custom: Vec<u8>,
 }
 
