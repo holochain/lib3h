@@ -80,7 +80,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .inner_dht
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
-                        .transport;
+                        .peer_uri;
                     println!(
                         "({}) GossipTo: {} {}",
                         self.identifier.clone(),
@@ -99,7 +99,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .serialize(&mut Serializer::new(&mut payload))
                         .unwrap();
                     // Forward gossip to the inner_transport
-                    // If no connection to that transportId is open, open one first.
+                    // If no connection to that connectionId is open, open one first.
                     self.inner_transport
                         .borrow_mut()
                         .send(&[peer_transport.path()], &payload)?;

@@ -4,7 +4,7 @@ pub mod p2p_gateway;
 
 use crate::{
     dht::dht_trait::Dht,
-    transport::{protocol::TransportCommand, transport_trait::Transport, TransportId},
+    transport::{protocol::TransportCommand, transport_trait::Transport, ConnectionId},
 };
 use std::{
     cell::RefCell,
@@ -23,8 +23,8 @@ pub struct P2pGateway<T: Transport, D: Dht> {
     inner_dht: D,
     /// Used for distinguishing gateways
     identifier: String,
-    /// Map holding the reversed mapping between connection url and transportId response
-    connection_map: HashMap<Url, TransportId>,
+    /// Map holding the reversed mapping between connection url and connectionId response
+    connection_map: HashMap<Url, ConnectionId>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
 }

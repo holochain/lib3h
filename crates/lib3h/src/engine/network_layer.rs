@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine},
-    transport::{protocol::*, transport_trait::Transport, TransportIdRef},
+    transport::{protocol::*, transport_trait::Transport, ConnectionIdRef},
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
@@ -120,13 +120,13 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
                         our_joined_space_list, id
                     );
-                    // id is connection_id but we need a machine_id, so search for it in the DHT
+                    // id is connectionId but we need a transportId, so search for it in the DHT
                     let peer_list = network_gateway.get_peer_list();
                     println!(
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
                         peer_list
                     );
-                    let maybe_peer_data = peer_list.iter().find(|pd| pd.transport == uri);
+                    let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
                     if let Some(peer_data) = maybe_peer_data {
                         println!(
                             "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
@@ -140,7 +140,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     if self.network_connections.is_empty() {
                         let data = ConnectedData {
                             request_id: "FIXME".to_string(),
-                            network_transport: uri,
+                            uri,
                         };
                         outbox.push(Lib3hServerProtocol::Connected(data));
                     }
@@ -181,7 +181,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
     /// Return a list of Lib3hServerProtocol to send to Core.
     fn serve_P2pProtocol(
         &mut self,
-        _from_id: &TransportIdRef,
+        _from_id: &ConnectionIdRef,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();

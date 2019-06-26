@@ -1,7 +1,7 @@
 use crate::transport::{
     error::{TransportError, TransportResult},
     protocol::TransportEvent,
-    TransportId, TransportIdRef,
+    ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
 use std::{
@@ -54,9 +54,9 @@ pub struct MemoryServer {
     /// Address of this server
     uri: Url,
     /// Inboxes for payloads from each of its connections.
-    inbox_map: HashMap<TransportId, VecDeque<Vec<u8>>>,
+    inbox_map: HashMap<ConnectionId, VecDeque<Vec<u8>>>,
     /// Inbox of new inbound connections
-    new_conn_inbox: Vec<TransportId>,
+    new_conn_inbox: Vec<ConnectionId>,
 }
 
 impl MemoryServer {
@@ -71,8 +71,7 @@ impl MemoryServer {
 
     /// Create an inbox for this new sender
     /// Will connect the other way.
-    /// Return our transportId
-    pub fn connect(&mut self, requester_uri: &TransportIdRef) -> TransportResult<()> {
+    pub fn connect(&mut self, requester_uri: &ConnectionIdRef) -> TransportResult<()> {
         println!(
             "[i] (MemoryServer) {} creates inbox for {}",
             self.uri, requester_uri
@@ -87,20 +86,20 @@ impl MemoryServer {
             .inbox_map
             .insert(requester_uri.to_string(), VecDeque::new());
         if res.is_some() {
-            return Err(TransportError::new("TransportId already used".to_string()));
+            return Err(TransportError::new("connectionId already used".to_string()));
         }
         // Notify our TransportMemory to connect back
         self.new_conn_inbox.push(requester_uri.to_string());
         Ok(())
     }
 
-    /// Delete this transportId's inbox
-    pub fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+    /// Delete this connectionId's inbox
+    pub fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         println!("[i] (MemoryServer {}).close({})", self.uri, id);
         let res = self.inbox_map.remove(id);
         if res.is_none() {
             return Err(TransportError::new(format!(
-                "TransportId '{}' unknown for server {}",
+                "connectionId '{}' unknown for server {}",
                 id, self.uri
             )));
         }
@@ -108,12 +107,12 @@ impl MemoryServer {
         Ok(())
     }
 
-    /// Add payload to transportId's inbox
-    pub fn post(&mut self, from_id: &TransportIdRef, payload: &[u8]) -> TransportResult<()> {
+    /// Add payload to connectionId's inbox
+    pub fn post(&mut self, from_id: &ConnectionIdRef, payload: &[u8]) -> TransportResult<()> {
         let maybe_inbox = self.inbox_map.get_mut(from_id);
         if let None = maybe_inbox {
             return Err(TransportError::new(format!(
-                "(MemoryServer {}) Unknown TransportId {}",
+                "(MemoryServer {}) Unknown connectionId {}",
                 self.uri, from_id
             )));
         }
