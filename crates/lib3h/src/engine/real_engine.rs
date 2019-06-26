@@ -197,7 +197,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        println!("[d] {} >> recv: {:?}", self.name.clone(), client_msg);
+        println!("[d] {} serving: {:?}", self.name.clone(), client_msg);
         let mut outbox = Vec::new();
         let did_work = true;
         // Note: use same order as the enum
@@ -371,7 +371,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport =
             // TODO encapsulate this conversion logic
-            Url::parse(format!("hc:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
+            Url::parse(format!("machine:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
             this_peer_transport,
@@ -390,7 +390,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             std::string::String::from_utf8_lossy(&join_msg.space_address).into_owned();
         let peer = new_space_gateway.this_peer().to_owned();
         let mut payload = Vec::new();
-        let p2p_msg = P2pProtocol::JoinSpace(space_address.clone(), peer.clone());
+        let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
         p2p_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();

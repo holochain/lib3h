@@ -102,7 +102,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     // If no connection to that transportId is open, open one first.
                     self.inner_transport
                         .borrow_mut()
-                        .send(&[peer_transport.as_str()], &payload)?;
+                        .send(&[peer_transport.path()], &payload)?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
