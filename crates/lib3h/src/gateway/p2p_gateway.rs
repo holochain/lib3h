@@ -6,7 +6,7 @@ use crate::{
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
     gateway::P2pGateway,
-    transport::{transport_trait::Transport, url_to_connection_id},
+    transport::{transport_trait::Transport, url_to_transport_id},
 };
 use lib3h_protocol::{AddressRef, Lib3hResult};
 use std::{
@@ -29,7 +29,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
             self.connection_map.insert(
                 peer_data.peer_uri.clone(),
-                url_to_connection_id(&peer_data.peer_uri.clone()),
+                url_to_transport_id(&peer_data.peer_uri.clone()),
             );
         }
         // HACK END

@@ -34,7 +34,7 @@ pub struct RealEngineConfig {
 #[allow(dead_code)]
 pub struct TransportKeys<SecBuf: Buffer, Crypto: CryptoSystem> {
     /// Our TransportId (e.g. "HcMyadayada")
-    pub transport_id: ConnectionId,
+    pub transport_id: String,
     /// The TransportId public key
     pub transport_public_key: Vec<u8>,
     /// The TransportId secret key

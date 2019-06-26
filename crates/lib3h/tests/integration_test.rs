@@ -38,9 +38,9 @@ lazy_static! {
 
     // List of tests
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        //(setup_only, true),
+        (setup_only, true),
         (basic_two_send_message, true),
-        //(basic_two_join_first, false),
+        (basic_two_join_first, false),
     ];
 }
 

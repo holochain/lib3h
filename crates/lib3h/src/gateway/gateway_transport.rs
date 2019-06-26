@@ -5,9 +5,9 @@ use crate::{
     engine::p2p_protocol::P2pProtocol,
     gateway::P2pGateway,
     transport::{
-        connection_id_to_url,
         error::{TransportError, TransportResult},
         protocol::{TransportCommand, TransportEvent},
+        transport_id_to_url,
         transport_trait::Transport,
         ConnectionId, ConnectionIdRef,
     },
@@ -162,13 +162,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    /// Get Transports from DHT peer_address'
+    /// Get Uris from DHT peer_address'
     pub(crate) fn connection_id_to_dht_uri_list(
         &self,
         id_list: &[&ConnectionIdRef],
     ) -> TransportResult<Vec<Url>> {
-        // get peer transport from dht first
-        let mut transport_list = Vec::with_capacity(id_list.len());
+        let mut uri_list = Vec::with_capacity(id_list.len());
         for connectionId in id_list {
             let maybe_peer = self.inner_dht.get_peer(connectionId);
             match maybe_peer {
@@ -178,10 +177,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         connectionId
                     )));
                 }
-                Some(peer) => transport_list.push(peer.peer_uri),
+                Some(peer) => uri_list.push(peer.peer_uri),
             }
         }
-        Ok(transport_list)
+        Ok(uri_list)
     }
 
     /// Process a transportEvent received from our internal connection.
@@ -255,7 +254,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         if self.identifier == gateway_id {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
-                                peer_uri: connection_id_to_url(id.clone()),
+                                peer_uri: transport_id_to_url(id.clone()),
                                 timestamp: 42, // FIXME
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");

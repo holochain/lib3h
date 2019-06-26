@@ -140,7 +140,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     if self.network_connections.is_empty() {
                         let data = ConnectedData {
                             request_id: "FIXME".to_string(),
-                            uri: uri,
+                            uri,
                         };
                         outbox.push(Lib3hServerProtocol::Connected(data));
                     }

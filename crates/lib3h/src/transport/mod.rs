@@ -11,12 +11,12 @@ pub mod transport_trait;
 pub type ConnectionId = String;
 
 // TODO make a struct for transport id and make these trait converters
-pub fn connection_id_to_url(id: ConnectionId) -> Url {
+pub fn transport_id_to_url(id: ConnectionId) -> Url {
     // TODO this is not general enough for all transports
-    Url::parse(id.as_str()).expect("transport_id_to_url: transport id is not a well formed url")
+    Url::parse(id.as_str()).expect("transport_id_to_url: connection id is not a well formed url")
 }
 
-pub fn url_to_connection_id(url: &Url) -> ConnectionId {
+pub fn url_to_transport_id(url: &Url) -> ConnectionId {
     // TODO this is not general enough for all transports
     String::from(url.path())
 }
