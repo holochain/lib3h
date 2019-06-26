@@ -24,8 +24,10 @@ impl TransportWss<std::net::TcpStream> {
     }
 
     fn tcp_bind(url: &url::Url) -> TransportResult<Acceptor<TcpStream>> {
+
+        // TODO return transport result rather than expect()
         let host = url.host_str().expect("host name must be supplied");
-        let port = url.port().unwrap_or(80);
+        let port = url.port().unwrap_or(80); // TODO default or error here?
         let formatted_url = format!("{}:{}", host, port);
         println!("formatted url: {}", formatted_url);
         TcpListener::bind(formatted_url)
@@ -67,7 +69,7 @@ impl TransportWss<std::net::TcpStream> {
                                                 );
                                                 WssInfo::server(
                                                     connection_id,
-                                                    url.clone(),
+                                                    url,
                                                     tcp_stream,
                                                 )
                                             })

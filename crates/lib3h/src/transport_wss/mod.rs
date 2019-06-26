@@ -149,19 +149,29 @@ pub trait IdGenerator {
 }
 
 #[derive(Clone)]
-pub struct ConnectionIdFactory(Arc<Mutex<u64>>);
+/// A ConnectionIdFactory is a tuple of it's own internal id and incremental counter 
+/// for each established transport
+pub struct ConnectionIdFactory(u64, Arc<Mutex<u64>>);
 impl IdGenerator for ConnectionIdFactory {
     fn next_id(&mut self) -> ConnectionId {
-        let mut n_id = self.0.lock().expect("could not lock mutex");
-        let out = format!("ws{}", *n_id);
+        let self_id = self.0;
+        let mut n_id = self.1.lock().expect("could not lock mutex");
+        let out = format!("ws{}_{}", self_id, *n_id);
         *n_id += 1;
         out
     }
 }
 
+lazy_static! {
+    static ref TRANSPORT_COUNT: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+}
 impl ConnectionIdFactory {
     pub fn new() -> Self {
-        ConnectionIdFactory(Arc::new(Mutex::new(1)))
+        let mut tc = TRANSPORT_COUNT
+            .lock()
+            .expect("could not lock transport count mutex");
+        *tc += 1;
+        ConnectionIdFactory(*tc, Arc::new(Mutex::new(1)))
     }
 }
 
@@ -481,7 +491,6 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 Ok(())
             }
             WebsocketStreamState::TlsSrvMidHandshake(socket) => {
-                println!("[t] tls srv mid handshake");
                 info.stateful_socket = self.priv_tls_srv_handshake(socket.handshake())?;
                 Ok(())
             }
