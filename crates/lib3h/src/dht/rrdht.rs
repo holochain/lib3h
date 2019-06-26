@@ -1,62 +1,69 @@
-use crate::dht::{
-    dht_event::{DhtEvent, PeerHoldRequestData},
-    dht_trait::Dht,
-};
-use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
+use crate::dht::{dht_protocol::*, dht_trait::Dht};
+use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
 use std::collections::VecDeque;
+use url::Url;
 
-/// RoundAndRound DHT implementation
+/// RedRibbon DHT implementation
 pub struct RrDht {
-    /// FIFO of DhtEvents send to us
-    inbox: VecDeque<DhtEvent>,
+    /// FIFO of DhtCommands send to us
+    inbox: VecDeque<DhtCommand>,
+    ///
+    this_peer: PeerData,
 }
 
 impl RrDht {
     pub fn new() -> Self {
         RrDht {
             inbox: VecDeque::new(),
+            this_peer: PeerData {
+                peer_address: "FIXME".to_string(),
+                transport: Url::parse("fixme://host:123").expect("a valid transport url"),
+                timestamp: 0, // FIXME
+            },
         }
+    }
+
+    pub fn new_with_raw_config(_config: &[u8]) -> Lib3hResult<Self> {
+        Ok(Self::new())
     }
 }
 
 impl Dht for RrDht {
     // -- Getters -- //
 
-    fn this_peer(&self) -> Lib3hResult<()> {
-        // FIXME
-        Ok(())
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
 
     // -- Peer -- //
 
-    fn get_peer(&self, _peer_address: &str) -> Option<PeerHoldRequestData> {
+    fn get_peer(&self, _peer_address: &str) -> Option<PeerData> {
         // FIXME
         None
     }
-    fn fetch_peer(&self, _peer_address: &str) -> Option<PeerHoldRequestData> {
+    fn fetch_peer(&self, _peer_address: &str) -> Option<PeerData> {
         // FIXME
         None
     }
-    fn drop_peer(&self, _peer_address: &str) -> Lib3hResult<()> {
+    fn get_peer_list(&self) -> Vec<PeerData> {
         // FIXME
-        Ok(())
+        vec![]
     }
-
     // -- Data -- //
 
-    fn get_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
+    fn get_entry(&self, _data_address: &AddressRef) -> Option<EntryData> {
         // FIXME
-        Ok(vec![])
+        None
     }
-    fn fetch_data(&self, _data_address: &AddressRef) -> Lib3hResult<Vec<u8>> {
+    fn fetch_entry(&self, _data_address: &AddressRef) -> Option<EntryData> {
         // FIXME
-        Ok(vec![])
+        None
     }
 
     // -- Processing -- //
 
-    fn post(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        self.inbox.push_back(evt);
+    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        self.inbox.push_back(cmd);
         Ok(())
     }
 
@@ -65,12 +72,12 @@ impl Dht for RrDht {
         let outbox = Vec::new();
         let mut did_work = false;
         loop {
-            let evt = match self.inbox.pop_front() {
+            let cmd = match self.inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
             did_work = true;
-            println!("(log.t) RrDht.process(): {:?}", evt)
+            println!("[t] RrDht.process(): {:?}", cmd)
         }
         Ok((did_work, outbox))
     }

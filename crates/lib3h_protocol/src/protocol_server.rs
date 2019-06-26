@@ -8,14 +8,14 @@ use crate::data_types::*;
 ///  - Notification: Notify that something happened. Not expecting any response. Ends with verb in past form, i.e. '-ed'.
 /// Fetch = Request between node and the network (other nodes)
 /// Get   = Request within a node between p2p module and core
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Lib3hServerProtocol {
     // -- Generic responses -- //
     /// Success response to a request (any Command with an `request_id` field.)
-    SuccessResult(ResultData),
+    SuccessResult(GenericResultData),
     /// Failure response to a request (any Command with an `request_id` field.)
     /// Can also be a response to a mal-formed request.
-    FailureResult(ResultData),
+    FailureResult(GenericResultData),
 
     // -- Connection -- //
     /// Notification of successful connection to a network
@@ -34,15 +34,17 @@ pub enum Lib3hServerProtocol {
     FetchEntryResult(FetchEntryResultData),
     /// Another node, or the network module itself is requesting data from us
     HandleFetchEntry(FetchEntryData),
-
     /// Store data on a node's dht arc.
-    HandleStoreEntry(ClaimedEntryData),
+    HandleStoreEntryAspect(StoreEntryAspectData),
     /// Local client does not need to hold that entry anymore.
     /// Local client doesn't 'have to' comply.
     HandleDropEntry(DropEntryData),
+    /// Request a node to handle a QueryEntry request
+    HandleQueryEntry(QueryEntryData),
+    /// Response to a `QueryEntry` request
+    QueryEntryResult(QueryEntryResultData),
 
     // -- Entry lists -- //
-    HandleGetPublishingEntryList(GetListData),
-
-    HandleGetHoldingEntryList(GetListData),
+    HandleGetAuthoringEntryList(GetListData),
+    HandleGetGossipingEntryList(GetListData),
 }

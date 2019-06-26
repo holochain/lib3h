@@ -1,40 +1,72 @@
 use crate::Address;
+use url::Url;
 
 /// Tuple holding all the info required for identifying an Aspect.
-/// (entry_address, content hash)
+/// (entry_address, aspect_address)
 pub type AspectKey = (Address, Address);
 
 //--------------------------------------------------------------------------------------------------
-// Semi-opaque Holochain Entry
+// Entry (Semi-opaque Holochain entry type)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum EntryAspectKind {
-    Content, // the actual entry content
-    Header,  // the header for the entry
-    Meta,    // could be EntryWithHeader for links
-    ValidationResult,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EntryAspect {
-    pub kind: EntryAspectKind,
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct EntryAspectData {
+    pub aspect_address: Address,
+    pub type_hint: String,
+    pub aspect: Vec<u8>,
     pub publish_ts: u64,
-    pub data: String, // opaque, but in core would be EntryWithHeader for both Entry and Meta
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryData {
-    pub aspect_list: Vec<EntryAspect>,
     pub entry_address: Address,
+    pub aspect_list: Vec<EntryAspectData>,
+}
+
+impl EntryData {
+    /// get an EntryAspectData from an EntryData
+    pub fn get(&self, aspect_address: &Address) -> Option<EntryAspectData> {
+        for aspect in self.aspect_list.iter() {
+            if aspect.aspect_address == *aspect_address {
+                return Some(aspect.clone());
+            }
+        }
+        None
+    }
+
+    /// Return true if we added new content from other
+    pub fn merge(&mut self, other: &EntryData) -> bool {
+        // Must be same entry address
+        if self.entry_address != other.entry_address {
+            return false;
+        }
+        // Get all new aspects
+        let mut to_append = Vec::new();
+        for aspect in other.aspect_list.iter() {
+            if self
+                .aspect_list
+                .iter()
+                .any(|a| a.aspect_address == aspect.aspect_address)
+            {
+                continue;
+            }
+            to_append.push(aspect.clone());
+        }
+        // append new aspects
+        if to_append.len() == 0 {
+            return false;
+        }
+        self.aspect_list.append(&mut to_append);
+        true
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
 // Generic responses
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResultData {
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct GenericResultData {
     pub request_id: String,
     pub space_address: Address,
     pub to_agent_id: Address,
@@ -45,7 +77,7 @@ pub struct ResultData {
 // Connection
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConnectData {
     /// Identifier of this request
     pub request_id: String,
@@ -54,25 +86,27 @@ pub struct ConnectData {
     /// Ex:
     ///  - `wss://192.168.0.102:58081/`
     ///  - `holorelay://x.x.x.x`
-    pub peer_transport: String,
+    #[serde(with = "url_serde")]
+    pub peer_transport: Url,
     /// TODO: Add a machine Id?
     /// Specify to which network to connect to.
     /// Empty string for 'any'
     pub network_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
-    /// MachineId of the first peer we are connected to
-    pub machine_id: Address,
+    /// The first network transport address we are connected to (e.g. url)
+    #[serde(with = "url_serde")]
+    pub network_transport: Url,
     // TODO: Add network_id? Or let local client figure it out with the request_id?
     // TODO: Maybe add some info on network state?
     // pub peer_count: u32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DisconnectedData {
     /// Specify to which network to connect to.
     /// Empty string for 'all'
@@ -83,7 +117,7 @@ pub struct DisconnectedData {
 // Space tracking
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct SpaceData {
     /// Identifier of this request
     pub request_id: String,
@@ -95,7 +129,7 @@ pub struct SpaceData {
 // Direct Messaging
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DirectMessageData {
     pub space_address: Address,
     pub request_id: String,
@@ -105,45 +139,51 @@ pub struct DirectMessageData {
 }
 
 //--------------------------------------------------------------------------------------------------
-// DHT Entry
+// Query
+//--------------------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct QueryEntryData {
+    pub space_address: Address,
+    pub entry_address: Address,
+    pub request_id: String,
+    pub requester_agent_id: Address,
+    pub query: Vec<u8>, // opaque query struct
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct QueryEntryResultData {
+    pub space_address: Address,
+    pub entry_address: Address,
+    pub request_id: String,
+    pub requester_agent_id: Address,
+    pub responder_agent_id: Address,
+    pub query_result: Vec<u8>, // opaque query-result struct
+}
+
+//--------------------------------------------------------------------------------------------------
+// Publish, Store & Drop
 //--------------------------------------------------------------------------------------------------
 
 /// Wrapped Entry message
-#[derive(Debug, Clone, PartialEq)]
-pub struct ClaimedEntryData {
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ProvidedEntryData {
     pub space_address: Address,
     pub provider_agent_id: Address,
     pub entry: EntryData,
 }
 
-/// Entry hodled message
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct EntryStoredData {
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StoreEntryAspectData {
+    pub request_id: String,
     pub space_address: Address,
     pub provider_agent_id: Address,
     pub entry_address: Address,
-    pub holder_agent_id: Address,
-}
-
-/// Request for Entry
-#[derive(Debug, Clone, PartialEq)]
-pub struct FetchEntryData {
-    pub space_address: Address,
-    pub entry_address: Address,
-    pub request_id: String,
-    pub requester_agent_id: Address,
-}
-
-/// DHT data response from a request
-#[derive(Debug, Clone, PartialEq)]
-pub struct FetchEntryResultData {
-    pub request_id: String,
-    pub requester_agent_id: Address,
-    pub entry: ClaimedEntryData,
+    pub entry_aspect: EntryAspectData,
 }
 
 /// Identifier of what entry (and its meta?) to drop
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DropEntryData {
     pub space_address: Address,
     pub request_id: String,
@@ -151,18 +191,44 @@ pub struct DropEntryData {
 }
 
 //--------------------------------------------------------------------------------------------------
+// Gossip
+//--------------------------------------------------------------------------------------------------
+
+/// Request for Entry
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct FetchEntryData {
+    pub space_address: Address,
+    pub entry_address: Address,
+    pub request_id: String,
+    pub provider_agent_id: Address,
+    pub aspect_address_list: Option<Vec<Address>>, // None -> Get all, otherwise get specified aspects
+}
+
+/// DHT data response from a request
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct FetchEntryResultData {
+    pub space_address: Address,
+    pub provider_agent_id: Address,
+    pub request_id: String,
+    pub entry: EntryData,
+}
+
+//--------------------------------------------------------------------------------------------------
 // Lists (publish & hold)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GetListData {
     pub space_address: Address,
+    /// Request List from a specific Agent
+    pub provider_agent_id: Address,
     pub request_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryListData {
     pub space_address: Address,
+    pub provider_agent_id: Address,
     pub request_id: String,
-    pub entry_address_list: Vec<Address>,
+    pub address_map: std::collections::HashMap<Address, Vec<Address>>, // Aspect addresses per entry
 }

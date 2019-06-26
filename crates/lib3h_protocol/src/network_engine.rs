@@ -3,6 +3,8 @@ use crate::{
     Lib3hResult,
 };
 
+use url::Url;
+
 /// Common interface for all types of network modules to be used by the Lib3hWorker
 pub trait NetworkEngine {
     /// Start network communications
@@ -18,5 +20,5 @@ pub trait NetworkEngine {
     /// Returns a vector of protocol messages core is required to handle.
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)>;
     /// Get qualified transport address
-    fn advertise(&self) -> String;
+    fn advertise(&self) -> Url;
 }
