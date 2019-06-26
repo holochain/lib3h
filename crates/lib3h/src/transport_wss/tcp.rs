@@ -40,7 +40,7 @@ impl TransportWss<std::net::TcpStream> {
                     .map(|()| {
                         let acceptor: Acceptor<TcpStream> =
                             Box::new(move |mut connection_id_factory: ConnectionIdFactory| {
-                                let transport_id = connection_id_factory.next_id();
+                                let connection_id = connection_id_factory.next_id();
                                 listener
                                     .accept()
                                     .map_err(|err| {
@@ -65,7 +65,7 @@ impl TransportWss<std::net::TcpStream> {
                                                     url.clone()
                                                 );
                                                 WssInfo::server(
-                                                    transport_id,
+                                                    connection_id,
                                                     url.clone(),
                                                     tcp_stream,
                                                 )

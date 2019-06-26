@@ -232,9 +232,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let transport_id =
+                        let connection_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        println!("[d] {} -- transport_id: {:?}", my_name, transport_id);
+                        println!("[d] {} -- connection_id: {:?}", my_name, connection_id);
                         // Change into P2pProtocol
                         let net_msg = P2pProtocol::DirectMessage(msg);
                         // Serialize
@@ -245,9 +245,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                         // Send
                         println!(
                             "[t] {} sending payload to transport id {}",
-                            my_name, transport_id
+                            my_name, connection_id
                         );
-                        space_gateway.send(&[transport_id.as_str()], &payload)?;
+                        space_gateway.send(&[connection_id.as_str()], &payload)?;
                     }
                 }
             }
@@ -261,7 +261,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let transport_id =
+                        let connection_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
                         // Change into P2pProtocol
                         let net_msg = P2pProtocol::DirectMessageResult(msg);
@@ -271,7 +271,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                             .serialize(&mut Serializer::new(&mut payload))
                             .unwrap();
                         // Send
-                        space_gateway.send(&[transport_id.as_str()], &payload)?;
+                        space_gateway.send(&[connection_id.as_str()], &payload)?;
                     }
                 }
             }

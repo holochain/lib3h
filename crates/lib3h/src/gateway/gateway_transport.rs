@@ -23,12 +23,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         println!("[t] ({}).connect() {}", self.identifier.clone(), uri);
         // Connect
-        let transport_id = self.inner_transport.borrow_mut().connect(&uri)?;
+        let connection_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in connection map
         self.connection_map
-            .insert(uri.clone(), transport_id.clone());
+            .insert(uri.clone(), connection_id.clone());
         // Done
-        Ok(transport_id)
+        Ok(connection_id)
     }
 
     /// TODO?
@@ -56,19 +56,19 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             dht_uri_list,
             payload.len()
         );
-        // Get transportIds for the inner Transport.
+        // Get Uris for the inner Transport.
         let mut net_uri_list = Vec::new();
-        for dht_transport in dht_uri_list {
-            let net_transport = self
+        for dht_uri in dht_uri_list {
+            let net_uri = self
                 .connection_map
-                .get(&dht_transport)
+                .get(&dht_uri)
                 .expect("unknown dht_transport");
-            net_uri_list.push(net_transport);
+            net_uri_list.push(net_uri);
             println!(
-                "[t] ({}).send() reversed mapped dht_transport {:?} to net_transport {:?}",
+                "[t] ({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
                 self.identifier.clone(),
-                dht_transport,
-                net_transport
+                dht_uri,
+                net_uri
             )
         }
         let ref_list: Vec<&str> = net_uri_list.iter().map(|v| v.as_str()).collect();
@@ -78,14 +78,14 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     ///
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        let transport_list = self.connection_id_list()?;
-        let transport_list: Vec<&str> = transport_list.iter().map(|v| &**v).collect();
+        let connection_list = self.connection_id_list()?;
+        let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
         println!(
             "[t] ({}) send_all() {:?}",
             self.identifier.clone(),
-            transport_list
+            dht_id_list
         );
-        self.send(&transport_list, payload)
+        self.send(&dht_id_list, payload)
     }
 
     /// TODO?

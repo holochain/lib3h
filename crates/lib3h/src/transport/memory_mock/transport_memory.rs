@@ -20,8 +20,7 @@ pub struct TransportMemory {
     connections: HashMap<ConnectionId, Url>,
     /// Counter for generating new connectionIds
     n_id: u32,
-    ///// My peer address on the network layer
-    /// My peer transport
+    /// My peer uri on the network layer
     maybe_my_uri: Option<Url>,
 }
 
