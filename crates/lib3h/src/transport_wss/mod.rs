@@ -477,7 +477,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 Ok(())
             }
             WebsocketStreamState::TlsMidHandshake(socket) => {
-               info.stateful_socket = self.priv_tls_handshake(socket.handshake())?;
+                info.stateful_socket = self.priv_tls_handshake(socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::TlsSrvMidHandshake(socket) => {
@@ -500,7 +500,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 Ok(())
             }
             WebsocketStreamState::WsMidHandshake(socket) => {
-               info.stateful_socket = self.priv_ws_handshake(&info.id, socket.handshake())?;
+                info.stateful_socket = self.priv_ws_handshake(&info.id, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::WsSrvMidHandshake(socket) => {
