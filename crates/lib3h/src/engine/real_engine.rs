@@ -92,7 +92,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             .bind(&config.bind_url)
             .expect("TransportMemory.bind() failed. bind-url might not be unique?");
         let dht_config = DhtConfig {
-            this_peer_address: format!("{}_mId", name),
+            this_peer_address: format!("{}_tId", name),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
         };
