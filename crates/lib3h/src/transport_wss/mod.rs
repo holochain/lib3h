@@ -149,7 +149,7 @@ pub trait IdGenerator {
 }
 
 #[derive(Clone)]
-/// A ConnectionIdFactory is a tuple of it's own internal id and incremental counter 
+/// A ConnectionIdFactory is a tuple of it's own internal id and incremental counter
 /// for each established transport
 pub struct ConnectionIdFactory(u64, Arc<Mutex<u64>>);
 impl IdGenerator for ConnectionIdFactory {

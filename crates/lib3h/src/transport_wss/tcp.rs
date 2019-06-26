@@ -24,7 +24,6 @@ impl TransportWss<std::net::TcpStream> {
     }
 
     fn tcp_bind(url: &url::Url) -> TransportResult<Acceptor<TcpStream>> {
-
         // TODO return transport result rather than expect()
         let host = url.host_str().expect("host name must be supplied");
         let port = url.port().unwrap_or(80); // TODO default or error here?
@@ -67,11 +66,7 @@ impl TransportWss<std::net::TcpStream> {
                                                     "transport_wss::tcp accepted for url {}",
                                                     url.clone()
                                                 );
-                                                WssInfo::server(
-                                                    connection_id,
-                                                    url,
-                                                    tcp_stream,
-                                                )
+                                                WssInfo::server(connection_id, url, tcp_stream)
                                             })
                                             .map_err(|err| {
                                                 println!("transport_wss::tcp url error: {:?}", err);
