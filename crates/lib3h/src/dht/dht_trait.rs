@@ -6,7 +6,7 @@ use url::Url;
 pub struct DhtConfig {
     pub this_peer_address: String,
     #[serde(with = "url_serde")]
-    pub this_peer_transport: Url,
+    pub this_peer_uri: Url,
     pub custom: Vec<u8>,
 }
 

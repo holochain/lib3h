@@ -7,7 +7,7 @@ use crate::transport::{
     error::{TransportError, TransportResult},
     protocol::{TransportCommand, TransportEvent},
     transport_trait::Transport,
-    TransportId, TransportIdRef,
+    ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
 use std::{
@@ -61,7 +61,7 @@ type WssSrvMidHandshake<T> = tungstenite::handshake::MidHandshake<
 type WsStream<T> = tungstenite::protocol::WebSocket<T>;
 type WssStream<T> = tungstenite::protocol::WebSocket<TlsStream<T>>;
 
-type SocketMap<T> = std::collections::HashMap<String, TransportInfo<T>>;
+type SocketMap<T> = std::collections::HashMap<String, WssInfo<T>>;
 
 // an internal state sequence for stream building
 #[derive(Debug)]
@@ -90,15 +90,15 @@ pub const DEFAULT_HEARTBEAT_WAIT_MS: usize = 5000;
 
 /// Represents an individual connection
 #[derive(Debug)]
-pub struct TransportInfo<T: Read + Write + std::fmt::Debug> {
-    id: TransportId,
+pub struct WssInfo<T: Read + Write + std::fmt::Debug> {
+    id: ConnectionId,
     url: url::Url,
     last_msg: std::time::Instant,
     send_queue: Vec<Vec<u8>>,
     stateful_socket: WebsocketStreamState<T>,
 }
 
-impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
+impl<T: Read + Write + std::fmt::Debug> WssInfo<T> {
     pub fn close(&mut self) -> TransportResult<()> {
         if let WebsocketStreamState::ReadyWss(socket) = &mut self.stateful_socket {
             socket.close(None)?;
@@ -108,8 +108,8 @@ impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
         Ok(())
     }
 
-    pub fn new(id: TransportId, url: url::Url, socket: BaseStream<T>, is_server: bool) -> Self {
-        TransportInfo {
+    pub fn new(id: ConnectionId, url: url::Url, socket: BaseStream<T>, is_server: bool) -> Self {
+        WssInfo {
             id: id.clone(),
             url,
             last_msg: std::time::Instant::now(),
@@ -121,11 +121,11 @@ impl<T: Read + Write + std::fmt::Debug> TransportInfo<T> {
         }
     }
 
-    pub fn client(id: TransportId, url: url::Url, socket: BaseStream<T>) -> Self {
+    pub fn client(id: ConnectionId, url: url::Url, socket: BaseStream<T>) -> Self {
         Self::new(id, url, socket, false)
     }
 
-    pub fn server(id: TransportId, url: url::Url, socket: BaseStream<T>) -> Self {
+    pub fn server(id: ConnectionId, url: url::Url, socket: BaseStream<T>) -> Self {
         Self::new(id, url, socket, true)
     }
 }
@@ -145,13 +145,13 @@ pub enum TlsConfig {
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
 
 pub trait IdGenerator {
-    fn next_id(&mut self) -> TransportId;
+    fn next_id(&mut self) -> ConnectionId;
 }
 
 #[derive(Clone)]
-pub struct TransportIdFactory(Arc<Mutex<u64>>);
-impl IdGenerator for TransportIdFactory {
-    fn next_id(&mut self) -> TransportId {
+pub struct ConnectionIdFactory(Arc<Mutex<u64>>);
+impl IdGenerator for ConnectionIdFactory {
+    fn next_id(&mut self) -> ConnectionId {
         let mut n_id = self.0.lock().expect("could not lock mutex");
         let out = format!("ws{}", *n_id);
         *n_id += 1;
@@ -159,14 +159,14 @@ impl IdGenerator for TransportIdFactory {
     }
 }
 
-impl TransportIdFactory {
+impl ConnectionIdFactory {
     pub fn new() -> Self {
-        TransportIdFactory(Arc::new(Mutex::new(1)))
+        ConnectionIdFactory(Arc::new(Mutex::new(1)))
     }
 }
 
 /// A function that produces accepted sockets of type R wrapped in a TransportInfo
-pub type Acceptor<T> = Box<FnMut(TransportIdFactory) -> TransportResult<TransportInfo<T>>>;
+pub type Acceptor<T> = Box<FnMut(ConnectionIdFactory) -> TransportResult<WssInfo<T>>>;
 
 /// A function that binds to a url and produces sockt acceptors of type T
 pub type Bind<T> = Box<FnMut(&Url) -> TransportResult<Acceptor<T>>>;
@@ -187,7 +187,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
     stream_factory: StreamFactory<T>,
     stream_sockets: SocketMap<T>,
     event_queue: Vec<TransportEvent>,
-    n_id: TransportIdFactory,
+    n_id: ConnectionIdFactory,
     inbox: VecDeque<TransportCommand>,
     bind: Bind<T>,
     acceptor: TransportResult<Acceptor<T>>,
@@ -195,7 +195,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
 
 impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     /// connect to a remote websocket service
-    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
+    fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         let host_port = format!(
             "{}:{}",
             uri.host_str()
@@ -205,13 +205,13 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         );
         let socket = (self.stream_factory)(&host_port)?;
         let id = self.priv_next_id();
-        let info = TransportInfo::client(id.clone(), uri.clone(), socket);
+        let info = WssInfo::client(id.clone(), uri.clone(), socket);
         self.stream_sockets.insert(id.clone(), info);
         Ok(id)
     }
 
     /// close a currently tracked connection
-    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         if let Some(mut info) = self.stream_sockets.remove(id) {
             info.close()?;
         }
@@ -244,12 +244,12 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     /// get a list of all open transport ids
-    fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
+    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
         Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
     }
 
-    /// get uri from a transportId
-    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
+    /// get uri from a connectionId
+    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
         let res = self.stream_sockets.get(&id.to_string());
         res.map(|info| info.url.clone())
     }
@@ -268,7 +268,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     /// send a message to one or more remote connected nodes
-    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
+    fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         for id in id_list {
             if let Some(info) = self.stream_sockets.get_mut(&id.to_string()) {
                 info.send_queue.push(payload.to_vec());
@@ -302,7 +302,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
-            n_id: TransportIdFactory::new(),
+            n_id: ConnectionIdFactory::new(),
             inbox: VecDeque::new(),
             bind,
             acceptor: Err(TransportError("acceptor not initialized".into())),
@@ -323,9 +323,9 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     }
 
     /// connect and wait for a Connect event response
-    pub fn wait_connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
+    pub fn wait_connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         // Launch connection attempt
-        let transport_id = self.connect(uri)?;
+        let connection_id = self.connect(uri)?;
         // Wait for a successful response
         let mut out = Vec::new();
         let start = std::time::Instant::now();
@@ -334,7 +334,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             for evt in evt_lst {
                 match evt {
                     TransportEvent::ConnectResult(id) => {
-                        if id == transport_id {
+                        if id == connection_id {
                             return Ok(id);
                         }
                     }
@@ -346,14 +346,14 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         // Timed out
         Err(TransportError::new(format!(
             "ipc wss connection attempt timed out for '{}'. Received events: {:?}",
-            transport_id, out
+            connection_id, out
         )))
     }
 
     // -- private -- //
 
     // generate a unique id for
-    fn priv_next_id(&mut self) -> TransportId {
+    fn priv_next_id(&mut self) -> ConnectionId {
         self.n_id.next_id()
     }
 
@@ -364,9 +364,9 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 false
             }
             Ok(acceptor) => (acceptor)(self.n_id.clone())
-                .map(move |transport_info| {
-                    let id = transport_info.id.clone();
-                    let _insert_result = self.stream_sockets.insert(id, transport_info);
+                .map(move |wss_info| {
+                    let connection_id = wss_info.id.clone();
+                    let _insert_result = self.stream_sockets.insert(connection_id, wss_info);
                     true
                 })
                 .unwrap_or_else(|err| {
@@ -384,7 +384,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         did_work |= self.priv_process_accept();
 
         // take sockets out, so we can mut ref into self and it at same time
-        let sockets: Vec<(String, TransportInfo<T>)> = self.stream_sockets.drain().collect();
+        let sockets: Vec<(String, WssInfo<T>)> = self.stream_sockets.drain().collect();
 
         for (id, mut info) in sockets {
             if let Err(e) = self.priv_process_socket(&mut did_work, &mut info) {
@@ -417,7 +417,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     fn priv_process_socket(
         &mut self,
         did_work: &mut bool,
-        info: &mut TransportInfo<T>,
+        info: &mut WssInfo<T>,
     ) -> TransportResult<()> {
         // move the socket out, to be replaced
         let socket = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
@@ -624,7 +624,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     // process websocket handshaking
     fn priv_ws_handshake(
         &mut self,
-        id: &TransportId,
+        id: &ConnectionId,
         res: WsConnectResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
@@ -643,7 +643,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     // process websocket handshaking
     fn priv_wss_handshake(
         &mut self,
-        id: &TransportId,
+        id: &ConnectionId,
         res: WssConnectResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
@@ -662,7 +662,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     // process websocket srv handshaking
     fn priv_ws_srv_handshake(
         &mut self,
-        id: &TransportId,
+        id: &ConnectionId,
         res: WsSrvAcceptResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
@@ -681,7 +681,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     // process websocket srv handshaking
     fn priv_wss_srv_handshake(
         &mut self,
-        id: &TransportId,
+        id: &ConnectionId,
         res: WssSrvAcceptResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
         match res {

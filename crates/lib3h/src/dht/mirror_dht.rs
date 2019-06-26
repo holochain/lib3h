@@ -40,17 +40,14 @@ impl MirrorDht {
             entry_list: HashMap::new(),
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
-                transport: peer_transport.clone(),
+                peer_uri: peer_transport.clone(),
                 timestamp: 0, // FIXME
             },
         }
     }
 
     pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
-        Ok(Self::new(
-            &config.this_peer_address,
-            &config.this_peer_transport,
-        ))
+        Ok(Self::new(&config.this_peer_address, &config.this_peer_uri))
     }
 }
 
