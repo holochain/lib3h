@@ -33,7 +33,7 @@ pub struct RealEngineConfig {
 
 #[allow(dead_code)]
 pub struct TransportKeys<SecBuf: Buffer, Crypto: CryptoSystem> {
-    /// Our TransportId (e.g. "HcMyadayada")
+    /// Our TransportId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
     pub transport_id: String,
     /// The TransportId public key
     pub transport_public_key: Vec<u8>,
@@ -53,7 +53,7 @@ pub struct RealEngine<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
-    /// Remove this if we have a full functionning mock without having to use it.
+    // Remove this if we have a full functioning mock without having to use it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
     network_transport: Rc<RefCell<T>>,
