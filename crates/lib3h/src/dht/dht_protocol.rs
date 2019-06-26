@@ -58,7 +58,7 @@ pub struct GossipToData {
 pub struct PeerData {
     pub peer_address: String,
     #[serde(with = "url_serde")]
-    pub transport: Url,
+    pub peer_uri: Url,
     pub timestamp: u64,
 }
 

@@ -2,7 +2,7 @@ use crate::transport::{
     error::TransportResult,
     protocol::{TransportCommand, TransportEvent},
     transport_trait::Transport,
-    TransportId, TransportIdRef,
+    ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
 
@@ -24,10 +24,10 @@ impl<T: Transport> TransportCrypto<T> {
 /// Implement Transport trait by composing inner transport
 /// FIXME passthrough for now
 impl<T: Transport> Transport for TransportCrypto<T> {
-    fn connect(&mut self, uri: &Url) -> TransportResult<TransportId> {
+    fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         self.inner_transport.connect(&uri)
     }
-    fn close(&mut self, id: &TransportIdRef) -> TransportResult<()> {
+    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         self.inner_transport.close(id)
     }
 
@@ -35,7 +35,7 @@ impl<T: Transport> Transport for TransportCrypto<T> {
         self.inner_transport.close_all()
     }
 
-    fn send(&mut self, id_list: &[&TransportIdRef], payload: &[u8]) -> TransportResult<()> {
+    fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         self.inner_transport.send(id_list, payload)
     }
 
@@ -55,11 +55,11 @@ impl<T: Transport> Transport for TransportCrypto<T> {
         self.inner_transport.process()
     }
 
-    fn transport_id_list(&self) -> TransportResult<Vec<TransportId>> {
-        self.inner_transport.transport_id_list()
+    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
+        self.inner_transport.connection_id_list()
     }
 
-    fn get_uri(&self, id: &TransportIdRef) -> Option<Url> {
+    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
         self.inner_transport.get_uri(id)
     }
 }

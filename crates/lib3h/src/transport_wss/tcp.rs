@@ -1,8 +1,9 @@
 //! abstraction for working with Websocket connections
 //! TcpStream specific functions
 
-use crate::transport_wss::{
-    Acceptor, Bind, IdGenerator, TransportIdFactory, TransportInfo, TransportResult, TransportWss,
+use crate::{
+    transport::error::TransportResult,
+    transport_wss::{Acceptor, Bind, ConnectionIdFactory, IdGenerator, TransportWss, WssInfo},
 };
 
 use std::net::{TcpListener, TcpStream};
@@ -38,8 +39,8 @@ impl TransportWss<std::net::TcpStream> {
                     })
                     .map(|()| {
                         let acceptor: Acceptor<TcpStream> =
-                            Box::new(move |mut transport_id_factory: TransportIdFactory| {
-                                let transport_id = transport_id_factory.next_id();
+                            Box::new(move |mut connection_id_factory: ConnectionIdFactory| {
+                                let connection_id = connection_id_factory.next_id();
                                 listener
                                     .accept()
                                     .map_err(|err| {
@@ -64,8 +65,8 @@ impl TransportWss<std::net::TcpStream> {
                                                     "transport_wss::tcp accepted for url {}",
                                                     url.clone()
                                                 );
-                                                TransportInfo::server(
-                                                    transport_id,
+                                                WssInfo::server(
+                                                    connection_id,
                                                     url.clone(),
                                                     tcp_stream,
                                                 )

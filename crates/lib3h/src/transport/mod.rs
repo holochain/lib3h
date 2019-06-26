@@ -8,20 +8,20 @@ pub mod transport_crypto;
 pub mod transport_trait;
 
 /// a connection identifier
-pub type TransportId = String;
+pub type ConnectionId = String;
 
 // TODO make a struct for transport id and make these trait converters
-pub fn transport_id_to_url(id: TransportId) -> Url {
+pub fn transport_id_to_url(id: ConnectionId) -> Url {
     // TODO this is not general enough for all transports
-    Url::parse(id.as_str()).expect("transport_id_to_url: transport id is not a well formed url")
+    Url::parse(id.as_str()).expect("transport_id_to_url: connection id is not a well formed url")
 }
 
-pub fn url_to_transport_id(url: &Url) -> TransportId {
+pub fn url_to_transport_id(url: &Url) -> ConnectionId {
     // TODO this is not general enough for all transports
     String::from(url.path())
 }
 
-pub type TransportIdRef = str;
+pub type ConnectionIdRef = str;
 
 ///
 #[cfg(test)]
@@ -100,7 +100,7 @@ pub mod tests {
 
         // Send B -> A
         let payload = [4, 2, 1, 3];
-        let id_list = node_B.transport_id_list().unwrap();
+        let id_list = node_B.connection_id_list().unwrap();
         let idBA = id_list[0].clone();
         node_B.send(&[&idBA], &payload).unwrap();
         did_work = false;

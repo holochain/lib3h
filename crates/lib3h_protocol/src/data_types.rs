@@ -87,8 +87,8 @@ pub struct ConnectData {
     ///  - `wss://192.168.0.102:58081/`
     ///  - `holorelay://x.x.x.x`
     #[serde(with = "url_serde")]
-    pub peer_transport: Url,
-    /// TODO: Add a machine Id?
+    pub peer_uri: Url,
+    /// TODO: Add a transportId?
     /// Specify to which network to connect to.
     /// Empty string for 'any'
     pub network_id: String,
@@ -98,9 +98,9 @@ pub struct ConnectData {
 pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
-    /// The first network transport address we are connected to (e.g. url)
+    /// The first uri we are connected to
     #[serde(with = "url_serde")]
-    pub network_transport: Url,
+    pub uri: Url,
     // TODO: Add network_id? Or let local client figure it out with the request_id?
     // TODO: Maybe add some info on network state?
     // pub peer_count: u32,

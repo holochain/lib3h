@@ -44,7 +44,7 @@ pub mod tests {
     fn create_PeerData(peer_address: &str) -> PeerData {
         PeerData {
             peer_address: peer_address.to_owned(),
-            transport: create_test_transport(peer_address),
+            peer_uri: create_test_transport(peer_address),
             timestamp: 421,
         }
     }
