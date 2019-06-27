@@ -80,11 +80,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
         let connection_list = self.connection_id_list()?;
         let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
-        trace!(
-            "({}) send_all() {:?}",
-            self.identifier.clone(),
-            dht_id_list
-        );
+        trace!("({}) send_all() {:?}", self.identifier.clone(), dht_id_list);
         self.send(&dht_id_list, payload)
     }
 
@@ -200,15 +196,12 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                info!(
-                    "({}) Connection opened id: {}",
-                    self.identifier.clone(),
-                    id
-                );
+                info!("({}) Connection opened id: {}", self.identifier.clone(), id);
                 if let Some(uri) = self.get_uri(id) {
                     trace!(
                         "(GatewayTransport).ConnectResult: mapping {} -> {}",
-                        uri, id
+                        uri,
+                        id
                     );
                     self.connection_map.insert(uri, id.clone());
                     // Ok(conn_id)
@@ -224,7 +217,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .unwrap();
                     trace!(
                         "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
-                        our_peer_address, id
+                        our_peer_address,
+                        id
                     );
                     self.inner_transport.borrow_mut().send(&[&id], &buf)?;
                 }

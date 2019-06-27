@@ -61,11 +61,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        trace!(
-            "({}).handle_DhtEvent() {:?}",
-            self.identifier.clone(),
-            evt
-        );
+        trace!("({}).handle_DhtEvent() {:?}", self.identifier.clone(), evt);
         match evt {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport

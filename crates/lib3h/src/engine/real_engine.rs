@@ -245,7 +245,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                         // Send
                         trace!(
                             "{} sending payload to transport id {}",
-                            my_name, connection_id
+                            my_name,
+                            connection_id
                         );
                         space_gateway.send(&[connection_id.as_str()], &payload)?;
                     }

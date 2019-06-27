@@ -79,7 +79,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         &mut self,
         evt: &TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netTransportEvent: {:?}",
+        debug!(
+            "{} << handle_netTransportEvent: {:?}",
             self.name.clone(),
             evt
         );
@@ -88,12 +89,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         match evt {
             TransportEvent::TransportError(id, e) => {
                 self.network_connections.remove(id);
-                error!(
-                    "{} Network error from {} : {:?}",
-                    self.name.clone(),
-                    id,
-                    e
-                );
+                error!("{} Network error from {} : {:?}", self.name.clone(), id, e);
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
@@ -117,7 +113,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                         .unwrap();
                     trace!(
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
-                        our_joined_space_list, id
+                        our_joined_space_list,
+                        id
                     );
                     // id is connectionId but we need a transportId, so search for it in the DHT
                     let peer_list = network_gateway.get_peer_list();

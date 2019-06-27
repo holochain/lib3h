@@ -236,7 +236,8 @@ impl MirrorDht {
                         .unwrap();
                     trace!(
                         "@MirrorDht@ gossiping peer back: {:?} | to: {}",
-                        peer, msg.peer_address
+                        peer,
+                        msg.peer_address
                     );
                     let gossip_evt = GossipToData {
                         peer_address_list: vec![msg.peer_address.clone()],
