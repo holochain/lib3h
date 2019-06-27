@@ -69,7 +69,7 @@ impl Transport for TransportMemory {
             Some(u) => u,
         };
 
-        // println!("[d] ---- connect: {} -> {}", my_uri, uri);
+        // debug!(" ---- connect: {} -> {}", my_uri, uri);
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(uri);
         if let None = maybe_server {
@@ -131,7 +131,7 @@ impl Transport for TransportMemory {
         for id in id_list {
             let maybe_uri = self.connections.get(*id);
             if let None = maybe_uri {
-                println!("[w] No known connection for connectionId: {}", id);
+                warn!("No known connection for connectionId: {}", id);
                 continue;
             }
             let uri = maybe_uri.unwrap();
@@ -143,7 +143,7 @@ impl Transport for TransportMemory {
                     uri
                 )));
             }
-            println!("[t] (TransportMemory).send() {} | {}", uri, payload.len());
+            trace!("(TransportMemory).send() {} | {}", uri, payload.len());
             // let uri = self.get_uri(id).unwrap();
             let mut server = maybe_server.unwrap().lock().unwrap();
             server
@@ -179,7 +179,7 @@ impl Transport for TransportMemory {
 
     /// Process my TransportCommand inbox and all my server inboxes
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        // println!("[t] (TransportMemory).process()");
+        // trace!("(TransportMemory).process()");
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process TransportCommand inbox
@@ -214,8 +214,8 @@ impl Transport for TransportMemory {
         }
         // Connect back to received connections if not already connected to them
         for uri in to_connect_list {
-            println!(
-                "[t] (TransportMemory) {} <- {}",
+            trace!(
+                "(TransportMemory) {} <- {}",
                 uri,
                 self.maybe_my_uri.clone().unwrap()
             );
@@ -247,7 +247,7 @@ impl TransportMemory {
         &mut self,
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
-        println!("[d] >>> '(TransportMemory)' recv cmd: {:?}", cmd);
+        debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url) => {
