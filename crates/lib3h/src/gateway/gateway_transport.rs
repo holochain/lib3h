@@ -7,7 +7,6 @@ use crate::{
     transport::{
         error::{TransportError, TransportResult},
         protocol::{TransportCommand, TransportEvent},
-        transport_id_to_url,
         transport_trait::Transport,
         ConnectionId, ConnectionIdRef,
     },
@@ -16,6 +15,12 @@ use lib3h_protocol::DidWork;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
+
+// TODO make a struct for transport id and make these trait converters
+fn transport_id_to_url(id: ConnectionId) -> Url {
+    Url::parse(id.as_str())
+        .expect("gateway_transport: transport_id_to_url: connection id is not a well formed url")
+}
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {

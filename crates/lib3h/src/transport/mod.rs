@@ -1,6 +1,4 @@
 //! common types and traits for working with Transport instances
-use url::Url;
-
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
@@ -9,17 +7,6 @@ pub mod transport_trait;
 
 /// a connection identifier
 pub type ConnectionId = String;
-
-// TODO make a struct for transport id and make these trait converters
-pub fn transport_id_to_url(id: ConnectionId) -> Url {
-    // TODO this is not general enough for all transports
-    Url::parse(id.as_str()).expect("transport_id_to_url: connection id is not a well formed url")
-}
-
-pub fn url_to_transport_id(url: &Url) -> ConnectionId {
-    // TODO this is not general enough for all transports
-    String::from(url.path())
-}
 
 pub type ConnectionIdRef = str;
 
