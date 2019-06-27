@@ -34,7 +34,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // Process the dht
         let (did_work, dht_event_list) = self.inner_dht.process()?;
-        println!(
+        debug!(
             "[t] ({}).Dht.process() - output: {} {}",
             self.identifier.clone(),
             did_work,
@@ -61,7 +61,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        println!(
+        debug!(
             "[t] ({}).handle_DhtEvent() {:?}",
             self.identifier.clone(),
             evt
@@ -81,7 +81,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
                         .peer_uri;
-                    println!(
+                    debug!(
                         "({}) GossipTo: {} {}",
                         self.identifier.clone(),
                         to_peer_address,

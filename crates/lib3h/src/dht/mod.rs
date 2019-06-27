@@ -13,6 +13,12 @@ pub mod tests {
     };
     use url::Url;
 
+    // for this to actually show log entries you also have to run the tests like this:
+    // RUST_LOG=lib3h=debug cargo test -- --nocapture
+    fn enable_logging_for_test(enable: bool) {
+        let _ = env_logger::builder().is_test(enable).try_init();
+    }
+
     /// CONSTS
     lazy_static! {
         /// Entries
@@ -128,6 +134,7 @@ pub mod tests {
 
     #[test]
     fn test_get_own_entry() {
+        enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
         let result = dht.get_entry(&ENTRY_ADDRESS_1);

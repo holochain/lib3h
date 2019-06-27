@@ -24,7 +24,7 @@ lazy_static! {
 
 /// Add new MemoryServer to the global server map
 pub fn set_server(uri: &Url) -> TransportResult<()> {
-    // println!("[d] MemoryServer::set_server: {}", uri);
+    debug!("[d] MemoryServer::set_server: {}", uri);
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if server_map.contains_key(uri) {
@@ -72,7 +72,7 @@ impl MemoryServer {
     /// Create an inbox for this new sender
     /// Will connect the other way.
     pub fn connect(&mut self, requester_uri: &ConnectionIdRef) -> TransportResult<()> {
-        println!(
+        debug!(
             "[i] (MemoryServer) {} creates inbox for {}",
             self.uri, requester_uri
         );
@@ -95,7 +95,7 @@ impl MemoryServer {
 
     /// Delete this connectionId's inbox
     pub fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        println!("[i] (MemoryServer {}).close({})", self.uri, id);
+        debug!("[i] (MemoryServer {}).close({})", self.uri, id);
         let res = self.inbox_map.remove(id);
         if res.is_none() {
             return Err(TransportError::new(format!(
@@ -123,7 +123,7 @@ impl MemoryServer {
     /// Process all inboxes.
     /// Return a TransportEvent::Received for each payload processed.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        println!("[t] (MemoryServer {}).process()", self.uri);
+        debug!("[t] (MemoryServer {}).process()", self.uri);
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connexion inbox
@@ -140,7 +140,7 @@ impl MemoryServer {
                     Some(msg) => msg,
                 };
                 did_work = true;
-                println!("[t] (MemoryServer {}) received: {:?}", self.uri, payload);
+                debug!("[t] (MemoryServer {}) received: {:?}", self.uri, payload);
                 let evt = TransportEvent::Received(id.clone(), payload);
                 outbox.push(evt);
             }
