@@ -20,6 +20,7 @@ pub enum TransportEvent {
     ConnectResult(ConnectionId),
     /// we have received an incoming connection
     Connection(ConnectionId),
+    /// We have received data from a connection
     Received(ConnectionId, Vec<u8>),
     Closed(ConnectionId),
 }

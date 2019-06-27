@@ -9,6 +9,7 @@ use crate::{
     dht::dht_trait::{Dht, DhtFactory},
     gateway::P2pGateway,
     transport::{transport_trait::Transport, ConnectionId},
+    transport_wss::TlsConfig,
 };
 
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -22,6 +23,7 @@ pub type ChainId = (Address, Address);
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {
+    pub tls_config: TlsConfig,
     pub socket_type: String,
     pub bootstrap_nodes: Vec<String>,
     pub work_dir: String,
