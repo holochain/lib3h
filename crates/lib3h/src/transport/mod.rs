@@ -67,7 +67,7 @@ pub mod tests {
         let _actual_bind_uri_a = node_A.bind(uri_A).unwrap();
         let actual_bind_uri_b = node_B.bind(uri_B).unwrap();
         let idAB = node_A.connect(&actual_bind_uri_b).unwrap();
-        println!("actual_uri: {}, idAB: {}", actual_bind_uri_b, idAB);
+        println!("actual_bind_uri_b: {}, idAB: {}", actual_bind_uri_b, idAB);
 
         let (_did_work, _event_list) = node_A.process().unwrap();
         let (_did_work, _event_list) = node_B.process().unwrap();
@@ -90,8 +90,9 @@ pub mod tests {
             TransportEvent::Received(a, b) => (a, b),
             e => panic!("Received wrong TransportEvent type: {:?}", e),
         };
-        assert!(node_A.get_uri(recv_id.as_str()).is_none());
+        assert!(node_A.get_uri(idAB.as_str()).is_some());
         assert!(node_B.get_uri(recv_id.as_str()).is_some());
+
         // TODO review this net devs
         println!(
             "node_B.get_uri({}): {}",
@@ -122,8 +123,9 @@ pub mod tests {
             TransportEvent::Received(a, b) => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
-        // TODO review with net devs
         assert!(node_A.get_uri(recv_id.as_str()).is_some());
+        assert!(node_B.get_uri(idBA.as_str()).is_some());
+
         assert_eq!(payload, recv_payload.as_slice());
     }
 }

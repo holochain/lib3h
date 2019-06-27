@@ -41,6 +41,19 @@ impl TransportMemory {
             Some(uri) => uri.as_str(),
         }
     }
+
+    pub fn is_bound(&self, id: &ConnectionIdRef) -> bool {
+        match &self.maybe_my_uri {
+            None => false,
+            Some(uri) => {
+                let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+                server_map
+                    .get(uri)
+                    .map(|server| server.lock().unwrap().is_connection(id))
+                    .unwrap_or(false)
+            }
+        }
+    }
 }
 
 /// Compose Transport
@@ -53,7 +66,16 @@ impl Transport for TransportMemory {
     /// get uri from a connectionId
     fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
         let res = self.connections.get(&id.to_string());
-        res.map(|url| url.clone())
+        res.map(|url| url.clone()).or_else(|| {
+            if self.is_bound(id) {
+                match &self.maybe_my_uri {
+                    Some(uri) => Some(uri.clone()),
+                    None => None,
+                }
+            } else {
+                None
+            }
+        })
     }
 
     /// Connect to another node's "bind".
