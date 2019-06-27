@@ -53,6 +53,7 @@ pub mod tests {
 
     #[test]
     fn wss_send_test() {
+        enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let uri_A = Url::parse("wss://127.0.0.1:64529").unwrap();
@@ -63,6 +64,7 @@ pub mod tests {
 
     #[test]
     fn wss_send_test_tls() {
+        enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
         let uri_A = Url::parse("wss://127.0.0.1:64531").unwrap();
@@ -109,12 +111,12 @@ pub mod tests {
         assert!(node_A.get_uri(idAB.as_str()).is_some());
         assert!(node_B.get_uri(recv_id.as_str()).is_some());
 
-        trace!(
+        debug!(
             "node_A.get_uri({:?}): {:?}",
             idAB,
             node_A.get_uri(idAB.as_str()).unwrap()
         );
-        trace!(
+        debug!(
             "node_B.get_uri({:?}): {:?}",
             recv_id,
             node_B.get_uri(recv_id.as_str()).unwrap()
