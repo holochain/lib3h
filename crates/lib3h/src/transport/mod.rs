@@ -66,6 +66,8 @@ pub mod tests {
         node_A.send(&[&idAB], &payload).unwrap();
         let mut did_work = false;
         let mut event_list = Vec::new();
+
+        // TODO consider making this a while loop with timeout
         for _x in 0..NUM_PROCESS_LOOPS {
             let (did_work_B, mut event_list_B) = node_B.process().unwrap();
             let (_did_work_A, _event_list_A) = node_A.process().unwrap();
