@@ -93,13 +93,6 @@ pub mod tests {
         assert!(node_A.get_uri(idAB.as_str()).is_some());
         assert!(node_B.get_uri(recv_id.as_str()).is_some());
 
-        // TODO review this net devs
-        println!(
-            "node_B.get_uri({}): {}",
-            recv_id,
-            node_B.get_uri(recv_id.as_str()).unwrap()
-        );
-
         assert_eq!(payload, recv_payload.as_slice());
         let (_did_work, _event_list) = node_A.process().unwrap();
 
