@@ -11,6 +11,10 @@
 
 Lib3h mdns LAN discovery module.
 
+## Usage
+
+Please see [tests/integration_test.rs](tests/integration_test.rs) for a usage example.
+
 ## Contribute
 
 Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](https://github.com/holochain/org/blob/master/CONTRIBUTING.md) for our general practices and protocols on participating in the community.

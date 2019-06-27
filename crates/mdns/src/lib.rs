@@ -1,23 +1,4 @@
 //! lib3h mdns LAN discovery module
-//!
-//! # Example
-//!
-//! ```rust
-//! // simple p2p mdns usage
-//! extern crate lib3h_mdns;
-//! use lib3h_mdns::{Builder, dns};
-//!
-//! fn main() {
-//!     let mut mdns = Builder::new().build().unwrap();
-//!
-//!     let mut packet = dns::Packet::new();
-//!     packet.is_query = true;
-//!     packet.questions.push(dns::Question::Srv(dns::SrvDataQ {
-//!         name: b"lib3h.test.service".to_vec(),
-//!     }));
-//!     mdns.send(&packet).expect("send fail");
-//! }
-//! ```
 
 #![feature(try_trait)]
 
