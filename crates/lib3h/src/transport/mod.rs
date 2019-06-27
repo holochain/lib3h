@@ -95,12 +95,24 @@ pub mod tests {
         assert!(node_A.get_uri(idAB.as_str()).is_some());
         assert!(node_B.get_uri(recv_id.as_str()).is_some());
 
+        println!(
+            "node_A.get_uri({:?}): {:?}",
+            idAB,
+            node_A.get_uri(idAB.as_str()).unwrap()
+        );
+        println!(
+            "node_B.get_uri({:?}): {:?}",
+            recv_id,
+            node_B.get_uri(recv_id.as_str()).unwrap()
+        );
+
         assert_eq!(payload, recv_payload.as_slice());
         let (_did_work, _event_list) = node_A.process().unwrap();
 
         // Send B -> A
         let payload = [4, 2, 1, 3];
         let id_list = node_B.connection_id_list().unwrap();
+        // TODO When connection event is fully implemented use it instead of referencing node_B's connection list
         let idBA = id_list[0].clone();
         node_B.send(&[&idBA], &payload).unwrap();
         did_work = false;
