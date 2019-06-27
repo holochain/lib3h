@@ -8,7 +8,7 @@ use crate::transport::{
 use lib3h_protocol::DidWork;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
-
+use std::sync::{Arc, Mutex};
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
 pub struct TransportMemory {
@@ -20,17 +20,28 @@ pub struct TransportMemory {
     connections: HashMap<ConnectionId, Url>,
     /// Counter for generating new connectionIds
     n_id: u32,
+    own_id: u32,
     /// My peer uri on the network layer
     maybe_my_uri: Option<Url>,
 }
 
+lazy_static! {
+    static ref TRANSPORT_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+}
+
+
 impl TransportMemory {
     pub fn new() -> Self {
-        TransportMemory {
+        let mut tc = TRANSPORT_COUNT
+            .lock()
+            .expect("could not lock transport count mutex");
+        *tc += 1;
+         TransportMemory {
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
             connections: HashMap::new(),
             n_id: 0,
+            own_id: *tc,
             maybe_my_uri: None,
         }
     }
@@ -102,7 +113,7 @@ impl Transport for TransportMemory {
         }
         // Generate ConnectionId
         self.n_id += 1;
-        let id = format!("mem_conn_{}", self.n_id);
+        let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
         // Get other's server and connect us to it by using our new ConnectionId.
         let mut server = maybe_server.unwrap().lock().unwrap();
         server.connect(&my_uri.as_str())?;
