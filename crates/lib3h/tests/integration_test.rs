@@ -10,7 +10,7 @@ use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
-    transport_wss::TransportWss,
+    transport_wss::{TlsConfig, TransportWss},
 };
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
@@ -63,6 +63,7 @@ fn basic_setup_mock(
     name: &str,
 ) -> RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
+        tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
@@ -82,6 +83,7 @@ fn basic_setup_mock(
 fn basic_setup_wss(
 ) -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
     let config = RealEngineConfig {
+        tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),

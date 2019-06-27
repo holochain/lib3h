@@ -48,7 +48,9 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
         name: &str,
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
-        let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream()));
+        let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream(
+            config.tls_config.clone(),
+        )));
         let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
         let transport_keys = TransportKeys::new()?;
         let dht_config = DhtConfig {
