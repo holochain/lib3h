@@ -6,9 +6,11 @@ use crate::transport::{
     ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{Arc, Mutex},
+};
 use url::Url;
-use std::sync::{Arc, Mutex};
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
 pub struct TransportMemory {
@@ -29,14 +31,13 @@ lazy_static! {
     static ref TRANSPORT_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
 }
 
-
 impl TransportMemory {
     pub fn new() -> Self {
         let mut tc = TRANSPORT_COUNT
             .lock()
             .expect("could not lock transport count mutex");
         *tc += 1;
-         TransportMemory {
+        TransportMemory {
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
             connections: HashMap::new(),
