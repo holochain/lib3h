@@ -7,11 +7,6 @@ use crate::{Buffer, CryptoRandom, CryptoResult, CryptoSignature, CryptoSystem};
 /// Even the random functions are fake, and produce poor results.
 pub struct FakeCryptoSystem {}
 
-const FAKE_SEQ: [usize; 4] = [0x30698bae, 0x47984c92, 0x901d24fb, 0x91fba506];
-
-static mut FAKE_TRACK: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-//static FAKE_TRACK: *mut std::sync::Mutex<u32> = std::ptr::null_mut();
-
 impl CryptoRandom for FakeCryptoSystem {
     // rust doesn't supply any random functions in std
     // and we don't want to import another crate just for this
@@ -19,21 +14,8 @@ impl CryptoRandom for FakeCryptoSystem {
     fn randombytes_buf<OutputBuffer: Buffer>(buffer: &mut OutputBuffer) -> CryptoResult<()> {
         let mut buffer = buffer.write_lock();
 
-        let mut idx = 0;
-        let seed: &mut usize = unsafe { FAKE_TRACK.get_mut() };
-
         for i in 0..buffer.len() {
-            *seed = *seed
-                ^ FAKE_SEQ[idx]
-                ^ std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .subsec_nanos() as usize;
-            idx += 1;
-            if idx >= FAKE_SEQ.len() {
-                idx = 0;
-            }
-            buffer[i] = (*seed % 256) as u8;
+            buffer[i] = rand::random();
         }
 
         Ok(())
