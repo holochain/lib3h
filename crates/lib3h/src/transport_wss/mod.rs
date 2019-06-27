@@ -166,10 +166,10 @@ impl ConnectionIdFactory {
 }
 
 /// A function that produces accepted sockets of type R wrapped in a TransportInfo
-pub type Acceptor<T> = Box<FnMut(ConnectionIdFactory) -> TransportResult<WssInfo<T>>>;
+pub type Acceptor<T> = Box<dyn FnMut(ConnectionIdFactory) -> TransportResult<WssInfo<T>>>;
 
 /// A function that binds to a url and produces sockt acceptors of type T
-pub type Bind<T> = Box<FnMut(&Url) -> TransportResult<Acceptor<T>>>;
+pub type Bind<T> = Box<dyn FnMut(&Url) -> TransportResult<Acceptor<T>>>;
 
 /// An implememtation of Bind that accepts no connections.
 fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(

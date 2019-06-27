@@ -13,7 +13,7 @@ pub mod tests {
     };
     use url::Url;
 
-    /// CONSTS
+    // CONSTS
     lazy_static! {
         /// Entries
         pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".as_bytes().to_vec();
