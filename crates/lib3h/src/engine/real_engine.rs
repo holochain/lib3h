@@ -148,7 +148,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
-        trace!("RealEngine.post(): {:?}", client_msg);
+        // trace!("RealEngine.post(): {:?}", client_msg);
         self.inbox.push_back(client_msg);
         Ok(())
     }
@@ -156,7 +156,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        trace!("\n{} - RealEngine.process() START", self.name);
+        trace!("");
+        trace!("{} - RealEngine.process() START", self.name);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer

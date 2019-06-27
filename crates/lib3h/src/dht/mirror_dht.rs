@@ -121,7 +121,7 @@ impl Dht for MirrorDht {
 impl MirrorDht {
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
-        debug!("[t] @MirrorDht@ Adding peer: {:?}", peer_info);
+        trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
         let maybe_peer = self.peer_list.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {

@@ -16,7 +16,12 @@ pub mod tests {
     // for this to actually show log entries you also have to run the tests like this:
     // RUST_LOG=lib3h=debug cargo test -- --nocapture
     fn enable_logging_for_test(enable: bool) {
-        let _ = env_logger::builder().is_test(enable).try_init();
+        std::env::set_var("RUST_LOG", "debug");
+        let _ = env_logger::builder()
+            .default_format_timestamp(false)
+            .default_format_module_path(false)
+            .is_test(enable)
+            .try_init();
     }
 
     /// CONSTS
@@ -96,6 +101,7 @@ pub mod tests {
 
     #[test]
     fn test_this_peer() {
+        enable_logging_for_test(true);
         let dht = new_dht(true, PEER_A);
         let this = dht.this_peer();
         assert_eq!(this.peer_address, PEER_A);
@@ -103,6 +109,7 @@ pub mod tests {
 
     #[test]
     fn test_own_peer_list() {
+        enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
         let this = dht.get_peer(PEER_A);
@@ -151,6 +158,7 @@ pub mod tests {
 
     #[test]
     fn test_update_peer() {
+        enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
         let this = dht.get_peer(PEER_A);
@@ -186,6 +194,7 @@ pub mod tests {
 
     #[test]
     fn test_mirror_broadcast_entry() {
+        enable_logging_for_test(true);
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer
@@ -232,6 +241,7 @@ pub mod tests {
 
     #[test]
     fn test_mirror_gossip_peer() {
+        enable_logging_for_test(true);
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer
