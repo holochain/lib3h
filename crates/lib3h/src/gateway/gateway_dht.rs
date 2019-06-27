@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
-    gateway::P2pGateway,
+    gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
@@ -34,8 +34,8 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // Process the dht
         let (did_work, dht_event_list) = self.inner_dht.process()?;
-        println!(
-            "[t] ({}).Dht.process() - output: {} {}",
+        trace!(
+            "({}).Dht.process() - output: {} {}",
             self.identifier.clone(),
             did_work,
             dht_event_list.len()
@@ -61,11 +61,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        println!(
-            "[t] ({}).handle_DhtEvent() {:?}",
-            self.identifier.clone(),
-            evt
-        );
+        trace!("({}).handle_DhtEvent() {:?}", self.identifier.clone(), evt);
         match evt {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
@@ -81,7 +77,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
                         .peer_uri;
-                    println!(
+                    trace!(
                         "({}) GossipTo: {} {}",
                         self.identifier.clone(),
                         to_peer_address,
@@ -100,9 +96,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .unwrap();
                     // Forward gossip to the inner_transport
                     // If no connection to that connectionId is open, open one first.
-                    self.inner_transport
-                        .borrow_mut()
-                        .send(&[peer_transport.path()], &payload)?;
+                    self.inner_transport.borrow_mut().send(
+                        &[gateway::url_to_transport_id(&peer_transport).as_str()],
+                        &payload,
+                    )?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

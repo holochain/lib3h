@@ -1,6 +1,4 @@
 //! common types and traits for working with Transport instances
-use url::Url;
-
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
@@ -10,17 +8,6 @@ pub mod transport_trait;
 /// a connection identifier
 pub type ConnectionId = String;
 
-// TODO make a struct for transport id and make these trait converters
-pub fn transport_id_to_url(id: ConnectionId) -> Url {
-    // TODO this is not general enough for all transports
-    Url::parse(id.as_str()).expect("transport_id_to_url: connection id is not a well formed url")
-}
-
-pub fn url_to_transport_id(url: &Url) -> ConnectionId {
-    // TODO this is not general enough for all transports
-    String::from(url.path())
-}
-
 pub type ConnectionIdRef = str;
 
 ///
@@ -28,17 +15,34 @@ pub type ConnectionIdRef = str;
 pub mod tests {
     #![allow(non_snake_case)]
 
-    use crate::transport::{
-        memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
+    use crate::{
+        transport::{
+            memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
+        },
+        transport_wss::{TlsConfig, TransportWss},
     };
 
     use url::Url;
 
-    // How many times to call process before checking if work was done
-    const NUM_PROCESS_LOOPS: u8 = 5;
+    // How many times to call process before asserting if work was done.
+    // Empirically verified to work with just 6- raise this value
+    // if your transport to be tested requires more iterations.
+    const NUM_PROCESS_LOOPS: u8 = 6;
+
+    // for this to actually show log entries you also have to run the tests like this:
+    // RUST_LOG=lib3h=debug cargo test -- --nocapture
+    fn enable_logging_for_test(enable: bool) {
+        std::env::set_var("RUST_LOG", "debug");
+        let _ = env_logger::builder()
+            .default_format_timestamp(false)
+            .default_format_module_path(false)
+            .is_test(enable)
+            .try_init();
+    }
 
     #[test]
     fn memory_send_test() {
+        enable_logging_for_test(true);
         let mut node_A = transport_memory::TransportMemory::new();
         let mut node_B = transport_memory::TransportMemory::new();
         let uri_A = Url::parse("mem://a").unwrap();
@@ -47,12 +51,22 @@ pub mod tests {
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
 
-    //#[test]
-    fn _wss_send_test() {
-        let mut node_A = crate::transport_wss::TransportWss::with_std_tcp_stream();
-        let mut node_B = crate::transport_wss::TransportWss::with_std_tcp_stream();
+    #[test]
+    fn wss_send_test() {
+        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
+        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let uri_A = Url::parse("wss://127.0.0.1:64529").unwrap();
         let uri_B = Url::parse("wss://127.0.0.1:64530").unwrap();
+
+        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
+    }
+
+    #[test]
+    fn wss_send_test_tls() {
+        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
+        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
+        let uri_A = Url::parse("wss://127.0.0.1:64531").unwrap();
+        let uri_B = Url::parse("wss://127.0.0.1:64532").unwrap();
 
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
@@ -64,28 +78,64 @@ pub mod tests {
         uri_B: &Url,
     ) {
         // Connect
-        let actual_uri_a = node_A.bind(uri_A).unwrap();
-        let actual_uri_b = node_B.bind(uri_B).unwrap();
-        let idAB = node_A.connect(&actual_uri_b).unwrap();
-        println!("actual_uri: {}, idAB: {}", actual_uri_b, idAB);
+        let _actual_bind_uri_a = node_A.bind(uri_A).unwrap();
+        let actual_bind_uri_b = node_B.bind(uri_B).unwrap();
+        let idAB = node_A.connect(&actual_bind_uri_b).unwrap();
+        trace!("actual_bind_uri_b: {}, idAB: {}", actual_bind_uri_b, idAB);
 
-        println!("calling node A process 1");
         let (_did_work, _event_list) = node_A.process().unwrap();
-
-        println!("calling node B process 1");
         let (_did_work, _event_list) = node_B.process().unwrap();
 
         // Send A -> B
         let payload = [1, 2, 3, 4];
         node_A.send(&[&idAB], &payload).unwrap();
-        println!("calling node B process 2");
         let mut did_work = false;
         let mut event_list = Vec::new();
+
+        // TODO consider making this a while loop with timeout
         for _x in 0..NUM_PROCESS_LOOPS {
             let (did_work_B, mut event_list_B) = node_B.process().unwrap();
-            // let (_did_work_A, _event_list_A) = node_A.process().unwrap();
+            let (_did_work_A, _event_list_A) = node_A.process().unwrap();
             event_list.append(&mut event_list_B);
             did_work |= did_work_B;
+        }
+        assert!(did_work);
+        assert!(event_list.len() >= 1);
+        let recv_event = event_list.last().unwrap().clone();
+        let (recv_id, recv_payload) = match recv_event {
+            TransportEvent::Received(a, b) => (a, b),
+            e => panic!("Received wrong TransportEvent type: {:?}", e),
+        };
+        assert!(node_A.get_uri(idAB.as_str()).is_some());
+        assert!(node_B.get_uri(recv_id.as_str()).is_some());
+
+        trace!(
+            "node_A.get_uri({:?}): {:?}",
+            idAB,
+            node_A.get_uri(idAB.as_str()).unwrap()
+        );
+        trace!(
+            "node_B.get_uri({:?}): {:?}",
+            recv_id,
+            node_B.get_uri(recv_id.as_str()).unwrap()
+        );
+
+        assert_eq!(payload, recv_payload.as_slice());
+        let (_did_work, _event_list) = node_A.process().unwrap();
+
+        // Send B -> A
+        let payload = [4, 2, 1, 3];
+        let id_list = node_B.connection_id_list().unwrap();
+        // TODO When connection event is fully implemented use it instead of referencing node_B's connection list
+        let idBA = id_list[0].clone();
+        node_B.send(&[&idBA], &payload).unwrap();
+        did_work = false;
+        event_list.clear();
+        for _x in 0..NUM_PROCESS_LOOPS {
+            let (did_work_A, mut event_list_A) = node_A.process().unwrap();
+            let (_did_work_B, _event_list_B) = node_B.process().unwrap();
+            did_work |= did_work_A;
+            event_list.append(&mut event_list_A);
         }
         assert!(did_work);
         assert_eq!(event_list.len(), 1);
@@ -94,26 +144,9 @@ pub mod tests {
             TransportEvent::Received(a, b) => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
-        assert_eq!(actual_uri_a.as_str(), recv_id);
-        assert_eq!(payload, recv_payload.as_slice());
-        println!("calling node A process 2");
-        let (_did_work, _event_list) = node_A.process().unwrap();
+        assert!(node_A.get_uri(recv_id.as_str()).is_some());
+        assert!(node_B.get_uri(idBA.as_str()).is_some());
 
-        // Send B -> A
-        let payload = [4, 2, 1, 3];
-        let id_list = node_B.connection_id_list().unwrap();
-        let idBA = id_list[0].clone();
-        node_B.send(&[&idBA], &payload).unwrap();
-        println!("calling node A process 3");
-        let (did_work, event_list) = node_A.process().unwrap();
-        assert!(did_work);
-        assert_eq!(event_list.len(), 1);
-        let recv_event = event_list[0].clone();
-        let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::Received(a, b) => (a, b),
-            _ => panic!("Received wrong TransportEvent type"),
-        };
-        assert_eq!(actual_uri_b.as_str(), recv_id);
         assert_eq!(payload, recv_payload.as_slice());
     }
 }

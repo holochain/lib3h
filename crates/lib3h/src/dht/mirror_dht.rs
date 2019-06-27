@@ -92,7 +92,6 @@ impl Dht for MirrorDht {
     // -- Processing -- //
 
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        // println!("(log.d) >>> '(MirrorDht)' recv cmd: {:?}", cmd);
         self.inbox.push_back(cmd);
         Ok(())
     }
@@ -111,7 +110,7 @@ impl Dht for MirrorDht {
                 did_work = true;
                 outbox.append(&mut output);
             } else {
-                println!("[e] serve_DhtCommand() failed: {:?}", res);
+                error!("serve_DhtCommand() failed: {:?}", res);
             }
         }
         Ok((did_work, outbox))
@@ -122,21 +121,21 @@ impl Dht for MirrorDht {
 impl MirrorDht {
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
-        println!("[t] @MirrorDht@ Adding peer: {:?}", peer_info);
+        trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
         let maybe_peer = self.peer_list.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
-                println!("[t] @MirrorDht@ Adding peer - OK NEW");
+                trace!("@MirrorDht@ Adding peer - OK NEW");
                 self.peer_list
                     .insert(peer_info.peer_address.clone(), peer_info.clone());
                 true
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
-                    println!("[t] @MirrorDht@ Adding peer - BAD");
+                    trace!("@MirrorDht@ Adding peer - BAD");
                     return false;
                 }
-                println!("[t] @MirrorDht@ Adding peer - OK UPDATED");
+                trace!("@MirrorDht@ Adding peer - OK UPDATED");
                 peer.timestamp = peer_info.timestamp;
                 true
             }
@@ -163,12 +162,12 @@ impl MirrorDht {
     /// Return a list of DhtEvent to owner.
     #[allow(non_snake_case)]
     fn serve_DhtCommand(&mut self, cmd: &DhtCommand) -> Lib3hResult<Vec<DhtEvent>> {
-        println!("[d] @MirrorDht@ serving cmd: {:?}", cmd);
+        debug!("@MirrorDht@ serving cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtCommand::HandleGossip(msg) => {
-                println!("Deserializer msg.bundle: {:?}", msg.bundle);
+                trace!("Deserializer msg.bundle: {:?}", msg.bundle);
                 let mut de = Deserializer::new(&msg.bundle[..]);
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -220,7 +219,7 @@ impl MirrorDht {
                 peer_gossip
                     .serialize(&mut Serializer::new(&mut buf))
                     .unwrap();
-                println!("[t] @MirrorDht@ gossiping peer: {:?}", peer);
+                trace!("@MirrorDht@ gossiping peer: {:?}", peer);
                 let gossip_evt = GossipToData {
                     peer_address_list,
                     bundle: buf,
@@ -235,9 +234,10 @@ impl MirrorDht {
                     peer_gossip
                         .serialize(&mut Serializer::new(&mut buf))
                         .unwrap();
-                    println!(
-                        "[t] @MirrorDht@ gossiping peer back: {:?} | to: {}",
-                        peer, msg.peer_address
+                    trace!(
+                        "@MirrorDht@ gossiping peer back: {:?} | to: {}",
+                        peer,
+                        msg.peer_address
                     );
                     let gossip_evt = GossipToData {
                         peer_address_list: vec![msg.peer_address.clone()],

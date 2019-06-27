@@ -6,9 +6,11 @@ use crate::transport::{
     ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{Arc, Mutex},
+};
 use url::Url;
-
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
 pub struct TransportMemory {
@@ -20,17 +22,27 @@ pub struct TransportMemory {
     connections: HashMap<ConnectionId, Url>,
     /// Counter for generating new connectionIds
     n_id: u32,
+    own_id: u32,
     /// My peer uri on the network layer
     maybe_my_uri: Option<Url>,
 }
 
+lazy_static! {
+    static ref TRANSPORT_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+}
+
 impl TransportMemory {
     pub fn new() -> Self {
+        let mut tc = TRANSPORT_COUNT
+            .lock()
+            .expect("could not lock transport count mutex");
+        *tc += 1;
         TransportMemory {
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
             connections: HashMap::new(),
             n_id: 0,
+            own_id: *tc,
             maybe_my_uri: None,
         }
     }
@@ -39,6 +51,19 @@ impl TransportMemory {
         match &self.maybe_my_uri {
             None => "",
             Some(uri) => uri.as_str(),
+        }
+    }
+
+    pub fn is_bound(&self, id: &ConnectionIdRef) -> bool {
+        match &self.maybe_my_uri {
+            None => false,
+            Some(uri) => {
+                let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+                server_map
+                    .get(uri)
+                    .map(|server| server.lock().unwrap().has_connection(id))
+                    .unwrap_or(false)
+            }
         }
     }
 }
@@ -53,7 +78,16 @@ impl Transport for TransportMemory {
     /// get uri from a connectionId
     fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
         let res = self.connections.get(&id.to_string());
-        res.map(|url| url.clone())
+        res.map(|url| url.clone()).or_else(|| {
+            if self.is_bound(id) {
+                match &self.maybe_my_uri {
+                    Some(uri) => Some(uri.clone()),
+                    None => None,
+                }
+            } else {
+                None
+            }
+        })
     }
 
     /// Connect to another node's "bind".
@@ -69,7 +103,7 @@ impl Transport for TransportMemory {
             Some(u) => u,
         };
 
-        // println!("[d] ---- connect: {} -> {}", my_uri, uri);
+        // debug!(" ---- connect: {} -> {}", my_uri, uri);
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(uri);
         if let None = maybe_server {
@@ -80,7 +114,7 @@ impl Transport for TransportMemory {
         }
         // Generate ConnectionId
         self.n_id += 1;
-        let id = format!("mem_conn_{}", self.n_id);
+        let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
         // Get other's server and connect us to it by using our new ConnectionId.
         let mut server = maybe_server.unwrap().lock().unwrap();
         server.connect(&my_uri.as_str())?;
@@ -131,7 +165,7 @@ impl Transport for TransportMemory {
         for id in id_list {
             let maybe_uri = self.connections.get(*id);
             if let None = maybe_uri {
-                println!("[w] No known connection for connectionId: {}", id);
+                warn!("No known connection for connectionId: {}", id);
                 continue;
             }
             let uri = maybe_uri.unwrap();
@@ -143,7 +177,7 @@ impl Transport for TransportMemory {
                     uri
                 )));
             }
-            println!("[t] (TransportMemory).send() {} | {}", uri, payload.len());
+            trace!("(TransportMemory).send() {} | {}", uri, payload.len());
             // let uri = self.get_uri(id).unwrap();
             let mut server = maybe_server.unwrap().lock().unwrap();
             server
@@ -179,7 +213,7 @@ impl Transport for TransportMemory {
 
     /// Process my TransportCommand inbox and all my server inboxes
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        // println!("[t] (TransportMemory).process()");
+        // trace!("(TransportMemory).process()");
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process TransportCommand inbox
@@ -214,8 +248,8 @@ impl Transport for TransportMemory {
         }
         // Connect back to received connections if not already connected to them
         for uri in to_connect_list {
-            println!(
-                "[t] (TransportMemory) {} <- {}",
+            trace!(
+                "(TransportMemory) {} <- {}",
                 uri,
                 self.maybe_my_uri.clone().unwrap()
             );
@@ -247,7 +281,7 @@ impl TransportMemory {
         &mut self,
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
-        println!("[d] >>> '(TransportMemory)' recv cmd: {:?}", cmd);
+        debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url) => {
