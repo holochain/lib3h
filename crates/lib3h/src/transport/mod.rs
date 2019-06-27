@@ -34,8 +34,10 @@ pub mod tests {
 
     use url::Url;
 
-    // How many times to call process before checking if work was done
-    const NUM_PROCESS_LOOPS: u8 = 10;
+    // How many times to call process before asserting if work was done.
+    // Empirically verified to work with just 6- raise this value
+    // if your transport to be tested requires more iterations.
+    const NUM_PROCESS_LOOPS: u8 = 6;
 
     #[test]
     fn memory_send_test() {
