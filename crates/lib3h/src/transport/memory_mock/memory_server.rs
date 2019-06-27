@@ -5,7 +5,7 @@ use crate::transport::{
 };
 use lib3h_protocol::DidWork;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{Mutex, RwLock},
 };
 use url::Url;
@@ -57,6 +57,7 @@ pub struct MemoryServer {
     inbox_map: HashMap<ConnectionId, VecDeque<Vec<u8>>>,
     /// Inbox of new inbound connections
     new_conn_inbox: Vec<ConnectionId>,
+    connection_ids: HashSet<ConnectionId>,
 }
 
 impl MemoryServer {
@@ -66,7 +67,12 @@ impl MemoryServer {
             uri: uri.clone(),
             inbox_map: HashMap::new(),
             new_conn_inbox: Vec::new(),
+            connection_ids: HashSet::new(),
         }
+    }
+
+    pub fn has_connection(&self, id: &ConnectionIdRef) -> bool {
+        self.connection_ids.contains(id)
     }
 
     /// Create an inbox for this new sender
@@ -90,6 +96,7 @@ impl MemoryServer {
         }
         // Notify our TransportMemory to connect back
         self.new_conn_inbox.push(requester_uri.to_string());
+        self.connection_ids.insert(requester_uri.to_string());
         Ok(())
     }
 
@@ -103,6 +110,7 @@ impl MemoryServer {
                 id, self.uri
             )));
         }
+        self.connection_ids.remove(&id.to_string());
         // TODO: Should we process here whatever is left in the inbox?
         Ok(())
     }

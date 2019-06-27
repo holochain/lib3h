@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
-    gateway::P2pGateway,
+    gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
@@ -96,9 +96,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .unwrap();
                     // Forward gossip to the inner_transport
                     // If no connection to that connectionId is open, open one first.
-                    self.inner_transport
-                        .borrow_mut()
-                        .send(&[peer_transport.path()], &payload)?;
+                    self.inner_transport.borrow_mut().send(
+                        &[gateway::url_to_transport_id(&peer_transport).as_str()],
+                        &payload,
+                    )?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
