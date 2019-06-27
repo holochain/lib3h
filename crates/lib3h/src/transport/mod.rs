@@ -26,8 +26,20 @@ pub mod tests {
     // if your transport to be tested requires more iterations.
     const NUM_PROCESS_LOOPS: u8 = 6;
 
+    // for this to actually show log entries you also have to run the tests like this:
+    // RUST_LOG=lib3h=debug cargo test -- --nocapture
+    fn enable_logging_for_test(enable: bool) {
+        std::env::set_var("RUST_LOG", "debug");
+        let _ = env_logger::builder()
+            .default_format_timestamp(false)
+            .default_format_module_path(false)
+            .is_test(enable)
+            .try_init();
+    }
+
     #[test]
     fn memory_send_test() {
+        enable_logging_for_test(true);
         let mut node_A = transport_memory::TransportMemory::new();
         let mut node_B = transport_memory::TransportMemory::new();
         let uri_A = Url::parse("mem://a").unwrap();

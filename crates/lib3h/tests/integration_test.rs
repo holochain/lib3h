@@ -44,6 +44,17 @@ lazy_static! {
     ];
 }
 
+// for this to actually show log entries you also have to run the tests like this:
+// RUST_LOG=lib3h=debug cargo test -- --nocapture
+fn enable_logging_for_test(enable: bool) {
+    std::env::set_var("RUST_LOG", "trace");
+    let _ = env_logger::builder()
+        .default_format_timestamp(false)
+        .default_format_module_path(false)
+        .is_test(enable)
+        .try_init();
+}
+
 //--------------------------------------------------------------------------------------------------
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
@@ -109,6 +120,7 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 
 #[test]
 fn basic_connect_test_mock() {
+    enable_logging_for_test(true);
     // Setup
     let mut engine_a = basic_setup_mock("basic_send_test_mock_node_a");
     let engine_b = basic_setup_mock("basic_send_test_mock_node_b");
@@ -136,6 +148,7 @@ fn basic_connect_test_mock() {
 
 #[test]
 fn basic_track_test_wss() {
+    enable_logging_for_test(true);
     // Setup
     let mut engine = basic_setup_wss();
     basic_track_test(&mut engine);
@@ -143,6 +156,7 @@ fn basic_track_test_wss() {
 
 #[test]
 fn basic_track_test_mock() {
+    enable_logging_for_test(true);
     // Setup
     let mut engine = basic_setup_mock("basic_track_test_mock");
     basic_track_test(&mut engine);
@@ -197,6 +211,7 @@ fn basic_track_test<T: Transport, D: Dht>(
 
 #[test]
 fn basic_two_nodes_mock() {
+    enable_logging_for_test(true);
     // Launch tests on each setup
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
         launch_two_nodes_test_with_memory_network(*test_fn, *can_setup).unwrap();
