@@ -360,7 +360,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     fn priv_process_accept(&mut self) -> DidWork {
         match &mut self.acceptor {
             Err(err) => {
-                println!("acceptor in error state: {:?}", err);
+                warn!("acceptor in error state: {:?}", err);
                 false
             }
             Ok(acceptor) => (acceptor)(self.n_id.clone())
@@ -370,7 +370,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                     true
                 })
                 .unwrap_or_else(|err| {
-                    println!("did not accept any connections: {:?}", err);
+                    warn!("did not accept any connections: {:?}", err);
                     false
                 }),
         }
@@ -422,7 +422,8 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         // move the socket out, to be replaced
         let socket = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
 
-        println!("transport_wss: socket={:?}", socket);
+        debug!("transport_wss: socket={:?}", socket);
+        // TODO remove?
         std::io::stdout().flush().ok().expect("flush stdout");
         match socket {
             WebsocketStreamState::None => {
