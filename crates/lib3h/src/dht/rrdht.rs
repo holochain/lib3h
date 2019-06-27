@@ -77,7 +77,7 @@ impl Dht for RrDht {
                 Some(msg) => msg,
             };
             did_work = true;
-            debug!("[t] RrDht.process(): {:?}", cmd)
+            trace!("RrDht.process(): {:?}", cmd)
         }
         Ok((did_work, outbox))
     }

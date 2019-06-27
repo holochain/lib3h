@@ -148,7 +148,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
-        debug!("[t] RealEngine.post(): {:?}", client_msg);
+        trace!("RealEngine.post(): {:?}", client_msg);
         self.inbox.push_back(client_msg);
         Ok(())
     }
@@ -156,7 +156,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        debug!("\n[t] {} - RealEngine.process() START", self.name);
+        trace!("\n{} - RealEngine.process() START", self.name);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -165,7 +165,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
-        debug!("[t] {} - RealEngine.process() END\n", self.name);
+        trace!("{} - RealEngine.process() END\n", self.name);
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }
@@ -198,7 +198,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        debug!("[d] {} serving: {:?}", self.name.clone(), client_msg);
+        debug!("{} serving: {:?}", self.name.clone(), client_msg);
         let mut outbox = Vec::new();
         let did_work = true;
         // Note: use same order as the enum
@@ -234,7 +234,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     Ok(space_gateway) => {
                         let connection_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        debug!("[d] {} -- connection_id: {:?}", my_name, connection_id);
+                        debug!("{} -- connection_id: {:?}", my_name, connection_id);
                         // Change into P2pProtocol
                         let net_msg = P2pProtocol::DirectMessage(msg);
                         // Serialize
@@ -243,8 +243,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                             .serialize(&mut Serializer::new(&mut payload))
                             .unwrap();
                         // Send
-                        debug!(
-                            "[t] {} sending payload to transport id {}",
+                        trace!(
+                            "{} sending payload to transport id {}",
                             my_name, connection_id
                         );
                         space_gateway.send(&[connection_id.as_str()], &payload)?;
@@ -395,8 +395,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         p2p_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
-        debug!(
-            "[t] {} - Broadcasting JoinSpace: {}, {}",
+        trace!(
+            "{} - Broadcasting JoinSpace: {}, {}",
             self.name.clone(),
             space_address,
             peer.peer_address

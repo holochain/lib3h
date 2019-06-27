@@ -21,7 +21,7 @@ use url::Url;
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     /// TODO: return a higher-level uri instead
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
-        debug!("[t] ({}).connect() {}", self.identifier.clone(), uri);
+        trace!("({}).connect() {}", self.identifier.clone(), uri);
         // Connect
         let connection_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in connection map
@@ -49,8 +49,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // get connectionId from the inner dht first
         let dht_uri_list = self.connection_id_to_dht_uri_list(dht_id_list)?;
         // send
-        debug!(
-            "[t] ({}).send() {:?} -> {:?} | {}",
+        trace!(
+            "({}).send() {:?} -> {:?} | {}",
             self.identifier.clone(),
             dht_id_list,
             dht_uri_list,
@@ -64,8 +64,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
                 .get(&dht_uri)
                 .expect("unknown dht_transport");
             net_uri_list.push(net_uri);
-            debug!(
-                "[t] ({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
+            trace!(
+                "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
                 self.identifier.clone(),
                 dht_uri,
                 net_uri
@@ -80,8 +80,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
         let connection_list = self.connection_id_list()?;
         let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
-        debug!(
-            "[t] ({}) send_all() {:?}",
+        trace!(
+            "({}) send_all() {:?}",
             self.identifier.clone(),
             dht_id_list
         );
@@ -90,7 +90,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 
     /// TODO?
     fn bind(&mut self, url: &Url) -> TransportResult<Url> {
-        debug!("[t] ({}) bind() {}", self.identifier.clone(), url);
+        trace!("({}) bind() {}", self.identifier.clone(), url);
         self.inner_transport.borrow_mut().bind(url)
     }
 
@@ -116,8 +116,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
                 outbox.append(&mut output);
             }
         }
-        debug!(
-            "[t] ({}).Transport.process() - output: {} {}",
+        trace!(
+            "({}).Transport.process() - output: {} {}",
             self.identifier.clone(),
             did_work,
             outbox.len()
@@ -125,8 +125,8 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         //// ?? Don't process inner transport because we are not the owner and are not responsable for that??
         // Process inner transport
         let (inner_did_work, mut event_list) = self.inner_transport.borrow_mut().process()?;
-        debug!(
-            "[t] ({}).Transport.inner_process() - output: {} {}",
+        trace!(
+            "({}).Transport.inner_process() - output: {} {}",
             self.identifier.clone(),
             inner_did_work,
             event_list.len()
@@ -186,28 +186,28 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
         debug!(
-            "[d] <<< '({})' recv transport event: {:?}",
+            "<<< '({})' recv transport event: {:?}",
             self.identifier.clone(),
             evt
         );
         // Note: use same order as the enum
         match evt {
             TransportEvent::TransportError(id, e) => {
-                debug!(
-                    "[e] (GatewayTransport) Connection Error for {}: {}\n Closing connection.",
+                error!(
+                    "(GatewayTransport) Connection Error for {}: {}\n Closing connection.",
                     id, e
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                debug!(
-                    "[i] ({}) Connection opened id: {}",
+                info!(
+                    "({}) Connection opened id: {}",
                     self.identifier.clone(),
                     id
                 );
                 if let Some(uri) = self.get_uri(id) {
-                    debug!(
-                        "[t] (GatewayTransport).ConnectResult: mapping {} -> {}",
+                    trace!(
+                        "(GatewayTransport).ConnectResult: mapping {} -> {}",
                         uri, id
                     );
                     self.connection_map.insert(uri, id.clone());
@@ -222,7 +222,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     our_peer_address
                         .serialize(&mut Serializer::new(&mut buf))
                         .unwrap();
-                    debug!(
+                    trace!(
                         "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
                         our_peer_address, id
                     );
@@ -235,12 +235,12 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportEvent::Closed(id) => {
                 // FIXME
-                debug!("[w] Connection closed: {}", id);
+                warn!("Connection closed: {}", id);
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::Received(id, payload) => {
-                debug!("[d] Received message from: {}", id);
+                debug!("Received message from: {}", id);
                 // debug!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
@@ -248,7 +248,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 if let Ok(p2p_msg) = maybe_p2p_msg {
                     if let P2pProtocol::PeerAddress(gateway_id, peer_address) = p2p_msg {
                         debug!(
-                            "[d] Received PeerAddress: {} | {} ({})",
+                            "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier
                         );
                         if self.identifier == gateway_id {
@@ -275,8 +275,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         &mut self,
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
-        debug!(
-            "[t]'({})' serving transport cmd: {:?}",
+        trace!(
+            "({}) serving transport cmd: {:?}",
             self.identifier.clone(),
             cmd
         );

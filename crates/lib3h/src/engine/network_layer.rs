@@ -22,7 +22,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         let (tranport_did_work, event_list) =
             Transport::process(&mut *self.network_gateway.borrow_mut())?;
         debug!(
-            "[d] {} - network_gateway Transport.process(): {} {}",
+            "{} - network_gateway Transport.process(): {} {}",
             self.name.clone(),
             tranport_did_work,
             event_list.len()
@@ -46,7 +46,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
 
     /// Handle a DhtEvent sent to us by our network gateway
     fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("[d] {} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
+        debug!("{} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
         let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {
@@ -79,8 +79,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         &mut self,
         evt: &TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!(
-            "[d] {} << handle_netTransportEvent: {:?}",
+        debug!("{} << handle_netTransportEvent: {:?}",
             self.name.clone(),
             evt
         );
@@ -90,7 +89,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             TransportEvent::TransportError(id, e) => {
                 self.network_connections.remove(id);
                 error!(
-                    "[e] {} Network error from {} : {:?}",
+                    "{} Network error from {} : {:?}",
                     self.name.clone(),
                     id,
                     e
@@ -106,7 +105,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             TransportEvent::ConnectResult(id) => {
                 let mut network_gateway = self.network_gateway.borrow_mut();
                 if let Some(uri) = network_gateway.get_uri(id) {
-                    debug!("[i] Network Connection opened: {} ({})", id, uri);
+                    info!("Network Connection opened: {} ({})", id, uri);
 
                     // FIXME: Do this in next process instead
                     // Send to other node our Joined Spaces
@@ -116,19 +115,19 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     our_joined_space_list
                         .serialize(&mut Serializer::new(&mut buf))
                         .unwrap();
-                    debug!(
+                    trace!(
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
                         our_joined_space_list, id
                     );
                     // id is connectionId but we need a transportId, so search for it in the DHT
                     let peer_list = network_gateway.get_peer_list();
-                    debug!(
+                    trace!(
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
                         peer_list
                     );
                     let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
                     if let Some(peer_data) = maybe_peer_data {
-                        debug!(
+                        trace!(
                             "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
                             peer_data,
                         );
@@ -162,7 +161,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 }
             }
             TransportEvent::Received(id, payload) => {
-                debug!("[d] Received message from: {} | {}", id, payload.len());
+                debug!("Received message from: {} | {}", id, payload.len());
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -224,14 +223,14 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             }
             // HACK
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
-                debug!("[d] Received JoinSpace: {} {:?}", gateway_id, peer_data);
+                debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
                 }
             }
             // HACK
             P2pProtocol::AllJoinedSpaceList(join_list) => {
-                debug!("[d] Received AllJoinedSpaceList: {:?}", join_list);
+                debug!("Received AllJoinedSpaceList: {:?}", join_list);
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
