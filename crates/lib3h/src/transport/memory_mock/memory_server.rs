@@ -71,7 +71,7 @@ impl MemoryServer {
         }
     }
 
-    pub fn is_connection(&self, id: &ConnectionIdRef) -> bool {
+    pub fn has_connection(&self, id: &ConnectionIdRef) -> bool {
         self.connection_ids.contains(id)
     }
 

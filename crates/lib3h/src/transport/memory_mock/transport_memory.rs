@@ -61,7 +61,7 @@ impl TransportMemory {
                 let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
                 server_map
                     .get(uri)
-                    .map(|server| server.lock().unwrap().is_connection(id))
+                    .map(|server| server.lock().unwrap().has_connection(id))
                     .unwrap_or(false)
             }
         }
