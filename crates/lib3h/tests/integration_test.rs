@@ -6,6 +6,8 @@ extern crate lazy_static;
 extern crate unwrap_to;
 extern crate backtrace;
 
+mod p2p_node;
+
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},

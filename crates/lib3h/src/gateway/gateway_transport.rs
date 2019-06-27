@@ -47,7 +47,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     ///   - space   : agentId
     fn send(&mut self, dht_id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         // get connectionId from the inner dht first
-        let dht_uri_list = self.connection_id_to_dht_uri_list(dht_id_list)?;
+        let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
         // send
         println!(
             "[t] ({}).send() {:?} -> {:?} | {}",
@@ -56,14 +56,14 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             dht_uri_list,
             payload.len()
         );
-        // Get Uris for the inner Transport.
-        let mut net_uri_list = Vec::new();
+        // Get connectionIds for the inner Transport.
+        let mut conn_list = Vec::new();
         for dht_uri in dht_uri_list {
             let net_uri = self
                 .connection_map
                 .get(&dht_uri)
                 .expect("unknown dht_transport");
-            net_uri_list.push(net_uri);
+            conn_list.push(net_uri);
             println!(
                 "[t] ({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
                 self.identifier.clone(),
@@ -71,7 +71,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
                 net_uri
             )
         }
-        let ref_list: Vec<&str> = net_uri_list.iter().map(|v| v.as_str()).collect();
+        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
         // Send on the inner Transport
         self.inner_transport.borrow_mut().send(&ref_list, payload)
     }
@@ -163,18 +163,18 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Get Uris from DHT peer_address'
-    pub(crate) fn connection_id_to_dht_uri_list(
+    pub(crate) fn dht_address_to_uri_list(
         &self,
-        id_list: &[&ConnectionIdRef],
+        address_list: &[&str],
     ) -> TransportResult<Vec<Url>> {
-        let mut uri_list = Vec::with_capacity(id_list.len());
-        for connectionId in id_list {
-            let maybe_peer = self.inner_dht.get_peer(connectionId);
+        let mut uri_list = Vec::with_capacity(address_list.len());
+        for address in address_list {
+            let maybe_peer = self.inner_dht.get_peer(address);
             match maybe_peer {
                 None => {
                     return Err(TransportError::new(format!(
-                        "Unknown connectionId: {}",
-                        connectionId
+                        "Unknown peerAddress: {}",
+                        address
                     )));
                 }
                 Some(peer) => uri_list.push(peer.peer_uri),
