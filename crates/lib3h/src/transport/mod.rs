@@ -68,7 +68,7 @@ pub mod tests {
         let _actual_bind_uri_a = node_A.bind(uri_A).unwrap();
         let actual_bind_uri_b = node_B.bind(uri_B).unwrap();
         let idAB = node_A.connect(&actual_bind_uri_b).unwrap();
-        println!("actual_bind_uri_b: {}, idAB: {}", actual_bind_uri_b, idAB);
+        trace!("actual_bind_uri_b: {}, idAB: {}", actual_bind_uri_b, idAB);
 
         let (_did_work, _event_list) = node_A.process().unwrap();
         let (_did_work, _event_list) = node_B.process().unwrap();
@@ -96,12 +96,12 @@ pub mod tests {
         assert!(node_A.get_uri(idAB.as_str()).is_some());
         assert!(node_B.get_uri(recv_id.as_str()).is_some());
 
-        println!(
+        trace!(
             "node_A.get_uri({:?}): {:?}",
             idAB,
             node_A.get_uri(idAB.as_str()).unwrap()
         );
-        println!(
+        trace!(
             "node_B.get_uri({:?}): {:?}",
             recv_id,
             node_B.get_uri(recv_id.as_str()).unwrap()
