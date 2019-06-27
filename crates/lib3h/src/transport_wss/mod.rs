@@ -130,11 +130,13 @@ impl<T: Read + Write + std::fmt::Debug> WssInfo<T> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct TlsCertificate {
     pkcs12_data: Vec<u8>,
     passphrase: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TlsConfig {
     Unencrypted,
     FakeServer,
@@ -180,15 +182,6 @@ pub type Acceptor<T> = Box<FnMut(ConnectionIdFactory) -> TransportResult<WssInfo
 
 /// A function that binds to a url and produces sockt acceptors of type T
 pub type Bind<T> = Box<FnMut(&Url) -> TransportResult<Acceptor<T>>>;
-
-/// An implememtation of Bind that accepts no connections.
-fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(
-    _url: &Url,
-) -> TransportResult<Acceptor<T>> {
-    Err(TransportError(
-        "bind not configured (this is a noop impl)".into(),
-    ))
-}
 
 /// A "Transport" implementation based off the websocket protocol
 /// any rust io Read/Write stream should be able to serve as the base
@@ -306,9 +299,9 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
 }
 
 impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
-    pub fn new(stream_factory: StreamFactory<T>, bind: Bind<T>) -> Self {
+    pub fn new(stream_factory: StreamFactory<T>, bind: Bind<T>, tls_config: TlsConfig) -> Self {
         TransportWss {
-            tls_config: TlsConfig::FakeServer,
+            tls_config,
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
@@ -317,19 +310,6 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             bind,
             acceptor: Err(TransportError("acceptor not initialized".into())),
         }
-    }
-
-    /// create a new websocket "Transport" instance of type T for client connections
-    pub fn client(stream_factory: StreamFactory<T>) -> Self {
-        let bind: Bind<T> = Box::new(|url| noop_bind(url));
-        Self::new(stream_factory, bind)
-    }
-
-    pub fn server(bind: Bind<T>) -> Self {
-        Self::new(
-            |_url| Err(TransportError("client connections unsupported".into())),
-            bind,
-        )
     }
 
     /// connect and wait for a Connect event response

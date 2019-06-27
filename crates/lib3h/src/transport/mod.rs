@@ -15,8 +15,11 @@ pub type ConnectionIdRef = str;
 pub mod tests {
     #![allow(non_snake_case)]
 
-    use crate::transport::{
-        memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
+    use crate::{
+        transport::{
+            memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
+        },
+        transport_wss::{TlsConfig, TransportWss},
     };
 
     use url::Url;
@@ -50,10 +53,20 @@ pub mod tests {
 
     #[test]
     fn wss_send_test() {
-        let mut node_A = crate::transport_wss::TransportWss::with_std_tcp_stream();
-        let mut node_B = crate::transport_wss::TransportWss::with_std_tcp_stream();
+        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
+        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let uri_A = Url::parse("wss://127.0.0.1:64529").unwrap();
         let uri_B = Url::parse("wss://127.0.0.1:64530").unwrap();
+
+        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
+    }
+
+    #[test]
+    fn wss_send_test_tls() {
+        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
+        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
+        let uri_A = Url::parse("wss://127.0.0.1:64531").unwrap();
+        let uri_B = Url::parse("wss://127.0.0.1:64532").unwrap();
 
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }

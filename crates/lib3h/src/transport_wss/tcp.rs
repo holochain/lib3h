@@ -3,7 +3,9 @@
 
 use crate::{
     transport::error::TransportResult,
-    transport_wss::{Acceptor, Bind, ConnectionIdFactory, IdGenerator, TransportWss, WssInfo},
+    transport_wss::{
+        Acceptor, Bind, ConnectionIdFactory, IdGenerator, TlsConfig, TransportWss, WssInfo,
+    },
 };
 
 use std::net::{TcpListener, TcpStream};
@@ -11,7 +13,7 @@ use std::net::{TcpListener, TcpStream};
 impl TransportWss<std::net::TcpStream> {
     /// convenience constructor for creating a websocket "Transport"
     /// instance that is based of the rust std TcpStream
-    pub fn with_std_tcp_stream() -> Self {
+    pub fn with_std_tcp_stream(tls_config: TlsConfig) -> Self {
         let bind: Bind<TcpStream> = Box::new(move |url| Self::tcp_bind(url));
         TransportWss::new(
             |uri| {
@@ -20,6 +22,7 @@ impl TransportWss<std::net::TcpStream> {
                 Ok(socket)
             },
             bind,
+            tls_config,
         )
     }
 
