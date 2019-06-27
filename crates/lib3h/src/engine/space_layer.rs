@@ -66,8 +66,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         chain_id: &ChainId,
         cmd: DhtEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        println!(
-            "[d] {} << handle_spaceDhtEvent: [{:?}] - {:?}",
+        debug!(
+            "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
             self.name.clone(),
             chain_id,
             cmd
@@ -85,8 +85,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 // n/a - should have been handled by gateway
             }
             DhtEvent::HoldPeerRequested(peer_data) => {
-                println!(
-                    "[d] {} -- ({}).post() HoldPeer {:?}",
+                debug!(
+                    "{} -- ({}).post() HoldPeer {:?}",
                     self.name.clone(),
                     space_gateway.identifier(),
                     peer_data
