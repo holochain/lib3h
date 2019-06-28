@@ -3,9 +3,7 @@ pub mod entry_store;
 pub mod r#impl;
 
 use lib3h::{
-    engine::{RealEngine, RealEngineConfig},
-    transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
-    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
+    engine::RealEngineConfig,
 };
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol,
@@ -16,19 +14,11 @@ use lib3h_protocol::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
 };
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
-use node_mock::{
-    chain_store::ChainStore,
-    //create_config::{create_ipc_config, create_lib3h_config},
-};
+use self::chain_store::ChainStore;
 use crossbeam_channel::{unbounded, Receiver};
-use lib3h_protocol::{
-    data_types::DirectMessageData, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol,
-};
-use multihash::Hash;
+// use multihash::Hash;
 use url::Url;
 
 static TIMEOUT_MS: usize = 5000;
@@ -40,7 +30,7 @@ pub type EngineFactory = fn(config: &RealEngineConfig, name: &str) -> Lib3hResul
 pub struct NodeMock {
     /// Temp dir used for persistence
     /// Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
-    _maybe_temp_dir: Option<tempfile::TempDir>,
+    //_maybe_temp_dir: Option<tempfile::TempDir>,
     /// TODO: Run engine in a thread and communicate via a channel?
     _receiver: Receiver<Lib3hServerProtocol>,
     /// The Node's networking engine
@@ -77,7 +67,7 @@ impl NodeMock {
         agent_id_arg: Address,
         config: RealEngineConfig,
         engine_factory: EngineFactory,
-        _maybe_temp_dir: Option<tempfile::TempDir>,
+        //_maybe_temp_dir: Option<tempfile::TempDir>,
     ) -> Self {
         debug!(
             "new NodeMock '{}' with config: {:?}",
@@ -86,15 +76,15 @@ impl NodeMock {
         );
 
         // Use a channel for messaging between Node and its Engine?
-        let (sender, receiver) = unbounded::<Lib3hServerProtocol>();
+        let (sender, _receiver) = unbounded::<Lib3hServerProtocol>();
 
-        let engine = EngineFactory(config).expect("Failed to create RealEngine");
+        let engine = engine_factory(&config).expect("Failed to create RealEngine");
 
         NodeMock {
-            _maybe_temp_dir,
+            // _maybe_temp_dir,
             engine,
             _receiver,
-            config: config.clone(),
+            config,
             agent_id: agent_id_arg.clone(),
             request_log: Vec::new(),
             request_count: 0,

@@ -2,8 +2,8 @@
 
 use lib3h::{
     engine::{RealEngine, RealEngineConfig},
-    transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
-    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
+    transport::transport_trait::Transport,
+    dht::dht_trait::Dht,
 };
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol,
@@ -15,15 +15,16 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
 };
-use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use super::{
     chain_store::ChainStore,
-    create_config::{create_ipc_config, create_lib3h_config},
+    // create_config::{create_ipc_config, create_lib3h_config},
     NodeMock, TIMEOUT_MS,
 };
 use crossbeam_channel::{unbounded, Receiver};
 use multihash::Hash;
 use url::Url;
+use holochain_persistence_api::hash::HashString;
+use crate::constants::*;
 
 /// Query logs
 impl NodeMock {
@@ -73,7 +74,10 @@ impl NodeMock {
 
     pub fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let (did_work, msgs) = self.engine.process()?;
-        self.recv_msg_log.extend_from_slice(msgs.iter());
+        self.recv_msg_log.extend(msgs.iter());
+        for msg in msgs {
+            self.handle_lib3h(msg);
+        }
         Ok((did_work, msgs))
     }
 
@@ -212,7 +216,7 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self.send(Lib3hServerProtocol::PublishEntry(msg_data).into());
+            return self.engine.post(Lib3hServerProtocol::PublishEntry(msg_data).into());
         }
         // Done
         Ok(())
@@ -400,7 +404,7 @@ impl NodeMock {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let response = DirectMessageData {
             space_address: current_space.clone().to_string().into_bytes(),
-            request_id: dm.request_id,
+            request_id: request_id.to_owned(),
             to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
             content: response_content,
@@ -499,14 +503,14 @@ impl NodeMock {
             .expect("Reply to HandleGetHoldingEntryList failed.");
     }
 
-    /// See if there is a message to receive, and log it
-    /// return a Lib3hServerProtocol if the received message is of that type
-    pub fn process(&mut self) -> Lib3hResult<Lib3hServerProtocol> {
-        let data = self.receiver.try_recv()?;
-        self.recv_msg_log.push(data.clone());
-        self.handle_lib3h(r.clone());
-        Ok(r)
-    }
+//    /// See if there is a message to receive, and log it
+//    /// return a Lib3hServerProtocol if the received message is of that type
+//    pub fn process(&mut self) -> Lib3hResult<Lib3hServerProtocol> {
+//        let data = self.receiver.try_recv()?;
+//        self.recv_msg_log.push(data.clone());
+//        self.handle_lib3h(data.clone());
+//        Ok(r)
+//    }
 
     /// recv messages until timeout is reached
     /// returns the number of messages it received during listening period
@@ -518,10 +522,10 @@ impl NodeMock {
             let mut has_recved = false;
 
             if let Ok(p2p_msg) = self.try_recv() {
-                self.logger.t(&format!(
+                trace!(
                     "({})::listen() - received: {:?}",
                     self.agent_id, p2p_msg,
-                ));
+                );
                 has_recved = true;
                 time_ms = 0;
                 count += 1;
@@ -570,49 +574,39 @@ impl NodeMock {
 
     /// Wait for receiving a message corresponding to predicate
     /// hard coded timeout
-    pub fn wait_lib3h(
+    pub fn wait(
         &mut self,
         predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
     ) -> Option<Lib3hServerProtocol> {
-        self.wait_lib3h_with_timeout(predicate, TIMEOUT_MS)
+        self.wait_with_timeout(predicate, TIMEOUT_MS)
     }
 
-    /// Wait for receiving a message corresponding to predicate until timeout is reached
-    pub fn wait_lib3h_with_timeout(
+    /// Call process() in a loop until receiving a message corresponding to predicate
+    /// or until timeout is reached
+    pub fn wait_with_timeout(
         &mut self,
         predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
         timeout_ms: usize,
     ) -> Option<Lib3hServerProtocol> {
         let mut time_ms: usize = 0;
         loop {
-            let mut did_something = false;
+            let (_, msgs) = self.process().expect("Process should work");
 
-            if let Ok(p2p_msg) = self.try_recv() {
-                if let Protocol::Lib3hServer(lib3h_msg) = p2p_msg {
-                    self.logger.i(&format!(
-                        "({})::wait_lib3h() - received: {:?}",
-                        self.agent_id, lib3h_msg
-                    ));
-                    did_something = true;
-                    if predicate(&lib3h_msg) {
-                        self.logger
-                            .i(&format!("({})::wait_lib3h() - match", self.agent_id));
-                        return Some(lib3h_msg);
-                    } else {
-                        self.logger
-                            .i(&format!("({})::wait_lib3h() - NO match", self.agent_id));
-                    }
+            for lib3h_msg in msgs {
+                info!("({})::wait() - received: {:?}", self.agent_id, lib3h_msg);
+                if predicate(&lib3h_msg) {
+                    info!("({})::wait() - match", self.agent_id);
+                    return Some(lib3h_msg);
+                } else {
+                    info!("({})::wait() - NO match", self.agent_id);
                 }
             }
 
-            if !did_something {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                time_ms += 10;
-                if time_ms > timeout_ms {
-                    self.logger
-                        .i(&format!("({})::wait_lib3h() has TIMEOUT", self.agent_id));
-                    return None;
-                }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            time_ms += 10;
+            if time_ms > timeout_ms {
+                info!("({})::wait() has TIMEOUT", self.agent_id);
+                return None;
             }
         }
     }
@@ -621,12 +615,7 @@ impl NodeMock {
     pub fn stop(self) {
         self.engine
             .stop()
-            .expect("Failed to stop p2p connection properly");
-    }
-
-    /// Getter of the endpoint of its connection
-    pub fn endpoint(&self) -> String {
-        self.engine.endpoint()
+            .expect("Failed to stop the NetworkEngine properly");
     }
 
     /// handle all types of Lib3hServerProtocol message
@@ -656,7 +645,7 @@ impl NodeMock {
             Lib3hServerProtocol::HandleFetchEntry(_msg) => {
                 // FIXME
             }
-            Lib3hServerProtocol::HandleStoreEntry(_msg) => {
+            Lib3hServerProtocol::HandleStoreEntry(msg) => {
                 // FIXME
                 if self.has_joined(&msg.space_address) {
                     // Store data in local datastore
@@ -665,13 +654,13 @@ impl NodeMock {
                         .get_mut(&msg.space_address)
                         .expect("No chain_store for this Space");
                     let res = chain_store.hold_aspect(&msg.entry_address, &msg.entry_aspect);
-                    self.logger.d(&format!(
+                    debug!(
                         "({}) auto-store of aspect: {} - {} -> {}",
                         self.agent_id,
                         msg.entry_address,
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
-                    ));
+                    );
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
