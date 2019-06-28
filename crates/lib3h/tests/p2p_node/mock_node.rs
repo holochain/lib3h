@@ -30,7 +30,7 @@ use multihash::Hash;
 static TIMEOUT_MS: usize = 5000;
 
 /// Conductor Mock of one agent with multiple Spaces
-pub struct TestNode {
+pub struct MockNode {
     // Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
     _maybe_temp_dir: Option<tempfile::TempDir>,
     engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem>,
@@ -57,7 +57,7 @@ pub struct TestNode {
 }
 
 /// Query logs
-impl TestNode {
+impl MockNode {
     /// Return number of JsonProtocol message this node has received
     pub fn count_recv_messages(&self) -> usize {
         self.recv_msg_log.len()
@@ -83,7 +83,7 @@ impl TestNode {
 }
 
 /// Space managing
-impl TestNode {
+impl MockNode {
     ///
     pub fn join_current_space(&mut self) -> NetResult<()> {
         assert!(self.current_space.is_some());
@@ -162,7 +162,7 @@ impl TestNode {
 }
 
 ///
-impl TestNode {
+impl MockNode {
     /// Convert an aspect_content_list into an EntryData
     fn into_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
@@ -190,7 +190,7 @@ impl TestNode {
     ) -> NetResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
-        let entry = TestNode::into_EntryData(entry_address, aspect_content_list);
+        let entry = MockNode::into_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
         {
@@ -232,7 +232,7 @@ impl TestNode {
     ) -> NetResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
-        let entry = TestNode::into_EntryData(entry_address, aspect_content_list);
+        let entry = MockNode::into_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
             .get_mut(&current_space)
@@ -257,7 +257,7 @@ impl TestNode {
 }
 
 /// Query & Fetch
-impl TestNode {
+impl MockNode {
     /// generate a new request_id
     fn generate_request_id(&mut self) -> String {
         self.request_count += 1;
@@ -383,7 +383,7 @@ impl TestNode {
         Ok(fetch_result_data)
     }
 }
-impl TestNode {
+impl MockNode {
     /// Node sends Message on the network.
     pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
         debug!("current_space: {:?}", self.current_space);
@@ -450,7 +450,7 @@ impl TestNode {
 }
 
 /// Reply LISTS
-impl TestNode {
+impl MockNode {
     /// Reply to a HandleGetAuthoringEntryList request
     pub fn reply_to_HandleGetAuthoringEntryList(&mut self, request: &GetListData) -> NetResult<()> {
         assert!(self.current_space.is_some());
@@ -539,7 +539,7 @@ impl TestNode {
     }
 }
 
-impl TestNode {
+impl MockNode {
     /// Private constructor
     #[cfg_attr(tarpaulin, skip)]
     pub fn new_with_config(
@@ -564,7 +564,7 @@ impl TestNode {
         )
         .expect("Failed to create RealEngine");
 
-        TestNode {
+        MockNode {
             _maybe_temp_dir,
             engine,
             receiver,
@@ -615,7 +615,7 @@ impl TestNode {
             bootstrap_nodes,
             maybe_dir_path,
         );
-        return TestNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
+        return MockNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
     }
 
     /// Constructor for an IPC node that spawns and uses a n3h process and a temp folder
@@ -633,7 +633,7 @@ impl TestNode {
             bootstrap_nodes,
             maybe_dir_path,
         );
-        return TestNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
+        return MockNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
     }
 
     /// See if there is a message to receive, and log it
