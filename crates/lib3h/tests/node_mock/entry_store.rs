@@ -1,4 +1,3 @@
-use holochain_net::connection::json_protocol::{EntryAspectData, EntryData};
 use lib3h_protocol::{
     data_types::{EntryData, EntryAspectData},
     Address, AddressRef,
@@ -27,14 +26,13 @@ impl EntryStore {
 
     ///
     pub fn insert_entry(&mut self, entry: &EntryData) {
-        log_tt!(
-            "entrystore",
+        trace!(
             "EntryStore: adding content for '{}'",
             entry.entry_address,
         );
         if self.store.get(&entry.entry_address).is_none() {
             let mut map = HashMap::new();
-            log_tt!("entrystore", "  -> first content!");
+            trace!("  -> first content!");
             for aspect in entry.aspect_list.clone() {
                 map.insert(aspect.aspect_address.clone(), aspect.clone());
             }
@@ -50,15 +48,14 @@ impl EntryStore {
 
     ///
     pub fn insert_aspect(&mut self, entry_address: &Address, aspect: &EntryAspectData) {
-        log_tt!(
-            "entrystore",
+        trace!(
             "EntryStore: adding content for '{}': {}",
             entry_address,
             aspect.aspect_address,
         );
         if self.store.get(&entry_address).is_none() {
             let mut map = HashMap::new();
-            log_tt!("entrystore", "  -> first content!");
+            trace!("  -> first content!");
             map.insert(aspect.aspect_address.clone(), aspect.clone());
             self.store.insert(entry_address.clone(), map);
             return;

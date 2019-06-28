@@ -9,7 +9,7 @@ use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
     data_types::*,
-    Address, AddressRef,
+    Address, AddressRef, Lib3hResult, DidWork,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -19,51 +19,21 @@ use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use super::{
     chain_store::ChainStore,
     create_config::{create_ipc_config, create_lib3h_config},
+    NodeMock, TIMEOUT_MS,
 };
 use crossbeam_channel::{unbounded, Receiver};
-use lib3h_protocol::{
-    data_types::DirectMessageData, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol,
-};
 use multihash::Hash;
-
-static TIMEOUT_MS: usize = 5000;
-
-/// Conductor Mock of one agent with multiple Spaces
-pub struct MockNode {
-    // Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
-    _maybe_temp_dir: Option<tempfile::TempDir>,
-    engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem>,
-    receiver: Receiver<Lib3hServerProtocol>,
-    pub config: RealEngineConfig,
-
-    pub agent_id: Address,
-
-    // my request logging
-    request_log: Vec<String>,
-    request_count: usize,
-
-    // logging
-    recv_msg_log: Vec<Lib3hServerProtocol>,
-
-    // datastores per Space
-    chain_store_list: HashMap<Address, ChainStore>,
-    joined_space_list: HashSet<Address>,
-
-    pub current_space: Option<Address>,
-
-    is_network_ready: bool,
-    pub p2p_binding: String,
-}
+use url::Url;
 
 /// Query logs
-impl MockNode {
-    /// Return number of JsonProtocol message this node has received
+impl NodeMock {
+    /// Return number of Lib3hServerProtocol message this node has received
     pub fn count_recv_messages(&self) -> usize {
         self.recv_msg_log.len()
     }
 
-    /// Return the ith JSON message that this node has received and fullfills predicate
+    /// Return the ith Lib3hServerProtocol message
+    /// that this node has received and fullfills predicate
     pub fn find_recv_msg(
         &self,
         ith: usize,
@@ -80,18 +50,57 @@ impl MockNode {
         }
         None
     }
-}
 
-/// Space managing
-impl MockNode {
-    ///
-    pub fn join_current_space(&mut self) -> NetResult<()> {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        self.join_space(&current_space, false)
+    pub fn is_network_ready(&self) -> bool {
+        self.is_network_ready
     }
 
-    pub fn join_space(&mut self, space_address: &Address, can_set_current: bool) -> NetResult<()> {
+    pub fn advertise(&self) -> Url {
+        self.my_advertise.clone()
+    }
+}
+
+/// Connection & Space managing
+impl NodeMock {
+    pub fn connect_to(&mut self, uri: &Url) -> Lib3hResult<()> {
+        let req_connect = ConnectData {
+            request_id: self.generate_request_id(),
+            peer_uri: uri.clone(),
+            network_id: NETWORK_A_ID.clone(),
+        };
+        return self.engine.post(Lib3hClientProtocol::Connect(req_connect.clone()));
+    }
+
+    pub fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        let (did_work, msgs) = self.engine.process()?;
+        self.recv_msg_log.extend_from_slice(msgs.iter());
+        Ok((did_work, msgs))
+    }
+
+    ///
+    pub fn set_current_space(&mut self, space_address: &Address) {
+        if self.chain_store_list.contains_key(space_address) {
+            self.current_space = Some(space_address.clone());
+        };
+    }
+
+    ///
+    pub fn join_current_space(&mut self) -> Lib3hResult<()> {
+        let current_space = self.current_space.clone().expect("Current space not set");
+        self.join_space(&current_space, false)
+    }
+    ///
+    pub fn leave_current_space(&mut self) -> Lib3hResult<()> {
+        let current_space = self.current_space.clone().expect("Current space not set");
+        let res = self.leave_space(&current_space);
+        if res.is_ok() {
+            self.current_space = None;
+        }
+        res
+    }
+
+    /// Post a Lib3hClientProtocol::JoinSpace and update internal tracking
+    pub fn join_space(&mut self, space_address: &Address, can_set_current: bool) -> Lib3hResult<()> {
         if self.joined_space_list.contains(space_address) {
             if can_set_current {
                 self.set_current_space(space_address);
@@ -99,14 +108,14 @@ impl MockNode {
             return Ok(());
         }
         let join_space = lib3h_protocol::data_types::SpaceData {
-            request_id: "leave_space_req".to_string(),
+            request_id: self.generate_request_id(),
             space_address: space_address.clone().to_string().into_bytes(),
-            agent_id: agent_id.to_string().into_bytes(),
+            agent_id: self.agent_id.to_string().into_bytes(),
         };
         let protocol_msg = Lib3hClientProtocol::JoinSpace(join_space).into();
 
-        debug!("TestNode.join_space(): {:?}", protocol_msg);
-        let res = self.send(protocol_msg);
+        debug!("NodeMock.join_space(): {:?}", protocol_msg);
+        let res = self.post(protocol_msg);
         if res.is_ok() {
             self.joined_space_list.insert(space_address.clone());
             if !self.chain_store_list.contains_key(space_address) {
@@ -120,28 +129,19 @@ impl MockNode {
         res
     }
 
-    pub fn leave_current_space(&mut self) -> NetResult<()> {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        let res = self.leave_space(&current_space);
-        if res.is_ok() {
-            self.current_space = None;
-        }
-        res
-    }
-
-    pub fn leave_space(&mut self, space_address: &Address) -> NetResult<()> {
+    /// Post a Lib3hClientProtocol::LeaveSpace and update internal tracking
+    pub fn leave_space(&mut self, space_address: &Address) -> Lib3hResult<()> {
         if !self.joined_space_list.contains(space_address) {
             return Ok(());
         }
         let agent_id = self.agent_id.clone();
         let leave_space_msg = lib3h_protocol::data_types::SpaceData {
-            request_id: "leave_space_req".to_string(),
+            request_id: self.generate_request_id(),
             space_address: space_address.clone().to_string().into_bytes(),
             agent_id: agent_id.to_string().into_bytes(),
         };
         let protocol_msg = Lib3hClientProtocol::LeaveSpace(leave_space_msg).into();
-        let res = self.send(protocol_msg);
+        let res = self.post(protocol_msg);
         if res.is_ok() {
             self.joined_space_list.remove(space_address);
         }
@@ -152,17 +152,10 @@ impl MockNode {
     pub fn has_joined(&self, space_address: &Address) -> bool {
         self.joined_space_list.contains(space_address)
     }
-
-    ///
-    pub fn set_current_space(&mut self, space_address: &Address) {
-        if self.chain_store_list.contains_key(space_address) {
-            self.current_space = Some(space_address.clone());
-        };
-    }
 }
 
 ///
-impl MockNode {
+impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
     fn into_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
@@ -170,7 +163,7 @@ impl MockNode {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
             aspect_list.push(EntryAspectData {
                 aspect_address: hash,
-                type_hint: "TestNode".to_string(),
+                type_hint: "NodeMock".to_string(),
                 aspect: aspect_content,
                 publish_ts: 42,
             });
@@ -187,10 +180,10 @@ impl MockNode {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
-    ) -> NetResult<()> {
+    ) -> Lib3hResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
-        let entry = MockNode::into_EntryData(entry_address, aspect_content_list);
+        let entry = NodeMock::into_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
         {
@@ -219,7 +212,7 @@ impl MockNode {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self.send(JsonProtocol::PublishEntry(msg_data).into());
+            return self.send(Lib3hServerProtocol::PublishEntry(msg_data).into());
         }
         // Done
         Ok(())
@@ -229,10 +222,10 @@ impl MockNode {
         &mut self,
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
-    ) -> NetResult<()> {
+    ) -> Lib3hResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
-        let entry = MockNode::into_EntryData(entry_address, aspect_content_list);
+        let entry = NodeMock::into_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
             .get_mut(&current_space)
@@ -257,7 +250,7 @@ impl MockNode {
 }
 
 /// Query & Fetch
-impl MockNode {
+impl NodeMock {
     /// generate a new request_id
     fn generate_request_id(&mut self) -> String {
         self.request_count += 1;
@@ -277,8 +270,8 @@ impl MockNode {
             requester_agent_id: self.agent_id.clone(),
             query: vec![], // empty means give me the EntryData,
         };
-        self.send(JsonProtocol::QueryEntry(query_data.clone()).into())
-            .expect("Sending Query failed");
+        self.engine.post(Lib3hClientProtocol::QueryEntry(query_data.clone()).into())
+            .expect("Posting Query failed");
         query_data
     }
 
@@ -295,8 +288,8 @@ impl MockNode {
                 to_agent_id: query.requester_agent_id.clone(),
                 result_info: "Unknown query request".as_bytes().to_vec(),
             };
-            self.send(JsonProtocol::FailureResult(msg_data.clone()).into())
-                .expect("Sending FailureResult failed");
+            self.engine.post(Lib3hClientProtocol::FailureResult(msg_data.clone()).into())
+                .expect("Posting FailureResult failed");
             return Err(msg_data);
         }
         // Convert query to fetch
@@ -310,7 +303,7 @@ impl MockNode {
         // HandleFetchEntry
         let fetch_res = self.reply_to_HandleFetchEntry_inner(&fetch);
         if let Err(res) = fetch_res {
-            self.send(JsonProtocol::FailureResult(res.clone()).into())
+            self.engine.post(Lib3hClientProtocol::FailureResult(res.clone()).into())
                 .expect("Sending FailureResult failed");
             return Err(res);
         }
@@ -323,7 +316,7 @@ impl MockNode {
             responder_agent_id: self.agent_id.clone(),
             query_result: bincode::serialize(&fetch_res.unwrap().entry).unwrap(),
         };
-        self.send(JsonProtocol::HandleQueryEntryResult(query_res.clone()).into())
+        self.engine.post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
             .expect("Sending FailureResult failed");
         return Ok(query_res);
     }
@@ -334,11 +327,11 @@ impl MockNode {
         fetch: &FetchEntryData,
     ) -> Result<FetchEntryResultData, GenericResultData> {
         let fetch_res = self.reply_to_HandleFetchEntry_inner(fetch);
-        let json_msg = match fetch_res.clone() {
-            Err(res) => JsonProtocol::FailureResult(res),
-            Ok(fetch) => JsonProtocol::HandleFetchEntryResult(fetch),
+        let msg = match fetch_res.clone() {
+            Err(res) => Lib3hClientProtocol::FailureResult(res),
+            Ok(fetch) => Lib3hClientProtocol::HandleFetchEntryResult(fetch),
         };
-        self.send(json_msg.into()).expect("Sending failed");
+        self.engine.post(msg.into()).expect("Sending failed");
         fetch_res
     }
 
@@ -383,76 +376,44 @@ impl MockNode {
         Ok(fetch_result_data)
     }
 }
-impl MockNode {
+impl NodeMock {
     /// Node sends Message on the network.
+    /// Returns the generated request_id for this send
     pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
-        debug!("current_space: {:?}", self.current_space);
-        assert!(self.current_space.is_some());
-        let space_address = self.current_space.clone().unwrap();
+        let current_space = self.current_space.clone().expect("Current Space not set");
         let request_id = self.generate_request_id();
-        let from_agent_id = self.agent_id.to_string();
-
+        debug!("current_space: {:?}", self.current_space);
         let msg_data = DirectMessageData {
-            space_address: space_address.to_string().into_bytes(),
+            space_address: current_space.to_string().into_bytes(),
             request_id: request_id.clone(),
             to_agent_id: to_agent_id.to_string().into_bytes(),
-            from_agent_id: from_agent_id.to_string().into_bytes(),
+            from_agent_id: self.agent_id.clone(),
             content,
         };
         let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
-        self.send(p).expect("Sending SendMessage failed");
+        self.engine.post(p).expect("Posting SendDirectMessage failed");
         request_id
     }
 
     /// Node sends Message on the network.
-    pub fn send_reponse_json(&mut self, msg: MessageData, response_content: Vec<u8>) {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        assert_eq!(msg.space_address, current_space.clone());
-        assert_eq!(msg.to_agent_id, self.agent_id);
-        let response = MessageData {
-            space_address: current_space.clone(),
-            request_id: msg.request_id,
-            to_agent_id: msg.from_agent_id.clone(),
+    pub fn send_response(&mut self, request_id: &str, to_agent_id: &AddressRef, response_content: Vec<u8>) {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let response = DirectMessageData {
+            space_address: current_space.clone().to_string().into_bytes(),
+            request_id: dm.request_id,
+            to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
             content: response_content,
         };
-        self.send(JsonProtocol::HandleSendMessageResult(response.clone()).into())
-            .expect("Sending HandleSendMessageResult failed");
-    }
-
-    /// Node sends Message on the network.
-    pub fn send_reponse_lib3h(
-        &mut self,
-        msg: DirectMessageData,
-        response_content: serde_json::Value,
-    ) {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        assert_eq!(
-            msg.space_address,
-            current_space.clone().to_string().into_bytes()
-        );
-        assert_eq!(
-            msg.to_agent_id,
-            self.agent_id.clone().to_string().into_bytes()
-        );
-        let response = DirectMessageData {
-            space_address: current_space.clone().to_string().into_bytes(),
-            request_id: msg.request_id,
-            to_agent_id: msg.from_agent_id.clone(),
-            from_agent_id: self.agent_id.to_string().into_bytes(),
-            content: response_content.to_string().into_bytes(),
-        };
-        self.send(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
-            .expect("Sending HandleSendMessageResult failed");
+        self.engine.post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
+            .expect("Posting HandleSendMessageResult failed");
     }
 }
 
 /// Reply LISTS
-impl MockNode {
+impl NodeMock {
     /// Reply to a HandleGetAuthoringEntryList request
-    pub fn reply_to_HandleGetAuthoringEntryList(&mut self, request: &GetListData) -> NetResult<()> {
+    pub fn reply_to_HandleGetAuthoringEntryList(&mut self, request: &GetListData) -> Lib3hResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         assert_eq!(request.space_address, current_space);
@@ -479,23 +440,23 @@ impl MockNode {
                 provider_agent_id: self.agent_id.clone(),
             };
         }
-        self.send(JsonProtocol::HandleGetAuthoringEntryListResult(msg).into())
+        self.engine.post(Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg).into())
     }
     /// Look for the first HandleGetAuthoringEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetAuthoringEntryList(&mut self) {
         let request = self
             .find_recv_msg(
                 0,
-                Box::new(one_is!(JsonProtocol::HandleGetAuthoringEntryList(_))),
+                Box::new(one_is!(Lib3hServerProtocol::HandleGetAuthoringEntryList(_))),
             )
             .expect("Did not receive any HandleGetAuthoringEntryList request");
-        let get_entry_list_data = unwrap_to!(request => JsonProtocol::HandleGetAuthoringEntryList);
+        let get_entry_list_data = unwrap_to!(request => Lib3hServerProtocol::HandleGetAuthoringEntryList);
         self.reply_to_HandleGetAuthoringEntryList(&get_entry_list_data)
             .expect("Reply to HandleGetAuthoringEntryList failed.");
     }
 
     /// Reply to a HandleGetHoldingEntryList request
-    pub fn reply_to_HandleGetHoldingEntryList(&mut self, request: &GetListData) -> NetResult<()> {
+    pub fn reply_to_HandleGetHoldingEntryList(&mut self, request: &GetListData) -> Lib3hResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         assert_eq!(request.space_address, current_space);
@@ -521,125 +482,26 @@ impl MockNode {
                 provider_agent_id: self.agent_id.clone(),
             };
         }
-        self.send(JsonProtocol::HandleGetGossipingEntryListResult(msg).into())
+        self.engine.post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg).into())
     }
     /// Look for the first HandleGetHoldingEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetHoldingEntryList(&mut self) {
         let request = self
             .find_recv_msg(
                 0,
-                Box::new(one_is!(JsonProtocol::HandleGetGossipingEntryList(_))),
+                Box::new(one_is!(Lib3hServerProtocol::HandleGetGossipingEntryList(_))),
             )
             .expect("Did not receive a HandleGetHoldingEntryList request");
         // extract request data
-        let get_list_data = unwrap_to!(request => JsonProtocol::HandleGetGossipingEntryList);
+        let get_list_data = unwrap_to!(request => Lib3hServerProtocol::HandleGetGossipingEntryList);
         // reply
         self.reply_to_HandleGetHoldingEntryList(&get_list_data)
             .expect("Reply to HandleGetHoldingEntryList failed.");
     }
-}
-
-impl MockNode {
-    /// Private constructor
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn new_with_config(
-        name: &str,
-        agent_id_arg: Address,
-        config: RealEngineConfig,
-        _maybe_temp_dir: Option<tempfile::TempDir>,
-    ) -> Self {
-        log_dd!(
-            "p2pnode",
-            "new TestNode '{}' with config: {:?}",
-            agent_id_arg,
-            config
-        );
-
-        // use a channel for messaging between p2p connection and main thread
-        let (sender, receiver) = unbounded::<Lib3hServerProtocol>();
-        // create a new P2pNetwork instance with the handler that will send the received Protocol to a channel
-        let agent_id = agent_id_arg.clone();
-        let engine = RealEngine::new_mock(
-                        config, name, MirrorDht::new_with_config,
-        )
-        .expect("Failed to create RealEngine");
-
-        MockNode {
-            _maybe_temp_dir,
-            engine,
-            receiver,
-            config: config.clone(),
-            agent_id,
-            request_log: Vec::new(),
-            request_count: 0,
-            recv_msg_log: Vec::new(),
-            chain_store_list: HashMap::new(),
-            joined_space_list: HashSet::new(),
-            current_space: None,
-            is_network_ready: false,
-            p2p_binding: String::new(),
-        }
-    }
-
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn is_network_ready(&self) -> bool {
-        self.is_network_ready
-    }
-
-//    /// Constructor for an in-memory P2P Network
-//    #[cfg_attr(tarpaulin, skip)]
-//    pub fn new_with_unique_memory_network(agent_id: Address) -> Self {
-//        let config = P2pConfig::new_with_unique_memory_backend();
-//        return TestNode::new_with_config(agent_id, &config, None);
-//    }
-
-//    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-//    #[cfg_attr(tarpaulin, skip)]
-//    pub fn new_with_uri_ipc_network(agent_id: Address, ipc_binding: &str) -> Self {
-//        let p2p_config = P2pConfig::default_ipc_uri(Some(ipc_binding));
-//        return TestNode::new_with_config(agent_id, &p2p_config, None);
-//    }
-
-    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn new_with_lib3h(
-        agent_id: Address,
-        maybe_config_filepath: Option<&str>,
-        maybe_end_user_config_filepath: Option<String>,
-        bootstrap_nodes: Vec<String>,
-        maybe_dir_path: Option<String>,
-    ) -> Self {
-        let (p2p_config, _maybe_temp_dir) = create_lib3h_config(
-            maybe_config_filepath,
-            maybe_end_user_config_filepath,
-            bootstrap_nodes,
-            maybe_dir_path,
-        );
-        return MockNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
-    }
-
-    /// Constructor for an IPC node that spawns and uses a n3h process and a temp folder
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn new_with_spawn_ipc_network(
-        agent_id: Address,
-        maybe_config_filepath: Option<&str>,
-        maybe_end_user_config_filepath: Option<String>,
-        bootstrap_nodes: Vec<String>,
-        maybe_dir_path: Option<String>,
-    ) -> Self {
-        let (p2p_config, _maybe_temp_dir) = create_ipc_config(
-            maybe_config_filepath,
-            maybe_end_user_config_filepath,
-            bootstrap_nodes,
-            maybe_dir_path,
-        );
-        return MockNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
-    }
 
     /// See if there is a message to receive, and log it
-    /// return a JsonProtocol if the received message is of that type
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn process(&mut self) -> NetResult<Lib3hServerProtocol> {
+    /// return a Lib3hServerProtocol if the received message is of that type
+    pub fn process(&mut self) -> Lib3hResult<Lib3hServerProtocol> {
         let data = self.receiver.try_recv()?;
         self.recv_msg_log.push(data.clone());
         self.handle_lib3h(r.clone());
@@ -649,7 +511,6 @@ impl MockNode {
     /// recv messages until timeout is reached
     /// returns the number of messages it received during listening period
     /// timeout is reset after a message is received
-    #[cfg_attr(tarpaulin, skip)]
     pub fn listen(&mut self, timeout_ms: usize) -> usize {
         let mut count: usize = 0;
         let mut time_ms: usize = 0;
@@ -678,13 +539,13 @@ impl MockNode {
     /// wait to receive a HandleFetchEntry request and automatically reply
     /// return true if a HandleFetchEntry has been received
     pub fn wait_HandleFetchEntry_and_reply(&mut self) -> bool {
-        let maybe_request = self.wait_json(Box::new(one_is!(JsonProtocol::HandleFetchEntry(_))));
+        let maybe_request = self.wait(Box::new(one_is!(Lib3hServerProtocol::HandleFetchEntry(_))));
         if maybe_request.is_none() {
             return false;
         }
         let request = maybe_request.unwrap();
         // extract msg data
-        let fetch_data = unwrap_to!(request => JsonProtocol::HandleFetchEntry);
+        let fetch_data = unwrap_to!(request => Lib3hServerProtocol::HandleFetchEntry);
         // Respond
         self.reply_to_HandleFetchEntry(&fetch_data)
             .expect("Reply to HandleFetchEntry should work");
@@ -694,13 +555,13 @@ impl MockNode {
     /// wait to receive a HandleFetchEntry request and automatically reply
     /// return true if a HandleFetchEntry has been received
     pub fn wait_HandleQueryEntry_and_reply(&mut self) -> bool {
-        let maybe_request = self.wait_json(Box::new(one_is!(JsonProtocol::HandleQueryEntry(_))));
+        let maybe_request = self.wait(Box::new(one_is!(Lib3hServerProtocol::HandleQueryEntry(_))));
         if maybe_request.is_none() {
             return false;
         }
         let request = maybe_request.unwrap();
         // extract msg data
-        let query_data = unwrap_to!(request => JsonProtocol::HandleQueryEntry);
+        let query_data = unwrap_to!(request => Lib3hServerProtocol::HandleQueryEntry);
         // Respond
         self.reply_to_HandleQueryEntry(&query_data)
             .expect("Reply to HandleFetchEntry should work");
@@ -709,7 +570,6 @@ impl MockNode {
 
     /// Wait for receiving a message corresponding to predicate
     /// hard coded timeout
-    #[cfg_attr(tarpaulin, skip)]
     pub fn wait_lib3h(
         &mut self,
         predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
@@ -758,7 +618,6 @@ impl MockNode {
     }
 
     // Stop node
-    #[cfg_attr(tarpaulin, skip)]
     pub fn stop(self) {
         self.engine
             .stop()
@@ -766,13 +625,11 @@ impl MockNode {
     }
 
     /// Getter of the endpoint of its connection
-    #[cfg_attr(tarpaulin, skip)]
     pub fn endpoint(&self) -> String {
         self.engine.endpoint()
     }
 
-    /// handle all types of json message
-    #[cfg_attr(tarpaulin, skip)]
+    /// handle all types of Lib3hServerProtocol message
     fn handle_lib3h(&mut self, lib3h_msg: Lib3hServerProtocol) {
         match lib3h_msg {
             Lib3hServerProtocol::SuccessResult(_msg) => {

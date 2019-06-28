@@ -1,5 +1,4 @@
 use super::entry_store::EntryStore;
-use holochain_net::connection::json_protocol::{EntryAspectData, EntryData};
 use lib3h_protocol::{
     data_types::{EntryData, EntryAspectData},
     Address, AddressRef,
