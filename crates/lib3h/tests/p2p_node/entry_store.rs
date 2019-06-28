@@ -1,13 +1,11 @@
-use holochain_net::{
-    connection::json_protocol::{EntryAspectData, EntryData},
-    tweetlog::*,
+use holochain_net::connection::json_protocol::{EntryAspectData, EntryData};
+use lib3h_protocol::{
+    data_types::{EntryData, EntryAspectData},
+    Address, AddressRef,
 };
-use holochain_persistence_api::cas::content::Address;
 use std::collections::HashMap;
 
 pub struct EntryStore {
-    // TODO: Changed once meta is only Addresses
-    // pub meta_store: HashMap<MetaKey, HashSet<Address>>,
     pub store: HashMap<Address, HashMap<Address, EntryAspectData>>,
 }
 

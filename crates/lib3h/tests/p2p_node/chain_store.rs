@@ -6,7 +6,7 @@ use lib3h_protocol::{
 };
 use std::collections::HashMap;
 
-/// Holds DNA-specific data
+/// Holds Space-specific data
 pub struct ChainStore {
     space_address: Address,
     stored_entry_store: EntryStore,
@@ -14,9 +14,9 @@ pub struct ChainStore {
 }
 
 impl ChainStore {
-    pub fn new(dna_address: &Address) -> Self {
+    pub fn new(space_address: &Address) -> Self {
         ChainStore {
-            space_address: dna_address.clone(),
+            space_address: space_address.clone(),
             stored_entry_store: EntryStore::new(),
             authored_entry_store: EntryStore::new(),
         }
@@ -133,7 +133,7 @@ impl ChainStore {
         self.stored_entry_store.store.clone()
     }
 
-    pub fn dna_address(&self) -> Address {
+    pub fn space_address(&self) -> Address {
         self.space_address.clone()
     }
 }

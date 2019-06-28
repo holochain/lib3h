@@ -1,33 +1,26 @@
 #![allow(non_snake_case)]
 
-use holochain_net::{
-    connection::{
-        json_protocol::{
-            EntryAspectData, EntryData, EntryListData, FetchEntryData, FetchEntryResultData,
-            GenericResultData, GetListData, JsonProtocol, MessageData, ProvidedEntryData,
-            QueryEntryData, QueryEntryResultData, TrackDnaData,
-        },
-        net_connection::NetSend,
-        protocol::Protocol,
-        NetResult,
-    },
-    p2p_config::*,
-    p2p_network::P2pNetwork,
-    tweetlog::{TweetProxy, *},
+use lib3h::{
+    engine::{RealEngine, RealEngineConfig},
+    transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
+    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
 };
-use holochain_persistence_api::{cas::content::Address, hash::HashString};
-
+use lib3h_protocol::{
+    protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol,
+    data_types::*,
+    Address, AddressRef,
+};
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
 };
-
+use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use super::{
     chain_store::ChainStore,
     create_config::{create_ipc_config, create_lib3h_config},
 };
 use crossbeam_channel::{unbounded, Receiver};
-use holochain_net::connection::net_connection::NetHandler;
 use lib3h_protocol::{
     data_types::DirectMessageData, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
@@ -36,13 +29,13 @@ use multihash::Hash;
 
 static TIMEOUT_MS: usize = 5000;
 
-/// Conductor Mock of one agent with multiple DNAs
+/// Conductor Mock of one agent with multiple Spaces
 pub struct TestNode {
     // Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
     _maybe_temp_dir: Option<tempfile::TempDir>,
-    p2p_connection: P2pNetwork,
-    receiver: Receiver<Protocol>,
-    pub config: P2pConfig,
+    engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem>,
+    receiver: Receiver<Lib3hServerProtocol>,
+    pub config: RealEngineConfig,
 
     pub agent_id: Address,
 
@@ -51,49 +44,36 @@ pub struct TestNode {
     request_count: usize,
 
     // logging
-    recv_msg_log: Vec<Protocol>,
+    recv_msg_log: Vec<Lib3hServerProtocol>,
 
-    // datastores per dna
+    // datastores per Space
     chain_store_list: HashMap<Address, ChainStore>,
-    tracked_dna_list: HashSet<Address>,
+    joined_space_list: HashSet<Address>,
 
-    pub current_dna: Option<Address>,
-
-    pub logger: TweetProxy,
+    pub current_space: Option<Address>,
 
     is_network_ready: bool,
     pub p2p_binding: String,
-    is_json: bool,
 }
 
 /// Query logs
 impl TestNode {
     /// Return number of JsonProtocol message this node has received
-    pub fn count_recv_json_messages(&self) -> usize {
-        let mut count = 0;
-        for msg in self.recv_msg_log.clone() {
-            if JsonProtocol::try_from(&msg).is_ok() {
-                count += 1;
-            };
-        }
-        count
+    pub fn count_recv_messages(&self) -> usize {
+        self.recv_msg_log.len()
     }
 
     /// Return the ith JSON message that this node has received and fullfills predicate
-    pub fn find_recv_json_msg(
+    pub fn find_recv_msg(
         &self,
         ith: usize,
-        predicate: Box<dyn Fn(&JsonProtocol) -> bool>,
-    ) -> Option<JsonProtocol> {
+        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
+    ) -> Option<Lib3hServerProtocol> {
         let mut count = 0;
         for msg in self.recv_msg_log.clone() {
-            let json_msg = match JsonProtocol::try_from(&msg) {
-                Ok(r) => r,
-                Err(_) => continue,
-            };
-            if predicate(&json_msg) {
+            if predicate(&msg) {
                 if count == ith {
-                    return Some(json_msg);
+                    return Some(msg);
                 }
                 count += 1;
             }
@@ -102,96 +82,81 @@ impl TestNode {
     }
 }
 
-// Track
+/// Space managing
 impl TestNode {
-    pub fn track_current_dna(&mut self) -> NetResult<()> {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
-        self.track_dna(&current_dna, false)
+    ///
+    pub fn join_current_space(&mut self) -> NetResult<()> {
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
+        self.join_space(&current_space, false)
     }
 
-    pub fn track_dna(&mut self, dna_address: &Address, can_set_current: bool) -> NetResult<()> {
-        if self.tracked_dna_list.contains(dna_address) {
+    pub fn join_space(&mut self, space_address: &Address, can_set_current: bool) -> NetResult<()> {
+        if self.joined_space_list.contains(space_address) {
             if can_set_current {
-                self.set_current_dna(dna_address);
+                self.set_current_space(space_address);
             }
             return Ok(());
         }
-        let agent_id = self.agent_id.clone();
-        let protocol_msg: Protocol = if self.is_json {
-            let track_dna_msg = TrackDnaData {
-                dna_address: dna_address.clone(),
-                agent_id,
-            };
-            JsonProtocol::TrackDna(track_dna_msg).into()
-        } else {
-            let track_dna_msg = lib3h_protocol::data_types::SpaceData {
-                request_id: "leave_space_req".to_string(),
-                space_address: dna_address.clone().to_string().into_bytes(),
-                agent_id: agent_id.to_string().into_bytes(),
-            };
-            Lib3hClientProtocol::JoinSpace(track_dna_msg).into()
+        let join_space = lib3h_protocol::data_types::SpaceData {
+            request_id: "leave_space_req".to_string(),
+            space_address: space_address.clone().to_string().into_bytes(),
+            agent_id: agent_id.to_string().into_bytes(),
         };
-        println!("TestNode.track_dna(): {:?}", protocol_msg);
+        let protocol_msg = Lib3hClientProtocol::JoinSpace(join_space).into();
+
+        debug!("TestNode.join_space(): {:?}", protocol_msg);
         let res = self.send(protocol_msg);
         if res.is_ok() {
-            self.tracked_dna_list.insert(dna_address.clone());
-            if !self.chain_store_list.contains_key(dna_address) {
+            self.joined_space_list.insert(space_address.clone());
+            if !self.chain_store_list.contains_key(space_address) {
                 self.chain_store_list
-                    .insert(dna_address.clone(), ChainStore::new(dna_address));
+                    .insert(space_address.clone(), ChainStore::new(space_address));
             }
             if can_set_current {
-                self.set_current_dna(dna_address);
+                self.set_current_space(space_address);
             }
         }
         res
     }
 
-    pub fn untrack_current_dna(&mut self) -> NetResult<()> {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
-        let res = self.untrack_dna(&current_dna);
+    pub fn leave_current_space(&mut self) -> NetResult<()> {
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
+        let res = self.leave_space(&current_space);
         if res.is_ok() {
-            self.current_dna = None;
+            self.current_space = None;
         }
         res
     }
 
-    pub fn untrack_dna(&mut self, dna_address: &Address) -> NetResult<()> {
-        if !self.tracked_dna_list.contains(dna_address) {
+    pub fn leave_space(&mut self, space_address: &Address) -> NetResult<()> {
+        if !self.joined_space_list.contains(space_address) {
             return Ok(());
         }
         let agent_id = self.agent_id.clone();
-        let protocol_msg: Protocol = if self.is_json {
-            let track_dna_msg = TrackDnaData {
-                dna_address: dna_address.clone(),
-                agent_id,
-            };
-            JsonProtocol::UntrackDna(track_dna_msg).into()
-        } else {
-            let leave_space_msg = lib3h_protocol::data_types::SpaceData {
-                request_id: "leave_space_req".to_string(),
-                space_address: dna_address.clone().to_string().into_bytes(),
-                agent_id: agent_id.to_string().into_bytes(),
-            };
-            Lib3hClientProtocol::LeaveSpace(leave_space_msg).into()
+        let leave_space_msg = lib3h_protocol::data_types::SpaceData {
+            request_id: "leave_space_req".to_string(),
+            space_address: space_address.clone().to_string().into_bytes(),
+            agent_id: agent_id.to_string().into_bytes(),
         };
+        let protocol_msg = Lib3hClientProtocol::LeaveSpace(leave_space_msg).into();
         let res = self.send(protocol_msg);
         if res.is_ok() {
-            self.tracked_dna_list.remove(dna_address);
+            self.joined_space_list.remove(space_address);
         }
         res
     }
 
     ///
-    pub fn is_tracking(&self, dna_address: &Address) -> bool {
-        self.tracked_dna_list.contains(dna_address)
+    pub fn has_joined(&self, space_address: &Address) -> bool {
+        self.joined_space_list.contains(space_address)
     }
 
     ///
-    pub fn set_current_dna(&mut self, dna_address: &Address) {
-        if self.chain_store_list.contains_key(dna_address) {
-            self.current_dna = Some(dna_address.clone());
+    pub fn set_current_space(&mut self, space_address: &Address) {
+        if self.chain_store_list.contains_key(space_address) {
+            self.current_space = Some(space_address.clone());
         };
     }
 }
@@ -216,22 +181,23 @@ impl TestNode {
         }
     }
 
+    ///
     pub fn author_entry(
         &mut self,
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> NetResult<()> {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
         let entry = TestNode::into_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
         {
             let chain_store = self
                 .chain_store_list
-                .get_mut(&current_dna)
-                .expect("No dna_store for this DNA");
+                .get_mut(&current_space)
+                .expect("No chain_store for this Space");
             let res = chain_store.author_entry(&entry);
             // Entry is known, try authoring each aspect instead
             if res.is_err() {
@@ -249,7 +215,7 @@ impl TestNode {
         }
         if can_broadcast {
             let msg_data = ProvidedEntryData {
-                dna_address: current_dna,
+                space_address: current_space,
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
@@ -264,13 +230,13 @@ impl TestNode {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
     ) -> NetResult<()> {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
         let entry = TestNode::into_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
-            .get_mut(&current_dna)
-            .expect("No dna_store for this DNA");
+            .get_mut(&current_space)
+            .expect("No chain_store for this Space");
         let res = chain_store.hold_entry(&entry);
         // Entry is known, try authoring each aspect instead
         if res.is_err() {
@@ -302,10 +268,10 @@ impl TestNode {
 
     /// Node asks for some entry on the network.
     pub fn request_entry(&mut self, entry_address: Address) -> QueryEntryData {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
         let query_data = QueryEntryData {
-            dna_address: current_dna,
+            space_address: current_space,
             entry_address,
             request_id: self.generate_request_id(),
             requester_agent_id: self.agent_id.clone(),
@@ -324,7 +290,7 @@ impl TestNode {
         // Must be empty query
         if !query.query.is_empty() {
             let msg_data = GenericResultData {
-                dna_address: query.dna_address.clone(),
+                space_address: query.space_address.clone(),
                 request_id: query.request_id.clone(),
                 to_agent_id: query.requester_agent_id.clone(),
                 result_info: "Unknown query request".as_bytes().to_vec(),
@@ -335,7 +301,7 @@ impl TestNode {
         }
         // Convert query to fetch
         let fetch = FetchEntryData {
-            dna_address: query.dna_address.clone(),
+            space_address: query.space_address.clone(),
             request_id: query.request_id.clone(),
             provider_agent_id: query.requester_agent_id.clone(),
             entry_address: query.entry_address.clone(),
@@ -350,7 +316,7 @@ impl TestNode {
         }
         // Convert query to fetch
         let query_res = QueryEntryResultData {
-            dna_address: query.dna_address.clone(),
+            space_address: query.space_address.clone(),
             entry_address: query.entry_address.clone(),
             request_id: query.request_id.clone(),
             requester_agent_id: query.requester_agent_id.clone(),
@@ -381,18 +347,18 @@ impl TestNode {
         &mut self,
         fetch: &FetchEntryData,
     ) -> Result<FetchEntryResultData, GenericResultData> {
-        // Must be tracking DNA
-        if !self.is_tracking(&fetch.dna_address) {
+        // Must be tracking Space
+        if !self.has_joined(&fetch.space_address) {
             let msg_data = GenericResultData {
-                dna_address: fetch.dna_address.clone(),
+                space_address: fetch.space_address.clone(),
                 request_id: fetch.request_id.clone(),
                 to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: "DNA is not tracked".as_bytes().to_vec(),
+                result_info: "Space is not tracked".as_bytes().to_vec(),
             };
             return Err(msg_data);
         }
         // Get Entry
-        let maybe_store = self.chain_store_list.get(&fetch.dna_address);
+        let maybe_store = self.chain_store_list.get(&fetch.space_address);
         let maybe_entry = match maybe_store {
             None => None,
             Some(chain_store) => chain_store.get_entry(&fetch.entry_address),
@@ -400,7 +366,7 @@ impl TestNode {
         // No entry, send failure
         if maybe_entry.is_none() {
             let msg_data = GenericResultData {
-                dna_address: fetch.dna_address.clone(),
+                space_address: fetch.space_address.clone(),
                 request_id: fetch.request_id.clone(),
                 to_agent_id: fetch.provider_agent_id.clone(),
                 result_info: "No entry found".as_bytes().to_vec(),
@@ -409,7 +375,7 @@ impl TestNode {
         }
         // Send EntryData as binary
         let fetch_result_data = FetchEntryResultData {
-            dna_address: fetch.dna_address.clone(),
+            space_address: fetch.space_address.clone(),
             provider_agent_id: fetch.provider_agent_id.clone(),
             request_id: fetch.request_id.clone(),
             entry: maybe_entry.unwrap(),
@@ -420,43 +386,32 @@ impl TestNode {
 impl TestNode {
     /// Node sends Message on the network.
     pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
-        println!("set_current_dna: {:?}", self.current_dna);
-        assert!(self.current_dna.is_some());
-        let dna_address = self.current_dna.clone().unwrap();
+        debug!("current_space: {:?}", self.current_space);
+        assert!(self.current_space.is_some());
+        let space_address = self.current_space.clone().unwrap();
         let request_id = self.generate_request_id();
         let from_agent_id = self.agent_id.to_string();
 
-        let p = if self.is_json {
-            let msg_data = MessageData {
-                dna_address,
-                from_agent_id: self.agent_id.clone(),
-                request_id: self.generate_request_id(),
-                to_agent_id: to_agent_id.clone(),
-                content,
-            };
-            JsonProtocol::SendMessage(msg_data.clone()).into()
-        } else {
-            let msg_data = DirectMessageData {
-                space_address: dna_address.to_string().into_bytes(),
-                request_id: request_id.clone(),
-                to_agent_id: to_agent_id.to_string().into_bytes(),
-                from_agent_id: from_agent_id.to_string().into_bytes(),
-                content,
-            };
-            Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into()
+        let msg_data = DirectMessageData {
+            space_address: space_address.to_string().into_bytes(),
+            request_id: request_id.clone(),
+            to_agent_id: to_agent_id.to_string().into_bytes(),
+            from_agent_id: from_agent_id.to_string().into_bytes(),
+            content,
         };
+        let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
         self.send(p).expect("Sending SendMessage failed");
         request_id
     }
 
     /// Node sends Message on the network.
     pub fn send_reponse_json(&mut self, msg: MessageData, response_content: Vec<u8>) {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
-        assert_eq!(msg.dna_address, current_dna.clone());
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
+        assert_eq!(msg.space_address, current_space.clone());
         assert_eq!(msg.to_agent_id, self.agent_id);
         let response = MessageData {
-            dna_address: current_dna.clone(),
+            space_address: current_space.clone(),
             request_id: msg.request_id,
             to_agent_id: msg.from_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
@@ -472,18 +427,18 @@ impl TestNode {
         msg: DirectMessageData,
         response_content: serde_json::Value,
     ) {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
         assert_eq!(
             msg.space_address,
-            current_dna.clone().to_string().into_bytes()
+            current_space.clone().to_string().into_bytes()
         );
         assert_eq!(
             msg.to_agent_id,
             self.agent_id.clone().to_string().into_bytes()
         );
         let response = DirectMessageData {
-            space_address: current_dna.clone().to_string().into_bytes(),
+            space_address: current_space.clone().to_string().into_bytes(),
             request_id: msg.request_id,
             to_agent_id: msg.from_agent_id.clone(),
             from_agent_id: self.agent_id.to_string().into_bytes(),
@@ -498,16 +453,16 @@ impl TestNode {
 impl TestNode {
     /// Reply to a HandleGetAuthoringEntryList request
     pub fn reply_to_HandleGetAuthoringEntryList(&mut self, request: &GetListData) -> NetResult<()> {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
-        assert_eq!(request.dna_address, current_dna);
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
+        assert_eq!(request.space_address, current_space);
         // Create msg data
         let msg;
         {
             let authored_entry_store = self
                 .chain_store_list
-                .get_mut(&current_dna)
-                .expect("No chain_store for this DNA")
+                .get_mut(&current_space)
+                .expect("No chain_store for this Space")
                 .get_authored_store();
             let mut entry_address_list = HashMap::new();
             for (entry_address, entry_map) in authored_entry_store {
@@ -519,7 +474,7 @@ impl TestNode {
             }
             msg = EntryListData {
                 request_id: request.request_id.clone(),
-                dna_address: request.dna_address.clone(),
+                space_address: request.space_address.clone(),
                 address_map: entry_address_list,
                 provider_agent_id: self.agent_id.clone(),
             };
@@ -529,7 +484,7 @@ impl TestNode {
     /// Look for the first HandleGetAuthoringEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetAuthoringEntryList(&mut self) {
         let request = self
-            .find_recv_json_msg(
+            .find_recv_msg(
                 0,
                 Box::new(one_is!(JsonProtocol::HandleGetAuthoringEntryList(_))),
             )
@@ -541,15 +496,15 @@ impl TestNode {
 
     /// Reply to a HandleGetHoldingEntryList request
     pub fn reply_to_HandleGetHoldingEntryList(&mut self, request: &GetListData) -> NetResult<()> {
-        assert!(self.current_dna.is_some());
-        let current_dna = self.current_dna.clone().unwrap();
-        assert_eq!(request.dna_address, current_dna);
+        assert!(self.current_space.is_some());
+        let current_space = self.current_space.clone().unwrap();
+        assert_eq!(request.space_address, current_space);
         let msg;
         {
             let stored_entry_store = self
                 .chain_store_list
-                .get_mut(&current_dna)
-                .expect("No chain_store for this DNA")
+                .get_mut(&current_space)
+                .expect("No chain_store for this Space")
                 .get_stored_store();
             let mut entry_address_list = HashMap::new();
             for (entry_address, entry_map) in stored_entry_store {
@@ -561,7 +516,7 @@ impl TestNode {
             }
             msg = EntryListData {
                 request_id: request.request_id.clone(),
-                dna_address: request.dna_address.clone(),
+                space_address: request.space_address.clone(),
                 address_map: entry_address_list,
                 provider_agent_id: self.agent_id.clone(),
             };
@@ -571,7 +526,7 @@ impl TestNode {
     /// Look for the first HandleGetHoldingEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetHoldingEntryList(&mut self) {
         let request = self
-            .find_recv_json_msg(
+            .find_recv_msg(
                 0,
                 Box::new(one_is!(JsonProtocol::HandleGetGossipingEntryList(_))),
             )
@@ -588,8 +543,9 @@ impl TestNode {
     /// Private constructor
     #[cfg_attr(tarpaulin, skip)]
     pub fn new_with_config(
+        name: &str,
         agent_id_arg: Address,
-        config: &P2pConfig,
+        config: RealEngineConfig,
         _maybe_temp_dir: Option<tempfile::TempDir>,
     ) -> Self {
         log_dd!(
@@ -599,23 +555,18 @@ impl TestNode {
             config
         );
 
-        // use a mpsc channel for messaging between p2p connection and main thread
-        let (sender, receiver) = unbounded::<Protocol>();
+        // use a channel for messaging between p2p connection and main thread
+        let (sender, receiver) = unbounded::<Lib3hServerProtocol>();
         // create a new P2pNetwork instance with the handler that will send the received Protocol to a channel
         let agent_id = agent_id_arg.clone();
-        let p2p_connection = P2pNetwork::new(
-            NetHandler::new(Box::new(move |r| {
-                log_tt!("p2pnode", "<<< ({}) handler: {:?}", agent_id_arg, r);
-                sender.send(r?)?;
-                Ok(())
-            })),
-            &config,
+        let engine = RealEngine::new_mock(
+                        config, name, MirrorDht::new_with_config,
         )
-        .expect("Failed to create P2pNetwork");
+        .expect("Failed to create RealEngine");
 
         TestNode {
             _maybe_temp_dir,
-            p2p_connection,
+            engine,
             receiver,
             config: config.clone(),
             agent_id,
@@ -623,12 +574,10 @@ impl TestNode {
             request_count: 0,
             recv_msg_log: Vec::new(),
             chain_store_list: HashMap::new(),
-            tracked_dna_list: HashSet::new(),
-            current_dna: None,
-            logger: TweetProxy::new("p2pnode"),
+            joined_space_list: HashSet::new(),
+            current_space: None,
             is_network_ready: false,
             p2p_binding: String::new(),
-            is_json: config.backend_kind != P2pBackendKind::LIB3H,
         }
     }
 
@@ -637,19 +586,19 @@ impl TestNode {
         self.is_network_ready
     }
 
-    /// Constructor for an in-memory P2P Network
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn new_with_unique_memory_network(agent_id: Address) -> Self {
-        let config = P2pConfig::new_with_unique_memory_backend();
-        return TestNode::new_with_config(agent_id, &config, None);
-    }
+//    /// Constructor for an in-memory P2P Network
+//    #[cfg_attr(tarpaulin, skip)]
+//    pub fn new_with_unique_memory_network(agent_id: Address) -> Self {
+//        let config = P2pConfig::new_with_unique_memory_backend();
+//        return TestNode::new_with_config(agent_id, &config, None);
+//    }
 
-    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn new_with_uri_ipc_network(agent_id: Address, ipc_binding: &str) -> Self {
-        let p2p_config = P2pConfig::default_ipc_uri(Some(ipc_binding));
-        return TestNode::new_with_config(agent_id, &p2p_config, None);
-    }
+//    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
+//    #[cfg_attr(tarpaulin, skip)]
+//    pub fn new_with_uri_ipc_network(agent_id: Address, ipc_binding: &str) -> Self {
+//        let p2p_config = P2pConfig::default_ipc_uri(Some(ipc_binding));
+//        return TestNode::new_with_config(agent_id, &p2p_config, None);
+//    }
 
     /// Constructor for an IPC node that uses an existing n3h process and a temp folder
     #[cfg_attr(tarpaulin, skip)]
@@ -687,118 +636,14 @@ impl TestNode {
         return TestNode::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
     }
 
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn try_recv(&mut self) -> NetResult<Protocol> {
-        let data = self.receiver.try_recv()?;
-
-        self.recv_msg_log.push(data.clone());
-        Ok(data)
-    }
-
     /// See if there is a message to receive, and log it
     /// return a JsonProtocol if the received message is of that type
     #[cfg_attr(tarpaulin, skip)]
-    pub fn try_recv_json(&mut self) -> NetResult<JsonProtocol> {
-        let data = self.try_recv()?;
-
-        // logging depending on received type
-        match data {
-            Protocol::NamedBinary(_) => {
-                let dbg_msg = format!("<< ({}) recv: {:?}", self.agent_id, data);
-                self.logger.d(&dbg_msg);
-            }
-            Protocol::Json(_) => {
-                let dbg_msg = format!("<< ({}) recv: {:?}", self.agent_id, data);
-                self.logger.d(&dbg_msg);
-            }
-            Protocol::P2pReady => {
-                let dbg_msg = format!("<< ({}) recv ** P2pReady **", self.agent_id);
-                self.logger.d(&dbg_msg);
-                self.is_network_ready = true;
-                bail!("received P2pReady");
-            }
-            Protocol::Terminated => {
-                let dbg_msg = format!("<< ({}) recv ** Terminated **", self.agent_id);
-                self.logger.d(&dbg_msg);
-                self.is_network_ready = false;
-                bail!("received Terminated");
-            }
-            _ => {
-                let dbg_msg = format!("<< ({}) recv <other>", self.agent_id);
-                self.logger.t(&dbg_msg);
-            }
-        };
-
-        match JsonProtocol::try_from(&data) {
-            Ok(r) => {
-                self.handle_json(r.clone());
-                Ok(r)
-            }
-            Err(e) => {
-                let s = format!("{:?}", e);
-                if !s.contains("Empty") && !s.contains("Pong(PongData") {
-                    self.logger.e(&format!(
-                        "({}) ###### Received parse error: {} | data = {:?}",
-                        self.agent_id, s, data,
-                    ));
-                }
-                Err(e)
-            }
-        }
-    }
-
-    /// See if there is a message to receive, and log it
-    /// return a JsonProtocol if the received message is of that type
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn try_recv_lib3h(&mut self) -> NetResult<Lib3hServerProtocol> {
+    pub fn process(&mut self) -> NetResult<Lib3hServerProtocol> {
         let data = self.receiver.try_recv()?;
-
         self.recv_msg_log.push(data.clone());
-
-        // logging depending on received type
-        match data {
-            Protocol::NamedBinary(_) => {
-                let dbg_msg = format!("<< ({}) recv: {:?}", self.agent_id, data);
-                self.logger.d(&dbg_msg);
-            }
-            Protocol::Json(_) => {
-                let dbg_msg = format!("<< ({}) recv: {:?}", self.agent_id, data);
-                self.logger.d(&dbg_msg);
-            }
-            Protocol::P2pReady => {
-                let dbg_msg = format!("<< ({}) recv ** P2pReady **", self.agent_id);
-                self.logger.d(&dbg_msg);
-                self.is_network_ready = true;
-                bail!("received P2pReady");
-            }
-            Protocol::Terminated => {
-                let dbg_msg = format!("<< ({}) recv ** Terminated **", self.agent_id);
-                self.logger.d(&dbg_msg);
-                self.is_network_ready = false;
-                bail!("received Terminated");
-            }
-            _ => {
-                let dbg_msg = format!("<< ({}) recv <other>", self.agent_id);
-                self.logger.t(&dbg_msg);
-            }
-        };
-
-        match Lib3hServerProtocol::try_from(&data) {
-            Ok(r) => {
-                self.handle_lib3h(r.clone());
-                Ok(r)
-            }
-            Err(e) => {
-                let s = format!("{:?}", e);
-                if !s.contains("Empty") && !s.contains("Pong(PongData") {
-                    self.logger.e(&format!(
-                        "({}) ###### Received parse error: {} | data = {:?}",
-                        self.agent_id, s, data,
-                    ));
-                }
-                Err(e)
-            }
-        }
+        self.handle_lib3h(r.clone());
+        Ok(r)
     }
 
     /// recv messages until timeout is reached
@@ -862,54 +707,6 @@ impl TestNode {
         true
     }
 
-    /// Wait for receiving a message corresponding to predicate until timeout is reached
-    pub fn wait_json_with_timeout(
-        &mut self,
-        predicate: Box<dyn Fn(&JsonProtocol) -> bool>,
-        timeout_ms: usize,
-    ) -> Option<JsonProtocol> {
-        let mut time_ms: usize = 0;
-        loop {
-            let mut did_something = false;
-
-            if let Ok(p2p_msg) = self.try_recv_json() {
-                self.logger.i(&format!(
-                    "({})::wait_json() - received: {:?}",
-                    self.agent_id, p2p_msg
-                ));
-                did_something = true;
-                if predicate(&p2p_msg) {
-                    self.logger
-                        .i(&format!("({})::wait_json() - match", self.agent_id));
-                    return Some(p2p_msg);
-                } else {
-                    self.logger
-                        .i(&format!("({})::wait_json() - NO match", self.agent_id));
-                }
-            }
-
-            if !did_something {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                time_ms += 10;
-                if time_ms > timeout_ms {
-                    self.logger
-                        .i(&format!("({})::wait_json() has TIMEOUT", self.agent_id));
-                    return None;
-                }
-            }
-        }
-    }
-
-    /// Wait for receiving a message corresponding to predicate
-    /// hard coded timeout
-    #[cfg_attr(tarpaulin, skip)]
-    pub fn wait_json(
-        &mut self,
-        predicate: Box<dyn Fn(&JsonProtocol) -> bool>,
-    ) -> Option<JsonProtocol> {
-        self.wait_json_with_timeout(predicate, TIMEOUT_MS)
-    }
-
     /// Wait for receiving a message corresponding to predicate
     /// hard coded timeout
     #[cfg_attr(tarpaulin, skip)]
@@ -963,7 +760,7 @@ impl TestNode {
     // Stop node
     #[cfg_attr(tarpaulin, skip)]
     pub fn stop(self) {
-        self.p2p_connection
+        self.engine
             .stop()
             .expect("Failed to stop p2p connection properly");
     }
@@ -971,7 +768,7 @@ impl TestNode {
     /// Getter of the endpoint of its connection
     #[cfg_attr(tarpaulin, skip)]
     pub fn endpoint(&self) -> String {
-        self.p2p_connection.endpoint()
+        self.engine.endpoint()
     }
 
     /// handle all types of json message
@@ -1004,6 +801,21 @@ impl TestNode {
             }
             Lib3hServerProtocol::HandleStoreEntry(_msg) => {
                 // FIXME
+                if self.has_joined(&msg.space_address) {
+                    // Store data in local datastore
+                    let mut chain_store = self
+                        .chain_store_list
+                        .get_mut(&msg.space_address)
+                        .expect("No chain_store for this Space");
+                    let res = chain_store.hold_aspect(&msg.entry_address, &msg.entry_aspect);
+                    self.logger.d(&format!(
+                        "({}) auto-store of aspect: {} - {} -> {}",
+                        self.agent_id,
+                        msg.entry_address,
+                        msg.entry_aspect.aspect_address,
+                        res.is_ok()
+                    ));
+                }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
                 // FIXME
@@ -1016,124 +828,13 @@ impl TestNode {
             }
         }
     }
-    /// handle all types of json message
-    #[cfg_attr(tarpaulin, skip)]
-    fn handle_json(&mut self, json_msg: JsonProtocol) {
-        match json_msg {
-            JsonProtocol::SuccessResult(_msg) => {
-                // n/a
-            }
-            JsonProtocol::FailureResult(_msg) => {
-                // n/a
-            }
-            JsonProtocol::TrackDna(_) => {
-                panic!("Core should not receive TrackDna message");
-            }
-            JsonProtocol::UntrackDna(_) => {
-                panic!("Core should not receive UntrackDna message");
-            }
-            JsonProtocol::Connect(_) => {
-                panic!("Core should not receive Connect message");
-            }
-            JsonProtocol::PeerConnected(_) => {
-                // n/a
-            }
-            JsonProtocol::GetState => {
-                panic!("Core should not receive GetState message");
-            }
-            JsonProtocol::GetStateResult(state) => {
-                if !state.bindings.is_empty() {
-                    self.p2p_binding = state.bindings[0].clone();
-                }
-            }
-            JsonProtocol::GetDefaultConfig => {
-                panic!("Core should not receive GetDefaultConfig message");
-            }
-            JsonProtocol::GetDefaultConfigResult(_) => {
-                panic!("Core should not receive GetDefaultConfigResult message");
-            }
-            JsonProtocol::SetConfig(_) => {
-                panic!("Core should not receive SetConfig message");
-            }
-
-            JsonProtocol::SendMessage(_) => {
-                panic!("Core should not receive SendMessage message");
-            }
-            JsonProtocol::SendMessageResult(_) => {
-                // n/a
-            }
-            JsonProtocol::HandleSendMessage(_msg) => {
-                // log the direct message sent to us
-                // FIXME
-            }
-            JsonProtocol::HandleSendMessageResult(_msg) => {
-                panic!("Core should not receive HandleSendMessageResult message");
-            }
-
-            JsonProtocol::HandleFetchEntry(_) => {
-                // n/a
-            }
-            JsonProtocol::HandleFetchEntryResult(_) => {
-                // n/a
-            }
-
-            JsonProtocol::PublishEntry(_msg) => {
-                panic!("Core should not receive PublishDhtData message");
-            }
-            JsonProtocol::HandleStoreEntryAspect(msg) => {
-                if self.is_tracking(&msg.dna_address) {
-                    // Store data in local datastore
-                    let mut chain_store = self
-                        .chain_store_list
-                        .get_mut(&msg.dna_address)
-                        .expect("No dna_store for this DNA");
-                    let res = chain_store.hold_aspect(&msg.entry_address, &msg.entry_aspect);
-                    self.logger.d(&format!(
-                        "({}) auto-store of aspect: {} - {} -> {}",
-                        self.agent_id,
-                        msg.entry_address,
-                        msg.entry_aspect.aspect_address,
-                        res.is_ok()
-                    ));
-                }
-            }
-
-            JsonProtocol::QueryEntry(_msg) => {
-                panic!("Core should not receive Query message");
-            }
-            JsonProtocol::QueryEntryResult(_msg) => {
-                // n/a
-            }
-            JsonProtocol::HandleQueryEntry(_msg) => {
-                // n/a
-            }
-            JsonProtocol::HandleQueryEntryResult(_msg) => {
-                panic!("Core should not receive HandleQueryResult message");
-            }
-
-            // -- Publish & Hold data -- //
-            JsonProtocol::HandleGetAuthoringEntryList(_) => {
-                // n/a
-            }
-            JsonProtocol::HandleGetAuthoringEntryListResult(_) => {
-                panic!("Core should not receive HandleGetPublishingDataListResult message");
-            }
-            JsonProtocol::HandleGetGossipingEntryList(_) => {
-                // n/a
-            }
-            // Our request for the hold_list has returned
-            JsonProtocol::HandleGetGossipingEntryListResult(_) => {
-                panic!("Core should not receive HandleGetHoldingDataListResult message");
-            }
-        }
-    }
 }
 
-impl NetSend for TestNode {
-    /// send a Protocol message to the p2p network instance
-    fn send(&mut self, data: Protocol) -> NetResult<()> {
-        self.logger
-            .d(&format!(">> ({}) send: {:?}", self.agent_id, data));
-        self.p2p_connection.send(data)
-    }
-}
+//impl NetSend for TestNode {
+//    /// send a Protocol message to the p2p network instance
+//    fn send(&mut self, data: Protocol) -> NetResult<()> {
+//        self.logger
+//            .d(&format!(">> ({}) send: {:?}", self.agent_id, data));
+//        self.p2p_connection.send(data)
+//    }
+//}
