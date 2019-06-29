@@ -27,6 +27,8 @@ pub struct NodeMock {
     pub config: RealEngineConfig,
     /// The node's simulated agentId
     pub agent_id: Address,
+    /// The node's uri
+    my_advertise: Url,
 
     /// Sent messages logs
     request_log: Vec<String>,
@@ -40,12 +42,6 @@ pub struct NodeMock {
     joined_space_list: HashSet<Address>,
     /// Space currently in use
     pub current_space: Option<Address>,
-
-    ///
-    is_network_ready: bool,
-
-    ///
-    my_advertise: Url,
 }
 
 /// Constructors
@@ -75,58 +71,7 @@ impl NodeMock {
             chain_store_list: HashMap::new(),
             joined_space_list: HashSet::new(),
             current_space: None,
-            is_network_ready: false,
             my_advertise,
         }
     }
-
-    //    /// Constructor for an in-memory P2P Network
-    //    #[cfg_attr(tarpaulin, skip)]
-    //    pub fn new_with_unique_memory_network(agent_id: Address) -> Self {
-    //        let config = P2pConfig::new_with_unique_memory_backend();
-    //        return TestNode::new_with_config(agent_id, &config, None);
-    //    }
-
-    //    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-    //    #[cfg_attr(tarpaulin, skip)]
-    //    pub fn new_with_uri_ipc_network(agent_id: Address, ipc_binding: &str) -> Self {
-    //        let p2p_config = P2pConfig::default_ipc_uri(Some(ipc_binding));
-    //        return TestNode::new_with_config(agent_id, &p2p_config, None);
-    //    }
-
-    //    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-    //    #[cfg_attr(tarpaulin, skip)]
-    //    pub fn new_with_lib3h(
-    //        agent_id: Address,
-    //        maybe_config_filepath: Option<&str>,
-    //        maybe_end_user_config_filepath: Option<String>,
-    //        bootstrap_nodes: Vec<String>,
-    //        maybe_dir_path: Option<String>,
-    //    ) -> Self {
-    //        let (p2p_config, _maybe_temp_dir) = create_lib3h_config(
-    //            maybe_config_filepath,
-    //            maybe_end_user_config_filepath,
-    //            bootstrap_nodes,
-    //            maybe_dir_path,
-    //        );
-    //        return NodeMock::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
-    //    }
-
-    //    /// Constructor for an IPC node that spawns and uses a n3h process and a temp folder
-    //    #[cfg_attr(tarpaulin, skip)]
-    //    pub fn new_with_spawn_ipc_network(
-    //        agent_id: Address,
-    //        maybe_config_filepath: Option<&str>,
-    //        maybe_end_user_config_filepath: Option<String>,
-    //        bootstrap_nodes: Vec<String>,
-    //        maybe_dir_path: Option<String>,
-    //    ) -> Self {
-    //        let (p2p_config, _maybe_temp_dir) = create_ipc_config(
-    //            maybe_config_filepath,
-    //            maybe_end_user_config_filepath,
-    //            bootstrap_nodes,
-    //            maybe_dir_path,
-    //        );
-    //        return NodeMock::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
-    //    }
 }

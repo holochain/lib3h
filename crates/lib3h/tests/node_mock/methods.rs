@@ -2,8 +2,6 @@
 
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
 use crate::constants::*;
-#[allow(unused_imports)]
-use crossbeam_channel::{unbounded, Receiver};
 use holochain_persistence_api::hash::HashString;
 use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
@@ -37,10 +35,6 @@ impl NodeMock {
             }
         }
         None
-    }
-
-    pub fn is_network_ready(&self) -> bool {
-        self.is_network_ready
     }
 
     pub fn advertise(&self) -> Url {
@@ -379,8 +373,10 @@ impl NodeMock {
         Ok(fetch_result_data)
     }
 }
+
+/// Direct Messaging
 impl NodeMock {
-    /// Node sends Message on the network.
+    /// Send a DirectMessage on the network.
     /// Returns the generated request_id for this send
     pub fn send_direct_message(&mut self, to_agent_id: &AddressRef, content: Vec<u8>) -> String {
         let current_space = self.current_space.clone().expect("Current Space not set");
@@ -400,7 +396,7 @@ impl NodeMock {
         request_id
     }
 
-    /// Node sends Message on the network.
+    /// Send a DirectMessage response on the network.
     pub fn send_response(
         &mut self,
         request_id: &str,
@@ -421,7 +417,7 @@ impl NodeMock {
     }
 }
 
-/// Reply LISTS
+/// Reply to get*List
 impl NodeMock {
     /// Reply to a HandleGetAuthoringEntryList request
     pub fn reply_to_HandleGetAuthoringEntryList(
@@ -515,7 +511,10 @@ impl NodeMock {
         self.reply_to_HandleGetHoldingEntryList(&get_list_data)
             .expect("Reply to HandleGetHoldingEntryList failed.");
     }
+}
 
+/// Wait & Reply
+impl NodeMock {
     /// wait to receive a HandleFetchEntry request and automatically reply
     /// return true if a HandleFetchEntry has been received
     pub fn wait_HandleFetchEntry_and_reply(&mut self) -> bool {
@@ -690,12 +689,3 @@ impl NodeMock {
         }
     }
 }
-
-//impl NetSend for TestNode {
-//    /// send a Protocol message to the p2p network instance
-//    fn send(&mut self, data: Protocol) -> NetResult<()> {
-//        self.logger
-//            .d(&format!(">> ({}) send: {:?}", self.agent_id, data));
-//        self.p2p_connection.send(data)
-//    }
-//}
