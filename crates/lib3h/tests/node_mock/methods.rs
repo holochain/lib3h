@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 
 use lib3h::{
-    engine::{RealEngine, RealEngineConfig},
     transport::transport_trait::Transport,
     dht::dht_trait::Dht,
 };
@@ -12,8 +11,7 @@ use lib3h_protocol::{
     Address, AddressRef, Lib3hResult, DidWork,
 };
 use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
+    collections::HashMap,
 };
 use super::{
     chain_store::ChainStore,
@@ -74,9 +72,9 @@ impl NodeMock {
 
     pub fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let (did_work, msgs) = self.engine.process()?;
-        self.recv_msg_log.extend(msgs.iter());
-        for msg in msgs {
-            self.handle_lib3h(msg);
+        self.recv_msg_log.extend_from_slice(msgs.as_slice());
+        for msg in msgs.iter() {
+            self.handle_lib3h(msg.clone());
         }
         Ok((did_work, msgs))
     }
@@ -113,13 +111,13 @@ impl NodeMock {
         }
         let join_space = lib3h_protocol::data_types::SpaceData {
             request_id: self.generate_request_id(),
-            space_address: space_address.clone().to_string().into_bytes(),
-            agent_id: self.agent_id.to_string().into_bytes(),
+            space_address: space_address.clone(),
+            agent_id: self.agent_id.clone(),
         };
         let protocol_msg = Lib3hClientProtocol::JoinSpace(join_space).into();
 
         debug!("NodeMock.join_space(): {:?}", protocol_msg);
-        let res = self.post(protocol_msg);
+        let res = self.engine.post(protocol_msg);
         if res.is_ok() {
             self.joined_space_list.insert(space_address.clone());
             if !self.chain_store_list.contains_key(space_address) {
@@ -141,11 +139,11 @@ impl NodeMock {
         let agent_id = self.agent_id.clone();
         let leave_space_msg = lib3h_protocol::data_types::SpaceData {
             request_id: self.generate_request_id(),
-            space_address: space_address.clone().to_string().into_bytes(),
-            agent_id: agent_id.to_string().into_bytes(),
+            space_address: space_address.clone(),
+            agent_id,
         };
         let protocol_msg = Lib3hClientProtocol::LeaveSpace(leave_space_msg).into();
-        let res = self.post(protocol_msg);
+        let res = self.engine.post(protocol_msg);
         if res.is_ok() {
             self.joined_space_list.remove(space_address);
         }
@@ -166,7 +164,7 @@ impl NodeMock {
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
             aspect_list.push(EntryAspectData {
-                aspect_address: hash,
+                aspect_address: hash.to_string().as_bytes().to_vec(),
                 type_hint: "NodeMock".to_string(),
                 aspect: aspect_content,
                 publish_ts: 42,
@@ -216,7 +214,7 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self.engine.post(Lib3hServerProtocol::PublishEntry(msg_data).into());
+            return self.engine.post(Lib3hClientProtocol::PublishEntry(msg_data).into());
         }
         // Done
         Ok(())
@@ -258,7 +256,7 @@ impl NodeMock {
     /// generate a new request_id
     fn generate_request_id(&mut self) -> String {
         self.request_count += 1;
-        let request_id = format!("req_{}_{}", self.agent_id, self.request_count);
+        let request_id = format!("req_{:?}_{}", self.agent_id, self.request_count);
         self.request_log.push(request_id.clone());
         request_id
     }
@@ -383,14 +381,14 @@ impl NodeMock {
 impl NodeMock {
     /// Node sends Message on the network.
     /// Returns the generated request_id for this send
-    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
+    pub fn send_direct_message(&mut self, to_agent_id: &AddressRef, content: Vec<u8>) -> String {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let request_id = self.generate_request_id();
         debug!("current_space: {:?}", self.current_space);
         let msg_data = DirectMessageData {
-            space_address: current_space.to_string().into_bytes(),
+            space_address: current_space.clone(),
             request_id: request_id.clone(),
-            to_agent_id: to_agent_id.to_string().into_bytes(),
+            to_agent_id: to_agent_id.to_vec(),
             from_agent_id: self.agent_id.clone(),
             content,
         };
@@ -403,9 +401,9 @@ impl NodeMock {
     pub fn send_response(&mut self, request_id: &str, to_agent_id: &AddressRef, response_content: Vec<u8>) {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let response = DirectMessageData {
-            space_address: current_space.clone().to_string().into_bytes(),
+            space_address: current_space.clone(),
             request_id: request_id.to_owned(),
-            to_agent_id: to_agent_id.clone(),
+            to_agent_id: to_agent_id.to_vec(),
             from_agent_id: self.agent_id.clone(),
             content: response_content,
         };
@@ -512,34 +510,6 @@ impl NodeMock {
 //        Ok(r)
 //    }
 
-    /// recv messages until timeout is reached
-    /// returns the number of messages it received during listening period
-    /// timeout is reset after a message is received
-    pub fn listen(&mut self, timeout_ms: usize) -> usize {
-        let mut count: usize = 0;
-        let mut time_ms: usize = 0;
-        loop {
-            let mut has_recved = false;
-
-            if let Ok(p2p_msg) = self.try_recv() {
-                trace!(
-                    "({})::listen() - received: {:?}",
-                    self.agent_id, p2p_msg,
-                );
-                has_recved = true;
-                time_ms = 0;
-                count += 1;
-            }
-            if !has_recved {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                time_ms += 10;
-                if time_ms > timeout_ms {
-                    return count;
-                }
-            }
-        }
-    }
-
     /// wait to receive a HandleFetchEntry request and automatically reply
     /// return true if a HandleFetchEntry has been received
     pub fn wait_HandleFetchEntry_and_reply(&mut self) -> bool {
@@ -593,20 +563,45 @@ impl NodeMock {
             let (_, msgs) = self.process().expect("Process should work");
 
             for lib3h_msg in msgs {
-                info!("({})::wait() - received: {:?}", self.agent_id, lib3h_msg);
+                info!("({:?})::wait() - received: {:?}", self.agent_id, lib3h_msg);
                 if predicate(&lib3h_msg) {
-                    info!("({})::wait() - match", self.agent_id);
+                    info!("({:?})::wait() - match", self.agent_id);
                     return Some(lib3h_msg);
                 } else {
-                    info!("({})::wait() - NO match", self.agent_id);
+                    info!("({:?})::wait() - NO match", self.agent_id);
                 }
             }
 
             std::thread::sleep(std::time::Duration::from_millis(10));
             time_ms += 10;
             if time_ms > timeout_ms {
-                info!("({})::wait() has TIMEOUT", self.agent_id);
+                info!("({:?})::wait() has TIMEOUT", self.agent_id);
                 return None;
+            }
+        }
+    }
+
+    /// Call process until timeout is reached
+/// returns the number of messages it received during listening period
+/// timeout is reset after a message is received
+    pub fn listen(&mut self, timeout_ms: usize) -> usize {
+        let mut count: usize = 0;
+        let mut time_ms: usize = 0;
+        loop {
+            let (_, msgs) = self.process().expect("Process should work");
+
+            for lib3h_msg in msgs {
+                trace!(
+                    "({:?})::listen() - received: {:?}",
+                    self.agent_id, lib3h_msg,
+                );
+                time_ms = 0;
+                count += 1;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            time_ms += 10;
+            if time_ms > timeout_ms {
+                return count;
             }
         }
     }
@@ -645,17 +640,17 @@ impl NodeMock {
             Lib3hServerProtocol::HandleFetchEntry(_msg) => {
                 // FIXME
             }
-            Lib3hServerProtocol::HandleStoreEntry(msg) => {
+            Lib3hServerProtocol::HandleStoreEntryAspect(msg) => {
                 // FIXME
                 if self.has_joined(&msg.space_address) {
                     // Store data in local datastore
-                    let mut chain_store = self
+                    let chain_store = self
                         .chain_store_list
                         .get_mut(&msg.space_address)
                         .expect("No chain_store for this Space");
                     let res = chain_store.hold_aspect(&msg.entry_address, &msg.entry_aspect);
                     debug!(
-                        "({}) auto-store of aspect: {} - {} -> {}",
+                        "({:?}) auto-store of aspect: {:?} - {:?} -> {}",
                         self.agent_id,
                         msg.entry_address,
                         msg.entry_aspect.aspect_address,
@@ -666,10 +661,16 @@ impl NodeMock {
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
                 // FIXME
             }
-            Lib3hServerProtocol::HandleGetPublishingEntryList(_msg) => {
+            Lib3hServerProtocol::HandleQueryEntry(_msg) => {
                 // FIXME
             }
-            Lib3hServerProtocol::HandleGetHoldingEntryList(_msg) => {
+            Lib3hServerProtocol::QueryEntryResult(_msg) => {
+                // FIXME
+            }
+            Lib3hServerProtocol::HandleGetAuthoringEntryList(_msg) => {
+                // FIXME
+            }
+            Lib3hServerProtocol::HandleGetGossipingEntryList(_msg) => {
                 // FIXME
             }
         }

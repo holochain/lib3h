@@ -20,7 +20,7 @@ mod node_mock;
 
 use constants::*;
 use node_mock::{
-    NodeMock, r#impl,
+    NodeMock, methods,
 };
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
@@ -55,7 +55,7 @@ fn enable_logging_for_test(enable: bool) {
 //--------------------------------------------------------------------------------------------------
 
 fn construct_mock_engine(config: &RealEngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine = RealEngine::new_mock(config.clone(), name.into(), MirrorDht::new_with_config).unwrap();
+    let engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> = RealEngine::new_mock(config.clone(), name.into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
     println!(
         "construct_mock_engine(): test engine for {}, advertise: {}",
@@ -178,7 +178,7 @@ fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
 //    billy.run().unwrap();
 
     // Connect Alex to Billy
-    alex.connect(billy.advertise()).unwrap();
+    alex.connect_to(&billy.advertise()).unwrap();
 
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);

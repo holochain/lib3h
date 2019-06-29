@@ -220,7 +220,7 @@ fn launch_two_nodes_test_with_memory_network(
     can_setup: bool,
 ) -> Result<(), ()> {
     println!("");
-    print_two_engines_test_name("IN-MEMORY TWO NODE TEST: ", test_fn);
+    print_two_engines_test_name("IN-MEMORY TWO ENGINES TEST: ", test_fn);
     println!("=======================");
 
     // Setup
@@ -235,7 +235,7 @@ fn launch_two_nodes_test_with_memory_network(
 
     // Wrap-up test
     println!("==================");
-    print_two_engines_test_name("IN-MEMORY TEST END: ", test_fn);
+    print_two_engines_test_name("IN-MEMORY TWO ENGINES TEST END: ", test_fn);
     // Terminate nodes
     alex.terminate().unwrap();
     billy.terminate().unwrap();

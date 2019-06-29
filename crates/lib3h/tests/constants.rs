@@ -1,5 +1,5 @@
 use lib3h_protocol::{
-    Address, AddressRef,
+    Address,
 };
 
 lazy_static! {

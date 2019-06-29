@@ -1,6 +1,6 @@
 pub mod chain_store;
 pub mod entry_store;
-pub mod r#impl;
+pub mod methods;
 
 use lib3h::{
     engine::RealEngineConfig,
@@ -70,7 +70,7 @@ impl NodeMock {
         //_maybe_temp_dir: Option<tempfile::TempDir>,
     ) -> Self {
         debug!(
-            "new NodeMock '{}' with config: {:?}",
+            "new NodeMock '{:?}' with config: {:?}",
             agent_id_arg,
             config
         );
@@ -78,8 +78,8 @@ impl NodeMock {
         // Use a channel for messaging between Node and its Engine?
         let (sender, _receiver) = unbounded::<Lib3hServerProtocol>();
 
-        let engine = engine_factory(&config).expect("Failed to create RealEngine");
-
+        let engine = engine_factory(&config, name).expect("Failed to create RealEngine");
+        let my_advertise = engine.advertise();
         NodeMock {
             // _maybe_temp_dir,
             engine,
@@ -93,7 +93,7 @@ impl NodeMock {
             joined_space_list: HashSet::new(),
             current_space: None,
             is_network_ready: false,
-            my_advertise: engine.advertise(),
+            my_advertise,
         }
     }
 
