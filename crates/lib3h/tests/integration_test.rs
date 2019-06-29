@@ -3,7 +3,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
 extern crate backtrace;
-extern crate crossbeam_channel;
 #[macro_use]
 extern crate log;
 extern crate holochain_persistence_api;

@@ -28,7 +28,6 @@ failure = "=0.1.5"
 log = "=0.4.6"
 # Should be dev only
 lazy_static = "=1.2.0"
-crossbeam-channel = "=0.3.8"
 
 [dev-dependencies]
 unwrap_to = "=0.1.0"
