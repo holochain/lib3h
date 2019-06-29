@@ -201,8 +201,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     trace!(
                         "(GatewayTransport).ConnectResult: mapping {} -> {}",
                         uri,
-                    id
-                );
+                        id
+                    );
                     self.connection_map.insert(uri, id.clone());
                     // Ok(conn_id)
 

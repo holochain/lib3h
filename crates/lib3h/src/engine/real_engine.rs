@@ -213,7 +213,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             Lib3hClientProtocol::Connect(msg) => {
                 // Convert into TransportCommand & post to network gateway
                 let cmd = TransportCommand::Connect(msg.peer_uri);
-                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
+                Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let output = self.serve_JoinSpace(&msg)?;

@@ -1,6 +1,6 @@
 use super::entry_store::EntryStore;
 use lib3h_protocol::{
-    data_types::{EntryData, EntryAspectData},
+    data_types::{EntryAspectData, EntryData},
     Address,
 };
 use std::collections::HashMap;

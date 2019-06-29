@@ -2,28 +2,22 @@ pub mod chain_store;
 pub mod entry_store;
 pub mod methods;
 
-use lib3h::{
-    engine::RealEngineConfig,
-};
-use lib3h_protocol::{
-    protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol,
-    data_types::*,
-    Address, AddressRef, Lib3hResult,
-    network_engine::NetworkEngine,
-};
-use std::{
-    collections::{HashMap, HashSet},
-};
-use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use self::chain_store::ChainStore;
 use crossbeam_channel::{unbounded, Receiver};
+use lib3h::engine::RealEngineConfig;
+use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
+use lib3h_protocol::{
+    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol, Address, AddressRef, Lib3hResult,
+};
+use std::collections::{HashMap, HashSet};
 // use multihash::Hash;
 use url::Url;
 
 static TIMEOUT_MS: usize = 5000;
 
-pub type EngineFactory = fn(config: &RealEngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>>;
+pub type EngineFactory =
+    fn(config: &RealEngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>>;
 
 /// Mock of a node handling one agent with multiple Spaces
 /// i.e. a conductor mock
@@ -71,8 +65,7 @@ impl NodeMock {
     ) -> Self {
         debug!(
             "new NodeMock '{:?}' with config: {:?}",
-            agent_id_arg,
-            config
+            agent_id_arg, config
         );
 
         // Use a channel for messaging between Node and its Engine?
@@ -97,53 +90,53 @@ impl NodeMock {
         }
     }
 
-//    /// Constructor for an in-memory P2P Network
-//    #[cfg_attr(tarpaulin, skip)]
-//    pub fn new_with_unique_memory_network(agent_id: Address) -> Self {
-//        let config = P2pConfig::new_with_unique_memory_backend();
-//        return TestNode::new_with_config(agent_id, &config, None);
-//    }
+    //    /// Constructor for an in-memory P2P Network
+    //    #[cfg_attr(tarpaulin, skip)]
+    //    pub fn new_with_unique_memory_network(agent_id: Address) -> Self {
+    //        let config = P2pConfig::new_with_unique_memory_backend();
+    //        return TestNode::new_with_config(agent_id, &config, None);
+    //    }
 
-//    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-//    #[cfg_attr(tarpaulin, skip)]
-//    pub fn new_with_uri_ipc_network(agent_id: Address, ipc_binding: &str) -> Self {
-//        let p2p_config = P2pConfig::default_ipc_uri(Some(ipc_binding));
-//        return TestNode::new_with_config(agent_id, &p2p_config, None);
-//    }
+    //    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
+    //    #[cfg_attr(tarpaulin, skip)]
+    //    pub fn new_with_uri_ipc_network(agent_id: Address, ipc_binding: &str) -> Self {
+    //        let p2p_config = P2pConfig::default_ipc_uri(Some(ipc_binding));
+    //        return TestNode::new_with_config(agent_id, &p2p_config, None);
+    //    }
 
-//    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
-//    #[cfg_attr(tarpaulin, skip)]
-//    pub fn new_with_lib3h(
-//        agent_id: Address,
-//        maybe_config_filepath: Option<&str>,
-//        maybe_end_user_config_filepath: Option<String>,
-//        bootstrap_nodes: Vec<String>,
-//        maybe_dir_path: Option<String>,
-//    ) -> Self {
-//        let (p2p_config, _maybe_temp_dir) = create_lib3h_config(
-//            maybe_config_filepath,
-//            maybe_end_user_config_filepath,
-//            bootstrap_nodes,
-//            maybe_dir_path,
-//        );
-//        return NodeMock::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
-//    }
+    //    /// Constructor for an IPC node that uses an existing n3h process and a temp folder
+    //    #[cfg_attr(tarpaulin, skip)]
+    //    pub fn new_with_lib3h(
+    //        agent_id: Address,
+    //        maybe_config_filepath: Option<&str>,
+    //        maybe_end_user_config_filepath: Option<String>,
+    //        bootstrap_nodes: Vec<String>,
+    //        maybe_dir_path: Option<String>,
+    //    ) -> Self {
+    //        let (p2p_config, _maybe_temp_dir) = create_lib3h_config(
+    //            maybe_config_filepath,
+    //            maybe_end_user_config_filepath,
+    //            bootstrap_nodes,
+    //            maybe_dir_path,
+    //        );
+    //        return NodeMock::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
+    //    }
 
-//    /// Constructor for an IPC node that spawns and uses a n3h process and a temp folder
-//    #[cfg_attr(tarpaulin, skip)]
-//    pub fn new_with_spawn_ipc_network(
-//        agent_id: Address,
-//        maybe_config_filepath: Option<&str>,
-//        maybe_end_user_config_filepath: Option<String>,
-//        bootstrap_nodes: Vec<String>,
-//        maybe_dir_path: Option<String>,
-//    ) -> Self {
-//        let (p2p_config, _maybe_temp_dir) = create_ipc_config(
-//            maybe_config_filepath,
-//            maybe_end_user_config_filepath,
-//            bootstrap_nodes,
-//            maybe_dir_path,
-//        );
-//        return NodeMock::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
-//    }
+    //    /// Constructor for an IPC node that spawns and uses a n3h process and a temp folder
+    //    #[cfg_attr(tarpaulin, skip)]
+    //    pub fn new_with_spawn_ipc_network(
+    //        agent_id: Address,
+    //        maybe_config_filepath: Option<&str>,
+    //        maybe_end_user_config_filepath: Option<String>,
+    //        bootstrap_nodes: Vec<String>,
+    //        maybe_dir_path: Option<String>,
+    //    ) -> Self {
+    //        let (p2p_config, _maybe_temp_dir) = create_ipc_config(
+    //            maybe_config_filepath,
+    //            maybe_end_user_config_filepath,
+    //            bootstrap_nodes,
+    //            maybe_dir_path,
+    //        );
+    //        return NodeMock::new_with_config(agent_id, &p2p_config, _maybe_temp_dir);
+    //    }
 }

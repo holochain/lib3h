@@ -1,6 +1,4 @@
-use lib3h_protocol::{
-    Address,
-};
+use lib3h_protocol::Address;
 
 lazy_static! {
     pub static ref NETWORK_A_ID: String = "net_A".to_string();
@@ -43,4 +41,3 @@ macro_rules! one_let {
         }
     };
 }
-

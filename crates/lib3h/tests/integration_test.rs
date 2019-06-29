@@ -19,9 +19,6 @@ mod constants;
 mod node_mock;
 
 use constants::*;
-use node_mock::{
-    NodeMock, methods,
-};
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
@@ -33,6 +30,7 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
 };
+use node_mock::{methods, NodeMock};
 use url::Url;
 
 //--------------------------------------------------------------------------------------------------
@@ -54,8 +52,12 @@ fn enable_logging_for_test(enable: bool) {
 // Engine factories
 //--------------------------------------------------------------------------------------------------
 
-fn construct_mock_engine(config: &RealEngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> = RealEngine::new_mock(config.clone(), name.into(), MirrorDht::new_with_config).unwrap();
+fn construct_mock_engine(
+    config: &RealEngineConfig,
+    name: &str,
+) -> Lib3hResult<Box<dyn NetworkEngine>> {
+    let engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> =
+        RealEngine::new_mock(config.clone(), name.into(), MirrorDht::new_with_config).unwrap();
     let p2p_binding = engine.advertise();
     println!(
         "construct_mock_engine(): test engine for {}, advertise: {}",
@@ -139,17 +141,14 @@ fn test_two_memory_nodes_suite() {
 }
 
 // Do general test with config
-fn launch_two_memory_nodes_test(
-    test_fn: TwoNodesTestFn,
-    can_setup: bool,
-) -> Result<(), ()> {
+fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
     println!("");
     print_two_nodes_test_name("IN-MEMORY TWO NODES TEST: ", test_fn);
     println!("=======================");
 
     // Setup
     let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone());
-    let mut billy= setup_memory_node("billy", BILLY_AGENT_ID.clone());
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone());
     if can_setup {
         setup_two_nodes(&mut alex, &mut billy);
     }
@@ -173,9 +172,9 @@ fn launch_two_memory_nodes_test(
 
 ///
 fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
-//    // Start
-//    alex.run().unwrap();
-//    billy.run().unwrap();
+    //    // Start
+    //    alex.run().unwrap();
+    //    billy.run().unwrap();
 
     // Connect Alex to Billy
     alex.connect_to(&billy.advertise()).unwrap();
