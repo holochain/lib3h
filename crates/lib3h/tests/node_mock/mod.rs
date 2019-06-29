@@ -3,15 +3,11 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
-use crossbeam_channel::{unbounded, Receiver};
 use lib3h::engine::RealEngineConfig;
-use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, AddressRef, Lib3hResult,
+    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
 };
 use std::collections::{HashMap, HashSet};
-// use multihash::Hash;
 use url::Url;
 
 static TIMEOUT_MS: usize = 5000;
@@ -25,8 +21,6 @@ pub struct NodeMock {
     /// Temp dir used for persistence
     /// Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
     //_maybe_temp_dir: Option<tempfile::TempDir>,
-    /// TODO: Run engine in a thread and communicate via a channel?
-    _receiver: Receiver<Lib3hServerProtocol>,
     /// The Node's networking engine
     engine: Box<dyn NetworkEngine>,
     /// Config used by the engine
@@ -68,15 +62,11 @@ impl NodeMock {
             agent_id_arg, config
         );
 
-        // Use a channel for messaging between Node and its Engine?
-        let (sender, _receiver) = unbounded::<Lib3hServerProtocol>();
-
         let engine = engine_factory(&config, name).expect("Failed to create RealEngine");
         let my_advertise = engine.advertise();
         NodeMock {
             // _maybe_temp_dir,
             engine,
-            _receiver,
             config,
             agent_id: agent_id_arg.clone(),
             request_log: Vec::new(),

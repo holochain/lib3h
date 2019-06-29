@@ -1,5 +1,3 @@
-extern crate lib3h;
-extern crate lib3h_protocol;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -11,8 +9,12 @@ extern crate log;
 extern crate holochain_persistence_api;
 #[macro_use]
 extern crate failure;
+extern crate lib3h;
+extern crate lib3h_protocol;
 extern crate multihash;
 
+#[macro_use]
+mod predicate;
 #[macro_use]
 mod constants;
 
@@ -20,17 +22,15 @@ mod node_mock;
 
 use constants::*;
 use lib3h::{
-    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
+    dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
-    transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
-    transport_wss::TransportWss,
+    transport::memory_mock::transport_memory::TransportMemory,
 };
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
+    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
 };
-use node_mock::{methods, NodeMock};
+use node_mock::NodeMock;
 use url::Url;
 
 //--------------------------------------------------------------------------------------------------
@@ -84,6 +84,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address) -> NodeMock {
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
 }
 
+#[allow(dead_code)]
 fn setup_wss_node(name: &str, agent_id_arg: Address) -> NodeMock {
     let config = RealEngineConfig {
         socket_type: "ws".into(),
@@ -172,9 +173,9 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
 
 ///
 fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
-    //    // Start
-    //    alex.run().unwrap();
-    //    billy.run().unwrap();
+    // Start
+    alex.run();
+    billy.run();
 
     // Connect Alex to Billy
     alex.connect_to(&billy.advertise()).unwrap();
@@ -184,7 +185,7 @@ fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert_eq!(srv_msg_list.len(), 1);
     let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
     println!("connected_msg = {:?}", connected_msg);
-    //assert_eq!(connected_msg.uri, req_connect.peer_uri);
+    assert_eq!(&connected_msg.uri, &billy.advertise());
     // More process: Have Billy process P2p::PeerAddress of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
@@ -229,7 +230,7 @@ fn basic_two_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Send response
     let response_content = format!("echo: {}", content).as_bytes().to_vec();
-    billy.send_response(&req_id, &alex.agent_id, response_content);
+    billy.send_response(&req_id, &alex.agent_id, response_content.clone());
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
@@ -240,5 +241,5 @@ fn basic_two_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
-    // FIXME assert_eq!(content, response_content);
+    assert_eq!(msg.content, response_content);
 }

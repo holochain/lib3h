@@ -16,6 +16,7 @@ impl EntryStore {
     }
 
     /// Check if this value is already stored
+    #[allow(dead_code)]
     pub fn has(&self, entry_address: &AddressRef, aspect_address: &AddressRef) -> bool {
         let maybe_map = self.store.get(&entry_address.to_vec());
         if maybe_map.is_none() {
@@ -77,6 +78,7 @@ impl EntryStore {
     }
 
     /// Get all values for a meta_key as a vec
+    #[allow(dead_code)]
     pub fn get_aspect(
         &self,
         entry_address: &AddressRef,
@@ -88,15 +90,4 @@ impl EntryStore {
         }
         return maybe_entry.unwrap().get(&aspect_address.to_vec());
     }
-
-    //    /// Get all values stored
-    //    pub fn get_all(&self) -> Vec<MetaTuple> {
-    //        let mut meta_list: Vec<MetaTuple> = Vec::new();
-    //        for (meta_key, meta_map) in self.store.clone() {
-    //            for (_, v) in meta_map {
-    //                meta_list.push((meta_key.0.clone(), meta_key.1.clone(), v));
-    //            }
-    //        }
-    //        meta_list
-    //    }
 }

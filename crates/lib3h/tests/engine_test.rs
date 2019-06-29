@@ -1,14 +1,16 @@
-extern crate lib3h;
-extern crate lib3h_protocol;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
 extern crate backtrace;
 extern crate crossbeam_channel;
+extern crate lib3h;
+extern crate lib3h_protocol;
 
+#[macro_use]
 mod constants;
 
+use constants::*;
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
@@ -18,12 +20,12 @@ use lib3h::{
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address,
+    protocol_server::Lib3hServerProtocol,
 };
 use url::Url;
 
 //--------------------------------------------------------------------------------------------------
-// Typedefs
+// Test suites
 //--------------------------------------------------------------------------------------------------
 
 type TwoEnginesTestFn = fn(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>);

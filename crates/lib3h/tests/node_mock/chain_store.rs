@@ -132,6 +132,7 @@ impl ChainStore {
         self.stored_entry_store.store.clone()
     }
 
+    #[allow(dead_code)]
     pub fn space_address(&self) -> Address {
         self.space_address.clone()
     }

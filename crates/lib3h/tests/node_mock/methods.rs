@@ -2,9 +2,9 @@
 
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
 use crate::constants::*;
+#[allow(unused_imports)]
 use crossbeam_channel::{unbounded, Receiver};
 use holochain_persistence_api::hash::HashString;
-use lib3h::{dht::dht_trait::Dht, transport::transport_trait::Transport};
 use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
     Address, AddressRef, DidWork, Lib3hResult,
@@ -516,15 +516,6 @@ impl NodeMock {
             .expect("Reply to HandleGetHoldingEntryList failed.");
     }
 
-    //    /// See if there is a message to receive, and log it
-    //    /// return a Lib3hServerProtocol if the received message is of that type
-    //    pub fn process(&mut self) -> Lib3hResult<Lib3hServerProtocol> {
-    //        let data = self.receiver.try_recv()?;
-    //        self.recv_msg_log.push(data.clone());
-    //        self.handle_lib3h(data.clone());
-    //        Ok(r)
-    //    }
-
     /// wait to receive a HandleFetchEntry request and automatically reply
     /// return true if a HandleFetchEntry has been received
     pub fn wait_HandleFetchEntry_and_reply(&mut self) -> bool {
@@ -622,11 +613,18 @@ impl NodeMock {
         }
     }
 
-    // Stop node
-    pub fn stop(self) {
+    /// Start engine
+    pub fn run(&mut self) {
+        self.engine
+            .run()
+            .expect("Failed to start the NetworkEngine");
+    }
+
+    /// Stop engine
+    pub fn stop(&mut self) {
         self.engine
             .stop()
-            .expect("Failed to stop the NetworkEngine properly");
+            .expect("Failed to stop the NetworkEngine");
     }
 
     /// handle all types of Lib3hServerProtocol message
