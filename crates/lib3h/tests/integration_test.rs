@@ -47,7 +47,7 @@ lazy_static! {
 // for this to actually show log entries you also have to run the tests like this:
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
-    std::env::set_var("RUST_LOG", "trace");
+    //std::env::set_var("RUST_LOG", "trace");
     let _ = env_logger::builder()
         .default_format_timestamp(false)
         .default_format_module_path(false)
