@@ -24,6 +24,7 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     transport::memory_mock::transport_memory::TransportMemory,
+    transport_wss::TlsConfig,
 };
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
@@ -73,6 +74,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 
 fn setup_memory_node(name: &str, agent_id_arg: Address) -> NodeMock {
     let config = RealEngineConfig {
+        tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
@@ -86,6 +88,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address) -> NodeMock {
 #[allow(dead_code)]
 fn setup_wss_node(name: &str, agent_id_arg: Address) -> NodeMock {
     let config = RealEngineConfig {
+        tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
