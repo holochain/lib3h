@@ -7,6 +7,7 @@ members = [
   "crates/lib3h_protocol",
   "crates/p2p_protocol",
   "crates/lib3h",
+  "crates/mdns",
   "crates/tools/half_busy_chat",
   "crates/tools/capnp_build",
 ]
