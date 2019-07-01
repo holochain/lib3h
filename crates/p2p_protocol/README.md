@@ -1,4 +1,4 @@
-# lib3h_protocol
+# lib3h_p2p_protocol
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Chat](https://img.shields.io/badge/chat-chat%2eholochain%2enet-blue.svg?style=flat-square)](https://chat.holochain.net)
@@ -9,11 +9,7 @@
 
 ## Overview
 
-Lib3h Protocol definition for API interaction with the library.
-
-## Usage
-
-FIXME
+Lib3h Protocol definition for inter-node p2p communication.
 
 ## Contribute
 
