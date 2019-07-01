@@ -130,11 +130,13 @@ impl<T: Read + Write + std::fmt::Debug> WssInfo<T> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct TlsCertificate {
     pkcs12_data: Vec<u8>,
     passphrase: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum TlsConfig {
     Unencrypted,
     FakeServer,
@@ -149,19 +151,29 @@ pub trait IdGenerator {
 }
 
 #[derive(Clone)]
-pub struct ConnectionIdFactory(Arc<Mutex<u64>>);
+/// A ConnectionIdFactory is a tuple of it's own internal id and incremental counter
+/// for each established transport
+pub struct ConnectionIdFactory(u64, Arc<Mutex<u64>>);
 impl IdGenerator for ConnectionIdFactory {
     fn next_id(&mut self) -> ConnectionId {
-        let mut n_id = self.0.lock().expect("could not lock mutex");
-        let out = format!("ws{}", *n_id);
+        let self_id = self.0;
+        let mut n_id = self.1.lock().expect("could not lock mutex");
+        let out = format!("ws{}_{}", self_id, *n_id);
         *n_id += 1;
         out
     }
 }
 
+lazy_static! {
+    static ref TRANSPORT_COUNT: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+}
 impl ConnectionIdFactory {
     pub fn new() -> Self {
-        ConnectionIdFactory(Arc::new(Mutex::new(1)))
+        let mut tc = TRANSPORT_COUNT
+            .lock()
+            .expect("could not lock transport count mutex");
+        *tc += 1;
+        ConnectionIdFactory(*tc, Arc::new(Mutex::new(1)))
     }
 }
 
@@ -170,15 +182,6 @@ pub type Acceptor<T> = Box<FnMut(ConnectionIdFactory) -> TransportResult<WssInfo
 
 /// A function that binds to a url and produces sockt acceptors of type T
 pub type Bind<T> = Box<FnMut(&Url) -> TransportResult<Acceptor<T>>>;
-
-/// An implememtation of Bind that accepts no connections.
-fn noop_bind<T: std::fmt::Debug + std::io::Read + std::io::Write>(
-    _url: &Url,
-) -> TransportResult<Acceptor<T>> {
-    Err(TransportError(
-        "bind not configured (this is a noop impl)".into(),
-    ))
-}
 
 /// A "Transport" implementation based off the websocket protocol
 /// any rust io Read/Write stream should be able to serve as the base
@@ -296,9 +299,9 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
 }
 
 impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
-    pub fn new(stream_factory: StreamFactory<T>, bind: Bind<T>) -> Self {
+    pub fn new(stream_factory: StreamFactory<T>, bind: Bind<T>, tls_config: TlsConfig) -> Self {
         TransportWss {
-            tls_config: TlsConfig::FakeServer,
+            tls_config,
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
@@ -307,19 +310,6 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             bind,
             acceptor: Err(TransportError("acceptor not initialized".into())),
         }
-    }
-
-    /// create a new websocket "Transport" instance of type T for client connections
-    pub fn client(stream_factory: StreamFactory<T>) -> Self {
-        let bind: Bind<T> = Box::new(|url| noop_bind(url));
-        Self::new(stream_factory, bind)
-    }
-
-    pub fn server(bind: Bind<T>) -> Self {
-        Self::new(
-            |_url| Err(TransportError("client connections unsupported".into())),
-            bind,
-        )
     }
 
     /// connect and wait for a Connect event response
@@ -613,6 +603,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         &mut self,
         res: TlsConnectResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
+        trace!("[t] processing tls connect result: {:?}", res);
         match res {
             Err(native_tls::HandshakeError::WouldBlock(socket)) => {
                 Ok(WebsocketStreamState::TlsSrvMidHandshake(socket))

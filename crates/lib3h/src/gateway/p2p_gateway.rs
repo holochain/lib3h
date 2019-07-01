@@ -5,8 +5,8 @@ use crate::{
         dht_protocol::*,
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    gateway::P2pGateway,
-    transport::{transport_trait::Transport, url_to_transport_id},
+    gateway::{self, P2pGateway},
+    transport::transport_trait::Transport,
 };
 use lib3h_protocol::{AddressRef, Lib3hResult};
 use std::{
@@ -21,7 +21,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
     }
-
     /// Hack: explicit post because of dumb rust compiler
     pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         // HACK: Add fake reverse on HoldPeer
@@ -29,7 +28,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
             self.connection_map.insert(
                 peer_data.peer_uri.clone(),
-                url_to_transport_id(&peer_data.peer_uri.clone()),
+                gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
             );
         }
         // HACK END
