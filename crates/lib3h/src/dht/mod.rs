@@ -6,23 +6,15 @@ pub mod rrdht;
 #[cfg(test)]
 pub mod tests {
 
-    use crate::dht::{dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht};
+    use crate::{
+        dht::{dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht},
+        tests::enable_logging_for_test,
+    };
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
         Address, AddressRef,
     };
     use url::Url;
-
-    // for this to actually show log entries you also have to run the tests like this:
-    // RUST_LOG=lib3h=debug cargo test -- --nocapture
-    fn enable_logging_for_test(enable: bool) {
-        std::env::set_var("RUST_LOG", "debug");
-        let _ = env_logger::builder()
-            .default_format_timestamp(false)
-            .default_format_module_path(false)
-            .is_test(enable)
-            .try_init();
-    }
 
     lazy_static! {
         /// CONSTS
