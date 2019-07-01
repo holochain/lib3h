@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
-use crate::constants::*;
+use crate::utils::constants::*;
 use holochain_persistence_api::hash::HashString;
 use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,

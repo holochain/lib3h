@@ -1,4 +1,6 @@
 #[macro_use]
+mod utils;
+#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
@@ -12,14 +14,8 @@ extern crate lib3h;
 extern crate lib3h_protocol;
 extern crate multihash;
 
-#[macro_use]
-mod predicate;
-#[macro_use]
-mod constants;
-
 mod node_mock;
 
-use constants::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
@@ -32,6 +28,7 @@ use lib3h_protocol::{
 };
 use node_mock::NodeMock;
 use url::Url;
+use utils::constants::*;
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -40,7 +37,9 @@ use url::Url;
 // for this to actually show log entries you also have to run the tests like this:
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
-    std::env::set_var("RUST_LOG", "trace");
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "trace");
+    }
     let _ = env_logger::builder()
         .default_format_timestamp(false)
         .default_format_module_path(false)

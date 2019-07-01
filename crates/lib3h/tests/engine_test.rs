@@ -6,10 +6,8 @@ extern crate backtrace;
 extern crate lib3h;
 extern crate lib3h_protocol;
 
-#[macro_use]
-mod constants;
+mod utils;
 
-use constants::*;
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
@@ -22,6 +20,7 @@ use lib3h_protocol::{
     protocol_server::Lib3hServerProtocol,
 };
 use url::Url;
+use utils::constants::*;
 
 //--------------------------------------------------------------------------------------------------
 // Test suites
@@ -44,7 +43,9 @@ lazy_static! {
 // for this to actually show log entries you also have to run the tests like this:
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
-    std::env::set_var("RUST_LOG", "trace");
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "trace");
+    }
     let _ = env_logger::builder()
         .default_format_timestamp(false)
         .default_format_module_path(false)
