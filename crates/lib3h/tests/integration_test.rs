@@ -124,9 +124,9 @@ type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        (setup_only, true),
-        (basic_two_send_message, true),
-        // (basic_two_join_first, false),
+        // (setup_only, true),
+        // (two_nodes_send_message, true),
+        (two_nodes_dht_test, true),
     ];
 }
 
@@ -213,8 +213,8 @@ fn setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock) {
     // n/a
 }
 
-//
-fn basic_two_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
+/// Test SendDirectMessage and response
+fn two_nodes_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send DM
     let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -243,4 +243,60 @@ fn basic_two_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
     assert_eq!(msg.content, response_content);
+}
+
+/// Test publish, Store, Query
+fn two_nodes_dht_test(alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Alex publish data on the network
+    alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true).unwrap();
+
+    // #fullsync
+    // Alex should receive the data
+    let result_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
+    assert!(result_a.is_some());
+    println!("got HandleStoreEntryAspect on node A: {:?}", result_a);
+    // Gossip should ask Alex for the data
+    let maybe_fetch_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleFetchEntry(_))));
+    if let Some(fetch_a) = maybe_fetch_a {
+        let fetch = unwrap_to!(fetch_a => Lib3hServerProtocol::HandleFetchEntry);
+        let _ = alex.reply_to_HandleFetchEntry(&fetch).unwrap();
+    }
+    // #fullsync
+    // Billy should receive the data
+    let result_b = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
+    assert!(result_b.is_some());
+    println!("got HandleStoreEntryAspect on node B: {:?}", result_b);
+
+    // Billy asks for that data
+    let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
+
+    // #fullsync
+    // Billy sends that data back to the network
+    let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
+
+    // Billy should receive requested data
+    let result = billy
+        .wait(Box::new(one_is!(Lib3hServerProtocol::QueryEntryResult(_))))
+        .unwrap();
+    println!("got QueryEntryResult: {:?}\n\n\n\n", result);
+
+//    // Billy asks for unknown data
+//    // ===========================
+//    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
+//
+//    // #fullsync
+//    // Billy sends that data back to the network
+//    let res = billy.reply_to_HandleQueryEntry(&query_data);
+//    assert!(res.is_err());
+//    // Billy should receive FailureResult
+//    let result = billy
+//        .wait(Box::new(one_is!(Lib3hServerProtocol::FailureResult(_))))
+//        .unwrap();
+//    log_i!("got FailureResult: {:?}", result);
+//    let gen_res = unwrap_to!(result => Lib3hServerProtocol::FailureResult);
+//    log_i!(
+//        "Failure result_info: {}",
+//        std::str::from_utf8(&gen_res.result_info).unwrap()
+//    );
+//    assert_eq!(res.err().unwrap(), *gen_res);
 }

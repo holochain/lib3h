@@ -10,7 +10,7 @@ use lib3h_protocol::{
 use std::collections::{HashMap, HashSet};
 use url::Url;
 
-static TIMEOUT_MS: usize = 5000;
+static TIMEOUT_MS: usize = 2000;
 
 pub type EngineFactory =
     fn(config: &RealEngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>>;

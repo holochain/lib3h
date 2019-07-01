@@ -148,7 +148,7 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    fn into_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
+    fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
@@ -172,9 +172,8 @@ impl NodeMock {
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<()> {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        let entry = NodeMock::into_EntryData(entry_address, aspect_content_list);
+        let current_space = self.current_space.clone().expect("Should have current space");
+        let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
         {
@@ -216,9 +215,8 @@ impl NodeMock {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
     ) -> Lib3hResult<()> {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        let entry = NodeMock::into_EntryData(entry_address, aspect_content_list);
+        let current_space = self.current_space.clone().expect("Should have current space");
+        let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
             .get_mut(&current_space)
@@ -577,8 +575,8 @@ impl NodeMock {
                 }
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            time_ms += 10;
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            time_ms += 100;
             if time_ms > timeout_ms {
                 info!("({:?})::wait() has TIMEOUT", self.agent_id);
                 return None;
