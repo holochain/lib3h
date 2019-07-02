@@ -4,7 +4,7 @@
 
 
 pub mod message {
-  pub use self::Which::{MsgError,MsgChannel,MsgGspArcRequest,MsgGspArcResponse,MsgGspAspectDataRequest,MsgGspAspectDataResponse,MsgGspAspectBroadcast,MsgDirectRequest,MsgDirectResponse,MsgQueryRequest,MsgQueryResponse};
+  pub use self::Which::{MsgError,MsgHandshake,MsgGspArcRequest,MsgGspArcResponse,MsgGspAspectDataRequest,MsgGspAspectDataResponse,MsgGspAspectBroadcast,MsgDirectRequest,MsgDirectResponse,MsgQueryRequest,MsgQueryResponse};
 
   #[derive(Copy, Clone)]
   pub struct Owned;
@@ -55,7 +55,7 @@ pub mod message {
       if self.reader.get_data_field::<u16>(0) != 0 { return false; }
       !self.reader.get_pointer_field(0).is_null()
     }
-    pub fn has_msg_channel(&self) -> bool {
+    pub fn has_msg_handshake(&self) -> bool {
       if self.reader.get_data_field::<u16>(0) != 1 { return false; }
       !self.reader.get_pointer_field(0).is_null()
     }
@@ -104,7 +104,7 @@ pub mod message {
           ))
         }
         1 => {
-          ::std::result::Result::Ok(MsgChannel(
+          ::std::result::Result::Ok(MsgHandshake(
             ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
           ))
         }
@@ -221,16 +221,16 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_channel<'b>(&mut self, value: crate::p2p_capnp::message::msg_channel::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_handshake<'b>(&mut self, value: crate::p2p_capnp::message::msg_handshake::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 1);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_channel(self, ) -> crate::p2p_capnp::message::msg_channel::Builder<'a> {
+    pub fn init_msg_handshake(self, ) -> crate::p2p_capnp::message::msg_handshake::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 1);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
-    pub fn has_msg_channel(&self) -> bool {
+    pub fn has_msg_handshake(&self) -> bool {
       if self.builder.get_data_field::<u16>(0) != 1 { return false; }
       !self.builder.get_pointer_field(0).is_null()
     }
@@ -369,7 +369,7 @@ pub mod message {
           ))
         }
         1 => {
-          ::std::result::Result::Ok(MsgChannel(
+          ::std::result::Result::Ok(MsgHandshake(
             ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
           ))
         }
@@ -438,7 +438,7 @@ pub mod message {
   }
   pub enum Which<A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10> {
     MsgError(A0),
-    MsgChannel(A1),
+    MsgHandshake(A1),
     MsgGspArcRequest(A2),
     MsgGspArcResponse(A3),
     MsgGspAspectDataRequest(A4),
@@ -449,8 +449,8 @@ pub mod message {
     MsgQueryRequest(A9),
     MsgQueryResponse(A10),
   }
-  pub type WhichReader<'a,> = Which<::capnp::Result<crate::p2p_capnp::message::msg_error::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_channel::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_request::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_response::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Reader<'a>>>;
-  pub type WhichBuilder<'a,> = Which<::capnp::Result<crate::p2p_capnp::message::msg_error::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_channel::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_request::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_response::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Builder<'a>>>;
+  pub type WhichReader<'a,> = Which<::capnp::Result<crate::p2p_capnp::message::msg_error::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_handshake::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_request::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_response::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Reader<'a>>>;
+  pub type WhichBuilder<'a,> = Which<::capnp::Result<crate::p2p_capnp::message::msg_error::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_handshake::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_request::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_response::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Builder<'a>>>;
 
   pub mod msg_error {
     #[derive(Copy, Clone)]
@@ -499,12 +499,8 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
-      }
-      #[inline]
       pub fn get_error_code(self) -> ::std::result::Result<crate::p2p_capnp::message::msg_error::ErrorCode,::capnp::NotInSchema> {
-        ::capnp::traits::FromU16::from_u16(self.reader.get_data_field::<u16>(2))
+        ::capnp::traits::FromU16::from_u16(self.reader.get_data_field::<u16>(0))
       }
       #[inline]
       pub fn get_error_text(self) -> ::capnp::Result<::capnp::text::Reader<'a>> {
@@ -564,20 +560,12 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
-      }
-      #[inline]
       pub fn get_error_code(self) -> ::std::result::Result<crate::p2p_capnp::message::msg_error::ErrorCode,::capnp::NotInSchema> {
-        ::capnp::traits::FromU16::from_u16(self.builder.get_data_field::<u16>(2))
+        ::capnp::traits::FromU16::from_u16(self.builder.get_data_field::<u16>(0))
       }
       #[inline]
       pub fn set_error_code(&mut self, value: crate::p2p_capnp::message::msg_error::ErrorCode)  {
-        self.builder.set_data_field::<u16>(2, value as u16)
+        self.builder.set_data_field::<u16>(0, value as u16)
       }
       #[inline]
       pub fn get_error_text(self) -> ::capnp::Result<::capnp::text::Builder<'a>> {
@@ -614,20 +602,12 @@ pub mod message {
     #[derive(Clone, Copy, PartialEq)]
     pub enum ErrorCode {
       Unknown = 0,
-      BadChannelId = 1,
-      BadSpaceHash = 2,
-      BadToId = 3,
-      BadFromId = 4,
     }
     impl ::capnp::traits::FromU16 for ErrorCode {
       #[inline]
       fn from_u16(value: u16) -> ::std::result::Result<ErrorCode, ::capnp::NotInSchema> {
         match value {
           0 => ::std::result::Result::Ok(ErrorCode::Unknown),
-          1 => ::std::result::Result::Ok(ErrorCode::BadChannelId),
-          2 => ::std::result::Result::Ok(ErrorCode::BadSpaceHash),
-          3 => ::std::result::Result::Ok(ErrorCode::BadToId),
-          4 => ::std::result::Result::Ok(ErrorCode::BadFromId),
           n => ::std::result::Result::Err(::capnp::NotInSchema(n)),
         }
       }
@@ -642,7 +622,7 @@ pub mod message {
     }
   }
 
-  pub mod msg_channel {
+  pub mod msg_handshake {
     #[derive(Copy, Clone)]
     pub struct Owned;
     impl <'a> ::capnp::traits::Owned<'a> for Owned { type Reader = Reader<'a>; type Builder = Builder<'a>; }
@@ -689,37 +669,12 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
+      pub fn get_from_store_arc(self) -> u32 {
         self.reader.get_data_field::<u32>(0)
       }
       #[inline]
-      pub fn get_space_hash(self) -> ::capnp::Result<::capnp::data::Reader<'a>> {
-        ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
-      }
-      pub fn has_space_hash(&self) -> bool {
-        !self.reader.get_pointer_field(0).is_null()
-      }
-      #[inline]
-      pub fn get_to_id(self) -> ::capnp::Result<::capnp::data::Reader<'a>> {
-        ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(1), ::std::option::Option::None)
-      }
-      pub fn has_to_id(&self) -> bool {
-        !self.reader.get_pointer_field(1).is_null()
-      }
-      #[inline]
-      pub fn get_from_id(self) -> ::capnp::Result<::capnp::data::Reader<'a>> {
-        ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(2), ::std::option::Option::None)
-      }
-      pub fn has_from_id(&self) -> bool {
-        !self.reader.get_pointer_field(2).is_null()
-      }
-      #[inline]
-      pub fn get_from_store_arc(self) -> u32 {
-        self.reader.get_data_field::<u32>(1)
-      }
-      #[inline]
       pub fn get_from_query_arc(self) -> u32 {
-        self.reader.get_data_field::<u32>(2)
+        self.reader.get_data_field::<u32>(1)
       }
     }
 
@@ -772,73 +727,20 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
+      pub fn get_from_store_arc(self) -> u32 {
         self.builder.get_data_field::<u32>(0)
       }
       #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
+      pub fn set_from_store_arc(&mut self, value: u32)  {
         self.builder.set_data_field::<u32>(0, value);
       }
       #[inline]
-      pub fn get_space_hash(self) -> ::capnp::Result<::capnp::data::Builder<'a>> {
-        ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
-      }
-      #[inline]
-      pub fn set_space_hash(&mut self, value: ::capnp::data::Reader)  {
-        self.builder.get_pointer_field(0).set_data(value);
-      }
-      #[inline]
-      pub fn init_space_hash(self, size: u32) -> ::capnp::data::Builder<'a> {
-        self.builder.get_pointer_field(0).init_data(size)
-      }
-      pub fn has_space_hash(&self) -> bool {
-        !self.builder.get_pointer_field(0).is_null()
-      }
-      #[inline]
-      pub fn get_to_id(self) -> ::capnp::Result<::capnp::data::Builder<'a>> {
-        ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(1), ::std::option::Option::None)
-      }
-      #[inline]
-      pub fn set_to_id(&mut self, value: ::capnp::data::Reader)  {
-        self.builder.get_pointer_field(1).set_data(value);
-      }
-      #[inline]
-      pub fn init_to_id(self, size: u32) -> ::capnp::data::Builder<'a> {
-        self.builder.get_pointer_field(1).init_data(size)
-      }
-      pub fn has_to_id(&self) -> bool {
-        !self.builder.get_pointer_field(1).is_null()
-      }
-      #[inline]
-      pub fn get_from_id(self) -> ::capnp::Result<::capnp::data::Builder<'a>> {
-        ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(2), ::std::option::Option::None)
-      }
-      #[inline]
-      pub fn set_from_id(&mut self, value: ::capnp::data::Reader)  {
-        self.builder.get_pointer_field(2).set_data(value);
-      }
-      #[inline]
-      pub fn init_from_id(self, size: u32) -> ::capnp::data::Builder<'a> {
-        self.builder.get_pointer_field(2).init_data(size)
-      }
-      pub fn has_from_id(&self) -> bool {
-        !self.builder.get_pointer_field(2).is_null()
-      }
-      #[inline]
-      pub fn get_from_store_arc(self) -> u32 {
+      pub fn get_from_query_arc(self) -> u32 {
         self.builder.get_data_field::<u32>(1)
       }
       #[inline]
-      pub fn set_from_store_arc(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(1, value);
-      }
-      #[inline]
-      pub fn get_from_query_arc(self) -> u32 {
-        self.builder.get_data_field::<u32>(2)
-      }
-      #[inline]
       pub fn set_from_query_arc(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(2, value);
+        self.builder.set_data_field::<u32>(1, value);
       }
     }
 
@@ -852,8 +754,8 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 2, pointers: 3 };
-      pub const TYPE_ID: u64 = 0xea5c_6830_3ef3_0a8c;
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 0 };
+      pub const TYPE_ID: u64 = 0xf78c_7a72_1b79_3f3b;
     }
   }
 
@@ -902,10 +804,6 @@ pub mod message {
 
       pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
         self.reader.total_size()
-      }
-      #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
       }
       #[inline]
       pub fn get_aspect_constraint_loc(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_loc::Reader<'a>> {
@@ -984,14 +882,6 @@ pub mod message {
 
       pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
         self.builder.into_reader().total_size()
-      }
-      #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
       }
       #[inline]
       pub fn get_aspect_constraint_loc(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_loc::Builder<'a>> {
@@ -1074,7 +964,7 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 4 };
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 4 };
       pub const TYPE_ID: u64 = 0xfdc0_3c90_688b_e108;
     }
   }
@@ -1124,10 +1014,6 @@ pub mod message {
 
       pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
         self.reader.total_size()
-      }
-      #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
       }
       #[inline]
       pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>> {
@@ -1187,14 +1073,6 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
-      }
-      #[inline]
       pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1221,7 +1099,7 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 1 };
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
       pub const TYPE_ID: u64 = 0xb97d_7a3f_6181_2b03;
     }
   }
@@ -1273,10 +1151,6 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
-      }
-      #[inline]
       pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1334,14 +1208,6 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
-      }
-      #[inline]
       pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1368,7 +1234,7 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 1 };
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
       pub const TYPE_ID: u64 = 0xc0f4_f2a8_4660_b1ef;
     }
   }
@@ -1420,10 +1286,6 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
-      }
-      #[inline]
       pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1481,14 +1343,6 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
-      }
-      #[inline]
       pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1515,7 +1369,7 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 1 };
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
       pub const TYPE_ID: u64 = 0xacae_cf41_eb34_2b2c;
     }
   }
@@ -1565,10 +1419,6 @@ pub mod message {
 
       pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
         self.reader.total_size()
-      }
-      #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
       }
       #[inline]
       pub fn get_request_id(self) -> ::capnp::Result<::capnp::text::Reader<'a>> {
@@ -1635,14 +1485,6 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
-      }
-      #[inline]
       pub fn get_request_id(self) -> ::capnp::Result<::capnp::text::Builder<'a>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1684,7 +1526,7 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 2 };
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 2 };
       pub const TYPE_ID: u64 = 0xa430_3fd6_0c1b_0af8;
     }
   }
@@ -1734,10 +1576,6 @@ pub mod message {
 
       pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
         self.reader.total_size()
-      }
-      #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.reader.get_data_field::<u32>(0)
       }
       #[inline]
       pub fn get_request_id(self) -> ::capnp::Result<::capnp::text::Reader<'a>> {
@@ -1811,14 +1649,6 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_channel_id(self) -> u32 {
-        self.builder.get_data_field::<u32>(0)
-      }
-      #[inline]
-      pub fn set_channel_id(&mut self, value: u32)  {
-        self.builder.set_data_field::<u32>(0, value);
-      }
-      #[inline]
       pub fn get_request_id(self) -> ::capnp::Result<::capnp::text::Builder<'a>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
@@ -1875,7 +1705,7 @@ pub mod message {
     }
     mod _private {
       use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 3 };
+      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 3 };
       pub const TYPE_ID: u64 = 0xcef5_5967_d4b5_87d2;
     }
   }

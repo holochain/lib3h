@@ -13,9 +13,8 @@ struct Message {
     # indicates an error
     # if the error is not recoverable, the connection will be closed
 
-    msgChannel @1 :MsgChannel;
-    # establish a new channel.
-    # All other messages require an established channelId.
+    msgHandshake @1 :MsgHandshake;
+    # On a new connection, tell the remote node about ourselves.
 
     msgGspArcRequest @2 :MsgGspArc;
     # Open a gossip sequence with a remote node.
@@ -49,73 +48,39 @@ struct Message {
   # -- top-level Message Types -- #
 
   struct MsgError {
-    channelId @0 :UInt32;
-    # Use 0xffffffff to indicate an error not related to a specific channel
-
-    errorCode @1 :ErrorCode;
+    errorCode @0 :ErrorCode;
     # code indicating if error is well-known
 
-    errorText @2 :Text;
+    errorText @1 :Text;
     # text indicating details of error
 
     enum ErrorCode {
       unknown @0;
       # default if error is not well-known, or if remote is using a newer proto
-
-      badChannelId @1;
-      # usually, a message was sent without first sending `msgChannel`
-
-      badSpaceHash @2;
-      # this node is not a part of this spaceHash
-
-      badToId @3;
-      # this node does not have a transportId or agentId matching this id
-
-      badFromId @4;
-      # this node does not wish to accept messages from this remote id
     }
   }
 
-  struct MsgChannel {
-    # this protocol multiplexes between multiple spaceHash / id pairs
-    # to avoid repeating this info in every message, we want to establish
-    # symbolic `channelId`s.
-
-    channelId @0 :UInt32;
-    # the channel id to establish. Must be unique to this communication session.
-
-    spaceHash @1 :Data;
-    # the spaceHash to establish this channel for.
-
-    toId @2 :Data;
-    # the destination transportId or agentId to establish this channel for
-
-    fromId @3 :Data;
-    # the source transportId or agentId to establish this channel for
-
-    fromStoreArc @4 :UInt32;
+  struct MsgHandshake {
+    fromStoreArc @0 :UInt32;
     # the storage arc length of the source transport / agent
 
-    fromQueryArc @5 :UInt32;
+    fromQueryArc @1 :UInt32;
     # the query arc length of the source transport / agent
   }
 
   struct MsgGspArc {
     # data for `msgGspArcRequest` and `msgGspArcResponse`
 
-    channelId @0 :UInt32;
-    # requisit channelId (see `msgChannel`)
-
-    aspectConstraintLoc @1 :AspectConstraintLoc;
+    aspectConstraintLoc @0 :AspectConstraintLoc;
     # constrain aspectHashList by loc arc
 
-    aspectConstraintTime @2 :AspectConstraintTime;
+    aspectConstraintTime @1 :AspectConstraintTime;
     # constrain aspectHashList by publish timestamp
 
-    aspectConstraintCount @3 :AspectConstraintCount;
+    aspectConstraintCount @2 :AspectConstraintCount;
     # constrain aspectHashList by local store count
 
-    aspectHashList @4 :List(AspectHashList);
+    aspectHashList @3 :List(AspectHashList);
     # list of aspectHashes associated with entryAddresses
     # that fall within all the above constraints.
   }
@@ -123,59 +88,44 @@ struct Message {
   struct MsgGspAspectDataRequest {
     # request a list of aspect hashes
 
-    channelId @0 :UInt32;
-    # requisit channelId (see `msgChannel`)
-
-    aspectHashList @1 :List(AspectHashList);
+    aspectHashList @0 :List(AspectHashList);
     # the aspect hashes we are requesting
   }
 
   struct MsgGspAspectDataResponse {
     # respond to an aspectDataRequest with aspect data
 
-    channelId @0 :UInt32;
-    # requisit channelId (see `msgChannel`)
-
-    aspectHashDataList @1 :List(AspectHashDataList);
+    aspectHashDataList @0 :List(AspectHashDataList);
     # the aspect data to respond with
   }
 
   struct MsgGspAspectBroadcast {
     # fast push new published data
 
-    channelId @0 :UInt32;
-    # requisit channelId (see `msgChannel`)
-
-    aspectHashDataList @1 :List(AspectHashDataList);
+    aspectHashDataList @0 :List(AspectHashDataList);
     # the aspect data to publish / broadcast
   }
 
   struct MsgDirect {
     # node-to-node message data
 
-    channelId @0 :UInt32;
-    # requisit channelId (see `msgChannel`)
-
-    requestId @1 :Text;
+    requestId @0 :Text;
     # requestId for associating requests / responses
 
-    data @2 :Data;
+    data @1 :Data;
     # the content of the direct message
   }
 
   struct MsgQuery {
     # dht query message data
 
-    channelId @0 :UInt32;
-    # requisit channelId (see `msgChannel`)
-
-    requestId @1 :Text;
+    requestId @0 :Text;
     # requestId for associating requests / responses
 
-    entryAddress @2 :Data;
+    entryAddress @1 :Data;
     # the entryAddress being queried
 
-    data @3 :Data;
+    data @2 :Data;
     # the message content (either request or response)
   }
 

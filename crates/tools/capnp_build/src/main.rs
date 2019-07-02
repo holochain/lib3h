@@ -18,6 +18,11 @@ fn main() {
     p2p_file.push("p2p.capnp");
     let p2p_file = p2p_file.to_string_lossy().to_string();
 
+    let mut tdm_file = path.to_path_buf();
+    tdm_file.push("protocol");
+    tdm_file.push("transport_dm.capnp");
+    let tdm_file = tdm_file.to_string_lossy().to_string();
+
     let mut transit_file = path.to_path_buf();
     transit_file.push("protocol");
     transit_file.push("transit_encoding.capnp");
@@ -38,6 +43,7 @@ fn main() {
         .no_standard_import()
         .src_prefix(src_prefix)
         .file(p2p_file)
+        .file(tdm_file)
         .file(transit_file)
         .output_path(output)
         .run()
