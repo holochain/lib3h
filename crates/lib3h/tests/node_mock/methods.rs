@@ -245,7 +245,8 @@ impl NodeMock {
     /// generate a new request_id
     fn generate_request_id(&mut self) -> String {
         self.request_count += 1;
-        let request_id = format!("req_{:?}_{}", self.agent_id, self.request_count);
+        let agent_id = std::str::from_utf8(self.agent_id.as_slice()).unwrap();
+        let request_id = format!("req_{}_{}", agent_id, self.request_count);
         self.request_log.push(request_id.clone());
         request_id
     }
@@ -529,8 +530,8 @@ impl NodeMock {
         true
     }
 
-    /// wait to receive a HandleFetchEntry request and automatically reply
-    /// return true if a HandleFetchEntry has been received
+    /// wait to receive a HandleQueryEntry request and automatically reply
+    /// return true if a HandleQueryEntry has been received
     pub fn wait_HandleQueryEntry_and_reply(&mut self) -> bool {
         let maybe_request = self.wait(Box::new(one_is!(Lib3hServerProtocol::HandleQueryEntry(_))));
         if maybe_request.is_none() {
@@ -543,15 +544,6 @@ impl NodeMock {
         self.reply_to_HandleQueryEntry(&query_data)
             .expect("Reply to HandleFetchEntry should work");
         true
-    }
-
-    /// Wait for receiving a message corresponding to predicate
-    /// hard coded timeout
-    pub fn wait(
-        &mut self,
-        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
-    ) -> Option<Lib3hServerProtocol> {
-        self.wait_with_timeout(predicate, TIMEOUT_MS)
     }
 
     /// Call process() in a loop until receiving a message corresponding to predicate
@@ -582,6 +574,15 @@ impl NodeMock {
                 return None;
             }
         }
+    }
+
+    /// Wait for receiving a message corresponding to predicate
+/// hard coded timeout
+    pub fn wait(
+        &mut self,
+        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
+    ) -> Option<Lib3hServerProtocol> {
+        self.wait_with_timeout(predicate, TIMEOUT_MS)
     }
 
     /// Call process until timeout is reached
@@ -651,8 +652,9 @@ impl NodeMock {
             Lib3hServerProtocol::HandleFetchEntry(_msg) => {
                 // FIXME
             }
+            /// HandleStoreEntryAspect: Network is asking us to store some aspect
+            /// Accept if we joined that space and tell our Lib3h that we are holding it.
             Lib3hServerProtocol::HandleStoreEntryAspect(msg) => {
-                // FIXME
                 if self.has_joined(&msg.space_address) {
                     // Store data in local datastore
                     let chain_store = self
@@ -667,6 +669,15 @@ impl NodeMock {
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
                     );
+                    let provided_entry = ProvidedEntryData {
+                        space_address: msg.space_address.clone(),
+                        provider_agent_id: msg.provider_agent_id.clone(),
+                        entry: EntryData {
+                            entry_address: msg.entry_address.clone(),
+                            aspect_list: vec![msg.entry_aspect.clone()],
+                        },
+                    };
+                    self.engine.post(Lib3hClientProtocol::HoldEntry(provided_entry)).expect("FIXME");
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {

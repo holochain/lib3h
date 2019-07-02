@@ -201,6 +201,8 @@ fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
     println!("DONE setup_two_nodes() DONE \n\n\n");
 }
 
@@ -249,30 +251,41 @@ fn two_nodes_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 fn two_nodes_dht_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex publish data on the network
     alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true).unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     // #fullsync
     // Alex should receive the data
-    let result_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
+    let result_a = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
     assert!(result_a.is_some());
-    println!("got HandleStoreEntryAspect on node A: {:?}", result_a);
-    // Gossip should ask Alex for the data
-    let maybe_fetch_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleFetchEntry(_))));
-    if let Some(fetch_a) = maybe_fetch_a {
-        let fetch = unwrap_to!(fetch_a => Lib3hServerProtocol::HandleFetchEntry);
-        let _ = alex.reply_to_HandleFetchEntry(&fetch).unwrap();
-    }
-    // #fullsync
-    // Billy should receive the data
-    let result_b = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
-    assert!(result_b.is_some());
-    println!("got HandleStoreEntryAspect on node B: {:?}", result_b);
+    println!("\n got HandleStoreEntryAspect on node A: {:?}", result_a);
+    // Process the HoldEntry command to lib3h
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+//    // Gossip should ask Alex for the data
+//    let maybe_fetch_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleFetchEntry(_))));
+//    if let Some(fetch_a) = maybe_fetch_a {
+//        let fetch = unwrap_to!(fetch_a => Lib3hServerProtocol::HandleFetchEntry);
+//        let _ = alex.reply_to_HandleFetchEntry(&fetch).unwrap();
+//    }
+//    // #fullsync
+//    // Billy should receive the data
+//    let result_b = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
+//    assert!(result_b.is_some());
+//    println!("got HandleStoreEntryAspect on node B: {:?}", result_b);
 
     // Billy asks for that data
+    println!("\nBilly requesting entry: ENTRY_ADDRESS_1\n");
     let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    println!("\nBilly reply to own request\n");
 
     // #fullsync
     // Billy sends that data back to the network
     let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    println!("\nBilly gets own response\n");
 
     // Billy should receive requested data
     let result = billy

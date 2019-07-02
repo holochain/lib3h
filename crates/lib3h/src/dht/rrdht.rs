@@ -1,5 +1,5 @@
 use crate::dht::{dht_protocol::*, dht_trait::Dht};
-use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
 use std::collections::VecDeque;
 use url::Url;
 
@@ -29,35 +29,27 @@ impl RrDht {
 }
 
 impl Dht for RrDht {
-    // -- Getters -- //
+    // -- Peer info -- //
 
-    fn this_peer(&self) -> &PeerData {
-        &self.this_peer
+    fn get_peer_list(&self) -> Vec<PeerData> {
+        // FIXME
+        vec![]
     }
-
-    // -- Peer -- //
 
     fn get_peer(&self, _peer_address: &str) -> Option<PeerData> {
         // FIXME
         None
     }
-    fn fetch_peer(&self, _peer_address: &str) -> Option<PeerData> {
-        // FIXME
-        None
+
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
-    fn get_peer_list(&self) -> Vec<PeerData> {
+
+    // -- Entry -- //
+
+    fn get_entry_address_list(&self) -> Vec<Address> {
         // FIXME
         vec![]
-    }
-    // -- Data -- //
-
-    fn get_entry(&self, _data_address: &AddressRef) -> Option<EntryData> {
-        // FIXME
-        None
-    }
-    fn fetch_entry(&self, _data_address: &AddressRef) -> Option<EntryData> {
-        // FIXME
-        None
     }
 
     // -- Processing -- //

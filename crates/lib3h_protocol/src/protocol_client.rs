@@ -34,7 +34,7 @@ pub enum Lib3hClientProtocol {
     HandleSendDirectMessageResult(DirectMessageData),
 
     // -- Entry -- //
-    /// Request an Entry (and its meta?) from the dht network
+    /// Request an Entry from the dht network
     FetchEntry(FetchEntryData),
     /// Successful data response for a `HandleFetchEntryData` request
     HandleFetchEntryResult(FetchEntryResultData),
