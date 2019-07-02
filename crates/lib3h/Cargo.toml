@@ -1,6 +1,6 @@
 [package]
 name = "lib3h"
-version = "0.0.2-alpha1"
+version = "0.0.3-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
@@ -14,8 +14,8 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 hcid = "=0.0.6"
-lib3h_protocol = { path = "../lib3h_protocol", version = "=0.0.2-alpha1" }
-lib3h_crypto_api = { path = "../crypto_api", version = "=0.0.2-alpha1" }
+lib3h_protocol = { path = "../lib3h_protocol", version = "=0.0.3-alpha1" }
+lib3h_crypto_api = { path = "../crypto_api", version = "=0.0.3-alpha1" }
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 url_serde = "=0.2.0"
