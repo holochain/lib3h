@@ -72,10 +72,10 @@ pub mod tests {
 
     #[allow(non_snake_case)]
     #[allow(dead_code)]
-    fn create_FetchEntry(entry_address: &AddressRef) -> FetchEntryData {
+    fn create_FetchEntry(entry_address: &AddressRef) -> FetchDhtEntryData {
         unsafe {
             FETCH_COUNT += 1;
-            FetchEntryData {
+            FetchDhtEntryData {
                 msg_id: format!("fetch_{}", FETCH_COUNT),
                 entry_address: entry_address.to_owned(),
             }
@@ -148,22 +148,21 @@ pub mod tests {
         let entry_address_list = dht.get_entry_address_list();
         assert_eq!(entry_address_list.len(), 1);
         // Fetch it
-        let fetch_entry = FetchEntryData {
+        let fetch_entry = FetchDhtEntryData {
             msg_id: "fetch_1".to_owned(),
             entry_address: ENTRY_ADDRESS_1.clone(),
         };
         dht.post(DhtCommand::FetchEntry(fetch_entry)).unwrap();
         let (_did_work, event_list) = dht.process().unwrap();
         assert_eq!(event_list.len(), 1);
-        let provide_entry = unwrap_to!(event_list[0] => DhtEvent::ProvideEntry);
+        let provide_entry = unwrap_to!(event_list[0] => DhtEvent::EntryDataRequested);
         // Make something up
         let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
-        let response = FetchEntryResponseData {
+        let response = FetchDhtEntryResponseData {
             msg_id: provide_entry.msg_id.clone(),
             entry: entry.clone(),
         };
-        dht.post(DhtCommand::ProvideEntryResponse(response))
-            .unwrap();
+        dht.post(DhtCommand::EntryDataResponse(response)).unwrap();
         let (_did_work, event_list) = dht.process().unwrap();
         // Should have it
         assert_eq!(event_list.len(), 1);

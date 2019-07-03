@@ -174,10 +174,7 @@ impl NodeMock {
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<()> {
-        let current_space = self
-            .current_space
-            .clone()
-            .expect("Should have current space");
+        let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
@@ -219,11 +216,9 @@ impl NodeMock {
         &mut self,
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
+        can_tell_engine: bool,
     ) -> Lib3hResult<()> {
-        let current_space = self
-            .current_space
-            .clone()
-            .expect("Should have current space");
+        let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
@@ -233,15 +228,25 @@ impl NodeMock {
         // Entry is known, try authoring each aspect instead
         if res.is_err() {
             let mut success = false;
-            for aspect in entry.aspect_list {
+            for aspect in &entry.aspect_list {
                 let aspect_res = chain_store.hold_aspect(&entry.entry_address, &aspect);
                 if aspect_res.is_ok() {
                     success = true;
                 }
             }
             if !success {
-                return Err(format_err!("Storing of all aspects failed."));
+                return Err(format_err!("Storing of aspects failed."));
             }
+        }
+        if can_tell_engine {
+            let msg_data = ProvidedEntryData {
+                space_address: current_space,
+                provider_agent_id: self.agent_id.clone(),
+                entry: entry.clone(),
+            };
+            return self
+                .engine
+                .post(Lib3hClientProtocol::HoldEntry(msg_data).into());
         }
         // Done
         Ok(())
