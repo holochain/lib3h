@@ -6,26 +6,27 @@ use crate::{
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
 /// Compose DHT
 impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Peer info
+    fn get_peer_list(&self) -> Vec<PeerData> {
+        self.inner_dht.get_peer_list()
+    }
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht.get_peer(peer_address)
     }
-    fn fetch_peer(&self, peer_address: &str) -> Option<PeerData> {
-        self.inner_dht.fetch_peer(peer_address)
+    fn this_peer(&self) -> &PeerData {
+        self.inner_dht.this_peer()
     }
     /// Entry
-    fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
-        self.inner_dht.get_entry(entry_address)
+    fn get_entry_address_list(&self) -> Vec<&AddressRef> {
+        self.inner_dht.get_entry_address_list()
     }
-    fn fetch_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
-        self.inner_dht.fetch_entry(entry_address)
-    }
+
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inner_dht.post(cmd)
@@ -47,13 +48,6 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
             }
         }
         Ok((did_work, dht_event_list))
-    }
-    /// Getters
-    fn this_peer(&self) -> &PeerData {
-        self.inner_dht.this_peer()
-    }
-    fn get_peer_list(&self) -> Vec<PeerData> {
-        self.inner_dht.get_peer_list()
     }
 }
 
@@ -118,6 +112,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 // FIXME
             }
             DhtEvent::EntryPruned(_address) => {
+                // FIXME
+            }
+            DhtEvent::EntryDataRequested(_) => {
                 // FIXME
             }
         }

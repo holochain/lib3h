@@ -8,6 +8,8 @@ use lib3h_protocol::{
     Address, AddressRef, DidWork, Lib3hResult,
 };
 use multihash::Hash;
+use rmp_serde::Serializer;
+use serde::Serialize;
 use std::collections::HashMap;
 use url::Url;
 
@@ -148,7 +150,7 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    fn into_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
+    fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
@@ -172,9 +174,8 @@ impl NodeMock {
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<()> {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        let entry = NodeMock::into_EntryData(entry_address, aspect_content_list);
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
         {
@@ -215,10 +216,10 @@ impl NodeMock {
         &mut self,
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
+        can_tell_engine: bool,
     ) -> Lib3hResult<()> {
-        assert!(self.current_space.is_some());
-        let current_space = self.current_space.clone().unwrap();
-        let entry = NodeMock::into_EntryData(entry_address, aspect_content_list);
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
             .get_mut(&current_space)
@@ -227,15 +228,25 @@ impl NodeMock {
         // Entry is known, try authoring each aspect instead
         if res.is_err() {
             let mut success = false;
-            for aspect in entry.aspect_list {
+            for aspect in &entry.aspect_list {
                 let aspect_res = chain_store.hold_aspect(&entry.entry_address, &aspect);
                 if aspect_res.is_ok() {
                     success = true;
                 }
             }
             if !success {
-                return Err(format_err!("Storing of all aspects failed."));
+                return Err(format_err!("Storing of aspects failed."));
             }
+        }
+        if can_tell_engine {
+            let msg_data = ProvidedEntryData {
+                space_address: current_space,
+                provider_agent_id: self.agent_id.clone(),
+                entry: entry.clone(),
+            };
+            return self
+                .engine
+                .post(Lib3hClientProtocol::HoldEntry(msg_data).into());
         }
         // Done
         Ok(())
@@ -247,7 +258,8 @@ impl NodeMock {
     /// generate a new request_id
     fn generate_request_id(&mut self) -> String {
         self.request_count += 1;
-        let request_id = format!("req_{:?}_{}", self.agent_id, self.request_count);
+        let agent_id = std::str::from_utf8(self.agent_id.as_slice()).unwrap();
+        let request_id = format!("req_{}_{}", agent_id, self.request_count);
         self.request_log.push(request_id.clone());
         request_id
     }
@@ -304,13 +316,19 @@ impl NodeMock {
             return Err(res);
         }
         // Convert query to fetch
+        let mut query_result = Vec::new();
+        fetch_res
+            .unwrap()
+            .entry
+            .serialize(&mut Serializer::new(&mut query_result))
+            .unwrap();
         let query_res = QueryEntryResultData {
             space_address: query.space_address.clone(),
             entry_address: query.entry_address.clone(),
             request_id: query.request_id.clone(),
             requester_agent_id: query.requester_agent_id.clone(),
             responder_agent_id: self.agent_id.clone(),
-            query_result: bincode::serialize(&fetch_res.unwrap().entry).unwrap(),
+            query_result,
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
@@ -531,8 +549,8 @@ impl NodeMock {
         true
     }
 
-    /// wait to receive a HandleFetchEntry request and automatically reply
-    /// return true if a HandleFetchEntry has been received
+    /// wait to receive a HandleQueryEntry request and automatically reply
+    /// return true if a HandleQueryEntry has been received
     pub fn wait_HandleQueryEntry_and_reply(&mut self) -> bool {
         let maybe_request = self.wait(Box::new(one_is!(Lib3hServerProtocol::HandleQueryEntry(_))));
         if maybe_request.is_none() {
@@ -545,15 +563,6 @@ impl NodeMock {
         self.reply_to_HandleQueryEntry(&query_data)
             .expect("Reply to HandleFetchEntry should work");
         true
-    }
-
-    /// Wait for receiving a message corresponding to predicate
-    /// hard coded timeout
-    pub fn wait(
-        &mut self,
-        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
-    ) -> Option<Lib3hServerProtocol> {
-        self.wait_with_timeout(predicate, TIMEOUT_MS)
     }
 
     /// Call process() in a loop until receiving a message corresponding to predicate
@@ -577,13 +586,22 @@ impl NodeMock {
                 }
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            time_ms += 10;
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            time_ms += 100;
             if time_ms > timeout_ms {
                 info!("({:?})::wait() has TIMEOUT", self.agent_id);
                 return None;
             }
         }
+    }
+
+    /// Wait for receiving a message corresponding to predicate
+    /// hard coded timeout
+    pub fn wait(
+        &mut self,
+        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
+    ) -> Option<Lib3hServerProtocol> {
+        self.wait_with_timeout(predicate, TIMEOUT_MS)
     }
 
     /// Call process until timeout is reached
@@ -653,8 +671,9 @@ impl NodeMock {
             Lib3hServerProtocol::HandleFetchEntry(_msg) => {
                 // FIXME
             }
+            // HandleStoreEntryAspect: Network is asking us to store some aspect
+            // Accept if we joined that space and tell our Lib3h that we are holding it.
             Lib3hServerProtocol::HandleStoreEntryAspect(msg) => {
-                // FIXME
                 if self.has_joined(&msg.space_address) {
                     // Store data in local datastore
                     let chain_store = self
@@ -669,6 +688,17 @@ impl NodeMock {
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
                     );
+                    let provided_entry = ProvidedEntryData {
+                        space_address: msg.space_address.clone(),
+                        provider_agent_id: msg.provider_agent_id.clone(),
+                        entry: EntryData {
+                            entry_address: msg.entry_address.clone(),
+                            aspect_list: vec![msg.entry_aspect.clone()],
+                        },
+                    };
+                    self.engine
+                        .post(Lib3hClientProtocol::HoldEntry(provided_entry))
+                        .expect("Engine.post() can't fail");
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
