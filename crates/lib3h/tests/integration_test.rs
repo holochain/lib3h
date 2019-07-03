@@ -24,14 +24,14 @@ use lib3h::{
 };
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
-    data_types::*,
-    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
+    data_types::*, network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address,
+    Lib3hResult,
 };
 use node_mock::NodeMock;
+use rmp_serde::Deserializer;
+use serde::Deserialize;
 use url::Url;
 use utils::constants::*;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -127,8 +127,8 @@ type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        // (setup_only, true),
-        // (two_nodes_send_message, true),
+        (setup_only, true),
+        (two_nodes_send_message, true),
         (two_nodes_dht_test, true),
     ];
 }
@@ -255,56 +255,56 @@ fn two_nodes_dht_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex publish data on the network
     alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
 
     // #fullsync
-    // Alex should receive the data
-    let result_a = billy.wait(Box::new(one_is!(
+    // Alex or Billy should receive the entry store request
+    let store_result = billy.wait(Box::new(one_is!(
         Lib3hServerProtocol::HandleStoreEntryAspect(_)
     )));
-    assert!(result_a.is_some());
-    println!("\n got HandleStoreEntryAspect on node A: {:?}", result_a);
-    // Process the HoldEntry command to lib3h
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    assert!(store_result.is_some());
+    println!("\n got HandleStoreEntryAspect: {:?}", store_result);
+    // Process the HoldEntry
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
 
-    // Billy asks for that data
+    // Billy asks for that entry
+    // ==========================
     println!("\nBilly requesting entry: ENTRY_ADDRESS_1\n");
     let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
 
-    println!("\nBilly reply to own request\n");
+    println!("\nBilly reply to own request:\n");
 
     // #fullsync
     // Billy sends that data back to the network
     let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
-    let (_did_work, srv_msg_list) = billy.process().unwrap();
-
+    let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("\nBilly gets own response {:?}\n", srv_msg_list);
+    assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
     assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
     let mut de = Deserializer::new(&msg.query_result[..]);
     let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
         Deserialize::deserialize(&mut de);
-    assert_eq!(&maybe_entry.unwrap().aspect_list[0].aspect, &*ASPECT_CONTENT_1);
+    assert_eq!(
+        &maybe_entry.unwrap().aspect_list[0].aspect,
+        &*ASPECT_CONTENT_1
+    );
 
-    //    // Billy asks for unknown data
-    //    // ===========================
-    //    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
-    //
-    //    // #fullsync
-    //    // Billy sends that data back to the network
-    //    let res = billy.reply_to_HandleQueryEntry(&query_data);
-    //    assert!(res.is_err());
-    //    // Billy should receive FailureResult
-    //    let result = billy
-    //        .wait(Box::new(one_is!(Lib3hServerProtocol::FailureResult(_))))
-    //        .unwrap();
-    //    log_i!("got FailureResult: {:?}", result);
-    //    let gen_res = unwrap_to!(result => Lib3hServerProtocol::FailureResult);
-    //    log_i!(
-    //        "Failure result_info: {}",
-    //        std::str::from_utf8(&gen_res.result_info).unwrap()
-    //    );
-    //    assert_eq!(res.err().unwrap(), *gen_res);
+    // Billy asks for unknown entry
+    // ============================
+    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
+    let res = alex.reply_to_HandleQueryEntry(&query_data);
+    println!("\nAlex gives response {:?}\n", res);
+    assert!(res.is_err());
+    let res_data: GenericResultData = res.err().unwrap();
+    let res_info = std::str::from_utf8(res_data.result_info.as_slice()).unwrap();
+    assert_eq!(res_info, "No entry found");
 }

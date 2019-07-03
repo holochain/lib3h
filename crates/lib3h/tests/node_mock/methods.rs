@@ -8,10 +8,10 @@ use lib3h_protocol::{
     Address, AddressRef, DidWork, Lib3hResult,
 };
 use multihash::Hash;
+use rmp_serde::Serializer;
+use serde::Serialize;
 use std::collections::HashMap;
 use url::Url;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
 
 /// Query logs
 impl NodeMock {
@@ -312,7 +312,9 @@ impl NodeMock {
         }
         // Convert query to fetch
         let mut query_result = Vec::new();
-        fetch_res.unwrap().entry
+        fetch_res
+            .unwrap()
+            .entry
             .serialize(&mut Serializer::new(&mut query_result))
             .unwrap();
         let query_res = QueryEntryResultData {
@@ -665,8 +667,8 @@ impl NodeMock {
             Lib3hServerProtocol::HandleFetchEntry(_msg) => {
                 // FIXME
             }
-            /// HandleStoreEntryAspect: Network is asking us to store some aspect
-            /// Accept if we joined that space and tell our Lib3h that we are holding it.
+            // HandleStoreEntryAspect: Network is asking us to store some aspect
+            // Accept if we joined that space and tell our Lib3h that we are holding it.
             Lib3hServerProtocol::HandleStoreEntryAspect(msg) => {
                 if self.has_joined(&msg.space_address) {
                     // Store data in local datastore

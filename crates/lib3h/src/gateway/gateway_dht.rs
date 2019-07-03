@@ -6,7 +6,7 @@ use crate::{
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, AddressRef, DidWork, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
@@ -115,9 +115,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 // FIXME
             }
             DhtEvent::ProvideEntry(_) => {
-                // FIXME
-            }
-            DhtEvent::FetchEntryResponse(_) => {
                 // FIXME
             }
         }

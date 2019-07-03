@@ -37,6 +37,7 @@ pub mod tests {
     const PEER_C: &str = "camille";
 
     // Request counters
+    #[allow(dead_code)]
     static mut FETCH_COUNT: u32 = 0;
 
     fn create_test_transport(peer_address: &str) -> Url {
@@ -71,6 +72,7 @@ pub mod tests {
     }
 
     #[allow(non_snake_case)]
+    #[allow(dead_code)]
     fn create_FetchEntry(entry_address: &AddressRef) -> FetchEntryData {
         unsafe {
             FETCH_COUNT += 1;
@@ -152,7 +154,7 @@ pub mod tests {
             entry_address: ENTRY_ADDRESS_1.clone(),
         };
         dht.post(DhtCommand::FetchEntry(fetch_entry)).unwrap();
-        let (did_work, event_list) = dht.process().unwrap();
+        let (_did_work, event_list) = dht.process().unwrap();
         assert_eq!(event_list.len(), 1);
         let provide_entry = unwrap_to!(event_list[0] => DhtEvent::ProvideEntry);
         // Make something up
@@ -163,7 +165,7 @@ pub mod tests {
         };
         dht.post(DhtCommand::ProvideEntryResponse(response))
             .unwrap();
-        let (did_work, event_list) = dht.process().unwrap();
+        let (_did_work, event_list) = dht.process().unwrap();
         // Should have it
         assert_eq!(event_list.len(), 1);
         let entry_response = unwrap_to!(event_list[0] => DhtEvent::FetchEntryResponse);

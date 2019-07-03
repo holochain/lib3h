@@ -73,9 +73,6 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             DhtEvent::ProvideEntry(_) => {
                 // FIXME
             }
-            DhtEvent::FetchEntryResponse(_) => {
-                // FIXME
-            }
         }
         Ok(outbox)
     }
