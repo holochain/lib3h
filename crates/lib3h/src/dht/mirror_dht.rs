@@ -76,8 +76,11 @@ impl Dht for MirrorDht {
 
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<Address> {
-        self.entry_address_list.iter().map(|e| e.clone()).collect()
+    fn get_entry_address_list(&self) -> Vec<&AddressRef> {
+        self.entry_address_list
+            .iter()
+            .map(|e| e.as_slice())
+            .collect()
     }
 
     // -- Processing -- //

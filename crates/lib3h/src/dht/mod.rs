@@ -29,7 +29,6 @@ pub mod tests {
         pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".as_bytes().to_vec();
         pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".as_bytes().to_vec();
         pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".as_bytes().to_vec();
-
     }
 
     const PEER_A: &str = "alex";

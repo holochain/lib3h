@@ -1,5 +1,5 @@
 use crate::dht::dht_protocol::{DhtCommand, DhtEvent, PeerData};
-use lib3h_protocol::{Address, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -21,7 +21,7 @@ pub trait Dht {
     fn get_peer(&self, peer_address: &str) -> Option<PeerData>;
     fn this_peer(&self) -> &PeerData;
     /// Entry
-    fn get_entry_address_list(&self) -> Vec<Address>;
+    fn get_entry_address_list(&self) -> Vec<&AddressRef>;
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()>;
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)>;

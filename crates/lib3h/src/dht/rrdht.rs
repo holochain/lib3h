@@ -1,5 +1,5 @@
 use crate::dht::{dht_protocol::*, dht_trait::Dht};
-use lib3h_protocol::{Address, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 use std::collections::VecDeque;
 use url::Url;
 
@@ -47,7 +47,7 @@ impl Dht for RrDht {
 
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<Address> {
+    fn get_entry_address_list(&self) -> Vec<&AddressRef> {
         // FIXME
         vec![]
     }
