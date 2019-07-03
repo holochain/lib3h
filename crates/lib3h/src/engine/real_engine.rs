@@ -364,6 +364,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 let entry = maybe_entry.expect("Deserialization should always work");
+                //let entry = bincode::deserialize(&msg.query_result).expect("Deserialization should always work");
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {

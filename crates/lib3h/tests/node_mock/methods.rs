@@ -10,6 +10,8 @@ use lib3h_protocol::{
 use multihash::Hash;
 use std::collections::HashMap;
 use url::Url;
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// Query logs
 impl NodeMock {
@@ -309,13 +311,18 @@ impl NodeMock {
             return Err(res);
         }
         // Convert query to fetch
+        let mut query_result = Vec::new();
+        fetch_res.unwrap().entry
+            .serialize(&mut Serializer::new(&mut query_result))
+            .unwrap();
         let query_res = QueryEntryResultData {
             space_address: query.space_address.clone(),
             entry_address: query.entry_address.clone(),
             request_id: query.request_id.clone(),
             requester_agent_id: query.requester_agent_id.clone(),
             responder_agent_id: self.agent_id.clone(),
-            query_result: bincode::serialize(&fetch_res.unwrap().entry).unwrap(),
+            query_result,
+            // query_result: bincode::serialize(&fetch_res.unwrap().entry).unwrap(),
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
