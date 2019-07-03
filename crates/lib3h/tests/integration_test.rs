@@ -127,10 +127,10 @@ type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        //(setup_only, true),
-        //(two_nodes_send_message, true),
+        (setup_only, true),
+        (two_nodes_send_message, true),
         (two_nodes_dht_publish_test, true),
-        //(two_nodes_dht_hold_test, true),
+        (two_nodes_dht_hold_test, true),
     ];
 }
 
