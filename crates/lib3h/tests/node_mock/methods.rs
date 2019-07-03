@@ -324,7 +324,6 @@ impl NodeMock {
             requester_agent_id: query.requester_agent_id.clone(),
             responder_agent_id: self.agent_id.clone(),
             query_result,
-            // query_result: bincode::serialize(&fetch_res.unwrap().entry).unwrap(),
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
@@ -694,7 +693,7 @@ impl NodeMock {
                     };
                     self.engine
                         .post(Lib3hClientProtocol::HoldEntry(provided_entry))
-                        .expect("FIXME");
+                        .expect("Engine.post() can't fail");
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {

@@ -184,7 +184,7 @@ impl MirrorDht {
                     .insert(fetch_entry.msg_id.clone());
                 return Ok(vec![DhtEvent::ProvideEntry(fetch_entry.clone())]);
             }
-            // Owner is asking us to hold peer info
+            // Owner is asking us to hold a peer info
             DhtCommand::HoldPeer(msg) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let peer_address_list: Vec<String> = self
@@ -238,16 +238,16 @@ impl MirrorDht {
                 // Done
                 Ok(event_list)
             }
-            // Owner asks us to hold some entry. Store it.
+            // Owner is holding some entry. Store its address for bookkeeping.
             DhtCommand::HoldEntryAddress(entry_address) => {
                 // Store it
                 let _received_new_content = self.add_entry_address(entry_address);
                 Ok(vec![])
             }
-            // Owner asks us to hold some entry. Store it and gossip to every known peer.
+            // Owner has some entry and wants it stored on the network
+            // Bookkeep address and gossip entry to every known peer.
             DhtCommand::BroadcastEntry(entry) => {
-                // Local asks us to hold entry.
-                // Store it
+                // Store address
                 let received_new_content = self.add_entry_address(&entry.entry_address.clone());
                 // Bail if did not receive new content
                 if !received_new_content {
@@ -270,7 +270,7 @@ impl MirrorDht {
                 // Done
                 Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
-            // Do nothing since monotonic fullsync dht for now
+            // N/A. Do nothing since this is a monotonic fullsync dht
             DhtCommand::DropEntryAddress(_) => Ok(vec![]),
             // Forward response back to self
             DhtCommand::ProvideEntryResponse(provide_response) => {

@@ -128,7 +128,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     space_address: chain_id.0.clone(),
                     entry_address: response.entry.entry_address.clone(),
                     request_id: response.msg_id.clone(),
-                    requester_agent_id: chain_id.1.clone(), // FIXME
+                    requester_agent_id: chain_id.1.clone(), // TODO: get requester with channel from p2p protocol
                     responder_agent_id: chain_id.1.clone(),
                     query_result,
                 });

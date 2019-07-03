@@ -176,14 +176,6 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
 
 /// Private
 impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
-    //    /// generate a new request_id
-    //    fn generate_request_id(&mut self) -> String {
-    //        self.request_count += 1;
-    //        let request_id = format!("req_{:?}_{}", self.agent_id, self.request_count);
-    //        self.request_log.push(request_id.clone());
-    //        request_id
-    //    }
-
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
@@ -295,7 +287,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             Lib3hClientProtocol::HandleFetchEntryResult(_msg) => {
                 // FIXME
             }
-            // PublishEntry
+            // PublishEntry: Broadcast on the space DHT
             Lib3hClientProtocol::PublishEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -312,7 +304,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     }
                 }
             }
-            // HoldEntry: Core validated the entry and tells us its holding it
+            // HoldEntry: Core validated an entry/aspect and tells us its holding it
             Lib3hClientProtocol::HoldEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -364,7 +356,6 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 let entry = maybe_entry.expect("Deserialization should always work");
-                //let entry = bincode::deserialize(&msg.query_result).expect("Deserialization should always work");
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
