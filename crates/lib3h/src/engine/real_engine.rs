@@ -20,8 +20,8 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol, AddressRef, DidWork, Lib3hResult,
 };
-use rmp_serde::Serializer;
-use serde::Serialize;
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc};
 
 impl<SecBuf: Buffer, Crypto: CryptoSystem> TransportKeys<SecBuf, Crypto> {
@@ -224,6 +224,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             Lib3hClientProtocol::LeaveSpace(_msg) => {
                 // FIXME
             }
+            // SendDirectMessage
             Lib3hClientProtocol::SendDirectMessage(msg) => {
                 let my_name = self.name.clone();
                 let maybe_space = self.get_space_or_fail(
@@ -255,6 +256,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     }
                 }
             }
+            // HandleSendDirectMessageResult
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -282,9 +284,28 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // FIXME
             }
-            Lib3hClientProtocol::HandleFetchEntryResult(_msg) => {
-                // FIXME
+            // HandleFetchEntryResult: Convert to DhtCommand::EntryDataResponse
+            Lib3hClientProtocol::HandleFetchEntryResult(msg) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.provider_agent_id,
+                    &format!("PublishEntry_{:?}", msg.entry.entry_address),
+                    None,
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Ok(space_gateway) => {
+                        let response = FetchDhtEntryResponseData {
+                            msg_id: msg.request_id.clone(),
+                            entry: msg.entry.clone(),
+                        };
+                        let cmd = DhtCommand::EntryDataResponse(response);
+                        space_gateway.post_dht(cmd)?;
+                        // Dht::post(&mut space_gateway, cmd)?;
+                    }
+                }
             }
+            // PublishEntry: Broadcast on the space DHT
             Lib3hClientProtocol::PublishEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -295,13 +316,13 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        // Post BroadcastEntry command
                         let cmd = DhtCommand::BroadcastEntry(msg.entry);
                         space_gateway.post_dht(cmd)?;
                         // Dht::post(&mut space_gateway, cmd)?;
                     }
                 }
             }
+            // HoldEntry: Core validated an entry/aspect and tells us its holding it.
             Lib3hClientProtocol::HoldEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -312,13 +333,14 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        // Post BroadcastEntry command
-                        let cmd = DhtCommand::HoldEntry(msg.entry);
+                        let cmd = DhtCommand::HoldEntryAddress(msg.entry.entry_address);
                         space_gateway.post_dht(cmd)?;
                         // Dht::post(&mut space_gateway, cmd)?;
                     }
                 }
             }
+            // QueryEntry: Converting to DHT FetchEntry for now
+            // TODO: make actual use of the query field
             Lib3hClientProtocol::QueryEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -329,8 +351,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        // Post BroadcastEntry command
-                        let msg = dht_protocol::FetchEntryData {
+                        let msg = dht_protocol::FetchDhtEntryData {
                             msg_id: msg.request_id,
                             entry_address: msg.entry_address,
                         };
@@ -340,8 +361,31 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     }
                 }
             }
-            Lib3hClientProtocol::HandleQueryEntryResult(_msg) => {
-                // FIXME
+            // HandleQueryEntryResult: Convert into DhtCommand::ProvideEntryResponse
+            // TODO use actual query data
+            Lib3hClientProtocol::HandleQueryEntryResult(msg) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.responder_agent_id,
+                    &msg.request_id,
+                    None,
+                );
+                let mut de = Deserializer::new(&msg.query_result[..]);
+                let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
+                    Deserialize::deserialize(&mut de);
+                let entry = maybe_entry.expect("Deserialization should always work");
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Ok(space_gateway) => {
+                        let msg = dht_protocol::FetchDhtEntryResponseData {
+                            msg_id: msg.request_id,
+                            entry,
+                        };
+                        let cmd = DhtCommand::EntryDataResponse(msg);
+                        space_gateway.post_dht(cmd)?;
+                        // Dht::post(&mut space_gateway, cmd)?;
+                    }
+                }
             }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(_msg) => {
