@@ -124,21 +124,29 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     .entry
                     .serialize(&mut Serializer::new(&mut query_result))
                     .unwrap();
-                let lib3h_msg = Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
+                let msg_data = QueryEntryResultData {
                     space_address: chain_id.0.clone(),
                     entry_address: response.entry.entry_address.clone(),
                     request_id: response.msg_id.clone(),
                     requester_agent_id: chain_id.1.clone(), // TODO: get requester with channel from p2p protocol
                     responder_agent_id: chain_id.1.clone(),
                     query_result,
-                });
-                outbox.push(lib3h_msg)
+                };
+                outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
             }
             DhtEvent::EntryPruned(_address) => {
                 // FIXME
             }
-            DhtEvent::ProvideEntry(_) => {
-                // FIXME
+            // EntryDataRequested: Change it into a Lib3hServerProtocol::HandleFetchEntry.
+            DhtEvent::EntryDataRequested(fetch_entry) => {
+                let msg_data = FetchEntryData {
+                    space_address: chain_id.0.clone(),
+                    entry_address: fetch_entry.entry_address.clone(),
+                    request_id: fetch_entry.msg_id.clone(),
+                    provider_agent_id: chain_id.1.clone(),
+                    aspect_address_list: None,
+                };
+                outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data))
             }
         }
         Ok(outbox)

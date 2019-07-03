@@ -142,6 +142,24 @@ impl MirrorDht {
         self.entry_address_list.insert(entry_address.to_vec())
     }
 
+    /// Create GossipTo event for entry to all known peers
+    fn gossip_entry(&self, entry: &EntryData) -> DhtEvent {
+        let entry_gossip = MirrorGossip::Entry(entry.clone());
+        let mut buf = Vec::new();
+        entry_gossip
+            .serialize(&mut Serializer::new(&mut buf))
+            .unwrap();
+        let gossip_evt = GossipToData {
+            peer_address_list: self
+                .get_peer_list()
+                .iter()
+                .map(|pi| pi.peer_address.clone())
+                .collect(),
+            bundle: buf,
+        };
+        DhtEvent::GossipTo(gossip_evt)
+    }
+
     /// Process a DhtEvent Command, sent by our owner.
     /// Return a list of DhtEvent to owner.
     #[allow(non_snake_case)]
@@ -182,7 +200,7 @@ impl MirrorDht {
             DhtCommand::FetchEntry(fetch_entry) => {
                 self.pending_fetch_requests
                     .insert(fetch_entry.msg_id.clone());
-                return Ok(vec![DhtEvent::ProvideEntry(fetch_entry.clone())]);
+                return Ok(vec![DhtEvent::EntryDataRequested(fetch_entry.clone())]);
             }
             // Owner is asking us to hold a peer info
             DhtCommand::HoldPeer(msg) => {
@@ -239,10 +257,17 @@ impl MirrorDht {
                 Ok(event_list)
             }
             // Owner is holding some entry. Store its address for bookkeeping.
+            // Ask for its data and broadcast it because we want fullsync.
             DhtCommand::HoldEntryAddress(entry_address) => {
-                // Store it
                 let _received_new_content = self.add_entry_address(entry_address);
-                Ok(vec![])
+                // Use entry_address as request_id
+                let address_str = std::str::from_utf8(entry_address.as_slice()).unwrap();
+                self.pending_fetch_requests.insert(address_str.to_string());
+                let fetch_entry = FetchDhtEntryData {
+                    msg_id: address_str.to_string(),
+                    entry_address: entry_address.to_owned(),
+                };
+                Ok(vec![DhtEvent::EntryDataRequested(fetch_entry)])
             }
             // Owner has some entry and wants it stored on the network
             // Bookkeep address and gossip entry to every known peer.
@@ -253,31 +278,26 @@ impl MirrorDht {
                 if !received_new_content {
                     return Ok(vec![]);
                 }
-                // Gossip new entry to all known peers
-                let entry_gossip = MirrorGossip::Entry(entry.clone());
-                let mut buf = Vec::new();
-                entry_gossip
-                    .serialize(&mut Serializer::new(&mut buf))
-                    .unwrap();
-                let gossip_evt = GossipToData {
-                    peer_address_list: self
-                        .get_peer_list()
-                        .iter()
-                        .map(|pi| pi.peer_address.clone())
-                        .collect(),
-                    bundle: buf,
-                };
+                let gossip_evt = self.gossip_entry(entry);
                 // Done
-                Ok(vec![DhtEvent::GossipTo(gossip_evt)])
+                Ok(vec![gossip_evt])
             }
             // N/A. Do nothing since this is a monotonic fullsync dht
             DhtCommand::DropEntryAddress(_) => Ok(vec![]),
-            // Forward response back to self
-            DhtCommand::ProvideEntryResponse(provide_response) => {
-                if !self.pending_fetch_requests.remove(&provide_response.msg_id) {
+            // EntryDataResponse:
+            //   - From a Publish: Forward response back to self
+            //   - From a Hold   : Broadcast entry
+            DhtCommand::EntryDataResponse(response) => {
+                if !self.pending_fetch_requests.remove(&response.msg_id) {
                     return Err(format_err!("Received response for an unknown request"));
                 }
-                Ok(vec![DhtEvent::FetchEntryResponse(provide_response.clone())])
+                // From a Hold if msg_id matches one set in HoldEntryAddress
+                let address_str = std::str::from_utf8(&response.entry.entry_address).unwrap();
+                if address_str == response.msg_id {
+                    let gossip_evt = self.gossip_entry(&response.entry);
+                    return Ok(vec![gossip_evt]);
+                }
+                Ok(vec![DhtEvent::FetchEntryResponse(response.clone())])
             }
         }
     }

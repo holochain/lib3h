@@ -8,7 +8,7 @@ pub enum DhtCommand {
     /// Owner received a gossip bundle from a remote peer, and asks us to handle it.
     HandleGossip(RemoteGossipBundleData),
     /// Owner wants a specific entry.
-    FetchEntry(FetchEntryData),
+    FetchEntry(FetchDhtEntryData),
     /// Owner wants us to hold a peer discovery data item.
     HoldPeer(PeerData),
     /// Owner notifies us that it is holding one or several Aspects for an Entry.
@@ -18,7 +18,7 @@ pub enum DhtCommand {
     /// Owner notifies us that is is not holding an entry anymore.
     DropEntryAddress(Address),
     /// Owner's response to ProvideEntry request
-    ProvideEntryResponse(FetchEntryResponseData),
+    EntryDataResponse(FetchDhtEntryResponseData),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -38,9 +38,9 @@ pub enum DhtEvent {
     /// String argument is: from_peer_address
     HoldEntryRequested(FromPeerAddress, EntryData),
     /// DHT wants an entry in order to send it to someone on the network
-    ProvideEntry(FetchEntryData),
+    EntryDataRequested(FetchDhtEntryData),
     /// Response to a `FetchEntry` command.
-    FetchEntryResponse(FetchEntryResponseData),
+    FetchEntryResponse(FetchDhtEntryResponseData),
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),
@@ -67,13 +67,13 @@ pub struct PeerData {
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct FetchEntryData {
+pub struct FetchDhtEntryData {
     pub msg_id: String,
     pub entry_address: Address,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct FetchEntryResponseData {
+pub struct FetchDhtEntryResponseData {
     pub msg_id: String,
     pub entry: EntryData,
 }

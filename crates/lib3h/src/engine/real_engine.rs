@@ -284,8 +284,26 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // FIXME
             }
-            Lib3hClientProtocol::HandleFetchEntryResult(_msg) => {
-                // FIXME
+            // HandleFetchEntryResult: Convert to DhtCommand::EntryDataResponse
+            Lib3hClientProtocol::HandleFetchEntryResult(msg) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.provider_agent_id,
+                    &format!("PublishEntry_{:?}", msg.entry.entry_address),
+                    None,
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Ok(space_gateway) => {
+                        let response = FetchDhtEntryResponseData {
+                            msg_id: msg.request_id.clone(),
+                            entry: msg.entry.clone(),
+                        };
+                        let cmd = DhtCommand::EntryDataResponse(response);
+                        space_gateway.post_dht(cmd)?;
+                        // Dht::post(&mut space_gateway, cmd)?;
+                    }
+                }
             }
             // PublishEntry: Broadcast on the space DHT
             Lib3hClientProtocol::PublishEntry(msg) => {
@@ -304,7 +322,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     }
                 }
             }
-            // HoldEntry: Core validated an entry/aspect and tells us its holding it
+            // HoldEntry: Core validated an entry/aspect and tells us its holding it.
             Lib3hClientProtocol::HoldEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -333,7 +351,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let msg = dht_protocol::FetchEntryData {
+                        let msg = dht_protocol::FetchDhtEntryData {
                             msg_id: msg.request_id,
                             entry_address: msg.entry_address,
                         };
@@ -359,11 +377,11 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let msg = dht_protocol::FetchEntryResponseData {
+                        let msg = dht_protocol::FetchDhtEntryResponseData {
                             msg_id: msg.request_id,
                             entry,
                         };
-                        let cmd = DhtCommand::ProvideEntryResponse(msg);
+                        let cmd = DhtCommand::EntryDataResponse(msg);
                         space_gateway.post_dht(cmd)?;
                         // Dht::post(&mut space_gateway, cmd)?;
                     }

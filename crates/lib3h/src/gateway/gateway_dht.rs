@@ -114,7 +114,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             DhtEvent::EntryPruned(_address) => {
                 // FIXME
             }
-            DhtEvent::ProvideEntry(_) => {
+            DhtEvent::EntryDataRequested(_) => {
                 // FIXME
             }
         }
