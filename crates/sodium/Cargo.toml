@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_sodium"
-version = "0.0.2-alpha1"
+version = "0.0.3-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h libsodium wrapper providing memory secure api access"
@@ -12,7 +12,7 @@ documentation = "https://docs.rs/lib3h_sodium"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-lib3h_crypto_api = { path = "../crypto_api", version = "=0.0.2-alpha1" }
+lib3h_crypto_api = { path = "../crypto_api", version = "=0.0.3-alpha1" }
 lazy_static = "=1.2.0"
 libc = "=0.2.50"
 rust_sodium = "=0.10.2"
