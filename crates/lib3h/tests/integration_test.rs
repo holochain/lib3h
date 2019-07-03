@@ -250,28 +250,31 @@ fn two_nodes_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 /// Test publish, Store, Query
 fn two_nodes_dht_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex publish data on the network
-    alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true).unwrap();
+    alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
+        .unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     // #fullsync
     // Alex should receive the data
-    let result_a = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
+    let result_a = billy.wait(Box::new(one_is!(
+        Lib3hServerProtocol::HandleStoreEntryAspect(_)
+    )));
     assert!(result_a.is_some());
     println!("\n got HandleStoreEntryAspect on node A: {:?}", result_a);
     // Process the HoldEntry command to lib3h
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
-//    // Gossip should ask Alex for the data
-//    let maybe_fetch_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleFetchEntry(_))));
-//    if let Some(fetch_a) = maybe_fetch_a {
-//        let fetch = unwrap_to!(fetch_a => Lib3hServerProtocol::HandleFetchEntry);
-//        let _ = alex.reply_to_HandleFetchEntry(&fetch).unwrap();
-//    }
-//    // #fullsync
-//    // Billy should receive the data
-//    let result_b = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
-//    assert!(result_b.is_some());
-//    println!("got HandleStoreEntryAspect on node B: {:?}", result_b);
+    //    // Gossip should ask Alex for the data
+    //    let maybe_fetch_a = alex.wait(Box::new(one_is!(Lib3hServerProtocol::HandleFetchEntry(_))));
+    //    if let Some(fetch_a) = maybe_fetch_a {
+    //        let fetch = unwrap_to!(fetch_a => Lib3hServerProtocol::HandleFetchEntry);
+    //        let _ = alex.reply_to_HandleFetchEntry(&fetch).unwrap();
+    //    }
+    //    // #fullsync
+    //    // Billy should receive the data
+    //    let result_b = billy.wait(Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))));
+    //    assert!(result_b.is_some());
+    //    println!("got HandleStoreEntryAspect on node B: {:?}", result_b);
 
     // Billy asks for that data
     println!("\nBilly requesting entry: ENTRY_ADDRESS_1\n");
@@ -293,23 +296,23 @@ fn two_nodes_dht_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     println!("got QueryEntryResult: {:?}\n\n\n\n", result);
 
-//    // Billy asks for unknown data
-//    // ===========================
-//    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
-//
-//    // #fullsync
-//    // Billy sends that data back to the network
-//    let res = billy.reply_to_HandleQueryEntry(&query_data);
-//    assert!(res.is_err());
-//    // Billy should receive FailureResult
-//    let result = billy
-//        .wait(Box::new(one_is!(Lib3hServerProtocol::FailureResult(_))))
-//        .unwrap();
-//    log_i!("got FailureResult: {:?}", result);
-//    let gen_res = unwrap_to!(result => Lib3hServerProtocol::FailureResult);
-//    log_i!(
-//        "Failure result_info: {}",
-//        std::str::from_utf8(&gen_res.result_info).unwrap()
-//    );
-//    assert_eq!(res.err().unwrap(), *gen_res);
+    //    // Billy asks for unknown data
+    //    // ===========================
+    //    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
+    //
+    //    // #fullsync
+    //    // Billy sends that data back to the network
+    //    let res = billy.reply_to_HandleQueryEntry(&query_data);
+    //    assert!(res.is_err());
+    //    // Billy should receive FailureResult
+    //    let result = billy
+    //        .wait(Box::new(one_is!(Lib3hServerProtocol::FailureResult(_))))
+    //        .unwrap();
+    //    log_i!("got FailureResult: {:?}", result);
+    //    let gen_res = unwrap_to!(result => Lib3hServerProtocol::FailureResult);
+    //    log_i!(
+    //        "Failure result_info: {}",
+    //        std::str::from_utf8(&gen_res.result_info).unwrap()
+    //    );
+    //    assert_eq!(res.err().unwrap(), *gen_res);
 }

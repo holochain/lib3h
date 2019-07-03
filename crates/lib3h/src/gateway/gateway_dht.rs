@@ -23,7 +23,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         self.inner_dht.this_peer()
     }
     /// Entry
-    fn get_entry_address_list(&self) ->  Vec<Address> {
+    fn get_entry_address_list(&self) -> Vec<Address> {
         self.inner_dht.get_entry_address_list()
     }
 

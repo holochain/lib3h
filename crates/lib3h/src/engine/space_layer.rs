@@ -8,9 +8,9 @@ use crate::{
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use std::collections::HashMap;
-use rmp_serde::{Serializer};
-use serde::{Serialize};
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
@@ -120,18 +120,18 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             // TODO Discern Fetch from Query
             DhtEvent::FetchEntryResponse(response) => {
                 let mut query_result = Vec::new();
-                response.entry
+                response
+                    .entry
                     .serialize(&mut Serializer::new(&mut query_result))
                     .unwrap();
-                let lib3h_msg =
-                    Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
-                        space_address: chain_id.0.clone(),
-                        entry_address: response.entry.entry_address.clone(),
-                        request_id: response.msg_id.clone(),
-                        requester_agent_id: chain_id.1.clone(), // FIXME
-                        responder_agent_id: chain_id.1.clone(),
-                        query_result,
-                    });
+                let lib3h_msg = Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
+                    space_address: chain_id.0.clone(),
+                    entry_address: response.entry.entry_address.clone(),
+                    request_id: response.msg_id.clone(),
+                    requester_agent_id: chain_id.1.clone(), // FIXME
+                    responder_agent_id: chain_id.1.clone(),
+                    query_result,
+                });
                 outbox.push(lib3h_msg)
             }
             DhtEvent::EntryPruned(_address) => {

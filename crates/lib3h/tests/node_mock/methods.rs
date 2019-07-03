@@ -172,7 +172,10 @@ impl NodeMock {
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<()> {
-        let current_space = self.current_space.clone().expect("Should have current space");
+        let current_space = self
+            .current_space
+            .clone()
+            .expect("Should have current space");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
 
         // bookkeep
@@ -215,7 +218,10 @@ impl NodeMock {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
     ) -> Lib3hResult<()> {
-        let current_space = self.current_space.clone().expect("Should have current space");
+        let current_space = self
+            .current_space
+            .clone()
+            .expect("Should have current space");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
@@ -577,7 +583,7 @@ impl NodeMock {
     }
 
     /// Wait for receiving a message corresponding to predicate
-/// hard coded timeout
+    /// hard coded timeout
     pub fn wait(
         &mut self,
         predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
@@ -677,7 +683,9 @@ impl NodeMock {
                             aspect_list: vec![msg.entry_aspect.clone()],
                         },
                     };
-                    self.engine.post(Lib3hClientProtocol::HoldEntry(provided_entry)).expect("FIXME");
+                    self.engine
+                        .post(Lib3hClientProtocol::HoldEntry(provided_entry))
+                        .expect("FIXME");
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {

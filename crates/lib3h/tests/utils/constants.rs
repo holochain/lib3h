@@ -1,6 +1,6 @@
+use holochain_persistence_api::hash::HashString;
 use lib3h_protocol::Address;
 use multihash::Hash;
-use holochain_persistence_api::hash::HashString;
 
 lazy_static! {
     /// Networks
@@ -30,7 +30,9 @@ lazy_static! {
 
 pub fn generate_address(content: &[u8]) -> Address {
     HashString::encode_from_bytes(content, Hash::SHA2256)
-        .to_string().as_bytes().to_vec()
+        .to_string()
+        .as_bytes()
+        .to_vec()
 }
 
 #[allow(dead_code)]

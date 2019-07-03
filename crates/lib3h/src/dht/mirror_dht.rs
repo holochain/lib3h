@@ -177,7 +177,8 @@ impl MirrorDht {
             }
             // Ask owner to respond to self
             DhtCommand::FetchEntry(fetch_entry) => {
-                self.pending_fetch_requests.insert(fetch_entry.msg_id.clone());
+                self.pending_fetch_requests
+                    .insert(fetch_entry.msg_id.clone());
                 return Ok(vec![DhtEvent::ProvideEntry(fetch_entry.clone())]);
             }
             // Owner is asking us to hold peer info

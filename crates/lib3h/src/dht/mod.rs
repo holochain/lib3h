@@ -139,7 +139,8 @@ pub mod tests {
         let entry_address_list = dht.get_entry_address_list();
         assert_eq!(entry_address_list.len(), 0);
         // Add a data item
-        dht.post(DhtCommand::HoldEntryAddress(ENTRY_ADDRESS_1.clone())).unwrap();
+        dht.post(DhtCommand::HoldEntryAddress(ENTRY_ADDRESS_1.clone()))
+            .unwrap();
         let (did_work, _) = dht.process().unwrap();
         assert!(did_work);
         // Should have it
@@ -160,7 +161,8 @@ pub mod tests {
             msg_id: provide_entry.msg_id.clone(),
             entry: entry.clone(),
         };
-        dht.post(DhtCommand::ProvideEntryResponse(response)).unwrap();
+        dht.post(DhtCommand::ProvideEntryResponse(response))
+            .unwrap();
         let (did_work, event_list) = dht.process().unwrap();
         // Should have it
         assert_eq!(event_list.len(), 1);
@@ -238,13 +240,15 @@ pub mod tests {
         // Should receive a HoldRequested
         assert_eq!(event_list.len(), 1);
         if let DhtEvent::HoldEntryRequested(from, hold_entry) = event_list[0].clone() {
-            assert_eq!(from, PEER_A.clone());
+            assert_eq!(from, PEER_B.clone());
             assert_eq!(hold_entry, entry_data.clone());
         } else {
             panic!("Should be of variant type HoldEntryRequested");
         }
         // Tell DHT B to hold it
-        dht_b.post(DhtCommand::HoldEntryAddress(entry_data.entry_address)).unwrap();
+        dht_b
+            .post(DhtCommand::HoldEntryAddress(entry_data.entry_address))
+            .unwrap();
         let (did_work, _) = dht_b.process().unwrap();
         assert!(did_work);
         // DHT B should have the entry

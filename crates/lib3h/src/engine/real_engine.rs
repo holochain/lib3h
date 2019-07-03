@@ -176,14 +176,13 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
 
 /// Private
 impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
-
-//    /// generate a new request_id
-//    fn generate_request_id(&mut self) -> String {
-//        self.request_count += 1;
-//        let request_id = format!("req_{:?}_{}", self.agent_id, self.request_count);
-//        self.request_log.push(request_id.clone());
-//        request_id
-//    }
+    //    /// generate a new request_id
+    //    fn generate_request_id(&mut self) -> String {
+    //        self.request_count += 1;
+    //        let request_id = format!("req_{:?}_{}", self.agent_id, self.request_count);
+    //        self.request_log.push(request_id.clone());
+    //        request_id
+    //    }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
