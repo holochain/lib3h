@@ -3,7 +3,7 @@ use crate::dht::{
     dht_trait::{Dht, DhtConfig},
 };
 use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -23,12 +23,14 @@ enum MirrorGossip {
 pub struct MirrorDht {
     /// FIFO of DhtCommands send to us
     inbox: VecDeque<DhtCommand>,
+    /// Storage of EntryData with empty aspect content?
+    entry_address_list: HashSet<Address>,
     /// Storage of PeerData
     peer_list: HashMap<String, PeerData>,
-    /// Storage of EntryData with empty aspect content?
-    entry_list: HashMap<Address, EntryData>,
     /// PeerData of this peer
     this_peer: PeerData,
+    ///
+    pending_fetch_requests: HashSet<String>,
 }
 
 /// Constructors
@@ -37,12 +39,13 @@ impl MirrorDht {
         MirrorDht {
             inbox: VecDeque::new(),
             peer_list: HashMap::new(),
-            entry_list: HashMap::new(),
+            entry_address_list: HashSet::new(),
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 peer_uri: peer_transport.clone(),
                 timestamp: 0, // FIXME
             },
+            pending_fetch_requests: HashSet::new(),
         }
     }
 
@@ -53,13 +56,11 @@ impl MirrorDht {
 
 /// Impl Dht interface
 impl Dht for MirrorDht {
-    // -- Getters -- //
+    // -- Peer info -- //
 
-    fn this_peer(&self) -> &PeerData {
-        &self.this_peer
+    fn get_peer_list(&self) -> Vec<PeerData> {
+        self.peer_list.values().map(|v| v.clone()).collect()
     }
-
-    // -- Peer -- //
 
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         let res = self.peer_list.get(peer_address);
@@ -68,25 +69,18 @@ impl Dht for MirrorDht {
         }
         None
     }
-    fn fetch_peer(&self, peer_address: &str) -> Option<PeerData> {
-        // FIXME: wait 200ms?
-        self.get_peer(peer_address)
+
+    fn this_peer(&self) -> &PeerData {
+        &self.this_peer
     }
 
-    fn get_peer_list(&self) -> Vec<PeerData> {
-        self.peer_list.values().map(|v| v.clone()).collect()
-    }
+    // -- Entry -- //
 
-    // -- Data -- //
-
-    fn get_entry(&self, data_address: &AddressRef) -> Option<EntryData> {
-        self.entry_list.get(data_address).map(|e| e.clone())
-    }
-
-    /// Same as get_data with artificial wait
-    fn fetch_entry(&self, data_address: &AddressRef) -> Option<EntryData> {
-        // FIXME: wait 200ms?
-        self.get_entry(data_address)
+    fn get_entry_address_list(&self) -> Vec<&AddressRef> {
+        self.entry_address_list
+            .iter()
+            .map(|e| e.as_slice())
+            .collect()
     }
 
     // -- Processing -- //
@@ -144,18 +138,8 @@ impl MirrorDht {
 
     /// Add entry to our local storage
     /// Return true if new entry was successfully added
-    fn add_entry(&mut self, entry: &EntryData) -> bool {
-        let maybe_entry = self.entry_list.get_mut(&entry.entry_address);
-        match maybe_entry {
-            None => {
-                self.entry_list
-                    .insert(entry.entry_address.clone(), entry.clone());
-                true
-            }
-            Some(prev_entry) => {
-                return prev_entry.merge(entry);
-            }
-        }
+    fn add_entry_address(&mut self, entry_address: &AddressRef) -> bool {
+        self.entry_address_list.insert(entry_address.to_vec())
     }
 
     /// Process a DhtEvent Command, sent by our owner.
@@ -176,7 +160,7 @@ impl MirrorDht {
                 }
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
-                        let is_new = self.add_entry(&entry);
+                        let is_new = self.add_entry_address(&entry.entry_address);
                         if is_new {
                             return Ok(vec![DhtEvent::HoldEntryRequested(
                                 self.this_peer.peer_address.clone(),
@@ -194,7 +178,13 @@ impl MirrorDht {
                     }
                 }
             }
-            // Owner is asking us to hold peer info
+            // Ask owner to respond to self
+            DhtCommand::FetchEntry(fetch_entry) => {
+                self.pending_fetch_requests
+                    .insert(fetch_entry.msg_id.clone());
+                return Ok(vec![DhtEvent::ProvideEntry(fetch_entry.clone())]);
+            }
+            // Owner is asking us to hold a peer info
             DhtCommand::HoldPeer(msg) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let peer_address_list: Vec<String> = self
@@ -248,26 +238,22 @@ impl MirrorDht {
                 // Done
                 Ok(event_list)
             }
-            // Owner asks us to hold some entry. Store it.
-            DhtCommand::HoldEntry(entry) => {
+            // Owner is holding some entry. Store its address for bookkeeping.
+            DhtCommand::HoldEntryAddress(entry_address) => {
                 // Store it
-                let _received_new_content = self.add_entry(entry);
+                let _received_new_content = self.add_entry_address(entry_address);
                 Ok(vec![])
             }
-            // Owner asks us to hold some entry. Store it and gossip to every known peer.
+            // Owner has some entry and wants it stored on the network
+            // Bookkeep address and gossip entry to every known peer.
             DhtCommand::BroadcastEntry(entry) => {
-                // Local asks us to hold entry.
-                // Store it
-                let received_new_content = self.add_entry(entry);
+                // Store address
+                let received_new_content = self.add_entry_address(&entry.entry_address.clone());
                 // Bail if did not receive new content
                 if !received_new_content {
                     return Ok(vec![]);
                 }
                 // Gossip new entry to all known peers
-                let entry = self
-                    .entry_list
-                    .get(&entry.entry_address)
-                    .expect("Should have content at this point");
                 let entry_gossip = MirrorGossip::Entry(entry.clone());
                 let mut buf = Vec::new();
                 entry_gossip
@@ -284,22 +270,15 @@ impl MirrorDht {
                 // Done
                 Ok(vec![DhtEvent::GossipTo(gossip_evt)])
             }
-            // Respond with internal query
-            DhtCommand::FetchEntry(msg) => {
-                let maybe_entry = self.fetch_entry(&msg.entry_address);
-                match maybe_entry {
-                    None => Ok(vec![]),
-                    Some(entry) => {
-                        let response = FetchEntryResponseData {
-                            msg_id: msg.msg_id.clone(),
-                            entry,
-                        };
-                        Ok(vec![DhtEvent::FetchEntryResponse(response)])
-                    }
+            // N/A. Do nothing since this is a monotonic fullsync dht
+            DhtCommand::DropEntryAddress(_) => Ok(vec![]),
+            // Forward response back to self
+            DhtCommand::ProvideEntryResponse(provide_response) => {
+                if !self.pending_fetch_requests.remove(&provide_response.msg_id) {
+                    return Err(format_err!("Received response for an unknown request"));
                 }
+                Ok(vec![DhtEvent::FetchEntryResponse(provide_response.clone())])
             }
-            // Monotonic fullsync dht for now
-            DhtCommand::DropEntry(_) => Ok(vec![]),
         }
     }
 }

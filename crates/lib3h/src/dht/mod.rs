@@ -29,7 +29,6 @@ pub mod tests {
         pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".as_bytes().to_vec();
         pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".as_bytes().to_vec();
         pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".as_bytes().to_vec();
-
     }
 
     const PEER_A: &str = "alex";
@@ -37,6 +36,7 @@ pub mod tests {
     const PEER_C: &str = "camille";
 
     // Request counters
+    #[allow(dead_code)]
     static mut FETCH_COUNT: u32 = 0;
 
     fn create_test_transport(peer_address: &str) -> Url {
@@ -71,6 +71,7 @@ pub mod tests {
     }
 
     #[allow(non_snake_case)]
+    #[allow(dead_code)]
     fn create_FetchEntry(entry_address: &AddressRef) -> FetchEntryData {
         unsafe {
             FETCH_COUNT += 1;
@@ -136,16 +137,38 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
-        let result = dht.get_entry(&ENTRY_ADDRESS_1);
-        assert!(result.is_none());
+        let entry_address_list = dht.get_entry_address_list();
+        assert_eq!(entry_address_list.len(), 0);
         // Add a data item
-        let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
-        dht.post(DhtCommand::HoldEntry(entry_data.clone())).unwrap();
+        dht.post(DhtCommand::HoldEntryAddress(ENTRY_ADDRESS_1.clone()))
+            .unwrap();
         let (did_work, _) = dht.process().unwrap();
         assert!(did_work);
         // Should have it
-        let entry = dht.get_entry(&ENTRY_ADDRESS_1).unwrap();
-        assert_eq!(entry, entry_data);
+        let entry_address_list = dht.get_entry_address_list();
+        assert_eq!(entry_address_list.len(), 1);
+        // Fetch it
+        let fetch_entry = FetchEntryData {
+            msg_id: "fetch_1".to_owned(),
+            entry_address: ENTRY_ADDRESS_1.clone(),
+        };
+        dht.post(DhtCommand::FetchEntry(fetch_entry)).unwrap();
+        let (_did_work, event_list) = dht.process().unwrap();
+        assert_eq!(event_list.len(), 1);
+        let provide_entry = unwrap_to!(event_list[0] => DhtEvent::ProvideEntry);
+        // Make something up
+        let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
+        let response = FetchEntryResponseData {
+            msg_id: provide_entry.msg_id.clone(),
+            entry: entry.clone(),
+        };
+        dht.post(DhtCommand::ProvideEntryResponse(response))
+            .unwrap();
+        let (_did_work, event_list) = dht.process().unwrap();
+        // Should have it
+        assert_eq!(event_list.len(), 1);
+        let entry_response = unwrap_to!(event_list[0] => DhtEvent::FetchEntryResponse);
+        assert_eq!(entry_response.entry, entry);
     }
 
     #[test]
@@ -195,7 +218,7 @@ pub mod tests {
             .unwrap();
         let (did_work, _) = dht_a.process().unwrap();
         assert!(did_work);
-        // Add a data item
+        // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a
             .post(DhtCommand::BroadcastEntry(entry_data.clone()))
@@ -213,22 +236,25 @@ pub mod tests {
             bundle: gossip_to.bundle.clone(),
         };
         dht_b.post(DhtCommand::HandleGossip(remote_gossip)).unwrap();
+        let (did_work, event_list) = dht_b.process().unwrap();
+        assert!(did_work);
+        // Should receive a HoldRequested
+        assert_eq!(event_list.len(), 1);
+        if let DhtEvent::HoldEntryRequested(from, hold_entry) = event_list[0].clone() {
+            assert_eq!(from, PEER_B.clone());
+            assert_eq!(hold_entry, entry_data.clone());
+        } else {
+            panic!("Should be of variant type HoldEntryRequested");
+        }
+        // Tell DHT B to hold it
+        dht_b
+            .post(DhtCommand::HoldEntryAddress(entry_data.entry_address))
+            .unwrap();
         let (did_work, _) = dht_b.process().unwrap();
         assert!(did_work);
-        // DHT B should have the data
-        let entry = dht_b.get_entry(&ENTRY_ADDRESS_1).unwrap();
-        assert_eq!(entry, entry_data.clone());
-        // DHT B should have the data with a Fetch
-        let fetch_data = create_FetchEntry(&ENTRY_ADDRESS_1);
-        let _ = dht_b
-            .post(DhtCommand::FetchEntry(fetch_data.clone()))
-            .unwrap();
-        let (did_work, events) = dht_b.process().unwrap();
-        assert!(did_work);
-        assert_eq!(events.len(), 1);
-        let fetch_response = unwrap_to!(events[0] => DhtEvent::FetchEntryResponse);
-        assert_eq!(fetch_response.msg_id, fetch_data.msg_id);
-        assert_eq!(fetch_response.entry, entry_data.clone());
+        // DHT B should have the entry
+        let entry_list = dht_b.get_entry_address_list();
+        assert_eq!(entry_list.len(), 1);
     }
 
     #[test]

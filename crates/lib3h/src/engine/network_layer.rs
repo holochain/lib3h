@@ -70,6 +70,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             DhtEvent::EntryPruned(_address) => {
                 // FIXME
             }
+            DhtEvent::ProvideEntry(_) => {
+                // FIXME
+            }
         }
         Ok(outbox)
     }

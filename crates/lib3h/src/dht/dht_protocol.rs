@@ -7,16 +7,18 @@ pub type FromPeerAddress = String;
 pub enum DhtCommand {
     /// Owner received a gossip bundle from a remote peer, and asks us to handle it.
     HandleGossip(RemoteGossipBundleData),
-    /// Owner wants access to the entry associated with an entry address.
+    /// Owner wants a specific entry.
     FetchEntry(FetchEntryData),
     /// Owner wants us to hold a peer discovery data item.
     HoldPeer(PeerData),
-    /// Owner wants us to hold an entry.
-    HoldEntry(EntryData),
-    /// Owner wants us to hold an entry and broadcast it to neighbors
+    /// Owner notifies us that it is holding one or several Aspects for an Entry.
+    HoldEntryAddress(Address),
+    /// Owner wants us to bookkeep an entry and broadcast it to neighbors
     BroadcastEntry(EntryData),
-    /// Owner wants us to drop an entry.
-    DropEntry(Address),
+    /// Owner notifies us that is is not holding an entry anymore.
+    DropEntryAddress(Address),
+    /// Owner's response to ProvideEntry request
+    ProvideEntryResponse(FetchEntryResponseData),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -35,6 +37,8 @@ pub enum DhtEvent {
     /// Notify owner that gossip is requesting we hold an entry.
     /// String argument is: from_peer_address
     HoldEntryRequested(FromPeerAddress, EntryData),
+    /// DHT wants an entry in order to send it to someone on the network
+    ProvideEntry(FetchEntryData),
     /// Response to a `FetchEntry` command.
     FetchEntryResponse(FetchEntryResponseData),
     /// Notify owner that we are no longer tracking this entry internally.

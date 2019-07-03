@@ -8,6 +8,8 @@ use crate::{
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use std::collections::HashMap;
 
 /// Space layer related private methods
@@ -84,6 +86,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             DhtEvent::GossipUnreliablyTo(_data) => {
                 // n/a - should have been handled by gateway
             }
+            // HoldPeerRequested from gossip
             DhtEvent::HoldPeerRequested(peer_data) => {
                 debug!(
                     "{} -- ({}).post() HoldPeer {:?}",
@@ -98,8 +101,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             DhtEvent::PeerTimedOut(_data) => {
                 // FIXME
             }
+            // HoldEntryRequested from gossip
+            // -> Send each aspect to Core for validation
             DhtEvent::HoldEntryRequested(from, entry) => {
-                // Send each aspect to Core for validation
                 for aspect in entry.aspect_list {
                     let lib3h_msg =
                         Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData {
@@ -112,10 +116,28 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     outbox.push(lib3h_msg)
                 }
             }
-            DhtEvent::FetchEntryResponse(_data) => {
-                // FIXME
+            // FetchEntryResponse: Send back as a query response to Core
+            // TODO Discern Fetch from Query
+            DhtEvent::FetchEntryResponse(response) => {
+                let mut query_result = Vec::new();
+                response
+                    .entry
+                    .serialize(&mut Serializer::new(&mut query_result))
+                    .unwrap();
+                let lib3h_msg = Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
+                    space_address: chain_id.0.clone(),
+                    entry_address: response.entry.entry_address.clone(),
+                    request_id: response.msg_id.clone(),
+                    requester_agent_id: chain_id.1.clone(), // TODO: get requester with channel from p2p protocol
+                    responder_agent_id: chain_id.1.clone(),
+                    query_result,
+                });
+                outbox.push(lib3h_msg)
             }
             DhtEvent::EntryPruned(_address) => {
+                // FIXME
+            }
+            DhtEvent::ProvideEntry(_) => {
                 // FIXME
             }
         }

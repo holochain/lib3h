@@ -1,5 +1,5 @@
 use crate::dht::dht_protocol::{DhtCommand, DhtEvent, PeerData};
-use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -13,17 +13,15 @@ pub struct DhtConfig {
 pub type DhtFactory<D> = fn(config: &DhtConfig) -> Lib3hResult<D>;
 
 /// Allow storage and retrieval of peer & entry data.
-/// Trait API is for query
-/// DhtEvent is for mutating storage
+/// Trait API is for querying local dht data
+/// DhtCommand is for mutating storage or network/async queries
 pub trait Dht {
     /// Peer info
-    fn get_peer(&self, peer_address: &str) -> Option<PeerData>;
-    fn fetch_peer(&self, peer_address: &str) -> Option<PeerData>;
     fn get_peer_list(&self) -> Vec<PeerData>;
+    fn get_peer(&self, peer_address: &str) -> Option<PeerData>;
     fn this_peer(&self) -> &PeerData;
-    /// Data
-    fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData>;
-    fn fetch_entry(&self, entry_address: &AddressRef) -> Option<EntryData>;
+    /// Entry
+    fn get_entry_address_list(&self) -> Vec<&AddressRef>;
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()>;
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)>;
