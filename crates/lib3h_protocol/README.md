@@ -9,7 +9,7 @@
 
 ## Overview
 
-Lib3h Protocol definition for API interaction with the library.
+Protocol definition for interacting with Lib3h.
 
 ## Usage
 

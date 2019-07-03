@@ -8,9 +8,15 @@
 struct Halt {
   # Let's at least try to be nice to people connecting to us
   # Give them some info why we won't accept their connection
+  # Note: We may disable Halt responses for production to prevent
+  # leaking information, but for protocol testing / debugging
+  # it is useful to have the capability.
 
   reasonCode @0 :ReasonCode;
+  # If the error is well known, include the reasonCode, otherwise unspecified
+
   reasonText @1 :Text;
+  # the specific details of the halt reason
 
   enum ReasonCode {
     unspecified @0;
@@ -20,11 +26,10 @@ struct Halt {
     kxDecodeFail @4;
     unexpectedSigPubKey @5;
     badSignature @6;
-    encDecodeFail @7;
   }
 }
 
-struct MsgConH1 {
+struct MsgStep1FromConnect {
   # When opening a connection, you should send this first message
 
   magic @0 :UInt16 = 0x0000;
@@ -61,7 +66,7 @@ struct MsgConH1 {
   }
 }
 
-struct MsgLsnH2 {
+struct MsgStep2FromListen {
   # A remote node has connected to us, and sent MsgConH1
   # We need to either accept or reject their request
 
@@ -89,7 +94,7 @@ struct MsgLsnH2 {
   }
 }
 
-struct MsgLsnH2Kx {
+struct MsgStep2FromListenKxEncoded {
   # this message will be encoded into the kxSecret field in MsgLsnH2
 
   padding @0 :Data;
@@ -101,7 +106,7 @@ struct MsgLsnH2Kx {
   # pure entropy listening-to-connecting session key
 }
 
-struct MsgConH3 {
+struct MsgStep3FromConnect {
   # this message is also kx encrypted (see MsgLsnH2)
 
   union {
@@ -118,7 +123,7 @@ struct MsgConH3 {
   }
 }
 
-struct MsgConH3Kx {
+struct MsgStep3FromConnectKxEncoded {
   # this message will be encoded into the kxSecret field in MsgConH3
 
   padding @0 :Data;
@@ -133,7 +138,7 @@ struct MsgConH3Kx {
   # signature of l2cSessionKey proving we own sig priv key
 }
 
-struct MsgLsnH4Enc {
+struct MsgStep4FromListenEncoded {
   # this message is encoded directly, not wrapped like Kx above
   # this message will use nonce-0 of the l2cSessionKey
 
@@ -143,11 +148,21 @@ struct MsgLsnH4Enc {
   # signature of c2lSessionKey proving we own sig priv key
 }
 
-struct MsgConH5Enc {
+struct MsgStep5FromConnectEncoded {
   # this message is encoded directly, not wrapped like Kx above
   # this message will use nonce-0 of the c2lSessionKey
   # when this message is received, we can upgrade to the next protocol
-  # Further messages will be sent raw without a wrapper in this schema
 
   padding @0 :Data;
+}
+
+struct EncodedMessage {
+  # We have made it past the handshake sequence
+  # We can now start exchanging encoded data using sequential nonces
+  # and the session keys.
+  # This framing allows us to specify padding if we'd like to normalize
+  # the message lengths and/or inject steganography.
+
+  padding @0 :Data;
+  content @1 :Data;
 }

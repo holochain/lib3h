@@ -3,7 +3,7 @@
 // source: p2p.capnp
 
 
-pub mod message {
+pub mod p2p_message {
   pub use self::Which::{MsgError,MsgHandshake,MsgGspArcRequest,MsgGspArcResponse,MsgGspAspectDataRequest,MsgGspAspectDataResponse,MsgGspAspectBroadcast,MsgDirectRequest,MsgDirectResponse,MsgQueryRequest,MsgQueryResponse};
 
   #[derive(Copy, Clone)]
@@ -207,12 +207,12 @@ pub mod message {
       self.builder.into_reader().total_size()
     }
     #[inline]
-    pub fn set_msg_error<'b>(&mut self, value: crate::p2p_capnp::message::msg_error::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_error<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_error::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 0);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_error(self, ) -> crate::p2p_capnp::message::msg_error::Builder<'a> {
+    pub fn init_msg_error(self, ) -> crate::p2p_capnp::p2p_message::msg_error::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 0);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -221,12 +221,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_handshake<'b>(&mut self, value: crate::p2p_capnp::message::msg_handshake::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_handshake<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_handshake::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 1);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_handshake(self, ) -> crate::p2p_capnp::message::msg_handshake::Builder<'a> {
+    pub fn init_msg_handshake(self, ) -> crate::p2p_capnp::p2p_message::msg_handshake::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 1);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -235,12 +235,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_gsp_arc_request<'b>(&mut self, value: crate::p2p_capnp::message::msg_gsp_arc::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_gsp_arc_request<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_gsp_arc::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 2);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_gsp_arc_request(self, ) -> crate::p2p_capnp::message::msg_gsp_arc::Builder<'a> {
+    pub fn init_msg_gsp_arc_request(self, ) -> crate::p2p_capnp::p2p_message::msg_gsp_arc::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 2);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -249,12 +249,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_gsp_arc_response<'b>(&mut self, value: crate::p2p_capnp::message::msg_gsp_arc::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_gsp_arc_response<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_gsp_arc::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 3);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_gsp_arc_response(self, ) -> crate::p2p_capnp::message::msg_gsp_arc::Builder<'a> {
+    pub fn init_msg_gsp_arc_response(self, ) -> crate::p2p_capnp::p2p_message::msg_gsp_arc::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 3);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -263,12 +263,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_gsp_aspect_data_request<'b>(&mut self, value: crate::p2p_capnp::message::msg_gsp_aspect_data_request::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_gsp_aspect_data_request<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_request::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 4);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_gsp_aspect_data_request(self, ) -> crate::p2p_capnp::message::msg_gsp_aspect_data_request::Builder<'a> {
+    pub fn init_msg_gsp_aspect_data_request(self, ) -> crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_request::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 4);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -277,12 +277,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_gsp_aspect_data_response<'b>(&mut self, value: crate::p2p_capnp::message::msg_gsp_aspect_data_response::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_gsp_aspect_data_response<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_response::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 5);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_gsp_aspect_data_response(self, ) -> crate::p2p_capnp::message::msg_gsp_aspect_data_response::Builder<'a> {
+    pub fn init_msg_gsp_aspect_data_response(self, ) -> crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_response::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 5);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -291,12 +291,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_gsp_aspect_broadcast<'b>(&mut self, value: crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_gsp_aspect_broadcast<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_gsp_aspect_broadcast::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 6);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_gsp_aspect_broadcast(self, ) -> crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Builder<'a> {
+    pub fn init_msg_gsp_aspect_broadcast(self, ) -> crate::p2p_capnp::p2p_message::msg_gsp_aspect_broadcast::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 6);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -305,12 +305,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_direct_request<'b>(&mut self, value: crate::p2p_capnp::message::msg_direct::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_direct_request<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_direct::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 7);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_direct_request(self, ) -> crate::p2p_capnp::message::msg_direct::Builder<'a> {
+    pub fn init_msg_direct_request(self, ) -> crate::p2p_capnp::p2p_message::msg_direct::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 7);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -319,12 +319,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_direct_response<'b>(&mut self, value: crate::p2p_capnp::message::msg_direct::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_direct_response<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_direct::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 8);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_direct_response(self, ) -> crate::p2p_capnp::message::msg_direct::Builder<'a> {
+    pub fn init_msg_direct_response(self, ) -> crate::p2p_capnp::p2p_message::msg_direct::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 8);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -333,12 +333,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_query_request<'b>(&mut self, value: crate::p2p_capnp::message::msg_query::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_query_request<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_query::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 9);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_query_request(self, ) -> crate::p2p_capnp::message::msg_query::Builder<'a> {
+    pub fn init_msg_query_request(self, ) -> crate::p2p_capnp::p2p_message::msg_query::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 9);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -347,12 +347,12 @@ pub mod message {
       !self.builder.get_pointer_field(0).is_null()
     }
     #[inline]
-    pub fn set_msg_query_response<'b>(&mut self, value: crate::p2p_capnp::message::msg_query::Reader<'b>) -> ::capnp::Result<()> {
+    pub fn set_msg_query_response<'b>(&mut self, value: crate::p2p_capnp::p2p_message::msg_query::Reader<'b>) -> ::capnp::Result<()> {
       self.builder.set_data_field::<u16>(0, 10);
       ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
     }
     #[inline]
-    pub fn init_msg_query_response(self, ) -> crate::p2p_capnp::message::msg_query::Builder<'a> {
+    pub fn init_msg_query_response(self, ) -> crate::p2p_capnp::p2p_message::msg_query::Builder<'a> {
       self.builder.set_data_field::<u16>(0, 10);
       ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
     }
@@ -434,7 +434,7 @@ pub mod message {
   mod _private {
     use capnp::private::layout;
     pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 1 };
-    pub const TYPE_ID: u64 = 0xea69_9bc8_8102_5f7d;
+    pub const TYPE_ID: u64 = 0x8525_e0f5_2956_47a2;
   }
   pub enum Which<A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10> {
     MsgError(A0),
@@ -449,8 +449,8 @@ pub mod message {
     MsgQueryRequest(A9),
     MsgQueryResponse(A10),
   }
-  pub type WhichReader<'a,> = Which<::capnp::Result<crate::p2p_capnp::message::msg_error::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_handshake::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_request::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_response::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Reader<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Reader<'a>>>;
-  pub type WhichBuilder<'a,> = Which<::capnp::Result<crate::p2p_capnp::message::msg_error::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_handshake::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_request::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_data_response::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_gsp_aspect_broadcast::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Builder<'a>>,::capnp::Result<crate::p2p_capnp::message::msg_query::Builder<'a>>>;
+  pub type WhichReader<'a,> = Which<::capnp::Result<crate::p2p_capnp::p2p_message::msg_error::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_handshake::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_arc::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_request::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_response::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_aspect_broadcast::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_direct::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_query::Reader<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_query::Reader<'a>>>;
+  pub type WhichBuilder<'a,> = Which<::capnp::Result<crate::p2p_capnp::p2p_message::msg_error::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_handshake::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_arc::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_request::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_aspect_data_response::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_gsp_aspect_broadcast::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_direct::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_query::Builder<'a>>,::capnp::Result<crate::p2p_capnp::p2p_message::msg_query::Builder<'a>>>;
 
   pub mod msg_error {
     #[derive(Copy, Clone)]
@@ -499,7 +499,7 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_error_code(self) -> ::std::result::Result<crate::p2p_capnp::message::msg_error::ErrorCode,::capnp::NotInSchema> {
+      pub fn get_error_code(self) -> ::std::result::Result<crate::p2p_capnp::p2p_message::msg_error::ErrorCode,::capnp::NotInSchema> {
         ::capnp::traits::FromU16::from_u16(self.reader.get_data_field::<u16>(0))
       }
       #[inline]
@@ -560,11 +560,11 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_error_code(self) -> ::std::result::Result<crate::p2p_capnp::message::msg_error::ErrorCode,::capnp::NotInSchema> {
+      pub fn get_error_code(self) -> ::std::result::Result<crate::p2p_capnp::p2p_message::msg_error::ErrorCode,::capnp::NotInSchema> {
         ::capnp::traits::FromU16::from_u16(self.builder.get_data_field::<u16>(0))
       }
       #[inline]
-      pub fn set_error_code(&mut self, value: crate::p2p_capnp::message::msg_error::ErrorCode)  {
+      pub fn set_error_code(&mut self, value: crate::p2p_capnp::p2p_message::msg_error::ErrorCode)  {
         self.builder.set_data_field::<u16>(0, value as u16)
       }
       #[inline]
@@ -595,7 +595,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 1 };
-      pub const TYPE_ID: u64 = 0xbeca_48fa_372d_dda6;
+      pub const TYPE_ID: u64 = 0x9af7_35d0_d94f_e197;
     }
 
     #[repr(u16)]
@@ -618,7 +618,7 @@ pub mod message {
     }
     impl ::capnp::traits::HasTypeId for ErrorCode {
       #[inline]
-      fn type_id() -> u64 { 0xce0b_3c91_790c_46f5u64 }
+      fn type_id() -> u64 { 0x87d2_ebff_a2ca_69deu64 }
     }
   }
 
@@ -755,7 +755,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 0 };
-      pub const TYPE_ID: u64 = 0xf78c_7a72_1b79_3f3b;
+      pub const TYPE_ID: u64 = 0x8be4_5ddf_6bb6_74ce;
     }
   }
 
@@ -806,28 +806,28 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_aspect_constraint_loc(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_loc::Reader<'a>> {
+      pub fn get_aspect_constraint_arc(self) -> ::capnp::Result<crate::p2p_capnp::p2p_message::aspect_constraint_arc::Reader<'a>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
       }
-      pub fn has_aspect_constraint_loc(&self) -> bool {
+      pub fn has_aspect_constraint_arc(&self) -> bool {
         !self.reader.get_pointer_field(0).is_null()
       }
       #[inline]
-      pub fn get_aspect_constraint_time(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_time::Reader<'a>> {
+      pub fn get_aspect_constraint_time(self) -> ::capnp::Result<crate::p2p_capnp::p2p_message::aspect_constraint_time::Reader<'a>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(1), ::std::option::Option::None)
       }
       pub fn has_aspect_constraint_time(&self) -> bool {
         !self.reader.get_pointer_field(1).is_null()
       }
       #[inline]
-      pub fn get_aspect_constraint_count(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_count::Reader<'a>> {
+      pub fn get_aspect_constraint_count(self) -> ::capnp::Result<crate::p2p_capnp::p2p_message::aspect_constraint_count::Reader<'a>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(2), ::std::option::Option::None)
       }
       pub fn has_aspect_constraint_count(&self) -> bool {
         !self.reader.get_pointer_field(2).is_null()
       }
       #[inline]
-      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>> {
+      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(3), ::std::option::Option::None)
       }
       pub fn has_aspect_hash_list(&self) -> bool {
@@ -884,60 +884,60 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_aspect_constraint_loc(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_loc::Builder<'a>> {
+      pub fn get_aspect_constraint_arc(self) -> ::capnp::Result<crate::p2p_capnp::p2p_message::aspect_constraint_arc::Builder<'a>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_constraint_loc<'b>(&mut self, value: crate::p2p_capnp::message::aspect_constraint_loc::Reader<'b>) -> ::capnp::Result<()> {
+      pub fn set_aspect_constraint_arc<'b>(&mut self, value: crate::p2p_capnp::p2p_message::aspect_constraint_arc::Reader<'b>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
       }
       #[inline]
-      pub fn init_aspect_constraint_loc(self, ) -> crate::p2p_capnp::message::aspect_constraint_loc::Builder<'a> {
+      pub fn init_aspect_constraint_arc(self, ) -> crate::p2p_capnp::p2p_message::aspect_constraint_arc::Builder<'a> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), 0)
       }
-      pub fn has_aspect_constraint_loc(&self) -> bool {
+      pub fn has_aspect_constraint_arc(&self) -> bool {
         !self.builder.get_pointer_field(0).is_null()
       }
       #[inline]
-      pub fn get_aspect_constraint_time(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_time::Builder<'a>> {
+      pub fn get_aspect_constraint_time(self) -> ::capnp::Result<crate::p2p_capnp::p2p_message::aspect_constraint_time::Builder<'a>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(1), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_constraint_time<'b>(&mut self, value: crate::p2p_capnp::message::aspect_constraint_time::Reader<'b>) -> ::capnp::Result<()> {
+      pub fn set_aspect_constraint_time<'b>(&mut self, value: crate::p2p_capnp::p2p_message::aspect_constraint_time::Reader<'b>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(1), value, false)
       }
       #[inline]
-      pub fn init_aspect_constraint_time(self, ) -> crate::p2p_capnp::message::aspect_constraint_time::Builder<'a> {
+      pub fn init_aspect_constraint_time(self, ) -> crate::p2p_capnp::p2p_message::aspect_constraint_time::Builder<'a> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(1), 0)
       }
       pub fn has_aspect_constraint_time(&self) -> bool {
         !self.builder.get_pointer_field(1).is_null()
       }
       #[inline]
-      pub fn get_aspect_constraint_count(self) -> ::capnp::Result<crate::p2p_capnp::message::aspect_constraint_count::Builder<'a>> {
+      pub fn get_aspect_constraint_count(self) -> ::capnp::Result<crate::p2p_capnp::p2p_message::aspect_constraint_count::Builder<'a>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(2), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_constraint_count<'b>(&mut self, value: crate::p2p_capnp::message::aspect_constraint_count::Reader<'b>) -> ::capnp::Result<()> {
+      pub fn set_aspect_constraint_count<'b>(&mut self, value: crate::p2p_capnp::p2p_message::aspect_constraint_count::Reader<'b>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(2), value, false)
       }
       #[inline]
-      pub fn init_aspect_constraint_count(self, ) -> crate::p2p_capnp::message::aspect_constraint_count::Builder<'a> {
+      pub fn init_aspect_constraint_count(self, ) -> crate::p2p_capnp::p2p_message::aspect_constraint_count::Builder<'a> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(2), 0)
       }
       pub fn has_aspect_constraint_count(&self) -> bool {
         !self.builder.get_pointer_field(2).is_null()
       }
       #[inline]
-      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>> {
+      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(3), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_hash_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>) -> ::capnp::Result<()> {
+      pub fn set_aspect_hash_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(3), value, false)
       }
       #[inline]
-      pub fn init_aspect_hash_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_list::Owned> {
+      pub fn init_aspect_hash_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(3), size)
       }
       pub fn has_aspect_hash_list(&self) -> bool {
@@ -952,20 +952,20 @@ pub mod message {
       }
     }
     impl Pipeline  {
-      pub fn get_aspect_constraint_loc(&self) -> crate::p2p_capnp::message::aspect_constraint_loc::Pipeline {
+      pub fn get_aspect_constraint_arc(&self) -> crate::p2p_capnp::p2p_message::aspect_constraint_arc::Pipeline {
         ::capnp::capability::FromTypelessPipeline::new(self._typeless.get_pointer_field(0))
       }
-      pub fn get_aspect_constraint_time(&self) -> crate::p2p_capnp::message::aspect_constraint_time::Pipeline {
+      pub fn get_aspect_constraint_time(&self) -> crate::p2p_capnp::p2p_message::aspect_constraint_time::Pipeline {
         ::capnp::capability::FromTypelessPipeline::new(self._typeless.get_pointer_field(1))
       }
-      pub fn get_aspect_constraint_count(&self) -> crate::p2p_capnp::message::aspect_constraint_count::Pipeline {
+      pub fn get_aspect_constraint_count(&self) -> crate::p2p_capnp::p2p_message::aspect_constraint_count::Pipeline {
         ::capnp::capability::FromTypelessPipeline::new(self._typeless.get_pointer_field(2))
       }
     }
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 4 };
-      pub const TYPE_ID: u64 = 0xfdc0_3c90_688b_e108;
+      pub const TYPE_ID: u64 = 0x980f_4f0f_9325_d37f;
     }
   }
 
@@ -1016,7 +1016,7 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>> {
+      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
       }
       pub fn has_aspect_hash_list(&self) -> bool {
@@ -1073,15 +1073,15 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>> {
+      pub fn get_aspect_hash_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_hash_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_list::Owned>) -> ::capnp::Result<()> {
+      pub fn set_aspect_hash_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
       }
       #[inline]
-      pub fn init_aspect_hash_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_list::Owned> {
+      pub fn init_aspect_hash_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_hash_list::Owned> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), size)
       }
       pub fn has_aspect_hash_list(&self) -> bool {
@@ -1100,7 +1100,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
-      pub const TYPE_ID: u64 = 0xb97d_7a3f_6181_2b03;
+      pub const TYPE_ID: u64 = 0x8f64_86ad_dab6_7ae7;
     }
   }
 
@@ -1151,10 +1151,10 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
+      pub fn get_aspect_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
       }
-      pub fn has_aspect_hash_data_list(&self) -> bool {
+      pub fn has_aspect_data_list(&self) -> bool {
         !self.reader.get_pointer_field(0).is_null()
       }
     }
@@ -1208,18 +1208,18 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
+      pub fn get_aspect_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_hash_data_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>) -> ::capnp::Result<()> {
+      pub fn set_aspect_data_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
       }
       #[inline]
-      pub fn init_aspect_hash_data_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned> {
+      pub fn init_aspect_data_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), size)
       }
-      pub fn has_aspect_hash_data_list(&self) -> bool {
+      pub fn has_aspect_data_list(&self) -> bool {
         !self.builder.get_pointer_field(0).is_null()
       }
     }
@@ -1235,7 +1235,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
-      pub const TYPE_ID: u64 = 0xc0f4_f2a8_4660_b1ef;
+      pub const TYPE_ID: u64 = 0xd90d_9ffa_6c31_b0ff;
     }
   }
 
@@ -1286,10 +1286,10 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
+      pub fn get_aspect_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
       }
-      pub fn has_aspect_hash_data_list(&self) -> bool {
+      pub fn has_aspect_data_list(&self) -> bool {
         !self.reader.get_pointer_field(0).is_null()
       }
     }
@@ -1343,18 +1343,18 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>> {
+      pub fn get_aspect_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_hash_data_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned>) -> ::capnp::Result<()> {
+      pub fn set_aspect_data_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(0), value, false)
       }
       #[inline]
-      pub fn init_aspect_hash_data_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data_list::Owned> {
+      pub fn init_aspect_data_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::p2p_message::aspect_data_list::Owned> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(0), size)
       }
-      pub fn has_aspect_hash_data_list(&self) -> bool {
+      pub fn has_aspect_data_list(&self) -> bool {
         !self.builder.get_pointer_field(0).is_null()
       }
     }
@@ -1370,7 +1370,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 1 };
-      pub const TYPE_ID: u64 = 0xacae_cf41_eb34_2b2c;
+      pub const TYPE_ID: u64 = 0xc404_9235_ef4d_e9b4;
     }
   }
 
@@ -1527,7 +1527,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 2 };
-      pub const TYPE_ID: u64 = 0xa430_3fd6_0c1b_0af8;
+      pub const TYPE_ID: u64 = 0xcaf3_3a76_558f_07e7;
     }
   }
 
@@ -1706,7 +1706,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 3 };
-      pub const TYPE_ID: u64 = 0xcef5_5967_d4b5_87d2;
+      pub const TYPE_ID: u64 = 0xa7e5_ad12_a54c_dcdd;
     }
   }
 
@@ -1863,11 +1863,11 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 2 };
-      pub const TYPE_ID: u64 = 0xfd12_8195_e026_0263;
+      pub const TYPE_ID: u64 = 0xc3f9_8bc7_9025_c948;
     }
   }
 
-  pub mod aspect_hash_data_list {
+  pub mod aspect_data_list {
     #[derive(Copy, Clone)]
     pub struct Owned;
     impl <'a> ::capnp::traits::Owned<'a> for Owned { type Reader = Reader<'a>; type Builder = Builder<'a>; }
@@ -1921,10 +1921,10 @@ pub mod message {
         !self.reader.get_pointer_field(0).is_null()
       }
       #[inline]
-      pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data::Owned>> {
+      pub fn get_aspect_data_list(self) -> ::capnp::Result<::capnp::data_list::Reader<'a>> {
         ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(1), ::std::option::Option::None)
       }
-      pub fn has_aspect_hash_data_list(&self) -> bool {
+      pub fn has_aspect_data_list(&self) -> bool {
         !self.reader.get_pointer_field(1).is_null()
       }
     }
@@ -1993,18 +1993,18 @@ pub mod message {
         !self.builder.get_pointer_field(0).is_null()
       }
       #[inline]
-      pub fn get_aspect_hash_data_list(self) -> ::capnp::Result<::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data::Owned>> {
+      pub fn get_aspect_data_list(self) -> ::capnp::Result<::capnp::data_list::Builder<'a>> {
         ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(1), ::std::option::Option::None)
       }
       #[inline]
-      pub fn set_aspect_hash_data_list(&mut self, value: ::capnp::struct_list::Reader<'a,crate::p2p_capnp::message::aspect_hash_data::Owned>) -> ::capnp::Result<()> {
+      pub fn set_aspect_data_list(&mut self, value: ::capnp::data_list::Reader<'a>) -> ::capnp::Result<()> {
         ::capnp::traits::SetPointerBuilder::set_pointer_builder(self.builder.get_pointer_field(1), value, false)
       }
       #[inline]
-      pub fn init_aspect_hash_data_list(self, size: u32) -> ::capnp::struct_list::Builder<'a,crate::p2p_capnp::message::aspect_hash_data::Owned> {
+      pub fn init_aspect_data_list(self, size: u32) -> ::capnp::data_list::Builder<'a> {
         ::capnp::traits::FromPointerBuilder::init_pointer(self.builder.get_pointer_field(1), size)
       }
-      pub fn has_aspect_hash_data_list(&self) -> bool {
+      pub fn has_aspect_data_list(&self) -> bool {
         !self.builder.get_pointer_field(1).is_null()
       }
     }
@@ -2020,11 +2020,11 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 2 };
-      pub const TYPE_ID: u64 = 0xd296_f3c8_7b9b_169b;
+      pub const TYPE_ID: u64 = 0xfaab_efdd_33da_a362;
     }
   }
 
-  pub mod aspect_hash_data {
+  pub mod aspect_constraint_arc {
     #[derive(Copy, Clone)]
     pub struct Owned;
     impl <'a> ::capnp::traits::Owned<'a> for Owned { type Reader = Reader<'a>; type Builder = Builder<'a>; }
@@ -2071,168 +2071,11 @@ pub mod message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_aspect_hash(self) -> ::capnp::Result<::capnp::data::Reader<'a>> {
-        ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(0), ::std::option::Option::None)
-      }
-      pub fn has_aspect_hash(&self) -> bool {
-        !self.reader.get_pointer_field(0).is_null()
-      }
-      #[inline]
-      pub fn get_aspect_data(self) -> ::capnp::Result<::capnp::data::Reader<'a>> {
-        ::capnp::traits::FromPointerReader::get_from_pointer(&self.reader.get_pointer_field(1), ::std::option::Option::None)
-      }
-      pub fn has_aspect_data(&self) -> bool {
-        !self.reader.get_pointer_field(1).is_null()
-      }
-    }
-
-    pub struct Builder<'a> { builder: ::capnp::private::layout::StructBuilder<'a> }
-    impl <'a,> ::capnp::traits::HasStructSize for Builder<'a,>  {
-      #[inline]
-      fn struct_size() -> ::capnp::private::layout::StructSize { _private::STRUCT_SIZE }
-    }
-    impl <'a,> ::capnp::traits::HasTypeId for Builder<'a,>  {
-      #[inline]
-      fn type_id() -> u64 { _private::TYPE_ID }
-    }
-    impl <'a,> ::capnp::traits::FromStructBuilder<'a> for Builder<'a,>  {
-      fn new(builder: ::capnp::private::layout::StructBuilder<'a>) -> Builder<'a, > {
-        Builder { builder: builder,  }
-      }
-    }
-
-    impl <'a,> ::capnp::traits::ImbueMut<'a> for Builder<'a,>  {
-      fn imbue_mut(&mut self, cap_table: &'a mut ::capnp::private::layout::CapTable) {
-        self.builder.imbue(::capnp::private::layout::CapTableBuilder::Plain(cap_table))
-      }
-    }
-
-    impl <'a,> ::capnp::traits::FromPointerBuilder<'a> for Builder<'a,>  {
-      fn init_pointer(builder: ::capnp::private::layout::PointerBuilder<'a>, _size: u32) -> Builder<'a,> {
-        ::capnp::traits::FromStructBuilder::new(builder.init_struct(_private::STRUCT_SIZE))
-      }
-      fn get_from_pointer(builder: ::capnp::private::layout::PointerBuilder<'a>, default: ::std::option::Option<&'a [::capnp::Word]>) -> ::capnp::Result<Builder<'a,>> {
-        ::std::result::Result::Ok(::capnp::traits::FromStructBuilder::new(builder.get_struct(_private::STRUCT_SIZE, default)?))
-      }
-    }
-
-    impl <'a,> ::capnp::traits::SetPointerBuilder<Builder<'a,>> for Reader<'a,>  {
-      fn set_pointer_builder<'b>(pointer: ::capnp::private::layout::PointerBuilder<'b>, value: Reader<'a,>, canonicalize: bool) -> ::capnp::Result<()> { pointer.set_struct(&value.reader, canonicalize) }
-    }
-
-    impl <'a,> Builder<'a,>  {
-      pub fn into_reader(self) -> Reader<'a,> {
-        ::capnp::traits::FromStructReader::new(self.builder.into_reader())
-      }
-      pub fn reborrow(&mut self) -> Builder<> {
-        Builder { .. *self }
-      }
-      pub fn reborrow_as_reader(&self) -> Reader<> {
-        ::capnp::traits::FromStructReader::new(self.builder.into_reader())
-      }
-
-      pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
-        self.builder.into_reader().total_size()
-      }
-      #[inline]
-      pub fn get_aspect_hash(self) -> ::capnp::Result<::capnp::data::Builder<'a>> {
-        ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(0), ::std::option::Option::None)
-      }
-      #[inline]
-      pub fn set_aspect_hash(&mut self, value: ::capnp::data::Reader)  {
-        self.builder.get_pointer_field(0).set_data(value);
-      }
-      #[inline]
-      pub fn init_aspect_hash(self, size: u32) -> ::capnp::data::Builder<'a> {
-        self.builder.get_pointer_field(0).init_data(size)
-      }
-      pub fn has_aspect_hash(&self) -> bool {
-        !self.builder.get_pointer_field(0).is_null()
-      }
-      #[inline]
-      pub fn get_aspect_data(self) -> ::capnp::Result<::capnp::data::Builder<'a>> {
-        ::capnp::traits::FromPointerBuilder::get_from_pointer(self.builder.get_pointer_field(1), ::std::option::Option::None)
-      }
-      #[inline]
-      pub fn set_aspect_data(&mut self, value: ::capnp::data::Reader)  {
-        self.builder.get_pointer_field(1).set_data(value);
-      }
-      #[inline]
-      pub fn init_aspect_data(self, size: u32) -> ::capnp::data::Builder<'a> {
-        self.builder.get_pointer_field(1).init_data(size)
-      }
-      pub fn has_aspect_data(&self) -> bool {
-        !self.builder.get_pointer_field(1).is_null()
-      }
-    }
-
-    pub struct Pipeline { _typeless: ::capnp::any_pointer::Pipeline }
-    impl ::capnp::capability::FromTypelessPipeline for Pipeline {
-      fn new(typeless: ::capnp::any_pointer::Pipeline) -> Pipeline {
-        Pipeline { _typeless: typeless,  }
-      }
-    }
-    impl Pipeline  {
-    }
-    mod _private {
-      use capnp::private::layout;
-      pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 0, pointers: 2 };
-      pub const TYPE_ID: u64 = 0xeed2_e4de_4dde_03fc;
-    }
-  }
-
-  pub mod aspect_constraint_loc {
-    #[derive(Copy, Clone)]
-    pub struct Owned;
-    impl <'a> ::capnp::traits::Owned<'a> for Owned { type Reader = Reader<'a>; type Builder = Builder<'a>; }
-    impl <'a> ::capnp::traits::OwnedStruct<'a> for Owned { type Reader = Reader<'a>; type Builder = Builder<'a>; }
-    impl ::capnp::traits::Pipelined for Owned { type Pipeline = Pipeline; }
-
-    #[derive(Clone, Copy)]
-    pub struct Reader<'a> { reader: ::capnp::private::layout::StructReader<'a> }
-
-    impl <'a,> ::capnp::traits::HasTypeId for Reader<'a,>  {
-      #[inline]
-      fn type_id() -> u64 { _private::TYPE_ID }
-    }
-    impl <'a,> ::capnp::traits::FromStructReader<'a> for Reader<'a,>  {
-      fn new(reader: ::capnp::private::layout::StructReader<'a>) -> Reader<'a,> {
-        Reader { reader: reader,  }
-      }
-    }
-
-    impl <'a,> ::capnp::traits::FromPointerReader<'a> for Reader<'a,>  {
-      fn get_from_pointer(reader: &::capnp::private::layout::PointerReader<'a>, default: ::std::option::Option<&'a [::capnp::Word]>) -> ::capnp::Result<Reader<'a,>> {
-        ::std::result::Result::Ok(::capnp::traits::FromStructReader::new(reader.get_struct(default)?))
-      }
-    }
-
-    impl <'a,> ::capnp::traits::IntoInternalStructReader<'a> for Reader<'a,>  {
-      fn into_internal_struct_reader(self) -> ::capnp::private::layout::StructReader<'a> {
-        self.reader
-      }
-    }
-
-    impl <'a,> ::capnp::traits::Imbue<'a> for Reader<'a,>  {
-      fn imbue(&mut self, cap_table: &'a ::capnp::private::layout::CapTable) {
-        self.reader.imbue(::capnp::private::layout::CapTableReader::Plain(cap_table))
-      }
-    }
-
-    impl <'a,> Reader<'a,>  {
-      pub fn reborrow(&self) -> Reader<> {
-        Reader { .. *self }
-      }
-
-      pub fn total_size(&self) -> ::capnp::Result<::capnp::MessageSize> {
-        self.reader.total_size()
-      }
-      #[inline]
-      pub fn get_loc_arc_start(self) -> u32 {
+      pub fn get_arc_start(self) -> u32 {
         self.reader.get_data_field::<u32>(0)
       }
       #[inline]
-      pub fn get_loc_arc_end(self) -> u32 {
+      pub fn get_arc_end(self) -> u32 {
         self.reader.get_data_field::<u32>(1)
       }
     }
@@ -2286,19 +2129,19 @@ pub mod message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_loc_arc_start(self) -> u32 {
+      pub fn get_arc_start(self) -> u32 {
         self.builder.get_data_field::<u32>(0)
       }
       #[inline]
-      pub fn set_loc_arc_start(&mut self, value: u32)  {
+      pub fn set_arc_start(&mut self, value: u32)  {
         self.builder.set_data_field::<u32>(0, value);
       }
       #[inline]
-      pub fn get_loc_arc_end(self) -> u32 {
+      pub fn get_arc_end(self) -> u32 {
         self.builder.get_data_field::<u32>(1)
       }
       #[inline]
-      pub fn set_loc_arc_end(&mut self, value: u32)  {
+      pub fn set_arc_end(&mut self, value: u32)  {
         self.builder.set_data_field::<u32>(1, value);
       }
     }
@@ -2314,7 +2157,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 0 };
-      pub const TYPE_ID: u64 = 0xa56d_a156_34c4_307c;
+      pub const TYPE_ID: u64 = 0xc139_1ca6_5ff8_aba5;
     }
   }
 
@@ -2439,7 +2282,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 0 };
-      pub const TYPE_ID: u64 = 0xa3c6_6999_144e_108d;
+      pub const TYPE_ID: u64 = 0xb1d2_1dc6_fbfd_d2f6;
     }
   }
 
@@ -2564,7 +2407,7 @@ pub mod message {
     mod _private {
       use capnp::private::layout;
       pub const STRUCT_SIZE: layout::StructSize = layout::StructSize { data: 1, pointers: 0 };
-      pub const TYPE_ID: u64 = 0xa2e9_8255_66be_5058;
+      pub const TYPE_ID: u64 = 0x9c28_221c_ed2b_7a32;
     }
   }
 }

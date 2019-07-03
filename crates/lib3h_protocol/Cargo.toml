@@ -4,7 +4,7 @@ version = "0.0.3-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
-description = "Lib3h Protocol definition for API interaction with the library."
+description = "Protocol definition for interacting with Lib3h."
 keywords = ["holochain", "holo", "p2p", "network"]
 categories = ["network-programming"]
 license = "Apache-2.0"

@@ -5,7 +5,7 @@
 
 @0x859198991b95d3e1;
 
-struct Message {
+struct P2pMessage {
   # Main P2P Message struct, anon union determines message type
 
   union {
@@ -71,7 +71,7 @@ struct Message {
   struct MsgGspArc {
     # data for `msgGspArcRequest` and `msgGspArcResponse`
 
-    aspectConstraintLoc @0 :AspectConstraintLoc;
+    aspectConstraintArc @0 :AspectConstraintArc;
     # constrain aspectHashList by loc arc
 
     aspectConstraintTime @1 :AspectConstraintTime;
@@ -95,14 +95,14 @@ struct Message {
   struct MsgGspAspectDataResponse {
     # respond to an aspectDataRequest with aspect data
 
-    aspectHashDataList @0 :List(AspectHashDataList);
+    aspectDataList @0 :List(AspectDataList);
     # the aspect data to respond with
   }
 
   struct MsgGspAspectBroadcast {
     # fast push new published data
 
-    aspectHashDataList @0 :List(AspectHashDataList);
+    aspectDataList @0 :List(AspectDataList);
     # the aspect data to publish / broadcast
   }
 
@@ -143,27 +143,19 @@ struct Message {
     # those that are being requested / responded with / etc.
   }
 
-  struct AspectHashDataList {
+  struct AspectDataList {
     entryAddress @0 :Data;
     # when asking for aspect hash data, we also want to know the entryAddress
 
-    aspectHashDataList @1 :List(AspectHashData);
-    # the list of pairs of aspectHash / aspectData
+    aspectDataList @1 :List(Data);
+    # the aspect data corresponding to the aspect hashes that were requested
   }
 
-  struct AspectHashData {
-    aspectHash @0 :Data;
-    # the hash of the aspectData
-
-    aspectData @1 :Data;
-    # the data associated with the aspectHash
-  }
-
-  struct AspectConstraintLoc {
-    locArcStart @0 :UInt32;
+  struct AspectConstraintArc {
+    arcStart @0 :UInt32;
     # the start location of the rrdht arc (inclusive)
 
-    locArcEnd @1 :UInt32;
+    arcEnd @1 :UInt32;
     # the end location of the rrdht arc (exclusive)
   }
 

@@ -6,7 +6,7 @@
 
 @0xdd5a14cf7a6734dc;
 
-struct Message {
+struct MultiplexMessage {
   # Transport Direct Message Protocol Schema
 
   union {
@@ -17,6 +17,8 @@ struct Message {
     msgChannelCreate @1 :MsgChannelCreate;
     # establish a new multiplexing channel.
     # All other messages require an established channelId.
+    # Unless a relay contract has been negotiated, the to_agents
+    # must exist on the remote node.
 
     msgChannelClose @2 :UInt32;
     # close a previously opened channel
@@ -29,15 +31,6 @@ struct Message {
 
     msgRelayAccept @5 :Void;
     # if the remote node accepts relay duty, they'll send this, otherwise msgError
-
-    msgRelayChannelCreate @6 :MsgChannelCreate;
-    # if we have a relay argeement, we can create channels to anyone on the network
-
-    msgRelayChannelClose @7 :UInt32;
-    # close a previously opened relay channel
-
-    msgRelayChannelMessage @8 :MsgChannelMessage;
-    # send data over the relay (or receive relayed data)
   }
 
   # -- top-level Message Types -- #
@@ -82,10 +75,10 @@ struct Message {
     # the spaceHash to establish this channel for.
 
     toId @2 :Data;
-    # the destination transportId or agentId to establish this channel for
+    # the destination agentId to establish this channel for
 
     fromId @3 :Data;
-    # the source transportId or agentId to establish this channel for
+    # the source agentId to establish this channel for
   }
 
   struct MsgChannelMessage {
