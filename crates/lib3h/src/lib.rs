@@ -32,7 +32,7 @@ pub mod tests {
     // RUST_LOG=lib3h=debug cargo test -- --nocapture
     pub fn enable_logging_for_test(enable: bool) {
         if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "trace");
+            std::env::set_var("RUST_LOG", "debug");
         }
         let _ = env_logger::builder()
             .default_format_timestamp(false)
