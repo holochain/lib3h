@@ -180,12 +180,13 @@ impl MirrorDht {
                     MirrorGossip::Entry(entry) => {
                         let _is_new = self.add_entry_address(&entry.entry_address);
                         // TODO - since aspects are not tracked, act as if there is always new data
-                        //if is_new {
-                        //    return Ok(vec![DhtEvent::HoldEntryRequested(
-                        //        self.this_peer.peer_address.clone(),
-                        //        entry,
-                        //    )]);
-                        //}
+                        let is_new = true;
+                        if is_new {
+                            return Ok(vec![DhtEvent::HoldEntryRequested(
+                                self.this_peer.peer_address.clone(),
+                                entry,
+                            )]);
+                        }
                         return Ok(vec![]);
                     }
                     MirrorGossip::Peer(peer) => {
