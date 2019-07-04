@@ -178,13 +178,14 @@ impl MirrorDht {
                 }
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
-                        let is_new = self.add_entry_address(&entry.entry_address);
-                        if is_new {
-                            return Ok(vec![DhtEvent::HoldEntryRequested(
-                                self.this_peer.peer_address.clone(),
-                                entry,
-                            )]);
-                        }
+                        let _is_new = self.add_entry_address(&entry.entry_address);
+                        // TODO - since aspects are not tracked, act as if there is always new data
+                        //if is_new {
+                        //    return Ok(vec![DhtEvent::HoldEntryRequested(
+                        //        self.this_peer.peer_address.clone(),
+                        //        entry,
+                        //    )]);
+                        //}
                         return Ok(vec![]);
                     }
                     MirrorGossip::Peer(peer) => {
@@ -273,11 +274,12 @@ impl MirrorDht {
             // Bookkeep address and gossip entry to every known peer.
             DhtCommand::BroadcastEntry(entry) => {
                 // Store address
-                let received_new_content = self.add_entry_address(&entry.entry_address.clone());
-                // Bail if did not receive new content
-                if !received_new_content {
-                    return Ok(vec![]);
-                }
+                let _received_new_content = self.add_entry_address(&entry.entry_address.clone());
+                // TODO - since aspects are not tracked, act as if there is always new data
+                //// Bail if did not receive new content
+                //if !received_new_content {
+                //    return Ok(vec![]);
+                //}
                 let gossip_evt = self.gossip_entry(entry);
                 // Done
                 Ok(vec![gossip_evt])

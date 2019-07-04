@@ -381,12 +381,14 @@ impl NodeMock {
             };
             return Err(msg_data);
         }
+        let entry = maybe_entry.unwrap();
+        // println!("\n reply_to_HandleFetchEntry_inner({}) = {:?}\n", entry.aspect_list.len(), entry.clone());
         // Send EntryData as binary
         let fetch_result_data = FetchEntryResultData {
             space_address: fetch.space_address.clone(),
             provider_agent_id: fetch.provider_agent_id.clone(),
             request_id: fetch.request_id.clone(),
-            entry: maybe_entry.unwrap(),
+            entry,
         };
         Ok(fetch_result_data)
     }
