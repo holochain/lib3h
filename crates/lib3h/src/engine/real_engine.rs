@@ -168,7 +168,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
-        trace!("{} - RealEngine.process() END\n", self.name);
+        trace!("RealEngine.process() END - (outbox: {})\n", outbox.len());
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }
@@ -218,8 +218,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
-                let output = self.serve_JoinSpace(&msg)?;
-                outbox.push(output);
+                let mut output = self.serve_JoinSpace(&msg)?;
+                outbox.append(&mut output);
             }
             Lib3hClientProtocol::LeaveSpace(_msg) => {
                 // FIXME
@@ -284,24 +284,32 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // FIXME
             }
-            // HandleFetchEntryResult: Convert to DhtCommand::EntryDataResponse
+            // HandleFetchEntryResult:
+            //   - From GetAuthoringList      : Convert to DhtCommand::BroadcastEntry
+            //   - From DHT EntryDataRequested: Convert to DhtCommand::EntryDataResponse
             Lib3hClientProtocol::HandleFetchEntryResult(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.provider_agent_id,
-                    &format!("PublishEntry_{:?}", msg.entry.entry_address),
+                    &msg.request_id,
                     None,
                 );
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let response = FetchDhtEntryResponseData {
-                            msg_id: msg.request_id.clone(),
-                            entry: msg.entry.clone(),
-                        };
-                        let cmd = DhtCommand::EntryDataResponse(response);
-                        space_gateway.post_dht(cmd)?;
+                        if msg.request_id == "__author_list" {
+                            let cmd = DhtCommand::BroadcastEntry(msg.entry);
+                            space_gateway.post_dht(cmd)?;
                         // Dht::post(&mut space_gateway, cmd)?;
+                        } else {
+                            let response = FetchDhtEntryResponseData {
+                                msg_id: msg.request_id.clone(),
+                                entry: msg.entry.clone(),
+                            };
+                            let cmd = DhtCommand::EntryDataResponse(response);
+                            space_gateway.post_dht(cmd)?;
+                            // Dht::post(&mut space_gateway, cmd)?;
+                        }
                     }
                 }
             }
@@ -388,12 +396,59 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 }
             }
             // Our request for the publish_list has returned
-            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(_msg) => {
-                // FIXME
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.provider_agent_id,
+                    &msg.request_id,
+                    None,
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Ok(_space_gateway) => {
+                        let mut msg_data = FetchEntryData {
+                            space_address: msg.space_address.clone(),
+                            entry_address: vec![],
+                            request_id: "__author_list".to_string(),
+                            provider_agent_id: msg.provider_agent_id.clone(),
+                            aspect_address_list: None,
+                        };
+                        // Request every Entry from Core
+                        // TODO: should check aspects and only request entry with new aspects
+                        // let known_entries = space_gateway.get_entry_address_list();
+                        let mut count = 0;
+                        for (entry_address, _) in msg.address_map {
+                            //                            if known_entries.contains(entry_address) {
+                            //                                continue;
+                            //                            }
+                            count += 1;
+                            // msg_data.request_id = format!("{}_{}", msg.request_id, count);
+                            msg_data.entry_address = entry_address.clone();
+                            outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
+                        }
+                        debug!(
+                            "HandleGetAuthoringEntryListResult: sent {} HandleFetchEntry",
+                            count
+                        );
+                    }
+                }
             }
             // Our request for the hold_list has returned
-            Lib3hClientProtocol::HandleGetGossipingEntryListResult(_msg) => {
-                // FIXME
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg) => {
+                let maybe_space = self.get_space_or_fail(
+                    &msg.space_address,
+                    &msg.provider_agent_id,
+                    &msg.request_id,
+                    None,
+                );
+                match maybe_space {
+                    Err(res) => outbox.push(res),
+                    Ok(space_gateway) => {
+                        for (entry_address, _) in msg.address_map {
+                            space_gateway.post_dht(DhtCommand::HoldEntryAddress(entry_address))?;
+                        }
+                    }
+                }
             }
         }
         Ok((did_work, outbox))
@@ -401,7 +456,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
 
     /// Create a gateway for this agent in this space, if not already part of it.
     /// Must not already be part of this space.
-    fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Lib3hServerProtocol> {
+    fn serve_JoinSpace(&mut self, join_msg: &SpaceData) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // Prepare response
         let mut res = GenericResultData {
             request_id: join_msg.request_id.clone(),
@@ -413,7 +468,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
             res.result_info = "Already joined space".to_string().into_bytes();
-            return Ok(Lib3hServerProtocol::FailureResult(res));
+            return Ok(vec![Lib3hServerProtocol::FailureResult(res)]);
         }
         // First create DhtConfig for space gateway
         let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
@@ -465,10 +520,25 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 timestamp: 42, // FIXME
             }),
         )?;
+        // Send Get*Lists requests
+        let mut output = Vec::new();
+        let mut list_data = GetListData {
+            space_address: join_msg.space_address.clone(),
+            provider_agent_id: join_msg.agent_id.clone(),
+            request_id: "gossiping".to_owned(),
+        };
+        output.push(Lib3hServerProtocol::HandleGetGossipingEntryList(
+            list_data.clone(),
+        ));
+        list_data.request_id = "authoring".to_owned();
+        output.push(Lib3hServerProtocol::HandleGetAuthoringEntryList(list_data));
         // Done
-        Ok(Lib3hServerProtocol::SuccessResult(res))
+        output.push(Lib3hServerProtocol::SuccessResult(res));
+        Ok(output)
     }
 
+    /// Get a space_gateway for the specified space+agent.
+    /// If agent did not join that space, respond with a FailureResult instead.
     fn get_space_or_fail(
         &mut self,
         space_address: &AddressRef,

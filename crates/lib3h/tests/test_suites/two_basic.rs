@@ -1,5 +1,5 @@
-use super::super::{node_mock::NodeMock, utils::constants::*};
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
+use crate::{node_mock::NodeMock, utils::constants::*};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
@@ -50,6 +50,36 @@ pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     println!("DONE setup_two_nodes() DONE \n\n\n");
+}
+
+//--------------------------------------------------------------------------------------------------
+// Helpers
+//--------------------------------------------------------------------------------------------------
+
+/// Request ENTRY_ADDRESS_1 from the network and should get it back
+pub fn request_entry_1(node: &mut NodeMock) {
+    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", node.name);
+    let query_data = node.request_entry(ENTRY_ADDRESS_1.clone());
+    let (did_work, _srv_msg_list) = node.process().unwrap();
+    assert!(did_work);
+
+    // #fullsync
+    // Billy sends that data back to the network
+    println!("\n{} reply to own request:\n", node.name);
+    let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
+    let (did_work, srv_msg_list) = node.process().unwrap();
+    println!("\n{} gets own response {:?}\n", node.name, srv_msg_list);
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
+    assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
+    let mut de = Deserializer::new(&msg.query_result[..]);
+    let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
+        Deserialize::deserialize(&mut de);
+    assert_eq!(
+        &maybe_entry.unwrap().aspect_list[0].aspect,
+        &*ASPECT_CONTENT_1
+    );
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -114,31 +144,7 @@ fn two_nodes_dht_publish_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
 
     // Billy asks for that entry
-    // ==========================
-    println!("\nBilly requesting entry: ENTRY_ADDRESS_1\n");
-    let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
-
-    println!("\nBilly reply to own request:\n");
-
-    // #fullsync
-    // Billy sends that data back to the network
-    let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("\nBilly gets own response {:?}\n", srv_msg_list);
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
-    assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
-    let mut de = Deserializer::new(&msg.query_result[..]);
-    let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-        Deserialize::deserialize(&mut de);
-    assert_eq!(
-        &maybe_entry.unwrap().aspect_list[0].aspect,
-        &*ASPECT_CONTENT_1
-    );
+    request_entry_1(billy);
 
     // Billy asks for unknown entry
     // ============================
@@ -173,30 +179,7 @@ fn two_nodes_dht_hold_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
 
     // Billy asks for that entry
-    // =========================
-    println!("\nBilly requesting entry: ENTRY_ADDRESS_1\n");
-    let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
-
-    // #fullsync
-    // Billy sends that data back to the network
-    println!("\nBilly reply to own request\n",);
-    let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("\nBilly gets own response {:?}\n", srv_msg_list);
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
-    assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
-    let mut de = Deserializer::new(&msg.query_result[..]);
-    let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-        Deserialize::deserialize(&mut de);
-    assert_eq!(
-        &maybe_entry.unwrap().aspect_list[0].aspect,
-        &*ASPECT_CONTENT_1
-    );
+    request_entry_1(billy);
 
     // Billy asks for unknown entry
     // ============================
