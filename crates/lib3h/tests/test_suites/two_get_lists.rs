@@ -10,6 +10,7 @@ lazy_static! {
         (author_list_test, true),
         (hold_list_test, true),
         (empty_author_list_test, true),
+        (author_list_known_entry_test, true),
     ];
 }
 
@@ -97,4 +98,23 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     let result_data = res.err().unwrap();
     let info = std::string::String::from_utf8_lossy(&result_data.result_info).to_string();
     assert_eq!(info, "No entry found");
+}
+
+/// Return some data in publish_list request
+pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock) {
+    alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
+        .unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+    alex.reply_to_first_HandleGetAuthoringEntryList();
+    let (did_work, _srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+
+    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
+    let (did_work, _srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+
+    // Billy asks for that entry
+    request_entry_1(billy);
 }
