@@ -669,11 +669,11 @@ pub mod p2p_message {
         self.reader.total_size()
       }
       #[inline]
-      pub fn get_from_store_arc(self) -> u32 {
+      pub fn get_store_arc_radius(self) -> u32 {
         self.reader.get_data_field::<u32>(0)
       }
       #[inline]
-      pub fn get_from_query_arc(self) -> u32 {
+      pub fn get_query_arc_radius(self) -> u32 {
         self.reader.get_data_field::<u32>(1)
       }
     }
@@ -727,19 +727,19 @@ pub mod p2p_message {
         self.builder.into_reader().total_size()
       }
       #[inline]
-      pub fn get_from_store_arc(self) -> u32 {
+      pub fn get_store_arc_radius(self) -> u32 {
         self.builder.get_data_field::<u32>(0)
       }
       #[inline]
-      pub fn set_from_store_arc(&mut self, value: u32)  {
+      pub fn set_store_arc_radius(&mut self, value: u32)  {
         self.builder.set_data_field::<u32>(0, value);
       }
       #[inline]
-      pub fn get_from_query_arc(self) -> u32 {
+      pub fn get_query_arc_radius(self) -> u32 {
         self.builder.get_data_field::<u32>(1)
       }
       #[inline]
-      pub fn set_from_query_arc(&mut self, value: u32)  {
+      pub fn set_query_arc_radius(&mut self, value: u32)  {
         self.builder.set_data_field::<u32>(1, value);
       }
     }

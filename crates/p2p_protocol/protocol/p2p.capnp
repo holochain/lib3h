@@ -61,10 +61,10 @@ struct P2pMessage {
   }
 
   struct MsgHandshake {
-    fromStoreArc @0 :UInt32;
+    storeArcRadius @0 :UInt32;
     # the storage arc length of the source transport / agent
 
-    fromQueryArc @1 :UInt32;
+    queryArcRadius @1 :UInt32;
     # the query arc length of the source transport / agent
   }
 
