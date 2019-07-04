@@ -418,18 +418,11 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                         // let known_entries = space_gateway.get_entry_address_list();
                         let mut count = 0;
                         for (entry_address, _) in msg.address_map {
-                            //                            if known_entries.contains(entry_address) {
-                            //                                continue;
-                            //                            }
                             count += 1;
-                            // msg_data.request_id = format!("{}_{}", msg.request_id, count);
                             msg_data.entry_address = entry_address.clone();
                             outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
                         }
-                        debug!(
-                            "HandleGetAuthoringEntryListResult: sent {} HandleFetchEntry",
-                            count
-                        );
+                        debug!("HandleGetAuthoringEntryListResult: {}", count);
                     }
                 }
             }

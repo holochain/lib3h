@@ -6,8 +6,11 @@ use crate::{
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 lazy_static! {
-    pub static ref TWO_NODES_GET_LISTS_TEST_FNS: Vec<(TwoNodesTestFn, bool)> =
-        vec![(publish_entry_list_test, true), (hold_list_test, true),];
+    pub static ref TWO_NODES_GET_LISTS_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
+        (author_list_test, true),
+        (hold_list_test, true),
+        (empty_author_list_test, true),
+    ];
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -15,7 +18,7 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 /// Return some entry in authoring_list request
-pub fn publish_entry_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
+pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // author an entry without publishing it
     alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
         .unwrap();
@@ -70,4 +73,28 @@ pub fn hold_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Billy asks for that entry
     request_entry_1(billy);
+}
+
+///
+pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Alex replies an empty list to the initial HandleGetAuthoringEntryList
+    alex.reply_to_first_HandleGetAuthoringEntryList();
+    let (did_work, _srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+
+    // Billy asks for unpublished data.
+    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name);
+    let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
+    let (did_work, _srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+
+    // #fullsync
+    // Alex sends back a failureResult response to the network
+    println!("\n{} looking for HandleQueryEntry\n", billy.name);
+    let res = billy.reply_to_HandleQueryEntry(&query_data);
+    println!("\n{} found: {:?}\n", billy.name, res);
+    assert!(res.is_err());
+    let result_data = res.err().unwrap();
+    let info = std::string::String::from_utf8_lossy(&result_data.result_info).to_string();
+    assert_eq!(info, "No entry found");
 }
