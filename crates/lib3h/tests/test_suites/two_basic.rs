@@ -1,5 +1,5 @@
 use crate::{node_mock::NodeMock, utils::constants::*};
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
@@ -70,7 +70,7 @@ pub fn request_entry_1(node: &mut NodeMock) {
     let (did_work, srv_msg_list) = node.process().unwrap();
     println!("\n{} gets own response {:?}\n", node.name, srv_msg_list);
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
+    assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
     assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
     let mut de = Deserializer::new(&msg.query_result[..]);

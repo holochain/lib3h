@@ -180,8 +180,10 @@ fn basic_track_test<T: Transport, D: Dht>(
         .unwrap();
     let (did_work, srv_msg_list) = engine.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
+    assert_eq!(srv_msg_list.len(), 3);
+    let _ = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleGetGossipingEntryList);
+    let _ = unwrap_to!(srv_msg_list[1] => Lib3hServerProtocol::HandleGetAuthoringEntryList);
+    let res_msg = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::SuccessResult);
     assert_eq!(res_msg.request_id, "track_a_1".to_string());
     assert_eq!(res_msg.space_address, SPACE_ADDRESS_A.as_slice());
     assert_eq!(res_msg.to_agent_id, ALEX_AGENT_ID.as_slice());

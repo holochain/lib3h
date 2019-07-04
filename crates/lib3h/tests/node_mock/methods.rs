@@ -485,8 +485,11 @@ impl NodeMock {
             .expect("Reply to HandleGetAuthoringEntryList failed.");
     }
 
-    /// Reply to a HandleGetHoldingEntryList request
-    pub fn reply_to_HandleGetHoldingEntryList(&mut self, request: &GetListData) -> Lib3hResult<()> {
+    /// Reply to a HandleGetGossipingEntryList request
+    pub fn reply_to_HandleGetGossipingEntryList(
+        &mut self,
+        request: &GetListData,
+    ) -> Lib3hResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         assert_eq!(request.space_address, current_space);
@@ -515,8 +518,8 @@ impl NodeMock {
         self.engine
             .post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg).into())
     }
-    /// Look for the first HandleGetHoldingEntryList request received from network module and reply
-    pub fn reply_to_first_HandleGetHoldingEntryList(&mut self) {
+    /// Look for the first HandleGetGossipingEntryList request received from network module and reply
+    pub fn reply_to_first_HandleGetGossipingEntryList(&mut self) {
         let request = self
             .find_recv_msg(
                 0,
@@ -526,7 +529,7 @@ impl NodeMock {
         // extract request data
         let get_list_data = unwrap_to!(request => Lib3hServerProtocol::HandleGetGossipingEntryList);
         // reply
-        self.reply_to_HandleGetHoldingEntryList(&get_list_data)
+        self.reply_to_HandleGetGossipingEntryList(&get_list_data)
             .expect("Reply to HandleGetHoldingEntryList failed.");
     }
 }

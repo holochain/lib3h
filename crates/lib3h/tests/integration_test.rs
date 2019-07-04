@@ -71,14 +71,15 @@ fn construct_mock_engine(
 
 pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 
-fn setup_memory_node(name: &str, agent_id_arg: Address) -> NodeMock {
+fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
+    let fn_name = fn_name.replace("::", "__");
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
+        bind_url: Url::parse(format!("mem://{}//{}", fn_name, name).as_str()).unwrap(),
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -102,19 +103,21 @@ fn setup_wss_node(name: &str, agent_id_arg: Address) -> NodeMock {
 // Utils
 //--------------------------------------------------------------------------------------------------
 
-fn print_two_nodes_test_name(print_str: &str, test_fn: TwoNodesTestFn) {
-    print_test_name(print_str, test_fn as *mut std::os::raw::c_void);
+/// Get function name as a String by using backtrace
+fn fn_name(test_fn: *mut std::os::raw::c_void) -> String {
+    let mut fn_name = String::new();
+    backtrace::resolve(test_fn, |symbol| {
+        let mut full_name = symbol.name().unwrap().as_str().unwrap().to_string();
+        fn_name = full_name.split_off("integration_test::test_suites::".to_string().len());
+    });
+    fn_name
 }
 
 /// Print name of test function
 fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
-    backtrace::resolve(test_fn, |symbol| {
-        let mut full_name = symbol.name().unwrap().as_str().unwrap().to_string();
-        let mut test_name =
-            full_name.split_off("integration_test::test_suites::".to_string().len());
-        test_name.push_str("()");
-        println!("{}{}", print_str, test_name);
-    });
+    let mut fn_name = fn_name(test_fn);
+    fn_name.push_str("()");
+    println!("{}{}", print_str, fn_name);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -139,13 +142,14 @@ fn test_two_memory_nodes_get_lists_suite() {
 
 // Do general test with config
 fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
+    let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     println!("");
-    print_two_nodes_test_name("IN-MEMORY TWO NODES TEST: ", test_fn);
+    print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
     println!("========================");
 
     // Setup
-    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone());
-    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone());
+    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     if can_setup {
         setup_two_nodes(&mut alex, &mut billy);
     }
@@ -155,7 +159,7 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
 
     // Wrap-up test
     println!("========================");
-    print_two_nodes_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn);
+    print_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn_ptr);
     // Terminate nodes
     alex.stop();
     billy.stop();
