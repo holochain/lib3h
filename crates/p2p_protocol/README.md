@@ -11,6 +11,16 @@
 
 Lib3h Protocol definition for inter-node p2p communication.
 
+There are a lot of options for wire protocol definition tooling. In a lot of ways [Protocol Buffers](https://developers.google.com/protocol-buffers/) through the [prost crate](https://crates.io/crates/prost) is more ergonomic to work with as it gives you standard rust structures and enums that are just annotated to work with the encoding / decoding library.
+
+We've chosen to use [Cap'n Proto](https://capnproto.org/) through the [capnp](https://crates.io/crates/capnp) crate. The encoding / decoding is more memory efficient as it works directly with the wire buffer at the expense of having to navigate the data structure heirarchy through accessors.
+
+The aggregate p2p protocol is split into 3 separate protocol schema files:
+
+- [Transit Encoding](doc/transit_encoding_protocol.md)
+- [Multiplex](doc/multiplex_protocol.md)
+- [P2p](doc/p2p_protocol.md)
+
 ## Contribute
 
 Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](https://github.com/holochain/org/blob/master/CONTRIBUTING.md) for our general practices and protocols on participating in the community.
