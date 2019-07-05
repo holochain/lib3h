@@ -1,92 +1,51 @@
-use super::{CryptoError, CryptoResult};
+use std::ops::{Deref, DerefMut};
+use zeroize::Zeroize;
 
-pub mod read_lock;
-use read_lock::ReadLocker;
+use crate::{CryptoResult, CryptoError};
 
-pub mod write_lock;
-use write_lock::WriteLocker;
+mod read_locker;
+pub use read_locker::ReadLocker;
 
-pub mod insecure_buffer;
+mod write_locker;
+pub use write_locker::WriteLocker;
 
-/// Track if a buffer has read/write access or is memory protected.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProtectState {
-    NoAccess,
-    ReadOnly,
-    ReadWrite,
-}
+mod buffer_vec_u8;
 
-/// This is a thunk so we don't have to type these trait bounds over and over
-pub trait BufferType:
-    Sized
-    + Send
-    + Clone
-    + std::fmt::Debug
-    + std::ops::Deref<Target = [u8]>
-    + std::ops::DerefMut<Target = [u8]>
-{
-}
+mod insecure_buffer;
+pub use insecure_buffer::InsecureBuffer;
 
-/// The Buffer trait is used by crypto_api functions to exchange data.
-/// It is implemented for Vec<u8> for direct use.
-/// If your crypto system provides memory security, you should prefer that type for private keys.
-pub trait Buffer: BufferType {
-    /// Create a new Buffer instance of given type
-    fn new(size: usize) -> CryptoResult<Self>;
-
-    /// Get the length of this buffer
+pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Target = [u8]> {
+    fn box_clone(&self) -> Box<dyn Buffer>;
+    fn as_buffer(&self) -> &dyn Buffer;
+    fn as_buffer_mut(&mut self) -> &mut dyn Buffer;
     fn len(&self) -> usize;
-
-    /// Mark the buffer as no-access (secure)
     fn set_no_access(&self);
-
-    /// Mark the buffer as read-only (see read_lock)
     fn set_readable(&self);
-
-    /// Mark the buffer as read-write (see write_lock)
     fn set_writable(&self);
-
-    /// Mark the buffer as readable (read-only)
-    /// When the returned ReadLocker instance is dropped,
-    /// the buffer will be marked no-access.
-    fn read_lock(&self) -> ReadLocker<Self> {
-        ReadLocker::new(self)
+    fn read_lock<'a>(&'a self) -> ReadLocker {
+        ReadLocker::new(self.as_buffer())
     }
-
-    /// Mark the buffer as writable (read-write)
-    /// When the returned WriteLocker instance is dropped,
-    /// the buffer will be marked no-access.
-    fn write_lock(&mut self) -> WriteLocker<Self> {
-        WriteLocker::new(self)
+    fn write_lock<'a>(&'a mut self) -> WriteLocker {
+        WriteLocker::new(self.as_buffer_mut())
     }
-
-    /// Write data to this Buffer instance
+    fn zero(&mut self) {
+        self.write_lock().zeroize();
+    }
     fn write(&mut self, offset: usize, data: &[u8]) -> CryptoResult<()> {
         if offset + data.len() > self.len() {
-            return Err(CryptoError::new("write overflow"));
+            return Err(CryptoError::WriteOverflow);
         }
         unsafe {
             let mut b = self.write_lock();
-            std::ptr::copy(data.as_ptr(), (**b).as_mut_ptr().add(offset), data.len());
+            std::ptr::copy(data.as_ptr(), (*b).as_mut_ptr().add(offset), data.len());
         }
         Ok(())
     }
 }
 
-// implement our base thunk for Vec<u8>
-impl BufferType for Vec<u8> {}
-
-// implement the Buffer trait for Vec<u8>
-impl Buffer for Vec<u8> {
-    fn new(size: usize) -> CryptoResult<Self> {
-        Ok(vec![0; size])
-    }
-
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-
-    fn set_no_access(&self) {}
-    fn set_readable(&self) {}
-    fn set_writable(&self) {}
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProtectState {
+    NoAccess,
+    ReadOnly,
+    ReadWrite,
 }

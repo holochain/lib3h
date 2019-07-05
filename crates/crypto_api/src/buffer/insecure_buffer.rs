@@ -1,14 +1,23 @@
-use crate::{Buffer, BufferType, CryptoResult, ProtectState};
+use std::ops::{Deref, DerefMut};
 
-/// You probably just want to use Vec<u8> directly rather than this.
-/// This is a class is mainly an implementation reference for SecureBuffers.
+use crate::{Buffer, ProtectState};
+
 #[derive(Debug, Clone)]
 pub struct InsecureBuffer {
     b: Box<[u8]>,
     p: std::cell::RefCell<ProtectState>,
 }
 
-impl std::ops::Deref for InsecureBuffer {
+impl InsecureBuffer {
+    pub fn new(size: usize) -> Self {
+        InsecureBuffer {
+            b: vec![0; size].into_boxed_slice(),
+            p: std::cell::RefCell::new(ProtectState::NoAccess),
+        }
+    }
+}
+
+impl Deref for InsecureBuffer {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -19,7 +28,7 @@ impl std::ops::Deref for InsecureBuffer {
     }
 }
 
-impl std::ops::DerefMut for InsecureBuffer {
+impl DerefMut for InsecureBuffer {
     fn deref_mut(&mut self) -> &mut Self::Target {
         if *self.p.borrow() != ProtectState::ReadWrite {
             panic!("DerefMut, but state is not ReadWrite");
@@ -28,29 +37,35 @@ impl std::ops::DerefMut for InsecureBuffer {
     }
 }
 
-impl BufferType for InsecureBuffer {}
-
 impl Buffer for InsecureBuffer {
-    fn new(size: usize) -> CryptoResult<Self> {
-        Ok(InsecureBuffer {
-            b: vec![0; size].into_boxed_slice(),
-            p: std::cell::RefCell::new(ProtectState::NoAccess),
-        })
+    fn box_clone(&self) -> Box<dyn Buffer> {
+        Box::new(self.clone())
     }
-
+    fn as_buffer(&self) -> &dyn Buffer {
+        &*self
+    }
+    fn as_buffer_mut(&mut self) -> &mut dyn Buffer {
+        &mut *self
+    }
     fn len(&self) -> usize {
         self.b.len()
     }
-
     fn set_no_access(&self) {
+        if *self.p.borrow() == ProtectState::NoAccess {
+            panic!("already no access... bad logic");
+        }
         *self.p.borrow_mut() = ProtectState::NoAccess;
     }
-
     fn set_readable(&self) {
+        if *self.p.borrow() != ProtectState::NoAccess {
+            panic!("not no access... bad logic");
+        }
         *self.p.borrow_mut() = ProtectState::ReadOnly;
     }
-
     fn set_writable(&self) {
+        if *self.p.borrow() != ProtectState::NoAccess {
+            panic!("not no access... bad logic");
+        }
         *self.p.borrow_mut() = ProtectState::ReadWrite;
     }
 }
