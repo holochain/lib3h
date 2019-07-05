@@ -144,23 +144,22 @@ impl MirrorDht {
         }
     }
 
-    /// Add aspect addresses for an entry in our local storage.
-    /// Return Diff
+    /// Return aspect addresses diff between
+    /// known aspects and aspects in the entry argument
     fn diff_aspects(&self, entry: &EntryData) -> HashSet<Address> {
-        let wtf_aspects: HashSet<_> = entry
+        let aspect_address_set: HashSet<_> = entry
             .aspect_list
             .iter()
             .map(|aspect| aspect.aspect_address.clone())
             .collect();
-        let wtf_aspects: HashSet<_> = wtf_aspects.into();
         let maybe_aspects = self.entry_list.get(&entry.entry_address);
         // Insert arg if first aspects
         if maybe_aspects.is_none() {
-            return wtf_aspects;
+            return aspect_address_set;
         }
         // Check if arg has new aspects
         let held_aspects: HashSet<_> = maybe_aspects.unwrap().clone();
-        let diff: HashSet<_> = wtf_aspects
+        let diff: HashSet<_> = aspect_address_set
             .difference(&held_aspects)
             .map(|item| item.clone())
             .collect();

@@ -80,7 +80,9 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let mut de = Deserializer::new(&msg.query_result[..]);
     let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
         Deserialize::deserialize(&mut de);
-    assert_eq!(&maybe_entry.unwrap(), entry);
+    let mut found_entry = maybe_entry.expect("Should have found an entry");
+    found_entry.aspect_list.sort();
+    assert_eq!(&found_entry, entry);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -206,9 +208,10 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // #fullsync
     // Alex or Billy should not receive anything
-    let store_result = billy.wait(Box::new(one_is!(
-        Lib3hServerProtocol::HandleStoreEntryAspect(_)
-    )));
+    let store_result = billy.wait_with_timeout(
+        Box::new(one_is!(Lib3hServerProtocol::HandleStoreEntryAspect(_))),
+        1000,
+    );
     assert!(store_result.is_none());
     let (did_work, _srv_msg_list) = billy.process().unwrap();
     assert!(!did_work);

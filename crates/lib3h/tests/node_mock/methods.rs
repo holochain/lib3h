@@ -161,6 +161,7 @@ impl NodeMock {
                 publish_ts: 42,
             });
         }
+        aspect_list.sort();
         EntryData {
             entry_address: entry_address.clone(),
             aspect_list,
