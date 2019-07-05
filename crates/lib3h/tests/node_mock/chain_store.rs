@@ -30,12 +30,14 @@ impl ChainStore {
         // Append what we have in `authored_entry_store`
         let maybe_entry_store = self.authored_entry_store.get(&entry_address);
         if let Some(mut local_entry) = maybe_entry_store {
+            // println!("ChainStore.get_entry: authored_entry_store has {}", local_entry.aspect_list.len());
             entry.aspect_list.append(&mut local_entry.aspect_list);
             has_aspects = true;
         }
         // Append what we have in `stored_entry_store`
         let maybe_entry_store = self.stored_entry_store.get(&entry_address);
         if let Some(mut local_entry) = maybe_entry_store {
+            // println!("ChainStore.get_entry: stored_entry_store has {}", local_entry.aspect_list.len());
             entry.aspect_list.append(&mut local_entry.aspect_list);
             has_aspects = true;
         }
