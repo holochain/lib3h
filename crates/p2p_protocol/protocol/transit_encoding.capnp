@@ -42,6 +42,9 @@ struct MsgStep1FromConnect {
   networkId @2 :Data;
   # The network identifier we are trying to join
   # If the remote has a different id, it may drop the connection.
+  # TODO - let's remove this to not expose networkId
+  # We could put networkId in additional data for the KX exchange
+  # (or just in the content for better error reporting)
 
   kxPubKey @3 :Data;
   # Send the remote our key exchange public key
@@ -160,6 +163,8 @@ struct EncodedMessage {
   # We have made it past the handshake sequence
   # We can now start exchanging encoded data using sequential nonces
   # and the session keys.
+  # Note: EncodedMessage + Steps 4 and 5 above may use bucketed timestamps
+  # in the aead additional data to ensure timelyness of communications.
   # This framing allows us to specify padding if we'd like to normalize
   # the message lengths and/or inject steganography.
 
