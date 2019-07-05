@@ -297,6 +297,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
+                        // TODO: create a rust equivalent of
+                        // https://github.com/holochain/n3h/blob/master/lib/n3h-common/track.js
                         if msg.request_id == "__author_list" {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
                             space_gateway.post_dht(cmd)?;
@@ -483,6 +485,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             res.result_info = "Already joined space".to_string().into_bytes();
             return Ok(vec![Lib3hServerProtocol::FailureResult(res)]);
         }
+        let mut output = Vec::new();
+        output.push(Lib3hServerProtocol::SuccessResult(res));
         // First create DhtConfig for space gateway
         let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
@@ -534,7 +538,6 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             }),
         )?;
         // Send Get*Lists requests
-        let mut output = Vec::new();
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),
             provider_agent_id: join_msg.agent_id.clone(),
@@ -546,7 +549,6 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         list_data.request_id = "authoring".to_owned();
         output.push(Lib3hServerProtocol::HandleGetAuthoringEntryList(list_data));
         // Done
-        output.push(Lib3hServerProtocol::SuccessResult(res));
         Ok(output)
     }
 
