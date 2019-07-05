@@ -341,7 +341,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let cmd = DhtCommand::HoldEntryAddress(msg.entry.entry_address);
+                        let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
                         space_gateway.post_dht(cmd)?;
                         // Dht::post(&mut space_gateway, cmd)?;
                     }
@@ -437,8 +437,23 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        for (entry_address, _) in msg.address_map {
-                            space_gateway.post_dht(DhtCommand::HoldEntryAddress(entry_address))?;
+                        for (entry_address, aspect_address_list) in msg.address_map {
+                            let mut aspect_list = Vec::new();
+                            for aspect_address in aspect_address_list {
+                                let fake_aspect = EntryAspectData {
+                                    aspect_address: aspect_address.clone(),
+                                    type_hint: String::new(),
+                                    aspect: vec![],
+                                    publish_ts: 0,
+                                };
+                                aspect_list.push(fake_aspect);
+                            }
+                            let fake_entry = EntryData {
+                                entry_address: entry_address.clone(),
+                                aspect_list,
+                            };
+                            space_gateway
+                                .post_dht(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
                         }
                     }
                 }
