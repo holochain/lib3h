@@ -29,6 +29,7 @@ pub struct NodeMock {
     pub agent_id: Address,
     /// The node's uri
     my_advertise: Url,
+    pub name: String,
 
     /// Sent messages logs
     request_log: Vec<String>,
@@ -72,6 +73,7 @@ impl NodeMock {
             joined_space_list: HashSet::new(),
             current_space: None,
             my_advertise,
+            name: name.to_string(),
         }
     }
 }
