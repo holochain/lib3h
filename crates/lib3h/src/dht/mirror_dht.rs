@@ -303,7 +303,10 @@ impl MirrorDht {
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
             DhtCommand::HoldEntryAspectAddress(entry) => {
-                let _received_new_content = self.add_entry_aspects(&entry);
+                let received_new_content = self.add_entry_aspects(&entry);
+                if !received_new_content {
+                    return Ok(vec![]);
+                }
                 // Use entry_address as request_id
                 let address_str = std::str::from_utf8(entry.entry_address.as_slice()).unwrap();
                 self.pending_fetch_request_list

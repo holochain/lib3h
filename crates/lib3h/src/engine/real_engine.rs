@@ -18,7 +18,7 @@ use crate::{
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, AddressRef, DidWork, Lib3hResult,
+    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -405,7 +405,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 );
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Ok(_space_gateway) => {
+                    Ok(space_gateway) => {
                         let mut msg_data = FetchEntryData {
                             space_address: msg.space_address.clone(),
                             entry_address: vec![],
@@ -414,10 +414,15 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                             aspect_address_list: None,
                         };
                         // Request every Entry from Core
-                        // TODO: should check aspects and only request entry with new aspects
-                        // let known_entries = space_gateway.get_entry_address_list();
                         let mut count = 0;
-                        for (entry_address, _) in msg.address_map {
+                        for (entry_address, aspect_address_list) in msg.address_map {
+                            // Check aspects and only request entry with new aspects
+                            let maybe_known_aspects = space_gateway.get_aspects_of(&entry_address);
+                            if let Some(known_aspects) = maybe_known_aspects {
+                                if includes(&known_aspects, &aspect_address_list) {
+                                    continue;
+                                }
+                            }
                             count += 1;
                             msg_data.entry_address = entry_address.clone();
                             outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
@@ -575,4 +580,12 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }
+}
+
+/// Return true if all elements of list_b are found in list_a
+fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
+    let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
+    let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
+    let diff: HashSet<_> = set_a.difference(&set_b).map(|addr| addr).collect();
+    diff.len() > 0
 }
