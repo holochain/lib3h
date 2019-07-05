@@ -588,6 +588,5 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
 fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
-    let diff: HashSet<_> = set_a.difference(&set_b).map(|addr| addr).collect();
-    diff.len() > 0
+    set_b.is_subset(&set_a)
 }
