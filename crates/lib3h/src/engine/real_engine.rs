@@ -455,6 +455,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                                 };
                                 aspect_list.push(fake_aspect);
                             }
+                            // Create "fake" entry, in the sense an entry with no actual content,
+                            // but valid addresses.
                             let fake_entry = EntryData {
                                 entry_address: entry_address.clone(),
                                 aspect_list,
