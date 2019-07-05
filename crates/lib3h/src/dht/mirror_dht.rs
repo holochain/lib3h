@@ -24,13 +24,13 @@ pub struct MirrorDht {
     /// FIFO of DhtCommands send to us
     inbox: VecDeque<DhtCommand>,
     /// Storage of EntryData with empty aspect content?
-    entry_address_list: HashSet<Address>,
+    entry_list: HashMap<Address, HashSet<Address>>,
     /// Storage of PeerData
     peer_list: HashMap<String, PeerData>,
     /// PeerData of this peer
     this_peer: PeerData,
-    ///
-    pending_fetch_requests: HashSet<String>,
+    /// Keep track of fetch requests sent to Core
+    pending_fetch_request_list: HashSet<String>,
 }
 
 /// Constructors
@@ -39,13 +39,13 @@ impl MirrorDht {
         MirrorDht {
             inbox: VecDeque::new(),
             peer_list: HashMap::new(),
-            entry_address_list: HashSet::new(),
+            entry_list: HashMap::new(),
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 peer_uri: peer_transport.clone(),
                 timestamp: 0, // FIXME
             },
-            pending_fetch_requests: HashSet::new(),
+            pending_fetch_request_list: HashSet::new(),
         }
     }
 
@@ -77,20 +77,28 @@ impl Dht for MirrorDht {
     // -- Entry -- //
 
     fn get_entry_address_list(&self) -> Vec<&AddressRef> {
-        self.entry_address_list
-            .iter()
-            .map(|e| e.as_slice())
-            .collect()
+        self.entry_list.iter().map(|kv| kv.0.as_slice()).collect()
+    }
+
+    fn get_aspects_of(&self, entry_address: &AddressRef) -> Option<Vec<Address>> {
+        match self.entry_list.get(entry_address) {
+            None => None,
+            Some(set) => {
+                let vec = set.iter().map(|addr| addr.clone()).collect();
+                Some(vec)
+            }
+        }
     }
 
     // -- Processing -- //
 
+    /// Add to inbox
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inbox.push_back(cmd);
         Ok(())
     }
 
-    ///
+    /// Serve each item in inbox
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         let mut outbox = Vec::new();
         let mut did_work = false;
@@ -136,10 +144,46 @@ impl MirrorDht {
         }
     }
 
-    /// Add entry to our local storage
-    /// Return true if new entry was successfully added
-    fn add_entry_address(&mut self, entry_address: &AddressRef) -> bool {
-        self.entry_address_list.insert(entry_address.to_vec())
+    /// Return aspect addresses diff between
+    /// known aspects and aspects in the entry argument
+    fn diff_aspects(&self, entry: &EntryData) -> HashSet<Address> {
+        let aspect_address_set: HashSet<_> = entry
+            .aspect_list
+            .iter()
+            .map(|aspect| aspect.aspect_address.clone())
+            .collect();
+        let maybe_aspects = self.entry_list.get(&entry.entry_address);
+        // Insert arg if first aspects
+        if maybe_aspects.is_none() {
+            return aspect_address_set;
+        }
+        // Check if arg has new aspects
+        let held_aspects: HashSet<_> = maybe_aspects.unwrap().clone();
+        let diff: HashSet<_> = aspect_address_set
+            .difference(&held_aspects)
+            .map(|item| item.clone())
+            .collect();
+        diff
+    }
+
+    /// Add aspect addresses for an entry in our local storage.
+    /// Return true if at least one new aspect address was added.
+    fn add_entry_aspects(&mut self, entry: &EntryData) -> bool {
+        let diff: HashSet<_> = self.diff_aspects(&entry);
+        if diff.len() == 0 {
+            return false;
+        }
+        let maybe_known_aspects = self.entry_list.get(&entry.entry_address);
+        let new_aspects: HashSet<_> = match maybe_known_aspects {
+            None => diff,
+            Some(known_aspects) => known_aspects
+                .union(&diff)
+                .map(|item| item.clone())
+                .collect(),
+        };
+        self.entry_list
+            .insert(entry.entry_address.to_vec(), new_aspects);
+        true
     }
 
     /// Create GossipTo event for entry to all known peers
@@ -178,10 +222,8 @@ impl MirrorDht {
                 }
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
-                        let _is_new = self.add_entry_address(&entry.entry_address);
-                        // TODO - since aspects are not tracked, act as if there is always new data
-                        let is_new = true;
-                        if is_new {
+                        let diff = self.diff_aspects(&entry);
+                        if diff.len() > 0 {
                             return Ok(vec![DhtEvent::HoldEntryRequested(
                                 self.this_peer.peer_address.clone(),
                                 entry,
@@ -200,7 +242,7 @@ impl MirrorDht {
             }
             // Ask owner to respond to self
             DhtCommand::FetchEntry(fetch_entry) => {
-                self.pending_fetch_requests
+                self.pending_fetch_request_list
                     .insert(fetch_entry.msg_id.clone());
                 return Ok(vec![DhtEvent::EntryDataRequested(fetch_entry.clone())]);
             }
@@ -260,14 +302,18 @@ impl MirrorDht {
             }
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
-            DhtCommand::HoldEntryAddress(entry_address) => {
-                let _received_new_content = self.add_entry_address(entry_address);
+            DhtCommand::HoldEntryAspectAddress(entry) => {
+                let received_new_content = self.add_entry_aspects(&entry);
+                if !received_new_content {
+                    return Ok(vec![]);
+                }
                 // Use entry_address as request_id
-                let address_str = std::str::from_utf8(entry_address.as_slice()).unwrap();
-                self.pending_fetch_requests.insert(address_str.to_string());
+                let address_str = std::str::from_utf8(entry.entry_address.as_slice()).unwrap();
+                self.pending_fetch_request_list
+                    .insert(address_str.to_string());
                 let fetch_entry = FetchDhtEntryData {
                     msg_id: address_str.to_string(),
-                    entry_address: entry_address.to_owned(),
+                    entry_address: entry.entry_address.to_owned(),
                 };
                 Ok(vec![DhtEvent::EntryDataRequested(fetch_entry)])
             }
@@ -275,12 +321,11 @@ impl MirrorDht {
             // Bookkeep address and gossip entry to every known peer.
             DhtCommand::BroadcastEntry(entry) => {
                 // Store address
-                let _received_new_content = self.add_entry_address(&entry.entry_address.clone());
-                // TODO - since aspects are not tracked, act as if there is always new data
+                let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
-                //if !received_new_content {
-                //    return Ok(vec![]);
-                //}
+                if !received_new_content {
+                    return Ok(vec![]);
+                }
                 let gossip_evt = self.gossip_entry(entry);
                 // Done
                 Ok(vec![gossip_evt])
@@ -291,10 +336,10 @@ impl MirrorDht {
             //   - From a Publish: Forward response back to self
             //   - From a Hold   : Broadcast entry
             DhtCommand::EntryDataResponse(response) => {
-                if !self.pending_fetch_requests.remove(&response.msg_id) {
+                if !self.pending_fetch_request_list.remove(&response.msg_id) {
                     return Err(format_err!("Received response for an unknown request"));
                 }
-                // From a Hold if msg_id matches one set in HoldEntryAddress
+                // From a Hold if msg_id matches one set in HoldEntryAspectAddress
                 let address_str = std::str::from_utf8(&response.entry.entry_address).unwrap();
                 if address_str == response.msg_id {
                     let gossip_evt = self.gossip_entry(&response.entry);

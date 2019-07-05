@@ -18,7 +18,7 @@ use crate::{
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, AddressRef, DidWork, Lib3hResult,
+    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -343,7 +343,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let cmd = DhtCommand::HoldEntryAddress(msg.entry.entry_address);
+                        let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
                         space_gateway.post_dht(cmd)?;
                         // Dht::post(&mut space_gateway, cmd)?;
                     }
@@ -407,7 +407,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 );
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Ok(_space_gateway) => {
+                    Ok(space_gateway) => {
                         let mut msg_data = FetchEntryData {
                             space_address: msg.space_address.clone(),
                             entry_address: vec![],
@@ -416,10 +416,15 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                             aspect_address_list: None,
                         };
                         // Request every Entry from Core
-                        // TODO: should check aspects and only request entry with new aspects
-                        // let known_entries = space_gateway.get_entry_address_list();
                         let mut count = 0;
-                        for (entry_address, _) in msg.address_map {
+                        for (entry_address, aspect_address_list) in msg.address_map {
+                            // Check aspects and only request entry with new aspects
+                            let maybe_known_aspects = space_gateway.get_aspects_of(&entry_address);
+                            if let Some(known_aspects) = maybe_known_aspects {
+                                if includes(&known_aspects, &aspect_address_list) {
+                                    continue;
+                                }
+                            }
                             count += 1;
                             msg_data.entry_address = entry_address.clone();
                             outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
@@ -439,8 +444,25 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        for (entry_address, _) in msg.address_map {
-                            space_gateway.post_dht(DhtCommand::HoldEntryAddress(entry_address))?;
+                        for (entry_address, aspect_address_list) in msg.address_map {
+                            let mut aspect_list = Vec::new();
+                            for aspect_address in aspect_address_list {
+                                let fake_aspect = EntryAspectData {
+                                    aspect_address: aspect_address.clone(),
+                                    type_hint: String::new(),
+                                    aspect: vec![],
+                                    publish_ts: 0,
+                                };
+                                aspect_list.push(fake_aspect);
+                            }
+                            // Create "fake" entry, in the sense an entry with no actual content,
+                            // but valid addresses.
+                            let fake_entry = EntryData {
+                                entry_address: entry_address.clone(),
+                                aspect_list,
+                            };
+                            space_gateway
+                                .post_dht(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
                         }
                     }
                 }
@@ -562,4 +584,11 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }
+}
+
+/// Return true if all elements of list_b are found in list_a
+fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
+    let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
+    let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
+    set_b.is_subset(&set_a)
 }
