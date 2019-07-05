@@ -150,7 +150,7 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
+    pub fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
@@ -173,7 +173,7 @@ impl NodeMock {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
-    ) -> Lib3hResult<()> {
+    ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
 
@@ -204,12 +204,11 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self
-                .engine
-                .post(Lib3hClientProtocol::PublishEntry(msg_data).into());
+            self.engine
+                .post(Lib3hClientProtocol::PublishEntry(msg_data).into())?;
         }
         // Done
-        Ok(())
+        Ok(entry)
     }
 
     pub fn hold_entry(
@@ -217,7 +216,7 @@ impl NodeMock {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_tell_engine: bool,
-    ) -> Lib3hResult<()> {
+    ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
@@ -244,12 +243,11 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self
-                .engine
-                .post(Lib3hClientProtocol::HoldEntry(msg_data).into());
+            self.engine
+                .post(Lib3hClientProtocol::HoldEntry(msg_data).into())?;
         }
         // Done
-        Ok(())
+        Ok(entry)
     }
 }
 
