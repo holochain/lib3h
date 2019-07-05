@@ -1,6 +1,6 @@
 use crate::{
     node_mock::NodeMock,
-    test_suites::two_basic::{request_entry_1, TwoNodesTestFn},
+    test_suites::two_basic::{request_entry_ok, TwoNodesTestFn},
     utils::constants::*,
 };
 use lib3h_protocol::{data_types::EntryData, protocol_server::Lib3hServerProtocol};
@@ -24,7 +24,8 @@ lazy_static! {
 /// Return some entry in authoring_list request
 pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // author an entry without publishing it
-    alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
+    let entry = alex
+        .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
         .unwrap();
     // Reply to the publish_list request received from network module
     alex.reply_to_first_HandleGetAuthoringEntryList();
@@ -47,13 +48,14 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
 
     // Billy asks for that entry
-    request_entry_1(billy);
+    request_entry_ok(billy, &entry);
 }
 
 /// Return some entry in gossiping_list request
 pub fn hold_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Have alex hold some data
-    alex.hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
+    let entry = alex
+        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
         .unwrap();
     // Alex: Look for the hold_list request received from network module and reply
     alex.reply_to_first_HandleGetGossipingEntryList();
@@ -76,7 +78,7 @@ pub fn hold_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
 
     // Billy asks for that entry
-    request_entry_1(billy);
+    request_entry_ok(billy, &entry);
 }
 
 ///
@@ -105,7 +107,8 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 
 /// Return author_list with already known entry
 pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock) {
-    alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
+    let entry = alex
+        .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
@@ -119,7 +122,7 @@ pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
 
     // Billy asks for that entry
-    request_entry_1(billy);
+    request_entry_ok(billy, &entry);
 }
 
 /// Return lots of entries
