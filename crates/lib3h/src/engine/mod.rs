@@ -43,7 +43,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'a, T: Transport, D: Dht> {
+pub struct RealEngine<T: Transport, D: Dht> {
     /// Identifier
     name: String,
     /// Config settings
@@ -64,7 +64,7 @@ pub struct RealEngine<'a, T: Transport, D: Dht> {
     space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
     #[allow(dead_code)]
     /// crypto system to use
-    crypto: &'a dyn CryptoSystem,
+    crypto: Box<dyn CryptoSystem>,
     #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
     transport_keys: TransportKeys,

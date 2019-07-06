@@ -1,5 +1,3 @@
-pub struct SodiumCryptoSystemConfig {}
-
 /// the [libsodium](https://libsodium.org) ([NaCl](https://nacl.cr.yp.to/)) implementation of lib3h_crypto_api::CryptoSystem
 ///
 /// # Examples
@@ -12,17 +10,16 @@ pub struct SodiumCryptoSystemConfig {}
 /// use lib3h_sodium::{
 ///     SecureBuffer,
 ///     SodiumCryptoSystem,
-///     SodiumCryptoSystemConfig
 /// };
 ///
 /// // CryptoSystem is designed to be used through trait-objects like this:
 /// fn test(crypto: Box<dyn CryptoSystem>) {
-///     let mut seed = crypto.sec_buf_new(crypto.sign_seed_bytes());
+///     let mut seed = crypto.buf_new_secure(crypto.sign_seed_bytes());
 ///     crypto.randombytes_buf(&mut seed).unwrap();
 ///
 ///     let mut pubkey: Box<dyn Buffer> =
 ///         Box::new(vec![0; crypto.sign_public_key_bytes()]);
-///     let mut seckey = crypto.sec_buf_new(crypto.sign_secret_key_bytes());
+///     let mut seckey = crypto.buf_new_secure(crypto.sign_secret_key_bytes());
 ///
 ///     crypto.sign_seed_keypair(&seed, &mut pubkey, &mut seckey).unwrap();
 ///
@@ -42,31 +39,45 @@ pub struct SodiumCryptoSystemConfig {}
 /// }
 ///
 /// fn main() {
-///     let crypto: Box<dyn CryptoSystem> = Box::new(
-///         SodiumCryptoSystem::new(SodiumCryptoSystemConfig {}));
+///     let crypto: Box<dyn CryptoSystem> =
+///         Box::new(SodiumCryptoSystem::new());
 ///     test(crypto);
 /// }
 /// ```
+#[derive(Clone)]
 pub struct SodiumCryptoSystem {
     config: SodiumCryptoSystemConfig,
 }
 
+#[derive(Clone)]
+struct SodiumCryptoSystemConfig {}
+
 use crate::check_init;
 
 impl SodiumCryptoSystem {
-    pub fn new(config: SodiumCryptoSystemConfig) -> Self {
+    pub fn new() -> Self {
         check_init();
-        Self { config }
+        Self {
+            config: SodiumCryptoSystemConfig {},
+        }
     }
 }
 
-use lib3h_crypto_api::{Buffer, CryptoError, CryptoResult};
+use lib3h_crypto_api::{Buffer, CryptoError, CryptoResult, CryptoSystem};
 
 mod secure_buffer;
 pub use secure_buffer::SecureBuffer;
 
-impl lib3h_crypto_api::CryptoSystem for SodiumCryptoSystem {
-    fn sec_buf_new(&self, size: usize) -> Box<dyn Buffer> {
+impl CryptoSystem for SodiumCryptoSystem {
+    fn box_clone(&self) -> Box<dyn CryptoSystem> {
+        Box::new(self.clone())
+    }
+
+    fn as_crypto_system(&self) -> &dyn CryptoSystem {
+        &*self
+    }
+
+    fn buf_new_secure(&self, size: usize) -> Box<dyn Buffer> {
         Box::new(SecureBuffer::new(size))
     }
 
@@ -213,8 +224,7 @@ mod test {
 
     #[test]
     fn sodium_should_pass_crypto_system_full_suite() {
-        let crypto: Box<dyn CryptoSystem> =
-            Box::new(SodiumCryptoSystem::new(SodiumCryptoSystemConfig {}));
+        let crypto: Box<dyn CryptoSystem> = Box::new(SodiumCryptoSystem::new());
         crypto_system_test::full_suite(crypto);
     }
 }

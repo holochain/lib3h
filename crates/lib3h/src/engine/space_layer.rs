@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<'a, T: Transport, D: Dht> RealEngine<'a, T, D> {
+impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();

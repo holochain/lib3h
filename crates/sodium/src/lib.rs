@@ -59,4 +59,4 @@ pub mod secbuf_util;
 pub mod sign;
 
 mod crypto_system;
-pub use crypto_system::{SecureBuffer, SodiumCryptoSystem, SodiumCryptoSystemConfig};
+pub use crypto_system::{SecureBuffer, SodiumCryptoSystem};

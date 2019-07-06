@@ -19,16 +19,9 @@ use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
 };
+use lib3h_sodium::SodiumCryptoSystem;
 use url::Url;
 use utils::constants::*;
-
-lazy_static! {
-    static ref CRYPTO: Box<dyn lib3h_crypto_api::CryptoSystem> = {
-        Box::new(lib3h_sodium::SodiumCryptoSystem::new(
-            lib3h_sodium::SodiumCryptoSystemConfig {},
-        ))
-    };
-}
 
 //--------------------------------------------------------------------------------------------------
 // Test suites
@@ -65,7 +58,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<'static, TransportMemory, MirrorDht> {
+fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
@@ -76,7 +69,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<'static, TransportMemory, MirrorDh
         dht_custom_config: vec![],
     };
     let engine = RealEngine::new_mock(
-        CRYPTO.as_ref(),
+        Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),
         MirrorDht::new_with_config,
@@ -90,7 +83,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<'static, TransportMemory, MirrorDh
     engine
 }
 
-fn basic_setup_wss() -> RealEngine<'static, TransportWss<std::net::TcpStream>, MirrorDht> {
+fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
@@ -101,7 +94,7 @@ fn basic_setup_wss() -> RealEngine<'static, TransportWss<std::net::TcpStream>, M
         dht_custom_config: vec![],
     };
     let engine = RealEngine::new(
-        CRYPTO.as_ref(),
+        Box::new(SodiumCryptoSystem::new()),
         config,
         "test_engine_wss".into(),
         MirrorDht::new_with_config,

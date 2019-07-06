@@ -29,14 +29,6 @@ use test_suites::{two_basic::*, two_get_lists::*};
 use url::Url;
 use utils::constants::*;
 
-lazy_static! {
-    static ref CRYPTO: Box<dyn lib3h_crypto_api::CryptoSystem> = {
-        Box::new(lib3h_sodium::SodiumCryptoSystem::new(
-            lib3h_sodium::SodiumCryptoSystemConfig {},
-        ))
-    };
-}
-
 //--------------------------------------------------------------------------------------------------
 // Logging
 //--------------------------------------------------------------------------------------------------
@@ -63,7 +55,7 @@ fn construct_mock_engine(
     name: &str,
 ) -> Lib3hResult<Box<dyn NetworkEngine>> {
     let engine: RealEngine<TransportMemory, MirrorDht> = RealEngine::new_mock(
-        CRYPTO.as_ref(),
+        Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
         MirrorDht::new_with_config,

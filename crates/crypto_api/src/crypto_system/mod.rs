@@ -2,7 +2,13 @@ use crate::{Buffer, CryptoResult};
 
 #[allow(clippy::borrowed_box)]
 pub trait CryptoSystem: Sync {
-    fn sec_buf_new(&self, size: usize) -> Box<dyn Buffer>;
+    fn box_clone(&self) -> Box<dyn CryptoSystem>;
+    fn as_crypto_system(&self) -> &dyn CryptoSystem;
+
+    fn buf_new_secure(&self, size: usize) -> Box<dyn Buffer>;
+    fn buf_new_insecure(&self, size: usize) -> Box<dyn Buffer> {
+        Box::new(vec![0; size])
+    }
 
     // -- random methods -- //
 

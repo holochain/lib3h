@@ -18,7 +18,7 @@ impl FullSuite {
     }
 
     fn test_sec_buf(&self) {
-        let mut b1 = self.crypto.sec_buf_new(8);
+        let mut b1 = self.crypto.buf_new_secure(8);
         assert_eq!(8, b1.len());
         assert_eq!(
             "[0, 0, 0, 0, 0, 0, 0, 0]",
@@ -153,7 +153,15 @@ mod test {
     struct FakeCryptoSystem;
 
     impl CryptoSystem for FakeCryptoSystem {
-        fn sec_buf_new(&self, size: usize) -> Box<dyn Buffer> {
+        fn box_clone(&self) -> Box<dyn CryptoSystem> {
+            Box::new(FakeCryptoSystem)
+        }
+
+        fn as_crypto_system(&self) -> &dyn CryptoSystem {
+            &*self
+        }
+
+        fn buf_new_secure(&self, size: usize) -> Box<dyn Buffer> {
             Box::new(InsecureBuffer::new(size))
         }
 
