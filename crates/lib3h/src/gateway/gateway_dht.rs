@@ -6,7 +6,7 @@ use crate::{
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, AddressRef, DidWork, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
@@ -25,6 +25,9 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Entry
     fn get_entry_address_list(&self) -> Vec<&AddressRef> {
         self.inner_dht.get_entry_address_list()
+    }
+    fn get_aspects_of(&self, entry_address: &AddressRef) -> Option<Vec<Address>> {
+        self.inner_dht.get_aspects_of(entry_address)
     }
 
     /// Processing

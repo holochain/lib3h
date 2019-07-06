@@ -1,4 +1,5 @@
 use crate::Address;
+use std::cmp::Ordering;
 use url::Url;
 
 /// Tuple holding all the info required for identifying an Aspect.
@@ -9,12 +10,22 @@ pub type AspectKey = (Address, Address);
 // Entry (Semi-opaque Holochain entry type)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct EntryAspectData {
     pub aspect_address: Address,
     pub type_hint: String,
     pub aspect: Vec<u8>,
     pub publish_ts: u64,
+}
+impl Ord for EntryAspectData {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.aspect_address.cmp(&other.aspect_address)
+    }
+}
+impl PartialOrd for EntryAspectData {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

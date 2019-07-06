@@ -12,7 +12,8 @@ pub enum DhtCommand {
     /// Owner wants us to hold a peer discovery data item.
     HoldPeer(PeerData),
     /// Owner notifies us that it is holding one or several Aspects for an Entry.
-    HoldEntryAddress(Address),
+    /// Note: Need an EntryData to know the aspect addresses, but aspects' content can be empty.
+    HoldEntryAspectAddress(EntryData),
     /// Owner wants us to bookkeep an entry and broadcast it to neighbors
     BroadcastEntry(EntryData),
     /// Owner notifies us that is is not holding an entry anymore.

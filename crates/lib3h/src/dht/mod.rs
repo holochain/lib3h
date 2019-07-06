@@ -140,13 +140,17 @@ pub mod tests {
         let entry_address_list = dht.get_entry_address_list();
         assert_eq!(entry_address_list.len(), 0);
         // Add a data item
-        dht.post(DhtCommand::HoldEntryAddress(ENTRY_ADDRESS_1.clone()))
+        let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
+        dht.post(DhtCommand::HoldEntryAspectAddress(entry.clone()))
             .unwrap();
         let (did_work, _) = dht.process().unwrap();
         assert!(did_work);
         // Should have it
         let entry_address_list = dht.get_entry_address_list();
         assert_eq!(entry_address_list.len(), 1);
+        let maybe_aspects = dht.get_aspects_of(&ENTRY_ADDRESS_1);
+        assert!(maybe_aspects.is_some());
+        assert_eq!(maybe_aspects.unwrap().len(), 1);
         // Fetch it
         let fetch_entry = FetchDhtEntryData {
             msg_id: "fetch_1".to_owned(),
@@ -157,7 +161,6 @@ pub mod tests {
         assert_eq!(event_list.len(), 1);
         let provide_entry = unwrap_to!(event_list[0] => DhtEvent::EntryDataRequested);
         // Make something up
-        let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         let response = FetchDhtEntryResponseData {
             msg_id: provide_entry.msg_id.clone(),
             entry: entry.clone(),
@@ -247,7 +250,7 @@ pub mod tests {
         }
         // Tell DHT B to hold it
         dht_b
-            .post(DhtCommand::HoldEntryAddress(entry_data.entry_address))
+            .post(DhtCommand::HoldEntryAspectAddress(entry_data))
             .unwrap();
         let (did_work, _) = dht_b.process().unwrap();
         assert!(did_work);

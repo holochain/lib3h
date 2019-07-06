@@ -31,7 +31,9 @@ pub mod tests {
     // for this to actually show log entries you also have to run the tests like this:
     // RUST_LOG=lib3h=debug cargo test -- --nocapture
     pub fn enable_logging_for_test(enable: bool) {
-        //std::env::set_var("RUST_LOG", "debug");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "debug");
+        }
         let _ = env_logger::builder()
             .default_format_timestamp(false)
             .default_format_module_path(false)

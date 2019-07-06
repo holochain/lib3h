@@ -150,7 +150,7 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
+    pub fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
@@ -161,6 +161,7 @@ impl NodeMock {
                 publish_ts: 42,
             });
         }
+        aspect_list.sort();
         EntryData {
             entry_address: entry_address.clone(),
             aspect_list,
@@ -173,7 +174,7 @@ impl NodeMock {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
-    ) -> Lib3hResult<()> {
+    ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
 
@@ -204,12 +205,11 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self
-                .engine
-                .post(Lib3hClientProtocol::PublishEntry(msg_data).into());
+            self.engine
+                .post(Lib3hClientProtocol::PublishEntry(msg_data).into())?;
         }
         // Done
-        Ok(())
+        Ok(entry)
     }
 
     pub fn hold_entry(
@@ -217,7 +217,7 @@ impl NodeMock {
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_tell_engine: bool,
-    ) -> Lib3hResult<()> {
+    ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
@@ -244,12 +244,11 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
-            return self
-                .engine
-                .post(Lib3hClientProtocol::HoldEntry(msg_data).into());
+            self.engine
+                .post(Lib3hClientProtocol::HoldEntry(msg_data).into())?;
         }
         // Done
-        Ok(())
+        Ok(entry)
     }
 }
 
@@ -381,12 +380,14 @@ impl NodeMock {
             };
             return Err(msg_data);
         }
+        let entry = maybe_entry.unwrap();
+        // println!("\n reply_to_HandleFetchEntry_inner({}) = {:?}\n", entry.aspect_list.len(), entry.clone());
         // Send EntryData as binary
         let fetch_result_data = FetchEntryResultData {
             space_address: fetch.space_address.clone(),
             provider_agent_id: fetch.provider_agent_id.clone(),
             request_id: fetch.request_id.clone(),
-            entry: maybe_entry.unwrap(),
+            entry,
         };
         Ok(fetch_result_data)
     }
@@ -485,8 +486,11 @@ impl NodeMock {
             .expect("Reply to HandleGetAuthoringEntryList failed.");
     }
 
-    /// Reply to a HandleGetHoldingEntryList request
-    pub fn reply_to_HandleGetHoldingEntryList(&mut self, request: &GetListData) -> Lib3hResult<()> {
+    /// Reply to a HandleGetGossipingEntryList request
+    pub fn reply_to_HandleGetGossipingEntryList(
+        &mut self,
+        request: &GetListData,
+    ) -> Lib3hResult<()> {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         assert_eq!(request.space_address, current_space);
@@ -515,8 +519,8 @@ impl NodeMock {
         self.engine
             .post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg).into())
     }
-    /// Look for the first HandleGetHoldingEntryList request received from network module and reply
-    pub fn reply_to_first_HandleGetHoldingEntryList(&mut self) {
+    /// Look for the first HandleGetGossipingEntryList request received from network module and reply
+    pub fn reply_to_first_HandleGetGossipingEntryList(&mut self) {
         let request = self
             .find_recv_msg(
                 0,
@@ -526,7 +530,7 @@ impl NodeMock {
         // extract request data
         let get_list_data = unwrap_to!(request => Lib3hServerProtocol::HandleGetGossipingEntryList);
         // reply
-        self.reply_to_HandleGetHoldingEntryList(&get_list_data)
+        self.reply_to_HandleGetGossipingEntryList(&get_list_data)
             .expect("Reply to HandleGetHoldingEntryList failed.");
     }
 }
