@@ -13,6 +13,9 @@ impl Buffer for Vec<u8> {
     fn len(&self) -> usize {
         Vec::len(self)
     }
+    fn is_empty(&self) -> bool {
+        Vec::is_empty(self)
+    }
     fn set_no_access(&self) {}
     fn set_readable(&self) {}
     fn set_writable(&self) {}

@@ -50,6 +50,9 @@ impl Buffer for InsecureBuffer {
     fn len(&self) -> usize {
         self.b.len()
     }
+    fn is_empty(&self) -> bool {
+        self.b.is_empty()
+    }
     fn set_no_access(&self) {
         if *self.p.borrow() == ProtectState::NoAccess {
             panic!("already no access... bad logic");

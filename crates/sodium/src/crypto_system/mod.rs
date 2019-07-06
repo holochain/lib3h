@@ -1,5 +1,4 @@
-pub struct SodiumCryptoSystemConfig {
-}
+pub struct SodiumCryptoSystemConfig {}
 
 /// the [libsodium](https://libsodium.org) ([NaCl](https://nacl.cr.yp.to/)) implementation of lib3h_crypto_api::CryptoSystem
 ///
@@ -61,7 +60,7 @@ impl SodiumCryptoSystem {
     }
 }
 
-use lib3h_crypto_api::{Buffer, CryptoResult, CryptoError};
+use lib3h_crypto_api::{Buffer, CryptoError, CryptoResult};
 
 mod secure_buffer;
 pub use secure_buffer::SecureBuffer;
@@ -79,10 +78,18 @@ impl lib3h_crypto_api::CryptoSystem for SodiumCryptoSystem {
         Ok(())
     }
 
-    fn sign_seed_bytes(&self) -> usize { rust_sodium_sys::crypto_sign_SEEDBYTES as usize }
-    fn sign_public_key_bytes(&self) -> usize { rust_sodium_sys::crypto_sign_PUBLICKEYBYTES as usize }
-    fn sign_secret_key_bytes(&self) -> usize { rust_sodium_sys::crypto_sign_SECRETKEYBYTES as usize }
-    fn sign_bytes(&self) -> usize { rust_sodium_sys::crypto_sign_BYTES as usize }
+    fn sign_seed_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_SEEDBYTES as usize
+    }
+    fn sign_public_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_PUBLICKEYBYTES as usize
+    }
+    fn sign_secret_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_SECRETKEYBYTES as usize
+    }
+    fn sign_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_sign_BYTES as usize
+    }
 
     fn sign_seed_keypair(
         &self,
@@ -202,7 +209,7 @@ impl lib3h_crypto_api::CryptoSystem for SodiumCryptoSystem {
 #[cfg(test)]
 mod test {
     use super::*;
-    use lib3h_crypto_api::{CryptoSystem, crypto_system_test};
+    use lib3h_crypto_api::{crypto_system_test, CryptoSystem};
 
     #[test]
     fn sodium_should_pass_crypto_system_full_suite() {

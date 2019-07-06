@@ -100,6 +100,10 @@ impl Buffer for SecureBuffer {
         self.s
     }
 
+    fn is_empty(&self) -> bool {
+        self.s == 0
+    }
+
     fn set_no_access(&self) {
         if *self.p.borrow() == ProtectState::NoAccess {
             panic!("already no access... bad logic");

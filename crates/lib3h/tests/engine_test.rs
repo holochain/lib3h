@@ -5,6 +5,7 @@ extern crate unwrap_to;
 extern crate backtrace;
 extern crate lib3h;
 extern crate lib3h_protocol;
+extern crate lib3h_sodium;
 
 mod utils;
 
@@ -14,13 +15,20 @@ use lib3h::{
     transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
     transport_wss::{TlsConfig, TransportWss},
 };
-use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
 };
 use url::Url;
 use utils::constants::*;
+
+lazy_static! {
+    static ref CRYPTO: Box<dyn lib3h_crypto_api::CryptoSystem> = {
+        Box::new(lib3h_sodium::SodiumCryptoSystem::new(
+            lib3h_sodium::SodiumCryptoSystemConfig {},
+        ))
+    };
+}
 
 //--------------------------------------------------------------------------------------------------
 // Test suites
@@ -57,9 +65,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(
-    name: &str,
-) -> RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
+fn basic_setup_mock(name: &str) -> RealEngine<'static, TransportMemory, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
@@ -69,7 +75,13 @@ fn basic_setup_mock(
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
         dht_custom_config: vec![],
     };
-    let engine = RealEngine::new_mock(config, name.into(), MirrorDht::new_with_config).unwrap();
+    let engine = RealEngine::new_mock(
+        CRYPTO.as_ref(),
+        config,
+        name.into(),
+        MirrorDht::new_with_config,
+    )
+    .unwrap();
     let p2p_binding = engine.advertise();
     println!(
         "basic_setup_mock(): test engine for {}, advertise: {}",
@@ -78,8 +90,7 @@ fn basic_setup_mock(
     engine
 }
 
-fn basic_setup_wss(
-) -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht, InsecureBuffer, FakeCryptoSystem> {
+fn basic_setup_wss() -> RealEngine<'static, TransportWss<std::net::TcpStream>, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
@@ -89,8 +100,13 @@ fn basic_setup_wss(
         bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
         dht_custom_config: vec![],
     };
-    let engine =
-        RealEngine::new(config, "test_engine_wss".into(), MirrorDht::new_with_config).unwrap();
+    let engine = RealEngine::new(
+        CRYPTO.as_ref(),
+        config,
+        "test_engine_wss".into(),
+        MirrorDht::new_with_config,
+    )
+    .unwrap();
     let p2p_binding = engine.advertise();
     println!("test_engine advertise: {}", p2p_binding);
     engine
@@ -162,9 +178,7 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<T: Transport, D: Dht>(
-    engine: &mut RealEngine<T, D, InsecureBuffer, FakeCryptoSystem>,
-) {
+fn basic_track_test<T: Transport, D: Dht>(engine: &mut RealEngine<T, D>) {
     // Start
     engine.run().unwrap();
 

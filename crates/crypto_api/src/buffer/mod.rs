@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use zeroize::Zeroize;
 
-use crate::{CryptoResult, CryptoError};
+use crate::{CryptoError, CryptoResult};
 
 mod read_locker;
 pub use read_locker::ReadLocker;
@@ -19,13 +19,14 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
     fn as_buffer(&self) -> &dyn Buffer;
     fn as_buffer_mut(&mut self) -> &mut dyn Buffer;
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn set_no_access(&self);
     fn set_readable(&self);
     fn set_writable(&self);
-    fn read_lock<'a>(&'a self) -> ReadLocker {
+    fn read_lock(&self) -> ReadLocker {
         ReadLocker::new(self.as_buffer())
     }
-    fn write_lock<'a>(&'a mut self) -> WriteLocker {
+    fn write_lock(&mut self) -> WriteLocker {
         WriteLocker::new(self.as_buffer_mut())
     }
     fn zero(&mut self) {

@@ -33,20 +33,17 @@ pub struct RealEngineConfig {
     pub dht_custom_config: Vec<u8>,
 }
 
-#[allow(dead_code)]
-pub struct TransportKeys<SecBuf: Buffer, Crypto: CryptoSystem> {
+pub struct TransportKeys {
     /// Our TransportId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
     pub transport_id: String,
     /// The TransportId public key
-    pub transport_public_key: Vec<u8>,
+    pub transport_public_key: Box<dyn Buffer>,
     /// The TransportId secret key
-    pub transport_secret_key: SecBuf,
-    /// needed to accept the Crypto trait generic
-    pub phantom_crypto: std::marker::PhantomData<Crypto>,
+    pub transport_secret_key: Box<dyn Buffer>,
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> {
+pub struct RealEngine<'a, T: Transport, D: Dht> {
     /// Identifier
     name: String,
     /// Config settings
@@ -66,6 +63,9 @@ pub struct RealEngine<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
     #[allow(dead_code)]
+    /// crypto system to use
+    crypto: &'a dyn CryptoSystem,
+    #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
-    transport_keys: TransportKeys<SecBuf, Crypto>,
+    transport_keys: TransportKeys,
 }

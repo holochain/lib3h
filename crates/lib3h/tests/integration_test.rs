@@ -23,12 +23,19 @@ use lib3h::{
     transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
 };
-use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
 use node_mock::NodeMock;
 use test_suites::{two_basic::*, two_get_lists::*};
 use url::Url;
 use utils::constants::*;
+
+lazy_static! {
+    static ref CRYPTO: Box<dyn lib3h_crypto_api::CryptoSystem> = {
+        Box::new(lib3h_sodium::SodiumCryptoSystem::new(
+            lib3h_sodium::SodiumCryptoSystemConfig {},
+        ))
+    };
+}
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -55,8 +62,13 @@ fn construct_mock_engine(
     config: &RealEngineConfig,
     name: &str,
 ) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine<TransportMemory, MirrorDht, InsecureBuffer, FakeCryptoSystem> =
-        RealEngine::new_mock(config.clone(), name.into(), MirrorDht::new_with_config).unwrap();
+    let engine: RealEngine<TransportMemory, MirrorDht> = RealEngine::new_mock(
+        CRYPTO.as_ref(),
+        config.clone(),
+        name.into(),
+        MirrorDht::new_with_config,
+    )
+    .unwrap();
     let p2p_binding = engine.advertise();
     println!(
         "construct_mock_engine(): test engine for {}, advertise: {}",

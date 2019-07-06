@@ -18,13 +18,7 @@ mod error;
 pub use error::{CryptoError, CryptoResult};
 
 mod buffer;
-pub use buffer::{
-    Buffer,
-    ReadLocker,
-    WriteLocker,
-    ProtectState,
-    InsecureBuffer,
-};
+pub use buffer::{Buffer, InsecureBuffer, ProtectState, ReadLocker, WriteLocker};
 
 mod crypto_system;
-pub use crypto_system::{CryptoSystem, crypto_system_test};
+pub use crypto_system::{crypto_system_test, CryptoSystem};
