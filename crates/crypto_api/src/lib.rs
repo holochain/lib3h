@@ -27,7 +27,4 @@ pub use buffer::{
 };
 
 mod crypto_system;
-pub use crypto_system::CryptoSystem;
-
-#[cfg(test)]
-pub use crypto_system::crypto_system_test;
+pub use crypto_system::{CryptoSystem, crypto_system_test};

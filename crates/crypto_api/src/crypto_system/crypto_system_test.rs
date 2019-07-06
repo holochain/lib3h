@@ -1,4 +1,4 @@
-use crate::{Buffer, InsecureBuffer, CryptoSystem, CryptoResult, CryptoError};
+use crate::{Buffer, CryptoSystem, CryptoError};
 
 struct FullSuite {
     crypto: Box<CryptoSystem>,
@@ -101,101 +101,107 @@ pub fn full_suite(crypto: Box<CryptoSystem>) {
     FullSuite::new(crypto).run();
 }
 
-#[test]
-fn it_should_pass_fake_full_suite() {
-    full_suite(Box::new(FakeCryptoSystem));
-}
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{InsecureBuffer, CryptoResult};
 
-struct FakeCryptoSystem;
-
-impl CryptoSystem for FakeCryptoSystem {
-    fn sec_buf_new(&self, size: usize) -> Box<dyn Buffer> {
-        Box::new(InsecureBuffer::new(size))
+    #[test]
+    fn fake_should_pass_crypto_system_full_suite() {
+        full_suite(Box::new(FakeCryptoSystem));
     }
 
-    fn randombytes_buf(&self, buffer: &mut Box<dyn Buffer>) -> CryptoResult<()> {
-        let mut buffer = buffer.write_lock();
+    struct FakeCryptoSystem;
 
-        for i in 0..buffer.len() {
-            buffer[i] = rand::random();
+    impl CryptoSystem for FakeCryptoSystem {
+        fn sec_buf_new(&self, size: usize) -> Box<dyn Buffer> {
+            Box::new(InsecureBuffer::new(size))
         }
 
-        Ok(())
-    }
+        fn randombytes_buf(&self, buffer: &mut Box<dyn Buffer>) -> CryptoResult<()> {
+            let mut buffer = buffer.write_lock();
 
-    fn sign_seed_bytes(&self) -> usize { 8 }
-    fn sign_public_key_bytes(&self) -> usize { 32 }
-    fn sign_secret_key_bytes(&self) -> usize { 8 }
-    fn sign_bytes(&self) -> usize { 16 }
+            for i in 0..buffer.len() {
+                buffer[i] = rand::random();
+            }
 
-    fn sign_seed_keypair(&self, seed: &Box<dyn Buffer>, public_key: &mut Box<dyn Buffer>, secret_key: &mut Box<dyn Buffer>) -> CryptoResult<()> {
-        if seed.len() != self.sign_seed_bytes() {
-            return Err(CryptoError::BadSeedSize);
+            Ok(())
         }
 
-        if public_key.len() != self.sign_public_key_bytes() {
-            return Err(CryptoError::BadPublicKeySize);
+        fn sign_seed_bytes(&self) -> usize { 8 }
+        fn sign_public_key_bytes(&self) -> usize { 32 }
+        fn sign_secret_key_bytes(&self) -> usize { 8 }
+        fn sign_bytes(&self) -> usize { 16 }
+
+        fn sign_seed_keypair(&self, seed: &Box<dyn Buffer>, public_key: &mut Box<dyn Buffer>, secret_key: &mut Box<dyn Buffer>) -> CryptoResult<()> {
+            if seed.len() != self.sign_seed_bytes() {
+                return Err(CryptoError::BadSeedSize);
+            }
+
+            if public_key.len() != self.sign_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if secret_key.len() != self.sign_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            secret_key.write(0, &seed.read_lock())?;
+
+            public_key.zero();
+            public_key.write(0, &seed.read_lock())?;
+
+            Ok(())
         }
 
-        if secret_key.len() != self.sign_secret_key_bytes() {
-            return Err(CryptoError::BadSecretKeySize);
+        fn sign_keypair(&self, public_key: &mut Box<dyn Buffer>, secret_key: &mut Box<dyn Buffer>) -> CryptoResult<()> {
+            if public_key.len() != self.sign_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if secret_key.len() != self.sign_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.sign_seed_bytes()]);
+            self.randombytes_buf(&mut seed)?;
+            self.sign_seed_keypair(&seed, public_key, secret_key)?;
+
+            Ok(())
         }
 
-        secret_key.write(0, &seed.read_lock())?;
+        fn sign(&self, signature: &mut Box<dyn Buffer>, message: &Box<dyn Buffer>, secret_key: &Box<dyn Buffer>) -> CryptoResult<()> {
+            if signature.len() != self.sign_bytes() {
+                return Err(CryptoError::BadSignatureSize);
+            }
 
-        public_key.zero();
-        public_key.write(0, &seed.read_lock())?;
+            if secret_key.len() != self.sign_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
 
-        Ok(())
-    }
+            signature.write(0, &secret_key.read_lock())?;
+            let mlen = if message.len() > 8 { 8 } else { message.len() };
+            signature.write(8, &message.read_lock()[0..mlen])?;
 
-    fn sign_keypair(&self, public_key: &mut Box<dyn Buffer>, secret_key: &mut Box<dyn Buffer>) -> CryptoResult<()> {
-        if public_key.len() != self.sign_public_key_bytes() {
-            return Err(CryptoError::BadPublicKeySize);
+            Ok(())
         }
 
-        if secret_key.len() != self.sign_secret_key_bytes() {
-            return Err(CryptoError::BadSecretKeySize);
+        fn sign_verify(&self, signature: &Box<dyn Buffer>, message: &Box<dyn Buffer>, public_key: &Box<dyn Buffer>) -> CryptoResult<bool> {
+            if signature.len() != self.sign_bytes() {
+                return Err(CryptoError::BadSignatureSize);
+            }
+
+            if public_key.len() != self.sign_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            let signature = signature.read_lock();
+            let mlen = if message.len() > 8 { 8 } else { message.len() };
+
+            Ok(
+                &signature[0..8] == &public_key.read_lock()[0..8] &&
+                &signature[8..mlen + 8] == &message.read_lock()[0..mlen]
+            )
         }
-
-        let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.sign_seed_bytes()]);
-        self.randombytes_buf(&mut seed)?;
-        self.sign_seed_keypair(&seed, public_key, secret_key)?;
-
-        Ok(())
-    }
-
-    fn sign(&self, signature: &mut Box<dyn Buffer>, message: &Box<dyn Buffer>, secret_key: &Box<dyn Buffer>) -> CryptoResult<()> {
-        if signature.len() != self.sign_bytes() {
-            return Err(CryptoError::BadSignatureSize);
-        }
-
-        if secret_key.len() != self.sign_secret_key_bytes() {
-            return Err(CryptoError::BadSecretKeySize);
-        }
-
-        signature.write(0, &secret_key.read_lock())?;
-        let mlen = if message.len() > 8 { 8 } else { message.len() };
-        signature.write(8, &message.read_lock()[0..mlen])?;
-
-        Ok(())
-    }
-
-    fn sign_verify(&self, signature: &Box<dyn Buffer>, message: &Box<dyn Buffer>, public_key: &Box<dyn Buffer>) -> CryptoResult<bool> {
-        if signature.len() != self.sign_bytes() {
-            return Err(CryptoError::BadSignatureSize);
-        }
-
-        if public_key.len() != self.sign_public_key_bytes() {
-            return Err(CryptoError::BadPublicKeySize);
-        }
-
-        let signature = signature.read_lock();
-        let mlen = if message.len() > 8 { 8 } else { message.len() };
-
-        Ok(
-            &signature[0..8] == &public_key.read_lock()[0..8] &&
-            &signature[8..mlen + 8] == &message.read_lock()[0..mlen]
-        )
     }
 }

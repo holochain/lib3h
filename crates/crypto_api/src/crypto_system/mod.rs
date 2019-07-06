@@ -20,5 +20,4 @@ pub trait CryptoSystem {
     fn sign_verify(&self, signature: &Box<dyn Buffer>, message: &Box<dyn Buffer>, public_key: &Box<dyn Buffer>) -> CryptoResult<bool>;
 }
 
-#[cfg(test)]
 pub mod crypto_system_test;
