@@ -1,4 +1,4 @@
-use lib3h_crypto_api::{Buffer, BufferType, CryptoError, CryptoResult, ProtectState};
+use lib3h_crypto_api::{Buffer, CryptoError, CryptoResult, ProtectState};
 
 use crate::check_init;
 use libc::c_void;
@@ -23,7 +23,7 @@ impl Drop for SecureBuffer {
 
 impl Clone for SecureBuffer {
     fn clone(&self) -> Self {
-        let mut out = SecureBuffer::new(self.s).expect("could not alloc new");
+        let mut out = SecureBuffer::new(self.s);
         out.write(0, &self.read_lock())
             .expect("could not write new");
         out
@@ -59,10 +59,8 @@ impl std::ops::DerefMut for SecureBuffer {
     }
 }
 
-impl BufferType for SecureBuffer {}
-
-impl Buffer for SecureBuffer {
-    fn new(size: usize) -> CryptoResult<Self> {
+impl SecureBuffer {
+    pub fn new(size: usize) -> Self {
         check_init();
         let z = unsafe {
             // sodium_malloc requires memory-aligned sizes,
@@ -70,24 +68,46 @@ impl Buffer for SecureBuffer {
             let align_size = (size + 7) & !7;
             let z = rust_sodium_sys::sodium_malloc(align_size);
             if z.is_null() {
-                return Err(CryptoError::OutOfMemory);
+                panic!("sodium_malloc could not allocate");
             }
+            rust_sodium_sys::sodium_memzero(z, align_size);
             rust_sodium_sys::sodium_mprotect_noaccess(z);
             z
         };
 
-        Ok(SecureBuffer {
+        SecureBuffer {
             z,
             s: size,
             p: std::cell::RefCell::new(ProtectState::NoAccess),
-        })
+        }
+    }
+}
+
+impl Buffer for SecureBuffer {
+    fn box_clone(&self) -> Box<dyn Buffer> {
+        Box::new(self.clone())
+    }
+
+    fn as_buffer(&self) -> &dyn Buffer {
+        &*self
+    }
+
+    fn as_buffer_mut(&mut self) -> &mut dyn Buffer {
+        &mut *self
     }
 
     fn len(&self) -> usize {
         self.s
     }
 
+    fn is_empty(&self) -> bool {
+        self.s == 0
+    }
+
     fn set_no_access(&self) {
+        if *self.p.borrow() == ProtectState::NoAccess {
+            panic!("already no access... bad logic");
+        }
         unsafe {
             rust_sodium_sys::sodium_mprotect_noaccess(self.z);
         }
@@ -95,6 +115,9 @@ impl Buffer for SecureBuffer {
     }
 
     fn set_readable(&self) {
+        if *self.p.borrow() != ProtectState::NoAccess {
+            panic!("not no access... bad logic");
+        }
         unsafe {
             rust_sodium_sys::sodium_mprotect_readonly(self.z);
         }
@@ -102,6 +125,9 @@ impl Buffer for SecureBuffer {
     }
 
     fn set_writable(&self) {
+        if *self.p.borrow() != ProtectState::NoAccess {
+            panic!("not no access... bad logic");
+        }
         unsafe {
             rust_sodium_sys::sodium_mprotect_readwrite(self.z);
         }
@@ -117,7 +143,7 @@ mod tests {
     fn it_handles_alignment() {
         // the underlying memory should be 8,
         // but every function should treat it as 1.
-        let mut b = SecureBuffer::new(1).unwrap();
+        let mut b = SecureBuffer::new(1);
         assert_eq!(1, b.len());
         {
             let r: &[u8] = &b.read_lock()[..];

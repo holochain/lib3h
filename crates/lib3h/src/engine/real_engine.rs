@@ -24,26 +24,24 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc};
 
-impl<SecBuf: Buffer, Crypto: CryptoSystem> TransportKeys<SecBuf, Crypto> {
-    pub fn new() -> Lib3hResult<Self> {
+impl TransportKeys {
+    pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
         let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
-        let mut public_key = vec![0; Crypto::SIGN_PUBLIC_KEY_BYTES];
-        let mut secret_key = SecBuf::new(Crypto::SIGN_SECRET_KEY_BYTES)?;
-        Crypto::sign_keypair(&mut public_key, &mut secret_key)?;
+        let mut public_key: Box<dyn Buffer> = Box::new(vec![0; crypto.sign_public_key_bytes()]);
+        let mut secret_key = crypto.buf_new_secure(crypto.sign_secret_key_bytes());
+        crypto.sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(Self {
             transport_id: hcm0.encode(&public_key)?,
             transport_public_key: public_key,
             transport_secret_key: secret_key,
-            phantom_crypto: std::marker::PhantomData,
         })
     }
 }
 
-impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
-    RealEngine<TransportWss<std::net::TcpStream>, D, SecBuf, Crypto>
-{
+impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
     /// Constructor
     pub fn new(
+        crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         name: &str,
         dht_factory: DhtFactory<D>,
@@ -52,7 +50,7 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
             config.tls_config.clone(),
         )));
         let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
-        let transport_keys = TransportKeys::new()?;
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         let dht_config = DhtConfig {
             this_peer_address: transport_keys.transport_id.clone(),
             this_peer_uri: binding,
@@ -65,7 +63,8 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
             &dht_config,
         )));
         Ok(RealEngine {
-            config: config,
+            crypto,
+            config,
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
@@ -80,8 +79,9 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem>
 
 /// Constructor
 //#[cfg(test)]
-impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D, SecBuf, Crypto> {
+impl<D: Dht> RealEngine<TransportMemory, D> {
     pub fn new_mock(
+        crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         name: &str,
         dht_factory: DhtFactory<D>,
@@ -110,8 +110,10 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             name,
             network_gateway.borrow().this_peer()
         );
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         Ok(RealEngine {
-            config: config,
+            crypto,
+            config,
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
@@ -119,14 +121,12 @@ impl<D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<TransportMemory, D
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
-            transport_keys: TransportKeys::new()?,
+            transport_keys,
         })
     }
 }
 
-impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
-    for RealEngine<T, D, SecBuf, Crypto>
-{
+impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     fn run(&self) -> Lib3hResult<()> {
         // FIXME
         Ok(())
@@ -175,7 +175,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> NetworkEngine
 }
 
 /// Private
-impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
+impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
