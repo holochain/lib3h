@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::Buffer;
 
+/// Helper object that will automatically secure a Buffer when dropped
 pub struct WriteLocker<'a>(&'a mut dyn Buffer);
 
 impl<'a> WriteLocker<'a> {

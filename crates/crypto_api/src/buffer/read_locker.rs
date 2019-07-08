@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use crate::Buffer;
 
+/// Helper object that will automatically secure a Buffer when dropped
 pub struct ReadLocker<'a>(&'a dyn Buffer);
 
 impl<'a> ReadLocker<'a> {
