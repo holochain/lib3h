@@ -1,12 +1,12 @@
 #[macro_use]
+mod utils;
+#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate unwrap_to;
 extern crate backtrace;
 extern crate lib3h;
 extern crate lib3h_protocol;
-
-mod utils;
 
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
@@ -317,7 +317,11 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_dm.request_id);
+    });
     // Receive
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -339,7 +343,11 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         .unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, res_dm.request_id);
+    });
     // Receive response
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);

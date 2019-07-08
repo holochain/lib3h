@@ -8,6 +8,7 @@ lazy_static! {
     /// Agents
     pub static ref ALEX_AGENT_ID: Address = "alex".into();
     pub static ref BILLY_AGENT_ID: Address = "billy".into();
+    pub static ref CAMILLE_AGENT_ID: Address = "camille".into();
     /// Spaces
     pub static ref SPACE_ADDRESS_A: Address = "SPACE_A".into();
     pub static ref SPACE_ADDRESS_B: Address = "SPACE_B".into();
