@@ -26,7 +26,7 @@ use lib3h::{
 use lib3h_crypto_api::{FakeCryptoSystem, InsecureBuffer};
 use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
 use node_mock::NodeMock;
-use test_suites::{two_basic::*, two_get_lists::*, two_spaces::*};
+use test_suites::{two_basic::*, two_get_lists::*};
 use url::Url;
 use utils::constants::*;
 
@@ -136,14 +136,6 @@ fn test_two_memory_nodes_basic_suite() {
 fn test_two_memory_nodes_get_lists_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_GET_LISTS_TEST_FNS.iter() {
-        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
-    }
-}
-
-#[test]
-fn test_two_memory_nodes_spaces_suite() {
-    enable_logging_for_test(true);
-    for (test_fn, can_setup) in TWO_NODES_SPACES_TEST_FNS.iter() {
         launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
     }
 }

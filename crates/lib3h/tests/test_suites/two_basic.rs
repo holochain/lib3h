@@ -133,7 +133,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 
 /// Test SendDirectMessage and response
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
-    /// Send to self
+    // Send to self
     let req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
@@ -144,7 +144,7 @@ fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
         assert_eq!(response.request_id, req_id);
     });
 
-    /// Send to unknown
+    // Send to unknown
     let req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "wah".as_bytes().to_vec());
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
