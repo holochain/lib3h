@@ -73,13 +73,14 @@ impl NodeMock {
         };
     }
 
-    ///
-    pub fn join_current_space(&mut self) -> Lib3hResult<()> {
+    /// Return request_id
+    pub fn join_current_space(&mut self) -> Lib3hResult<String> {
         let current_space = self.current_space.clone().expect("Current space not set");
         self.join_space(&current_space, false)
     }
-    ///
-    pub fn leave_current_space(&mut self) -> Lib3hResult<()> {
+
+    /// Return request_id
+    pub fn leave_current_space(&mut self) -> Lib3hResult<String> {
         let current_space = self.current_space.clone().expect("Current space not set");
         let res = self.leave_space(&current_space);
         if res.is_ok() {
@@ -89,23 +90,18 @@ impl NodeMock {
     }
 
     /// Post a Lib3hClientProtocol::JoinSpace and update internal tracking
+    /// Return request_id
     pub fn join_space(
         &mut self,
         space_address: &Address,
         can_set_current: bool,
-    ) -> Lib3hResult<()> {
-        if self.joined_space_list.contains(space_address) {
-            if can_set_current {
-                self.set_current_space(space_address);
-            }
-            return Ok(());
-        }
+    ) -> Lib3hResult<String> {
         let join_space = lib3h_protocol::data_types::SpaceData {
             request_id: self.generate_request_id(),
             space_address: space_address.clone(),
             agent_id: self.agent_id.clone(),
         };
-        let protocol_msg = Lib3hClientProtocol::JoinSpace(join_space).into();
+        let protocol_msg = Lib3hClientProtocol::JoinSpace(join_space.clone()).into();
 
         debug!("NodeMock.join_space(): {:?}", protocol_msg);
         let res = self.engine.post(protocol_msg);
@@ -119,26 +115,24 @@ impl NodeMock {
                 self.set_current_space(space_address);
             }
         }
-        res
+        res.map(|()| join_space.request_id)
     }
 
     /// Post a Lib3hClientProtocol::LeaveSpace and update internal tracking
-    pub fn leave_space(&mut self, space_address: &Address) -> Lib3hResult<()> {
-        if !self.joined_space_list.contains(space_address) {
-            return Ok(());
-        }
+    /// Return request_id
+    pub fn leave_space(&mut self, space_address: &Address) -> Lib3hResult<String> {
         let agent_id = self.agent_id.clone();
         let leave_space_msg = lib3h_protocol::data_types::SpaceData {
             request_id: self.generate_request_id(),
             space_address: space_address.clone(),
             agent_id,
         };
-        let protocol_msg = Lib3hClientProtocol::LeaveSpace(leave_space_msg).into();
+        let protocol_msg = Lib3hClientProtocol::LeaveSpace(leave_space_msg.clone()).into();
         let res = self.engine.post(protocol_msg);
         if res.is_ok() {
             self.joined_space_list.remove(space_address);
         }
-        res
+        res.map(|()| leave_space_msg.request_id)
     }
 
     ///
