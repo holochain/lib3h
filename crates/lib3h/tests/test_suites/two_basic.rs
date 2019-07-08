@@ -9,6 +9,7 @@ lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
         (test_setup_only, true),
         (test_send_message, true),
+        (test_send_message_fail, true),
         (test_hold_entry, true),
         (test_author_no_aspect, true),
         (test_author_one_aspect, true),
@@ -100,7 +101,11 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
     // Receive
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -115,7 +120,11 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     billy.send_response(&req_id, &alex.agent_id, response_content.clone());
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
     // Receive response
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
@@ -124,6 +133,31 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
     assert_eq!(msg.content, response_content);
+}
+
+/// Test SendDirectMessage and response
+fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
+    // Send to self
+    let req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    println!("response: {:?}", srv_msg_list);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
+
+    // Send to unknown
+    let req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "wah".as_bytes().to_vec());
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    println!("response: {:?}", srv_msg_list);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
 }
 
 /// Test publish, Store, Query
