@@ -120,7 +120,11 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     billy.send_response(&req_id, &alex.agent_id, response_content.clone());
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
     // Receive response
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
