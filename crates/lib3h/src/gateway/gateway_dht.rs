@@ -6,7 +6,7 @@ use crate::{
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{Address, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, DidWork, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
@@ -23,10 +23,10 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         self.inner_dht.this_peer()
     }
     /// Entry
-    fn get_entry_address_list(&self) -> Vec<&AddressRef> {
+    fn get_entry_address_list(&self) -> Vec<&Address> {
         self.inner_dht.get_entry_address_list()
     }
-    fn get_aspects_of(&self, entry_address: &AddressRef) -> Option<Vec<Address>> {
+    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
         self.inner_dht.get_aspects_of(entry_address)
     }
 
@@ -82,9 +82,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     );
                     // Change into P2pProtocol
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
-                        space_address: self.identifier().as_bytes().to_vec(),
-                        to_peer_address: to_peer_address.as_bytes().to_vec(),
-                        from_peer_address: self.this_peer().peer_address.as_bytes().to_vec(),
+                        space_address: self.identifier().into(),
+                        to_peer_address: to_peer_address.into(),
+                        from_peer_address: self.this_peer().peer_address.clone().into(),
                         bundle: data.bundle.clone(),
                     });
                     let mut payload = Vec::new();

@@ -18,7 +18,7 @@ use crate::{
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, AddressRef, DidWork, Lib3hResult,
+    protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -359,7 +359,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Ok(space_gateway) => {
                         let mut msg_data = FetchEntryData {
                             space_address: msg.space_address.clone(),
-                            entry_address: vec![],
+                            entry_address: "".into(),
                             request_id: "__author_list".to_string(),
                             provider_agent_id: msg.provider_agent_id.clone(),
                             aspect_address_list: None,
@@ -439,7 +439,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut output = Vec::new();
         output.push(Lib3hServerProtocol::SuccessResult(res));
         // First create DhtConfig for space gateway
-        let agent_id = std::string::String::from_utf8_lossy(&join_msg.agent_id).into_owned();
+        let agent_id: String = join_msg.agent_id.clone().into();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport =
             // TODO encapsulate this conversion logic
@@ -458,8 +458,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         );
 
         // HACK: Send JoinSpace to all known peers
-        let space_address =
-            std::string::String::from_utf8_lossy(&join_msg.space_address).into_owned();
+        let space_address: String = join_msg.space_address.clone().into();
         let peer = new_space_gateway.this_peer().to_owned();
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
@@ -528,8 +527,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             result_info: vec![],
         };
         // Check if messaging self
-        let this_peer = space_gateway.this_peer();
-        if this_peer.peer_address.as_bytes() == msg.to_agent_id.as_slice() {
+        let peer_address = &space_gateway.this_peer().peer_address;
+        let to_agent_id: String = msg.to_agent_id.clone().into();
+        if peer_address == &to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
         }
@@ -545,7 +545,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
         // Send
-        let conn_id = std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+        let conn_id: String = msg.to_agent_id.clone().into();
         // trace!("{} -- sending to connection id {}", self.name.clone(), conn_id);
         let res = space_gateway.send(&[conn_id.as_str()], &payload);
         if let Err(_) = res {
@@ -559,10 +559,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// If agent did not join that space, respond with a FailureResult instead.
     fn get_space_or_fail(
         &mut self,
-        space_address: &AddressRef,
-        agent_id: &AddressRef,
+        space_address: &Address,
+        agent_id: &Address,
         request_id: &str,
-        maybe_sender_agent_id: Option<&AddressRef>,
+        maybe_sender_agent_id: Option<&Address>,
     ) -> Result<&mut P2pGateway<P2pGateway<T, D>, D>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
@@ -577,8 +577,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             to_agent_id: to_agent_id.to_owned(),
             result_info: format!(
                 "Agent {} does not track space {}",
-                std::string::String::from_utf8_lossy(&agent_id).into_owned(),
-                std::string::String::from_utf8_lossy(&space_address).into_owned(),
+                &agent_id, &space_address,
             )
             .as_bytes()
             .to_vec(),

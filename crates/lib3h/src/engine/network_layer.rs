@@ -190,8 +190,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
                     .ok_or_else(|| format_err!("space_gateway not found"))?;
                 // Post it as a remoteGossipTo
-                let from_peer_address =
-                    std::string::String::from_utf8_lossy(&msg.from_peer_address).into_owned();
+                let from_peer_address: String = msg.from_peer_address.clone().into();
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
                     from_peer_address,
                     bundle: msg.bundle.clone(),

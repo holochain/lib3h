@@ -2,7 +2,7 @@ use crate::dht::{
     dht_protocol::*,
     dht_trait::{Dht, DhtConfig},
 };
-use lib3h_protocol::{data_types::EntryData, Address, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::EntryData, Address, DidWork, Lib3hResult};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use rmp_serde::{Deserializer, Serializer};
@@ -76,11 +76,11 @@ impl Dht for MirrorDht {
 
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<&AddressRef> {
-        self.entry_list.iter().map(|kv| kv.0.as_slice()).collect()
+    fn get_entry_address_list(&self) -> Vec<&Address> {
+        self.entry_list.iter().map(|kv| kv.0).collect()
     }
 
-    fn get_aspects_of(&self, entry_address: &AddressRef) -> Option<Vec<Address>> {
+    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
         match self.entry_list.get(entry_address) {
             None => None,
             Some(set) => {
@@ -182,7 +182,7 @@ impl MirrorDht {
                 .collect(),
         };
         self.entry_list
-            .insert(entry.entry_address.to_vec(), new_aspects);
+            .insert(entry.entry_address.clone(), new_aspects);
         true
     }
 
@@ -308,7 +308,7 @@ impl MirrorDht {
                     return Ok(vec![]);
                 }
                 // Use entry_address as request_id
-                let address_str = std::str::from_utf8(entry.entry_address.as_slice()).unwrap();
+                let address_str = entry.entry_address.clone();
                 self.pending_fetch_request_list
                     .insert(address_str.to_string());
                 let fetch_entry = FetchDhtEntryData {
@@ -340,7 +340,7 @@ impl MirrorDht {
                     return Err(format_err!("Received response for an unknown request"));
                 }
                 // From a Hold if msg_id matches one set in HoldEntryAspectAddress
-                let address_str = std::str::from_utf8(&response.entry.entry_address).unwrap();
+                let address_str: String = (&response.entry.entry_address).clone().into();
                 if address_str == response.msg_id {
                     let gossip_evt = self.gossip_entry(&response.entry);
                     return Ok(vec![gossip_evt]);
