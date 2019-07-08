@@ -5,7 +5,7 @@ use crate::utils::constants::*;
 use holochain_persistence_api::hash::HashString;
 use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
-    Address, AddressRef, DidWork, Lib3hResult,
+    Address, DidWork, Lib3hResult,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -155,7 +155,7 @@ impl NodeMock {
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
             aspect_list.push(EntryAspectData {
-                aspect_address: hash.to_string().as_bytes().to_vec(),
+                aspect_address: hash,
                 type_hint: "NodeMock".to_string(),
                 aspect: aspect_content,
                 publish_ts: 42,
@@ -257,7 +257,7 @@ impl NodeMock {
     /// generate a new request_id
     fn generate_request_id(&mut self) -> String {
         self.request_count += 1;
-        let agent_id = std::str::from_utf8(self.agent_id.as_slice()).unwrap();
+        let agent_id = &self.agent_id;
         let request_id = format!("req_{}_{}", agent_id, self.request_count);
         self.request_log.push(request_id.clone());
         request_id
@@ -397,14 +397,14 @@ impl NodeMock {
 impl NodeMock {
     /// Send a DirectMessage on the network.
     /// Returns the generated request_id for this send
-    pub fn send_direct_message(&mut self, to_agent_id: &AddressRef, content: Vec<u8>) -> String {
+    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let request_id = self.generate_request_id();
         debug!("current_space: {:?}", self.current_space);
         let msg_data = DirectMessageData {
             space_address: current_space.clone(),
             request_id: request_id.clone(),
-            to_agent_id: to_agent_id.to_vec(),
+            to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
             content,
         };
@@ -419,14 +419,14 @@ impl NodeMock {
     pub fn send_response(
         &mut self,
         request_id: &str,
-        to_agent_id: &AddressRef,
+        to_agent_id: &Address,
         response_content: Vec<u8>,
     ) {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let response = DirectMessageData {
             space_address: current_space.clone(),
             request_id: request_id.to_owned(),
-            to_agent_id: to_agent_id.to_vec(),
+            to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
             content: response_content,
         };

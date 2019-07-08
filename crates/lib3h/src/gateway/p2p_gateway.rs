@@ -8,7 +8,7 @@ use crate::{
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{AddressRef, Lib3hResult};
+use lib3h_protocol::{Address, Lib3hResult};
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
@@ -65,11 +65,11 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
     /// Constructors
     pub fn new_with_space(
         network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
-        space_address: &AddressRef,
+        space_address: &Address,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
-        let identifier = std::string::String::from_utf8_lossy(space_address).to_string();
+        let identifier: String = space_address.clone().into();
         P2pGateway {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),

@@ -183,8 +183,8 @@ fn basic_track_test<T: Transport, D: Dht>(
     assert_eq!(srv_msg_list.len(), 3);
     let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
     assert_eq!(res_msg.request_id, "track_a_1".to_string());
-    assert_eq!(res_msg.space_address, SPACE_ADDRESS_A.as_slice());
-    assert_eq!(res_msg.to_agent_id, ALEX_AGENT_ID.as_slice());
+    assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
+    assert_eq!(res_msg.to_agent_id, *ALEX_AGENT_ID);
     println!(
         "SuccessResult info: {}",
         std::str::from_utf8(res_msg.result_info.as_slice()).unwrap()
@@ -201,8 +201,8 @@ fn basic_track_test<T: Transport, D: Dht>(
     assert_eq!(srv_msg_list.len(), 1);
     let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::FailureResult);
     assert_eq!(res_msg.request_id, "track_a_2".to_string());
-    assert_eq!(res_msg.space_address, SPACE_ADDRESS_A.as_slice());
-    assert_eq!(res_msg.to_agent_id, ALEX_AGENT_ID.as_slice());
+    assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
+    assert_eq!(res_msg.to_agent_id, *ALEX_AGENT_ID);
     println!(
         "FailureResult info: {}",
         std::str::from_utf8(res_msg.result_info.as_slice()).unwrap()
