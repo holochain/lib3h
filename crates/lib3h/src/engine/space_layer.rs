@@ -6,7 +6,6 @@ use crate::{
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
-use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
@@ -14,7 +13,7 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
+impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
