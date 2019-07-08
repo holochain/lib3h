@@ -508,50 +508,51 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         msg: DirectMessageData,
         is_response: bool,
     ) -> Lib3hServerProtocol {
+        // Check if space is joined by sender
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
             &msg.from_agent_id,
             &msg.request_id,
             None,
         );
-        match maybe_space {
-            Err(failure_msg) => return failure_msg,
-            Ok(space_gateway) => {
-                // Prepare response
-                let mut response = GenericResultData {
-                    request_id: msg.request_id.clone(),
-                    space_address: msg.space_address.clone(),
-                    to_agent_id: msg.from_agent_id.clone(),
-                    result_info: vec![],
-                };
-                // Check if messaging self
-                let this_peer = space_gateway.this_peer();
-                if this_peer.peer_address.as_bytes() == msg.to_agent_id.as_slice() {
-                    response.result_info = "Messaging self".as_bytes().to_vec();
-                    return Lib3hServerProtocol::FailureResult(response);
-                }
-                // Change into P2pProtocol
-                let net_msg = if is_response {
-                    P2pProtocol::DirectMessageResult(msg.clone())
-                } else {
-                    P2pProtocol::DirectMessage(msg.clone())
-                };
-                // Serialize
-                let mut payload = Vec::new();
-                net_msg
-                    .serialize(&mut Serializer::new(&mut payload))
-                    .unwrap();
-                // Send
-                let conn_id = std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                // trace!("{} -- sending to connection id {}", self.name.clone(), conn_id);
-                let res = space_gateway.send(&[conn_id.as_str()], &payload);
-                if let Err(_) = res {
-                    response.result_info = "Unknown receiver".as_bytes().to_vec();
-                    return Lib3hServerProtocol::FailureResult(response);
-                }
-                Lib3hServerProtocol::SuccessResult(response)
-            }
+        // Return failure if not
+        if let Err(failure_msg) = maybe_space {
+            return failure_msg;
         }
+        let space_gateway = maybe_space.unwrap();
+        // Prepare response
+        let mut response = GenericResultData {
+            request_id: msg.request_id.clone(),
+            space_address: msg.space_address.clone(),
+            to_agent_id: msg.from_agent_id.clone(),
+            result_info: vec![],
+        };
+        // Check if messaging self
+        let this_peer = space_gateway.this_peer();
+        if this_peer.peer_address.as_bytes() == msg.to_agent_id.as_slice() {
+            response.result_info = "Messaging self".as_bytes().to_vec();
+            return Lib3hServerProtocol::FailureResult(response);
+        }
+        // Change into P2pProtocol
+        let net_msg = if is_response {
+            P2pProtocol::DirectMessageResult(msg.clone())
+        } else {
+            P2pProtocol::DirectMessage(msg.clone())
+        };
+        // Serialize payload
+        let mut payload = Vec::new();
+        net_msg
+            .serialize(&mut Serializer::new(&mut payload))
+            .unwrap();
+        // Send
+        let conn_id = std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+        // trace!("{} -- sending to connection id {}", self.name.clone(), conn_id);
+        let res = space_gateway.send(&[conn_id.as_str()], &payload);
+        if let Err(_) = res {
+            response.result_info = "Unknown receiver".as_bytes().to_vec();
+            return Lib3hServerProtocol::FailureResult(response);
+        }
+        Lib3hServerProtocol::SuccessResult(response)
     }
 
     /// Get a space_gateway for the specified space+agent.
