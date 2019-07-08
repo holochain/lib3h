@@ -1,4 +1,4 @@
-//! Expose a test suite that can excersize CryptoSystem implementations.
+//! Expose a test suite that can exercise CryptoSystem implementations.
 //! You'll probably also need to write unit tests specific to your impl.
 
 use crate::{Buffer, CryptoError, CryptoSystem};
