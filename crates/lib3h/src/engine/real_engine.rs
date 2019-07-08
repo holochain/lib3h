@@ -179,16 +179,13 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
-        let mut did_work = false;
+        let did_work = self.inbox.len() > 0;
         loop {
             let client_msg = match self.inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            let (success, mut output) = self.serve_Lib3hClientProtocol(client_msg)?;
-            if success {
-                did_work = success;
-            }
+            let mut output = self.serve_Lib3hClientProtocol(client_msg)?;
             outbox.append(&mut output);
         }
         Ok((did_work, outbox))
@@ -200,10 +197,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
     fn serve_Lib3hClientProtocol(
         &mut self,
         client_msg: Lib3hClientProtocol,
-    ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} serving: {:?}", self.name.clone(), client_msg);
         let mut outbox = Vec::new();
-        let did_work = true;
         // Note: use same order as the enum
         match client_msg {
             Lib3hClientProtocol::SuccessResult(_msg) => {
@@ -237,23 +233,37 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let connection_id =
+                        // Prepare response
+                        let mut response = GenericResultData {
+                            request_id: msg.request_id.clone(),
+                            space_address: msg.space_address.clone(),
+                            to_agent_id: msg.from_agent_id.clone(),
+                            result_info: vec![],
+                        };
+                        // Check if messaging self
+                        let this_peer = space_gateway.this_peer();
+                        if this_peer.peer_address.as_bytes() == msg.to_agent_id.as_slice() {
+                            response.result_info = "Messaging self".as_bytes().to_vec();
+                            return Ok(vec![Lib3hServerProtocol::FailureResult(response)]);
+                        }
+                        let conn_id =
                             std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        debug!("{} -- connection_id: {:?}", my_name, connection_id);
+                        // debug!("{} -- connection_id: {:?}", my_name, connection_id);
                         // Change into P2pProtocol
-                        let net_msg = P2pProtocol::DirectMessage(msg);
+                        let net_msg = P2pProtocol::DirectMessage(msg.clone());
                         // Serialize
                         let mut payload = Vec::new();
                         net_msg
                             .serialize(&mut Serializer::new(&mut payload))
                             .unwrap();
                         // Send
-                        trace!(
-                            "{} sending payload to transport id {}",
-                            my_name,
-                            connection_id
-                        );
-                        space_gateway.send(&[connection_id.as_str()], &payload)?;
+                        trace!("{} -- sending to connection id {}", my_name, conn_id);
+                        let res = space_gateway.send(&[conn_id.as_str()], &payload);
+                        if let Err(_) = res {
+                            response.result_info = "Unknown receiver".as_bytes().to_vec();
+                            return Ok(vec![Lib3hServerProtocol::FailureResult(response)]);
+                        }
+                        outbox.push(Lib3hServerProtocol::SuccessResult(response));
                     }
                 }
             }
@@ -469,7 +479,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 }
             }
         }
-        Ok((did_work, outbox))
+        Ok(outbox)
     }
 
     /// Destroy gateway for this agent in this space, if part of it.

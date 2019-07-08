@@ -200,17 +200,39 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 space_gateway.post_dht(cmd)?;
                 // Dht::post(&mut space_gateway, cmd);
             }
-            P2pProtocol::DirectMessage(data) => {
-                // FIXME: check with space gateway first?
-                // Change into Lib3hServerProtocol
-                let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(data.clone());
-                outbox.push(lib3_msg);
+            P2pProtocol::DirectMessage(dm_data) => {
+                let maybe_space_gateway = self.space_gateway_map.get(&(
+                    dm_data.space_address.to_owned(),
+                    dm_data.to_agent_id.to_owned(),
+                ));
+                //
+                if let Some(_space_gateway) = maybe_space_gateway {
+                    // TODO: check if we know sender?
+                    //  let sender_address = std::string::String::from_utf8_lossy(&dm_data.from_agent_id).to_string();
+                    //  let maybe_sender = _space_gateway.get_peer(sender_address);
+                    // Change into Lib3hServerProtocol
+                    let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(dm_data.clone());
+                    outbox.push(lib3_msg);
+                } else {
+                    warn!("Received message from unjoined space");
+                }
             }
-            P2pProtocol::DirectMessageResult(data) => {
-                // FIXME: check with space gateway first?
-                // Change into Lib3hServerProtocol
-                let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(data.clone());
-                outbox.push(lib3_msg);
+            P2pProtocol::DirectMessageResult(dm_data) => {
+                let maybe_space_gateway = self.space_gateway_map.get(&(
+                    dm_data.space_address.to_owned(),
+                    dm_data.to_agent_id.to_owned(),
+                ));
+                //
+                if let Some(_space_gateway) = maybe_space_gateway {
+                    // TODO: check if we know sender?
+                    //  let sender_address = std::string::String::from_utf8_lossy(&dm_data.from_agent_id).to_string();
+                    //  let maybe_sender = _space_gateway.get_peer(sender_address);
+                    // Change into Lib3hServerProtocol
+                    let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(dm_data.clone());
+                    outbox.push(lib3_msg);
+                } else {
+                    warn!("Received message from unjoined space");
+                }
             }
             P2pProtocol::FetchData => {
                 // FIXME

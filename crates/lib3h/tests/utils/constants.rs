@@ -8,6 +8,7 @@ lazy_static! {
     /// Agents
     pub static ref ALEX_AGENT_ID: Address = "alex".to_string().into_bytes();
     pub static ref BILLY_AGENT_ID: Address = "billy".to_string().into_bytes();
+    pub static ref CAMILLE_AGENT_ID: Address = "camille".to_string().into_bytes();
     /// Spaces
     pub static ref SPACE_ADDRESS_A: Address = "SPACE_A".to_string().into_bytes();
     pub static ref SPACE_ADDRESS_B: Address = "SPACE_B".to_string().into_bytes();

@@ -67,7 +67,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             let net_uri = self
                 .connection_map
                 .get(&dht_uri)
-                .expect("unknown dht_transport");
+                .expect(&format!("unknown dht_transport: {}", dht_uri));
             conn_list.push(net_uri);
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
