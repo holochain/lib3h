@@ -1,7 +1,0 @@
-[package]
-name = "lib3h_logging"
-version = "0.0.1-alpha1"
-authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
-edition = "2018"
-
-[dependencies]
