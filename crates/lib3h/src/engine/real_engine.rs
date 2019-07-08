@@ -179,16 +179,13 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
-        let mut did_work = false;
+        let did_work = self.inbox.len() > 0;
         loop {
             let client_msg = match self.inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            let (success, mut output) = self.serve_Lib3hClientProtocol(client_msg)?;
-            if success {
-                did_work = success;
-            }
+            let mut output = self.serve_Lib3hClientProtocol(client_msg)?;
             outbox.append(&mut output);
         }
         Ok((did_work, outbox))
@@ -200,10 +197,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
     fn serve_Lib3hClientProtocol(
         &mut self,
         client_msg: Lib3hClientProtocol,
-    ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} serving: {:?}", self.name.clone(), client_msg);
         let mut outbox = Vec::new();
-        let did_work = true;
         // Note: use same order as the enum
         match client_msg {
             Lib3hClientProtocol::SuccessResult(_msg) => {
@@ -226,60 +222,13 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             }
             // SendDirectMessage
             Lib3hClientProtocol::SendDirectMessage(msg) => {
-                let my_name = self.name.clone();
-                let maybe_space = self.get_space_or_fail(
-                    &msg.space_address,
-                    &msg.from_agent_id,
-                    &msg.request_id,
-                    None,
-                );
-                match maybe_space {
-                    Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        let connection_id =
-                            std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        debug!("{} -- connection_id: {:?}", my_name, connection_id);
-                        // Change into P2pProtocol
-                        let net_msg = P2pProtocol::DirectMessage(msg);
-                        // Serialize
-                        let mut payload = Vec::new();
-                        net_msg
-                            .serialize(&mut Serializer::new(&mut payload))
-                            .unwrap();
-                        // Send
-                        trace!(
-                            "{} sending payload to transport id {}",
-                            my_name,
-                            connection_id
-                        );
-                        space_gateway.send(&[connection_id.as_str()], &payload)?;
-                    }
-                }
+                let srv_msg = self.serve_DirectMessage(msg, false);
+                outbox.push(srv_msg);
             }
             // HandleSendDirectMessageResult
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
-                let maybe_space = self.get_space_or_fail(
-                    &msg.space_address,
-                    &msg.from_agent_id,
-                    &msg.request_id,
-                    Some(&msg.to_agent_id),
-                );
-                match maybe_space {
-                    Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        let connection_id =
-                            std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
-                        // Change into P2pProtocol
-                        let net_msg = P2pProtocol::DirectMessageResult(msg);
-                        // Serialize
-                        let mut payload = Vec::new();
-                        net_msg
-                            .serialize(&mut Serializer::new(&mut payload))
-                            .unwrap();
-                        // Send
-                        space_gateway.send(&[connection_id.as_str()], &payload)?;
-                    }
-                }
+                let srv_msg = self.serve_DirectMessage(msg, true);
+                outbox.push(srv_msg);
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // FIXME
@@ -468,7 +417,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 }
             }
         }
-        Ok((did_work, outbox))
+        Ok(outbox)
     }
 
     /// Create a gateway for this agent in this space, if not already part of it.
@@ -552,6 +501,58 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         output.push(Lib3hServerProtocol::HandleGetAuthoringEntryList(list_data));
         // Done
         Ok(output)
+    }
+
+    fn serve_DirectMessage(
+        &mut self,
+        msg: DirectMessageData,
+        is_response: bool,
+    ) -> Lib3hServerProtocol {
+        // Check if space is joined by sender
+        let maybe_space = self.get_space_or_fail(
+            &msg.space_address,
+            &msg.from_agent_id,
+            &msg.request_id,
+            None,
+        );
+        // Return failure if not
+        if let Err(failure_msg) = maybe_space {
+            return failure_msg;
+        }
+        let space_gateway = maybe_space.unwrap();
+        // Prepare response
+        let mut response = GenericResultData {
+            request_id: msg.request_id.clone(),
+            space_address: msg.space_address.clone(),
+            to_agent_id: msg.from_agent_id.clone(),
+            result_info: vec![],
+        };
+        // Check if messaging self
+        let this_peer = space_gateway.this_peer();
+        if this_peer.peer_address.as_bytes() == msg.to_agent_id.as_slice() {
+            response.result_info = "Messaging self".as_bytes().to_vec();
+            return Lib3hServerProtocol::FailureResult(response);
+        }
+        // Change into P2pProtocol
+        let net_msg = if is_response {
+            P2pProtocol::DirectMessageResult(msg.clone())
+        } else {
+            P2pProtocol::DirectMessage(msg.clone())
+        };
+        // Serialize payload
+        let mut payload = Vec::new();
+        net_msg
+            .serialize(&mut Serializer::new(&mut payload))
+            .unwrap();
+        // Send
+        let conn_id = std::string::String::from_utf8_lossy(&msg.to_agent_id).into_owned();
+        // trace!("{} -- sending to connection id {}", self.name.clone(), conn_id);
+        let res = space_gateway.send(&[conn_id.as_str()], &payload);
+        if let Err(_) = res {
+            response.result_info = "Unknown receiver".as_bytes().to_vec();
+            return Lib3hServerProtocol::FailureResult(response);
+        }
+        Lib3hServerProtocol::SuccessResult(response)
     }
 
     /// Get a space_gateway for the specified space+agent.
