@@ -20,7 +20,7 @@ pub enum ChatEvent {
     Message(MessageData),
 }
 
-pub type HandleEvent = Box<FnMut(ChatEvent) + Send>;
+pub type HandleEvent = Box<dyn FnMut(ChatEvent) + Send>;
 
 pub struct HalfBusyChat {
     thread: Option<std::thread::JoinHandle<()>>,

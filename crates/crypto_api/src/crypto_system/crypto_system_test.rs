@@ -4,11 +4,11 @@
 use crate::{Buffer, CryptoError, CryptoSystem};
 
 struct FullSuite {
-    crypto: Box<CryptoSystem>,
+    crypto: Box<dyn CryptoSystem>,
 }
 
 impl FullSuite {
-    pub fn new(crypto: Box<CryptoSystem>) -> Self {
+    pub fn new(crypto: Box<dyn CryptoSystem>) -> Self {
         FullSuite { crypto }
     }
 
@@ -140,7 +140,7 @@ impl FullSuite {
 }
 
 /// run a full suite of common CryptoSystem verification functions
-pub fn full_suite(crypto: Box<CryptoSystem>) {
+pub fn full_suite(crypto: Box<dyn CryptoSystem>) {
     FullSuite::new(crypto).run();
 }
 
