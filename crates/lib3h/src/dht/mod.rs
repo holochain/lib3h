@@ -15,8 +15,8 @@ pub mod tests {
     };
     use url::Url;
 
-    // CONSTS
     lazy_static! {
+        /// CONSTS
         /// Entries
         pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".into();
         pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".into();
