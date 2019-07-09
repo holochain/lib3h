@@ -3,29 +3,33 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
-    gateway::P2pGateway,
+    gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{data_types::EntryData, AddressRef, DidWork, Lib3hResult};
+use lib3h_protocol::{Address, DidWork, Lib3hResult};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
 /// Compose DHT
 impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Peer info
+    fn get_peer_list(&self) -> Vec<PeerData> {
+        self.inner_dht.get_peer_list()
+    }
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht.get_peer(peer_address)
     }
-    fn fetch_peer(&self, peer_address: &str) -> Option<PeerData> {
-        self.inner_dht.fetch_peer(peer_address)
+    fn this_peer(&self) -> &PeerData {
+        self.inner_dht.this_peer()
     }
     /// Entry
-    fn get_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
-        self.inner_dht.get_entry(entry_address)
+    fn get_entry_address_list(&self) -> Vec<&Address> {
+        self.inner_dht.get_entry_address_list()
     }
-    fn fetch_entry(&self, entry_address: &AddressRef) -> Option<EntryData> {
-        self.inner_dht.fetch_entry(entry_address)
+    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
+        self.inner_dht.get_aspects_of(entry_address)
     }
+
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inner_dht.post(cmd)
@@ -34,8 +38,8 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // Process the dht
         let (did_work, dht_event_list) = self.inner_dht.process()?;
-        println!(
-            "[t] ({}).Dht.process() - output: {} {}",
+        trace!(
+            "({}).Dht.process() - output: {} {}",
             self.identifier.clone(),
             did_work,
             dht_event_list.len()
@@ -48,24 +52,13 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         }
         Ok((did_work, dht_event_list))
     }
-    /// Getters
-    fn this_peer(&self) -> &PeerData {
-        self.inner_dht.this_peer()
-    }
-    fn get_peer_list(&self) -> Vec<PeerData> {
-        self.inner_dht.get_peer_list()
-    }
 }
 
 /// Private internals
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        println!(
-            "[t] ({}).handle_DhtEvent() {:?}",
-            self.identifier.clone(),
-            evt
-        );
+        trace!("({}).handle_DhtEvent() {:?}", self.identifier.clone(), evt);
         match evt {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
@@ -81,7 +74,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .get_peer(&to_peer_address)
                         .expect("Should gossip to a known peer")
                         .peer_uri;
-                    println!(
+                    trace!(
                         "({}) GossipTo: {} {}",
                         self.identifier.clone(),
                         to_peer_address,
@@ -89,9 +82,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     );
                     // Change into P2pProtocol
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
-                        space_address: self.identifier().as_bytes().to_vec(),
-                        to_peer_address: to_peer_address.as_bytes().to_vec(),
-                        from_peer_address: self.this_peer().peer_address.as_bytes().to_vec(),
+                        space_address: self.identifier().into(),
+                        to_peer_address: to_peer_address.into(),
+                        from_peer_address: self.this_peer().peer_address.clone().into(),
                         bundle: data.bundle.clone(),
                     });
                     let mut payload = Vec::new();
@@ -100,9 +93,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                         .unwrap();
                     // Forward gossip to the inner_transport
                     // If no connection to that connectionId is open, open one first.
-                    self.inner_transport
-                        .borrow_mut()
-                        .send(&[peer_transport.path()], &payload)?;
+                    self.inner_transport.borrow_mut().send(
+                        &[gateway::url_to_transport_id(&peer_transport).as_str()],
+                        &payload,
+                    )?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
@@ -121,6 +115,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 // FIXME
             }
             DhtEvent::EntryPruned(_address) => {
+                // FIXME
+            }
+            DhtEvent::EntryDataRequested(_) => {
                 // FIXME
             }
         }

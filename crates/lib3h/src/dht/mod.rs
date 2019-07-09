@@ -5,28 +5,29 @@ pub mod rrdht;
 
 #[cfg(test)]
 pub mod tests {
-
-    use crate::dht::{dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht};
+    use crate::{
+        dht::{dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht},
+        tests::enable_logging_for_test,
+    };
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
-        Address, AddressRef,
+        Address,
     };
     use url::Url;
 
     // CONSTS
     lazy_static! {
         /// Entries
-        pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".as_bytes().to_vec();
-        pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".as_bytes().to_vec();
-        pub static ref ENTRY_ADDRESS_3: Address = "entry_addr_3".as_bytes().to_vec();
+        pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".into();
+        pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".into();
+        pub static ref ENTRY_ADDRESS_3: Address = "entry_addr_3".into();
         /// Aspects
         pub static ref ASPECT_CONTENT_1: Vec<u8> = "hello-1".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_2: Vec<u8> = "l-2".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_3: Vec<u8> = "ChainHeader-3".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".as_bytes().to_vec();
-
+        pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".into();
+        pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".into();
+        pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".into();
     }
 
     const PEER_A: &str = "alex";
@@ -34,6 +35,7 @@ pub mod tests {
     const PEER_C: &str = "camille";
 
     // Request counters
+    #[allow(dead_code)]
     static mut FETCH_COUNT: u32 = 0;
 
     fn create_test_transport(peer_address: &str) -> Url {
@@ -51,8 +53,8 @@ pub mod tests {
 
     #[allow(non_snake_case)]
     fn create_EntryData(
-        entry_address: &AddressRef,
-        aspect_address: &AddressRef,
+        entry_address: &Address,
+        aspect_address: &Address,
         aspect_content: &[u8],
     ) -> EntryData {
         let aspect = EntryAspectData {
@@ -68,10 +70,11 @@ pub mod tests {
     }
 
     #[allow(non_snake_case)]
-    fn create_FetchEntry(entry_address: &AddressRef) -> FetchEntryData {
+    #[allow(dead_code)]
+    fn create_FetchEntry(entry_address: &Address) -> FetchDhtEntryData {
         unsafe {
             FETCH_COUNT += 1;
-            FetchEntryData {
+            FetchDhtEntryData {
                 msg_id: format!("fetch_{}", FETCH_COUNT),
                 entry_address: entry_address.to_owned(),
             }
@@ -90,6 +93,7 @@ pub mod tests {
 
     #[test]
     fn test_this_peer() {
+        enable_logging_for_test(true);
         let dht = new_dht(true, PEER_A);
         let this = dht.this_peer();
         assert_eq!(this.peer_address, PEER_A);
@@ -97,6 +101,7 @@ pub mod tests {
 
     #[test]
     fn test_own_peer_list() {
+        enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
         let this = dht.get_peer(PEER_A);
@@ -128,22 +133,48 @@ pub mod tests {
 
     #[test]
     fn test_get_own_entry() {
+        enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
-        let result = dht.get_entry(&ENTRY_ADDRESS_1);
-        assert!(result.is_none());
+        let entry_address_list = dht.get_entry_address_list();
+        assert_eq!(entry_address_list.len(), 0);
         // Add a data item
-        let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
-        dht.post(DhtCommand::HoldEntry(entry_data.clone())).unwrap();
+        let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
+        dht.post(DhtCommand::HoldEntryAspectAddress(entry.clone()))
+            .unwrap();
         let (did_work, _) = dht.process().unwrap();
         assert!(did_work);
         // Should have it
-        let entry = dht.get_entry(&ENTRY_ADDRESS_1).unwrap();
-        assert_eq!(entry, entry_data);
+        let entry_address_list = dht.get_entry_address_list();
+        assert_eq!(entry_address_list.len(), 1);
+        let maybe_aspects = dht.get_aspects_of(&ENTRY_ADDRESS_1);
+        assert!(maybe_aspects.is_some());
+        assert_eq!(maybe_aspects.unwrap().len(), 1);
+        // Fetch it
+        let fetch_entry = FetchDhtEntryData {
+            msg_id: "fetch_1".to_owned(),
+            entry_address: ENTRY_ADDRESS_1.clone(),
+        };
+        dht.post(DhtCommand::FetchEntry(fetch_entry)).unwrap();
+        let (_did_work, event_list) = dht.process().unwrap();
+        assert_eq!(event_list.len(), 1);
+        let provide_entry = unwrap_to!(event_list[0] => DhtEvent::EntryDataRequested);
+        // Make something up
+        let response = FetchDhtEntryResponseData {
+            msg_id: provide_entry.msg_id.clone(),
+            entry: entry.clone(),
+        };
+        dht.post(DhtCommand::EntryDataResponse(response)).unwrap();
+        let (_did_work, event_list) = dht.process().unwrap();
+        // Should have it
+        assert_eq!(event_list.len(), 1);
+        let entry_response = unwrap_to!(event_list[0] => DhtEvent::FetchEntryResponse);
+        assert_eq!(entry_response.entry, entry);
     }
 
     #[test]
     fn test_update_peer() {
+        enable_logging_for_test(true);
         let mut dht = new_dht(true, PEER_A);
         // Should be empty
         let this = dht.get_peer(PEER_A);
@@ -179,6 +210,7 @@ pub mod tests {
 
     #[test]
     fn test_mirror_broadcast_entry() {
+        enable_logging_for_test(true);
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer
@@ -187,7 +219,7 @@ pub mod tests {
             .unwrap();
         let (did_work, _) = dht_a.process().unwrap();
         assert!(did_work);
-        // Add a data item
+        // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a
             .post(DhtCommand::BroadcastEntry(entry_data.clone()))
@@ -205,26 +237,30 @@ pub mod tests {
             bundle: gossip_to.bundle.clone(),
         };
         dht_b.post(DhtCommand::HandleGossip(remote_gossip)).unwrap();
+        let (did_work, event_list) = dht_b.process().unwrap();
+        assert!(did_work);
+        // Should receive a HoldRequested
+        assert_eq!(event_list.len(), 1);
+        if let DhtEvent::HoldEntryRequested(from, hold_entry) = event_list[0].clone() {
+            assert_eq!(from, PEER_B.clone());
+            assert_eq!(hold_entry, entry_data.clone());
+        } else {
+            panic!("Should be of variant type HoldEntryRequested");
+        }
+        // Tell DHT B to hold it
+        dht_b
+            .post(DhtCommand::HoldEntryAspectAddress(entry_data))
+            .unwrap();
         let (did_work, _) = dht_b.process().unwrap();
         assert!(did_work);
-        // DHT B should have the data
-        let entry = dht_b.get_entry(&ENTRY_ADDRESS_1).unwrap();
-        assert_eq!(entry, entry_data.clone());
-        // DHT B should have the data with a Fetch
-        let fetch_data = create_FetchEntry(&ENTRY_ADDRESS_1);
-        let _ = dht_b
-            .post(DhtCommand::FetchEntry(fetch_data.clone()))
-            .unwrap();
-        let (did_work, events) = dht_b.process().unwrap();
-        assert!(did_work);
-        assert_eq!(events.len(), 1);
-        let fetch_response = unwrap_to!(events[0] => DhtEvent::FetchEntryResponse);
-        assert_eq!(fetch_response.msg_id, fetch_data.msg_id);
-        assert_eq!(fetch_response.entry, entry_data.clone());
+        // DHT B should have the entry
+        let entry_list = dht_b.get_entry_address_list();
+        assert_eq!(entry_list.len(), 1);
     }
 
     #[test]
     fn test_mirror_gossip_peer() {
+        enable_logging_for_test(true);
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer

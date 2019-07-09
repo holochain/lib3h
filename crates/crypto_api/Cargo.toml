@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_crypto_api"
-version = "0.0.2-alpha1"
+version = "0.0.4-alpha1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h abstract cryptography traits and data types"
@@ -14,3 +14,7 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 serde = "=1.0.89"
 serde_derive = "=1.0.89"
+zeroize = "=0.9.2"
+
+[dev-dependencies]
+rand = "=0.6.5"

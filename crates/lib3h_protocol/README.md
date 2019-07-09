@@ -9,7 +9,7 @@
 
 ## Overview
 
-Lib3h Protocol definition for P2P communication.
+Protocol definition for interacting with Lib3h.
 
 ## Usage
 

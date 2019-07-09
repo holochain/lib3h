@@ -5,10 +5,10 @@ use crate::{
         dht_protocol::*,
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    gateway::P2pGateway,
-    transport::{transport_trait::Transport, url_to_transport_id},
+    gateway::{self, P2pGateway},
+    transport::transport_trait::Transport,
 };
-use lib3h_protocol::{AddressRef, Lib3hResult};
+use lib3h_protocol::{Address, Lib3hResult};
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
@@ -21,7 +21,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
     }
-
     /// Hack: explicit post because of dumb rust compiler
     pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         // HACK: Add fake reverse on HoldPeer
@@ -29,7 +28,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
             self.connection_map.insert(
                 peer_data.peer_uri.clone(),
-                url_to_transport_id(&peer_data.peer_uri.clone()),
+                gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
             );
         }
         // HACK END
@@ -66,11 +65,11 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
     /// Constructors
     pub fn new_with_space(
         network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
-        space_address: &AddressRef,
+        space_address: &Address,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
-        let identifier = std::string::String::from_utf8_lossy(space_address).to_string();
+        let identifier: String = space_address.clone().into();
         P2pGateway {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),

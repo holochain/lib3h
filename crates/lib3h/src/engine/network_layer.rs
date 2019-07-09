@@ -5,14 +5,13 @@ use crate::{
     engine::{p2p_protocol::P2pProtocol, RealEngine},
     transport::{protocol::*, transport_trait::Transport, ConnectionIdRef},
 };
-use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer realted private methods
-impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
+impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
@@ -21,8 +20,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         // Process the network gateway as a transport
         let (tranport_did_work, event_list) =
             Transport::process(&mut *self.network_gateway.borrow_mut())?;
-        println!(
-            "[d] {} - network_gateway Transport.process(): {} {}",
+        debug!(
+            "{} - network_gateway Transport.process(): {} {}",
             self.name.clone(),
             tranport_did_work,
             event_list.len()
@@ -46,7 +45,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
 
     /// Handle a DhtEvent sent to us by our network gateway
     fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        println!("[d] {} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
+        debug!("{} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
         let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {
@@ -70,6 +69,9 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             DhtEvent::EntryPruned(_address) => {
                 // FIXME
             }
+            DhtEvent::EntryDataRequested(_) => {
+                // FIXME
+            }
         }
         Ok(outbox)
     }
@@ -79,8 +81,8 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         &mut self,
         evt: &TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        println!(
-            "[d] {} << handle_netTransportEvent: {:?}",
+        debug!(
+            "{} << handle_netTransportEvent: {:?}",
             self.name.clone(),
             evt
         );
@@ -89,12 +91,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
         match evt {
             TransportEvent::TransportError(id, e) => {
                 self.network_connections.remove(id);
-                eprintln!(
-                    "[e] {} Network error from {} : {:?}",
-                    self.name.clone(),
-                    id,
-                    e
-                );
+                error!("{} Network error from {} : {:?}", self.name.clone(), id, e);
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
@@ -106,7 +103,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             TransportEvent::ConnectResult(id) => {
                 let mut network_gateway = self.network_gateway.borrow_mut();
                 if let Some(uri) = network_gateway.get_uri(id) {
-                    println!("[i] Network Connection opened: {} ({})", id, uri);
+                    info!("Network Connection opened: {} ({})", id, uri);
 
                     // FIXME: Do this in next process instead
                     // Send to other node our Joined Spaces
@@ -116,19 +113,20 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     our_joined_space_list
                         .serialize(&mut Serializer::new(&mut buf))
                         .unwrap();
-                    println!(
+                    trace!(
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
-                        our_joined_space_list, id
+                        our_joined_space_list,
+                        id
                     );
                     // id is connectionId but we need a transportId, so search for it in the DHT
                     let peer_list = network_gateway.get_peer_list();
-                    println!(
+                    trace!(
                         "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
                         peer_list
                     );
                     let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
                     if let Some(peer_data) = maybe_peer_data {
-                        println!(
+                        trace!(
                             "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
                             peer_data,
                         );
@@ -162,7 +160,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 }
             }
             TransportEvent::Received(id, payload) => {
-                println!("[d] Received message from: {} | {}", id, payload.len());
+                debug!("Received message from: {} | {}", id, payload.len());
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -192,8 +190,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
                     .ok_or_else(|| format_err!("space_gateway not found"))?;
                 // Post it as a remoteGossipTo
-                let from_peer_address =
-                    std::string::String::from_utf8_lossy(&msg.from_peer_address).into_owned();
+                let from_peer_address: String = msg.from_peer_address.clone().into();
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
                     from_peer_address,
                     bundle: msg.bundle.clone(),
@@ -201,17 +198,39 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                 space_gateway.post_dht(cmd)?;
                 // Dht::post(&mut space_gateway, cmd);
             }
-            P2pProtocol::DirectMessage(data) => {
-                // FIXME: check with space gateway first?
-                // Change into Lib3hServerProtocol
-                let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(data.clone());
-                outbox.push(lib3_msg);
+            P2pProtocol::DirectMessage(dm_data) => {
+                let maybe_space_gateway = self.space_gateway_map.get(&(
+                    dm_data.space_address.to_owned(),
+                    dm_data.to_agent_id.to_owned(),
+                ));
+                //
+                if let Some(_space_gateway) = maybe_space_gateway {
+                    // TODO: check if we know sender?
+                    //  let sender_address = std::string::String::from_utf8_lossy(&dm_data.from_agent_id).to_string();
+                    //  let maybe_sender = _space_gateway.get_peer(sender_address);
+                    // Change into Lib3hServerProtocol
+                    let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(dm_data.clone());
+                    outbox.push(lib3_msg);
+                } else {
+                    warn!("Received message from unjoined space");
+                }
             }
-            P2pProtocol::DirectMessageResult(data) => {
-                // FIXME: check with space gateway first?
-                // Change into Lib3hServerProtocol
-                let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(data.clone());
-                outbox.push(lib3_msg);
+            P2pProtocol::DirectMessageResult(dm_data) => {
+                let maybe_space_gateway = self.space_gateway_map.get(&(
+                    dm_data.space_address.to_owned(),
+                    dm_data.to_agent_id.to_owned(),
+                ));
+                //
+                if let Some(_space_gateway) = maybe_space_gateway {
+                    // TODO: check if we know sender?
+                    //  let sender_address = std::string::String::from_utf8_lossy(&dm_data.from_agent_id).to_string();
+                    //  let maybe_sender = _space_gateway.get_peer(sender_address);
+                    // Change into Lib3hServerProtocol
+                    let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(dm_data.clone());
+                    outbox.push(lib3_msg);
+                } else {
+                    warn!("Received message from unjoined space");
+                }
             }
             P2pProtocol::FetchData => {
                 // FIXME
@@ -224,14 +243,14 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
             }
             // HACK
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
-                println!("[d] Received JoinSpace: {} {:?}", gateway_id, peer_data);
+                debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
                 }
             }
             // HACK
             P2pProtocol::AllJoinedSpaceList(join_list) => {
-                println!("[d] Received AllJoinedSpaceList: {:?}", join_list);
+                debug!("Received AllJoinedSpaceList: {:?}", join_list);
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {

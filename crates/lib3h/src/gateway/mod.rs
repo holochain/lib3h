@@ -14,6 +14,10 @@ use std::{
 
 use url::Url;
 
+pub fn url_to_transport_id(url: &Url) -> ConnectionId {
+    String::from(url.path())
+}
+
 /// Gateway to a P2P network.
 /// Combines a transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.

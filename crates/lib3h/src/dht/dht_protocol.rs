@@ -7,16 +7,19 @@ pub type FromPeerAddress = String;
 pub enum DhtCommand {
     /// Owner received a gossip bundle from a remote peer, and asks us to handle it.
     HandleGossip(RemoteGossipBundleData),
-    /// Owner wants access to the entry associated with an entry address.
-    FetchEntry(FetchEntryData),
+    /// Owner wants a specific entry.
+    FetchEntry(FetchDhtEntryData),
     /// Owner wants us to hold a peer discovery data item.
     HoldPeer(PeerData),
-    /// Owner wants us to hold an entry.
-    HoldEntry(EntryData),
-    /// Owner wants us to hold an entry and broadcast it to neighbors
+    /// Owner notifies us that it is holding one or several Aspects for an Entry.
+    /// Note: Need an EntryData to know the aspect addresses, but aspects' content can be empty.
+    HoldEntryAspectAddress(EntryData),
+    /// Owner wants us to bookkeep an entry and broadcast it to neighbors
     BroadcastEntry(EntryData),
-    /// Owner wants us to drop an entry.
-    DropEntry(Address),
+    /// Owner notifies us that is is not holding an entry anymore.
+    DropEntryAddress(Address),
+    /// Owner's response to ProvideEntry request
+    EntryDataResponse(FetchDhtEntryResponseData),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -35,8 +38,10 @@ pub enum DhtEvent {
     /// Notify owner that gossip is requesting we hold an entry.
     /// String argument is: from_peer_address
     HoldEntryRequested(FromPeerAddress, EntryData),
+    /// DHT wants an entry in order to send it to someone on the network
+    EntryDataRequested(FetchDhtEntryData),
     /// Response to a `FetchEntry` command.
-    FetchEntryResponse(FetchEntryResponseData),
+    FetchEntryResponse(FetchDhtEntryResponseData),
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),
@@ -63,13 +68,13 @@ pub struct PeerData {
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct FetchEntryData {
+pub struct FetchDhtEntryData {
     pub msg_id: String,
     pub entry_address: Address,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
-pub struct FetchEntryResponseData {
+pub struct FetchDhtEntryResponseData {
     pub msg_id: String,
     pub entry: EntryData,
 }

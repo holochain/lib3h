@@ -5,7 +5,7 @@ use crate::transport::{
 };
 use lib3h_protocol::DidWork;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{Mutex, RwLock},
 };
 use url::Url;
@@ -24,7 +24,7 @@ lazy_static! {
 
 /// Add new MemoryServer to the global server map
 pub fn set_server(uri: &Url) -> TransportResult<()> {
-    // println!("[d] MemoryServer::set_server: {}", uri);
+    debug!("MemoryServer::set_server: {}", uri);
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if server_map.contains_key(uri) {
@@ -57,6 +57,7 @@ pub struct MemoryServer {
     inbox_map: HashMap<ConnectionId, VecDeque<Vec<u8>>>,
     /// Inbox of new inbound connections
     new_conn_inbox: Vec<ConnectionId>,
+    connection_ids: HashSet<ConnectionId>,
 }
 
 impl MemoryServer {
@@ -66,14 +67,19 @@ impl MemoryServer {
             uri: uri.clone(),
             inbox_map: HashMap::new(),
             new_conn_inbox: Vec::new(),
+            connection_ids: HashSet::new(),
         }
+    }
+
+    pub fn has_connection(&self, id: &ConnectionIdRef) -> bool {
+        self.connection_ids.contains(id)
     }
 
     /// Create an inbox for this new sender
     /// Will connect the other way.
     pub fn connect(&mut self, requester_uri: &ConnectionIdRef) -> TransportResult<()> {
-        println!(
-            "[i] (MemoryServer) {} creates inbox for {}",
+        info!(
+            "(MemoryServer) {} creates inbox for {}",
             self.uri, requester_uri
         );
         if self.inbox_map.contains_key(requester_uri) {
@@ -90,12 +96,13 @@ impl MemoryServer {
         }
         // Notify our TransportMemory to connect back
         self.new_conn_inbox.push(requester_uri.to_string());
+        self.connection_ids.insert(requester_uri.to_string());
         Ok(())
     }
 
     /// Delete this connectionId's inbox
     pub fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        println!("[i] (MemoryServer {}).close({})", self.uri, id);
+        info!("(MemoryServer {}).close({})", self.uri, id);
         let res = self.inbox_map.remove(id);
         if res.is_none() {
             return Err(TransportError::new(format!(
@@ -103,6 +110,7 @@ impl MemoryServer {
                 id, self.uri
             )));
         }
+        self.connection_ids.remove(&id.to_string());
         // TODO: Should we process here whatever is left in the inbox?
         Ok(())
     }
@@ -123,7 +131,7 @@ impl MemoryServer {
     /// Process all inboxes.
     /// Return a TransportEvent::Received for each payload processed.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        println!("[t] (MemoryServer {}).process()", self.uri);
+        trace!("(MemoryServer {}).process()", self.uri);
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connexion inbox
@@ -140,7 +148,7 @@ impl MemoryServer {
                     Some(msg) => msg,
                 };
                 did_work = true;
-                println!("[t] (MemoryServer {}) received: {:?}", self.uri, payload);
+                trace!("(MemoryServer {}) received: {:?}", self.uri, payload);
                 let evt = TransportEvent::Received(id.clone(), payload);
                 outbox.push(evt);
             }
