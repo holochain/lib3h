@@ -1,5 +1,5 @@
 use crate::{node_mock::NodeMock, utils::constants::*};
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, AddressRef};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
@@ -77,9 +77,9 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 }
 
 ///
-pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &AddressRef) {
+pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
     // Alex joins space
-    let req_id = alex.join_space(&space_address.to_vec(), true).unwrap();
+    let req_id = alex.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 3);
@@ -91,7 +91,7 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space
-    let req_id = billy.join_space(&space_address.to_vec(), true).unwrap();
+    let req_id = billy.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 3);
