@@ -556,7 +556,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     /// Destroy gateway for this agent in this space, if part of it.
     /// Respond with FailureResult if space was not already joined.
-    /// Must not already be part of this space.
     fn serve_LeaveSpace(&mut self, join_msg: &SpaceData) -> Lib3hServerProtocol {
         // Prepare response
         let mut res = GenericResultData {
