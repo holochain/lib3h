@@ -25,7 +25,7 @@ macro_rules! one_let {
         if let $p = $enum {
             $code
         } else {
-            unimplemented!();
+            panic!("Received unexpected Protocol message type");
         }
     };
 }
