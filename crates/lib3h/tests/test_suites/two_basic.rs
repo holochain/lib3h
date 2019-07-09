@@ -52,7 +52,7 @@ pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
 
 /// Request ENTRY_ADDRESS_1 from the network and should get it back
 pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
-    let enty_address_str = std::string::String::from_utf8_lossy(&entry.entry_address).to_string();
+    let enty_address_str = &entry.entry_address;
     println!("\n{} requesting entry: {}\n", node.name, enty_address_str);
     let query_data = node.request_entry(entry.entry_address.clone());
     let (did_work, _srv_msg_list) = node.process().unwrap();

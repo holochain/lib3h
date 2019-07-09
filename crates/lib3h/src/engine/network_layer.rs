@@ -5,14 +5,13 @@ use crate::{
     engine::{p2p_protocol::P2pProtocol, RealEngine},
     transport::{protocol::*, transport_trait::Transport, ConnectionIdRef},
 };
-use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer realted private methods
-impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D, SecBuf, Crypto> {
+impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
@@ -191,8 +190,7 @@ impl<T: Transport, D: Dht, SecBuf: Buffer, Crypto: CryptoSystem> RealEngine<T, D
                     .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
                     .ok_or_else(|| format_err!("space_gateway not found"))?;
                 // Post it as a remoteGossipTo
-                let from_peer_address =
-                    std::string::String::from_utf8_lossy(&msg.from_peer_address).into_owned();
+                let from_peer_address: String = msg.from_peer_address.clone().into();
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
                     from_peer_address,
                     bundle: msg.bundle.clone(),

@@ -1,6 +1,6 @@
 [package]
 name = "lib3h"
-version = "0.0.3-alpha1"
+version = "0.0.5"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
@@ -14,9 +14,10 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 hcid = "=0.0.6"
-holochain_persistence_api = "0.0.1-alpha4"
-lib3h_protocol = { path = "../lib3h_protocol", version = "=0.0.3-alpha1" }
-lib3h_crypto_api = { path = "../crypto_api", version = "=0.0.3-alpha1" }
+holochain_persistence_api = "=0.0.5"
+# version on the left for release regex
+lib3h_protocol = { version = "=0.0.5", path = "../lib3h_protocol" }
+lib3h_crypto_api = { version = "=0.0.5", path = "../crypto_api" }
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 url_serde = "=0.2.0"
@@ -30,6 +31,7 @@ log = "=0.4.6"
 lazy_static = "=1.2.0"
 
 [dev-dependencies]
+lib3h_sodium = { version = "=0.0.5", path = "../sodium" }
 unwrap_to = "=0.1.0"
 backtrace = "=0.3.14"
 env_logger = "=0.6.1"

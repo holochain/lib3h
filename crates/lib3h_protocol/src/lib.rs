@@ -1,5 +1,6 @@
 //! This module provides the api definition for working with lib3h
 
+extern crate holochain_persistence_api;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -10,9 +11,8 @@ pub mod network_engine;
 pub mod protocol_client;
 pub mod protocol_server;
 
-/// Opaque Address Bytes
-pub type Address = Vec<u8>;
-pub type AddressRef = [u8];
+/// string encoded address type
+pub type Address = holochain_persistence_api::hash::HashString;
 
 /// type name for a bool indicating if work was done during a `process()`
 pub type DidWork = bool;

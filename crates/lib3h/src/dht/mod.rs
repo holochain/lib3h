@@ -5,30 +5,29 @@ pub mod rrdht;
 
 #[cfg(test)]
 pub mod tests {
-
     use crate::{
         dht::{dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht},
         tests::enable_logging_for_test,
     };
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
-        Address, AddressRef,
+        Address,
     };
     use url::Url;
 
-    /// CONSTS
     lazy_static! {
+        /// CONSTS
         /// Entries
-        pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".as_bytes().to_vec();
-        pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".as_bytes().to_vec();
-        pub static ref ENTRY_ADDRESS_3: Address = "entry_addr_3".as_bytes().to_vec();
+        pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".into();
+        pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".into();
+        pub static ref ENTRY_ADDRESS_3: Address = "entry_addr_3".into();
         /// Aspects
         pub static ref ASPECT_CONTENT_1: Vec<u8> = "hello-1".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_2: Vec<u8> = "l-2".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_3: Vec<u8> = "ChainHeader-3".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".as_bytes().to_vec();
+        pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".into();
+        pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".into();
+        pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".into();
     }
 
     const PEER_A: &str = "alex";
@@ -54,8 +53,8 @@ pub mod tests {
 
     #[allow(non_snake_case)]
     fn create_EntryData(
-        entry_address: &AddressRef,
-        aspect_address: &AddressRef,
+        entry_address: &Address,
+        aspect_address: &Address,
         aspect_content: &[u8],
     ) -> EntryData {
         let aspect = EntryAspectData {
@@ -72,7 +71,7 @@ pub mod tests {
 
     #[allow(non_snake_case)]
     #[allow(dead_code)]
-    fn create_FetchEntry(entry_address: &AddressRef) -> FetchDhtEntryData {
+    fn create_FetchEntry(entry_address: &Address) -> FetchDhtEntryData {
         unsafe {
             FETCH_COUNT += 1;
             FetchDhtEntryData {
