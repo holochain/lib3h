@@ -12,6 +12,7 @@ lazy_static! {
     /// Spaces
     pub static ref SPACE_ADDRESS_A: Address = "SPACE_A".to_string().into_bytes();
     pub static ref SPACE_ADDRESS_B: Address = "SPACE_B".to_string().into_bytes();
+    pub static ref SPACE_ADDRESS_C: Address = "SPACE_C".to_string().into_bytes();
     /// Entries
     pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".to_string().into_bytes();
     pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".to_string().into_bytes();

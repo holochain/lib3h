@@ -1,9 +1,19 @@
-use crate::{node_mock::NodeMock, test_suites::two_basic::TwoNodesTestFn, utils::constants::*};
+use crate::{
+    node_mock::NodeMock,
+    test_suites::two_basic::{
+        test_author_one_aspect, test_send_message, two_join_space, TwoNodesTestFn,
+    },
+    utils::constants::*,
+};
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 lazy_static! {
-    pub static ref TWO_NODES_SPACES_TEST_FNS: Vec<(TwoNodesTestFn, bool)> =
-        vec![(test_leave_space, true),];
+    pub static ref TWO_NODES_SPACES_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
+        (test_leave_space, true),
+        (test_rejoining, true),
+        (test_multispace_send, true),
+        (test_multispace_dht, true),
+    ];
 }
 
 /// Sending a Message before doing a 'TrackDna' should fail
@@ -12,14 +22,7 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     let req_id = alex
         .leave_current_space()
         .expect("Failed sending LeaveSpace message on alex");
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    println!("response: {:?}", srv_msg_list);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    assert_process_success!(alex, req_id);
     alex.set_current_space(&SPACE_ADDRESS_A);
 
     // Send a message from Alex to Billy
@@ -46,14 +49,7 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     // =================================
     println!("\n Billy trying to send DirectMessage...\n");
     let req_id = billy.send_direct_message(&ALEX_AGENT_ID, ASPECT_CONTENT_1.clone());
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
-
+    assert_process_success!(billy, req_id);
     // Alex should not receive it.
     let res = alex.wait_with_timeout(
         Box::new(one_is!(Lib3hServerProtocol::HandleSendDirectMessage(_))),
@@ -71,4 +67,104 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
         assert_eq!(response.request_id, req_id);
     });
+}
+
+/// Sending a Message before doing a 'TrackDna' should fail
+pub fn test_rejoining(alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Alex LeaveSpace
+    let req_id = alex
+        .leave_current_space()
+        .expect("Failed sending LeaveSpace message on Alex");
+    assert_process_success!(alex, req_id);
+    // Billy LeaveSpace
+    let req_id = billy
+        .leave_current_space()
+        .expect("Failed sending LeaveSpace message on Billy");
+    assert_process_success!(billy, req_id);
+    // Alex and Billy re-joins
+    println!("\nAlex and Billy re-joins...\n");
+    two_join_space(alex, billy, &SPACE_ADDRESS_A);
+    // Do some test
+    println!("\nTest send DirectMessage...\n");
+    test_send_message(alex, billy);
+
+    // Alex re-joins again
+    println!("\nAlex re-joins again...\n");
+    let req_id = alex.join_space(&SPACE_ADDRESS_A.clone(), true).unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
+}
+
+/// Sending a Message before doing a 'TrackDna' should fail
+pub fn test_multispace_send(alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Alex LeaveSpace
+    let req_id = alex
+        .leave_current_space()
+        .expect("Failed sending LeaveSpace message on Alex");
+    assert_process_success!(alex, req_id);
+    // Alex and Billy joins other spaces
+    println!("\nAlex and Billy re-joins...\n");
+    two_join_space(alex, billy, &SPACE_ADDRESS_B);
+    two_join_space(alex, billy, &SPACE_ADDRESS_C);
+
+    // Send messages on SPACE B
+    // ========================
+    println!("\nTest send DirectMessage in space B...\n");
+    alex.set_current_space(&SPACE_ADDRESS_B);
+    billy.set_current_space(&SPACE_ADDRESS_B);
+    test_send_message(alex, billy);
+
+    // Send messages on SPACE C
+    // ========================
+    println!("\nTest send DirectMessage in space C...\n");
+    alex.set_current_space(&SPACE_ADDRESS_C);
+    billy.set_current_space(&SPACE_ADDRESS_C);
+    test_send_message(alex, billy);
+
+    // Send messages on SPACE A - should fail
+    // ========================
+    println!("\nTest send DirectMessage in space A...\n");
+    alex.set_current_space(&SPACE_ADDRESS_A);
+    billy.set_current_space(&SPACE_ADDRESS_A);
+    let req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "marco".as_bytes().to_vec());
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    println!("response: {:?}", srv_msg_list);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
+}
+
+/// Sending a Message before doing a 'TrackDna' should fail
+pub fn test_multispace_dht(alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Alex LeaveSpace
+    let req_id = alex
+        .leave_current_space()
+        .expect("Failed sending LeaveSpace message on Alex");
+    assert_process_success!(alex, req_id);
+    // Alex and Billy joins other spaces
+    println!("\nAlex and Billy re-joins...\n");
+    two_join_space(alex, billy, &SPACE_ADDRESS_B);
+    two_join_space(alex, billy, &SPACE_ADDRESS_C);
+
+    // Author entry on SPACE B
+    // =======================
+    println!("\nTest send DirectMessage in space B...\n");
+    alex.set_current_space(&SPACE_ADDRESS_B);
+    billy.set_current_space(&SPACE_ADDRESS_B);
+    test_author_one_aspect(alex, billy);
+
+    // Author entry on SPACE C
+    // =======================
+    println!("\nTest send DirectMessage in space C...\n");
+    alex.set_current_space(&SPACE_ADDRESS_C);
+    billy.set_current_space(&SPACE_ADDRESS_C);
+    test_author_one_aspect(alex, billy);
 }
