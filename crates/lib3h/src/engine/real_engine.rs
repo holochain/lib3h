@@ -10,7 +10,9 @@ use crate::{
         dht_protocol::{self, *},
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys},
+    engine::{
+        p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
+    },
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
@@ -73,6 +75,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
+            process_count: 0,
         })
     }
 }
@@ -100,7 +103,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
         };
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
-            "__memory_network__",
+            NETWORK_GATEWAY_ID,
             Rc::clone(&network_transport),
             dht_factory,
             &dht_config,
@@ -122,6 +125,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
+            process_count: 0,
         })
     }
 }
@@ -158,8 +162,13 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        self.process_count += 1;
         trace!("");
-        trace!("{} - RealEngine.process() START", self.name);
+        trace!(
+            "{} - RealEngine.process() START - {}",
+            self.name,
+            self.process_count
+        );
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -168,7 +177,11 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
-        trace!("RealEngine.process() END - (outbox: {})\n", outbox.len());
+        trace!(
+            "RealEngine.process() END - {} (outbox: {})\n",
+            self.process_count,
+            outbox.len()
+        );
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }
@@ -544,11 +557,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
         // Send
-        let conn_id: String = msg.to_agent_id.clone().into();
-        // trace!("{} -- sending to connection id {}", self.name.clone(), conn_id);
-        let res = space_gateway.send(&[conn_id.as_str()], &payload);
-        if let Err(_) = res {
-            response.result_info = "Unknown receiver".as_bytes().to_vec();
+        let peer_address: String = msg.to_agent_id.clone().into();
+        let res = space_gateway.send(&[peer_address.as_str()], &payload);
+        if let Err(e) = res {
+            response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
         }
         Lib3hServerProtocol::SuccessResult(response)

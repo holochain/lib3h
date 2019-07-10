@@ -31,7 +31,6 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.reply_to_first_HandleGetAuthoringEntryList();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-
     // Should receive a HandleFetchEntry request from network module after receiving list
     assert_eq!(srv_msg_list.len(), 1);
     // extract msg data

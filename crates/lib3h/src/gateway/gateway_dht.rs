@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
-    gateway::{self, P2pGateway},
+    gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{Address, DidWork, Lib3hResult};
@@ -68,22 +68,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     if &to_peer_address == me {
                         continue;
                     }
-                    // get peer address
-                    let peer_transport = self
-                        .inner_dht
-                        .get_peer(&to_peer_address)
-                        .expect("Should gossip to a known peer")
-                        .peer_uri;
-                    trace!(
-                        "({}) GossipTo: {} {}",
-                        self.identifier.clone(),
-                        to_peer_address,
-                        peer_transport
-                    );
-                    // Change into P2pProtocol
+                    // Convert DHT Gossip to P2P Gossip
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
                         space_address: self.identifier().into(),
-                        to_peer_address: to_peer_address.into(),
+                        to_peer_address: to_peer_address.clone().into(),
                         from_peer_address: self.this_peer().peer_address.clone().into(),
                         bundle: data.bundle.clone(),
                     });
@@ -91,18 +79,34 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .unwrap();
+                    // get to_peer's connectionId
+                    let to_peer_uri = self
+                        .inner_dht
+                        .get_peer(&to_peer_address)
+                        .expect("Should gossip to a known peer")
+                        .peer_uri;
+                    // TODO: If no connectionId, open a connection first ?
+                    let to_conn_id = self
+                        .connection_map
+                        .get(&to_peer_uri)
+                        .expect("unknown peer_uri");
+                    trace!(
+                        "({}) GossipTo: {} -> {} -> {}",
+                        self.identifier.clone(),
+                        to_peer_address,
+                        to_peer_uri,
+                        to_conn_id
+                    );
                     // Forward gossip to the inner_transport
-                    // If no connection to that connectionId is open, open one first.
-                    self.inner_transport.borrow_mut().send(
-                        &[gateway::url_to_transport_id(&peer_transport).as_str()],
-                        &payload,
-                    )?;
+                    self.inner_transport
+                        .borrow_mut()
+                        .send(&[to_conn_id], &payload)?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
                 // FIXME
             }
-            DhtEvent::HoldPeerRequested(_peer_address) => {
+            DhtEvent::HoldPeerRequested(_peer_data) => {
                 // FIXME or have engine handle it?
             }
             DhtEvent::PeerTimedOut(_data) => {

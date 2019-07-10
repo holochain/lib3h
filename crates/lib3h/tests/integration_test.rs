@@ -25,7 +25,7 @@ use lib3h::{
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
 use node_mock::NodeMock;
-use test_suites::{two_basic::*, two_get_lists::*, two_spaces::*};
+use test_suites::{three_basic::*, two_basic::*, two_get_lists::*, two_spaces::*};
 use url::Url;
 use utils::constants::*;
 
@@ -83,7 +83,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}//{}", fn_name, name).as_str()).unwrap(),
+        bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -152,6 +152,14 @@ fn test_two_memory_nodes_spaces_suite() {
     }
 }
 
+#[test]
+fn test_three_memory_nodes_basic_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
+        launch_three_memory_nodes_test(*test_fn, *can_setup).unwrap();
+    }
+}
+
 // Do general test with config
 fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
@@ -175,6 +183,35 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     // Terminate nodes
     alex.stop();
     billy.stop();
+
+    Ok(())
+}
+
+// Do general test with config
+fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) -> Result<(), ()> {
+    let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
+    println!("");
+    print_test_name("IN-MEMORY THREE NODES TEST: ", test_fn_ptr);
+    println!("==========================");
+
+    // Setup
+    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut camille = setup_memory_node("camille", CAMILLE_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    if can_setup {
+        setup_three_nodes(&mut alex, &mut billy, &mut camille);
+    }
+
+    // Execute test
+    test_fn(&mut alex, &mut billy, &mut camille);
+
+    // Wrap-up test
+    println!("==========================");
+    print_test_name("IN-MEMORY THREE NODES TEST END: ", test_fn_ptr);
+    // Terminate nodes
+    alex.stop();
+    billy.stop();
+    camille.stop();
 
     Ok(())
 }

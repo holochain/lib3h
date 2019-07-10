@@ -2,7 +2,7 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
-    engine::{p2p_protocol::P2pProtocol, RealEngine},
+    engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
     transport::{protocol::*, transport_trait::Transport, ConnectionIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
@@ -54,8 +54,17 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             DhtEvent::GossipUnreliablyTo(_data) => {
                 // FIXME
             }
-            DhtEvent::HoldPeerRequested(_peer_address) => {
-                // FIXME
+            DhtEvent::HoldPeerRequested(peer_data) => {
+                // #fullsync HACK
+                // Connect to every peer
+                info!(
+                    "{} auto-connect to peer: {} ({})",
+                    self.name.clone(),
+                    peer_data.peer_address,
+                    peer_data.peer_uri
+                );
+                let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
+                Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             DhtEvent::PeerTimedOut(_data) => {
                 // FIXME
@@ -185,18 +194,26 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
-                let space_gateway = self
-                    .space_gateway_map
-                    .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                    .ok_or_else(|| format_err!("space_gateway not found"))?;
-                // Post it as a remoteGossipTo
-                let from_peer_address: String = msg.from_peer_address.clone().into();
+                // Prepare remoteGossipTo to post to dht
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
-                    from_peer_address,
+                    from_peer_address: msg.from_peer_address.clone().into(),
                     bundle: msg.bundle.clone(),
                 });
-                space_gateway.post_dht(cmd)?;
-                // Dht::post(&mut space_gateway, cmd);
+                // Check if its for the network_gateway
+                if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
+                    self.network_gateway.borrow_mut().post_dht(cmd)?;
+                //Dht::post(&mut self.network_gateway.borrow_mut(), cmd);
+                } else {
+                    // otherwise should be for one of our space
+                    let space_gateway = self
+                        .space_gateway_map
+                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
+                        .ok_or_else(|| {
+                            format_err!("space_gateway not found: {}", msg.space_address)
+                        })?;
+                    space_gateway.post_dht(cmd)?;
+                    // Dht::post(&mut space_gateway, cmd);
+                }
             }
             P2pProtocol::DirectMessage(dm_data) => {
                 let maybe_space_gateway = self.space_gateway_map.get(&(
