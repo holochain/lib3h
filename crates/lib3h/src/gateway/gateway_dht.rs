@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
-    gateway::{self, P2pGateway},
+    gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{Address, DidWork, Lib3hResult};

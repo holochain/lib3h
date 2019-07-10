@@ -1,7 +1,5 @@
 use crate::{node_mock::NodeMock, utils::constants::*};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
-use rmp_serde::Deserializer;
-use serde::Deserialize;
 
 pub type ThreeNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock);
 

@@ -31,7 +31,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
             );
             if let Some(previous_cId) = previous {
-                warn!("Replaced connectionId[{}] = {}", peer_data.peer_uri.clone(), previous_cId);
+                debug!("Replaced connectionId[{}] = {}", peer_data.peer_uri.clone(), previous_cId);
             }
         }
         // HACK END

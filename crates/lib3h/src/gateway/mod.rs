@@ -16,7 +16,6 @@ use url::Url;
 
 pub fn url_to_transport_id(url: &Url) -> ConnectionId {
     String::from(url.path())
-    //url.as_str().to_string()
 }
 
 /// Gateway to a P2P network.

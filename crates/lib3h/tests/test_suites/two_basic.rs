@@ -40,6 +40,7 @@ pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
     // More process: Have Billy process P2p::PeerAddress of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     two_join_space(alex, billy, &SPACE_ADDRESS_A);
 
@@ -78,6 +79,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 
 ///
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
+    println!("\ntwo_join_space ({},{}) -> {}\n", alex.name, billy.name, space_address);
     // Alex joins space
     let req_id = alex.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -102,6 +104,8 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -284,8 +284,10 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     // More process: Have Billy process P2p::PeerAddress of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Alex joins space A
+    println!("\n Alex joins space \n");
     let mut track_space = SpaceData {
         request_id: "track_a_1".into(),
         space_address: SPACE_ADDRESS_A.clone(),
@@ -298,12 +300,16 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space A
+    println!("\n Billy joins space \n");
     track_space.agent_id = BILLY_AGENT_ID.clone();
     billy
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     // More process
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     println!("DONE basic_two_setup DONE \n\n\n");
@@ -320,6 +326,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         content: "wah".as_bytes().to_vec(),
     };
     // Send
+    println!("\nAlex sends DM to Billy...\n");
     alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -379,11 +386,13 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
         space_address: SPACE_ADDRESS_A.clone(),
         agent_id: ALEX_AGENT_ID.clone(),
     };
+    println!("\n Alex joins space \n");
     alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     // Billy joins space
+    println!("\n Billy joins space \n");
     track_space.agent_id = BILLY_AGENT_ID.clone();
     billy
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
@@ -396,6 +405,7 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
+    println!("\n Alex connects to Billy \n");
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -405,6 +415,10 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
     println!("connected_msg = {:?}", connected_msg);
     assert_eq!(connected_msg.uri, req_connect.peer_uri);
     // More process: Have Billy process P2p::PeerAddress of alex
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 

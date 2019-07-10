@@ -4,7 +4,6 @@ use crate::dht::{
 };
 use lib3h_protocol::{data_types::EntryData, Address, DidWork, Lib3hResult};
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::gateway;
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -295,7 +294,6 @@ impl MirrorDht {
                     );
                     let gossip_evt = GossipToData {
                         peer_address_list: vec![new_peer_data.peer_address.clone()],
-                        //peer_address_list: vec![new_peer_data.peer_uri.as_str().to_string()],
                         bundle: buf,
                     };
                     event_list.push(DhtEvent::GossipTo(gossip_evt));

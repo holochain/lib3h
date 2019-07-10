@@ -292,6 +292,13 @@ pub mod tests {
             bundle: gossip_to.bundle.clone(),
         };
         dht_b.post(DhtCommand::HandleGossip(remote_gossip)).unwrap();
+        let (did_work, event_list) = dht_b.process().unwrap();
+        assert!(did_work);
+        println!("event_list: {:?}", event_list);
+        assert_eq!(event_list.len(), 1);
+        let peer_to_hold = unwrap_to!(event_list[0] => DhtEvent::HoldPeerRequested);
+        // Hold requested peer
+        dht_b.post(DhtCommand::HoldPeer(peer_to_hold.clone())).unwrap();
         let (did_work, _) = dht_b.process().unwrap();
         assert!(did_work);
         // DHT B should have the data
