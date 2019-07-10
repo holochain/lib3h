@@ -13,8 +13,8 @@ macro_rules! assert_process_success {
             assert_eq!(response.request_id, $req);
         } else {
             if let Lib3hServerProtocol::FailureResult(response) = msg_1 {
-            let content = std::str::from_utf8(response.result_info.as_slice()).unwrap();
-            panic!("Received FailureResult: {}", content);
+                let content = std::str::from_utf8(response.result_info.as_slice()).unwrap();
+                panic!("Received FailureResult: {}", content);
             } else {
                 panic!("Received unexpected Protocol message type");
             }

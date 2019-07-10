@@ -119,47 +119,47 @@ fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock, _camille: &mut N
 
 /// Test SendDirectMessage and response
 fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock) {
-//    // A sends DM to B
-//    // ===============
-//    let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
-//    assert_process_success!(alex, req_id);
-//    // B should receive
-//    let (did_work, srv_msg_list) = billy.process().unwrap();
-//    assert!(did_work);
-//    assert_eq!(srv_msg_list.len(), 1);
-//    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
-//    assert_eq!(msg.request_id, req_id);
-//    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
-//    println!("HandleSendDirectMessage: {}", content);
-//    // C should not receive
-//    let (did_work, srv_msg_list) = camille.process().unwrap();
-//    assert!(!did_work);
-//    assert_eq!(srv_msg_list.len(), 0);
-//
-//    // Send response
-//    println!("\nBilly responds to Alex...\n");
-//    let response_content = format!("echo: {}", content).as_bytes().to_vec();
-//    billy.send_response(&req_id, &alex.agent_id, response_content.clone());
-//    assert_process_success!(billy, req_id);
-//    // A receives response
-//    let (did_work, srv_msg_list) = alex.process().unwrap();
-//    assert!(did_work);
-//    assert_eq!(srv_msg_list.len(), 1);
-//    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
-//    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
-//    println!("SendDirectMessageResult: {}", content);
-//    assert_eq!(msg.content, response_content);
-//    // C should not receive
-//    let (did_work, srv_msg_list) = camille.process().unwrap();
-//    assert!(!did_work);
-//    assert_eq!(srv_msg_list.len(), 0);
+    //    // A sends DM to B
+    //    // ===============
+    //    let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
+    //    assert_process_success!(alex, req_id);
+    //    // B should receive
+    //    let (did_work, srv_msg_list) = billy.process().unwrap();
+    //    assert!(did_work);
+    //    assert_eq!(srv_msg_list.len(), 1);
+    //    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
+    //    assert_eq!(msg.request_id, req_id);
+    //    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    //    println!("HandleSendDirectMessage: {}", content);
+    //    // C should not receive
+    //    let (did_work, srv_msg_list) = camille.process().unwrap();
+    //    assert!(!did_work);
+    //    assert_eq!(srv_msg_list.len(), 0);
+    //
+    //    // Send response
+    //    println!("\nBilly responds to Alex...\n");
+    //    let response_content = format!("echo: {}", content).as_bytes().to_vec();
+    //    billy.send_response(&req_id, &alex.agent_id, response_content.clone());
+    //    assert_process_success!(billy, req_id);
+    //    // A receives response
+    //    let (did_work, srv_msg_list) = alex.process().unwrap();
+    //    assert!(did_work);
+    //    assert_eq!(srv_msg_list.len(), 1);
+    //    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
+    //    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
+    //    println!("SendDirectMessageResult: {}", content);
+    //    assert_eq!(msg.content, response_content);
+    //    // C should not receive
+    //    let (did_work, srv_msg_list) = camille.process().unwrap();
+    //    assert!(!did_work);
+    //    assert_eq!(srv_msg_list.len(), 0);
 
     // C sends DM to A
     // ===============
     println!("\nCamille sends DM to Alex...\n");
     let req_id = camille.send_direct_message(&ALEX_AGENT_ID, "marco".as_bytes().to_vec());
-//    let (did_work, srv_msg_list) = camille.process().unwrap();
-//    println!("response({}): {:?}", did_work, srv_msg_list);
+    //    let (did_work, srv_msg_list) = camille.process().unwrap();
+    //    println!("response({}): {:?}", did_work, srv_msg_list);
     assert_process_success!(camille, req_id);
     // A should receive
     let (did_work, srv_msg_list) = alex.process().unwrap();

@@ -10,7 +10,9 @@ use crate::{
         dht_protocol::{self, *},
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID},
+    engine::{
+        p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
+    },
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
@@ -162,7 +164,11 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
         trace!("");
-        trace!("{} - RealEngine.process() START - {}", self.name, self.process_count);
+        trace!(
+            "{} - RealEngine.process() START - {}",
+            self.name,
+            self.process_count
+        );
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -171,7 +177,11 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
-        trace!("RealEngine.process() END - {} (outbox: {})\n", self.process_count, outbox.len());
+        trace!(
+            "RealEngine.process() END - {} (outbox: {})\n",
+            self.process_count,
+            outbox.len()
+        );
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }

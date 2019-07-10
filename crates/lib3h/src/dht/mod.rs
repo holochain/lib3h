@@ -265,7 +265,9 @@ pub mod tests {
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer
         let peer_b_data = dht_b.this_peer();
-        dht_a.post(DhtCommand::HoldPeer(peer_b_data.clone())).unwrap();
+        dht_a
+            .post(DhtCommand::HoldPeer(peer_b_data.clone()))
+            .unwrap();
         let (did_work, _) = dht_a.process().unwrap();
         assert!(did_work);
         // Add a second peer
@@ -298,7 +300,9 @@ pub mod tests {
         assert_eq!(event_list.len(), 1);
         let peer_to_hold = unwrap_to!(event_list[0] => DhtEvent::HoldPeerRequested);
         // Hold requested peer
-        dht_b.post(DhtCommand::HoldPeer(peer_to_hold.clone())).unwrap();
+        dht_b
+            .post(DhtCommand::HoldPeer(peer_to_hold.clone()))
+            .unwrap();
         let (did_work, _) = dht_b.process().unwrap();
         assert!(did_work);
         // DHT B should have the data

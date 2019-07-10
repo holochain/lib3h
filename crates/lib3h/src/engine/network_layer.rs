@@ -57,7 +57,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             DhtEvent::HoldPeerRequested(peer_data) => {
                 // #fullsync HACK
                 // Connect to every peer
-                info!("{} auto-connect to peer: {} ({})", self.name.clone(), peer_data.peer_address, peer_data.peer_uri);
+                info!(
+                    "{} auto-connect to peer: {} ({})",
+                    self.name.clone(),
+                    peer_data.peer_address,
+                    peer_data.peer_uri
+                );
                 //self.network_gateway.borrow_mut().connect(&peer_data.peer_uri);
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
@@ -198,12 +203,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         bundle: msg.bundle.clone(),
                     });
                     self.network_gateway.borrow_mut().post_dht(cmd)?;
-                    //Dht::post(&mut self.network_gateway.borrow_mut(), cmd);
+                //Dht::post(&mut self.network_gateway.borrow_mut(), cmd);
                 } else {
                     let space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                        .ok_or_else(|| format_err!("space_gateway not found: {}", msg.space_address))?;
+                        .ok_or_else(|| {
+                            format_err!("space_gateway not found: {}", msg.space_address)
+                        })?;
                     // Post it as a remoteGossipTo
                     let from_peer_address: String = msg.from_peer_address.clone().into();
                     let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {

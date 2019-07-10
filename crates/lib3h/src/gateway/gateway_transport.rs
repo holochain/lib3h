@@ -64,10 +64,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // Get connectionIds for the inner Transport.
         let mut conn_list = Vec::new();
         for dht_uri in dht_uri_list {
-            let net_uri = self
-                .connection_map
-                .get(&dht_uri)
-                .expect("unknown dht_uri");
+            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
             conn_list.push(net_uri);
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
@@ -203,7 +200,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportEvent::ConnectResult(id) => {
                 info!("({}) Connection opened id: {}", self.identifier.clone(), id);
                 let maybe_uri = self.get_uri(id);
-                if maybe_uri.is_none()  {
+                if maybe_uri.is_none() {
                     return Ok(());
                 }
                 let uri = maybe_uri.unwrap();
