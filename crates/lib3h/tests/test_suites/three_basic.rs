@@ -197,13 +197,13 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
 
 /// Test publish, Store, Query
 fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock) {
-    // author an entry without publishing it
-    println!("\nAlex broadcasts entry via AuthoringList...\n");
+    // Hold an entry without publishing it
+    println!("\nAlex broadcasts entry via GossipingList...\n");
     let entry_1 = alex
-        .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
+        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
         .unwrap();
-    // Reply to the publish_list request received from network module
-    alex.reply_to_first_HandleGetAuthoringEntryList();
+    // Reply to the GetList request received from network module
+    alex.reply_to_first_HandleGetGossipingEntryList();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
     // Should receive a HandleFetchEntry request from network module after receiving list
