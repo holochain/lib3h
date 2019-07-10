@@ -264,8 +264,8 @@ pub mod tests {
         let mut dht_a = new_dht(true, PEER_A);
         let mut dht_b = new_dht(true, PEER_B);
         // Add a peer
-        let peer_b_data = create_PeerData(PEER_B);
-        dht_a.post(DhtCommand::HoldPeer(peer_b_data)).unwrap();
+        let peer_b_data = dht_b.this_peer();
+        dht_a.post(DhtCommand::HoldPeer(peer_b_data.clone())).unwrap();
         let (did_work, _) = dht_a.process().unwrap();
         assert!(did_work);
         // Add a second peer
