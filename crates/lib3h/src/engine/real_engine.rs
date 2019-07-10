@@ -560,7 +560,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let peer_address: String = msg.to_agent_id.clone().into();
         let res = space_gateway.send(&[peer_address.as_str()], &payload);
         if let Err(e) = res {
-            // response.result_info = "Unknown receiver".as_bytes().to_vec();
             response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
         }

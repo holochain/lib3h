@@ -63,7 +63,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     peer_data.peer_address,
                     peer_data.peer_uri
                 );
-                //self.network_gateway.borrow_mut().connect(&peer_data.peer_uri);
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
@@ -195,28 +194,23 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
+                // Prepare remoteGossipTo to post to dht
+                let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
+                    from_peer_address: msg.from_peer_address.clone().into(),
+                    bundle: msg.bundle.clone(),
+                });
+                // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    // Post it as a remoteGossipTo
-                    let from_peer_address: String = msg.from_peer_address.clone().into();
-                    let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
-                        from_peer_address,
-                        bundle: msg.bundle.clone(),
-                    });
                     self.network_gateway.borrow_mut().post_dht(cmd)?;
                 //Dht::post(&mut self.network_gateway.borrow_mut(), cmd);
                 } else {
+                    // otherwise should be for one of our space
                     let space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
                         .ok_or_else(|| {
                             format_err!("space_gateway not found: {}", msg.space_address)
                         })?;
-                    // Post it as a remoteGossipTo
-                    let from_peer_address: String = msg.from_peer_address.clone().into();
-                    let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
-                        from_peer_address,
-                        bundle: msg.bundle.clone(),
-                    });
                     space_gateway.post_dht(cmd)?;
                     // Dht::post(&mut space_gateway, cmd);
                 }
