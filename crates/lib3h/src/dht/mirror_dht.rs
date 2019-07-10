@@ -232,7 +232,6 @@ impl MirrorDht {
                         return Ok(vec![]);
                     }
                     MirrorGossip::Peer(peer) => {
-                        // let is_new = self.add_peer(&peer);
                         let maybe_peer = self.get_peer(&peer.peer_address);
                         if maybe_peer.is_none() {
                             return Ok(vec![DhtEvent::HoldPeerRequested(peer)]);

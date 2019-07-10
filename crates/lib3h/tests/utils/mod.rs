@@ -9,15 +9,13 @@ macro_rules! assert_process_success {
         assert!(did_work);
         assert_eq!(srv_msg_list.len(), 1);
         let msg_1 = &srv_msg_list[0];
-        if let Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-            assert_eq!(response.request_id, $req);
-        } else {
-            if let Lib3hServerProtocol::FailureResult(response) = msg_1 {
+        match msg_1 {
+            Lib3hServerProtocol::SuccessResult(response) => assert_eq!(response.request_id, $req),
+            Lib3hServerProtocol::FailureResult(response) => {
                 let content = std::str::from_utf8(response.result_info.as_slice()).unwrap();
                 panic!("Received FailureResult: {}", content);
-            } else {
-                panic!("Received unexpected Protocol message type");
             }
+            _ => panic!("Received unexpected Protocol message type"),
         }
     };
 }
