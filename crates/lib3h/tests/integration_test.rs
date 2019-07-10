@@ -83,7 +83,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}//{}", fn_name, name).as_str()).unwrap(),
+        bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)

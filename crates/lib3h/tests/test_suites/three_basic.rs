@@ -32,7 +32,7 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("connected_msg = {:?}", connected_msg);
+    println!("[Alex] connected_msg = {:?}\n", connected_msg);
     assert_eq!(&connected_msg.uri, &billy.advertise());
     // More process: Have Billy process P2p::PeerAddress of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
@@ -44,15 +44,29 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("connected_msg = {:?}", connected_msg);
+    println!("[Camille] connected_msg = {:?}\n", connected_msg);
     assert_eq!(&connected_msg.uri, &billy.advertise());
     // More process: Have Billy process P2p::PeerAddress of Camille
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
 
+    // Extra processing required for auto-handshaking
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = camille.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    let (_did_work, _srv_msg_list) = camille.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    let (_did_work, _srv_msg_list) = camille.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
     // Space joining
     // =============
     // Alex joins space
+    println!("\n Alex joins space \n");
     let req_id = alex.join_space(&SPACE_ADDRESS_A, true).unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
@@ -65,6 +79,7 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space
+    println!("\n Billy joins space \n");
     let req_id = billy.join_space(&SPACE_ADDRESS_A, true).unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -79,6 +94,7 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Camille joins space
+    println!("\n Camille joins space \n");
     let req_id = camille.join_space(&SPACE_ADDRESS_A, true).unwrap();
     let (did_work, srv_msg_list) = camille.process().unwrap();
     assert!(did_work);
@@ -89,6 +105,8 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     });
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = camille.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 

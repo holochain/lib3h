@@ -10,7 +10,7 @@ use crate::{
         dht_protocol::{self, *},
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys},
+    engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID},
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
@@ -100,7 +100,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
         };
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
-            "__memory_network__",
+            NETWORK_GATEWAY_ID,
             Rc::clone(&network_transport),
             dht_factory,
             &dht_config,
@@ -544,11 +544,11 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
         // Send
-        let conn_id: String = msg.to_agent_id.clone().into();
-        // trace!("{} -- sending to connection id {}", self.name.clone(), conn_id);
-        let res = space_gateway.send(&[conn_id.as_str()], &payload);
-        if let Err(_) = res {
-            response.result_info = "Unknown receiver".as_bytes().to_vec();
+        let peer_address: String = msg.to_agent_id.clone().into();
+        let res = space_gateway.send(&[peer_address.as_str()], &payload);
+        if let Err(e) = res {
+            // response.result_info = "Unknown receiver".as_bytes().to_vec();
+            response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
         }
         Lib3hServerProtocol::SuccessResult(response)

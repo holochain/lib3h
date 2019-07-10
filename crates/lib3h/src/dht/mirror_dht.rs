@@ -4,6 +4,7 @@ use crate::dht::{
 };
 use lib3h_protocol::{data_types::EntryData, Address, DidWork, Lib3hResult};
 use std::collections::{HashMap, HashSet, VecDeque};
+use crate::gateway;
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -247,7 +248,7 @@ impl MirrorDht {
                 return Ok(vec![DhtEvent::EntryDataRequested(fetch_entry.clone())]);
             }
             // Owner is asking us to hold a peer info
-            DhtCommand::HoldPeer(msg) => {
+            DhtCommand::HoldPeer(new_peer_data) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let peer_address_list: Vec<String> = self
                     .get_peer_list()
@@ -255,7 +256,7 @@ impl MirrorDht {
                     .map(|pi| pi.peer_address.clone())
                     .collect();
                 // Store it
-                let received_new_content = self.add_peer(msg);
+                let received_new_content = self.add_peer(new_peer_data);
                 // Bail if peer is known and up to date.
                 if !received_new_content {
                     return Ok(vec![]);
@@ -264,7 +265,7 @@ impl MirrorDht {
                 // Gossip to everyone to also hold it
                 let peer = self
                     .peer_list
-                    .get(&msg.peer_address)
+                    .get(&new_peer_data.peer_address)
                     .expect("Should have peer by now");
                 let peer_gossip = MirrorGossip::Peer(peer.clone());
                 let mut buf = Vec::new();
@@ -278,9 +279,9 @@ impl MirrorDht {
                 };
                 event_list.push(DhtEvent::GossipTo(gossip_evt));
 
-                // Gossip back your own PeerData
+                // Gossip back your own PeerData (but not to yourself)
                 let peer = self.this_peer();
-                if msg.peer_address != peer.peer_address {
+                if new_peer_data.peer_address != peer.peer_address {
                     let peer_gossip = MirrorGossip::Peer(peer.clone());
                     let mut buf = Vec::new();
                     peer_gossip
@@ -289,14 +290,40 @@ impl MirrorDht {
                     trace!(
                         "@MirrorDht@ gossiping peer back: {:?} | to: {}",
                         peer,
-                        msg.peer_address
+                        new_peer_data.peer_address
                     );
                     let gossip_evt = GossipToData {
-                        peer_address_list: vec![msg.peer_address.clone()],
+                        peer_address_list: vec![new_peer_data.peer_address.clone()],
+                        //peer_address_list: vec![new_peer_data.peer_uri.as_str().to_string()],
                         bundle: buf,
                     };
                     event_list.push(DhtEvent::GossipTo(gossip_evt));
                 }
+
+//                // Gossip back all known PeerData (but not to yourself)
+//                for (cur_peer_address, cur_peer_data) in self.peer_list.iter() {
+//                    if &new_peer_data.peer_address == cur_peer_address {
+//                        continue;
+//                    }
+//                    let peer_gossip = MirrorGossip::Peer(cur_peer_data.clone());
+//                    let mut buf = Vec::new();
+//                    peer_gossip
+//                        .serialize(&mut Serializer::new(&mut buf))
+//                        .unwrap();
+//                    trace!(
+//                        "@MirrorDht@ gossiping peer_data back: {:?} | to: {}",
+//                        cur_peer_address,
+//                        new_peer_data.peer_address
+//                    );
+//                    let gossip_evt = GossipToData {
+//                        // peer_address_list: vec![new_peer_data.peer_uri.clone()],
+//                        peer_address_list: vec![new_peer_data.peer_uri.as_str().to_string()],
+//                        bundle: buf,
+//                    };
+//                    event_list.push(DhtEvent::GossipTo(gossip_evt));
+//                }
+
+
                 // Done
                 Ok(event_list)
             }

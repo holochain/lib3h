@@ -20,6 +20,8 @@ use url::Url;
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
+pub static  NETWORK_GATEWAY_ID: &'static str = "__memory_network__";
+
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {

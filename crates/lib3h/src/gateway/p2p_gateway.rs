@@ -26,10 +26,13 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         // HACK: Add fake reverse on HoldPeer
         if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
             // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
-            self.connection_map.insert(
+            let previous = self.connection_map.insert(
                 peer_data.peer_uri.clone(),
                 gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
             );
+            if let Some(previous_cId) = previous {
+                warn!("Replaced connectionId[{}] = {}", peer_data.peer_uri.clone(), previous_cId);
+            }
         }
         // HACK END
         self.inner_dht.post(cmd)

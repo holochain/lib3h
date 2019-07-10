@@ -67,7 +67,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             let net_uri = self
                 .connection_map
                 .get(&dht_uri)
-                .expect("unknown dht_transport");
+                .expect("unknown dht_uri");
             conn_list.push(net_uri);
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
@@ -137,7 +137,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             outbox.append(&mut event_list);
         }
         // Handle TransportEvents
-        for evt in outbox.clone() {
+        for evt in outbox.clone().iter().rev() {
             self.handle_TransportEvent(&evt)?;
         }
         Ok((did_work, outbox))
@@ -202,31 +202,33 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportEvent::ConnectResult(id) => {
                 info!("({}) Connection opened id: {}", self.identifier.clone(), id);
-                if let Some(uri) = self.get_uri(id) {
-                    trace!(
-                        "(GatewayTransport).ConnectResult: mapping {} -> {}",
-                        uri,
-                        id
-                    );
-                    self.connection_map.insert(uri, id.clone());
-                    // Ok(conn_id)
-
-                    // Send to other node our PeerAddress
-                    let our_peer_address = P2pProtocol::PeerAddress(
-                        self.identifier().to_string(),
-                        self.this_peer().clone().peer_address,
-                    );
-                    let mut buf = Vec::new();
-                    our_peer_address
-                        .serialize(&mut Serializer::new(&mut buf))
-                        .unwrap();
-                    trace!(
-                        "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
-                        our_peer_address,
-                        id
-                    );
-                    self.inner_transport.borrow_mut().send(&[&id], &buf)?;
+                let maybe_uri = self.get_uri(id);
+                if maybe_uri.is_none()  {
+                    return Ok(());
                 }
+                let uri = maybe_uri.unwrap();
+                trace!(
+                    "(GatewayTransport).ConnectResult: mapping {} -> {}",
+                    uri,
+                    id
+                );
+                self.connection_map.insert(uri, id.clone());
+
+                // Send to other node our PeerAddress
+                let our_peer_address = P2pProtocol::PeerAddress(
+                    self.identifier().to_string(),
+                    self.this_peer().clone().peer_address,
+                );
+                let mut buf = Vec::new();
+                our_peer_address
+                    .serialize(&mut Serializer::new(&mut buf))
+                    .unwrap();
+                trace!(
+                    "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
+                    our_peer_address,
+                    id
+                );
+                self.inner_transport.borrow_mut().send(&[&id], &buf)?;
             }
             TransportEvent::Connection(_id) => {
                 // TODO!!
