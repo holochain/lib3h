@@ -568,24 +568,25 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     /// Destroy gateway for this agent in this space, if part of it.
     /// Respond with FailureResult if space was not already joined.
-    /// Must not already be part of this space.
     fn serve_LeaveSpace(&mut self, join_msg: &SpaceData) -> Lib3hServerProtocol {
-        // Prepare response
-        let mut res = GenericResultData {
+        // Try remove
+        let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
+        let res = self.space_gateway_map.remove(&chain_id);
+        // Create response according to remove result
+        let response = GenericResultData {
             request_id: join_msg.request_id.clone(),
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
-            result_info: vec![],
+            result_info: match res {
+                None => "Agent is not part of the space".to_string().into_bytes(),
+                Some(_) => vec![],
+            },
         };
-        // Bail if space not joined by agent
-        let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
-        if !self.space_gateway_map.contains_key(&chain_id) {
-            res.result_info = "Agent is not part of the space".to_string().into_bytes();
-            return Lib3hServerProtocol::FailureResult(res);
-        }
-        self.space_gateway_map.remove(&chain_id).unwrap();
         // Done
-        Lib3hServerProtocol::SuccessResult(res)
+        match res {
+            None => Lib3hServerProtocol::FailureResult(response),
+            Some(_) => Lib3hServerProtocol::SuccessResult(response),
+        }
     }
 
     /// Get a space_gateway for the specified space+agent.
