@@ -254,7 +254,8 @@ impl Transport for TransportMemory {
                 self.maybe_my_uri.clone().unwrap()
             );
             if let Ok(id) = self.connect(&uri) {
-                outbox.push(TransportEvent::ConnectResult(id));
+                // Note: Push ConnectResult at start of outbox so they are processed first.
+                outbox.insert(0, TransportEvent::ConnectResult(id));
             }
         }
         Ok((did_work, outbox))

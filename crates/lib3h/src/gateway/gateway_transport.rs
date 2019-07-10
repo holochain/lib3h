@@ -134,7 +134,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             outbox.append(&mut event_list);
         }
         // Handle TransportEvents
-        for evt in outbox.clone().iter().rev() {
+        for evt in outbox.clone().iter() {
             self.handle_TransportEvent(&evt)?;
         }
         Ok((did_work, outbox))
