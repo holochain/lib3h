@@ -49,16 +49,10 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     // More process: Have Billy process P2p::PeerAddress of Camille
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
-
-    // Extra processing required for auto-handshaking
+    // More process so Camille can handshake with billy
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
-
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
@@ -77,6 +71,7 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     });
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = camille.process().unwrap();
 
     // Billy joins space
     println!("\n Billy joins space \n");
@@ -92,6 +87,7 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Camille joins space
     println!("\n Camille joins space \n");
@@ -105,10 +101,11 @@ pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mu
     });
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
+    let (_did_work, _srv_msg_list) = camille.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     println!("DONE setup_three_nodes() DONE \n\n\n");
 }

@@ -114,7 +114,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             DhtEvent::GossipUnreliablyTo(_data) => {
                 // FIXME
             }
-            DhtEvent::HoldPeerRequested(_peer_address) => {
+            DhtEvent::HoldPeerRequested(_peer_data) => {
                 // FIXME or have engine handle it?
             }
             DhtEvent::PeerTimedOut(_data) => {

@@ -58,12 +58,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // #fullsync HACK
                 // Connect to every peer
                 info!("{} auto-connect to peer: {} ({})", self.name.clone(), peer_data.peer_address, peer_data.peer_uri);
-                // self.network_gateway.borrow_mut().connect(&peer_data.peer_uri);
+                //self.network_gateway.borrow_mut().connect(&peer_data.peer_uri);
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
-                //Transport::post(&mut self.network_gateway.borrow_mut(), cmd);
-                let mut net_gate = self.network_gateway.borrow_mut();
-                // self.network_gateway.borrow_mut().post(cmd);
-                Transport::post(&mut net_gate, cmd);
+                Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             DhtEvent::PeerTimedOut(_data) => {
                 // FIXME

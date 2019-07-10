@@ -73,6 +73,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
+            process_count: 0,
         })
     }
 }
@@ -122,6 +123,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
+            process_count: 0,
         })
     }
 }
@@ -158,8 +160,9 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        self.process_count += 1;
         trace!("");
-        trace!("{} - RealEngine.process() START", self.name);
+        trace!("{} - RealEngine.process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -168,7 +171,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
-        trace!("RealEngine.process() END - (outbox: {})\n", outbox.len());
+        trace!("RealEngine.process() END - {} (outbox: {})\n", self.process_count, outbox.len());
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }

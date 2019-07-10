@@ -70,4 +70,6 @@ pub struct RealEngine<T: Transport, D: Dht> {
     #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
     transport_keys: TransportKeys,
+    /// debug: count number of calls to process()
+    process_count: u64,
 }
