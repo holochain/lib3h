@@ -1,12 +1,12 @@
-.PHONY: all test fmt clean
+# Top-Level Environment Switcher
+# This will delegate to sub Makefile.* files
 
-all: test
+.PHONY: all
 
-test:
-	nix-shell --run l3h-test
-
-fmt:
-	nix-shell --run hn-rust-fmt
-
-clean:
-	nix-shell --run hn-flush
+export
+all:
+ifeq ($(MAKE_ENV),local)
+	$(MAKE) -f Makefile.local
+else
+	$(MAKE) -f Makefile.nix
+endif
