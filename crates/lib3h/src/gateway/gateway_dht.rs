@@ -32,6 +32,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+        // TODO #179
         self.inner_dht.post(cmd)
     }
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {

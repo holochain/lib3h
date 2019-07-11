@@ -238,7 +238,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportEvent::Received(id, payload) => {
                 debug!("Received message from: {}", id);
-                // debug!("Deserialize msg: {:?}", payload);
+                // trace!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
