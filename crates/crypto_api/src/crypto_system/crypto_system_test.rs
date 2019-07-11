@@ -15,6 +15,7 @@ impl FullSuite {
     pub fn run(&self) {
         self.test_sec_buf();
         self.test_random();
+        self.test_pwhash();
         self.test_sign_keypair_sizes();
         self.test_sign_keypair_generation();
         self.test_sign();
@@ -52,6 +53,18 @@ impl FullSuite {
         self.crypto.randombytes_buf(&mut b).unwrap();
         assert_ne!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", a));
         assert_ne!(&format!("{:?}", a), &format!("{:?}", b));
+    }
+
+    fn test_pwhash(&self) {
+        let mut pw: Box<dyn Buffer> = Box::new(vec![0; 16]);
+        self.crypto.randombytes_buf(&mut pw).unwrap();
+        let mut salt: Box<dyn Buffer> = Box::new(vec![0; self.crypto.pwhash_salt_bytes()]);
+        self.crypto.randombytes_buf(&mut salt).unwrap();
+        let mut hash1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.pwhash_bytes()]);
+        self.crypto.pwhash(&mut hash1, &pw, &salt).unwrap();
+        let mut hash2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.pwhash_bytes()]);
+        self.crypto.pwhash(&mut hash2, &pw, &salt).unwrap();
+        assert_eq!(&format!("{:?}", hash1), &format!("{:?}", hash2));
     }
 
     fn test_sign_keypair_sizes(&self) {
@@ -247,6 +260,38 @@ mod test {
             for i in 0..buffer.len() {
                 buffer[i] = rand::random();
             }
+
+            Ok(())
+        }
+
+        fn pwhash_salt_bytes(&self) -> usize {
+            8
+        }
+        fn pwhash_bytes(&self) -> usize {
+            16
+        }
+
+        fn pwhash(
+            &self,
+            hash: &mut Box<dyn Buffer>,
+            password: &Box<dyn Buffer>,
+            salt: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if hash.len() != self.pwhash_bytes() {
+                return Err(CryptoError::BadHashSize);
+            }
+
+            if salt.len() != self.pwhash_salt_bytes() {
+                return Err(CryptoError::BadSaltSize);
+            }
+
+            hash.write(0, &salt.read_lock())?;
+            let plen = if password.len() > 8 {
+                8
+            } else {
+                password.len()
+            };
+            hash.write(8, &password.read_lock()[0..plen])?;
 
             Ok(())
         }

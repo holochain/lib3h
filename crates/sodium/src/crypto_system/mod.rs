@@ -46,11 +46,29 @@
 /// ```
 #[derive(Clone)]
 pub struct SodiumCryptoSystem {
-    config: SodiumCryptoSystemConfig,
+    pwhash_ops_limit: libc::c_ulonglong,
+    pwhash_mem_limit: usize,
+    pwhash_alg: libc::c_int,
 }
 
-#[derive(Clone)]
-struct SodiumCryptoSystemConfig {}
+pub const PWHASH_OPSLIMIT_INTERACTIVE: libc::c_ulonglong =
+    rust_sodium_sys::crypto_pwhash_OPSLIMIT_INTERACTIVE as libc::c_ulonglong;
+pub const PWHASH_OPSLIMIT_MODERATE: libc::c_ulonglong =
+    rust_sodium_sys::crypto_pwhash_OPSLIMIT_MODERATE as libc::c_ulonglong;
+pub const PWHASH_OPSLIMIT_SENSITIVE: libc::c_ulonglong =
+    rust_sodium_sys::crypto_pwhash_OPSLIMIT_SENSITIVE as libc::c_ulonglong;
+
+pub const PWHASH_MEMLIMIT_INTERACTIVE: usize =
+    rust_sodium_sys::crypto_pwhash_MEMLIMIT_INTERACTIVE as usize;
+pub const PWHASH_MEMLIMIT_MODERATE: usize =
+    rust_sodium_sys::crypto_pwhash_MEMLIMIT_MODERATE as usize;
+pub const PWHASH_MEMLIMIT_SENSITIVE: usize =
+    rust_sodium_sys::crypto_pwhash_MEMLIMIT_SENSITIVE as usize;
+
+pub const PWHASH_ALG_ARGON2I13: libc::c_int =
+    rust_sodium_sys::crypto_pwhash_ALG_ARGON2I13 as libc::c_int;
+pub const PWHASH_ALG_ARGON2ID13: libc::c_int =
+    rust_sodium_sys::crypto_pwhash_ALG_ARGON2ID13 as libc::c_int;
 
 use crate::check_init;
 
@@ -58,8 +76,30 @@ impl SodiumCryptoSystem {
     pub fn new() -> Self {
         check_init();
         Self {
-            config: SodiumCryptoSystemConfig {},
+            pwhash_ops_limit: PWHASH_OPSLIMIT_SENSITIVE,
+            pwhash_mem_limit: PWHASH_MEMLIMIT_SENSITIVE,
+            pwhash_alg: PWHASH_ALG_ARGON2ID13,
         }
+    }
+
+    pub fn set_pwhash_opslimit(mut self, opslimit: libc::c_ulonglong) -> Self {
+        self.pwhash_ops_limit = opslimit;
+        self
+    }
+
+    pub fn set_pwhash_memlimit(mut self, memlimit: usize) -> Self {
+        self.pwhash_mem_limit = memlimit;
+        self
+    }
+
+    pub fn set_pwhash_alg(mut self, alg: libc::c_int) -> Self {
+        self.pwhash_alg = alg;
+        self
+    }
+
+    pub fn set_pwhash_interactive(mut self) -> Self {
+        self.set_pwhash_opslimit(PWHASH_OPSLIMIT_INTERACTIVE)
+            .set_pwhash_memlimit(PWHASH_MEMLIMIT_INTERACTIVE)
     }
 }
 
@@ -87,6 +127,50 @@ impl CryptoSystem for SodiumCryptoSystem {
             rust_sodium_sys::randombytes_buf(raw_ptr_void!(buffer), buffer.len());
         }
         Ok(())
+    }
+
+    fn pwhash_salt_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
+    }
+    fn pwhash_bytes(&self) -> usize {
+        32
+    }
+
+    fn pwhash(
+        &self,
+        hash: &mut Box<dyn Buffer>,
+        password: &Box<dyn Buffer>,
+        salt: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if hash.len() != self.pwhash_bytes() {
+            return Err(CryptoError::BadHashSize);
+        }
+
+        if salt.len() != self.pwhash_salt_bytes() {
+            return Err(CryptoError::BadSaltSize);
+        }
+
+        let mut hash = hash.write_lock();
+        let password = password.read_lock();
+        let salt = salt.read_lock();
+
+        let res = unsafe {
+            rust_sodium_sys::crypto_pwhash(
+                raw_ptr_char!(hash),
+                hash.len() as libc::c_ulonglong,
+                raw_ptr_ichar_immut!(password),
+                password.len() as libc::c_ulonglong,
+                raw_ptr_char_immut!(salt),
+                self.pwhash_ops_limit,
+                self.pwhash_mem_limit,
+                self.pwhash_alg,
+            )
+        };
+        match res {
+            0 => Ok(()),
+            -1 => Err(CryptoError::OutOfMemory),
+            _ => unreachable!(),
+        }
     }
 
     fn sign_seed_bytes(&self) -> usize {
@@ -224,7 +308,8 @@ mod test {
 
     #[test]
     fn sodium_should_pass_crypto_system_full_suite() {
-        let crypto: Box<dyn CryptoSystem> = Box::new(SodiumCryptoSystem::new());
+        let crypto: Box<dyn CryptoSystem> =
+            Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
         crypto_system_test::full_suite(crypto);
     }
 }

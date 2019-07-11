@@ -7,6 +7,8 @@ pub enum CryptoError {
     OutputLength(String),
     OutOfMemory,
     WriteOverflow,
+    BadHashSize,
+    BadSaltSize,
     BadSeedSize,
     BadPublicKeySize,
     BadSecretKeySize,
