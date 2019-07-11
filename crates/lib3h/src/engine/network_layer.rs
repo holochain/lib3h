@@ -49,14 +49,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::HoldPeerRequested(peer_data) => {
-                // #fullsync HACK
-                // Connect to every peer
+                // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
+                // Connect to every peer we are requested to hold.
                 info!(
                     "{} auto-connect to peer: {} ({})",
                     self.name.clone(),
@@ -67,19 +67,19 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             DhtEvent::PeerTimedOut(_data) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::HoldEntryRequested(_from, _entry) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::FetchEntryResponse(_data) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::EntryPruned(_address) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::EntryDataRequested(_) => {
-                // FIXME
+                // no-op
             }
         }
         Ok(outbox)
@@ -104,7 +104,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
-                        network_id: "FIXME".to_string(),
+                        network_id: "FIXME".to_string(), // TODO #172
                     };
                     outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
@@ -114,7 +114,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 if let Some(uri) = network_gateway.get_uri(id) {
                     info!("Network Connection opened: {} ({})", id, uri);
 
-                    // FIXME: Do this in next process instead
+                    // TODO #150 - Should do this in next process instead
                     // Send to other node our Joined Spaces
                     let space_list = self.get_all_spaces();
                     let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
@@ -141,12 +141,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         );
                         network_gateway.send(&[&peer_data.peer_address], &buf)?;
                     }
-                    // FIXME END
+                    // TODO END
 
                     // Output a Lib3hServerProtocol::Connected if its the first connection
                     if self.network_connections.is_empty() {
                         let data = ConnectedData {
-                            request_id: "FIXME".to_string(),
+                            request_id: "FIXME".to_string(), // TODO #173
                             uri,
                         };
                         outbox.push(Lib3hServerProtocol::Connected(data));
@@ -155,7 +155,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             TransportEvent::Connection(_id) => {
-                // TODO!!!
+                // TODO #159
                 unimplemented!();
             }
             TransportEvent::Closed(id) => {
@@ -163,7 +163,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
-                        network_id: "FIXME".to_string(),
+                        network_id: "FIXME".to_string(), // TODO #172
                     };
                     outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
@@ -186,6 +186,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     /// Serve a P2pProtocol sent to us by the network.
     /// Return a list of Lib3hServerProtocol to send to Core.
+    /// TODO #150
     fn serve_P2pProtocol(
         &mut self,
         _from_id: &ConnectionIdRef,
@@ -220,16 +221,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     dm_data.space_address.to_owned(),
                     dm_data.to_agent_id.to_owned(),
                 ));
-                //
-                if let Some(_space_gateway) = maybe_space_gateway {
-                    // TODO: check if we know sender?
-                    //  let sender_address = std::string::String::from_utf8_lossy(&dm_data.from_agent_id).to_string();
-                    //  let maybe_sender = _space_gateway.get_peer(sender_address);
+                if let Some(_) = maybe_space_gateway {
                     // Change into Lib3hServerProtocol
                     let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(dm_data.clone());
                     outbox.push(lib3_msg);
                 } else {
-                    warn!("Received message from unjoined space");
+                    warn!("Received message from unjoined space: {}", dm_data.space_address);
                 }
             }
             P2pProtocol::DirectMessageResult(dm_data) => {
@@ -237,35 +234,22 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     dm_data.space_address.to_owned(),
                     dm_data.to_agent_id.to_owned(),
                 ));
-                //
-                if let Some(_space_gateway) = maybe_space_gateway {
-                    // TODO: check if we know sender?
-                    //  let sender_address = std::string::String::from_utf8_lossy(&dm_data.from_agent_id).to_string();
-                    //  let maybe_sender = _space_gateway.get_peer(sender_address);
-                    // Change into Lib3hServerProtocol
+                if let Some(_) = maybe_space_gateway {
                     let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(dm_data.clone());
                     outbox.push(lib3_msg);
                 } else {
-                    warn!("Received message from unjoined space");
+                    warn!("Received message from unjoined space: {}", dm_data.space_address);
                 }
             }
-            P2pProtocol::FetchData => {
-                // FIXME
-            }
-            P2pProtocol::FetchDataResponse => {
-                // FIXME
-            }
             P2pProtocol::PeerAddress(_, _) => {
-                // FIXME
+                // no-op
             }
-            // HACK
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
                 }
             }
-            // HACK
             P2pProtocol::AllJoinedSpaceList(join_list) => {
                 debug!("Received AllJoinedSpaceList: {:?}", join_list);
                 for (space_address, peer_data) in join_list {

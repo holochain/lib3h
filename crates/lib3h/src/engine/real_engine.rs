@@ -132,15 +132,15 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
 
 impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     fn run(&self) -> Lib3hResult<()> {
-        // FIXME
+        // TODO #159
         Ok(())
     }
     fn stop(&self) -> Lib3hResult<()> {
-        // FIXME
+        // TODO #159
         Ok(())
     }
     fn terminate(&self) -> Lib3hResult<()> {
-        // FIXME
+        // TODO #159
         Ok(())
     }
 
@@ -216,10 +216,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         // Note: use same order as the enum
         match client_msg {
             Lib3hClientProtocol::SuccessResult(_msg) => {
-                // FIXME
+                // TODO #168
             }
             Lib3hClientProtocol::FailureResult(_msg) => {
-                // FIXME
+                // TODO #168
             }
             Lib3hClientProtocol::Connect(msg) => {
                 // Convert into TransportCommand & post to network gateway
@@ -243,7 +243,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 outbox.push(srv_msg);
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
-                // FIXME
+                // TODO #169
             }
             // HandleFetchEntryResult:
             //   - From GetAuthoringList      : Convert to DhtCommand::BroadcastEntry
@@ -258,7 +258,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        // TODO: create a rust equivalent of
+                        // TODO #168 - create a rust equivalent of
                         // https://github.com/holochain/n3h/blob/master/lib/n3h-common/track.js
                         if msg.request_id == "__author_list" {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
@@ -311,7 +311,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             // QueryEntry: Converting to DHT FetchEntry for now
-            // TODO: make actual use of the query field
+            // TODO #169
             Lib3hClientProtocol::QueryEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -333,7 +333,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             // HandleQueryEntryResult: Convert into DhtCommand::ProvideEntryResponse
-            // TODO use actual query data
+            // TODO #169
             Lib3hClientProtocol::HandleQueryEntryResult(msg) => {
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
@@ -454,7 +454,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let agent_id: String = join_msg.agent_id.clone().into();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport =
-            // TODO encapsulate this conversion logic
+            // TODO #175 - encapsulate this conversion logic
             Url::parse(format!("transport:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
@@ -469,7 +469,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             &dht_config,
         );
 
-        // HACK: Send JoinSpace to all known peers
+        // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
         let peer = new_space_gateway.this_peer().to_owned();
         let mut payload = Vec::new();
@@ -484,7 +484,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             peer.peer_address
         );
         self.network_gateway.borrow_mut().send_all(&payload).ok();
-        // HACK END
+        // TODO END
 
         // Add it to space map
         self.space_gateway_map
@@ -496,7 +496,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             DhtCommand::HoldPeer(PeerData {
                 peer_address: dht_config.this_peer_address,
                 peer_uri: dht_config.this_peer_uri,
-                timestamp: 42, // FIXME
+                timestamp: 42, // TODO #166
             }),
         )?;
         // Send Get*Lists requests

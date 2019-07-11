@@ -21,11 +21,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
     }
-    /// Hack: explicit post because of dumb rust compiler
+    /// TODO #179  - using an explicit post for dht because of dumb rust compiler
     pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        // HACK: Add fake reverse on HoldPeer
         if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
-            // println!("ADDIND FAKE REVERSE: {}", peer_data.transport.clone());
             let previous = self.connection_map.insert(
                 peer_data.peer_uri.clone(),
                 gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
@@ -38,7 +36,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 );
             }
         }
-        // HACK END
         self.inner_dht.post(cmd)
     }
 }

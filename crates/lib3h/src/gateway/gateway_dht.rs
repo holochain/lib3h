@@ -34,7 +34,6 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         self.inner_dht.post(cmd)
     }
-    /// FIXME: should P2pGateway `post() & process()` its inner dht?
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         // Process the dht
         let (did_work, dht_event_list) = self.inner_dht.process()?;
@@ -63,7 +62,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
                 for to_peer_address in data.peer_address_list {
-                    // HACK: (should not gossip to self in the first place)
+                    // FIXME: should not gossip to self in the first place
                     let me = &self.inner_dht.this_peer().peer_address;
                     if &to_peer_address == me {
                         continue;
@@ -104,25 +103,25 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
-                // FIXME
+                // TODO #171
             }
             DhtEvent::HoldPeerRequested(_peer_data) => {
-                // FIXME or have engine handle it?
+                // no-op
             }
             DhtEvent::PeerTimedOut(_data) => {
-                // FIXME
+                // TODO #159
             }
             DhtEvent::HoldEntryRequested(_from, _data) => {
-                // N/A - Have engine handle it
+                // no-op
             }
             DhtEvent::FetchEntryResponse(_data) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::EntryPruned(_address) => {
-                // FIXME
+                // no-op
             }
             DhtEvent::EntryDataRequested(_) => {
-                // FIXME
+                // no-op
             }
         }
         Ok(())

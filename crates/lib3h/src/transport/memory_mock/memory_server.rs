@@ -111,7 +111,7 @@ impl MemoryServer {
             )));
         }
         self.connection_ids.remove(&id.to_string());
-        // TODO: Should we process here whatever is left in the inbox?
+        // TODO #159 - Maybe process here whatever is left in the inbox?
         Ok(())
     }
 

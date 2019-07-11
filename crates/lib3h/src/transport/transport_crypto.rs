@@ -14,7 +14,7 @@ pub struct TransportCrypto<T: Transport> {
 }
 
 /// Constructor
-/// FIXME: Consume inner_tranport or have it be a reference?
+/// TODO #177 - Consume inner_tranport or have it be a reference?
 impl<T: Transport> TransportCrypto<T> {
     pub fn new(inner_transport: T) -> Self {
         TransportCrypto { inner_transport }
@@ -22,7 +22,7 @@ impl<T: Transport> TransportCrypto<T> {
 }
 
 /// Implement Transport trait by composing inner transport
-/// FIXME passthrough for now
+/// TODO #177 - passthrough for now
 impl<T: Transport> Transport for TransportCrypto<T> {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         self.inner_transport.connect(&uri)

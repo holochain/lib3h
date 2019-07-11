@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use url::Url;
 
 /// RedRibbon DHT implementation
+/// TODO #167
 pub struct RrDht {
     /// FIFO of DhtCommands send to us
     inbox: VecDeque<DhtCommand>,
@@ -18,7 +19,7 @@ impl RrDht {
             this_peer: PeerData {
                 peer_address: "FIXME".to_string(),
                 peer_uri: Url::parse("fixme://host:123").expect("a valid transport url"),
-                timestamp: 0, // FIXME
+                timestamp: 0, // TODO #166
             },
         }
     }
@@ -62,7 +63,6 @@ impl Dht for RrDht {
         Ok(())
     }
 
-    // FIXME
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
         let outbox = Vec::new();
         let mut did_work = false;
@@ -73,6 +73,7 @@ impl Dht for RrDht {
             };
             did_work = true;
             trace!("RrDht.process(): {:?}", cmd)
+            // FIXME
         }
         Ok((did_work, outbox))
     }

@@ -646,28 +646,28 @@ impl NodeMock {
     fn handle_lib3h(&mut self, lib3h_msg: Lib3hServerProtocol) {
         match lib3h_msg {
             Lib3hServerProtocol::SuccessResult(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::FailureResult(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::Connected(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::Disconnected(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::SendDirectMessageResult(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::HandleSendDirectMessage(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::FetchEntryResult(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::HandleFetchEntry(_msg) => {
-                // FIXME
+                // no-op
             }
             // HandleStoreEntryAspect: Network is asking us to store some aspect
             // Accept if we joined that space and tell our Lib3h that we are holding it.
@@ -700,19 +700,19 @@ impl NodeMock {
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::HandleQueryEntry(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::QueryEntryResult(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::HandleGetAuthoringEntryList(_msg) => {
-                // FIXME
+                // no-op
             }
             Lib3hServerProtocol::HandleGetGossipingEntryList(_msg) => {
-                // FIXME
+                // no-op
             }
         }
     }

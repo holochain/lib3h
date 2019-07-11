@@ -16,15 +16,15 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// TODO make a struct for transport id and make these trait converters
+// TODO #175 - Make a struct for transportId/connectionId and make type converters
 fn transport_id_to_url(id: ConnectionId) -> Url {
     Url::parse(id.as_str())
-        .expect("gateway_transport: transport_id_to_url: connection id is not a well formed url")
+        .expect("gateway_transport: transport_id_to_url: id is not a well formed url")
 }
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
-    /// TODO: return a higher-level uri instead
+    // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier.clone(), uri);
         // Connect
@@ -36,13 +36,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         Ok(connection_id)
     }
 
-    /// TODO?
+    // TODO #159 - remove conn id conn_map??
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        // FIXME remove conn id conn_map??
         self.inner_transport.borrow_mut().close(id)
     }
 
-    /// TODO?
+    // TODO #159
     fn close_all(&mut self) -> TransportResult<()> {
         self.inner_transport.borrow_mut().close_all()
     }
@@ -86,7 +85,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         self.send(&dht_id_list, payload)
     }
 
-    /// TODO?
+    ///
     fn bind(&mut self, url: &Url) -> TransportResult<Url> {
         trace!("({}) bind() {}", self.identifier.clone(), url);
         self.inner_transport.borrow_mut().bind(url)
@@ -228,11 +227,11 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 self.inner_transport.borrow_mut().send(&[&id], &buf)?;
             }
             TransportEvent::Connection(_id) => {
-                // TODO!!
+                // TODO #176
                 unimplemented!();
             }
             TransportEvent::Closed(id) => {
-                // FIXME
+                // TODO #176
                 warn!("Connection closed: {}", id);
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
@@ -253,10 +252,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
                                 peer_uri: transport_id_to_url(id.clone()),
-                                timestamp: 42, // FIXME
+                                timestamp: 42, // TODO #166
                             };
-                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");
-                            // FIXME: Should not call process manually
+                            Dht::post(self, DhtCommand::HoldPeer(peer))?;
+                            // TODO #150 - Should not call process manually
                             Dht::process(self).expect("HACK");
                         }
                     }
@@ -305,7 +304,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let outbox = Vec::new();
-                // FIXME: Send Closed event for each connection
+                // TODO #159: Send Closed event for each connection
                 //                for (id, _url) in &self.connections {
                 //                    let evt = TransportEvent::Closed(id.to_string());
                 //                    outbox.push(evt);
