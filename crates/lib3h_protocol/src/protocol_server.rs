@@ -47,4 +47,8 @@ pub enum Lib3hServerProtocol {
     // -- Entry lists -- //
     HandleGetAuthoringEntryList(GetListData),
     HandleGetGossipingEntryList(GetListData),
+
+    // -- N3h specific functinonality -- //
+    Terminated,
+    P2pReady,
 }

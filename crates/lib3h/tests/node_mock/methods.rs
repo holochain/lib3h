@@ -714,6 +714,12 @@ impl NodeMock {
             Lib3hServerProtocol::HandleGetGossipingEntryList(_msg) => {
                 // no-op
             }
+            Lib3hServerProtocol::Terminated => {
+                // no-op
+            }
+            Lib3hServerProtocol::P2pReady => {
+                // no-op
+            }
         }
     }
 }
