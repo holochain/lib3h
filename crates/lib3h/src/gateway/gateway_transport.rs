@@ -254,7 +254,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                                 peer_uri: transport_id_to_url(id.clone()),
                                 timestamp: 42, // TODO #166
                             };
-                            Dht::post(self, DhtCommand::HoldPeer(peer))?;
+                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
                             // TODO #150 - Should not call process manually
                             Dht::process(self).expect("HACK");
                         }
