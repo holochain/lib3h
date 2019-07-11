@@ -99,7 +99,6 @@ pub struct ConnectData {
     ///  - `holorelay://x.x.x.x`
     #[serde(with = "url_serde")]
     pub peer_uri: Url,
-    /// TODO: Add a transportId?
     /// Specify to which network to connect to.
     /// Empty string for 'any'
     pub network_id: String,
@@ -112,8 +111,8 @@ pub struct ConnectedData {
     /// The first uri we are connected to
     #[serde(with = "url_serde")]
     pub uri: Url,
-    // TODO: Add network_id? Or let local client figure it out with the request_id?
-    // TODO: Maybe add some info on network state?
+    // TODO #172 - Add network_id? Or let local client figure it out with the request_id?
+    // TODO #178 - Add some info on network state
     // pub peer_count: u32,
 }
 

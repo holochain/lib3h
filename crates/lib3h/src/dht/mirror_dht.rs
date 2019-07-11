@@ -43,7 +43,7 @@ impl MirrorDht {
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 peer_uri: peer_transport.clone(),
-                timestamp: 0, // FIXME
+                timestamp: 0, // TODO #166
             },
             pending_fetch_request_list: HashSet::new(),
         }
