@@ -28,6 +28,12 @@ pub trait CryptoSystem: Sync {
 
     // -- hash methods -- //
 
+    /// bytelength of sha256 hash
+    fn hash_sha256_bytes(&self) -> usize;
+
+    /// bytelength of sha512 hash
+    fn hash_sha512_bytes(&self) -> usize;
+
     /// bytelength of pwhash salt
     fn pwhash_salt_bytes(&self) -> usize;
 
@@ -41,6 +47,12 @@ pub trait CryptoSystem: Sync {
         password: &Box<dyn Buffer>,
         salt: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
+
+    /// compute a sha256 hash for `data`, storing it in `hash`
+    fn hash_sha256(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
+
+    /// compute a sha512 hash for `data`, storing it in `hash`
+    fn hash_sha512(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
 
     // -- signature methods -- //
 

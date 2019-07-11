@@ -129,11 +129,53 @@ impl CryptoSystem for SodiumCryptoSystem {
         Ok(())
     }
 
+    fn hash_sha256_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_hash_sha256_BYTES as usize
+    }
+    fn hash_sha512_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_hash_sha512_BYTES as usize
+    }
     fn pwhash_salt_bytes(&self) -> usize {
         rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
     }
     fn pwhash_bytes(&self) -> usize {
         32
+    }
+
+    fn hash_sha256(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()> {
+        if hash.len() != self.hash_sha256_bytes() {
+            return Err(CryptoError::BadHashSize);
+        }
+
+        unsafe {
+            let mut hash = hash.write_lock();
+            let data = data.read_lock();
+            rust_sodium_sys::crypto_hash_sha256(
+                raw_ptr_char!(hash),
+                raw_ptr_char_immut!(data),
+                data.len() as libc::c_ulonglong,
+            );
+        }
+
+        Ok(())
+    }
+
+    fn hash_sha512(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()> {
+        if hash.len() != self.hash_sha512_bytes() {
+            return Err(CryptoError::BadHashSize);
+        }
+
+        unsafe {
+            let mut hash = hash.write_lock();
+            let data = data.read_lock();
+            rust_sodium_sys::crypto_hash_sha512(
+                raw_ptr_char!(hash),
+                raw_ptr_char_immut!(data),
+                data.len() as libc::c_ulonglong,
+            );
+        }
+
+        Ok(())
     }
 
     fn pwhash(

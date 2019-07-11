@@ -15,6 +15,7 @@ impl FullSuite {
     pub fn run(&self) {
         self.test_sec_buf();
         self.test_random();
+        self.test_hash();
         self.test_pwhash();
         self.test_sign_keypair_sizes();
         self.test_sign_keypair_generation();
@@ -53,6 +54,18 @@ impl FullSuite {
         self.crypto.randombytes_buf(&mut b).unwrap();
         assert_ne!("[0, 0, 0, 0, 0, 0, 0, 0]", &format!("{:?}", a));
         assert_ne!(&format!("{:?}", a), &format!("{:?}", b));
+    }
+
+    fn test_hash(&self) {
+        let data: Box<dyn Buffer> = Box::new(vec![42, 1, 38, 2, 155, 212, 3, 11]);
+
+        let mut hash256: Box<dyn Buffer> = Box::new(vec![0; self.crypto.hash_sha256_bytes()]);
+        self.crypto.hash_sha256(&mut hash256, &data).unwrap();
+        assert_eq!("[69, 32, 143, 143, 29, 27, 233, 62, 97, 209, 120, 159, 137, 193, 1, 213, 107, 128, 33, 170, 165, 131, 217, 170, 66, 192, 214, 190, 20, 179, 219, 177]", &format!("{:?}", hash256));
+
+        let mut hash512: Box<dyn Buffer> = Box::new(vec![0; self.crypto.hash_sha512_bytes()]);
+        self.crypto.hash_sha512(&mut hash512, &data).unwrap();
+        assert_eq!("[105, 206, 48, 255, 80, 134, 192, 184, 108, 217, 124, 49, 193, 43, 2, 219, 148, 27, 91, 154, 89, 69, 229, 78, 13, 74, 51, 57, 52, 201, 186, 25, 109, 206, 155, 242, 249, 8, 179, 34, 106, 170, 160, 158, 11, 89, 85, 25, 22, 70, 70, 150, 84, 221, 184, 130, 245, 196, 101, 192, 160, 225, 160, 253]", &format!("{:?}", hash512));
     }
 
     fn test_pwhash(&self) {
@@ -161,6 +174,7 @@ pub fn full_suite(crypto: Box<dyn CryptoSystem>) {
 mod test {
     use super::*;
     use crate::{CryptoResult, ProtectState};
+    use sha2::Digest;
     use std::ops::{Deref, DerefMut};
 
     #[test]
@@ -264,11 +278,47 @@ mod test {
             Ok(())
         }
 
+        fn hash_sha256_bytes(&self) -> usize {
+            32
+        }
+        fn hash_sha512_bytes(&self) -> usize {
+            64
+        }
         fn pwhash_salt_bytes(&self) -> usize {
             8
         }
         fn pwhash_bytes(&self) -> usize {
             16
+        }
+
+        fn hash_sha256(
+            &self,
+            hash: &mut Box<dyn Buffer>,
+            data: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if hash.len() != self.hash_sha256_bytes() {
+                return Err(CryptoError::BadHashSize);
+            }
+
+            let mut hasher = sha2::Sha256::new();
+            hasher.input(data.read_lock().deref());
+            hash.write(0, &hasher.result())?;
+            Ok(())
+        }
+
+        fn hash_sha512(
+            &self,
+            hash: &mut Box<dyn Buffer>,
+            data: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if hash.len() != self.hash_sha512_bytes() {
+                return Err(CryptoError::BadHashSize);
+            }
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.input(data.read_lock().deref());
+            hash.write(0, &hasher.result())?;
+            Ok(())
         }
 
         fn pwhash(
