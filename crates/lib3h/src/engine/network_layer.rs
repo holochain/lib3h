@@ -226,7 +226,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(dm_data.clone());
                     outbox.push(lib3_msg);
                 } else {
-                    warn!("Received message from unjoined space: {}", dm_data.space_address);
+                    warn!(
+                        "Received message from unjoined space: {}",
+                        dm_data.space_address
+                    );
                 }
             }
             P2pProtocol::DirectMessageResult(dm_data) => {
@@ -238,7 +241,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(dm_data.clone());
                     outbox.push(lib3_msg);
                 } else {
-                    warn!("Received message from unjoined space: {}", dm_data.space_address);
+                    warn!(
+                        "Received message from unjoined space: {}",
+                        dm_data.space_address
+                    );
                 }
             }
             P2pProtocol::PeerAddress(_, _) => {
