@@ -215,6 +215,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match client_msg {
+            Lib3hClientProtocol::Shutdown => {
+                // TODO
+            }
             Lib3hClientProtocol::SuccessResult(_msg) => {
                 // TODO #168
             }
@@ -262,16 +265,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         // https://github.com/holochain/n3h/blob/master/lib/n3h-common/track.js
                         if msg.request_id == "__author_list" {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                            space_gateway.post_dht(cmd)?;
-                        // Dht::post(&mut space_gateway, cmd)?;
+                            Dht::post(space_gateway, cmd)?;
                         } else {
                             let response = FetchDhtEntryResponseData {
                                 msg_id: msg.request_id.clone(),
                                 entry: msg.entry.clone(),
                             };
                             let cmd = DhtCommand::EntryDataResponse(response);
-                            space_gateway.post_dht(cmd)?;
-                            // Dht::post(&mut space_gateway, cmd)?;
+                            Dht::post(space_gateway, cmd)?;
                         }
                     }
                 }
@@ -288,8 +289,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                        space_gateway.post_dht(cmd)?;
-                        // Dht::post(&mut space_gateway, cmd)?;
+                        Dht::post(space_gateway, cmd)?;
                     }
                 }
             }
@@ -305,8 +305,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
-                        space_gateway.post_dht(cmd)?;
-                        // Dht::post(&mut space_gateway, cmd)?;
+                        Dht::post(space_gateway, cmd)?;
                     }
                 }
             }
@@ -327,8 +326,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                             entry_address: msg.entry_address,
                         };
                         let cmd = DhtCommand::FetchEntry(msg);
-                        space_gateway.post_dht(cmd)?;
-                        // Dht::post(&mut space_gateway, cmd)?;
+                        Dht::post(space_gateway, cmd)?;
                     }
                 }
             }
@@ -353,8 +351,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                             entry,
                         };
                         let cmd = DhtCommand::EntryDataResponse(msg);
-                        space_gateway.post_dht(cmd)?;
-                        // Dht::post(&mut space_gateway, cmd)?;
+                        Dht::post(space_gateway, cmd)?;
                     }
                 }
             }
@@ -422,8 +419,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                                 entry_address: entry_address.clone(),
                                 aspect_list,
                             };
-                            space_gateway
-                                .post_dht(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
+                            Dht::post(
+                                space_gateway,
+                                DhtCommand::HoldEntryAspectAddress(fake_entry),
+                            )?;
                         }
                     }
                 }

@@ -202,8 +202,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 });
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    self.network_gateway.borrow_mut().post_dht(cmd)?;
-                //Dht::post(&mut self.network_gateway.borrow_mut(), cmd);
+                    Dht::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
                 } else {
                     // otherwise should be for one of our space
                     let space_gateway = self
@@ -212,8 +211,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         .ok_or_else(|| {
                             format_err!("space_gateway not found: {}", msg.space_address)
                         })?;
-                    space_gateway.post_dht(cmd)?;
-                    // Dht::post(&mut space_gateway, cmd);
+                    Dht::post(space_gateway, cmd)?;
                 }
             }
             P2pProtocol::DirectMessage(dm_data) => {
@@ -253,7 +251,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
+                    Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data.clone()))?;
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -261,7 +259,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        space_gateway.post_dht(DhtCommand::HoldPeer(peer_data.clone()))?;
+                        Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data.clone()))?;
                     }
                 }
             }
