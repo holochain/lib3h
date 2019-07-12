@@ -304,14 +304,14 @@ impl TransportMemory {
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
-                let evt = TransportEvent::Closed(id.to_string());
+                let evt = TransportEvent::ConnectionClosed(id.to_string());
                 Ok(vec![evt])
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let mut outbox = Vec::new();
                 for (id, _url) in &self.connections {
-                    let evt = TransportEvent::Closed(id.to_string());
+                    let evt = TransportEvent::ConnectionClosed(id.to_string());
                     outbox.push(evt);
                 }
                 Ok(outbox)
