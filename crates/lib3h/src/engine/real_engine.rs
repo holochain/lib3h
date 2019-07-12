@@ -215,6 +215,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match client_msg {
+            Lib3hClientProtocol::Shutdown => {
+                // TODO
+            }
             Lib3hClientProtocol::SuccessResult(_msg) => {
                 // TODO #168
             }
