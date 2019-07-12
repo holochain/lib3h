@@ -203,12 +203,17 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     return Ok(());
                 }
                 let uri = maybe_uri.unwrap();
-                trace!(
-                    "(GatewayTransport).ConnectResult: mapping {} -> {}",
-                    uri,
-                    id
-                );
-                self.connection_map.insert(uri, id.clone());
+                trace!("(GatewayTransport).ConnectResult: {} -> {}", uri, id);
+                // TODO #176 - Maybe we shouldn't have different code paths for populating
+                // the connection_map between space and network gateways.
+                let maybe_previous = self.connection_map.insert(uri.clone(), id.clone());
+                if let Some(previous_cId) = maybe_previous {
+                    debug!(
+                        "Replaced connectionId for {} ; was: {}",
+                        uri.clone(),
+                        previous_cId
+                    );
+                }
 
                 // Send to other node our PeerAddress
                 let our_peer_address = P2pProtocol::PeerAddress(

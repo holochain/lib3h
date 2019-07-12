@@ -93,8 +93,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     peer_data
                 );
                 // For now accept all request
-                let hold_cmd = DhtCommand::HoldPeer(peer_data);
-                space_gateway.post_dht(hold_cmd)?;
+                Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data))?;
             }
             DhtEvent::PeerTimedOut(_data) => {
                 // TODO #159
