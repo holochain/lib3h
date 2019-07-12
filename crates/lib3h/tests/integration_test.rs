@@ -180,10 +180,8 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     // Wrap-up test
     println!("========================");
     print_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn_ptr);
-    // Terminate nodes
-    alex.stop();
-    billy.stop();
 
+    // Done
     Ok(())
 }
 
@@ -208,10 +206,7 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
     // Wrap-up test
     println!("==========================");
     print_test_name("IN-MEMORY THREE NODES TEST END: ", test_fn_ptr);
-    // Terminate nodes
-    alex.stop();
-    billy.stop();
-    camille.stop();
 
+    // Done
     Ok(())
 }

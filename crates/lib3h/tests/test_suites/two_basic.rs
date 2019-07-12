@@ -24,10 +24,6 @@ lazy_static! {
 
 ///
 pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
-    // Start
-    alex.run();
-    billy.run();
-
     // Connect Alex to Billy
     alex.connect_to(&billy.advertise()).unwrap();
 

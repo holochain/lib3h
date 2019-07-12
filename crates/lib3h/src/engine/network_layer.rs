@@ -98,7 +98,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
-            TransportEvent::TransportError(id, e) => {
+            TransportEvent::ErrorOccured(id, e) => {
                 self.network_connections.remove(id);
                 error!("{} Network error from {} : {:?}", self.name.clone(), id, e);
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
@@ -154,11 +154,11 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     let _ = self.network_connections.insert(id.to_owned());
                 }
             }
-            TransportEvent::Connection(_id) => {
+            TransportEvent::IncomingConnectionEstablished(_id) => {
                 // TODO #159
                 unimplemented!();
             }
-            TransportEvent::Closed(id) => {
+            TransportEvent::ConnectionClosed(id) => {
                 self.network_connections.remove(id);
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
@@ -168,7 +168,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
             }
-            TransportEvent::Received(id, payload) => {
+            TransportEvent::ReceivedData(id, payload) => {
                 debug!("Received message from: {} | {}", id, payload.len());
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =

@@ -189,7 +189,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         );
         // Note: use same order as the enum
         match evt {
-            TransportEvent::TransportError(id, e) => {
+            TransportEvent::ErrorOccured(id, e) => {
                 error!(
                     "(GatewayTransport) Connection Error for {}: {}\n Closing connection.",
                     id, e
@@ -231,17 +231,17 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 );
                 self.inner_transport.borrow_mut().send(&[&id], &buf)?;
             }
-            TransportEvent::Connection(_id) => {
+            TransportEvent::IncomingConnectionEstablished(_id) => {
                 // TODO #176
                 unimplemented!();
             }
-            TransportEvent::Closed(id) => {
+            TransportEvent::ConnectionClosed(id) => {
                 // TODO #176
                 warn!("Connection closed: {}", id);
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
-            TransportEvent::Received(id, payload) => {
+            TransportEvent::ReceivedData(id, payload) => {
                 debug!("Received message from: {}", id);
                 // trace!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
@@ -303,7 +303,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
-                let evt = TransportEvent::Closed(id.to_string());
+                let evt = TransportEvent::ConnectionClosed(id.to_string());
                 Ok(vec![evt])
             }
             TransportCommand::CloseAll => {

@@ -20,7 +20,7 @@ use url::Url;
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
-pub static NETWORK_GATEWAY_ID: &'static str = "__memory_network__";
+pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -54,7 +54,7 @@ pub struct RealEngine<T: Transport, D: Dht> {
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
-    // Remove this if we have a full functioning mock without having to use it.
+    // TODO #159: Remove this if we have a full functioning mock without having to use it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
     network_transport: Rc<RefCell<T>>,

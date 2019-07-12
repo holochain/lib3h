@@ -15,12 +15,15 @@ pub enum TransportCommand {
 /// Events that can be generated during a `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportEvent {
-    TransportError(ConnectionId, TransportError),
+    /// Notify that some TransportError occured
+    ErrorOccured(ConnectionId, TransportError),
     /// an outgoing connection has been established
     ConnectResult(ConnectionId),
     /// we have received an incoming connection
-    Connection(ConnectionId),
+    IncomingConnectionEstablished(ConnectionId),
     /// We have received data from a connection
-    Received(ConnectionId, Vec<u8>),
-    Closed(ConnectionId),
+    ReceivedData(ConnectionId, Vec<u8>),
+    /// A connection closed for whatever reason
+    /// #159
+    ConnectionClosed(ConnectionId),
 }
