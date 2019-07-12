@@ -6,7 +6,7 @@
 export
 all test fmt clean:
 ifeq ($(MAKE_ENV),local)
-	$(MAKE) -f Makefile.local $@
+	$(MAKE) -f build/make/Makefile.local.mk $@
 else
-	$(MAKE) -f Makefile.nix $@
+	$(MAKE) -f build/make/Makefile.nix.mk $@
 endif
