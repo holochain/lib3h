@@ -8,8 +8,6 @@ extern crate backtrace;
 #[macro_use]
 extern crate log;
 extern crate holochain_persistence_api;
-#[macro_use]
-extern crate failure;
 extern crate lib3h;
 extern crate lib3h_protocol;
 extern crate multihash;

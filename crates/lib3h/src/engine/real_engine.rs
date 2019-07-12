@@ -11,14 +11,15 @@ use crate::{
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
     engine::{p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys},
+    error::Lib3hResult,
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
+    data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
+    protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -127,15 +128,15 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
 }
 
 impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
-    fn run(&self) -> Lib3hResult<()> {
+    fn run(&self) -> Lib3hProtocolResult<()> {
         // FIXME
         Ok(())
     }
-    fn stop(&self) -> Lib3hResult<()> {
+    fn stop(&self) -> Lib3hProtocolResult<()> {
         // FIXME
         Ok(())
     }
-    fn terminate(&self) -> Lib3hResult<()> {
+    fn terminate(&self) -> Lib3hProtocolResult<()> {
         // FIXME
         Ok(())
     }
@@ -149,7 +150,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
-    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
+    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         // trace!("RealEngine.post(): {:?}", client_msg);
         self.inbox.push_back(client_msg);
         Ok(())
@@ -157,7 +158,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
 
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         trace!("");
         trace!("{} - RealEngine.process() START", self.name);
         // Process all received Lib3hClientProtocol messages from Core

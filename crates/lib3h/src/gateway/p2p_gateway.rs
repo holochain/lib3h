@@ -5,10 +5,11 @@ use crate::{
         dht_protocol::*,
         dht_trait::{Dht, DhtConfig, DhtFactory},
     },
+    error::Lib3hResult,
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{Address, Lib3hResult};
+use lib3h_protocol::Address;
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},

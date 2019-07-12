@@ -1,8 +1,11 @@
-use crate::dht::{
-    dht_protocol::*,
-    dht_trait::{Dht, DhtConfig},
+use crate::{
+    dht::{
+        dht_protocol::*,
+        dht_trait::{Dht, DhtConfig},
+    },
+    error::{ErrorKind, Lib3hError, Lib3hResult},
 };
-use lib3h_protocol::{data_types::EntryData, Address, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::EntryData, Address, DidWork};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use rmp_serde::{Deserializer, Serializer};
@@ -218,7 +221,9 @@ impl MirrorDht {
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 if let Err(e) = maybe_gossip {
-                    return Err(format_err!("Failed deserializing gossip: {:?}", e));
+                    error!("Fail to deserialize gossip.");
+                    return Err(Lib3hError::new(ErrorKind::RMPSerdeDecodeError(e)));
+                    // return Err(e.into());
                 }
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
@@ -337,7 +342,9 @@ impl MirrorDht {
             //   - From a Hold   : Broadcast entry
             DhtCommand::EntryDataResponse(response) => {
                 if !self.pending_fetch_request_list.remove(&response.msg_id) {
-                    return Err(format_err!("Received response for an unknown request"));
+                    return Err(Lib3hError::new(ErrorKind::Other(String::from(
+                        "Received response for an unknown request",
+                    ))));
                 }
                 // From a Hold if msg_id matches one set in HoldEntryAspectAddress
                 let address_str: String = (&response.entry.entry_address).clone().into();

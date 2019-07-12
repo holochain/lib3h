@@ -3,9 +3,10 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine},
+    error::{ErrorKind, Lib3hError, Lib3hResult},
     transport::{protocol::*, transport_trait::Transport, ConnectionIdRef},
 };
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork, Lib3hResult};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -165,7 +166,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 if let Err(e) = maybe_msg {
-                    return Err(format_err!("Failed deserializing msg: {:?}", e));
+                    error!("Failed deserializing msg: {:?}", e);
+                    return Err(Lib3hError::new(ErrorKind::RMPSerdeDecodeError(e)));
                 }
                 let p2p_msg = maybe_msg.unwrap();
                 let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
@@ -188,7 +190,11 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let space_gateway = self
                     .space_gateway_map
                     .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                    .ok_or_else(|| format_err!("space_gateway not found"))?;
+                    .ok_or_else(|| {
+                        Lib3hError::new(ErrorKind::KeyNotFound(String::from(
+                            "space_gateway not found",
+                        )))
+                    })?;
                 // Post it as a remoteGossipTo
                 let from_peer_address: String = msg.from_peer_address.clone().into();
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {

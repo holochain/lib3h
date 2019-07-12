@@ -6,7 +6,9 @@ use crate::{
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Lib3hResult};
+use lib3h_protocol::{
+    data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
+};
 use rmp_serde::Serializer;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -39,7 +41,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     }
 
     /// Process all space gateways
-    pub(crate) fn process_space_gateways(&mut self) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    pub(crate) fn process_space_gateways(
+        &mut self,
+    ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
         // Process all gateways' DHT
         let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
@@ -65,7 +69,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         chain_id: &ChainId,
         cmd: DhtEvent,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
         debug!(
             "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
             self.name.clone(),
