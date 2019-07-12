@@ -2,7 +2,7 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
-    engine::p2p_protocol::*,
+    engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
@@ -32,27 +32,28 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        // TODO #179
-        // Add to connection_map
-        if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
-            debug!(
-                "({}).Dht.post(HoldPeer) - {}",
-                self.identifier.clone(),
-                peer_data.peer_uri.clone()
-            );
-            if !self.connection_map.contains_key(&peer_data.peer_uri) {
-                let previous = self.connection_map.insert(
+        // Add to connection_map for space_gateways
+        // TODO #176 - Maybe we shouldn't have different code paths for populating
+        // the connection_map between space and network gateways.
+        if self.identifier != NETWORK_GATEWAY_ID {
+            if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
+                debug!(
+                    "({}).Dht.post(HoldPeer) - {}",
+                    self.identifier.clone(),
+                    peer_data.peer_uri.clone()
+                );
+                let maybe_previous = self.connection_map.insert(
                     peer_data.peer_uri.clone(),
                     gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
                 );
+                if let Some(previous_cId) = maybe_previous {
+                    debug!(
+                        "Replaced connectionId for {} ; was: {}",
+                        peer_data.peer_uri.clone(),
+                        previous_cId
+                    );
+                }
             }
-//            if let Some(previous_cId) = previous {
-//                debug!(
-//                    "Replaced connectionId[{}] = {}",
-//                    peer_data.peer_uri.clone(),
-//                    previous_cId
-//                );
-//            }
         }
         self.inner_dht.post(cmd)
     }

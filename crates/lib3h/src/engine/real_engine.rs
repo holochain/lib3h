@@ -419,7 +419,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                                 entry_address: entry_address.clone(),
                                 aspect_list,
                             };
-                            Dht::post(space_gateway, DhtCommand::HoldEntryAspectAddress(fake_entry))?;
+                            Dht::post(
+                                space_gateway,
+                                DhtCommand::HoldEntryAspectAddress(fake_entry),
+                            )?;
                         }
                     }
                 }

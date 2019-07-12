@@ -1,14 +1,11 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{
-        dht_protocol::*,
-        dht_trait::{Dht, DhtConfig, DhtFactory},
-    },
-    gateway::{self, P2pGateway},
+    dht::dht_trait::{Dht, DhtConfig, DhtFactory},
+    gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
-use lib3h_protocol::{Address, Lib3hResult};
+use lib3h_protocol::Address;
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
