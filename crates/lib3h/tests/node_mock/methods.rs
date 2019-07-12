@@ -628,20 +628,6 @@ impl NodeMock {
         }
     }
 
-    /// Start engine
-    pub fn run(&mut self) {
-        self.engine
-            .run()
-            .expect("Failed to start the NetworkEngine");
-    }
-
-    /// Stop engine
-    pub fn stop(&mut self) {
-        self.engine
-            .stop()
-            .expect("Failed to stop the NetworkEngine");
-    }
-
     /// handle all types of Lib3hServerProtocol message
     fn handle_lib3h(&mut self, lib3h_msg: Lib3hServerProtocol) {
         match lib3h_msg {

@@ -149,7 +149,7 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!("(MemoryServer {}) received: {:?}", self.uri, payload);
-                let evt = TransportEvent::Received(id.clone(), payload);
+                let evt = TransportEvent::ReceivedData(id.clone(), payload);
                 outbox.push(evt);
             }
         }
