@@ -382,7 +382,8 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                     .push(TransportEvent::ErrorOccured(info.id.clone(), e));
             }
             if let WebsocketStreamState::None = info.stateful_socket {
-                self.event_queue.push(TransportEvent::ConnectionClosed(info.id));
+                self.event_queue
+                    .push(TransportEvent::ConnectionClosed(info.id));
                 continue;
             }
             if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_MS {
@@ -393,7 +394,8 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                     socket.write_message(tungstenite::Message::Ping(vec![]))?;
                 }
             } else if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_WAIT_MS {
-                self.event_queue.push(TransportEvent::ConnectionClosed(info.id));
+                self.event_queue
+                    .push(TransportEvent::ConnectionClosed(info.id));
                 info.stateful_socket = WebsocketStreamState::None;
                 continue;
             }

@@ -131,7 +131,6 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
 }
 
 impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
-
     fn advertise(&self) -> Url {
         self.network_gateway
             .borrow()
@@ -176,7 +175,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
 }
 
 /// Drop
-impl<T: Transport, D: Dht> Drop for  RealEngine<T, D> {
+impl<T: Transport, D: Dht> Drop for RealEngine<T, D> {
     fn drop(&mut self) {
         let res = self.shutdown();
         if let Err(e) = res {
@@ -187,7 +186,6 @@ impl<T: Transport, D: Dht> Drop for  RealEngine<T, D> {
 
 /// Private
 impl<T: Transport, D: Dht> RealEngine<T, D> {
-
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
