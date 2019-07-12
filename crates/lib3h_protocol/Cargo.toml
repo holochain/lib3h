@@ -13,6 +13,7 @@ documentation = "https://docs.rs/lib3h_protocol"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
+base64 = "=0.10.1"
 failure = "=0.1.5"
 holochain_persistence_api = "=0.0.5"
 rmp-serde = "=0.13.7"

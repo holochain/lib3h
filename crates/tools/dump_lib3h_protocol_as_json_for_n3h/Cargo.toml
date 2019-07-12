@@ -1,0 +1,17 @@
+[package]
+name = "dump_lib3h_protocol_as_json_for_n3h"
+version = "0.0.6"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+description = "delete me once n3h is deprecated"
+keywords = ["holochain", "holo"]
+categories = ["development-tools::testing"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_hbc"
+repository = "https://github.com/holochain/lib3h"
+
+[dependencies]
+serde_json = { version = "=1.0.39", features = ["preserve_order"] }
+lib3h_protocol = { version = "=0.0.6", path = "../../lib3h_protocol" }
+url = "=1.7.2"
