@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::*,
-    gateway::P2pGateway,
+    gateway::{self, P2pGateway},
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{Address, DidWork, Lib3hResult};
@@ -33,6 +33,27 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
         // TODO #179
+        // Add to connection_map
+        if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
+            debug!(
+                "({}).Dht.post(HoldPeer) - {}",
+                self.identifier.clone(),
+                peer_data.peer_uri.clone()
+            );
+            if !self.connection_map.contains_key(&peer_data.peer_uri) {
+                let previous = self.connection_map.insert(
+                    peer_data.peer_uri.clone(),
+                    gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
+                );
+            }
+//            if let Some(previous_cId) = previous {
+//                debug!(
+//                    "Replaced connectionId[{}] = {}",
+//                    peer_data.peer_uri.clone(),
+//                    previous_cId
+//                );
+//            }
+        }
         self.inner_dht.post(cmd)
     }
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {

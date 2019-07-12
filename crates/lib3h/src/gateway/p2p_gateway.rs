@@ -21,23 +21,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
     }
-    /// TODO #179 - using an explicit post for dht because of dumb rust compiler
-    pub fn post_dht(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
-            let previous = self.connection_map.insert(
-                peer_data.peer_uri.clone(),
-                gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
-            );
-            if let Some(previous_cId) = previous {
-                debug!(
-                    "Replaced connectionId[{}] = {}",
-                    peer_data.peer_uri.clone(),
-                    previous_cId
-                );
-            }
-        }
-        self.inner_dht.post(cmd)
-    }
 }
 
 //--------------------------------------------------------------------------------------------------
