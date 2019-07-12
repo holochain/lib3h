@@ -59,7 +59,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             custom: config.dht_custom_config.clone(),
         };
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
-            "__physical_network__",
+            NETWORK_GATEWAY_ID,
             Rc::clone(&network_transport),
             dht_factory,
             &dht_config,
@@ -131,18 +131,6 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
 }
 
 impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
-    fn run(&self) -> Lib3hResult<()> {
-        // TODO #159
-        Ok(())
-    }
-    fn stop(&self) -> Lib3hResult<()> {
-        // TODO #159
-        Ok(())
-    }
-    fn terminate(&self) -> Lib3hResult<()> {
-        // TODO #159
-        Ok(())
-    }
 
     fn advertise(&self) -> Url {
         self.network_gateway
@@ -187,8 +175,26 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     }
 }
 
+/// Drop
+impl<T: Transport, D: Dht> Drop for  RealEngine<T, D> {
+    fn drop(&mut self) {
+        let res = self.shutdown();
+        if let Err(e) = res {
+            warn!("Graceful shutdown failed: {}", e);
+        }
+    }
+}
+
 /// Private
 impl<T: Transport, D: Dht> RealEngine<T, D> {
+
+    /// Called on drop.
+    /// Close all connections gracefully
+    fn shutdown(&mut self) -> Lib3hResult<()> {
+        // TODO #159
+        Ok(())
+    }
+
     /// Progressively serve every Lib3hClientProtocol received in inbox
     fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();

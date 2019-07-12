@@ -19,11 +19,6 @@ lazy_static! {
 
 ///
 pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock) {
-    // Start
-    alex.run();
-    billy.run();
-    camille.run();
-
     // Connection
     // ==========
     // Connect Alex to Billy
