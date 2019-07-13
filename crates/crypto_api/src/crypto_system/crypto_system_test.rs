@@ -21,6 +21,8 @@ impl FullSuite {
         self.test_sign_keypair_sizes();
         self.test_sign_keypair_generation();
         self.test_sign();
+        self.test_kx_keypair_sizes();
+        self.test_kx_keypair_generation();
     }
 
     fn test_sec_buf(&self) {
@@ -192,6 +194,74 @@ impl FullSuite {
 
         self.crypto.randombytes_buf(&mut sig).unwrap();
         assert!(!self.crypto.sign_verify(&sig, &msg, &pk).unwrap());
+    }
+
+    fn test_kx_keypair_sizes(&self) {
+        let seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes() + 1]);
+        let mut pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        assert_eq!(
+            CryptoError::BadSeedSize,
+            self.crypto
+                .kx_seed_keypair(&seed, &mut pk, &mut sk)
+                .unwrap_err()
+        );
+
+        let seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes()]);
+        let mut pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes() + 1]);
+        let mut sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        assert_eq!(
+            CryptoError::BadPublicKeySize,
+            self.crypto
+                .kx_seed_keypair(&seed, &mut pk, &mut sk)
+                .unwrap_err()
+        );
+        assert_eq!(
+            CryptoError::BadPublicKeySize,
+            self.crypto.kx_keypair(&mut pk, &mut sk).unwrap_err()
+        );
+
+        let seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes()]);
+        let mut pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes() + 1]);
+        assert_eq!(
+            CryptoError::BadSecretKeySize,
+            self.crypto
+                .kx_seed_keypair(&seed, &mut pk, &mut sk)
+                .unwrap_err()
+        );
+        assert_eq!(
+            CryptoError::BadSecretKeySize,
+            self.crypto.kx_keypair(&mut pk, &mut sk).unwrap_err()
+        );
+    }
+
+    fn test_kx_keypair_generation(&self) {
+        let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes()]);
+        let mut pk1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        let mut pk2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+
+        self.crypto
+            .kx_seed_keypair(&seed, &mut pk1, &mut sk1)
+            .unwrap();
+        self.crypto
+            .kx_seed_keypair(&seed, &mut pk2, &mut sk2)
+            .unwrap();
+        assert_eq!(&format!("{:?}", pk1), &format!("{:?}", pk2));
+        assert_eq!(&format!("{:?}", sk1), &format!("{:?}", sk2));
+
+        self.crypto.randombytes_buf(&mut seed).unwrap();
+        self.crypto
+            .kx_seed_keypair(&seed, &mut pk2, &mut sk2)
+            .unwrap();
+        assert_ne!(&format!("{:?}", pk1), &format!("{:?}", pk2));
+        assert_ne!(&format!("{:?}", sk1), &format!("{:?}", sk2));
+
+        self.crypto.kx_keypair(&mut pk1, &mut sk1).unwrap();
+        assert_ne!(&format!("{:?}", pk1), &format!("{:?}", pk2));
+        assert_ne!(&format!("{:?}", sk1), &format!("{:?}", sk2));
     }
 }
 
@@ -515,6 +585,62 @@ mod test {
 
             Ok(&signature[0..8] == &public_key.read_lock()[0..8]
                 && &signature[8..mlen + 8] == &message.read_lock()[0..mlen])
+        }
+
+        fn kx_seed_bytes(&self) -> usize {
+            8
+        }
+        fn kx_public_key_bytes(&self) -> usize {
+            32
+        }
+        fn kx_secret_key_bytes(&self) -> usize {
+            8
+        }
+
+        fn kx_seed_keypair(
+            &self,
+            seed: &Box<dyn Buffer>,
+            public_key: &mut Box<dyn Buffer>,
+            secret_key: &mut Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if seed.len() != self.kx_seed_bytes() {
+                return Err(CryptoError::BadSeedSize);
+            }
+
+            if public_key.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if secret_key.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            secret_key.write(0, &seed.read_lock())?;
+
+            public_key.zero();
+            public_key.write(0, &seed.read_lock())?;
+
+            Ok(())
+        }
+
+        fn kx_keypair(
+            &self,
+            public_key: &mut Box<dyn Buffer>,
+            secret_key: &mut Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if public_key.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if secret_key.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.sign_seed_bytes()]);
+            self.randombytes_buf(&mut seed)?;
+            self.kx_seed_keypair(&seed, public_key, secret_key)?;
+
+            Ok(())
         }
     }
 }

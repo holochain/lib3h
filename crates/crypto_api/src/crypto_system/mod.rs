@@ -114,6 +114,33 @@ pub trait CryptoSystem: Sync {
         message: &Box<dyn Buffer>,
         public_key: &Box<dyn Buffer>,
     ) -> CryptoResult<bool>;
+
+    // -- key exchange methods -- //
+
+    /// bytelength of key exchange seed
+    fn kx_seed_bytes(&self) -> usize;
+
+    /// bytelength of key exchange public key
+    fn kx_public_key_bytes(&self) -> usize;
+
+    /// bytelength of key exchange secret key
+    fn kx_secret_key_bytes(&self) -> usize;
+
+    /// generate a deterministic key exchange public / secret keypair
+    /// based off the given seed entropy
+    fn kx_seed_keypair(
+        &self,
+        seed: &Box<dyn Buffer>,
+        public_key: &mut Box<dyn Buffer>,
+        secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
+
+    /// generate a pure entropy based key exchange public / secret keypair
+    fn kx_keypair(
+        &self,
+        public_key: &mut Box<dyn Buffer>,
+        secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
 }
 
 pub mod crypto_system_test;

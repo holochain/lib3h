@@ -390,6 +390,75 @@ impl CryptoSystem for SodiumCryptoSystem {
             )
         } == 0)
     }
+
+    fn kx_seed_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_SEEDBYTES as usize
+    }
+    fn kx_public_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_PUBLICKEYBYTES as usize
+    }
+    fn kx_secret_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_SECRETKEYBYTES as usize
+    }
+
+    fn kx_seed_keypair(
+        &self,
+        seed: &Box<dyn Buffer>,
+        public_key: &mut Box<dyn Buffer>,
+        secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if seed.len() != self.kx_seed_bytes() {
+            return Err(CryptoError::BadSeedSize);
+        }
+
+        if public_key.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if secret_key.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let mut public_key = public_key.write_lock();
+        let mut secret_key = secret_key.write_lock();
+        let seed = seed.read_lock();
+
+        unsafe {
+            rust_sodium_sys::crypto_kx_seed_keypair(
+                raw_ptr_char!(public_key),
+                raw_ptr_char!(secret_key),
+                raw_ptr_char_immut!(seed),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn kx_keypair(
+        &self,
+        public_key: &mut Box<dyn Buffer>,
+        secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if public_key.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if secret_key.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let mut public_key = public_key.write_lock();
+        let mut secret_key = secret_key.write_lock();
+
+        unsafe {
+            rust_sodium_sys::crypto_kx_keypair(
+                raw_ptr_char!(public_key),
+                raw_ptr_char!(secret_key),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
