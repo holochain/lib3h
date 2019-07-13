@@ -54,12 +54,16 @@ pub trait CryptoSystem: Sync {
         salt: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
 
+    /// bytelength of key derivation context
     fn kdf_context_bytes(&self) -> usize;
 
+    /// minimum bytelength of key derivation buffers
     fn kdf_min_bytes(&self) -> usize;
 
+    /// maximum bytelength of key derivation buffers
     fn kdf_max_bytes(&self) -> usize;
 
+    /// derive a new deterministic key based of index, context, and parent
     fn kdf(
         &self,
         out_buffer: &mut Box<dyn Buffer>,
@@ -126,6 +130,9 @@ pub trait CryptoSystem: Sync {
     /// bytelength of key exchange secret key
     fn kx_secret_key_bytes(&self) -> usize;
 
+    /// bytelength of session keys derived from key exchange
+    fn kx_session_key_bytes(&self) -> usize;
+
     /// generate a deterministic key exchange public / secret keypair
     /// based off the given seed entropy
     fn kx_seed_keypair(
@@ -140,6 +147,26 @@ pub trait CryptoSystem: Sync {
         &self,
         public_key: &mut Box<dyn Buffer>,
         secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
+
+    /// generate key exchange session keys from "client" perspective
+    fn kx_client_session_keys(
+        &self,
+        client_rx: &mut Box<dyn Buffer>,
+        client_tx: &mut Box<dyn Buffer>,
+        client_pk: &Box<dyn Buffer>,
+        client_sk: &Box<dyn Buffer>,
+        server_pk: &Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
+
+    /// generate key exchange session keys from "server" perspective
+    fn kx_server_session_keys(
+        &self,
+        server_rx: &mut Box<dyn Buffer>,
+        server_tx: &mut Box<dyn Buffer>,
+        server_pk: &Box<dyn Buffer>,
+        server_sk: &Box<dyn Buffer>,
+        client_pk: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
 }
 

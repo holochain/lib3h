@@ -400,6 +400,9 @@ impl CryptoSystem for SodiumCryptoSystem {
     fn kx_secret_key_bytes(&self) -> usize {
         rust_sodium_sys::crypto_kx_SECRETKEYBYTES as usize
     }
+    fn kx_session_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_SESSIONKEYBYTES as usize
+    }
 
     fn kx_seed_keypair(
         &self,
@@ -454,6 +457,98 @@ impl CryptoSystem for SodiumCryptoSystem {
             rust_sodium_sys::crypto_kx_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn kx_client_session_keys(
+        &self,
+        client_rx: &mut Box<dyn Buffer>,
+        client_tx: &mut Box<dyn Buffer>,
+        client_pk: &Box<dyn Buffer>,
+        client_sk: &Box<dyn Buffer>,
+        server_pk: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if client_rx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadRxSessionKeySize);
+        }
+
+        if client_tx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadTxSessionKeySize);
+        }
+
+        if client_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if client_sk.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        if server_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        unsafe {
+            let mut client_rx = client_rx.write_lock();
+            let mut client_tx = client_tx.write_lock();
+            let client_pk = client_pk.read_lock();
+            let client_sk = client_sk.read_lock();
+            let server_pk = server_pk.read_lock();
+            rust_sodium_sys::crypto_kx_client_session_keys(
+                raw_ptr_char!(client_rx),
+                raw_ptr_char!(client_tx),
+                raw_ptr_char_immut!(client_pk),
+                raw_ptr_char_immut!(client_sk),
+                raw_ptr_char_immut!(server_pk),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn kx_server_session_keys(
+        &self,
+        server_rx: &mut Box<dyn Buffer>,
+        server_tx: &mut Box<dyn Buffer>,
+        server_pk: &Box<dyn Buffer>,
+        server_sk: &Box<dyn Buffer>,
+        client_pk: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if server_rx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadRxSessionKeySize);
+        }
+
+        if server_tx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadTxSessionKeySize);
+        }
+
+        if server_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if server_sk.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        if client_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        unsafe {
+            let mut server_rx = server_rx.write_lock();
+            let mut server_tx = server_tx.write_lock();
+            let server_pk = server_pk.read_lock();
+            let server_sk = server_sk.read_lock();
+            let client_pk = client_pk.read_lock();
+            rust_sodium_sys::crypto_kx_server_session_keys(
+                raw_ptr_char!(server_rx),
+                raw_ptr_char!(server_tx),
+                raw_ptr_char_immut!(server_pk),
+                raw_ptr_char_immut!(server_sk),
+                raw_ptr_char_immut!(client_pk),
             );
         }
 

@@ -23,6 +23,7 @@ impl FullSuite {
         self.test_sign();
         self.test_kx_keypair_sizes();
         self.test_kx_keypair_generation();
+        self.test_kx();
     }
 
     fn test_sec_buf(&self) {
@@ -262,6 +263,34 @@ impl FullSuite {
         self.crypto.kx_keypair(&mut pk1, &mut sk1).unwrap();
         assert_ne!(&format!("{:?}", pk1), &format!("{:?}", pk2));
         assert_ne!(&format!("{:?}", sk1), &format!("{:?}", sk2));
+    }
+
+    fn test_kx(&self) {
+        let mut c_pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut c_sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        let mut s_pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut s_sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+
+        self.crypto.kx_keypair(&mut c_pk, &mut c_sk).unwrap();
+        self.crypto.kx_keypair(&mut s_pk, &mut s_sk).unwrap();
+
+        let mut c_rx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+        let mut c_tx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+        let mut s_rx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+        let mut s_tx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+
+        self.crypto
+            .kx_client_session_keys(&mut c_rx, &mut c_tx, &c_pk, &c_sk, &s_pk)
+            .unwrap();
+        self.crypto
+            .kx_server_session_keys(&mut s_rx, &mut s_tx, &s_pk, &s_sk, &c_pk)
+            .unwrap();
+
+        assert_ne!(&format!("{:?}", c_rx), &format!("{:?}", s_rx));
+        assert_ne!(&format!("{:?}", c_tx), &format!("{:?}", s_tx));
+
+        assert_eq!(&format!("{:?}", c_rx), &format!("{:?}", s_tx));
+        assert_eq!(&format!("{:?}", c_tx), &format!("{:?}", s_rx));
     }
 }
 
@@ -596,6 +625,9 @@ mod test {
         fn kx_secret_key_bytes(&self) -> usize {
             8
         }
+        fn kx_session_key_bytes(&self) -> usize {
+            8
+        }
 
         fn kx_seed_keypair(
             &self,
@@ -639,6 +671,78 @@ mod test {
             let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.sign_seed_bytes()]);
             self.randombytes_buf(&mut seed)?;
             self.kx_seed_keypair(&seed, public_key, secret_key)?;
+
+            Ok(())
+        }
+
+        fn kx_client_session_keys(
+            &self,
+            client_rx: &mut Box<dyn Buffer>,
+            client_tx: &mut Box<dyn Buffer>,
+            client_pk: &Box<dyn Buffer>,
+            client_sk: &Box<dyn Buffer>,
+            server_pk: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if client_rx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadRxSessionKeySize);
+            }
+
+            if client_tx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadTxSessionKeySize);
+            }
+
+            if client_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if client_sk.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            if server_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            client_rx.write(0, &client_pk.read_lock()[..4])?;
+            client_rx.write(4, &server_pk.read_lock()[..4])?;
+            client_tx.write(0, &server_pk.read_lock()[..4])?;
+            client_tx.write(4, &client_pk.read_lock()[..4])?;
+
+            Ok(())
+        }
+
+        fn kx_server_session_keys(
+            &self,
+            server_rx: &mut Box<dyn Buffer>,
+            server_tx: &mut Box<dyn Buffer>,
+            server_pk: &Box<dyn Buffer>,
+            server_sk: &Box<dyn Buffer>,
+            client_pk: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if server_rx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadRxSessionKeySize);
+            }
+
+            if server_tx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadTxSessionKeySize);
+            }
+
+            if server_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if server_sk.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            if client_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            server_rx.write(0, &server_pk.read_lock()[..4])?;
+            server_rx.write(4, &client_pk.read_lock()[..4])?;
+            server_tx.write(0, &client_pk.read_lock()[..4])?;
+            server_tx.write(4, &server_pk.read_lock()[..4])?;
 
             Ok(())
         }

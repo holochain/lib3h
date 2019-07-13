@@ -16,6 +16,8 @@ pub enum CryptoError {
     BadPublicKeySize,
     BadSecretKeySize,
     BadSignatureSize,
+    BadTxSessionKeySize,
+    BadRxSessionKeySize,
 }
 
 impl CryptoError {
