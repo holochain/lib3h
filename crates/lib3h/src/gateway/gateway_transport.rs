@@ -188,7 +188,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         let uri = maybe_uri.unwrap();
         trace!(
             "({}) new_connection: {} -> {}",
-               self.identifier.clone(), uri, id,
+            self.identifier.clone(),
+            uri,
+            id,
         );
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
@@ -212,7 +214,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             .unwrap();
         trace!(
             "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
-            self.identifier.clone(), our_peer_address,
+            self.identifier.clone(),
+            our_peer_address,
             id
         );
         return self.inner_transport.borrow_mut().send(&[&id], &buf);
@@ -230,17 +233,26 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportEvent::ErrorOccured(id, e) => {
                 error!(
                     "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier.clone(), id, e
+                    self.identifier.clone(),
+                    id,
+                    e
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                info!("({}) Outgoing connection opened: {}", self.identifier.clone(), id);
+                info!(
+                    "({}) Outgoing connection opened: {}",
+                    self.identifier.clone(),
+                    id
+                );
                 self.handle_new_connection(id)?;
-
             }
             TransportEvent::IncomingConnectionEstablished(id) => {
-                info!("({}) Incoming connection opened: {}", self.identifier.clone(), id);
+                info!(
+                    "({}) Incoming connection opened: {}",
+                    self.identifier.clone(),
+                    id
+                );
                 self.handle_new_connection(id)?;
             }
             TransportEvent::ConnectionClosed(id) => {

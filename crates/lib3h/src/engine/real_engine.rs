@@ -207,7 +207,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
         }
         // Done
-        result.map_err( |e| format_err!("Closing of some connection failed: {:?}", e))
+        result.map_err(|e| format_err!("Closing of some connection failed: {:?}", e))
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox

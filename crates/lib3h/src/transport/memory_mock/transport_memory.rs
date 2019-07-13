@@ -72,7 +72,11 @@ impl TransportMemory {
 impl Transport for TransportMemory {
     /// Get list of known connectionIds
     fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
-        Ok(self.connection_map.keys().map(|id| id.to_string()).collect())
+        Ok(self
+            .connection_map
+            .keys()
+            .map(|id| id.to_string())
+            .collect())
     }
 
     /// get uri from a connectionId

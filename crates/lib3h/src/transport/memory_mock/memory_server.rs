@@ -98,7 +98,8 @@ impl MemoryServer {
             return Err(TransportError::new("connectionId already used".to_string()));
         }
         // Notify our TransportMemory (so it can connect back)
-        self.connection_inbox.push((requester_uri.to_string(), true));
+        self.connection_inbox
+            .push((requester_uri.to_string(), true));
         self.connections.insert(requester_uri.to_string());
         Ok(())
     }

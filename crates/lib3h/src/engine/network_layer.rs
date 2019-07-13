@@ -85,7 +85,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         Ok(outbox)
     }
 
-    fn handle_new_connection(&mut self, id: &ConnectionIdRef) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_new_connection(
+        &mut self,
+        id: &ConnectionIdRef,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
         let mut network_gateway = self.network_gateway.borrow_mut();
         if let Some(uri) = network_gateway.get_uri(id) {
