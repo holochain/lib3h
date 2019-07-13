@@ -299,7 +299,10 @@ fn launch_two_wss_nodes_test(
 ) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     println!("");
-    print_test_name("WSS TWO NODES TEST: ", test_fn_ptr);
+    print_test_name(
+        format!("WSS TWO NODES TEST ({:?}): ", tls_config.clone()).as_str(),
+        test_fn_ptr,
+    );
     println!("========================");
 
     // Setup
@@ -324,7 +327,10 @@ fn launch_two_wss_nodes_test(
 
     // Wrap-up test
     println!("========================");
-    print_test_name("WSS TWO NODES TEST END: ", test_fn_ptr);
+    print_test_name(
+        format!("WSS TWO NODES TEST END ({:?}):", tls_config.clone()).as_str(),
+        test_fn_ptr,
+    );
 
     // Done
     Ok(())
@@ -338,7 +344,11 @@ fn launch_three_wss_nodes_test(
 ) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     println!("");
-    print_test_name("WSS THREE NODES TEST: ", test_fn_ptr);
+    print_test_name(
+        format!("WSS THREE NODES TEST ({:?}):", tls_config.clone()).as_str(),
+        test_fn_ptr,
+    );
+
     println!("==========================");
 
     // Setup
@@ -369,7 +379,10 @@ fn launch_three_wss_nodes_test(
 
     // Wrap-up test
     println!("==========================");
-    print_test_name("WSS THREE NODES TEST END: ", test_fn_ptr);
+    print_test_name(
+        format!("WSS THREE NODES TEST END ({:?}):", tls_config.clone()).as_str(),
+        test_fn_ptr,
+    );
 
     // Done
     Ok(())
