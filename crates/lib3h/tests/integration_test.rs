@@ -89,15 +89,24 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
 }
 
-fn setup_wss_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
+fn setup_wss_node(
+    name: &str,
+    agent_id_arg: Address,
+    tls_config: TlsConfig,
+    fn_name: &str,
+) -> NodeMock {
+    let fn_name = fn_name.replace("::", "__");
     let port = generate_port();
-    let bind_url = Url::parse(format!("ws://127.0.0.1:{}/{}", port, fn_name).as_str())
+    let protocol = match tls_config {
+        TlsConfig::Unencrypted => "ws",
+        TlsConfig::SuppliedCertificate(_) | TlsConfig::FakeServer => "wss",
+    };
+    let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
         .expect("invalid web socket url");
-    println!("bind url: {}", bind_url);
 
     let config = RealEngineConfig {
-        tls_config: TlsConfig::Unencrypted,
-        socket_type: "ws".into(),
+        tls_config: tls_config,
+        socket_type: protocol.into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
@@ -221,7 +230,7 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
 fn test_two_wss_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
-        launch_two_wss_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::Unencrypted, *can_setup).unwrap();
     }
 }
 
@@ -229,7 +238,7 @@ fn test_two_wss_nodes_basic_suite() {
 fn test_two_wss_nodes_get_lists_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_GET_LISTS_TEST_FNS.iter() {
-        launch_two_wss_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::Unencrypted, *can_setup).unwrap();
     }
 }
 
@@ -237,7 +246,7 @@ fn test_two_wss_nodes_get_lists_suite() {
 fn test_two_wss_nodes_spaces_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_SPACES_TEST_FNS.iter() {
-        launch_two_wss_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::Unencrypted, *can_setup).unwrap();
     }
 }
 
@@ -245,20 +254,67 @@ fn test_two_wss_nodes_spaces_suite() {
 fn test_three_wss_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
-        launch_three_wss_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_three_wss_nodes_test(*test_fn, TlsConfig::Unencrypted, *can_setup).unwrap();
+    }
+}
+
+// -- Wss+Tls Transport Tests --
+#[test]
+fn test_two_wss_tls_nodes_basic_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
+    }
+}
+
+#[test]
+fn test_two_wss_tls_nodes_get_lists_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_GET_LISTS_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
+    }
+}
+
+#[test]
+fn test_two_wss_tls_nodes_spaces_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_SPACES_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
+    }
+}
+
+#[test]
+fn test_three_wss_tls_nodes_basic_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
+        launch_three_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
     }
 }
 
 // Do general test with config
-fn launch_two_wss_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
+fn launch_two_wss_nodes_test(
+    test_fn: TwoNodesTestFn,
+    tls_config: TlsConfig,
+    can_setup: bool,
+) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     println!("");
     print_test_name("WSS TWO NODES TEST: ", test_fn_ptr);
     println!("========================");
 
     // Setup
-    let mut alex = setup_wss_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut billy = setup_wss_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut alex = setup_wss_node(
+        "alex",
+        ALEX_AGENT_ID.clone(),
+        tls_config.clone(),
+        &fn_name(test_fn_ptr),
+    );
+    let mut billy = setup_wss_node(
+        "billy",
+        BILLY_AGENT_ID.clone(),
+        tls_config.clone(),
+        &fn_name(test_fn_ptr),
+    );
     if can_setup {
         setup_two_nodes(&mut alex, &mut billy);
     }
@@ -275,16 +331,35 @@ fn launch_two_wss_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result
 }
 
 // Do general test with config
-fn launch_three_wss_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) -> Result<(), ()> {
+fn launch_three_wss_nodes_test(
+    test_fn: ThreeNodesTestFn,
+    tls_config: TlsConfig,
+    can_setup: bool,
+) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     println!("");
     print_test_name("WSS THREE NODES TEST: ", test_fn_ptr);
     println!("==========================");
 
     // Setup
-    let mut alex = setup_wss_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut billy = setup_wss_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut camille = setup_wss_node("camille", CAMILLE_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut alex = setup_wss_node(
+        "alex",
+        ALEX_AGENT_ID.clone(),
+        tls_config.clone(),
+        &fn_name(test_fn_ptr),
+    );
+    let mut billy = setup_wss_node(
+        "billy",
+        BILLY_AGENT_ID.clone(),
+        tls_config.clone(),
+        &fn_name(test_fn_ptr),
+    );
+    let mut camille = setup_wss_node(
+        "camille",
+        CAMILLE_AGENT_ID.clone(),
+        tls_config.clone(),
+        &fn_name(test_fn_ptr),
+    );
     if can_setup {
         setup_three_nodes(&mut alex, &mut billy, &mut camille);
     }
