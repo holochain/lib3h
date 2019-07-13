@@ -190,7 +190,24 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
         // TODO #159
-        Ok(())
+        let mut result = Ok(());
+        for space_gatway in self.space_gateway_map.values_mut() {
+            let res = space_gatway.close_all();
+            // Continue closing connections even if some failed
+            if let Err(e) = res {
+                if result.is_ok() {
+                    result = Err(e);
+                }
+            }
+        }
+        let res = self.network_gateway.borrow_mut().close_all();
+        if let Err(e) = res {
+            if result.is_ok() {
+                result = Err(e);
+            }
+        }
+        // Done
+        result.map_err( |e| format_err!("Closing of some connection failed: {:?}", e))
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
