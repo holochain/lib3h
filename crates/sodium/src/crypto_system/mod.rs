@@ -135,12 +135,6 @@ impl CryptoSystem for SodiumCryptoSystem {
     fn hash_sha512_bytes(&self) -> usize {
         rust_sodium_sys::crypto_hash_sha512_BYTES as usize
     }
-    fn pwhash_salt_bytes(&self) -> usize {
-        rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
-    }
-    fn pwhash_bytes(&self) -> usize {
-        32
-    }
 
     fn hash_sha256(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()> {
         if hash.len() != self.hash_sha256_bytes() {
@@ -178,6 +172,13 @@ impl CryptoSystem for SodiumCryptoSystem {
         Ok(())
     }
 
+    fn pwhash_salt_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
+    }
+    fn pwhash_bytes(&self) -> usize {
+        32
+    }
+
     fn pwhash(
         &self,
         hash: &mut Box<dyn Buffer>,
@@ -213,6 +214,54 @@ impl CryptoSystem for SodiumCryptoSystem {
             -1 => Err(CryptoError::OutOfMemory),
             _ => unreachable!(),
         }
+    }
+
+    fn kdf_context_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_CONTEXTBYTES as usize
+    }
+
+    fn kdf_min_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_BYTES_MIN as usize
+    }
+
+    fn kdf_max_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_BYTES_MAX as usize
+    }
+
+    fn kdf(
+        &self,
+        out_buffer: &mut Box<dyn Buffer>,
+        index: u64,
+        context: &Box<dyn Buffer>,
+        parent: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if out_buffer.len() < self.kdf_min_bytes() || out_buffer.len() > self.kdf_max_bytes() {
+            return Err(CryptoError::BadOutBufferSize);
+        }
+
+        if parent.len() < self.kdf_min_bytes() || parent.len() > self.kdf_max_bytes() {
+            return Err(CryptoError::BadParentSize);
+        }
+
+        if context.len() != self.kdf_context_bytes() {
+            return Err(CryptoError::BadContextSize);
+        }
+
+        let mut out_buffer = out_buffer.write_lock();
+        let context = context.read_lock();
+        let parent = parent.read_lock();
+
+        unsafe {
+            rust_sodium_sys::crypto_kdf_derive_from_key(
+                raw_ptr_char!(out_buffer),
+                out_buffer.len(),
+                index,
+                raw_ptr_ichar_immut!(context),
+                raw_ptr_char_immut!(parent),
+            );
+        }
+
+        Ok(())
     }
 
     fn sign_seed_bytes(&self) -> usize {

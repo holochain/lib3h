@@ -17,6 +17,7 @@ impl FullSuite {
         self.test_random();
         self.test_hash();
         self.test_pwhash();
+        self.test_kdf();
         self.test_sign_keypair_sizes();
         self.test_sign_keypair_generation();
         self.test_sign();
@@ -78,6 +79,35 @@ impl FullSuite {
         let mut hash2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.pwhash_bytes()]);
         self.crypto.pwhash(&mut hash2, &pw, &salt).unwrap();
         assert_eq!(&format!("{:?}", hash1), &format!("{:?}", hash2));
+    }
+
+    fn test_kdf(&self) {
+        let ctx1: Box<dyn Buffer> = Box::new(vec![1; self.crypto.kdf_context_bytes()]);
+        let ctx2: Box<dyn Buffer> = Box::new(vec![2; self.crypto.kdf_context_bytes()]);
+
+        let root: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut a_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut a_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut a_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut b_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut b_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut b_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+
+        self.crypto.kdf(&mut a_1_1, 1, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut a_2_1, 2, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut a_1_2, 1, &ctx2, &root).unwrap();
+
+        self.crypto.kdf(&mut b_1_1, 1, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut b_2_1, 2, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut b_1_2, 1, &ctx2, &root).unwrap();
+
+        assert_eq!(&format!("{:?}", a_1_1), &format!("{:?}", b_1_1));
+        assert_eq!(&format!("{:?}", a_2_1), &format!("{:?}", b_2_1));
+        assert_eq!(&format!("{:?}", a_1_2), &format!("{:?}", b_1_2));
+
+        assert_ne!(&format!("{:?}", a_1_1), &format!("{:?}", a_2_1));
+        assert_ne!(&format!("{:?}", a_1_1), &format!("{:?}", a_1_2));
+        assert_ne!(&format!("{:?}", a_2_1), &format!("{:?}", a_1_2));
     }
 
     fn test_sign_keypair_sizes(&self) {
@@ -284,12 +314,6 @@ mod test {
         fn hash_sha512_bytes(&self) -> usize {
             64
         }
-        fn pwhash_salt_bytes(&self) -> usize {
-            8
-        }
-        fn pwhash_bytes(&self) -> usize {
-            16
-        }
 
         fn hash_sha256(
             &self,
@@ -321,6 +345,13 @@ mod test {
             Ok(())
         }
 
+        fn pwhash_salt_bytes(&self) -> usize {
+            8
+        }
+        fn pwhash_bytes(&self) -> usize {
+            16
+        }
+
         fn pwhash(
             &self,
             hash: &mut Box<dyn Buffer>,
@@ -342,6 +373,45 @@ mod test {
                 password.len()
             };
             hash.write(8, &password.read_lock()[0..plen])?;
+
+            Ok(())
+        }
+
+        fn kdf_context_bytes(&self) -> usize {
+            1
+        }
+
+        fn kdf_min_bytes(&self) -> usize {
+            8
+        }
+
+        fn kdf_max_bytes(&self) -> usize {
+            8
+        }
+
+        fn kdf(
+            &self,
+            out_buffer: &mut Box<dyn Buffer>,
+            index: u64,
+            context: &Box<dyn Buffer>,
+            parent: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if out_buffer.len() < self.kdf_min_bytes() || out_buffer.len() > self.kdf_max_bytes() {
+                return Err(CryptoError::BadOutBufferSize);
+            }
+
+            if parent.len() < self.kdf_min_bytes() || parent.len() > self.kdf_max_bytes() {
+                return Err(CryptoError::BadParentSize);
+            }
+
+            if context.len() != self.kdf_context_bytes() {
+                return Err(CryptoError::BadContextSize);
+            }
+
+            out_buffer.write(0, parent)?;
+            let mut out_buffer = out_buffer.write_lock();
+            out_buffer[4] = (index % 256) as u8;
+            out_buffer[5] = context.read_lock()[0];
 
             Ok(())
         }

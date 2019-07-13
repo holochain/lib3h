@@ -26,13 +26,19 @@ pub trait CryptoSystem: Sync {
     /// fill all the bytes in the buffer with secure random data
     fn randombytes_buf(&self, buffer: &mut Box<dyn Buffer>) -> CryptoResult<()>;
 
-    // -- hash methods -- //
+    // -- derivation methods -- //
 
     /// bytelength of sha256 hash
     fn hash_sha256_bytes(&self) -> usize;
 
     /// bytelength of sha512 hash
     fn hash_sha512_bytes(&self) -> usize;
+
+    /// compute a sha256 hash for `data`, storing it in `hash`
+    fn hash_sha256(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
+
+    /// compute a sha512 hash for `data`, storing it in `hash`
+    fn hash_sha512(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
 
     /// bytelength of pwhash salt
     fn pwhash_salt_bytes(&self) -> usize;
@@ -48,11 +54,19 @@ pub trait CryptoSystem: Sync {
         salt: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
 
-    /// compute a sha256 hash for `data`, storing it in `hash`
-    fn hash_sha256(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
+    fn kdf_context_bytes(&self) -> usize;
 
-    /// compute a sha512 hash for `data`, storing it in `hash`
-    fn hash_sha512(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
+    fn kdf_min_bytes(&self) -> usize;
+
+    fn kdf_max_bytes(&self) -> usize;
+
+    fn kdf(
+        &self,
+        out_buffer: &mut Box<dyn Buffer>,
+        index: u64,
+        context: &Box<dyn Buffer>,
+        parent: &Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
 
     // -- signature methods -- //
 
