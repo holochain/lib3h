@@ -303,12 +303,20 @@ pub fn full_suite(crypto: Box<dyn CryptoSystem>) {
 mod test {
     use super::*;
     use crate::{CryptoResult, ProtectState};
+    use rand::{Rng, SeedableRng};
     use sha2::Digest;
     use std::ops::{Deref, DerefMut};
 
     #[test]
     fn fake_should_pass_crypto_system_full_suite() {
-        full_suite(Box::new(FakeCryptoSystem));
+        let seed: [u8; 32] = [
+            143, 106, 67, 237, 112, 106, 175, 150, 195, 103, 30, 19, 109, 13, 220, 160, 31, 212,
+            59, 142, 251, 44, 63, 50, 123, 52, 6, 104, 201, 223, 19, 140,
+        ];
+        full_suite(Box::new(FakeCryptoSystem {
+            seed: seed.clone(),
+            rng: std::sync::RwLock::new(rand::rngs::StdRng::from_seed(seed)),
+        }));
     }
 
     #[derive(Debug, Clone)]
@@ -382,11 +390,17 @@ mod test {
         }
     }
 
-    struct FakeCryptoSystem;
+    struct FakeCryptoSystem {
+        seed: [u8; 32],
+        rng: std::sync::RwLock<rand::rngs::StdRng>,
+    }
 
     impl CryptoSystem for FakeCryptoSystem {
         fn box_clone(&self) -> Box<dyn CryptoSystem> {
-            Box::new(FakeCryptoSystem)
+            Box::new(FakeCryptoSystem {
+                seed: self.seed.clone(),
+                rng: std::sync::RwLock::new(rand::rngs::StdRng::from_seed(self.seed.clone())),
+            })
         }
 
         fn as_crypto_system(&self) -> &dyn CryptoSystem {
@@ -401,7 +415,7 @@ mod test {
             let mut buffer = buffer.write_lock();
 
             for i in 0..buffer.len() {
-                buffer[i] = rand::random();
+                buffer[i] = self.rng.write().unwrap().gen();
             }
 
             Ok(())
