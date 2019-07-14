@@ -30,6 +30,7 @@ pub const SALTBYTES: usize = rust_sodium_sys::crypto_pwhash_SALTBYTES as usize;
 /// @param {SecBuf} salt - predefined salt (randomized it if you dont want to generate it )
 ///
 /// @param {SecBuf} hash - the hash generated
+#[deprecated(note = "use CryptoSystem")]
 pub fn hash(
     password: &mut SecBuf,
     ops_limit: u64,

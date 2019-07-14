@@ -16,7 +16,7 @@ pub const MAXBYTES: usize = rust_sodium_sys::crypto_kdf_BYTES_MAX as usize;
 /// @param {Buffer} context - eight bytes context
 ///
 /// @param {SecBuf} parent - the parent key to derive from
-
+#[deprecated(note = "use CryptoSystem")]
 pub fn derive(
     out: &mut SecBuf,
     index: u64,
