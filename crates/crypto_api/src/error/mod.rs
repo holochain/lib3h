@@ -18,6 +18,10 @@ pub enum CryptoError {
     BadSignatureSize,
     BadTxSessionKeySize,
     BadRxSessionKeySize,
+    BadCipherSize,
+    BadNonceSize,
+    BadMessageSize,
+    CouldNotDecrypt,
 }
 
 impl CryptoError {

@@ -554,6 +554,121 @@ impl CryptoSystem for SodiumCryptoSystem {
 
         Ok(())
     }
+
+    fn aead_nonce_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_NPUBBYTES as usize
+    }
+
+    fn aead_auth_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_ABYTES as usize
+    }
+
+    fn aead_secret_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_KEYBYTES as usize
+    }
+
+    fn aead_encrypt(
+        &self,
+        cipher: &mut Box<dyn Buffer>,
+        message: &Box<dyn Buffer>,
+        adata: Option<&Box<dyn Buffer>>,
+        nonce: &Box<dyn Buffer>,
+        secret: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if cipher.len() != message.len() + self.aead_auth_bytes() {
+            return Err(CryptoError::BadCipherSize);
+        }
+
+        if nonce.len() != self.aead_nonce_bytes() {
+            return Err(CryptoError::BadNonceSize);
+        }
+
+        if secret.len() != self.aead_secret_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let my_adata_locker;
+        let mut my_adata = std::ptr::null();
+        let mut my_ad_len = 0 as libc::c_ulonglong;
+        if let Some(adata) = adata {
+            my_adata_locker = adata.read_lock();
+            my_adata = raw_ptr_char_immut!(my_adata_locker);
+            my_ad_len = my_adata_locker.len() as libc::c_ulonglong;
+        }
+
+        let mut cipher = cipher.write_lock();
+        let message = message.read_lock();
+        let nonce = nonce.read_lock();
+        let secret = secret.read_lock();
+
+        unsafe {
+            rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_encrypt(
+                raw_ptr_char!(cipher),
+                std::ptr::null_mut(),
+                raw_ptr_char_immut!(message),
+                message.len() as libc::c_ulonglong,
+                my_adata,
+                my_ad_len,
+                std::ptr::null_mut(),
+                raw_ptr_char_immut!(nonce),
+                raw_ptr_char_immut!(secret),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn aead_decrypt(
+        &self,
+        message: &mut Box<dyn Buffer>,
+        cipher: &Box<dyn Buffer>,
+        adata: Option<&Box<dyn Buffer>>,
+        nonce: &Box<dyn Buffer>,
+        secret: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if message.len() != cipher.len() - self.aead_auth_bytes() {
+            return Err(CryptoError::BadMessageSize);
+        }
+
+        if nonce.len() != self.aead_nonce_bytes() {
+            return Err(CryptoError::BadNonceSize);
+        }
+
+        if secret.len() != self.aead_secret_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let my_adata_locker;
+        let mut my_adata = std::ptr::null();
+        let mut my_ad_len = 0 as libc::c_ulonglong;
+
+        if let Some(adata) = adata {
+            my_adata_locker = adata.read_lock();
+            my_adata = raw_ptr_char_immut!(my_adata_locker);
+            my_ad_len = my_adata_locker.len() as libc::c_ulonglong;
+        }
+
+        let mut message = message.write_lock();
+        let cipher = cipher.read_lock();
+        let nonce = nonce.read_lock();
+        let secret = secret.read_lock();
+
+        unsafe {
+            rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_decrypt(
+                raw_ptr_char!(message),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                raw_ptr_char_immut!(cipher),
+                cipher.len() as libc::c_ulonglong,
+                my_adata,
+                my_ad_len,
+                raw_ptr_char_immut!(nonce),
+                raw_ptr_char_immut!(secret),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

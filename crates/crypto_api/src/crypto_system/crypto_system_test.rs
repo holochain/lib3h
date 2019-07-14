@@ -24,6 +24,7 @@ impl FullSuite {
         self.test_kx_keypair_sizes();
         self.test_kx_keypair_generation();
         self.test_kx();
+        self.test_aead();
     }
 
     fn test_sec_buf(&self) {
@@ -291,6 +292,32 @@ impl FullSuite {
 
         assert_eq!(&format!("{:?}", c_rx), &format!("{:?}", s_tx));
         assert_eq!(&format!("{:?}", c_tx), &format!("{:?}", s_rx));
+    }
+
+    fn test_aead(&self) {
+        let mut secret: Box<dyn Buffer> = Box::new(vec![0; self.crypto.aead_secret_bytes()]);
+        self.crypto.randombytes_buf(&mut secret).unwrap();
+        let mut nonce: Box<dyn Buffer> = Box::new(vec![0; self.crypto.aead_nonce_bytes()]);
+        self.crypto.randombytes_buf(&mut nonce).unwrap();
+        let mut message: Box<dyn Buffer> = Box::new(vec![0; 16]);
+        self.crypto.randombytes_buf(&mut message).unwrap();
+        let mut adata: Box<dyn Buffer> = Box::new(vec![0; 16]);
+        self.crypto.randombytes_buf(&mut adata).unwrap();
+
+        let mut cipher: Box<dyn Buffer> = Box::new(vec![0; 16 + self.crypto.aead_auth_bytes()]);
+
+        self.crypto
+            .aead_encrypt(&mut cipher, &message, Some(&adata), &nonce, &secret)
+            .unwrap();
+
+        let mut msg_out: Box<dyn Buffer> =
+            Box::new(vec![0; cipher.len() - self.crypto.aead_auth_bytes()]);
+
+        self.crypto
+            .aead_decrypt(&mut msg_out, &cipher, Some(&adata), &nonce, &secret)
+            .unwrap();
+
+        assert_eq!(&format!("{:?}", message), &format!("{:?}", msg_out));
     }
 }
 
@@ -757,6 +784,92 @@ mod test {
             server_rx.write(4, &client_pk.read_lock()[..4])?;
             server_tx.write(0, &client_pk.read_lock()[..4])?;
             server_tx.write(4, &server_pk.read_lock()[..4])?;
+
+            Ok(())
+        }
+
+        fn aead_nonce_bytes(&self) -> usize {
+            8
+        }
+
+        fn aead_auth_bytes(&self) -> usize {
+            8
+        }
+
+        fn aead_secret_bytes(&self) -> usize {
+            8
+        }
+
+        fn aead_encrypt(
+            &self,
+            cipher: &mut Box<dyn Buffer>,
+            message: &Box<dyn Buffer>,
+            adata: Option<&Box<dyn Buffer>>,
+            nonce: &Box<dyn Buffer>,
+            secret: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if cipher.len() != message.len() + self.aead_auth_bytes() {
+                return Err(CryptoError::BadCipherSize);
+            }
+
+            if nonce.len() != self.aead_nonce_bytes() {
+                return Err(CryptoError::BadNonceSize);
+            }
+
+            if secret.len() != self.aead_secret_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            cipher.zero();
+            cipher.write(2, &nonce.read_lock()[..2])?;
+            cipher.write(4, &secret.read_lock()[..2])?;
+
+            if let Some(adata) = adata {
+                cipher.write(6, &adata.read_lock()[..2])?;
+            }
+
+            cipher.write(8, &message.read_lock())?;
+
+            Ok(())
+        }
+
+        fn aead_decrypt(
+            &self,
+            message: &mut Box<dyn Buffer>,
+            cipher: &Box<dyn Buffer>,
+            adata: Option<&Box<dyn Buffer>>,
+            nonce: &Box<dyn Buffer>,
+            secret: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if message.len() != cipher.len() - self.aead_auth_bytes() {
+                return Err(CryptoError::BadMessageSize);
+            }
+
+            if nonce.len() != self.aead_nonce_bytes() {
+                return Err(CryptoError::BadNonceSize);
+            }
+
+            if secret.len() != self.aead_secret_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            let cipher = cipher.read_lock();
+
+            if &cipher[2..4] != &nonce.read_lock()[..2] {
+                return Err(CryptoError::CouldNotDecrypt);
+            }
+
+            if &cipher[4..6] != &secret.read_lock()[..2] {
+                return Err(CryptoError::CouldNotDecrypt);
+            }
+
+            if let Some(adata) = adata {
+                if &cipher[6..8] != &adata.read_lock()[..2] {
+                    return Err(CryptoError::CouldNotDecrypt);
+                }
+            }
+
+            message.write(0, &cipher[8..])?;
 
             Ok(())
         }

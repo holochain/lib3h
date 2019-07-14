@@ -168,6 +168,35 @@ pub trait CryptoSystem: Sync {
         server_sk: &Box<dyn Buffer>,
         client_pk: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
+
+    // -- aead encryption methods -- //
+
+    /// bytelength of key exchange seed
+    fn aead_nonce_bytes(&self) -> usize;
+
+    /// bytelength of aead authentication tag
+    fn aead_auth_bytes(&self) -> usize;
+
+    /// bytelength of aead symmetric key
+    fn aead_secret_bytes(&self) -> usize;
+
+    fn aead_encrypt(
+        &self,
+        cipher: &mut Box<dyn Buffer>,
+        message: &Box<dyn Buffer>,
+        adata: Option<&Box<dyn Buffer>>,
+        nonce: &Box<dyn Buffer>,
+        secret: &Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
+
+    fn aead_decrypt(
+        &self,
+        message: &mut Box<dyn Buffer>,
+        cipher: &Box<dyn Buffer>,
+        adata: Option<&Box<dyn Buffer>>,
+        nonce: &Box<dyn Buffer>,
+        secret: &Box<dyn Buffer>,
+    ) -> CryptoResult<()>;
 }
 
 pub mod crypto_system_test;
