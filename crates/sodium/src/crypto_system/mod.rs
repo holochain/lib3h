@@ -144,11 +144,14 @@ impl CryptoSystem for SodiumCryptoSystem {
         unsafe {
             let mut hash = hash.write_lock();
             let data = data.read_lock();
-            rust_sodium_sys::crypto_hash_sha256(
+            if rust_sodium_sys::crypto_hash_sha256(
                 raw_ptr_char!(hash),
                 raw_ptr_char_immut!(data),
                 data.len() as libc::c_ulonglong,
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -252,13 +255,16 @@ impl CryptoSystem for SodiumCryptoSystem {
         let parent = parent.read_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_kdf_derive_from_key(
+            if rust_sodium_sys::crypto_kdf_derive_from_key(
                 raw_ptr_char!(out_buffer),
                 out_buffer.len(),
                 index,
                 raw_ptr_ichar_immut!(context),
                 raw_ptr_char_immut!(parent),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -300,11 +306,14 @@ impl CryptoSystem for SodiumCryptoSystem {
         let seed = seed.read_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_sign_seed_keypair(
+            if rust_sodium_sys::crypto_sign_seed_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
                 raw_ptr_char_immut!(seed),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -327,10 +336,13 @@ impl CryptoSystem for SodiumCryptoSystem {
         let mut secret_key = secret_key.write_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_sign_keypair(
+            if rust_sodium_sys::crypto_sign_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -355,13 +367,16 @@ impl CryptoSystem for SodiumCryptoSystem {
         let mut signature = signature.write_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_sign_detached(
+            if rust_sodium_sys::crypto_sign_detached(
                 raw_ptr_char!(signature),
                 std::ptr::null_mut(),
                 raw_ptr_char_immut!(message),
                 message.len() as libc::c_ulonglong,
                 raw_ptr_char_immut!(secret_key),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -388,7 +403,7 @@ impl CryptoSystem for SodiumCryptoSystem {
                 message.len() as libc::c_ulonglong,
                 raw_ptr_char_immut!(public_key),
             )
-        } == 0)
+        } == 0 as libc::c_int)
     }
 
     fn kx_seed_bytes(&self) -> usize {
@@ -427,11 +442,14 @@ impl CryptoSystem for SodiumCryptoSystem {
         let seed = seed.read_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_kx_seed_keypair(
+            if rust_sodium_sys::crypto_kx_seed_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
                 raw_ptr_char_immut!(seed),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -454,10 +472,13 @@ impl CryptoSystem for SodiumCryptoSystem {
         let mut secret_key = secret_key.write_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_kx_keypair(
+            if rust_sodium_sys::crypto_kx_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -497,13 +518,16 @@ impl CryptoSystem for SodiumCryptoSystem {
             let client_pk = client_pk.read_lock();
             let client_sk = client_sk.read_lock();
             let server_pk = server_pk.read_lock();
-            rust_sodium_sys::crypto_kx_client_session_keys(
+            if rust_sodium_sys::crypto_kx_client_session_keys(
                 raw_ptr_char!(client_rx),
                 raw_ptr_char!(client_tx),
                 raw_ptr_char_immut!(client_pk),
                 raw_ptr_char_immut!(client_sk),
                 raw_ptr_char_immut!(server_pk),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -543,13 +567,16 @@ impl CryptoSystem for SodiumCryptoSystem {
             let server_pk = server_pk.read_lock();
             let server_sk = server_sk.read_lock();
             let client_pk = client_pk.read_lock();
-            rust_sodium_sys::crypto_kx_server_session_keys(
+            if rust_sodium_sys::crypto_kx_server_session_keys(
                 raw_ptr_char!(server_rx),
                 raw_ptr_char!(server_tx),
                 raw_ptr_char_immut!(server_pk),
                 raw_ptr_char_immut!(server_sk),
                 raw_ptr_char_immut!(client_pk),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -602,7 +629,7 @@ impl CryptoSystem for SodiumCryptoSystem {
         let secret = secret.read_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_encrypt(
+            if rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_encrypt(
                 raw_ptr_char!(cipher),
                 std::ptr::null_mut(),
                 raw_ptr_char_immut!(message),
@@ -612,7 +639,10 @@ impl CryptoSystem for SodiumCryptoSystem {
                 std::ptr::null_mut(),
                 raw_ptr_char_immut!(nonce),
                 raw_ptr_char_immut!(secret),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -654,7 +684,7 @@ impl CryptoSystem for SodiumCryptoSystem {
         let secret = secret.read_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_decrypt(
+            if rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_decrypt(
                 raw_ptr_char!(message),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
@@ -664,7 +694,10 @@ impl CryptoSystem for SodiumCryptoSystem {
                 my_ad_len,
                 raw_ptr_char_immut!(nonce),
                 raw_ptr_char_immut!(secret),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::CouldNotDecrypt);
+            }
         }
 
         Ok(())
