@@ -8,10 +8,10 @@
 RUSTFLAGS += -D warnings -Z external-macro-backtrace -Z thinlto -C codegen-units=10
 
 SHELL = /usr/bin/env sh
-RUST_VER_WANT = "rustc 1.37.0-nightly (d132f544f 2019-06-07)"
-RUST_TAG_WANT = "nightly-2019-06-08"
-FMT_VER_WANT = "rustfmt 1.2.2-nightly (5274b49 2019-04-24)"
-CLP_VER_WANT = "clippy 0.0.212 (71be6f6 2019-06-06)"
+RUST_VER_WANT = "rustc 1.38.0-nightly (69656fa4c 2019-07-13)"
+RUST_TAG_WANT = "nightly-2019-07-14"
+FMT_VER_WANT = "rustfmt 1.3.0-nightly (d334502 2019-06-09)"
+CLP_VER_WANT = "clippy 0.0.212 (b029042 2019-07-12)"
 
 ENV = RUSTFLAGS='$(RUSTFLAGS)' OPENSSL_STATIC='1' CARGO_BUILD_JOBS='$(shell nproc)' NUM_JOBS='$(shell nproc)' CARGO_INCREMENTAL='1'
 

@@ -1,0 +1,14 @@
+build_cloud: azure
+image: hc-azure
+
+shallow_clone: true
+version: 1.0.{build}
+build: false
+max_jobs: 20
+
+environment:
+  matrix:
+  - test_p: all
+
+test_script:
+ - scripts\windows\do-ci-test.bat
