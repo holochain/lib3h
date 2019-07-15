@@ -12,7 +12,7 @@ pub struct Lib3hProtocolError(Box<ErrorKind>);
 
 impl Lib3hProtocolError {
     /// A crate private constructor for `Error`.
-    pub fn new(kind: ErrorKind) -> Lib3hProtocolError {
+    pub fn new(kind: ErrorKind) -> Self {
         Lib3hProtocolError(Box::new(kind))
     }
 

@@ -15,13 +15,19 @@ pub struct Lib3hError(Box<ErrorKind>);
 
 impl Lib3hError {
     /// A constructor for `Lib3hError`.
-    pub fn new(kind: ErrorKind) -> Lib3hError {
+    pub fn new(kind: ErrorKind) -> Self {
         Lib3hError(Box::new(kind))
     }
 
     /// Helper function to build a new error with an [Other](ErrorKind::Other) ErrorKind.
     pub fn new_other(s: &str) -> Self {
         Lib3hError::new(ErrorKind::Other(s.to_owned()))
+    }
+
+    /// Helper function to cut verbosity from error building originating from a missing key value
+    /// retrieval.
+    pub fn new_key_not_found(s: &str) -> Self {
+        Lib3hError::new(ErrorKind::KeyNotFound(s.to_owned()))
     }
 
     /// Return the specific type of this error.
