@@ -93,11 +93,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     peer_data
                 );
                 // For now accept all request
-                let hold_cmd = DhtCommand::HoldPeer(peer_data);
-                space_gateway.post_dht(hold_cmd)?;
+                Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data))?;
             }
             DhtEvent::PeerTimedOut(_data) => {
-                // FIXME
+                // TODO #159
             }
             // HoldEntryRequested from gossip
             // -> Send each aspect to Core for validation
@@ -105,7 +104,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 for aspect in entry.aspect_list {
                     let lib3h_msg =
                         Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData {
-                            request_id: "FIXME".to_string(),
+                            request_id: "FIXME".to_string(), // TODO #168
                             space_address: chain_id.0.clone(),
                             provider_agent_id: from.clone().into(),
                             entry_address: entry.entry_address.clone(),
@@ -115,7 +114,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             // FetchEntryResponse: Send back as a query response to Core
-            // TODO Discern Fetch from Query
+            // TODO #169 - Discern Fetch from Query
             DhtEvent::FetchEntryResponse(response) => {
                 let mut query_result = Vec::new();
                 response
@@ -126,14 +125,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     space_address: chain_id.0.clone(),
                     entry_address: response.entry.entry_address.clone(),
                     request_id: response.msg_id.clone(),
-                    requester_agent_id: chain_id.1.clone(), // TODO: get requester with channel from p2p protocol
+                    requester_agent_id: chain_id.1.clone(), // TODO #150 - get requester from channel from p2p-protocol
                     responder_agent_id: chain_id.1.clone(),
                     query_result,
                 };
                 outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
             }
             DhtEvent::EntryPruned(_address) => {
-                // FIXME
+                // TODO #174
             }
             // EntryDataRequested: Change it into a Lib3hServerProtocol::HandleFetchEntry.
             DhtEvent::EntryDataRequested(fetch_entry) => {

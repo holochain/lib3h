@@ -17,6 +17,6 @@ pub type Address = holochain_persistence_api::hash::HashString;
 /// type name for a bool indicating if work was done during a `process()`
 pub type DidWork = bool;
 
-/// TODO: To replace with our own custom Error handling
+/// TODO #58 - To replace with our own custom Error handling
 use failure::Error;
 pub type Lib3hResult<T> = Result<T, Error>;

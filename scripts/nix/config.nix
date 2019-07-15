@@ -68,7 +68,7 @@ l3h-release-hook-publish
   version = {
    current = "0.0.6";
    # not used by version hooks in this repo
-   previous = "_._._";
+   previous = "0.0.5";
   };
 
   github = {

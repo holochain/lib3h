@@ -50,4 +50,7 @@ pub enum Lib3hClientProtocol {
     // -- Entry lists -- //
     HandleGetAuthoringEntryListResult(EntryListData),
     HandleGetGossipingEntryListResult(EntryListData),
+
+    // -- N3h specific functinonality -- //
+    Shutdown,
 }
