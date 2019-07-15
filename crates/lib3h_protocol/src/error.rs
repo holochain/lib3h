@@ -1,7 +1,7 @@
 //! Lib3h_protocol custom error definition.
 
-use std::{error::Error as StdError, fmt, io, result};
 use serde::de::value::Error as DeserializeError;
+use std::{error::Error as StdError, fmt, io, result};
 
 /// A type alias for `Result<T, Lib3hProtocolError>`.
 pub type Lib3hProtocolResult<T> = result::Result<T, Lib3hProtocolError>;
@@ -15,6 +15,13 @@ impl Lib3hProtocolError {
     pub fn new(kind: ErrorKind) -> Lib3hProtocolError {
         Lib3hProtocolError(Box::new(kind))
     }
+
+    /// Helper function to build [Lib3h errors](https://github.com/holochain/lib3h) because we
+    /// cannot import them in order to avoid circular dependency.
+    pub fn new_lib3h_error(s: &str) -> Self {
+        Lib3hProtocolError::new(ErrorKind::Lib3hError(s.to_owned()))
+    }
+
     /// Return the specific type of this error.
     pub fn kind(&self) -> &ErrorKind {
         &self.0
@@ -35,6 +42,9 @@ pub enum ErrorKind {
     TransportError(String),
     /// An error occuring whiling trying to deserialize stuff during gossiping for example.
     DeserializeError(DeserializeError),
+    /// Error occuring in [Lib3h](https://github.com/holochain/lib3h/). This is kind of a hacky way
+    /// to do it but it's a viable option to avoid circular dependency.
+    Lib3hError(String),
     /// Yet undefined error.
     Other(String),
     /// Hints that destructuring should not be exhaustive.
@@ -52,7 +62,9 @@ impl StdError for Lib3hProtocolError {
         match *self.0 {
             ErrorKind::Io(ref err) => Some(err),
             ErrorKind::DeserializeError(ref err) => Some(err),
-            ErrorKind::Other(ref _s) | ErrorKind::TransportError(ref _s) => None,
+            ErrorKind::Lib3hError(ref _s)
+            | ErrorKind::Other(ref _s)
+            | ErrorKind::TransportError(ref _s) => None,
             _ => unreachable!(),
         }
     }
@@ -64,6 +76,7 @@ impl fmt::Display for Lib3hProtocolError {
             ErrorKind::Io(ref err) => err.fmt(f),
             ErrorKind::TransportError(ref s) => write!(f, "TransportError: '{}'.", s),
             ErrorKind::DeserializeError(ref err) => err.fmt(f),
+            ErrorKind::Lib3hError(ref s) => write!(f, "Li3hError encountered: '{}'.", s),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
@@ -81,22 +94,3 @@ impl From<DeserializeError> for Lib3hProtocolError {
         Lib3hProtocolError::new(ErrorKind::DeserializeError(err))
     }
 }
-
-// impl From<hcid::HcidError> for Lib3hProtocolError {
-//     fn from(err: hcid::HcidError) -> Self {
-//         Lib3hProtocolError::new(ErrorKind::HcId(err))
-//     }
-// }
-
-// impl From<Lib3hProtocolError> for io::Error {
-//     fn from(err: Lib3hProtocolError) -> Self {
-//         io::Error::new(io::ErrorKind::Other, err)
-//     }
-// }
-
-// impl From<transport::error::TransportError> for Lib3hProtocolError {
-//     fn from(err: transport::error::TransportError) -> Self {
-//         Lib3hProtocolError::new(ErrorKind::(err))
-//     }
-// }
-
