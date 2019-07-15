@@ -9,6 +9,7 @@ use crate::data_types::*;
 /// Fetch = Request between node and the network (other nodes)
 /// Get   = Request within a node between p2p module and core
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "lib3h_client_protocol")]
 pub enum Lib3hClientProtocol {
     // -- Generic responses -- //
     /// Success response to a request (any Command with an `request_id` field.)

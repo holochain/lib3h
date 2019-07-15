@@ -9,4 +9,5 @@ members = [
   "crates/mdns",
   "crates/tools/half_busy_chat",
   "crates/tools/capnp_build",
+  "crates/tools/dump_lib3h_protocol_as_json_for_n3h",
 ]

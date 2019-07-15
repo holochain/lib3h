@@ -14,6 +14,7 @@ pub type AspectKey = (Address, Address);
 pub struct EntryAspectData {
     pub aspect_address: Address,
     pub type_hint: String,
+    #[serde(with = "base64")]
     pub aspect: Vec<u8>,
     pub publish_ts: u64,
 }
@@ -81,6 +82,7 @@ pub struct GenericResultData {
     pub request_id: String,
     pub space_address: Address,
     pub to_agent_id: Address,
+    #[serde(with = "base64")]
     pub result_info: Vec<u8>,
 }
 
@@ -145,6 +147,7 @@ pub struct DirectMessageData {
     pub request_id: String,
     pub to_agent_id: Address,
     pub from_agent_id: Address,
+    #[serde(with = "base64")]
     pub content: Vec<u8>,
 }
 
@@ -158,6 +161,7 @@ pub struct QueryEntryData {
     pub entry_address: Address,
     pub request_id: String,
     pub requester_agent_id: Address,
+    #[serde(with = "base64")]
     pub query: Vec<u8>, // opaque query struct
 }
 
@@ -168,6 +172,7 @@ pub struct QueryEntryResultData {
     pub request_id: String,
     pub requester_agent_id: Address,
     pub responder_agent_id: Address,
+    #[serde(with = "base64")]
     pub query_result: Vec<u8>, // opaque query-result struct
 }
 
@@ -241,4 +246,29 @@ pub struct EntryListData {
     pub provider_agent_id: Address,
     pub request_id: String,
     pub address_map: std::collections::HashMap<Address, Vec<Address>>, // Aspect addresses per entry
+}
+
+// ---------- serialization helper for binary data as base 64 ---------- //
+
+mod base64 {
+    extern crate base64;
+    use serde::{de, Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(&base64::display::Base64Display::with_config(
+            bytes,
+            base64::STANDARD,
+        ))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = <String>::deserialize(deserializer)?;
+        base64::decode(&s).map_err(de::Error::custom)
+    }
 }
