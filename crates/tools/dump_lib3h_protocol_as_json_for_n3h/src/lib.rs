@@ -61,13 +61,15 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         content: b"yo".to_vec(),
     }));
 
-    test_client(Lib3hClientProtocol::HandleSendDirectMessageResult(DirectMessageData {
-        space_address: "adr".to_string().into(),
-        request_id: "rid".to_string(),
-        to_agent_id: "aid".to_string().into(),
-        from_agent_id: "aid".to_string().into(),
-        content: b"yo".to_vec(),
-    }));
+    test_client(Lib3hClientProtocol::HandleSendDirectMessageResult(
+        DirectMessageData {
+            space_address: "adr".to_string().into(),
+            request_id: "rid".to_string(),
+            to_agent_id: "aid".to_string().into(),
+            from_agent_id: "aid".to_string().into(),
+            content: b"yo".to_vec(),
+        },
+    ));
 
     test_client(Lib3hClientProtocol::FetchEntry(FetchEntryData {
         space_address: "adr".to_string().into(),
@@ -77,20 +79,22 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         aspect_address_list: Some(vec!["adr".to_string().into()]),
     }));
 
-    test_client(Lib3hClientProtocol::HandleFetchEntryResult(FetchEntryResultData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        request_id: "rid".to_string(),
-        entry: EntryData {
-            entry_address: "adr".to_string().into(),
-            aspect_list: vec![EntryAspectData {
-                aspect_address: "adr".to_string().into(),
-                type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec(),
-                publish_ts: 42,
-            }],
+    test_client(Lib3hClientProtocol::HandleFetchEntryResult(
+        FetchEntryResultData {
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            request_id: "rid".to_string(),
+            entry: EntryData {
+                entry_address: "adr".to_string().into(),
+                aspect_list: vec![EntryAspectData {
+                    aspect_address: "adr".to_string().into(),
+                    type_hint: "hint".to_string(),
+                    aspect: b"yo".to_vec(),
+                    publish_ts: 42,
+                }],
+            },
         },
-    }));
+    ));
 
     test_client(Lib3hClientProtocol::PublishEntry(ProvidedEntryData {
         space_address: "adr".to_string().into(),
@@ -128,34 +132,40 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         query: b"yo".to_vec(),
     }));
 
-    test_client(Lib3hClientProtocol::HandleQueryEntryResult(QueryEntryResultData {
-        space_address: "adr".to_string().into(),
-        entry_address: "adr".to_string().into(),
-        request_id: "rid".to_string(),
-        requester_agent_id: "aid".to_string().into(),
-        responder_agent_id: "aid".to_string().into(),
-        query_result: b"yo".to_vec(),
-    }));
+    test_client(Lib3hClientProtocol::HandleQueryEntryResult(
+        QueryEntryResultData {
+            space_address: "adr".to_string().into(),
+            entry_address: "adr".to_string().into(),
+            request_id: "rid".to_string(),
+            requester_agent_id: "aid".to_string().into(),
+            responder_agent_id: "aid".to_string().into(),
+            query_result: b"yo".to_vec(),
+        },
+    ));
 
-    test_client(Lib3hClientProtocol::HandleGetAuthoringEntryListResult(EntryListData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        request_id: "rid".to_string(),
-        address_map: [("adr".to_string().into(), vec!["adr".to_string().into()])]
-            .iter()
-            .cloned()
-            .collect(),
-    }));
+    test_client(Lib3hClientProtocol::HandleGetAuthoringEntryListResult(
+        EntryListData {
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            request_id: "rid".to_string(),
+            address_map: [("adr".to_string().into(), vec!["adr".to_string().into()])]
+                .iter()
+                .cloned()
+                .collect(),
+        },
+    ));
 
-    test_client(Lib3hClientProtocol::HandleGetGossipingEntryListResult(EntryListData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        request_id: "rid".to_string(),
-        address_map: [("adr".to_string().into(), vec!["adr".to_string().into()])]
-            .iter()
-            .cloned()
-            .collect(),
-    }));
+    test_client(Lib3hClientProtocol::HandleGetGossipingEntryListResult(
+        EntryListData {
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            request_id: "rid".to_string(),
+            address_map: [("adr".to_string().into(), vec!["adr".to_string().into()])]
+                .iter()
+                .cloned()
+                .collect(),
+        },
+    ));
 
     test_client(Lib3hClientProtocol::Shutdown);
 
@@ -186,36 +196,42 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         network_id: "nid".to_string(),
     }));
 
-    test_server(Lib3hServerProtocol::SendDirectMessageResult(DirectMessageData {
-        space_address: "adr".to_string().into(),
-        request_id: "rid".to_string(),
-        to_agent_id: "aid".to_string().into(),
-        from_agent_id: "aid".to_string().into(),
-        content: b"yo".to_vec(),
-    }));
-
-    test_server(Lib3hServerProtocol::HandleSendDirectMessage(DirectMessageData {
-        space_address: "adr".to_string().into(),
-        request_id: "rid".to_string(),
-        to_agent_id: "aid".to_string().into(),
-        from_agent_id: "aid".to_string().into(),
-        content: b"yo".to_vec(),
-    }));
-
-    test_server(Lib3hServerProtocol::FetchEntryResult(FetchEntryResultData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        request_id: "rid".to_string(),
-        entry: EntryData {
-            entry_address: "adr".to_string().into(),
-            aspect_list: vec![EntryAspectData {
-                aspect_address: "adr".to_string().into(),
-                type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec(),
-                publish_ts: 42,
-            }],
+    test_server(Lib3hServerProtocol::SendDirectMessageResult(
+        DirectMessageData {
+            space_address: "adr".to_string().into(),
+            request_id: "rid".to_string(),
+            to_agent_id: "aid".to_string().into(),
+            from_agent_id: "aid".to_string().into(),
+            content: b"yo".to_vec(),
         },
-    }));
+    ));
+
+    test_server(Lib3hServerProtocol::HandleSendDirectMessage(
+        DirectMessageData {
+            space_address: "adr".to_string().into(),
+            request_id: "rid".to_string(),
+            to_agent_id: "aid".to_string().into(),
+            from_agent_id: "aid".to_string().into(),
+            content: b"yo".to_vec(),
+        },
+    ));
+
+    test_server(Lib3hServerProtocol::FetchEntryResult(
+        FetchEntryResultData {
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            request_id: "rid".to_string(),
+            entry: EntryData {
+                entry_address: "adr".to_string().into(),
+                aspect_list: vec![EntryAspectData {
+                    aspect_address: "adr".to_string().into(),
+                    type_hint: "hint".to_string(),
+                    aspect: b"yo".to_vec(),
+                    publish_ts: 42,
+                }],
+            },
+        },
+    ));
 
     test_server(Lib3hServerProtocol::HandleFetchEntry(FetchEntryData {
         space_address: "adr".to_string().into(),
@@ -225,18 +241,20 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         aspect_address_list: Some(vec!["adr".to_string().into()]),
     }));
 
-    test_server(Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData {
-        request_id: "rid".to_string(),
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        entry_address: "adr".to_string().into(),
-        entry_aspect: EntryAspectData {
-            aspect_address: "adr".to_string().into(),
-            type_hint: "hint".to_string(),
-            aspect: b"yo".to_vec(),
-            publish_ts: 42,
+    test_server(Lib3hServerProtocol::HandleStoreEntryAspect(
+        StoreEntryAspectData {
+            request_id: "rid".to_string(),
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            entry_address: "adr".to_string().into(),
+            entry_aspect: EntryAspectData {
+                aspect_address: "adr".to_string().into(),
+                type_hint: "hint".to_string(),
+                aspect: b"yo".to_vec(),
+                publish_ts: 42,
+            },
         },
-    }));
+    ));
 
     test_server(Lib3hServerProtocol::HandleDropEntry(DropEntryData {
         space_address: "adr".to_string().into(),
@@ -252,26 +270,32 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         query: b"yo".to_vec(),
     }));
 
-    test_server(Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
-        space_address: "adr".to_string().into(),
-        entry_address: "adr".to_string().into(),
-        request_id: "rid".to_string(),
-        requester_agent_id: "aid".to_string().into(),
-        responder_agent_id: "aid".to_string().into(),
-        query_result: b"yo".to_vec(),
-    }));
+    test_server(Lib3hServerProtocol::QueryEntryResult(
+        QueryEntryResultData {
+            space_address: "adr".to_string().into(),
+            entry_address: "adr".to_string().into(),
+            request_id: "rid".to_string(),
+            requester_agent_id: "aid".to_string().into(),
+            responder_agent_id: "aid".to_string().into(),
+            query_result: b"yo".to_vec(),
+        },
+    ));
 
-    test_server(Lib3hServerProtocol::HandleGetAuthoringEntryList(GetListData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        request_id: "rid".to_string(),
-    }));
+    test_server(Lib3hServerProtocol::HandleGetAuthoringEntryList(
+        GetListData {
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            request_id: "rid".to_string(),
+        },
+    ));
 
-    test_server(Lib3hServerProtocol::HandleGetGossipingEntryList(GetListData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        request_id: "rid".to_string(),
-    }));
+    test_server(Lib3hServerProtocol::HandleGetGossipingEntryList(
+        GetListData {
+            space_address: "adr".to_string().into(),
+            provider_agent_id: "aid".to_string().into(),
+            request_id: "rid".to_string(),
+        },
+    ));
 
     test_server(Lib3hServerProtocol::Terminated);
 
