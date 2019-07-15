@@ -42,9 +42,9 @@ pub enum ErrorKind {
     /// Error occuring from [Hcid](hcid) crate.
     HcId(hcid::HcidError),
     /// Error originating from [MessagePack](rmp_serde) deserializing crate.
-    RMPSerdeDecodeError(RMPSerdeDecodeError),
+    RmpSerdeDecodeError(RMPSerdeDecodeError),
     /// Error from the [lib3h_crypto_api] crate.
-    CryptoAPIError(CryptoError),
+    CryptoApiError(CryptoError),
     /// Error occuring when the key is not present in the Map.
     KeyNotFound(String),
     /// Yet undefined error.
@@ -105,13 +105,13 @@ impl From<Lib3hProtocolError> for Lib3hError {
 
 impl From<RMPSerdeDecodeError> for Lib3hError {
     fn from(err: RMPSerdeDecodeError) -> Self {
-        Lib3hError::new(ErrorKind::RMPSerdeDecodeError(err))
+        Lib3hError::new(ErrorKind::RmpSerdeDecodeError(err))
     }
 }
 
 impl From<CryptoError> for Lib3hError {
     fn from(err: CryptoError) -> Self {
-        Lib3hError::new(ErrorKind::CryptoAPIError(err))
+        Lib3hError::new(ErrorKind::CryptoApiError(err))
     }
 }
 

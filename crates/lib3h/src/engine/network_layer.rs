@@ -167,7 +167,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Deserialize::deserialize(&mut de);
                 if let Err(e) = maybe_msg {
                     error!("Failed deserializing msg: {:?}", e);
-                    return Err(Lib3hError::new(ErrorKind::RMPSerdeDecodeError(e)));
+                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                 }
                 let p2p_msg = maybe_msg.unwrap();
                 let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
