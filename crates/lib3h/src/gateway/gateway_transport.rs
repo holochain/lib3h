@@ -204,9 +204,11 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         }
 
         // Send to other node our PeerAddress
+        let this_peer = self.this_peer().clone();
         let our_peer_address = P2pProtocol::PeerAddress(
             self.identifier().to_string(),
-            self.this_peer().clone().peer_address,
+            this_peer.peer_address,
+            this_peer.timestamp,
         );
         let mut buf = Vec::new();
         our_peer_address
@@ -268,7 +270,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 if let Ok(p2p_msg) = maybe_p2p_msg {
-                    if let P2pProtocol::PeerAddress(gateway_id, peer_address) = p2p_msg {
+                    if let P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) = p2p_msg {
                         debug!(
                             "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier
@@ -277,7 +279,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
                                 peer_uri: transport_id_to_url(id.clone()),
-                                timestamp: 42, // TODO #166
+                                timestamp: peer_timestamp,
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
                                                                                          // TODO #150 - Should not call process manually

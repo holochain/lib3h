@@ -1,6 +1,9 @@
-use crate::dht::{
-    dht_protocol::*,
-    dht_trait::{Dht, DhtConfig},
+use crate::{
+    time,
+    dht::{
+        dht_protocol::*,
+        dht_trait::{Dht, DhtConfig},
+    }
 };
 use lib3h_protocol::{data_types::EntryData, Address, DidWork, Lib3hResult};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -43,7 +46,7 @@ impl MirrorDht {
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 peer_uri: peer_transport.clone(),
-                timestamp: 0, // TODO #166
+                timestamp: time::since_epoch_ms(),
             },
             pending_fetch_request_list: HashSet::new(),
         }
@@ -137,7 +140,7 @@ impl MirrorDht {
                     trace!("@MirrorDht@ Adding peer - BAD");
                     return false;
                 }
-                trace!("@MirrorDht@ Adding peer - OK UPDATED");
+                trace!("@MirrorDht@ Adding peer - OK UPDATED: {} > {}", peer_info.timestamp, peer.timestamp);
                 peer.timestamp = peer_info.timestamp;
                 true
             }

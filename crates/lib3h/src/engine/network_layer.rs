@@ -215,13 +215,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Dht::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
                 } else {
                     // otherwise should be for one of our space
-                    let space_gateway = self
+                    let maybe_space_gateway = self
                         .space_gateway_map
-                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                        .ok_or_else(|| {
-                            format_err!("space_gateway not found: {}", msg.space_address)
-                        })?;
-                    Dht::post(space_gateway, cmd)?;
+                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
+                    if let Some(space_gateway) = maybe_space_gateway {
+                        Dht::post(space_gateway, cmd)?;
+                    } else {
+                        warn!("received gossip for unjoined space_gateway: {}", msg.space_address);
+                    }
                 }
             }
             P2pProtocol::DirectMessage(dm_data) => {
@@ -255,7 +256,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     );
                 }
             }
-            P2pProtocol::PeerAddress(_, _) => {
+            P2pProtocol::PeerAddress(_, _, _) => {
                 // no-op
             }
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {

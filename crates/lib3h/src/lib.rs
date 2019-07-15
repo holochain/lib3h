@@ -25,6 +25,7 @@ pub mod engine;
 pub mod gateway;
 pub mod transport;
 pub mod transport_wss;
+pub mod time;
 
 #[cfg(test)]
 pub mod tests {

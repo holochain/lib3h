@@ -513,11 +513,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         Dht::post(
             space_gateway,
-            DhtCommand::HoldPeer(PeerData {
-                peer_address: dht_config.this_peer_address,
-                peer_uri: dht_config.this_peer_uri,
-                timestamp: 42, // TODO #166
-            }),
+            DhtCommand::HoldPeer(space_gateway.this_peer().clone()),
         )?;
         // Send Get*Lists requests
         let mut list_data = GetListData {
