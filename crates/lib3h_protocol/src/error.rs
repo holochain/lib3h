@@ -1,7 +1,6 @@
 //! Lib3h_protocol custom error definition.
 
 use std::{error::Error as StdError, fmt, io, result};
-// use serde::Deserializer::Error as DerserializerError;
 use serde::de::value::Error as DeserializeError;
 
 /// A type alias for `Result<T, Lib3hProtocolError>`.
@@ -35,7 +34,6 @@ pub enum ErrorKind {
     /// Error occuring when using `transport`.
     TransportError(String),
     /// An error occuring whiling trying to deserialize stuff during gossiping for example.
-    // DeserializeError(String),
     DeserializeError(DeserializeError),
     /// Yet undefined error.
     Other(String),
@@ -49,10 +47,12 @@ pub enum ErrorKind {
 }
 
 impl StdError for Lib3hProtocolError {
+    /// The lower-level source of this error, if any.
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match *self.0 {
             ErrorKind::Io(ref err) => Some(err),
-            // ErrorKind::SerDeserializeError(ref err) => Some(err),
+            ErrorKind::DeserializeError(ref err) => Some(err),
+            ErrorKind::Other(ref _s) | ErrorKind::TransportError(ref _s) => None,
             _ => unreachable!(),
         }
     }
@@ -62,7 +62,9 @@ impl fmt::Display for Lib3hProtocolError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self.0 {
             ErrorKind::Io(ref err) => err.fmt(f),
-            // ErrorKind::SerDeserializeError(ref err) => err.fmt(f),
+            ErrorKind::TransportError(ref s) => write!(f, "TransportError: '{}'.", s),
+            ErrorKind::DeserializeError(ref err) => err.fmt(f),
+            ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
     }
@@ -98,8 +100,3 @@ impl From<DeserializeError> for Lib3hProtocolError {
 //     }
 // }
 
-// impl From<BincodeError> for Lib3hProtocolError {
-//     fn from(err: BincodeError) -> Self {
-//         new_gen_error(ErrorKind::SerDeserializeError(err))
-//     }
-// }

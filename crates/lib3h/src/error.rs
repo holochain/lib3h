@@ -63,7 +63,12 @@ impl StdError for Lib3hError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match *self.0 {
             ErrorKind::Io(ref err) => Some(err),
-            // ErrorKind::SerDeserializeError(ref err) => Some(err),
+            ErrorKind::TransportError(ref err) => Some(err),
+            ErrorKind::Lib3hProtocolError(ref err) => Some(err),
+            ErrorKind::HcId(ref err) => Some(err),
+            ErrorKind::RmpSerdeDecodeError(ref err) => Some(err),
+            ErrorKind::CryptoApiError(ref err) => Some(err),
+            ErrorKind::Other(ref _s) | ErrorKind::KeyNotFound(ref _s) => None,
             _ => unreachable!(),
         }
     }
@@ -73,7 +78,13 @@ impl fmt::Display for Lib3hError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self.0 {
             ErrorKind::Io(ref err) => err.fmt(f),
-            // ErrorKind::SerDeserializeError(ref err) => err.fmt(f),
+            ErrorKind::TransportError(ref err) => err.fmt(f),
+            ErrorKind::Lib3hProtocolError(ref err) => err.fmt(f),
+            ErrorKind::HcId(ref err) => err.fmt(f),
+            ErrorKind::RmpSerdeDecodeError(ref err) => err.fmt(f),
+            ErrorKind::CryptoApiError(ref err) => err.fmt(f),
+            ErrorKind::KeyNotFound(ref s) => write!(f, "Key: '{}' not found", s),
+            ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
     }
