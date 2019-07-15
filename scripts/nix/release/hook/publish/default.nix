@@ -1,6 +1,6 @@
 { pkgs, config }:
 let
- name = "hcp-release-hook-publish";
+ name = "l3h-release-hook-publish";
 
  script = pkgs.writeShellScriptBin name ''
 set -euox pipefail
