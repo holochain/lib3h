@@ -9,5 +9,5 @@ readme = "README.md"
 
 [dependencies]
 serde_json = { version = "=1.0.39", features = ["preserve_order"] }
-lib3h_protocol = { version = "=0.0.6", path = "../../lib3h_protocol" }
+lib3h_protocol = { version = "=0.0.7", path = "../../lib3h_protocol" }
 url = "=1.7.2"
