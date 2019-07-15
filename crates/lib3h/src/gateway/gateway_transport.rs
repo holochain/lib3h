@@ -180,6 +180,47 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         Ok(uri_list)
     }
 
+    fn handle_new_connection(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
+        let maybe_uri = self.get_uri(id);
+        if maybe_uri.is_none() {
+            return Ok(());
+        }
+        let uri = maybe_uri.unwrap();
+        trace!(
+            "({}) new_connection: {} -> {}",
+            self.identifier.clone(),
+            uri,
+            id,
+        );
+        // TODO #176 - Maybe we shouldn't have different code paths for populating
+        // the connection_map between space and network gateways.
+        let maybe_previous = self.connection_map.insert(uri.clone(), id.to_string());
+        if let Some(previous_cId) = maybe_previous {
+            debug!(
+                "Replaced connectionId for {} ; was: {}",
+                uri.clone(),
+                previous_cId
+            );
+        }
+
+        // Send to other node our PeerAddress
+        let our_peer_address = P2pProtocol::PeerAddress(
+            self.identifier().to_string(),
+            self.this_peer().clone().peer_address,
+        );
+        let mut buf = Vec::new();
+        our_peer_address
+            .serialize(&mut Serializer::new(&mut buf))
+            .unwrap();
+        trace!(
+            "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
+            self.identifier.clone(),
+            our_peer_address,
+            id
+        );
+        return self.inner_transport.borrow_mut().send(&[&id], &buf);
+    }
+
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
         debug!(
@@ -191,49 +232,28 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         match evt {
             TransportEvent::ErrorOccured(id, e) => {
                 error!(
-                    "(GatewayTransport) Connection Error for {}: {}\n Closing connection.",
-                    id, e
+                    "({}) Connection Error for {}: {}\n Closing connection.",
+                    self.identifier.clone(),
+                    id,
+                    e
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                info!("({}) Connection opened id: {}", self.identifier.clone(), id);
-                let maybe_uri = self.get_uri(id);
-                if maybe_uri.is_none() {
-                    return Ok(());
-                }
-                let uri = maybe_uri.unwrap();
-                trace!("(GatewayTransport).ConnectResult: {} -> {}", uri, id);
-                // TODO #176 - Maybe we shouldn't have different code paths for populating
-                // the connection_map between space and network gateways.
-                let maybe_previous = self.connection_map.insert(uri.clone(), id.clone());
-                if let Some(previous_cId) = maybe_previous {
-                    debug!(
-                        "Replaced connectionId for {} ; was: {}",
-                        uri.clone(),
-                        previous_cId
-                    );
-                }
-
-                // Send to other node our PeerAddress
-                let our_peer_address = P2pProtocol::PeerAddress(
-                    self.identifier().to_string(),
-                    self.this_peer().clone().peer_address,
-                );
-                let mut buf = Vec::new();
-                our_peer_address
-                    .serialize(&mut Serializer::new(&mut buf))
-                    .unwrap();
-                trace!(
-                    "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
-                    our_peer_address,
+                info!(
+                    "({}) Outgoing connection opened: {}",
+                    self.identifier.clone(),
                     id
                 );
-                self.inner_transport.borrow_mut().send(&[&id], &buf)?;
+                self.handle_new_connection(id)?;
             }
-            TransportEvent::IncomingConnectionEstablished(_id) => {
-                // TODO #176
-                unimplemented!();
+            TransportEvent::IncomingConnectionEstablished(id) => {
+                info!(
+                    "({}) Incoming connection opened: {}",
+                    self.identifier.clone(),
+                    id
+                );
+                self.handle_new_connection(id)?;
             }
             TransportEvent::ConnectionClosed(id) => {
                 // TODO #176
