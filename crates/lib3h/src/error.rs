@@ -19,6 +19,11 @@ impl Lib3hError {
         Lib3hError(Box::new(kind))
     }
 
+    /// Helper function to build a new error with an [Other](ErrorKind::Other) ErrorKind.
+    pub fn new_other(s: &str) -> Self {
+        Lib3hError::new(ErrorKind::Other(s.to_owned()))
+    }
+
     /// Return the specific type of this error.
     pub fn kind(&self) -> &ErrorKind {
         &self.0
