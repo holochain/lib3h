@@ -46,7 +46,7 @@ impl MirrorDht {
             this_peer: PeerData {
                 peer_address: peer_address.to_string(),
                 peer_uri: peer_transport.clone(),
-                timestamp: 0, // FIXME
+                timestamp: 0, // TODO #166
             },
             pending_fetch_request_list: HashSet::new(),
         }
@@ -237,8 +237,8 @@ impl MirrorDht {
                         return Ok(vec![]);
                     }
                     MirrorGossip::Peer(peer) => {
-                        let is_new = self.add_peer(&peer);
-                        if is_new {
+                        let maybe_peer = self.get_peer(&peer.peer_address);
+                        if maybe_peer.is_none() {
                             return Ok(vec![DhtEvent::HoldPeerRequested(peer)]);
                         }
                         return Ok(vec![]);
@@ -252,7 +252,7 @@ impl MirrorDht {
                 return Ok(vec![DhtEvent::EntryDataRequested(fetch_entry.clone())]);
             }
             // Owner is asking us to hold a peer info
-            DhtCommand::HoldPeer(msg) => {
+            DhtCommand::HoldPeer(new_peer_data) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let peer_address_list: Vec<String> = self
                     .get_peer_list()
@@ -260,7 +260,7 @@ impl MirrorDht {
                     .map(|pi| pi.peer_address.clone())
                     .collect();
                 // Store it
-                let received_new_content = self.add_peer(msg);
+                let received_new_content = self.add_peer(new_peer_data);
                 // Bail if peer is known and up to date.
                 if !received_new_content {
                     return Ok(vec![]);
@@ -269,35 +269,39 @@ impl MirrorDht {
                 // Gossip to everyone to also hold it
                 let peer = self
                     .peer_list
-                    .get(&msg.peer_address)
+                    .get(&new_peer_data.peer_address)
                     .expect("Should have peer by now");
                 let peer_gossip = MirrorGossip::Peer(peer.clone());
                 let mut buf = Vec::new();
                 peer_gossip
                     .serialize(&mut Serializer::new(&mut buf))
                     .unwrap();
-                trace!("@MirrorDht@ gossiping peer: {:?}", peer);
+                trace!(
+                    "@MirrorDht@ gossiping peer: {:?} to {:?}",
+                    peer,
+                    peer_address_list
+                );
                 let gossip_evt = GossipToData {
                     peer_address_list,
                     bundle: buf,
                 };
                 event_list.push(DhtEvent::GossipTo(gossip_evt));
 
-                // Gossip back your own PeerData
-                let peer = self.this_peer();
-                if msg.peer_address != peer.peer_address {
-                    let peer_gossip = MirrorGossip::Peer(peer.clone());
+                // Gossip back your own PeerData (but not to yourself)
+                let this_peer = self.this_peer();
+                if new_peer_data.peer_address != this_peer.peer_address {
+                    let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
                     let mut buf = Vec::new();
-                    peer_gossip
+                    gossip_this_peer
                         .serialize(&mut Serializer::new(&mut buf))
                         .unwrap();
                     trace!(
                         "@MirrorDht@ gossiping peer back: {:?} | to: {}",
-                        peer,
-                        msg.peer_address
+                        this_peer,
+                        new_peer_data.peer_address
                     );
                     let gossip_evt = GossipToData {
-                        peer_address_list: vec![msg.peer_address.clone()],
+                        peer_address_list: vec![new_peer_data.peer_address.clone()],
                         bundle: buf,
                     };
                     event_list.push(DhtEvent::GossipTo(gossip_evt));

@@ -24,10 +24,6 @@ lazy_static! {
 
 ///
 pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
-    // Start
-    alex.run();
-    billy.run();
-
     // Connect Alex to Billy
     alex.connect_to(&billy.advertise()).unwrap();
 
@@ -40,6 +36,7 @@ pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
     // More process: Have Billy process P2p::PeerAddress of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     two_join_space(alex, billy, &SPACE_ADDRESS_A);
 
@@ -78,6 +75,10 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 
 ///
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
+    println!(
+        "\ntwo_join_space ({},{}) -> {}\n",
+        alex.name, billy.name, space_address
+    );
     // Alex joins space
     let req_id = alex.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -102,6 +103,8 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -117,14 +120,7 @@ fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock) {
 pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send DM
     let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    assert_process_success!(alex, req_id);
     // Receive
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -137,13 +133,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send response
     let response_content = format!("echo: {}", content).as_bytes().to_vec();
     billy.send_response(&req_id, &alex.agent_id, response_content.clone());
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    assert_process_success!(billy, req_id);
     // Receive response
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);

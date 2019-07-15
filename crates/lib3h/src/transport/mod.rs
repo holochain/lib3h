@@ -46,8 +46,8 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
-        let uri_A = Url::parse("wss://127.0.0.1:64529").unwrap();
-        let uri_B = Url::parse("wss://127.0.0.1:64530").unwrap();
+        let uri_A = Url::parse("wss://127.0.0.1:64529/A").unwrap();
+        let uri_B = Url::parse("wss://127.0.0.1:64530/B").unwrap();
 
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
@@ -57,8 +57,8 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
-        let uri_A = Url::parse("wss://127.0.0.1:64531").unwrap();
-        let uri_B = Url::parse("wss://127.0.0.1:64532").unwrap();
+        let uri_A = Url::parse("wss://127.0.0.1:64531/TLS_A").unwrap();
+        let uri_B = Url::parse("wss://127.0.0.1:64532/TLS_B").unwrap();
 
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
@@ -95,7 +95,7 @@ pub mod tests {
         assert!(event_list.len() >= 1);
         let recv_event = event_list.last().unwrap().clone();
         let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::Received(a, b) => (a, b),
+            TransportEvent::ReceivedData(a, b) => (a, b),
             e => panic!("Received wrong TransportEvent type: {:?}", e),
         };
         assert!(node_A.get_uri(idAB.as_str()).is_some());
@@ -118,7 +118,8 @@ pub mod tests {
         // Send B -> A
         let payload = [4, 2, 1, 3];
         let id_list = node_B.connection_id_list().unwrap();
-        // TODO When connection event is fully implemented use it instead of referencing node_B's connection list
+        // TODO #159 - When connection event is fully implemented use it instead of
+        // referencing node_B's connection list
         let idBA = id_list[0].clone();
         node_B.send(&[&idBA], &payload).unwrap();
         did_work = false;
@@ -133,7 +134,7 @@ pub mod tests {
         assert_eq!(event_list.len(), 1);
         let recv_event = event_list[0].clone();
         let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::Received(a, b) => (a, b),
+            TransportEvent::ReceivedData(a, b) => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
         assert!(node_A.get_uri(recv_id.as_str()).is_some());

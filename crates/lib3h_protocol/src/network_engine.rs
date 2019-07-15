@@ -7,12 +7,6 @@ use url::Url;
 
 /// Common interface for all types of network modules to be used by the Lib3hWorker
 pub trait NetworkEngine {
-    /// Start network communications
-    fn run(&self) -> Lib3hProtocolResult<()>;
-    /// Stop network communications
-    fn stop(&self) -> Lib3hProtocolResult<()>;
-    /// Terminate module. Perform some cleanup.
-    fn terminate(&self) -> Lib3hProtocolResult<()>;
     /// Post a protocol message from core -> lib3h
     fn post(&mut self, data: Lib3hClientProtocol) -> Lib3hProtocolResult<()>;
     /// A single iteration of the networking process loop

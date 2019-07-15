@@ -254,7 +254,8 @@ impl Transport for TransportMemory {
                 self.maybe_my_uri.clone().unwrap()
             );
             if let Ok(id) = self.connect(&uri) {
-                outbox.push(TransportEvent::ConnectResult(id));
+                // Note: Push ConnectResult at start of outbox so they are processed first.
+                outbox.insert(0, TransportEvent::ConnectResult(id));
             }
         }
         Ok((did_work, outbox))
@@ -303,14 +304,14 @@ impl TransportMemory {
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
-                let evt = TransportEvent::Closed(id.to_string());
+                let evt = TransportEvent::ConnectionClosed(id.to_string());
                 Ok(vec![evt])
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let mut outbox = Vec::new();
                 for (id, _url) in &self.connections {
-                    let evt = TransportEvent::Closed(id.to_string());
+                    let evt = TransportEvent::ConnectionClosed(id.to_string());
                     outbox.push(evt);
                 }
                 Ok(outbox)

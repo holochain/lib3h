@@ -16,15 +16,15 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// TODO make a struct for transport id and make these trait converters
+// TODO #175 - Make a struct for transportId/connectionId and make type converters
 fn transport_id_to_url(id: ConnectionId) -> Url {
     Url::parse(id.as_str())
-        .expect("gateway_transport: transport_id_to_url: connection id is not a well formed url")
+        .expect("gateway_transport: transport_id_to_url: id is not a well formed url")
 }
 
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
-    /// TODO: return a higher-level uri instead
+    // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier.clone(), uri);
         // Connect
@@ -36,13 +36,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         Ok(connection_id)
     }
 
-    /// TODO?
+    // TODO #159 - remove conn id conn_map??
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        // FIXME remove conn id conn_map??
         self.inner_transport.borrow_mut().close(id)
     }
 
-    /// TODO?
+    // TODO #159
     fn close_all(&mut self) -> TransportResult<()> {
         self.inner_transport.borrow_mut().close_all()
     }
@@ -64,10 +63,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // Get connectionIds for the inner Transport.
         let mut conn_list = Vec::new();
         for dht_uri in dht_uri_list {
-            let net_uri = self
-                .connection_map
-                .get(&dht_uri)
-                .expect("unknown dht_transport");
+            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
             conn_list.push(net_uri);
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
@@ -89,7 +85,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         self.send(&dht_id_list, payload)
     }
 
-    /// TODO?
+    ///
     fn bind(&mut self, url: &Url) -> TransportResult<Url> {
         trace!("({}) bind() {}", self.identifier.clone(), url);
         self.inner_transport.borrow_mut().bind(url)
@@ -137,7 +133,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             outbox.append(&mut event_list);
         }
         // Handle TransportEvents
-        for evt in outbox.clone() {
+        for evt in outbox.clone().iter() {
             self.handle_TransportEvent(&evt)?;
         }
         Ok((did_work, outbox))
@@ -193,7 +189,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         );
         // Note: use same order as the enum
         match evt {
-            TransportEvent::TransportError(id, e) => {
+            TransportEvent::ErrorOccured(id, e) => {
                 error!(
                     "(GatewayTransport) Connection Error for {}: {}\n Closing connection.",
                     id, e
@@ -202,45 +198,52 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportEvent::ConnectResult(id) => {
                 info!("({}) Connection opened id: {}", self.identifier.clone(), id);
-                if let Some(uri) = self.get_uri(id) {
-                    trace!(
-                        "(GatewayTransport).ConnectResult: mapping {} -> {}",
-                        uri,
-                        id
-                    );
-                    self.connection_map.insert(uri, id.clone());
-                    // Ok(conn_id)
-
-                    // Send to other node our PeerAddress
-                    let our_peer_address = P2pProtocol::PeerAddress(
-                        self.identifier().to_string(),
-                        self.this_peer().clone().peer_address,
-                    );
-                    let mut buf = Vec::new();
-                    our_peer_address
-                        .serialize(&mut Serializer::new(&mut buf))
-                        .unwrap();
-                    trace!(
-                        "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
-                        our_peer_address,
-                        id
-                    );
-                    self.inner_transport.borrow_mut().send(&[&id], &buf)?;
+                let maybe_uri = self.get_uri(id);
+                if maybe_uri.is_none() {
+                    return Ok(());
                 }
+                let uri = maybe_uri.unwrap();
+                trace!("(GatewayTransport).ConnectResult: {} -> {}", uri, id);
+                // TODO #176 - Maybe we shouldn't have different code paths for populating
+                // the connection_map between space and network gateways.
+                let maybe_previous = self.connection_map.insert(uri.clone(), id.clone());
+                if let Some(previous_cId) = maybe_previous {
+                    debug!(
+                        "Replaced connectionId for {} ; was: {}",
+                        uri.clone(),
+                        previous_cId
+                    );
+                }
+
+                // Send to other node our PeerAddress
+                let our_peer_address = P2pProtocol::PeerAddress(
+                    self.identifier().to_string(),
+                    self.this_peer().clone().peer_address,
+                );
+                let mut buf = Vec::new();
+                our_peer_address
+                    .serialize(&mut Serializer::new(&mut buf))
+                    .unwrap();
+                trace!(
+                    "(GatewayTransport) P2pProtocol::PeerAddress: {:?} to {:?}",
+                    our_peer_address,
+                    id
+                );
+                self.inner_transport.borrow_mut().send(&[&id], &buf)?;
             }
-            TransportEvent::Connection(_id) => {
-                // TODO!!
+            TransportEvent::IncomingConnectionEstablished(_id) => {
+                // TODO #176
                 unimplemented!();
             }
-            TransportEvent::Closed(id) => {
-                // FIXME
+            TransportEvent::ConnectionClosed(id) => {
+                // TODO #176
                 warn!("Connection closed: {}", id);
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
-            TransportEvent::Received(id, payload) => {
+            TransportEvent::ReceivedData(id, payload) => {
                 debug!("Received message from: {}", id);
-                // debug!("Deserialize msg: {:?}", payload);
+                // trace!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -254,10 +257,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
                                 peer_uri: transport_id_to_url(id.clone()),
-                                timestamp: 42, // FIXME
+                                timestamp: 42, // TODO #166
                             };
-                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME");
-                            // FIXME: Should not call process manually
+                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
+                                                                                         // TODO #150 - Should not call process manually
                             Dht::process(self).expect("HACK");
                         }
                     }
@@ -300,13 +303,13 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
-                let evt = TransportEvent::Closed(id.to_string());
+                let evt = TransportEvent::ConnectionClosed(id.to_string());
                 Ok(vec![evt])
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let outbox = Vec::new();
-                // FIXME: Send Closed event for each connection
+                // TODO #159: Send Closed event for each connection
                 //                for (id, _url) in &self.connections {
                 //                    let evt = TransportEvent::Closed(id.to_string());
                 //                    outbox.push(evt);
