@@ -221,7 +221,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     if let Some(space_gateway) = maybe_space_gateway {
                         Dht::post(space_gateway, cmd)?;
                     } else {
-                        warn!("received gossip for unjoined space_gateway: {}", msg.space_address);
+                        warn!(
+                            "received gossip for unjoined space_gateway: {}",
+                            msg.space_address
+                        );
                     }
                 }
             }

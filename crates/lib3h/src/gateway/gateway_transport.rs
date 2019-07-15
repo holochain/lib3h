@@ -270,7 +270,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 if let Ok(p2p_msg) = maybe_p2p_msg {
-                    if let P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) = p2p_msg {
+                    if let P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) =
+                        p2p_msg
+                    {
                         debug!(
                             "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier

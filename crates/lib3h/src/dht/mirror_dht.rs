@@ -1,9 +1,9 @@
 use crate::{
-    time,
     dht::{
         dht_protocol::*,
         dht_trait::{Dht, DhtConfig},
-    }
+    },
+    time,
 };
 use lib3h_protocol::{data_types::EntryData, Address, DidWork, Lib3hResult};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -140,7 +140,11 @@ impl MirrorDht {
                     trace!("@MirrorDht@ Adding peer - BAD");
                     return false;
                 }
-                trace!("@MirrorDht@ Adding peer - OK UPDATED: {} > {}", peer_info.timestamp, peer.timestamp);
+                trace!(
+                    "@MirrorDht@ Adding peer - OK UPDATED: {} > {}",
+                    peer_info.timestamp,
+                    peer.timestamp
+                );
                 peer.timestamp = peer_info.timestamp;
                 true
             }
