@@ -2,7 +2,6 @@
 
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
-    error::Lib3hResult,
     gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
