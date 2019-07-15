@@ -18,10 +18,11 @@ mod test_suites;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
+    error::Lib3hResult,
     transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
 };
-use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
+use lib3h_protocol::{network_engine::NetworkEngine, Address};
 use node_mock::NodeMock;
 use test_suites::{two_basic::*, two_get_lists::*, two_spaces::*};
 use url::Url;
