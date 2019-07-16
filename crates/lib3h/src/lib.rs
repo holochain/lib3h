@@ -23,6 +23,7 @@ extern crate log;
 pub mod dht;
 pub mod engine;
 pub mod gateway;
+pub mod time;
 pub mod transport;
 pub mod transport_wss;
 
