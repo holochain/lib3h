@@ -354,7 +354,7 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     std::thread::sleep(std::time::Duration::from_millis(5500));
 
     // Billy should send a PeerTimedOut message
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?}", srv_msg_list);
     assert_eq!(srv_msg_list.len(), 1);
 }

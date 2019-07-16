@@ -36,27 +36,33 @@ pub struct MirrorDht {
     pending_fetch_request_list: HashSet<String>,
 
     last_gossip_of_self: u64,
+
+    config: DhtConfig,
 }
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(peer_address: &str, peer_transport: &Url) -> Self {
-        MirrorDht {
+    pub fn new(peer_address: &str, peer_uri: &Url) -> Self {
+        let dht_config = DhtConfig::new(peer_address, peer_uri);
+        Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht")
+    }
+
+    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
+        let timestamp = time::since_epoch_ms();
+        let this = MirrorDht {
             inbox: VecDeque::new(),
             peer_list: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
-                peer_address: peer_address.to_string(),
-                peer_uri: peer_transport.clone(),
-                timestamp: time::since_epoch_ms(),
+                peer_address: config.this_peer_address.to_string(),
+                peer_uri: config.this_peer_uri.clone(),
+                timestamp,
             },
             pending_fetch_request_list: HashSet::new(),
-            last_gossip_of_self: self.this_peer.timestamp,
-        }
-    }
-
-    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
-        Ok(Self::new(&config.this_peer_address, &config.this_peer_uri))
+            last_gossip_of_self: timestamp,
+            config: config.clone(),
+        };
+        Ok(this)
     }
 }
 
@@ -106,7 +112,7 @@ impl Dht for MirrorDht {
 
     /// Serve each item in inbox
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
-        let now = 0; // FIXME since epoch
+        let now = time::since_epoch_ms();
         let mut outbox = Vec::new();
         // Process inbox
         let mut did_work = false;
@@ -124,21 +130,22 @@ impl Dht for MirrorDht {
             }
         }
         // Check if must gossip self
-        if now - self.last_gossip_of_self > gossip_interval {
+        if now - self.last_gossip_of_self > self.config.gossip_interval {
             self.last_gossip_of_self = now;
-            let evt = self.gossip_self(self.peer_list.keys().collect());
+            let evt = self.gossip_self(self.peer_list.iter().map(|(key, _)| key.clone()).collect());
+            outbox.push(evt);
         }
         // Check if others timed-out
         let mut to_remove_list = Vec::new();
         for (peer_address, peer) in self.peer_list.iter() {
-            if now - peer.timestamp > timeout_threshold {
+            if now - peer.timestamp > self.config.timeout_threshold {
                 outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
-                to_remove_list.push(peer_address);
+                to_remove_list.push(peer_address.clone());
             }
         }
         // Remove peer data form local dht
         for peer_address in to_remove_list {
-            self.peer_list.remove(peer_address);
+            self.peer_list.remove(&peer_address);
         }
         // Done
         Ok((did_work, outbox))

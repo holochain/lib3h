@@ -32,6 +32,8 @@ pub struct RealEngineConfig {
     pub log_level: char,
     #[serde(with = "url_serde")]
     pub bind_url: Url,
+    pub dht_gossip_interval: u64,
+    pub dht_timeout_threshold: u64,
     pub dht_custom_config: Vec<u8>,
 }
 

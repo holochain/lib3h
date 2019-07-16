@@ -8,7 +8,7 @@ use url::Url;
 use crate::{
     dht::{
         dht_protocol::{self, *},
-        dht_trait::{Dht, DhtConfig, DhtFactory},
+        dht_trait::*,
     },
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
@@ -57,6 +57,8 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             this_peer_address: transport_keys.transport_id.clone(),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
+            gossip_interval: config.dht_gossip_interval.clone(),
+            timeout_threshold: config.dht_timeout_threshold.clone(),
         };
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
@@ -100,6 +102,8 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             this_peer_address: format!("{}_tId", name),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
+            gossip_interval: config.dht_gossip_interval.clone(),
+            timeout_threshold: config.dht_timeout_threshold.clone(),
         };
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
@@ -480,6 +484,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             this_peer_address: agent_id,
             this_peer_uri: this_peer_transport,
             custom: self.config.dht_custom_config.clone(),
+            gossip_interval: self.config.dht_gossip_interval.clone(),
+            timeout_threshold: self.config.dht_timeout_threshold.clone(),
         };
         // Create new space gateway for this ChainId
         let new_space_gateway = P2pGateway::new_with_space(
