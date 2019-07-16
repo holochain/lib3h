@@ -4,6 +4,7 @@ use lib3h_protocol::{data_types::DirectMessageData, Address};
 pub type SpaceAddress = String;
 pub type PeerAddress = String;
 pub type GatewayId = String;
+pub type PeerTimestamp = u64;
 
 /// Enum holding all message types in the 'network module <-> network module' protocol.
 /// TODO #150 - replace this with the p2p-protocol crate
@@ -13,7 +14,7 @@ pub enum P2pProtocol {
     DirectMessage(DirectMessageData),
     DirectMessageResult(DirectMessageData),
     /// Notify another node's our identify in a specific gateway/dht
-    PeerAddress(GatewayId, PeerAddress),
+    PeerAddress(GatewayId, PeerAddress, PeerTimestamp),
     /// Broadcast JoinSpace to all when joining a space
     BroadcastJoinSpace(SpaceAddress, PeerData),
     /// For sending a peer's 'JoinSpace' info to a newly connected peer
