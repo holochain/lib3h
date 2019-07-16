@@ -29,11 +29,17 @@ pub mod transport_wss;
 
 #[cfg(test)]
 pub mod tests {
+    use crate::time::START_TIME;
+    use std::time::SystemTime;
+
     // for this to actually show log entries you also have to run the tests like this:
     // RUST_LOG=lib3h=debug cargo test -- --nocapture
     pub fn enable_logging_for_test(enable: bool) {
+        unsafe { START_TIME = SystemTime::now(); }
+        // wait a bit because of non monotonic clock
+        std::thread::sleep(std::time::Duration::from_millis(5));
         if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "debug");
+            std::env::set_var("RUST_LOG", "trace");
         }
         let _ = env_logger::builder()
             .default_format_timestamp(false)

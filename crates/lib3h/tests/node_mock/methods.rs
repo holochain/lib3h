@@ -59,7 +59,7 @@ impl NodeMock {
 //            // drop
 //        }
         let mut dummy_config = self.config.clone();
-        dummy_config.bind_url = Url::parse("mem://dummy/").unwrap();
+        dummy_config.bind_url = Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
         self.engine = (self.engine_factory)(&dummy_config, "__dummy")
                           .expect("Failed to re-create RealEngine");
         self.engine = (self.engine_factory)(&self.config, &self.name)

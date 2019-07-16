@@ -75,6 +75,7 @@ impl Dht for MirrorDht {
     }
 
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
+        println!("get_peer({}) in {:?}", peer_address, self.peer_list);
         let res = self.peer_list.get(peer_address);
         if let Some(pd) = res {
             return Some(pd.clone());
@@ -330,6 +331,7 @@ impl MirrorDht {
                 let other_peer_address_list = self.get_other_peer_list();
                 // Store it
                 let received_new_content = self.add_peer(new_peer_data);
+                println!("HoldPeer({:?}) in {:?}", new_peer_data, self.peer_list);
                 // Bail if peer is known and up to date.
                 if !received_new_content {
                     return Ok(vec![]);

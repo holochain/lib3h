@@ -260,8 +260,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 );
                 self.handle_new_connection(id)?;
             }
-            TransportEvent::ConnectionClosed(id) => {
+            TransportEvent::ConnectionClosed(_id) => {
                 // TODO #176
+                // no-op?
 //                warn!("Connection closed: {}", id);
 //                self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;

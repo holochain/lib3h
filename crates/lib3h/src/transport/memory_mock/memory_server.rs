@@ -5,7 +5,7 @@ use crate::transport::{
 };
 use lib3h_protocol::DidWork;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     sync::{Mutex, RwLock},
 };
 use url::Url;

@@ -39,6 +39,8 @@ use std::time::SystemTime;
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
     unsafe { START_TIME = SystemTime::now(); }
+    // wait a bit because of non monotonic clock
+    std::thread::sleep(std::time::Duration::from_millis(5));
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "trace");
     }
@@ -87,8 +89,8 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
-        dht_gossip_interval: 100,
-        dht_timeout_threshold: 1000,
+        dht_gossip_interval: 500,
+        dht_timeout_threshold: 10000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -116,8 +118,8 @@ fn setup_wss_node(
         work_dir: String::new(),
         log_level: 'd',
         bind_url,
-        dht_gossip_interval: 200,
-        dht_timeout_threshold: 2000,
+        dht_gossip_interval: 500,
+        dht_timeout_threshold: 12000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)

@@ -362,7 +362,7 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
 
 fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait past peer Timeout threshold
-    std::thread::sleep(std::time::Duration::from_millis(1100));
+    std::thread::sleep(std::time::Duration::from_millis(10100));
     // Billy should send a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
