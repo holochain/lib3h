@@ -31,6 +31,8 @@ pub struct MirrorDht {
     this_peer: PeerData,
     /// Keep track of fetch requests sent to Core
     pending_fetch_request_list: HashSet<String>,
+
+    last_gossip_of_self: u64,
 }
 
 /// Constructors
@@ -46,6 +48,7 @@ impl MirrorDht {
                 timestamp: 0, // TODO #166
             },
             pending_fetch_request_list: HashSet::new(),
+            last_gossip_of_self: self.this_peer.timestamp,
         }
     }
 
@@ -100,7 +103,9 @@ impl Dht for MirrorDht {
 
     /// Serve each item in inbox
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
+        let now = 0; // FIXME since epoch
         let mut outbox = Vec::new();
+        // Process inbox
         let mut did_work = false;
         loop {
             let cmd = match self.inbox.pop_front() {
@@ -115,12 +120,51 @@ impl Dht for MirrorDht {
                 error!("serve_DhtCommand() failed: {:?}", res);
             }
         }
+        // Check if must gossip self
+        if now - self.last_gossip_of_self > gossip_interval {
+            self.last_gossip_of_self = now;
+            let evt = self.gossip_self(self.peer_list.keys().collect());
+        }
+        // Check if others timed-out
+        let mut to_remove_list = Vec::new();
+        for (peer_address, peer) in self.peer_list.iter() {
+            if now - peer.timestamp > timeout_threshold {
+                outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
+                to_remove_list.push(peer_address);
+            }
+        }
+        // Remove peer data form local dht
+        for peer_address in to_remove_list {
+            self.peer_list.remove(peer_address);
+        }
+        // Done
         Ok((did_work, outbox))
     }
 }
 
 /// Internals
 impl MirrorDht {
+
+    // Create gossipTo event of your own PeerData (but not to yourself)
+    fn gossip_self(&mut self, peer_address_list: Vec<String>) -> DhtEvent {
+        let this_peer = self.this_peer();
+        let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
+        let mut buf = Vec::new();
+        gossip_this_peer
+            .serialize(&mut Serializer::new(&mut buf))
+            .unwrap();
+        trace!(
+            "@MirrorDht@ gossiping self: {:?} | to: {:?}",
+            this_peer,
+            peer_address_list
+        );
+        let gossip_evt = GossipToData {
+            peer_address_list,
+            bundle: buf,
+        };
+        DhtEvent::GossipTo(gossip_evt)
+    }
+
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
         trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
@@ -220,6 +264,7 @@ impl MirrorDht {
                 if let Err(e) = maybe_gossip {
                     return Err(format_err!("Failed deserializing gossip: {:?}", e));
                 }
+                // Handle gossiped data
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
                         let diff = self.diff_aspects(&entry);
@@ -231,10 +276,15 @@ impl MirrorDht {
                         }
                         return Ok(vec![]);
                     }
-                    MirrorGossip::Peer(peer) => {
-                        let maybe_peer = self.get_peer(&peer.peer_address);
-                        if maybe_peer.is_none() {
-                            return Ok(vec![DhtEvent::HoldPeerRequested(peer)]);
+                    MirrorGossip::Peer(gossiped_peer) => {
+                        let maybe_known_peer = self.get_peer(&gossiped_peer.peer_address);
+                        if maybe_known_peer.is_none() {
+                            return Ok(vec![DhtEvent::HoldPeerRequested(gossiped_peer)]);
+                        }
+                        let known_peer = maybe_known_peer.unwrap();
+                        // Update Peer timestamp
+                        if gossiped_peer.timestamp > known_peer.timestamp {
+                            let _ = self.add_peer(&gossiped_peer);
                         }
                         return Ok(vec![]);
                     }
@@ -283,23 +333,9 @@ impl MirrorDht {
                 event_list.push(DhtEvent::GossipTo(gossip_evt));
 
                 // Gossip back your own PeerData (but not to yourself)
-                let this_peer = self.this_peer();
-                if new_peer_data.peer_address != this_peer.peer_address {
-                    let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
-                    let mut buf = Vec::new();
-                    gossip_this_peer
-                        .serialize(&mut Serializer::new(&mut buf))
-                        .unwrap();
-                    trace!(
-                        "@MirrorDht@ gossiping peer back: {:?} | to: {}",
-                        this_peer,
-                        new_peer_data.peer_address
-                    );
-                    let gossip_evt = GossipToData {
-                        peer_address_list: vec![new_peer_data.peer_address.clone()],
-                        bundle: buf,
-                    };
-                    event_list.push(DhtEvent::GossipTo(gossip_evt));
+                if new_peer_data.peer_address != self.this_peer().peer_address {
+                    let evt = self.gossip_self(vec![new_peer_data.peer_address.clone()]);
+                    event_list.push(evt);
                 }
                 // Done
                 Ok(event_list)

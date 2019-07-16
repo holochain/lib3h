@@ -72,6 +72,8 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
                 self.handle_DhtEvent(evt)?;
             }
         }
+        // Check for timeouts of own requests?
+        // Done
         Ok((did_work, dht_event_list))
     }
 }

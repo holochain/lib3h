@@ -25,11 +25,15 @@ pub struct NodeMock {
     engine: Box<dyn NetworkEngine>,
     /// Config used by the engine
     pub config: RealEngineConfig,
+    /// Factory used to create the engine
+    engine_factory: EngineFactory,
     /// The node's simulated agentId
     pub agent_id: Address,
     /// The node's uri
     my_advertise: Url,
     pub name: String,
+
+    connected_list: HashSet<Url>,
 
     /// Sent messages logs
     request_log: Vec<String>,
@@ -65,6 +69,7 @@ impl NodeMock {
             // _maybe_temp_dir,
             engine,
             config,
+            engine_factory,
             agent_id: agent_id_arg.clone(),
             request_log: Vec::new(),
             request_count: 0,
@@ -74,6 +79,7 @@ impl NodeMock {
             current_space: None,
             my_advertise,
             name: name.to_string(),
+            connected_list: HashSet::new(),
         }
     }
 }

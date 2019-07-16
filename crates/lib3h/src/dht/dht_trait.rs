@@ -8,6 +8,8 @@ pub struct DhtConfig {
     #[serde(with = "url_serde")]
     pub this_peer_uri: Url,
     pub custom: Vec<u8>,
+    pub gossip_interval: u64,
+    pub timeout_threshold: u64,
 }
 
 pub type DhtFactory<D> = fn(config: &DhtConfig) -> Lib3hResult<D>;

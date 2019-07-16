@@ -46,12 +46,63 @@ impl NodeMock {
 
 /// Connection & Space managing
 impl NodeMock {
+    /// Disconnect the NetworkEngine by destroying it.
+    pub fn disconnect(&mut self) {
+//        unsafe {
+//            self.engine.drop();
+//        }
+        // drop(self.engine);
+//        {
+//            // move
+//            let engine = self.engine;
+//            // let engine = Box::into_raw(self.engine);
+//            // drop
+//        }
+        let mut dummy_config = self.config.clone();
+        dummy_config.bind_url = Url::parse("mem://dummy/").unwrap();
+        self.engine = (self.engine_factory)(&dummy_config, "__dummy")
+                          .expect("Failed to re-create RealEngine");
+        self.engine = (self.engine_factory)(&self.config, &self.name)
+            .expect("Failed to re-create RealEngine");
+        self.my_advertise = self.engine.advertise();
+    }
+
+    /// Try connecting to previously connected_to nodes.
+    /// Return Err if all connects failed.
+    pub fn reconnect(&mut self) -> Lib3hResult<()> {
+        // re-connect to all nodes
+        let mut return_res = Err(format_err!("Failed to reconnect to any node"));
+        for uri in self.connected_list.clone().iter() {
+            let res = self.connect_to(&uri);
+            if res.is_ok() {
+                return_res = res;
+            } else {
+                warn!("Failed to reconnect to {}: {:?}", uri.as_str(), res.err().unwrap());
+            }
+        }
+        if return_res.is_err() {
+            return return_res;
+        }
+        // re-join all spaces
+        for space in self.joined_space_list.clone().iter() {
+            let res = self.join_space(space, false);
+            if let Err(e) = res {
+                warn!("Failed to rejoin space {}: {:?}", space, e);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Connection & Space managing
+impl NodeMock {
     pub fn connect_to(&mut self, uri: &Url) -> Lib3hResult<()> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
             peer_uri: uri.clone(),
             network_id: NETWORK_A_ID.clone(),
         };
+        self.connected_list.insert(uri.clone());
         return self
             .engine
             .post(Lib3hClientProtocol::Connect(req_connect.clone()));
