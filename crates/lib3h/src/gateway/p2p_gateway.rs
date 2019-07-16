@@ -42,6 +42,39 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             transport_inbox: VecDeque::new(),
         }
     }
+
+    pub(crate) fn get_connection_id(&self, peer_address: &str) -> Option<String> {
+        // get to_peer's connectionId
+        let maybe_peer_data = self
+            .inner_dht
+            .get_peer(peer_address);
+        if maybe_peer_data.is_none() {
+            return None;
+        }
+        let peer_uri = maybe_peer_data.unwrap().peer_uri;
+        trace!(
+            "({}) get_connection_id: {} -> {}",
+            self.identifier.clone(),
+            peer_address,
+            peer_uri
+        );
+        let maybe_connection_id = self
+            .connection_map
+            .get(&peer_uri);
+        // TODO: If no connectionId, open a connection first ?
+        if maybe_connection_id.is_none() {
+            return None;
+        }
+        let conn_id = maybe_connection_id.unwrap().clone();
+        trace!(
+            "({}) get_connection_id: {} -> {} -> {}",
+            self.identifier.clone(),
+            peer_address,
+            peer_uri,
+            conn_id
+        );
+        Some(conn_id)
+    }
 }
 
 /// P2pGateway Constructor

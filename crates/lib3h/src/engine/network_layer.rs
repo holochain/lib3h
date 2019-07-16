@@ -66,20 +66,27 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
-            DhtEvent::PeerTimedOut(_data) => {
-                // no-op
+            DhtEvent::PeerTimedOut(peer_address) => {
+                // TODO #159
+                let mut network_gateway = self.network_gateway.borrow_mut();
+                let maybe_connection_id = network_gateway.get_connection_id(&peer_address);
+                trace!("{} -- maybe_connection_id: {:?}", self.name.clone(), maybe_connection_id);
+                if let Some(connection_id) = maybe_connection_id {
+                    Transport::post(&mut *network_gateway, TransportCommand::Close(connection_id))?;
+                }
             }
-            DhtEvent::HoldEntryRequested(_from, _entry) => {
-                // no-op
+            // No entries in Network DHT
+            DhtEvent::HoldEntryRequested(_, _) => {
+                unreachable!();
             }
-            DhtEvent::FetchEntryResponse(_data) => {
-                // no-op
+            DhtEvent::FetchEntryResponse(_) => {
+                unreachable!();
             }
-            DhtEvent::EntryPruned(_address) => {
-                // no-op
+            DhtEvent::EntryPruned(_) => {
+                unreachable!();
             }
             DhtEvent::EntryDataRequested(_) => {
-                // no-op
+                unreachable!();
             }
         }
         Ok(outbox)

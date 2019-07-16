@@ -96,9 +96,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data))?;
             }
             DhtEvent::PeerTimedOut(_data) => {
-                // TODO #159
-
-                // Ping peer?
+                // no-op
             }
             // HoldEntryRequested from gossip
             // -> Send each aspect to Core for validation

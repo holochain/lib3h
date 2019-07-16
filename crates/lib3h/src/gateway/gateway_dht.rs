@@ -104,28 +104,12 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .unwrap();
-                    // get to_peer's connectionId
-                    let to_peer_uri = self
-                        .inner_dht
-                        .get_peer(&to_peer_address)
-                        .expect("Should gossip to a known peer")
-                        .peer_uri;
-                    // TODO: If no connectionId, open a connection first ?
-                    let to_conn_id = self
-                        .connection_map
-                        .get(&to_peer_uri)
-                        .expect("unknown peer_uri");
-                    trace!(
-                        "({}) GossipTo: {} -> {} -> {}",
-                        self.identifier.clone(),
-                        to_peer_address,
-                        to_peer_uri,
-                        to_conn_id
-                    );
+                    let to_conn_id = self.get_connection_id(&to_peer_address)
+                        .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
                     self.inner_transport
                         .borrow_mut()
-                        .send(&[to_conn_id], &payload)?;
+                        .send(&[&to_conn_id], &payload)?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

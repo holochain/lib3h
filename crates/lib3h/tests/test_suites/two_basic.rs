@@ -259,8 +259,8 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         1000,
     );
     assert!(store_result.is_none());
-    let (did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(!did_work);
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    assert_eq!(srv_msg_list.len(), 0);
 }
 
 /// Entry with two aspects case
@@ -355,6 +355,8 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     std::thread::sleep(std::time::Duration::from_millis(1200));
 
     // Billy should send a PeerTimedOut message
+    let (_did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?}", srv_msg_list);
     let (_did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?}", srv_msg_list);
     assert_eq!(srv_msg_list.len(), 1);

@@ -119,8 +119,11 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             did_work,
             outbox.len()
         );
-        //// ?? Don't process inner transport because we are not the owner and are not responsable for that??
         // Process inner transport
+        // Its okay to process inner transport as long as NetworkEngine only calls
+        // Transport::process() on the network gateway,
+        // otherwise remove this code and have RealEngine explicitly call the process of the
+        // Network transport.
         let (inner_did_work, mut event_list) = self.inner_transport.borrow_mut().process()?;
         trace!(
             "({}).Transport.inner_process() - output: {} {}",
@@ -263,8 +266,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
-            TransportEvent::ReceivedData(id, payload) => {
-                debug!("Received message from: {}", id);
+            TransportEvent::ReceivedData(connection_id, payload) => {
+                debug!("Received message from: {}", connection_id);
                 // trace!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
@@ -277,10 +280,13 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                             "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier
                         );
+                        let peer_uri = self.inner_transport.borrow_mut().get_uri(connection_id).expect("FIXME"); // TODO #58
+                        debug!("peer_uri of: {} = {}", connection_id, peer_uri);
                         if self.identifier == gateway_id {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
-                                peer_uri: transport_id_to_url(id.clone()),
+                                peer_uri,
+                                // peer_uri: transport_id_to_url(connection_id.clone()),
                                 timestamp: peer_timestamp,
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
