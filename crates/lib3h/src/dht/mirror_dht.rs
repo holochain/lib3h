@@ -129,23 +129,31 @@ impl Dht for MirrorDht {
                 error!("serve_DhtCommand() failed: {:?}", res);
             }
         }
-        // Check if must gossip self
-        if now - self.last_gossip_of_self > self.config.gossip_interval {
-            self.last_gossip_of_self = now;
-            let evt = self.gossip_self(self.peer_list.iter().map(|(key, _)| key.clone()).collect());
-            outbox.push(evt);
-        }
         // Check if others timed-out
         let mut to_remove_list = Vec::new();
         for (peer_address, peer) in self.peer_list.iter() {
+            // Skip self
+            if peer_address == &self.this_peer.peer_address {
+                continue;
+            }
+            trace!("@MirrorDht@ now: {} ; peer.timestamp: {} ({})", now, peer.timestamp, self.config.timeout_threshold);
             if now - peer.timestamp > self.config.timeout_threshold {
                 outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
                 to_remove_list.push(peer_address.clone());
+                did_work = true;
             }
         }
         // Remove peer data form local dht
         for peer_address in to_remove_list {
             self.peer_list.remove(&peer_address);
+        }
+        // Check if must gossip self
+        trace!("@MirrorDht@ now: {} ; last_gossip: {} ({})", now, self.last_gossip_of_self, self.config.gossip_interval);
+        if now - self.last_gossip_of_self > self.config.gossip_interval {
+            self.last_gossip_of_self = now;
+            let evt = self.gossip_self(self.get_other_peer_list());
+            outbox.push(evt);
+            did_work = true;
         }
         // Done
         Ok((did_work, outbox))
@@ -154,6 +162,16 @@ impl Dht for MirrorDht {
 
 /// Internals
 impl MirrorDht {
+
+    // Get all known peers except self
+    fn get_other_peer_list(&self) -> Vec<String> {
+        self
+            .peer_list
+            .iter()
+            .filter(|(address, _)| *address != &self.this_peer.peer_address)
+            .map(|(address, _)| address.clone())
+            .collect()
+    }
 
     // Create gossipTo event of your own PeerData (but not to yourself)
     fn gossip_self(&mut self, peer_address_list: Vec<String>) -> DhtEvent {
@@ -252,11 +270,7 @@ impl MirrorDht {
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
         let gossip_evt = GossipToData {
-            peer_address_list: self
-                .get_peer_list()
-                .iter()
-                .map(|pi| pi.peer_address.clone())
-                .collect(),
+            peer_address_list: self.get_other_peer_list(),
             bundle: buf,
         };
         DhtEvent::GossipTo(gossip_evt)
@@ -313,11 +327,7 @@ impl MirrorDht {
             // Owner is asking us to hold a peer info
             DhtCommand::HoldPeer(new_peer_data) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
-                let peer_address_list: Vec<String> = self
-                    .get_peer_list()
-                    .iter()
-                    .map(|pi| pi.peer_address.clone())
-                    .collect();
+                let other_peer_address_list = self.get_other_peer_list();
                 // Store it
                 let received_new_content = self.add_peer(new_peer_data);
                 // Bail if peer is known and up to date.
@@ -338,10 +348,10 @@ impl MirrorDht {
                 trace!(
                     "@MirrorDht@ gossiping peer: {:?} to {:?}",
                     peer,
-                    peer_address_list
+                    other_peer_address_list
                 );
                 let gossip_evt = GossipToData {
-                    peer_address_list,
+                    peer_address_list: other_peer_address_list,
                     bundle: buf,
                 };
                 event_list.push(DhtEvent::GossipTo(gossip_evt));

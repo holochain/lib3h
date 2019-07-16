@@ -97,6 +97,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             DhtEvent::PeerTimedOut(_data) => {
                 // TODO #159
+
+                // Ping peer?
             }
             // HoldEntryRequested from gossip
             // -> Send each aspect to Core for validation
