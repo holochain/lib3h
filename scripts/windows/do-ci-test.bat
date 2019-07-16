@@ -2,4 +2,5 @@
 setlocal enabledelayedexpansion
 
 rem KEEP IN SYNC WITH HOLONIX
-cargo test --release -p lib3h --target-dir c:\build\lib3h\target --verbose
+set RUST_BACKTRACE=1
+cargo test --target-dir c:\build\lib3h\target --verbose
