@@ -10,9 +10,9 @@ use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 lazy_static! {
     pub static ref TWO_NODES_SPACES_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
         (test_leave_space, true),
-        (test_rejoining, true),
-        (test_multispace_send, true),
-        (test_multispace_dht, true),
+//        (test_rejoining, true),
+//        (test_multispace_send, true),
+//        (test_multispace_dht, true),
     ];
 }
 

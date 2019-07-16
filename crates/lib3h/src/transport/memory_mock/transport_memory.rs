@@ -149,31 +149,27 @@ impl Transport for TransportMemory {
     /// Notify other server on that connectionId that we are closing connection and
     /// locally clear that connectionId.
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
+        trace!("TransportMemory[{}].close({})", self.own_id, id);
         if self.maybe_my_uri.is_none() {
             return Err(TransportError::new("Cannot close a connection before bounding".to_string()));
         }
         let my_uri = self.maybe_my_uri.clone().unwrap();
-
-        trace!("TransportMemory[{}].close({})", self.own_id, id);
         // Get the other node's uri on that connection
-        let maybe_url = self.outbound_connection_map.get(id);
-        if let None = maybe_url {
-            return Err(TransportError::new(format!(
-                "No known connection for connectionId {}",
-                id
-            )));
+        let maybe_other_uri = self.outbound_connection_map.get(id);
+        if let None = maybe_other_uri {
+            return Err(TransportError::new(format!("Unknown connectionId: {}", id)));
         }
-        let url = maybe_url.unwrap();
+        let other_uri = maybe_other_uri.unwrap();
         // Get other node's server
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(url);
-        if let None = maybe_server {
+        let maybe_other_server = server_map.get(other_uri);
+        if let None = maybe_other_server {
             return Err(TransportError::new(format!(
                 "No Memory server at this url: {}",
-                url,
+                other_uri,
             )));
         }
-        let mut other_server = maybe_server.unwrap().lock().unwrap();
+        let mut other_server = maybe_other_server.unwrap().lock().unwrap();
         // Tell it to close connection
         other_server.close(&my_uri)?;
         // Locally remove connection
@@ -188,7 +184,10 @@ impl Transport for TransportMemory {
     fn close_all(&mut self) -> TransportResult<()> {
         let id_list = self.connection_id_list()?;
         for id in id_list {
-            self.close(&id)?;
+            let res = self.close(&id);
+            if let Err(e) = res {
+                warn!("Closing connection {} failed: {:?}", id, e);
+            }
         }
         Ok(())
     }
@@ -301,7 +300,10 @@ impl Transport for TransportMemory {
             match event {
                 TransportEvent::ConnectionClosed(in_cid) => {
                     // convert inbound connectionId to outbound connectionId.
-                    let out_cid = self.inbound_connection_map.get(&in_cid).expect("Should have outbound at this stage");
+                    // let out_cid = self.inbound_connection_map.get(&in_cid).expect("Should have outbound at this stage");
+                    let out_cid = self.inbound_connection_map.remove(&in_cid).expect("Should have outbound at this stage");
+                    // close will fail as other side isn't there anymore
+                    let _ = self.close(&out_cid);
                     outbox.push(TransportEvent::ConnectionClosed(out_cid.to_string()));
                 }
                 TransportEvent::ReceivedData(in_cid, data) => {

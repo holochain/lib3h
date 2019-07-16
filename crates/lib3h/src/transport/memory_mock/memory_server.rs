@@ -130,7 +130,7 @@ impl MemoryServer {
         // Notify our TransportMemory
         self.connection_inbox.push((other_uri.clone(), false));
         // Locally remove connection
-        self.inbound_connections.remove(other_uri);
+        // self.inbound_connections.remove(other_uri);
         Ok(())
     }
 
@@ -156,10 +156,13 @@ impl MemoryServer {
         let mut did_work = false;
         // Process connection inbox
         for (uri, is_new) in self.connection_inbox.iter() {
-            let id = self.inbound_connections.get(uri).expect("Should always have id for a connected uri");
+            trace!("(MemoryServer {}). connection_inbox: {} | {}", self.this_uri, uri, is_new);
+            let id = self.inbound_connections.get(uri)
+                .expect("Should always have id for a connected uri (connection)").to_string();
             let event = if *is_new {
                 TransportEvent::IncomingConnectionEstablished(id.to_string())
             } else {
+                self.inbound_connections.remove(uri);
                 TransportEvent::ConnectionClosed(id.to_string())
             };
             trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
@@ -169,7 +172,8 @@ impl MemoryServer {
         self.connection_inbox.clear();
         // Process msg inboxes
         for (uri, inbox) in self.inbox_map.iter_mut() {
-            let id = self.inbound_connections.get(uri).expect("Should always have id for a connected uri");
+            let id = self.inbound_connections.get(uri)
+                .expect("Should always have id for a connected uri (msg)");
             loop {
                 let payload = match inbox.pop_front() {
                     None => break,
