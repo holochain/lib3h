@@ -66,14 +66,24 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
 
 /// Wait for peer timeout
 fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
+    let test_start_time = lib3h::time::since_epoch_ms();
+    println!("test_start_time = {}\n", test_start_time);
     // Wait before peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(1000));
+    println!(
+        "One second later = {}\n",
+        lib3h::time::since_epoch_ms() - test_start_time
+    );
     // Billy should NOT send a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
     // Wait past peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(2100));
+    println!(
+        "three seconds later = {}\n",
+        lib3h::time::since_epoch_ms() - test_start_time
+    );
     // Billy SHOULD send a PeerTimedOut message ...
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
