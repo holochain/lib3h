@@ -280,7 +280,7 @@ impl Transport for TransportMemory {
                 .get(my_server_uri)
                 .expect("My server should exist.")
                 .lock()
-                .expect("server_map already in use by this thread");
+                .unwrap();
             let (success, event_list) = my_server.process()?;
             if success {
                 did_work = true;
