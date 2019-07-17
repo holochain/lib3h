@@ -78,10 +78,6 @@ impl NodeMock {
     pub fn join_current_space(&mut self) -> Lib3hResult<String> {
         let current_space = self.current_space.clone().expect("Current space not set");
         self.join_space(&current_space, false)
-        // match self.join_space(&current_space, false) {
-        //     Ok(o) => return Ok(o),
-        //     Err(e) => return Err(e.into()),
-        // }
     }
 
     /// Return request_id
