@@ -1,5 +1,8 @@
-use crate::dht::dht_protocol::{DhtCommand, DhtEvent, PeerData};
-use lib3h_protocol::{Address, DidWork, Lib3hResult};
+use crate::{
+    dht::dht_protocol::{DhtCommand, DhtEvent, PeerData},
+    error::Lib3hResult,
+};
+use lib3h_protocol::{Address, DidWork};
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
