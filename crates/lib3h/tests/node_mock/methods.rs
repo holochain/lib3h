@@ -6,9 +6,10 @@ use holochain_persistence_api::hash::HashString;
 use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
     data_types::*,
-    error::{Lib3hProtocolResult, Lib3hProtocolError, ErrorKind},
+    error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, DidWork,
+    protocol_server::Lib3hServerProtocol,
+    Address, DidWork,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -65,8 +66,9 @@ impl NodeMock {
     /// Return Err if all connects failed.
     pub fn reconnect(&mut self) -> Lib3hProtocolResult<()> {
         // re-connect to all nodes
-        let mut return_res = Err(Lib3hProtocolError::new(ErrorKind::Other(
-            String::from("Failed to reconnect to any node"))));
+        let mut return_res = Err(Lib3hProtocolError::new(ErrorKind::Other(String::from(
+            "Failed to reconnect to any node",
+        ))));
         for uri in self.connected_list.clone().iter() {
             let res = self.connect_to(&uri);
             if res.is_ok() {
@@ -74,7 +76,8 @@ impl NodeMock {
             } else {
                 warn!(
                     "Failed to reconnect to {}: {:?}",
-                    uri.as_str(), res.err().unwrap(),
+                    uri.as_str(),
+                    res.err().unwrap(),
                 );
             }
         }

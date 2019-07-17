@@ -18,8 +18,8 @@ mod test_suites;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
-    time::START_TIME,
     error::Lib3hResult,
+    time::START_TIME,
     transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
 };
