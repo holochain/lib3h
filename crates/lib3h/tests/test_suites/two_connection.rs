@@ -38,7 +38,7 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
 /// Wait for peer timeout
 fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait before peer Timeout threshold
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     // Billy should send a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
@@ -56,7 +56,7 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     // Wait past peer Timeout threshold
-    std::thread::sleep(std::time::Duration::from_millis(1100));
+    std::thread::sleep(std::time::Duration::from_millis(2100));
     // Billy should not see a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
@@ -67,13 +67,13 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
 /// Wait for peer timeout
 fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait before peer Timeout threshold
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     // Billy should NOT send a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
     // Wait past peer Timeout threshold
-    std::thread::sleep(std::time::Duration::from_millis(1100));
+    std::thread::sleep(std::time::Duration::from_millis(2100));
     // Billy SHOULD send a PeerTimedOut message ...
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
