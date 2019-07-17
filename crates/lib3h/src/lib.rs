@@ -39,7 +39,8 @@ pub mod tests {
         }
         // wait a bit because of non monotonic clock,
         // otherwise we could get negative substraction panics
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        // TODO #211
+        std::thread::sleep(std::time::Duration::from_millis(10));
         if std::env::var("RUST_LOG").is_err() {
             std::env::set_var("RUST_LOG", "debug");
         }

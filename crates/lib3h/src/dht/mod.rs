@@ -179,6 +179,8 @@ pub mod tests {
         let peer_list = dht.get_peer_list();
         assert_eq!(peer_list.len(), 0);
         // Add a peer
+        // wait a bit so that the -1 does not underflow
+        std::thread::sleep(std::time::Duration::from_millis(10));
         let mut peer_b_data = create_PeerData(PEER_B);
         dht.post(DhtCommand::HoldPeer(peer_b_data.clone())).unwrap();
         let (did_work, _) = dht.process().unwrap();
@@ -197,7 +199,7 @@ pub mod tests {
         assert_eq!(peer.timestamp, ref_time);
         // Add newer peer info
         // wait a bit so that the +1 is not ahead of 'now'
-        std::thread::sleep(std::time::Duration::from_millis(3));
+        std::thread::sleep(std::time::Duration::from_millis(10));
         peer_b_data.timestamp = ref_time + 1;
         dht.post(DhtCommand::HoldPeer(peer_b_data)).unwrap();
         let (did_work, _) = dht.process().unwrap();
