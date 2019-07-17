@@ -5,7 +5,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate rmp_serde;
-// extern crate lib3h;
 
 pub mod data_types;
 pub mod network_engine;
