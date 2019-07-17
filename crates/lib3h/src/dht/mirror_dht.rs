@@ -140,7 +140,9 @@ impl Dht for MirrorDht {
                 continue;
             }
             // Skip already timed out
-            let has_timed_out = self.timed_out_map.get(peer_address)
+            let has_timed_out = self
+                .timed_out_map
+                .get(peer_address)
                 .expect("Should allways have time_out value for a peer");
             if *has_timed_out {
                 continue;

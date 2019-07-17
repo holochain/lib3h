@@ -1,8 +1,6 @@
 use crate::{
     node_mock::NodeMock,
-    test_suites::two_basic::{
-        test_author_one_aspect, test_send_message, TwoNodesTestFn,
-    },
+    test_suites::two_basic::{test_author_one_aspect, test_send_message, TwoNodesTestFn},
 };
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 

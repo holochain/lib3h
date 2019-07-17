@@ -27,7 +27,9 @@ use lib3h::{
 use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
 use node_mock::NodeMock;
 use std::time::SystemTime;
-use test_suites::{three_basic::*, two_basic::*, two_get_lists::*, two_spaces::*, two_connection::*};
+use test_suites::{
+    three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
+};
 use url::Url;
 use utils::constants::*;
 
