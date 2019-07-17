@@ -226,9 +226,8 @@ impl MirrorDht {
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 if let Err(e) = maybe_gossip {
-                    error!("Fail to deserialize gossip.");
+                    error!("Failed to deserialize gossip.");
                     return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
-                    // return Err(e.into());
                 }
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
