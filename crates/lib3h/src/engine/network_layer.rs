@@ -207,13 +207,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
-                let _space_gateway = self
-                    .space_gateway_map
-                    .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                    .ok_or_else(|| Lib3hError::new_key_not_found("space_gateway not found"))?;
-                // Post it as a remoteGossipTo
-                let _from_peer_address: String = msg.from_peer_address.clone().into();
-
                 // Prepare remoteGossipTo to post to dht
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
                     from_peer_address: msg.from_peer_address.clone().into(),
