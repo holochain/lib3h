@@ -86,6 +86,57 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         Ok(outbox)
     }
 
+    fn handle_new_connection(
+        &mut self,
+        id: &ConnectionIdRef,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        let mut outbox = Vec::new();
+        let mut network_gateway = self.network_gateway.borrow_mut();
+        if let Some(uri) = network_gateway.get_uri(id) {
+            info!("Network Connection opened: {} ({})", id, uri);
+
+            // TODO #150 - Should do this in next process instead
+            // Send to other node our Joined Spaces
+            let space_list = self.get_all_spaces();
+            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+            let mut buf = Vec::new();
+            our_joined_space_list
+                .serialize(&mut Serializer::new(&mut buf))
+                .unwrap();
+            trace!(
+                "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
+                our_joined_space_list,
+                id
+            );
+            // id is connectionId but we need a transportId, so search for it in the DHT
+            let peer_list = network_gateway.get_peer_list();
+            trace!(
+                "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
+                peer_list
+            );
+            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
+            if let Some(peer_data) = maybe_peer_data {
+                trace!(
+                    "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
+                    peer_data,
+                );
+                network_gateway.send(&[&peer_data.peer_address], &buf)?;
+            }
+            // TODO END
+
+            // Output a Lib3hServerProtocol::Connected if its the first connection
+            if self.network_connections.is_empty() {
+                let data = ConnectedData {
+                    request_id: "FIXME".to_string(), // TODO #173
+                    uri,
+                };
+                outbox.push(Lib3hServerProtocol::Connected(data));
+            }
+            let _ = self.network_connections.insert(id.to_owned());
+        }
+        Ok(outbox)
+    }
+
     /// Handle a TransportEvent sent to us by our network gateway
     fn handle_netTransportEvent(
         &mut self,
@@ -111,53 +162,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
             TransportEvent::ConnectResult(id) => {
-                let mut network_gateway = self.network_gateway.borrow_mut();
-                if let Some(uri) = network_gateway.get_uri(id) {
-                    info!("Network Connection opened: {} ({})", id, uri);
-
-                    // TODO #150 - Should do this in next process instead
-                    // Send to other node our Joined Spaces
-                    let space_list = self.get_all_spaces();
-                    let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-                    let mut buf = Vec::new();
-                    our_joined_space_list
-                        .serialize(&mut Serializer::new(&mut buf))
-                        .unwrap();
-                    trace!(
-                        "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
-                        our_joined_space_list,
-                        id
-                    );
-                    // id is connectionId but we need a transportId, so search for it in the DHT
-                    let peer_list = network_gateway.get_peer_list();
-                    trace!(
-                        "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
-                        peer_list
-                    );
-                    let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
-                    if let Some(peer_data) = maybe_peer_data {
-                        trace!(
-                            "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
-                            peer_data,
-                        );
-                        network_gateway.send(&[&peer_data.peer_address], &buf)?;
-                    }
-                    // TODO END
-
-                    // Output a Lib3hServerProtocol::Connected if its the first connection
-                    if self.network_connections.is_empty() {
-                        let data = ConnectedData {
-                            request_id: "FIXME".to_string(), // TODO #173
-                            uri,
-                        };
-                        outbox.push(Lib3hServerProtocol::Connected(data));
-                    }
-                    let _ = self.network_connections.insert(id.to_owned());
-                }
+                let mut output = self.handle_new_connection(id)?;
+                outbox.append(&mut output);
             }
-            TransportEvent::IncomingConnectionEstablished(_id) => {
-                // TODO #159
-                unimplemented!();
+            TransportEvent::IncomingConnectionEstablished(id) => {
+                let mut output = self.handle_new_connection(id)?;
+                outbox.append(&mut output);
             }
             TransportEvent::ConnectionClosed(id) => {
                 self.network_connections.remove(id);
@@ -216,14 +226,17 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Dht::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
                 } else {
                     // otherwise should be for one of our space
-                    let space_gateway = self
+                    let maybe_space_gateway = self
                         .space_gateway_map
-                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()))
-                        .ok_or_else(|| {
-                            Lib3hError::new_key_not_found(&format!("space_gateway not found: {}", msg.space_address))
-
-                        })?;
-                    Dht::post(space_gateway, cmd)?;
+                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
+                    if let Some(space_gateway) = maybe_space_gateway {
+                        Dht::post(space_gateway, cmd)?;
+                    } else {
+                        warn!(
+                            "received gossip for unjoined space_gateway: {}",
+                            msg.space_address
+                        );
+                    }
                 }
             }
             P2pProtocol::DirectMessage(dm_data) => {
@@ -257,7 +270,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     );
                 }
             }
-            P2pProtocol::PeerAddress(_, _) => {
+            P2pProtocol::PeerAddress(_, _, _) => {
                 // no-op
             }
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
