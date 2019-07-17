@@ -201,14 +201,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
         }
-        let res = self.network_gateway.borrow_mut().close_all();
-        if let Err(e) = res {
-            if result.is_ok() {
-                result = Err(e);
-            }
-        }
         // Done
-        result.map_err(|e| format_err!("Closing of some connection failed: {:?}", e))
+        self.network_gateway.borrow_mut().close_all().map_err(|e| {
+            error!("Closing of some connection failed: {:?}", e);
+            e
+        })?;
+        Ok(())
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
