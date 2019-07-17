@@ -28,15 +28,17 @@ pub struct MirrorDht {
     inbox: VecDeque<DhtCommand>,
     /// Storage of EntryData with empty aspect content?
     entry_list: HashMap<Address, HashSet<Address>>,
-    /// Storage of PeerData
-    peer_list: HashMap<String, PeerData>,
+    /// Monotonic Storage of PeerData
+    peer_map: HashMap<String, PeerData>,
+    /// Track if peer timed out
+    timed_out_map: HashMap<String, bool>,
     /// PeerData of this peer
     this_peer: PeerData,
     /// Keep track of fetch requests sent to Core
     pending_fetch_request_list: HashSet<String>,
-
+    /// Keep track of last time this peer gossiped self to others
     last_gossip_of_self: u64,
-
+    /// Store Dht config used by this peer
     config: DhtConfig,
 }
 
@@ -51,7 +53,8 @@ impl MirrorDht {
         let timestamp = time::since_epoch_ms();
         let this = MirrorDht {
             inbox: VecDeque::new(),
-            peer_list: HashMap::new(),
+            peer_map: HashMap::new(),
+            timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
                 peer_address: config.this_peer_address.to_string(),
@@ -71,11 +74,11 @@ impl Dht for MirrorDht {
     // -- Peer info -- //
 
     fn get_peer_list(&self) -> Vec<PeerData> {
-        self.peer_list.values().map(|v| v.clone()).collect()
+        self.peer_map.values().map(|v| v.clone()).collect()
     }
 
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
-        let res = self.peer_list.get(peer_address);
+        let res = self.peer_map.get(peer_address);
         if let Some(pd) = res {
             return Some(pd.clone());
         }
@@ -130,23 +133,30 @@ impl Dht for MirrorDht {
             }
         }
         // Check if others timed-out
-        let mut to_remove_list = Vec::new();
-        for (peer_address, peer) in self.peer_list.iter() {
+        let mut timed_out_list = Vec::new();
+        for (peer_address, peer) in self.peer_map.iter() {
             // Skip self
             if peer_address == &self.this_peer.peer_address {
                 continue;
             }
+            // Skip already timed out
+            let has_timed_out = self.timed_out_map.get(peer_address)
+                .expect("Should allways have time_out value for a peer");
+            if *has_timed_out {
+                continue;
+            }
+            // Check if timed-out
             if now - peer.timestamp > self.config.timeout_threshold {
                 debug!("@MirrorDht@ peer {} timed-out", peer_address);
                 outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
-                to_remove_list.push(peer_address.clone());
+                timed_out_list.push(peer_address.clone());
                 did_work = true;
             }
         }
-//        // Remove peer data form local dht
-//        for peer_address in to_remove_list {
-//            self.peer_list.remove(&peer_address);
-//        }
+        // Mark peers that timed out
+        for peer_address in timed_out_list {
+            self.timed_out_map.insert(peer_address, true);
+        }
         // Check if must gossip self
         trace!(
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
@@ -171,7 +181,7 @@ impl Dht for MirrorDht {
 impl MirrorDht {
     // Get all known peers except self
     fn get_other_peer_list(&self) -> Vec<String> {
-        self.peer_list
+        self.peer_map
             .iter()
             .filter(|(address, _)| *address != &self.this_peer.peer_address)
             .map(|(address, _)| address.clone())
@@ -200,12 +210,14 @@ impl MirrorDht {
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
         trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
-        let maybe_peer = self.peer_list.get_mut(&peer_info.peer_address);
+        let maybe_peer = self.peer_map.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
                 trace!("@MirrorDht@ Adding peer - OK NEW");
-                self.peer_list
+                self.peer_map
                     .insert(peer_info.peer_address.clone(), peer_info.clone());
+                self.timed_out_map
+                    .insert(peer_info.peer_address.clone(), false);
                 true
             }
             Some(mut peer) => {
@@ -219,6 +231,10 @@ impl MirrorDht {
                     peer.timestamp
                 );
                 peer.timestamp = peer_info.timestamp;
+                if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold {
+                    self.timed_out_map
+                        .insert(peer_info.peer_address.clone(), false);
+                }
                 true
             }
         }
@@ -334,7 +350,7 @@ impl MirrorDht {
                 let other_peer_address_list = self.get_other_peer_list();
                 // Store it
                 let received_new_content = self.add_peer(new_peer_data);
-                println!("HoldPeer({:?}) in {:?}", new_peer_data, self.peer_list);
+                println!("HoldPeer({:?}) in {:?}", new_peer_data, self.peer_map);
                 // Bail if peer is known and up to date.
                 if !received_new_content {
                     return Ok(vec![]);
@@ -342,7 +358,7 @@ impl MirrorDht {
                 let mut event_list = Vec::new();
                 // Gossip to everyone to also hold it
                 let peer = self
-                    .peer_list
+                    .peer_map
                     .get(&new_peer_data.peer_address)
                     .expect("Should have peer by now");
                 let peer_gossip = MirrorGossip::Peer(peer.clone());
