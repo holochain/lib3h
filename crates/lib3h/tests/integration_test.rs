@@ -92,7 +92,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
         dht_gossip_interval: 500,
-        dht_timeout_threshold: 10000,
+        dht_timeout_threshold: 3000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -121,7 +121,7 @@ fn setup_wss_node(
         log_level: 'd',
         bind_url,
         dht_gossip_interval: 500,
-        dht_timeout_threshold: 12000,
+        dht_timeout_threshold: 3500,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)

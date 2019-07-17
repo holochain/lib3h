@@ -95,7 +95,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // For now accept all request
                 Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data))?;
             }
-            DhtEvent::PeerTimedOut(_data) => {
+            DhtEvent::PeerTimedOut(_peer_address) => {
                 // no-op
             }
             // HoldEntryRequested from gossip

@@ -75,7 +75,6 @@ impl Dht for MirrorDht {
     }
 
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
-        println!("get_peer({}) in {:?}", peer_address, self.peer_list);
         let res = self.peer_list.get(peer_address);
         if let Some(pd) = res {
             return Some(pd.clone());
@@ -144,10 +143,10 @@ impl Dht for MirrorDht {
                 did_work = true;
             }
         }
-        // Remove peer data form local dht
-        for peer_address in to_remove_list {
-            self.peer_list.remove(&peer_address);
-        }
+//        // Remove peer data form local dht
+//        for peer_address in to_remove_list {
+//            self.peer_list.remove(&peer_address);
+//        }
         // Check if must gossip self
         trace!(
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
@@ -157,9 +156,11 @@ impl Dht for MirrorDht {
         );
         if now - self.last_gossip_of_self > self.config.gossip_interval {
             self.last_gossip_of_self = now;
-            let evt = self.gossip_self(self.get_other_peer_list());
-            outbox.push(evt);
-            did_work = true;
+            let gossip_data = self.gossip_self(self.get_other_peer_list());
+            if gossip_data.peer_address_list.len() > 0 {
+                outbox.push(DhtEvent::GossipTo(gossip_data));
+                did_work = true;
+            }
         }
         // Done
         Ok((did_work, outbox))
@@ -178,7 +179,7 @@ impl MirrorDht {
     }
 
     // Create gossipTo event of your own PeerData (but not to yourself)
-    fn gossip_self(&mut self, peer_address_list: Vec<String>) -> DhtEvent {
+    fn gossip_self(&mut self, peer_address_list: Vec<String>) -> GossipToData {
         let this_peer = self.this_peer();
         let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
         let mut buf = Vec::new();
@@ -190,11 +191,10 @@ impl MirrorDht {
             this_peer,
             peer_address_list
         );
-        let gossip_evt = GossipToData {
+        GossipToData {
             peer_address_list,
             bundle: buf,
-        };
-        DhtEvent::GossipTo(gossip_evt)
+        }
     }
 
     /// Return true if new peer or updated peer
@@ -363,8 +363,10 @@ impl MirrorDht {
 
                 // Gossip back your own PeerData (but not to yourself)
                 if new_peer_data.peer_address != self.this_peer().peer_address {
-                    let evt = self.gossip_self(vec![new_peer_data.peer_address.clone()]);
-                    event_list.push(evt);
+                    let gossip_data = self.gossip_self(vec![new_peer_data.peer_address.clone()]);
+                    if gossip_data.peer_address_list.len() > 0 {
+                        event_list.push(DhtEvent::GossipTo(gossip_data));
+                    }
                 }
                 // Done
                 Ok(event_list)

@@ -7,17 +7,18 @@ pub type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        (test_setup_only, true),
-        (test_send_message, true),
-        (test_send_message_fail, true),
-        (test_hold_entry, true),
-        (test_author_no_aspect, true),
-        (test_author_one_aspect, true),
-        (test_author_two_aspects, true),
-        (test_two_authors, true),
-        (test_two_disconnect, true),
-          // (test_two_peer_timeout, true)
-          (test_two_reconnect, true),
+//        (test_setup_only, true),
+//        (test_send_message, true),
+//        (test_send_message_fail, true),
+//        (test_hold_entry, true),
+//        (test_author_no_aspect, true),
+//        (test_author_one_aspect, true),
+//        (test_author_two_aspects, true),
+//        (test_two_authors, true),
+//        (test_two_disconnect, true),
+          // (test_two_gossip_self, true),
+          (test_two_peer_timeout, true),
+          //(test_two_reconnect, true),
     ];
 }
 
@@ -363,14 +364,58 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     });
 }
 
-fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
-    // Wait past peer Timeout threshold
-    std::thread::sleep(std::time::Duration::from_millis(10100));
+/// Wait for peer timeout
+fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Wait before peer Timeout threshold
+    std::thread::sleep(std::time::Duration::from_millis(2000));
     // Billy should send a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
     assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+
+    // Alex should gossip self
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+
+    // More process: Have Billy process P2p::PeerAddress of alex
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    // Wait past peer Timeout threshold
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    // Billy should not see a PeerTimedOut message
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+}
+
+/// Wait for peer timeout
+fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
+    // Wait before peer Timeout threshold
+    std::thread::sleep(std::time::Duration::from_millis(2000));
+    // Billy should send a PeerTimedOut message
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 0);
+    // Wait past peer Timeout threshold
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    // Billy should send a PeerTimedOut message
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
+        assert_eq!(response.network_id, "FIXME");
+    });
 }
 
 /// Have Alex disconnect and reconnect

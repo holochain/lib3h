@@ -68,6 +68,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             DhtEvent::PeerTimedOut(peer_address) => {
                 // TODO #159
+                // Disconnect from that peer
                 let mut network_gateway = self.network_gateway.borrow_mut();
                 let maybe_connection_id = network_gateway.get_connection_id(&peer_address);
                 trace!(

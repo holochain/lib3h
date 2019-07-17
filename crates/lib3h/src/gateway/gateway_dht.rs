@@ -119,7 +119,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             DhtEvent::HoldPeerRequested(_peer_data) => {
                 // no-op
             }
-            DhtEvent::PeerTimedOut(_data) => {
+            DhtEvent::PeerTimedOut(_peer_address) => {
                 // TODO #159
             }
             DhtEvent::HoldEntryRequested(_from, _data) => {
