@@ -23,13 +23,10 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.disconnect();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 0);
-    println!(
-        "disconnect srv_msg_list = {:?} ({})",
-        srv_msg_list, did_work
-    );
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     // Should be disconnected from the network
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
@@ -44,13 +41,13 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
     std::thread::sleep(std::time::Duration::from_millis(2000));
     // Billy should send a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
 
     // Alex should gossip self
     let (did_work, srv_msg_list) = alex.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
 
@@ -62,7 +59,7 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
     std::thread::sleep(std::time::Duration::from_millis(1100));
     // Billy should not see a PeerTimedOut message
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
 }
@@ -79,11 +76,11 @@ fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
     std::thread::sleep(std::time::Duration::from_millis(1100));
     // Billy SHOULD send a PeerTimedOut message ...
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     // ... resulting in a Disconnected on next process loop
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
@@ -128,7 +125,7 @@ fn test_two_peer_timeout_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     println!("\n Reconnecting Alex...\n");
     alex.reconnect().expect("Reconnection failed");
     let (did_work, srv_msg_list) = alex.process().unwrap();
-    println!("reconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
 
     // Billy should see a reconnect
@@ -156,12 +153,12 @@ fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 0);
     println!(
-        "disconnect srv_msg_list = {:?} ({})",
+        "disconnect srv_msg_list = {:?} ({})\n",
         srv_msg_list, did_work
     );
     // Should be disconnected from the network
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
@@ -173,12 +170,18 @@ fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.reconnect().expect("Reconnection failed");
 
     let (did_work, srv_msg_list) = alex.process().unwrap();
-    println!("reconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!(
+        "reconnect srv_msg_list = {:?} ({})\n",
+        srv_msg_list, did_work
+    );
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 4);
 
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("reconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!(
+        "reconnect srv_msg_list = {:?} ({})\n",
+        srv_msg_list, did_work
+    );
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
