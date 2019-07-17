@@ -27,7 +27,7 @@ use lib3h::{
 use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
 use node_mock::NodeMock;
 use std::time::SystemTime;
-use test_suites::{three_basic::*, two_basic::*, two_get_lists::*, two_spaces::*};
+use test_suites::{three_basic::*, two_basic::*, two_get_lists::*, two_spaces::*, two_connection::*};
 use url::Url;
 use utils::constants::*;
 
@@ -184,6 +184,13 @@ fn test_three_memory_nodes_basic_suite() {
         launch_three_memory_nodes_test(*test_fn, *can_setup).unwrap();
     }
 }
+#[test]
+fn test_two_memory_nodes_connection_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
+        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+    }
+}
 
 // Do general test with config
 fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
@@ -269,6 +276,14 @@ fn test_three_wss_nodes_basic_suite() {
     }
 }
 
+#[test]
+fn test_two_wss_nodes_connection_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::Unencrypted, *can_setup).unwrap();
+    }
+}
+
 // -- Wss+Tls Transport Tests --
 #[test]
 fn test_two_wss_tls_nodes_basic_suite() {
@@ -299,6 +314,14 @@ fn test_three_wss_tls_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
         launch_three_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
+    }
+}
+
+#[test]
+fn test_two_wss_tls_nodes_connection_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
     }
 }
 

@@ -31,6 +31,6 @@ pub mod tests {
         let second = since_epoch_ms();
         println!("second: {}", second);
         assert!(second > first);
-        assert!(second >= 10);
+        assert!(second >= 8);
     }
 }
