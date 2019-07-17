@@ -121,7 +121,7 @@ fn setup_wss_node(
         log_level: 'd',
         bind_url,
         dht_gossip_interval: 500,
-        dht_timeout_threshold: 3500,
+        dht_timeout_threshold: 3005,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
