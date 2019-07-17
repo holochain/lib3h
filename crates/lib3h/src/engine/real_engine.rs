@@ -13,14 +13,15 @@ use crate::{
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
+    error::Lib3hResult,
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
+    data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
+    protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -144,7 +145,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
-    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
+    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         // trace!("RealEngine.post(): {:?}", client_msg);
         self.inbox.push_back(client_msg);
         Ok(())
@@ -152,7 +153,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
 
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
         trace!("");
         trace!("{} - process() START - {}", self.name, self.process_count);
@@ -199,14 +200,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 }
             }
         }
-        let res = self.network_gateway.borrow_mut().close_all();
-        if let Err(e) = res {
-            if result.is_ok() {
-                result = Err(e);
-            }
-        }
         // Done
-        result.map_err(|e| format_err!("Closing of some connection failed: {:?}", e))
+        self.network_gateway.borrow_mut().close_all().map_err(|e| {
+            error!("Closing of some connection failed: {:?}", e);
+            e
+        })?;
+        Ok(())
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox

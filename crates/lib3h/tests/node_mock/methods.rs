@@ -3,9 +3,10 @@
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
 use crate::utils::constants::*;
 use holochain_persistence_api::hash::HashString;
+use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
-    data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
-    Address, DidWork, Lib3hResult,
+    data_types::*, error::Lib3hProtocolResult, protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -88,10 +89,8 @@ impl NodeMock {
         Ok(())
     }
 }
-
-/// Connection & Space managing
-impl NodeMock {
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hResult<()> {
+    /// Connect to another peer via its uri
+    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<()> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
             peer_uri: uri.clone(),
@@ -161,7 +160,11 @@ impl NodeMock {
                 self.set_current_space(space_address);
             }
         }
-        res.map(|()| join_space.request_id)
+
+        match res {
+            Ok(_) => Ok(join_space.request_id),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Post a Lib3hClientProtocol::LeaveSpace and update internal tracking
@@ -178,7 +181,10 @@ impl NodeMock {
         if res.is_ok() {
             self.joined_space_list.remove(space_address);
         }
-        res.map(|()| leave_space_msg.request_id)
+        match res {
+            Ok(_) => Ok(leave_space_msg.request_id),
+            Err(e) => Err(e.into()),
+        }
     }
 
     ///
@@ -235,7 +241,7 @@ impl NodeMock {
                     }
                 }
                 if !success {
-                    return Err(format_err!("Authoring of all aspects failed."));
+                    return Err(Lib3hError::new_other("Authoring of all aspects failed."));
                 }
             }
         }
@@ -275,7 +281,7 @@ impl NodeMock {
                 }
             }
             if !success {
-                return Err(format_err!("Storing of aspects failed."));
+                return Err(Lib3hError::new_other("Storing of aspects failed."));
             }
         }
         if can_tell_engine {
@@ -509,8 +515,10 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
             };
         }
+
         self.engine
             .post(Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg).into())
+            .map_err(|e| e.into())
     }
     /// Look for the first HandleGetAuthoringEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetAuthoringEntryList(&mut self) {
@@ -558,6 +566,7 @@ impl NodeMock {
         }
         self.engine
             .post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg).into())
+            .map_err(|e| e.into())
     }
     /// Look for the first HandleGetGossipingEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetGossipingEntryList(&mut self) {

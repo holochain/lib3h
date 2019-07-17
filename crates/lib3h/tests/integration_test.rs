@@ -8,8 +8,6 @@ extern crate backtrace;
 #[macro_use]
 extern crate log;
 extern crate holochain_persistence_api;
-#[macro_use]
-extern crate failure;
 extern crate lib3h;
 extern crate lib3h_protocol;
 extern crate multihash;
@@ -21,10 +19,11 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     time::START_TIME,
+    error::Lib3hResult,
     transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
 };
-use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
+use lib3h_protocol::{network_engine::NetworkEngine, Address};
 use node_mock::NodeMock;
 use std::time::SystemTime;
 use test_suites::{

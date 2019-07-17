@@ -1,5 +1,8 @@
-use crate::dht::{dht_protocol::*, dht_trait::Dht};
-use lib3h_protocol::{Address, DidWork, Lib3hResult};
+use crate::{
+    dht::{dht_protocol::*, dht_trait::Dht},
+    error::Lib3hResult,
+};
+use lib3h_protocol::{Address, DidWork};
 use std::collections::VecDeque;
 use url::Url;
 

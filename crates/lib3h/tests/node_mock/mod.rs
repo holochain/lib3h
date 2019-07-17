@@ -3,9 +3,9 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
-use lib3h::engine::RealEngineConfig;
+use lib3h::{engine::RealEngineConfig, error::Lib3hResult};
 use lib3h_protocol::{
-    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
+    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address,
 };
 use std::collections::{HashMap, HashSet};
 use url::Url;
