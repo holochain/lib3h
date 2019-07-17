@@ -31,8 +31,10 @@ pub struct NodeMock {
     pub agent_id: Address,
     /// The node's uri
     my_advertise: Url,
+    /// This node's handle
     pub name: String,
-
+    /// Keep track of the URIs used when calling `connect()`
+    /// in order to do `reconnect()`
     connected_list: HashSet<Url>,
 
     /// Sent messages logs

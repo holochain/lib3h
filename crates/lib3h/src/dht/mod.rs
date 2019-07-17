@@ -111,10 +111,8 @@ pub mod tests {
         let (did_work, _) = dht.process().unwrap();
         assert!(did_work);
         // Should have it
-        // let peer = dht.get_peer(PEER_B).unwrap();
-        let res = dht.get_peer(PEER_B);
-        println!("res: {:?}", res);
-        // assert_eq!(peer.peer_address, PEER_B);
+        let peer = dht.get_peer(PEER_B).unwrap();
+        assert_eq!(peer.peer_address, PEER_B);
         let peer_list = dht.get_peer_list();
         assert_eq!(peer_list.len(), 1);
         assert_eq!(peer_list[0].peer_address, PEER_B);
@@ -181,7 +179,6 @@ pub mod tests {
         let peer_list = dht.get_peer_list();
         assert_eq!(peer_list.len(), 0);
         // Add a peer
-        std::thread::sleep(std::time::Duration::from_millis(3)); // wait a bit so we can substract timestamp later
         let mut peer_b_data = create_PeerData(PEER_B);
         dht.post(DhtCommand::HoldPeer(peer_b_data.clone())).unwrap();
         let (did_work, _) = dht.process().unwrap();
@@ -199,7 +196,8 @@ pub mod tests {
         let peer = dht.get_peer(PEER_B).unwrap();
         assert_eq!(peer.timestamp, ref_time);
         // Add newer peer info
-        std::thread::sleep(std::time::Duration::from_millis(3)); // wait a bit so we can substract timestamp later
+        // wait a bit so we so that the +1 is not ahead of 'now'
+        std::thread::sleep(std::time::Duration::from_millis(3));
         peer_b_data.timestamp = ref_time + 1;
         dht.post(DhtCommand::HoldPeer(peer_b_data)).unwrap();
         let (did_work, _) = dht.process().unwrap();

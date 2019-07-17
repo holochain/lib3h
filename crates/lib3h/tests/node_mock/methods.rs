@@ -48,21 +48,11 @@ impl NodeMock {
 impl NodeMock {
     /// Disconnect the NetworkEngine by destroying it.
     pub fn disconnect(&mut self) {
-        //        unsafe {
-        //            self.engine.drop();
-        //        }
-        // drop(self.engine);
-        //        {
-        //            // move
-        //            let engine = self.engine;
-        //            // let engine = Box::into_raw(self.engine);
-        //            // drop
-        //        }
         let mut dummy_config = self.config.clone();
         dummy_config.bind_url =
             Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
         self.engine = (self.engine_factory)(&dummy_config, "__dummy")
-            .expect("Failed to re-create RealEngine");
+            .expect("Failed to create dummy RealEngine");
         self.engine = (self.engine_factory)(&self.config, &self.name)
             .expect("Failed to re-create RealEngine");
         self.my_advertise = self.engine.advertise();

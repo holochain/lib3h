@@ -12,6 +12,8 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+type HasTimedOut = bool;
+
 /// Enum holding all types of gossip messages used by MirrorDht
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 enum MirrorGossip {
@@ -31,7 +33,7 @@ pub struct MirrorDht {
     /// Monotonic Storage of PeerData
     peer_map: HashMap<String, PeerData>,
     /// Track if peer timed out
-    timed_out_map: HashMap<String, bool>,
+    timed_out_map: HashMap<String, HasTimedOut>,
     /// PeerData of this peer
     this_peer: PeerData,
     /// Keep track of fetch requests sent to Core
@@ -199,7 +201,7 @@ impl MirrorDht {
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
         trace!(
-            "@MirrorDht@ gossiping self: {:?} | to: {:?}",
+            "@MirrorDht@ gossip_self: {:?} | to: {:?}",
             this_peer,
             peer_address_list
         );

@@ -72,7 +72,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
                 self.handle_DhtEvent(evt)?;
             }
         }
-        // Check for timeouts of own requests?
+        // TODO #173: Check for timeouts of own requests here?
         // Done
         Ok((did_work, dht_event_list))
     }
@@ -120,7 +120,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 // no-op
             }
             DhtEvent::PeerTimedOut(_peer_address) => {
-                // TODO #159
+                // no-op
             }
             DhtEvent::HoldEntryRequested(_from, _data) => {
                 // no-op

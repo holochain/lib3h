@@ -92,7 +92,7 @@ fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
     });
 }
 
-/// Wait for peer timeout
+/// Wait for peer timeout than reconnect
 fn test_two_peer_timeout_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait past peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(3100));
@@ -130,7 +130,6 @@ fn test_two_peer_timeout_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (did_work, srv_msg_list) = alex.process().unwrap();
     println!("reconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
     assert!(did_work);
-    // assert_eq!(srv_msg_list.len(), 4);
 
     // Billy should see a reconnect
     let (did_work, srv_msg_list) = billy.process().unwrap();
@@ -142,7 +141,7 @@ fn test_two_peer_timeout_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
         assert_eq!(response.uri, alex.advertise());
     });
 
-    // More process: Have Billy process P2p::PeerAddress of alex
+    // More process
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
@@ -187,7 +186,7 @@ fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
         assert_eq!(response.uri, alex.advertise());
     });
 
-    // More process: Have Billy process P2p::PeerAddress of alex
+    // More process
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();

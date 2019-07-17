@@ -30,12 +30,12 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         Ok(connection_id)
     }
 
-    // TODO #159 - remove conn id conn_map??
+    // TODO #176 - remove conn id conn_map??
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         self.inner_transport.borrow_mut().close(id)
     }
 
-    // TODO #159
+    // TODO #176
     fn close_all(&mut self) -> TransportResult<()> {
         self.inner_transport.borrow_mut().close_all()
     }
@@ -256,10 +256,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             }
             TransportEvent::ConnectionClosed(_id) => {
                 // TODO #176
-                // no-op?
-                //                warn!("Connection closed: {}", id);
-                //                self.inner_transport.borrow_mut().close(id)?;
-                //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::ReceivedData(connection_id, payload) => {
                 debug!("Received message from: {}", connection_id);
@@ -285,7 +281,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
                                 peer_uri,
-                                // peer_uri: transport_id_to_url(connection_id.clone()),
                                 timestamp: peer_timestamp,
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
@@ -338,11 +333,6 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let outbox = Vec::new();
-                // TODO #159: Send Closed event for each connection
-                //                for (id, _url) in &self.connections {
-                //                    let evt = TransportEvent::Closed(id.to_string());
-                //                    outbox.push(evt);
-                //                }
                 Ok(outbox)
             }
             TransportCommand::Bind(url) => {

@@ -193,7 +193,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        // TODO #159
         let mut result = Ok(());
         for space_gatway in self.space_gateway_map.values_mut() {
             let res = space_gatway.close_all();

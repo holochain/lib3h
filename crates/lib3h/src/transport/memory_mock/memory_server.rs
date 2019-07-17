@@ -123,7 +123,7 @@ impl MemoryServer {
         Ok(())
     }
 
-    /// Another node close's its connection with us
+    /// Another node closes its connection with us
     pub fn request_close(&mut self, other_uri: &Url) -> TransportResult<()> {
         info!("(MemoryServer {}).close({})", self.this_uri, other_uri);
         // delete this connectionId's inbox

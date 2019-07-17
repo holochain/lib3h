@@ -43,8 +43,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         }
     }
 
+    /// Helper for getting a connectionId from a peer_address
     pub(crate) fn get_connection_id(&self, peer_address: &str) -> Option<String> {
-        // get to_peer's connectionId
+        // get peer_uri
         let maybe_peer_data = self.inner_dht.get_peer(peer_address);
         if maybe_peer_data.is_none() {
             return None;
@@ -56,8 +57,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             peer_address,
             peer_uri
         );
+        // get connection_id
         let maybe_connection_id = self.connection_map.get(&peer_uri);
-        // TODO: If no connectionId, open a connection first ?
         if maybe_connection_id.is_none() {
             return None;
         }

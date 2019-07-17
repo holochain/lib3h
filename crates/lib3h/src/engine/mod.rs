@@ -56,7 +56,7 @@ pub struct RealEngine<T: Transport, D: Dht> {
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
-    // TODO #159: Remove this if we have a full functioning mock without having to use it.
+    // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
     network_transport: Rc<RefCell<T>>,

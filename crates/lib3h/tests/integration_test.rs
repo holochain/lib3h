@@ -43,7 +43,8 @@ fn enable_logging_for_test(enable: bool) {
     unsafe {
         START_TIME = SystemTime::now();
     }
-    // wait a bit because of non monotonic clock
+    // wait a bit because of non monotonic clock,
+    // otherwise we could get negative substraction panics
     std::thread::sleep(std::time::Duration::from_millis(5));
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "trace");
