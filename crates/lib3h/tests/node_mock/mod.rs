@@ -62,7 +62,7 @@ impl NodeMock {
     ) -> Self {
         debug!(
             "new NodeMock '{:?}' with config: {:?}",
-            agent_id_arg, config
+            agent_id_arg, config,
         );
 
         let engine = engine_factory(&config, name).expect("Failed to create RealEngine");

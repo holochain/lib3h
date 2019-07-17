@@ -22,9 +22,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             Transport::process(&mut *self.network_gateway.borrow_mut())?;
         debug!(
             "{} - network_gateway Transport.process(): {} {}",
-            self.name.clone(),
+            self.name,
             tranport_did_work,
-            event_list.len()
+            event_list.len(),
         );
         if tranport_did_work {
             for evt in event_list {
@@ -45,7 +45,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     /// Handle a DhtEvent sent to us by our network gateway
     fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netDhtEvent: {:?}", self.name.clone(), cmd);
+        debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
         let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {
@@ -59,9 +59,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // Connect to every peer we are requested to hold.
                 info!(
                     "{} auto-connect to peer: {} ({})",
-                    self.name.clone(),
-                    peer_data.peer_address,
-                    peer_data.peer_uri
+                    self.name, peer_data.peer_address, peer_data.peer_uri,
                 );
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
@@ -73,7 +71,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 trace!(
                     "{} -- maybe_connection_id: {:?}",
                     self.name.clone(),
-                    maybe_connection_id
+                    maybe_connection_id,
                 );
                 if let Some(connection_id) = maybe_connection_id {
                     Transport::post(
@@ -117,22 +115,16 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 .serialize(&mut Serializer::new(&mut buf))
                 .unwrap();
             trace!(
-                "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: {:?} to {:?}",
+                "AllJoinedSpaceList: {:?} to {:?}",
                 our_joined_space_list,
                 id
             );
             // id is connectionId but we need a transportId, so search for it in the DHT
             let peer_list = network_gateway.get_peer_list();
-            trace!(
-                "(GatewayTransport) P2pProtocol::AllJoinedSpaceList: get_peer_list = {:?}",
-                peer_list
-            );
+            trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
             let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
             if let Some(peer_data) = maybe_peer_data {
-                trace!(
-                    "(GatewayTransport) P2pProtocol::AllJoinedSpaceList ; sending back to {:?}",
-                    peer_data,
-                );
+                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                 network_gateway.send(&[&peer_data.peer_address], &buf)?;
             }
             // TODO END
@@ -155,17 +147,13 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         evt: &TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!(
-            "{} << handle_netTransportEvent: {:?}",
-            self.name.clone(),
-            evt
-        );
+        debug!("{} << handle_netTransportEvent: {:?}", self.name, evt);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
             TransportEvent::ErrorOccured(id, e) => {
                 self.network_connections.remove(id);
-                error!("{} Network error from {} : {:?}", self.name.clone(), id, e);
+                error!("{} Network error from {} : {:?}", self.name, id, e);
                 // Output a Lib3hServerProtocol::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
@@ -235,10 +223,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     if let Some(space_gateway) = maybe_space_gateway {
                         Dht::post(space_gateway, cmd)?;
                     } else {
-                        warn!(
-                            "received gossip for unjoined space_gateway: {}",
-                            msg.space_address
-                        );
+                        warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
                 }
             }
@@ -254,7 +239,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
-                        dm_data.space_address
+                        dm_data.space_address,
                     );
                 }
             }
@@ -269,7 +254,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
-                        dm_data.space_address
+                        dm_data.space_address,
                     );
                 }
             }

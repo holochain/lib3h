@@ -71,7 +71,7 @@ impl NodeMock {
                 warn!(
                     "Failed to reconnect to {}: {:?}",
                     uri.as_str(),
-                    res.err().unwrap()
+                    res.err().unwrap(),
                 );
             }
         }
@@ -661,7 +661,7 @@ impl NodeMock {
                 trace!(
                     "({:?})::listen() - received: {:?}",
                     self.agent_id,
-                    lib3h_msg,
+                    lib3h_msg
                 );
                 time_ms = 0;
                 count += 1;

@@ -166,7 +166,7 @@ impl Dht for MirrorDht {
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
             now,
             self.last_gossip_of_self,
-            self.config.gossip_interval
+            self.config.gossip_interval,
         );
         if now - self.last_gossip_of_self > self.config.gossip_interval {
             self.last_gossip_of_self = now;
@@ -203,7 +203,7 @@ impl MirrorDht {
         trace!(
             "@MirrorDht@ gossip_self: {:?} | to: {:?}",
             this_peer,
-            peer_address_list
+            peer_address_list,
         );
         GossipToData {
             peer_address_list,
@@ -232,7 +232,7 @@ impl MirrorDht {
                 trace!(
                     "@MirrorDht@ Adding peer - OK UPDATED: {} > {}",
                     peer_info.timestamp,
-                    peer.timestamp
+                    peer.timestamp,
                 );
                 peer.timestamp = peer_info.timestamp;
                 if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold {
@@ -351,10 +351,9 @@ impl MirrorDht {
             // Owner is asking us to hold a peer info
             DhtCommand::HoldPeer(new_peer_data) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
-                let other_peer_address_list = self.get_other_peer_list();
+                let others_list = self.get_other_peer_list();
                 // Store it
                 let received_new_content = self.add_peer(new_peer_data);
-                println!("HoldPeer({:?}) in {:?}", new_peer_data, self.peer_map);
                 // Bail if peer is known and up to date.
                 if !received_new_content {
                     return Ok(vec![]);
@@ -373,10 +372,10 @@ impl MirrorDht {
                 trace!(
                     "@MirrorDht@ gossiping peer: {:?} to {:?}",
                     peer,
-                    other_peer_address_list
+                    others_list
                 );
                 let gossip_evt = GossipToData {
-                    peer_address_list: other_peer_address_list,
+                    peer_address_list: others_list,
                     bundle: buf,
                 };
                 event_list.push(DhtEvent::GossipTo(gossip_evt));

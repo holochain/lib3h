@@ -20,7 +20,7 @@ use url::Url;
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
-        trace!("({}).connect() {}", self.identifier.clone(), uri);
+        trace!("({}).connect() {}", self.identifier, uri);
         // Connect
         let connection_id = self.inner_transport.borrow_mut().connect(&uri)?;
         // Store result in connection map
@@ -49,10 +49,10 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         // send
         trace!(
             "({}).send() {:?} -> {:?} | {}",
-            self.identifier.clone(),
+            self.identifier,
             dht_id_list,
             dht_uri_list,
-            payload.len()
+            payload.len(),
         );
         // Get connectionIds for the inner Transport.
         let mut conn_list = Vec::new();
@@ -61,9 +61,9 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
             conn_list.push(net_uri);
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
-                self.identifier.clone(),
+                self.identifier,
                 dht_uri,
-                net_uri
+                net_uri,
             )
         }
         let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
@@ -75,13 +75,13 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
         let connection_list = self.connection_id_list()?;
         let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
-        trace!("({}) send_all() {:?}", self.identifier.clone(), dht_id_list);
+        trace!("({}) send_all() {:?}", self.identifier, dht_id_list);
         self.send(&dht_id_list, payload)
     }
 
     ///
     fn bind(&mut self, url: &Url) -> TransportResult<Url> {
-        trace!("({}) bind() {}", self.identifier.clone(), url);
+        trace!("({}) bind() {}", self.identifier, url);
         self.inner_transport.borrow_mut().bind(url)
     }
 
@@ -109,9 +109,9 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         }
         trace!(
             "({}).Transport.process() - output: {} {}",
-            self.identifier.clone(),
+            self.identifier,
             did_work,
-            outbox.len()
+            outbox.len(),
         );
         // Process inner transport
         // Its okay to process inner transport as long as NetworkEngine only calls
@@ -121,7 +121,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         let (inner_did_work, mut event_list) = self.inner_transport.borrow_mut().process()?;
         trace!(
             "({}).Transport.inner_process() - output: {} {}",
-            self.identifier.clone(),
+            self.identifier,
             inner_did_work,
             event_list.len()
         );
@@ -183,21 +183,12 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             return Ok(());
         }
         let uri = maybe_uri.unwrap();
-        trace!(
-            "({}) new_connection: {} -> {}",
-            self.identifier.clone(),
-            uri,
-            id,
-        );
+        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id,);
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         let maybe_previous = self.connection_map.insert(uri.clone(), id.to_string());
         if let Some(previous_cId) = maybe_previous {
-            debug!(
-                "Replaced connectionId for {} ; was: {}",
-                uri.clone(),
-                previous_cId
-            );
+            debug!("Replaced connectionId for {} ; was: {}", uri, previous_cId,);
         }
 
         // Send to other node our PeerAddress
@@ -213,9 +204,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             .unwrap();
         trace!(
             "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
-            self.identifier.clone(),
+            self.identifier,
             our_peer_address,
-            id
+            id,
         );
         return self.inner_transport.borrow_mut().send(&[&id], &buf);
     }
@@ -224,34 +215,23 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
         debug!(
             "<<< '({})' recv transport event: {:?}",
-            self.identifier.clone(),
-            evt
+            self.identifier, evt
         );
         // Note: use same order as the enum
         match evt {
             TransportEvent::ErrorOccured(id, e) => {
                 error!(
                     "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier.clone(),
-                    id,
-                    e
+                    self.identifier, id, e,
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id) => {
-                info!(
-                    "({}) Outgoing connection opened: {}",
-                    self.identifier.clone(),
-                    id
-                );
+                info!("({}) Outgoing connection opened: {}", self.identifier, id);
                 self.handle_new_connection(id)?;
             }
             TransportEvent::IncomingConnectionEstablished(id) => {
-                info!(
-                    "({}) Incoming connection opened: {}",
-                    self.identifier.clone(),
-                    id
-                );
+                info!("({}) Incoming connection opened: {}", self.identifier, id);
                 self.handle_new_connection(id)?;
             }
             TransportEvent::ConnectionClosed(_id) => {
@@ -301,11 +281,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         &mut self,
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
-        trace!(
-            "({}) serving transport cmd: {:?}",
-            self.identifier.clone(),
-            cmd
-        );
+        trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url) => {

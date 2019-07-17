@@ -53,9 +53,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         let peer_uri = maybe_peer_data.unwrap().peer_uri;
         trace!(
             "({}) get_connection_id: {} -> {}",
-            self.identifier.clone(),
+            self.identifier,
             peer_address,
-            peer_uri
+            peer_uri,
         );
         // get connection_id
         let maybe_connection_id = self.connection_map.get(&peer_uri);
@@ -65,10 +65,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         let conn_id = maybe_connection_id.unwrap().clone();
         trace!(
             "({}) get_connection_id: {} -> {} -> {}",
-            self.identifier.clone(),
+            self.identifier,
             peer_address,
             peer_uri,
-            conn_id
+            conn_id,
         );
         Some(conn_id)
     }

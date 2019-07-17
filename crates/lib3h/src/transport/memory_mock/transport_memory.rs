@@ -280,7 +280,7 @@ impl Transport for TransportMemory {
                 .get(my_server_uri)
                 .expect("My server should exist.")
                 .lock()
-                .unwrap();
+                .expect("server_map already in use by this thread");
             let (success, event_list) = my_server.process()?;
             if success {
                 did_work = true;
@@ -332,6 +332,7 @@ impl Transport for TransportMemory {
                         data.clone(),
                     ));
                 }
+                // We are not expecting anything else from the MemoryServer
                 _ => unreachable!(),
             }
         }

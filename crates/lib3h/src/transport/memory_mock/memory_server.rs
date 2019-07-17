@@ -172,7 +172,7 @@ impl MemoryServer {
                 "(MemoryServer {}). connection_inbox: {} | {}",
                 self.this_uri,
                 in_cid,
-                is_new
+                is_new,
             );
             let event = if *is_new {
                 TransportEvent::IncomingConnectionEstablished(in_cid.to_string())

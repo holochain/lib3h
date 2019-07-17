@@ -39,8 +39,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
             if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
                 debug!(
                     "({}).Dht.post(HoldPeer) - {}",
-                    self.identifier.clone(),
-                    peer_data.peer_uri.clone()
+                    self.identifier, peer_data.peer_uri,
                 );
                 let maybe_previous = self.connection_map.insert(
                     peer_data.peer_uri.clone(),
@@ -62,9 +61,9 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
         let (did_work, dht_event_list) = self.inner_dht.process()?;
         trace!(
             "({}).Dht.process() - output: {} {}",
-            self.identifier.clone(),
+            self.identifier,
             did_work,
-            dht_event_list.len()
+            dht_event_list.len(),
         );
         // Handle events directly
         if did_work {
@@ -82,7 +81,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 impl<T: Transport, D: Dht> P2pGateway<T, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
-        trace!("({}).handle_DhtEvent() {:?}", self.identifier.clone(), evt);
+        trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);
         match evt {
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
@@ -103,7 +102,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     let mut payload = Vec::new();
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
-                        .unwrap();
+                        .expect("P2pProtocol::Gossip serialization failed");
                     let to_conn_id = self
                         .get_connection_id(&to_peer_address)
                         .expect("Should gossip to a known peer");

@@ -68,9 +68,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!(
             "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
-            self.name.clone(),
-            chain_id,
-            cmd
+            self.name, chain_id, cmd,
         );
         let mut outbox = Vec::new();
         let space_gateway = self
@@ -88,9 +86,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             DhtEvent::HoldPeerRequested(peer_data) => {
                 debug!(
                     "{} -- ({}).post() HoldPeer {:?}",
-                    self.name.clone(),
+                    self.name,
                     space_gateway.identifier(),
-                    peer_data
+                    peer_data,
                 );
                 // For now accept all request
                 Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data))?;

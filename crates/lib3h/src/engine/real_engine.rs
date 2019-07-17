@@ -155,11 +155,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
         trace!("");
-        trace!(
-            "{} - RealEngine.process() START - {}",
-            self.name,
-            self.process_count
-        );
+        trace!("{} - process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -169,9 +165,9 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
         trace!(
-            "RealEngine.process() END - {} (outbox: {})\n",
+            "process() END - {} (outbox: {})\n",
             self.process_count,
-            outbox.len()
+            outbox.len(),
         );
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
@@ -235,7 +231,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} serving: {:?}", self.name.clone(), client_msg);
+        debug!("{} serving: {:?}", self.name, client_msg);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match client_msg {
@@ -504,9 +500,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .unwrap();
         trace!(
             "{} - Broadcasting JoinSpace: {}, {}",
-            self.name.clone(),
+            self.name,
             space_address,
-            peer.peer_address
+            peer.peer_address,
         );
         self.network_gateway.borrow_mut().send_all(&payload).ok();
         // TODO END

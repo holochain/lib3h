@@ -196,7 +196,7 @@ pub mod tests {
         let peer = dht.get_peer(PEER_B).unwrap();
         assert_eq!(peer.timestamp, ref_time);
         // Add newer peer info
-        // wait a bit so we so that the +1 is not ahead of 'now'
+        // wait a bit so that the +1 is not ahead of 'now'
         std::thread::sleep(std::time::Duration::from_millis(3));
         peer_b_data.timestamp = ref_time + 1;
         dht.post(DhtCommand::HoldPeer(peer_b_data)).unwrap();
