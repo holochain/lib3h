@@ -289,7 +289,7 @@ impl Transport for TransportMemory {
                     if let TransportEvent::IncomingConnectionEstablished(in_cid) = event {
                         let to_connect_uri = my_server
                             .get_inbound_uri(&in_cid)
-                            .expect("Should allways have uri");
+                            .expect("Should always have uri");
                         to_connect_list.push((to_connect_uri.clone(), in_cid.clone()));
                     } else {
                         output.push(event);

@@ -136,6 +136,8 @@ impl Dht for MirrorDht {
             }
         }
         // Check if others timed-out
+        // TODO: Might need to optimize performance as walking a map is expensive
+        // see comment: https://github.com/holochain/lib3h/pull/210/#discussion_r304518608
         let mut timed_out_list = Vec::new();
         for (peer_address, peer) in self.peer_map.iter() {
             // Skip self
@@ -146,7 +148,7 @@ impl Dht for MirrorDht {
             let has_timed_out = self
                 .timed_out_map
                 .get(peer_address)
-                .expect("Should allways have time_out value for a peer");
+                .expect("Should always have time_out value for a peer");
             if *has_timed_out {
                 continue;
             }

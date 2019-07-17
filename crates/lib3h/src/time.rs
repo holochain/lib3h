@@ -1,5 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// TODO #211
 pub static mut START_TIME: SystemTime = UNIX_EPOCH;
 
 pub fn since_epoch_ms() -> u64 {
