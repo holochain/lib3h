@@ -16,12 +16,6 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// TODO #175 - Make a struct for transportId/connectionId and make type converters
-fn transport_id_to_url(id: ConnectionId) -> Url {
-    Url::parse(id.as_str())
-        .expect("gateway_transport: transport_id_to_url: id is not a well formed url")
-}
-
 /// Compose Transport
 impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     // TODO #176 - Return a higher-level uri instead?

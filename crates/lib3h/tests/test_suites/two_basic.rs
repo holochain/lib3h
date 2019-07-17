@@ -17,7 +17,7 @@ lazy_static! {
         (test_two_authors, true),
         (test_two_disconnect, true),
           // (test_two_peer_timeout, true)
-          // (test_two_reconnect, true),
+          (test_two_reconnect, true),
     ];
 }
 
@@ -260,7 +260,7 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         1000,
     );
     assert!(store_result.is_none());
-    let (did_work, srv_msg_list) = billy.process().unwrap();
+    let (_did_work, srv_msg_list) = billy.process().unwrap();
     assert_eq!(srv_msg_list.len(), 0);
 }
 
@@ -360,7 +360,7 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     });
 }
 
-fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock) {
+fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait past peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(10100));
     // Billy should send a PeerTimedOut message
@@ -373,30 +373,40 @@ fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock) {
 /// Have Alex disconnect and reconnect
 fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.disconnect();
-
-//    // More process: Have Billy process P2p::PeerAddress of alex
-//    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-//    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-//    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    assert_eq!(srv_msg_list.len(), 0);
+    println!("disconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    // Should be disconnected from the network
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
+        assert_eq!(response.network_id, "FIXME");
+    });
 
     println!("\n Reconnecting Alex...\n");
     alex.reconnect().expect("Reconnection failed");
 
     let (did_work, srv_msg_list) = alex.process().unwrap();
+    println!("reconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
     assert!(did_work);
-    //assert_eq!(srv_msg_list.len(), 1);
-    //let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    //println!("connected_msg = {:?}", connected_msg);
-    //assert_eq!(&connected_msg.uri, &billy.advertise());
+    assert_eq!(srv_msg_list.len(), 4);
 
-    println!("srv_msg_list = {:?}", srv_msg_list);
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("reconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 1);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::Connected(response) = msg_1 {
+        assert_eq!(response.uri, alex.advertise());
+    });
 
     // More process: Have Billy process P2p::PeerAddress of alex
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
-//
-//    two_join_space(alex, billy, &SPACE_ADDRESS_A);
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     test_send_message(alex, billy);
     test_author_one_aspect(alex, billy);

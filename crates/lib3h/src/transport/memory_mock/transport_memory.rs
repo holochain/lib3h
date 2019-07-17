@@ -142,7 +142,7 @@ impl Transport for TransportMemory {
         self.outbound_connection_map.insert(id.clone(), uri.clone());
         // Connect to it
         let mut server = maybe_server.unwrap().lock().unwrap();
-        server.connect(my_uri, &id)?;
+        server.request_connect(my_uri, &id)?;
         Ok(id)
     }
 
@@ -170,8 +170,8 @@ impl Transport for TransportMemory {
             )));
         }
         let mut other_server = maybe_other_server.unwrap().lock().unwrap();
-        // Tell it to close connection
-        other_server.close(&my_uri)?;
+        // Tell it we closed connection with it
+        let _ = other_server.request_close(&my_uri);
         // Locally remove connection
         self.outbound_connection_map.remove(id);
         // FIXME

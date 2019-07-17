@@ -59,7 +59,7 @@ pub struct MemoryServer {
     inbox_map: HashMap<Url, VecDeque<Vec<u8>>>,
     /// Inbox of connection state change requests
     /// (true = incoming connection, false = connection closed)
-    connection_inbox: Vec<(Url, bool)>,
+    connection_inbox: Vec<(ConnectionId, bool)>,
     /// Store of all established connections
     inbound_connections: HashMap<Url, ConnectionId>,
 }
@@ -91,32 +91,34 @@ impl MemoryServer {
     /// Another node requested to connect with us.
     /// This creates a new connection: An inbox is created for receiving payloads from this requester.
     /// This also generates a request for us to connect to the other node in the other way.
-    pub fn connect(&mut self, requester_uri: &Url, connection_id: &ConnectionIdRef) -> TransportResult<()> {
-        info!("(MemoryServer) {} creates inbox for {} ({})", self.this_uri, requester_uri, connection_id);
-        if requester_uri == &self.this_uri {
+    pub fn request_connect(&mut self, other_uri: &Url, in_cid: &ConnectionIdRef) -> TransportResult<()> {
+        info!("(MemoryServer) {} creates inbox for {} ({})", self.this_uri, other_uri, in_cid);
+        if other_uri == &self.this_uri {
             return Err(TransportError::new(format!(
                 "Server {} cannot connect to self",
                 self.this_uri,
             )));
         }
-        if self.inbox_map.contains_key(requester_uri) {
+        if self.inbox_map.contains_key(other_uri) {
             return Err(TransportError::new(format!(
                 "Server {}, is already connected to {}",
-                self.this_uri, requester_uri,
+                self.this_uri, other_uri,
             )));
         }
-        let _ = self
+        // Establish inbound connection
+        let prev = self
             .inbox_map
-            .insert(requester_uri.clone(), VecDeque::new());
+            .insert(other_uri.clone(), VecDeque::new());
+        assert!(prev.is_none());
+        self.inbound_connections.insert(other_uri.clone(), in_cid.to_string());
         // Notify our TransportMemory (so it can connect back)
-        self.connection_inbox
-            .push((requester_uri.clone(), true));
-        self.inbound_connections.insert(requester_uri.clone(), connection_id.to_string());
+        self.connection_inbox.push((in_cid.to_string(), true));
+        // Done
         Ok(())
     }
 
-    /// Close a connection
-    pub fn close(&mut self, other_uri: &Url) -> TransportResult<()> {
+    /// Another node close's its connection with us
+    pub fn request_close(&mut self, other_uri: &Url) -> TransportResult<()> {
         info!("(MemoryServer {}).close({})", self.this_uri, other_uri);
         // delete this connectionId's inbox
         let res = self.inbox_map.remove(other_uri);
@@ -127,10 +129,13 @@ impl MemoryServer {
             )));
         }
         trace!("(MemoryServer {}). close event", self.this_uri);
+        // Remove inbound connection
+        let in_cid = self.inbound_connections
+            .remove(other_uri)
+            .expect("Should have connectionId for this uri");
         // Notify our TransportMemory
-        self.connection_inbox.push((other_uri.clone(), false));
-        // Locally remove connection
-        // self.inbound_connections.remove(other_uri);
+        self.connection_inbox.push((in_cid.clone(), false));
+        // Done
         Ok(())
     }
 
@@ -155,15 +160,12 @@ impl MemoryServer {
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connection inbox
-        for (uri, is_new) in self.connection_inbox.iter() {
-            trace!("(MemoryServer {}). connection_inbox: {} | {}", self.this_uri, uri, is_new);
-            let id = self.inbound_connections.get(uri)
-                .expect("Should always have id for a connected uri (connection)").to_string();
+        for (in_cid, is_new) in self.connection_inbox.iter() {
+            trace!("(MemoryServer {}). connection_inbox: {} | {}", self.this_uri, in_cid, is_new);
             let event = if *is_new {
-                TransportEvent::IncomingConnectionEstablished(id.to_string())
+                TransportEvent::IncomingConnectionEstablished(in_cid.to_string())
             } else {
-                self.inbound_connections.remove(uri);
-                TransportEvent::ConnectionClosed(id.to_string())
+                TransportEvent::ConnectionClosed(in_cid.to_string())
             };
             trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
             outbox.push(event);

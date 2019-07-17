@@ -137,8 +137,8 @@ impl Dht for MirrorDht {
             if peer_address == &self.this_peer.peer_address {
                 continue;
             }
-            trace!("@MirrorDht@ now: {} ; peer.timestamp: {} ({})", now, peer.timestamp, self.config.timeout_threshold);
             if now - peer.timestamp > self.config.timeout_threshold {
+                debug!("@MirrorDht@ peer {} timed-out", peer_address);
                 outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
                 to_remove_list.push(peer_address.clone());
                 did_work = true;
