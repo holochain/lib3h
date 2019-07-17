@@ -18,11 +18,11 @@ pub struct DhtConfig {
 impl DhtConfig {
     pub fn new(peer_address: &str, peer_uri: &Url) -> Self {
         DhtConfig {
-         this_peer_address: peer_address.to_owned(),
-         this_peer_uri: peer_uri.to_owned(),
-         custom: vec![],
-         gossip_interval: DEFAULT_GOSSIP_INTERVAL_MS,
-         timeout_threshold: DEFAULT_TIMEOUT_THRESHOLD_MS,
+            this_peer_address: peer_address.to_owned(),
+            this_peer_uri: peer_uri.to_owned(),
+            custom: vec![],
+            gossip_interval: DEFAULT_GOSSIP_INTERVAL_MS,
+            timeout_threshold: DEFAULT_TIMEOUT_THRESHOLD_MS,
         }
     }
 }

@@ -22,7 +22,9 @@ pub mod tests {
 
     #[test]
     pub fn test_since_epoch_ms() {
-        unsafe { START_TIME = SystemTime::now(); }
+        unsafe {
+            START_TIME = SystemTime::now();
+        }
         let first = since_epoch_ms();
         println!("first: {}", first);
         std::thread::sleep(std::time::Duration::from_millis(10));

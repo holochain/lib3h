@@ -104,7 +104,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .unwrap();
-                    let to_conn_id = self.get_connection_id(&to_peer_address)
+                    let to_conn_id = self
+                        .get_connection_id(&to_peer_address)
                         .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
                     self.inner_transport

@@ -149,7 +149,12 @@ impl Dht for MirrorDht {
             self.peer_list.remove(&peer_address);
         }
         // Check if must gossip self
-        trace!("@MirrorDht@ now: {} ; last_gossip: {} ({})", now, self.last_gossip_of_self, self.config.gossip_interval);
+        trace!(
+            "@MirrorDht@ now: {} ; last_gossip: {} ({})",
+            now,
+            self.last_gossip_of_self,
+            self.config.gossip_interval
+        );
         if now - self.last_gossip_of_self > self.config.gossip_interval {
             self.last_gossip_of_self = now;
             let evt = self.gossip_self(self.get_other_peer_list());
@@ -163,11 +168,9 @@ impl Dht for MirrorDht {
 
 /// Internals
 impl MirrorDht {
-
     // Get all known peers except self
     fn get_other_peer_list(&self) -> Vec<String> {
-        self
-            .peer_list
+        self.peer_list
             .iter()
             .filter(|(address, _)| *address != &self.this_peer.peer_address)
             .map(|(address, _)| address.clone())

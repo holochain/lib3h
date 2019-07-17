@@ -20,16 +20,16 @@ mod test_suites;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
+    time::START_TIME,
     transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
-    time::START_TIME,
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address, Lib3hResult};
 use node_mock::NodeMock;
+use std::time::SystemTime;
 use test_suites::{three_basic::*, two_basic::*, two_get_lists::*, two_spaces::*};
 use url::Url;
 use utils::constants::*;
-use std::time::SystemTime;
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -38,7 +38,9 @@ use std::time::SystemTime;
 // for this to actually show log entries you also have to run the tests like this:
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
-    unsafe { START_TIME = SystemTime::now(); }
+    unsafe {
+        START_TIME = SystemTime::now();
+    }
     // wait a bit because of non monotonic clock
     std::thread::sleep(std::time::Duration::from_millis(5));
     if std::env::var("RUST_LOG").is_err() {

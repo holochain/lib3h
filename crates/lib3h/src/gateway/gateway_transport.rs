@@ -257,8 +257,8 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             TransportEvent::ConnectionClosed(_id) => {
                 // TODO #176
                 // no-op?
-//                warn!("Connection closed: {}", id);
-//                self.inner_transport.borrow_mut().close(id)?;
+                //                warn!("Connection closed: {}", id);
+                //                self.inner_transport.borrow_mut().close(id)?;
                 //let _transport_id = self.wss_socket.wait_connect(&self.ipc_uri)?;
             }
             TransportEvent::ReceivedData(connection_id, payload) => {
@@ -275,7 +275,11 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                             "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier
                         );
-                        let peer_uri = self.inner_transport.borrow_mut().get_uri(connection_id).expect("FIXME"); // TODO #58
+                        let peer_uri = self
+                            .inner_transport
+                            .borrow_mut()
+                            .get_uri(connection_id)
+                            .expect("FIXME"); // TODO #58
                         debug!("peer_uri of: {} = {}", connection_id, peer_uri);
                         if self.identifier == gateway_id {
                             let peer = PeerData {

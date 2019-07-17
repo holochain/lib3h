@@ -83,10 +83,7 @@ pub mod tests {
 
     fn new_dht(is_mirror: bool, peer_address: &str) -> Box<dyn Dht> {
         if is_mirror {
-            return Box::new(MirrorDht::new(
-                peer_address,
-                &create_test_uri(peer_address),
-            ));
+            return Box::new(MirrorDht::new(peer_address, &create_test_uri(peer_address)));
         }
         Box::new(RrDht::new())
     }

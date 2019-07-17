@@ -70,9 +70,16 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // TODO #159
                 let mut network_gateway = self.network_gateway.borrow_mut();
                 let maybe_connection_id = network_gateway.get_connection_id(&peer_address);
-                trace!("{} -- maybe_connection_id: {:?}", self.name.clone(), maybe_connection_id);
+                trace!(
+                    "{} -- maybe_connection_id: {:?}",
+                    self.name.clone(),
+                    maybe_connection_id
+                );
                 if let Some(connection_id) = maybe_connection_id {
-                    Transport::post(&mut *network_gateway, TransportCommand::Close(connection_id))?;
+                    Transport::post(
+                        &mut *network_gateway,
+                        TransportCommand::Close(connection_id),
+                    )?;
                 }
             }
             // No entries in Network DHT

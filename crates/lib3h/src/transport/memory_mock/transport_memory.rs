@@ -112,7 +112,8 @@ impl Transport for TransportMemory {
     /// Get server from the uri and connect to it with a new connectionId for ourself.
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         // Check if already connected
-        let maybe_cid = self.outbound_connection_map
+        let maybe_cid = self
+            .outbound_connection_map
             .iter()
             .find(|(_, cur_uri)| *cur_uri == uri);
         if let Some((cid, _)) = maybe_cid {
@@ -151,7 +152,9 @@ impl Transport for TransportMemory {
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         trace!("TransportMemory[{}].close({})", self.own_id, id);
         if self.maybe_my_uri.is_none() {
-            return Err(TransportError::new("Cannot close a connection before bounding".to_string()));
+            return Err(TransportError::new(
+                "Cannot close a connection before bounding".to_string(),
+            ));
         }
         let my_uri = self.maybe_my_uri.clone().unwrap();
         // Get the other node's uri on that connection
@@ -195,7 +198,9 @@ impl Transport for TransportMemory {
     /// Send payload to known connectionIds in `id_list`
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         if self.maybe_my_uri.is_none() {
-            return Err(TransportError::new("Cannot send before bounding".to_string()));
+            return Err(TransportError::new(
+                "Cannot send before bounding".to_string(),
+            ));
         }
         let my_uri = self.maybe_my_uri.clone().unwrap();
         for id in id_list {
@@ -271,14 +276,20 @@ impl Transport for TransportMemory {
         let mut output = Vec::new();
         for my_server_uri in &self.my_servers {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let mut my_server = server_map.get(my_server_uri).expect("My server should exist.").lock().unwrap();
+            let mut my_server = server_map
+                .get(my_server_uri)
+                .expect("My server should exist.")
+                .lock()
+                .unwrap();
             let (success, event_list) = my_server.process()?;
             if success {
                 did_work = true;
 
                 for event in event_list {
                     if let TransportEvent::IncomingConnectionEstablished(in_cid) = event {
-                        let to_connect_uri = my_server.get_inbound_uri(&in_cid).expect("Should allways have uri");
+                        let to_connect_uri = my_server
+                            .get_inbound_uri(&in_cid)
+                            .expect("Should allways have uri");
                         to_connect_list.push((to_connect_uri.clone(), in_cid.clone()));
                     } else {
                         output.push(event);
@@ -289,8 +300,9 @@ impl Transport for TransportMemory {
         // Connect back to received connections if not already connected to them
         for (uri, in_cid) in to_connect_list {
             trace!("(TransportMemory) {} <- {:?}", uri, self.maybe_my_uri);
-             let out_cid= self.connect(&uri)?;
-            self.inbound_connection_map.insert(in_cid.clone(), out_cid.clone());
+            let out_cid = self.connect(&uri)?;
+            self.inbound_connection_map
+                .insert(in_cid.clone(), out_cid.clone());
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
             outbox.insert(0, TransportEvent::IncomingConnectionEstablished(out_cid));
@@ -301,15 +313,24 @@ impl Transport for TransportMemory {
                 TransportEvent::ConnectionClosed(in_cid) => {
                     // convert inbound connectionId to outbound connectionId.
                     // let out_cid = self.inbound_connection_map.get(&in_cid).expect("Should have outbound at this stage");
-                    let out_cid = self.inbound_connection_map.remove(&in_cid).expect("Should have outbound at this stage");
+                    let out_cid = self
+                        .inbound_connection_map
+                        .remove(&in_cid)
+                        .expect("Should have outbound at this stage");
                     // close will fail as other side isn't there anymore
                     let _ = self.close(&out_cid);
                     outbox.push(TransportEvent::ConnectionClosed(out_cid.to_string()));
                 }
                 TransportEvent::ReceivedData(in_cid, data) => {
                     // convert inbound connectionId to outbound connectionId.
-                    let out_cid = self.inbound_connection_map.get(&in_cid).expect("Should have outbound at this stage");
-                    outbox.push(TransportEvent::ReceivedData(out_cid.to_string(), data.clone()));
+                    let out_cid = self
+                        .inbound_connection_map
+                        .get(&in_cid)
+                        .expect("Should have outbound at this stage");
+                    outbox.push(TransportEvent::ReceivedData(
+                        out_cid.to_string(),
+                        data.clone(),
+                    ));
                 }
                 _ => unreachable!(),
             }

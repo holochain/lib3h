@@ -348,7 +348,10 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.disconnect();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 0);
-    println!("disconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!(
+        "disconnect srv_msg_list = {:?} ({})",
+        srv_msg_list, did_work
+    );
     // Should be disconnected from the network
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
@@ -375,7 +378,10 @@ fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.disconnect();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 0);
-    println!("disconnect srv_msg_list = {:?} ({})", srv_msg_list, did_work);
+    println!(
+        "disconnect srv_msg_list = {:?} ({})",
+        srv_msg_list, did_work
+    );
     // Should be disconnected from the network
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("srv_msg_list = {:?} ({})", srv_msg_list, did_work);
