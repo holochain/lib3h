@@ -19,7 +19,6 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     error::Lib3hResult,
-    time::START_TIME,
     transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
 };
@@ -39,9 +38,6 @@ use utils::constants::*;
 // for this to actually show log entries you also have to run the tests like this:
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
-    unsafe {
-        START_TIME = SystemTime::now();
-    }
     // wait a bit because of non monotonic clock,
     // otherwise we could get negative substraction panics
     std::thread::sleep(std::time::Duration::from_millis(5));

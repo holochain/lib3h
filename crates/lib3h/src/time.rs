@@ -1,8 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-// TODO #211
-pub static mut START_TIME: SystemTime = UNIX_EPOCH;
-
 pub fn since_epoch_ms() -> u64 {
     let since_the_epoch;
     //unsafe {
@@ -23,9 +20,6 @@ pub mod tests {
 
     #[test]
     pub fn test_since_epoch_ms() {
-        unsafe {
-            START_TIME = SystemTime::now();
-        }
         let first = since_epoch_ms();
         println!("first: {}", first);
         std::thread::sleep(std::time::Duration::from_millis(10));
