@@ -24,7 +24,9 @@ use lib3h::{
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address};
 use node_mock::NodeMock;
-use test_suites::{three_basic::*, two_basic::*, two_get_lists::*, two_spaces::*};
+use test_suites::{
+    three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
+};
 use url::Url;
 use utils::constants::*;
 
@@ -35,6 +37,9 @@ use utils::constants::*;
 // for this to actually show log entries you also have to run the tests like this:
 // RUST_LOG=lib3h=debug cargo test -- --nocapture
 fn enable_logging_for_test(enable: bool) {
+    // wait a bit because of non monotonic clock,
+    // otherwise we could get negative substraction panics
+    std::thread::sleep(std::time::Duration::from_millis(5));
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "trace");
     }
@@ -83,6 +88,8 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
+        dht_gossip_interval: 500,
+        dht_timeout_threshold: 3000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -110,6 +117,8 @@ fn setup_wss_node(
         work_dir: String::new(),
         log_level: 'd',
         bind_url,
+        dht_gossip_interval: 500,
+        dht_timeout_threshold: 3005,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -170,6 +179,13 @@ fn test_three_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
         launch_three_memory_nodes_test(*test_fn, *can_setup).unwrap();
+    }
+}
+#[test]
+fn test_two_memory_nodes_connection_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
+        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
     }
 }
 
@@ -257,6 +273,14 @@ fn test_three_wss_nodes_basic_suite() {
     }
 }
 
+#[test]
+fn test_two_wss_nodes_connection_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::Unencrypted, *can_setup).unwrap();
+    }
+}
+
 // -- Wss+Tls Transport Tests --
 #[test]
 fn test_two_wss_tls_nodes_basic_suite() {
@@ -287,6 +311,14 @@ fn test_three_wss_tls_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
         launch_three_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
+    }
+}
+
+#[test]
+fn test_two_wss_tls_nodes_connection_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
+        launch_two_wss_nodes_test(*test_fn, TlsConfig::FakeServer, *can_setup).unwrap();
     }
 }
 

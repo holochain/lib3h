@@ -8,7 +8,7 @@ use url::Url;
 use crate::{
     dht::{
         dht_protocol::{self, *},
-        dht_trait::{Dht, DhtConfig, DhtFactory},
+        dht_trait::*,
     },
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
@@ -58,6 +58,8 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             this_peer_address: transport_keys.transport_id.clone(),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
+            gossip_interval: config.dht_gossip_interval,
+            timeout_threshold: config.dht_timeout_threshold,
         };
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
@@ -101,6 +103,8 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             this_peer_address: format!("{}_tId", name),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
+            gossip_interval: config.dht_gossip_interval,
+            timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
@@ -152,11 +156,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
         trace!("");
-        trace!(
-            "{} - RealEngine.process() START - {}",
-            self.name,
-            self.process_count
-        );
+        trace!("{} - process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -166,9 +166,9 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
         trace!(
-            "RealEngine.process() END - {} (outbox: {})\n",
+            "process() END - {} (outbox: {})\n",
             self.process_count,
-            outbox.len()
+            outbox.len(),
         );
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
@@ -190,7 +190,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        // TODO #159
         let mut result = Ok(());
         for space_gatway in self.space_gateway_map.values_mut() {
             let res = space_gatway.close_all();
@@ -231,7 +230,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} serving: {:?}", self.name.clone(), client_msg);
+        debug!("{} serving: {:?}", self.name, client_msg);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match client_msg {
@@ -479,6 +478,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             this_peer_address: agent_id,
             this_peer_uri: this_peer_transport,
             custom: self.config.dht_custom_config.clone(),
+            gossip_interval: self.config.dht_gossip_interval,
+            timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
         let new_space_gateway = P2pGateway::new_with_space(
@@ -498,9 +499,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .unwrap();
         trace!(
             "{} - Broadcasting JoinSpace: {}, {}",
-            self.name.clone(),
+            self.name,
             space_address,
-            peer.peer_address
+            peer.peer_address,
         );
         self.network_gateway.borrow_mut().send_all(&payload).ok();
         // TODO END

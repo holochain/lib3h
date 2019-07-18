@@ -31,6 +31,10 @@ pub mod tests {
     // for this to actually show log entries you also have to run the tests like this:
     // RUST_LOG=lib3h=debug cargo test -- --nocapture
     pub fn enable_logging_for_test(enable: bool) {
+        // wait a bit because of non monotonic clock,
+        // otherwise we could get negative substraction panics
+        // TODO #211
+        std::thread::sleep(std::time::Duration::from_millis(10));
         if std::env::var("RUST_LOG").is_err() {
             std::env::set_var("RUST_LOG", "debug");
         }

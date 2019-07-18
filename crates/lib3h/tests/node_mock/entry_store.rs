@@ -27,7 +27,7 @@ impl EntryStore {
 
     ///
     pub fn insert_entry(&mut self, entry: &EntryData) {
-        trace!("EntryStore: adding content for '{:?}'", entry.entry_address,);
+        trace!("EntryStore: adding content for '{:?}'", entry.entry_address);
         if self.store.get(&entry.entry_address).is_none() {
             let mut map = HashMap::new();
             trace!("  -> first content!");

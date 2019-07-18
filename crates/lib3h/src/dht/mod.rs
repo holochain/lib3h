@@ -38,7 +38,7 @@ pub mod tests {
     #[allow(dead_code)]
     static mut FETCH_COUNT: u32 = 0;
 
-    fn create_test_transport(peer_address: &str) -> Url {
+    fn create_test_uri(peer_address: &str) -> Url {
         Url::parse(format!("test://{}", peer_address).as_str()).unwrap()
     }
 
@@ -46,8 +46,8 @@ pub mod tests {
     fn create_PeerData(peer_address: &str) -> PeerData {
         PeerData {
             peer_address: peer_address.to_owned(),
-            peer_uri: create_test_transport(peer_address),
-            timestamp: 421,
+            peer_uri: create_test_uri(peer_address),
+            timestamp: crate::time::since_epoch_ms(),
         }
     }
 
@@ -61,7 +61,7 @@ pub mod tests {
             aspect_address: aspect_address.to_owned(),
             type_hint: "dht_test".to_string(),
             aspect: aspect_content.to_owned(),
-            publish_ts: 123,
+            publish_ts: crate::time::since_epoch_ms(),
         };
         EntryData {
             entry_address: entry_address.to_owned(),
@@ -83,10 +83,7 @@ pub mod tests {
 
     fn new_dht(is_mirror: bool, peer_address: &str) -> Box<dyn Dht> {
         if is_mirror {
-            return Box::new(MirrorDht::new(
-                peer_address,
-                &create_test_transport(peer_address),
-            ));
+            return Box::new(MirrorDht::new(peer_address, &create_test_uri(peer_address)));
         }
         Box::new(RrDht::new())
     }
@@ -182,6 +179,8 @@ pub mod tests {
         let peer_list = dht.get_peer_list();
         assert_eq!(peer_list.len(), 0);
         // Add a peer
+        // wait a bit so that the -1 does not underflow
+        std::thread::sleep(std::time::Duration::from_millis(10));
         let mut peer_b_data = create_PeerData(PEER_B);
         dht.post(DhtCommand::HoldPeer(peer_b_data.clone())).unwrap();
         let (did_work, _) = dht.process().unwrap();
@@ -199,6 +198,8 @@ pub mod tests {
         let peer = dht.get_peer(PEER_B).unwrap();
         assert_eq!(peer.timestamp, ref_time);
         // Add newer peer info
+        // wait a bit so that the +1 is not ahead of 'now'
+        std::thread::sleep(std::time::Duration::from_millis(10));
         peer_b_data.timestamp = ref_time + 1;
         dht.post(DhtCommand::HoldPeer(peer_b_data)).unwrap();
         let (did_work, _) = dht.process().unwrap();

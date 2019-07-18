@@ -24,6 +24,5 @@ pub enum TransportEvent {
     /// We have received data from a connection
     ReceivedData(ConnectionId, Vec<u8>),
     /// A connection closed for whatever reason
-    /// #159
     ConnectionClosed(ConnectionId),
 }
