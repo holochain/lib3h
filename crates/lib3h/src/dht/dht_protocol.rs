@@ -1,6 +1,6 @@
+use crate::dht::PeerAddress;
 use lib3h_protocol::{data_types::EntryData, Address};
 use url::Url;
-use crate::dht::PeerAddress;
 
 pub type FromPeerAddress = PeerAddress;
 

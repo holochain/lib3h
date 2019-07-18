@@ -1,7 +1,7 @@
 use crate::{
     dht::{
-        PeerAddress, PeerAddressRef,
         dht_protocol::{DhtCommand, DhtEvent, PeerData},
+        PeerAddress, PeerAddressRef,
     },
     error::Lib3hResult,
 };

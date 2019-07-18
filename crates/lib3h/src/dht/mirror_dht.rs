@@ -1,8 +1,8 @@
 use crate::{
     dht::{
-        PeerAddress, PeerAddressRef,
         dht_protocol::*,
         dht_trait::{Dht, DhtConfig},
+        PeerAddress, PeerAddressRef,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     time,

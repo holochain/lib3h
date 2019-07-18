@@ -11,8 +11,8 @@ pub type PeerAddressRef = str;
 pub mod tests {
     use crate::{
         dht::{
-            PeerAddressRef,
-            dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht},
+            dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht, PeerAddressRef,
+        },
         tests::enable_logging_for_test,
     };
     use lib3h_protocol::{
