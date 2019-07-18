@@ -1,8 +1,7 @@
-use crate::dht::dht_protocol::PeerData;
+use crate::dht::{dht_protocol::PeerData, PeerAddress};
 use lib3h_protocol::{data_types::DirectMessageData, Address};
 
 pub type SpaceAddress = String;
-pub type PeerAddress = String;
 pub type GatewayId = String;
 pub type PeerTimestamp = u64;
 

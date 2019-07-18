@@ -1,7 +1,8 @@
 use lib3h_protocol::{data_types::EntryData, Address};
 use url::Url;
+use crate::dht::PeerAddress;
 
-pub type FromPeerAddress = String;
+pub type FromPeerAddress = PeerAddress;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DhtCommand {
@@ -34,9 +35,8 @@ pub enum DhtEvent {
     /// Notify owner that gossip is requesting we hold a peer discovery data item.
     HoldPeerRequested(PeerData),
     /// Notify owner that we believe a peer has dropped
-    PeerTimedOut(String),
+    PeerTimedOut(PeerAddress),
     /// Notify owner that gossip is requesting we hold an entry.
-    /// String argument is: from_peer_address
     HoldEntryRequested(FromPeerAddress, EntryData),
     /// DHT wants an entry in order to send it to someone on the network
     EntryDataRequested(FetchDhtEntryData),
@@ -49,19 +49,19 @@ pub enum DhtEvent {
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct RemoteGossipBundleData {
-    pub from_peer_address: String,
+    pub from_peer_address: PeerAddress,
     pub bundle: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct GossipToData {
-    pub peer_address_list: Vec<String>,
+    pub peer_address_list: Vec<PeerAddress>,
     pub bundle: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct PeerData {
-    pub peer_address: String,
+    pub peer_address: PeerAddress,
     #[serde(with = "url_serde")]
     pub peer_uri: Url,
     pub timestamp: u64,

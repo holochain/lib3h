@@ -3,10 +3,16 @@ pub mod dht_trait;
 pub mod mirror_dht;
 pub mod rrdht;
 
+/// a Peer identifier
+pub type PeerAddress = String;
+pub type PeerAddressRef = str;
+
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        dht::{dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht},
+        dht::{
+            PeerAddressRef,
+            dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht},
         tests::enable_logging_for_test,
     };
     use lib3h_protocol::{
@@ -30,20 +36,20 @@ pub mod tests {
         pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".into();
     }
 
-    const PEER_A: &str = "alex";
-    const PEER_B: &str = "billy";
-    const PEER_C: &str = "camille";
+    const PEER_A: &PeerAddressRef = "alex";
+    const PEER_B: &PeerAddressRef = "billy";
+    const PEER_C: &PeerAddressRef = "camille";
 
     // Request counters
     #[allow(dead_code)]
     static mut FETCH_COUNT: u32 = 0;
 
-    fn create_test_uri(peer_address: &str) -> Url {
+    fn create_test_uri(peer_address: &PeerAddressRef) -> Url {
         Url::parse(format!("test://{}", peer_address).as_str()).unwrap()
     }
 
     #[allow(non_snake_case)]
-    fn create_PeerData(peer_address: &str) -> PeerData {
+    fn create_PeerData(peer_address: &PeerAddressRef) -> PeerData {
         PeerData {
             peer_address: peer_address.to_owned(),
             peer_uri: create_test_uri(peer_address),
@@ -81,7 +87,7 @@ pub mod tests {
         }
     }
 
-    fn new_dht(is_mirror: bool, peer_address: &str) -> Box<dyn Dht> {
+    fn new_dht(is_mirror: bool, peer_address: &PeerAddressRef) -> Box<dyn Dht> {
         if is_mirror {
             return Box::new(MirrorDht::new(peer_address, &create_test_uri(peer_address)));
         }
@@ -236,7 +242,7 @@ pub mod tests {
         assert_eq!(gossip_to.peer_address_list[0], PEER_B);
         // Post it as a remoteGossipTo
         let remote_gossip = RemoteGossipBundleData {
-            from_peer_address: PEER_A.to_string(),
+            from_peer_address: PEER_A.to_owned(),
             bundle: gossip_to.bundle.clone(),
         };
         dht_b.post(DhtCommand::HandleGossip(remote_gossip)).unwrap();
@@ -293,7 +299,7 @@ pub mod tests {
         assert_eq!(gossip_to.peer_address_list[0], PEER_B);
         // Post it as a remoteGossipTo
         let remote_gossip = RemoteGossipBundleData {
-            from_peer_address: PEER_A.to_string(),
+            from_peer_address: PEER_A.to_owned(),
             bundle: gossip_to.bundle.clone(),
         };
         dht_b.post(DhtCommand::HandleGossip(remote_gossip)).unwrap();

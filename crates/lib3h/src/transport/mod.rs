@@ -7,7 +7,6 @@ pub mod transport_trait;
 
 /// a connection identifier
 pub type ConnectionId = String;
-
 pub type ConnectionIdRef = str;
 
 ///
