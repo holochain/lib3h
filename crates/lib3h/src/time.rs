@@ -16,7 +16,6 @@ pub fn since_epoch_ms() -> u64 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::time::SystemTime;
 
     #[test]
     pub fn test_since_epoch_ms() {
