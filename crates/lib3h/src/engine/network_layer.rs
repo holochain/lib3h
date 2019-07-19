@@ -11,14 +11,14 @@ use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWor
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
-/// Network layer realted private methods
+/// Network layer related private methods
 impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
-        // Process the network gateway as a transport
+        // Process the network gateway as a Transport
         let (tranport_did_work, event_list) =
             Transport::process(&mut *self.network_gateway.borrow_mut())?;
         debug!(
@@ -66,7 +66,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             DhtEvent::PeerTimedOut(peer_address) => {
-                // Disconnect from that peer
+                // Disconnect from that peer by calling a Close on it.
                 let mut network_gateway = self.network_gateway.borrow_mut();
                 let maybe_connection_id = network_gateway.get_connection_id(&peer_address);
                 trace!(
@@ -106,7 +106,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut network_gateway = self.network_gateway.borrow_mut();
         if let Some(uri) = network_gateway.get_uri(id) {
             info!("Network Connection opened: {} ({})", id, uri);
-
             // TODO #150 - Should do this in next process instead
             // Send to other node our Joined Spaces
             let space_list = self.get_all_spaces();
@@ -173,7 +172,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             TransportEvent::ConnectionClosed(id) => {
                 self.network_connections.remove(id);
-                // Output a Lib3hServerProtocol::Disconnected if it was the connection
+                // Output a Lib3hServerProtocol::Disconnected if it was the last connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
                         network_id: "FIXME".to_string(), // TODO #172

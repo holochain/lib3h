@@ -4,7 +4,7 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
-    gateway::{self, P2pGateway},
+    gateway::P2pGateway,
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::{Address, DidWork};
@@ -42,9 +42,11 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
                     "({}).Dht.post(HoldPeer) - {}",
                     self.identifier, peer_data.peer_uri,
                 );
+                // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
+                // to get the transportId
                 let maybe_previous = self.connection_map.insert(
                     peer_data.peer_uri.clone(),
-                    gateway::url_to_transport_id(&peer_data.peer_uri.clone()),
+                    String::from(peer_data.peer_uri.path()),
                 );
                 if let Some(previous_cId) = maybe_previous {
                     debug!(

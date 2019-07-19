@@ -42,18 +42,22 @@ impl TransportKeys {
 }
 
 impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
-    /// Constructor
+    /// Constructor with TransportWss
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         name: &str,
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
+        // Create Transport and bind
         let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream(
             config.tls_config.clone(),
         )));
         let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
+        // Generate keys
+        // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        // Generate DHT config and create network_gateway
         let dht_config = DhtConfig {
             this_peer_address: transport_keys.transport_id.clone(),
             this_peer_uri: binding,
@@ -67,6 +71,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             dht_factory,
             &dht_config,
         )));
+        // Done
         Ok(RealEngine {
             crypto,
             config,
@@ -86,6 +91,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
 /// Constructor
 //#[cfg(test)]
 impl<D: Dht> RealEngine<TransportMemory, D> {
+    /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,

@@ -30,6 +30,7 @@ pub struct TransportMemory {
 }
 
 lazy_static! {
+    /// Counter of the number of TransportMemory that spawned
     static ref TRANSPORT_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
 }
 
@@ -177,8 +178,6 @@ impl Transport for TransportMemory {
         let _ = other_server.request_close(&my_uri);
         // Locally remove connection
         self.outbound_connection_map.remove(id);
-        // FIXME
-        // self.inbound_connection_map.remove(id);
         // Done
         Ok(())
     }
