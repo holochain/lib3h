@@ -1,5 +1,5 @@
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::{dht_protocol::*, dht_trait::Dht, PeerAddressRef},
     error::Lib3hResult,
 };
 use lib3h_protocol::{Address, DidWork};
@@ -40,7 +40,7 @@ impl Dht for RrDht {
         vec![]
     }
 
-    fn get_peer(&self, _peer_address: &str) -> Option<PeerData> {
+    fn get_peer(&self, _peer_address: &PeerAddressRef) -> Option<PeerData> {
         // FIXME
         None
     }

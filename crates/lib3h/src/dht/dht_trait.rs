@@ -1,5 +1,8 @@
 use crate::{
-    dht::dht_protocol::{DhtCommand, DhtEvent, PeerData},
+    dht::{
+        dht_protocol::{DhtCommand, DhtEvent, PeerData},
+        PeerAddress, PeerAddressRef,
+    },
     error::Lib3hResult,
 };
 use lib3h_protocol::{Address, DidWork};
@@ -10,7 +13,7 @@ pub const DEFAULT_TIMEOUT_THRESHOLD_MS: u64 = 60000;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DhtConfig {
-    pub this_peer_address: String,
+    pub this_peer_address: PeerAddress,
     #[serde(with = "url_serde")]
     pub this_peer_uri: Url,
     pub custom: Vec<u8>,
@@ -37,7 +40,7 @@ pub type DhtFactory<D> = fn(config: &DhtConfig) -> Lib3hResult<D>;
 pub trait Dht {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData>;
-    fn get_peer(&self, peer_address: &str) -> Option<PeerData>;
+    fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData>;
     fn this_peer(&self) -> &PeerData;
     /// Entry
     fn get_entry_address_list(&self) -> Vec<&Address>;

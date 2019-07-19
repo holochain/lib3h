@@ -2,6 +2,7 @@ use crate::{
     dht::{
         dht_protocol::*,
         dht_trait::{Dht, DhtConfig},
+        PeerAddress, PeerAddressRef,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     time,
@@ -32,9 +33,9 @@ pub struct MirrorDht {
     /// Storage of EntryData with empty aspect content?
     entry_list: HashMap<Address, HashSet<Address>>,
     /// Monotonic Storage of PeerData
-    peer_map: HashMap<String, PeerData>,
+    peer_map: HashMap<PeerAddress, PeerData>,
     /// Track if peer timed out
-    timed_out_map: HashMap<String, HasTimedOut>,
+    timed_out_map: HashMap<PeerAddress, HasTimedOut>,
     /// PeerData of this peer
     this_peer: PeerData,
     /// Keep track of fetch requests sent to Core
@@ -47,8 +48,8 @@ pub struct MirrorDht {
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(peer_address: &str, peer_uri: &Url) -> Self {
-        let dht_config = DhtConfig::new(peer_address, peer_uri);
+    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Self {
+        let dht_config = DhtConfig::new(this_peer_address, this_peer_uri);
         Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht")
     }
 
@@ -60,7 +61,7 @@ impl MirrorDht {
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
-                peer_address: config.this_peer_address.to_string(),
+                peer_address: config.this_peer_address.to_owned(),
                 peer_uri: config.this_peer_uri.clone(),
                 timestamp,
             },
@@ -80,7 +81,7 @@ impl Dht for MirrorDht {
         self.peer_map.values().map(|v| v.clone()).collect()
     }
 
-    fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
+    fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData> {
         let res = self.peer_map.get(peer_address);
         if let Some(pd) = res {
             return Some(pd.clone());
@@ -187,7 +188,7 @@ impl Dht for MirrorDht {
 /// Internals
 impl MirrorDht {
     // Get all known peers except self
-    fn get_other_peer_list(&self) -> Vec<String> {
+    fn get_other_peer_list(&self) -> Vec<PeerAddress> {
         self.peer_map
             .iter()
             .filter(|(address, _)| *address != &self.this_peer.peer_address)
@@ -196,7 +197,7 @@ impl MirrorDht {
     }
 
     // Create gossipTo event of your own PeerData (but not to yourself)
-    fn gossip_self(&mut self, peer_address_list: Vec<String>) -> GossipToData {
+    fn gossip_self(&mut self, peer_address_list: Vec<PeerAddress>) -> GossipToData {
         let this_peer = self.this_peer();
         let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
         let mut buf = Vec::new();
