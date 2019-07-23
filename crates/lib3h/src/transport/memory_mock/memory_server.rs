@@ -28,7 +28,7 @@ pub fn set_server(uri: &Url) -> TransportResult<()> {
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if server_map.contains_key(uri) {
-        return Err(TransportError::new("Server already exist".to_string()));
+        return Ok(());
     }
     let server = MemoryServer::new(uri);
     server_map.insert(uri.clone(), Mutex::new(server));
