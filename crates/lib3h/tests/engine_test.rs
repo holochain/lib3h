@@ -66,6 +66,8 @@ fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
+        dht_gossip_interval: 100,
+        dht_timeout_threshold: 1000,
         dht_custom_config: vec![],
     };
     let engine = RealEngine::new_mock(
@@ -91,6 +93,8 @@ fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht>
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
+        dht_gossip_interval: 200,
+        dht_timeout_threshold: 2000,
         dht_custom_config: vec![],
     };
     let engine = RealEngine::new(

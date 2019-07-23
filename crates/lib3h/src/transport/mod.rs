@@ -7,7 +7,6 @@ pub mod transport_trait;
 
 /// a connection identifier
 pub type ConnectionId = String;
-
 pub type ConnectionIdRef = str;
 
 ///
@@ -118,7 +117,6 @@ pub mod tests {
         // Send B -> A
         let payload = [4, 2, 1, 3];
         let id_list = node_B.connection_id_list().unwrap();
-        // TODO #159 - When connection event is fully implemented use it instead of
         // referencing node_B's connection list
         let idBA = id_list[0].clone();
         node_B.send(&[&idBA], &payload).unwrap();

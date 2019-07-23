@@ -3,9 +3,13 @@
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
 use crate::utils::constants::*;
 use holochain_persistence_api::hash::HashString;
+use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
-    data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
-    Address, DidWork, Lib3hResult,
+    data_types::*,
+    error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
+    protocol_client::Lib3hClientProtocol,
+    protocol_server::Lib3hServerProtocol,
+    Address, DidWork,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -46,18 +50,64 @@ impl NodeMock {
 
 /// Connection & Space managing
 impl NodeMock {
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hResult<()> {
+    /// Disconnect the NetworkEngine by destroying it.
+    pub fn disconnect(&mut self) {
+        let mut dummy_config = self.config.clone();
+        dummy_config.bind_url =
+            Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
+        self.engine = (self.engine_factory)(&dummy_config, "__dummy")
+            .expect("Failed to create dummy RealEngine");
+        self.engine = (self.engine_factory)(&self.config, &self.name)
+            .expect("Failed to re-create RealEngine");
+        self.my_advertise = self.engine.advertise();
+    }
+
+    /// Try connecting to previously connected_to nodes.
+    /// Return Err if all connects failed.
+    pub fn reconnect(&mut self) -> Lib3hProtocolResult<()> {
+        // re-connect to all nodes
+        let mut return_res = Err(Lib3hProtocolError::new(ErrorKind::Other(String::from(
+            "Failed to reconnect to any node",
+        ))));
+        for uri in self.connected_list.clone().iter() {
+            let res = self.connect_to(&uri);
+            if res.is_ok() {
+                return_res = res;
+            } else {
+                warn!(
+                    "Failed to reconnect to {}: {:?}",
+                    uri.as_str(),
+                    res.err().unwrap(),
+                );
+            }
+        }
+        if return_res.is_err() {
+            return return_res;
+        }
+        // re-join all spaces
+        for space in self.joined_space_list.clone().iter() {
+            let res = self.join_space(space, false);
+            if let Err(e) = res {
+                warn!("Failed to rejoin space {}: {:?}", space, e);
+            }
+        }
+        Ok(())
+    }
+
+    /// Connect to another peer via its uri
+    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<()> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
             peer_uri: uri.clone(),
             network_id: NETWORK_A_ID.clone(),
         };
+        self.connected_list.insert(uri.clone());
         return self
             .engine
             .post(Lib3hClientProtocol::Connect(req_connect.clone()));
     }
 
-    pub fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let (did_work, msgs) = self.engine.process()?;
         self.recv_msg_log.extend_from_slice(msgs.as_slice());
         for msg in msgs.iter() {
@@ -115,7 +165,11 @@ impl NodeMock {
                 self.set_current_space(space_address);
             }
         }
-        res.map(|()| join_space.request_id)
+
+        match res {
+            Ok(_) => Ok(join_space.request_id),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Post a Lib3hClientProtocol::LeaveSpace and update internal tracking
@@ -132,7 +186,10 @@ impl NodeMock {
         if res.is_ok() {
             self.joined_space_list.remove(space_address);
         }
-        res.map(|()| leave_space_msg.request_id)
+        match res {
+            Ok(_) => Ok(leave_space_msg.request_id),
+            Err(e) => Err(e.into()),
+        }
     }
 
     ///
@@ -189,7 +246,7 @@ impl NodeMock {
                     }
                 }
                 if !success {
-                    return Err(format_err!("Authoring of all aspects failed."));
+                    return Err(Lib3hError::new_other("Authoring of all aspects failed."));
                 }
             }
         }
@@ -229,7 +286,7 @@ impl NodeMock {
                 }
             }
             if !success {
-                return Err(format_err!("Storing of aspects failed."));
+                return Err(Lib3hError::new_other("Storing of aspects failed."));
             }
         }
         if can_tell_engine {
@@ -463,8 +520,10 @@ impl NodeMock {
                 provider_agent_id: self.agent_id.clone(),
             };
         }
+
         self.engine
             .post(Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg).into())
+            .map_err(|e| e.into())
     }
     /// Look for the first HandleGetAuthoringEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetAuthoringEntryList(&mut self) {
@@ -512,6 +571,7 @@ impl NodeMock {
         }
         self.engine
             .post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg).into())
+            .map_err(|e| e.into())
     }
     /// Look for the first HandleGetGossipingEntryList request received from network module and reply
     pub fn reply_to_first_HandleGetGossipingEntryList(&mut self) {
@@ -615,7 +675,7 @@ impl NodeMock {
                 trace!(
                     "({:?})::listen() - received: {:?}",
                     self.agent_id,
-                    lib3h_msg,
+                    lib3h_msg
                 );
                 time_ms = 0;
                 count += 1;

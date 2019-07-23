@@ -257,8 +257,8 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         1000,
     );
     assert!(store_result.is_none());
-    let (did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(!did_work);
+    let (_did_work, srv_msg_list) = billy.process().unwrap();
+    assert_eq!(srv_msg_list.len(), 0);
 }
 
 /// Entry with two aspects case

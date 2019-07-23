@@ -3,9 +3,9 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
-use lib3h::engine::RealEngineConfig;
+use lib3h::{engine::RealEngineConfig, error::Lib3hResult};
 use lib3h_protocol::{
-    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address, Lib3hResult,
+    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address,
 };
 use std::collections::{HashMap, HashSet};
 use url::Url;
@@ -25,11 +25,17 @@ pub struct NodeMock {
     engine: Box<dyn NetworkEngine>,
     /// Config used by the engine
     pub config: RealEngineConfig,
+    /// Factory used to create the engine
+    engine_factory: EngineFactory,
     /// The node's simulated agentId
     pub agent_id: Address,
     /// The node's uri
     my_advertise: Url,
+    /// This node's handle
     pub name: String,
+    /// Keep track of the URIs used when calling `connect()`
+    /// in order to do `reconnect()`
+    connected_list: HashSet<Url>,
 
     /// Sent messages logs
     request_log: Vec<String>,
@@ -56,7 +62,7 @@ impl NodeMock {
     ) -> Self {
         debug!(
             "new NodeMock '{:?}' with config: {:?}",
-            agent_id_arg, config
+            agent_id_arg, config,
         );
 
         let engine = engine_factory(&config, name).expect("Failed to create RealEngine");
@@ -65,6 +71,7 @@ impl NodeMock {
             // _maybe_temp_dir,
             engine,
             config,
+            engine_factory,
             agent_id: agent_id_arg.clone(),
             request_log: Vec::new(),
             request_count: 0,
@@ -74,6 +81,7 @@ impl NodeMock {
             current_space: None,
             my_advertise,
             name: name.to_string(),
+            connected_list: HashSet::new(),
         }
     }
 }
