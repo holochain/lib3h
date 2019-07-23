@@ -7,7 +7,6 @@ pub mod transport_trait;
 
 /// a connection identifier
 pub type ConnectionId = String;
-
 pub type ConnectionIdRef = str;
 
 ///
@@ -46,8 +45,8 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
-        let uri_A = Url::parse("wss://127.0.0.1:64529").unwrap();
-        let uri_B = Url::parse("wss://127.0.0.1:64530").unwrap();
+        let uri_A = Url::parse("wss://127.0.0.1:64529/A").unwrap();
+        let uri_B = Url::parse("wss://127.0.0.1:64530/B").unwrap();
 
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
@@ -57,8 +56,8 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
-        let uri_A = Url::parse("wss://127.0.0.1:64531").unwrap();
-        let uri_B = Url::parse("wss://127.0.0.1:64532").unwrap();
+        let uri_A = Url::parse("wss://127.0.0.1:64531/TLS_A").unwrap();
+        let uri_B = Url::parse("wss://127.0.0.1:64532/TLS_B").unwrap();
 
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
@@ -118,7 +117,6 @@ pub mod tests {
         // Send B -> A
         let payload = [4, 2, 1, 3];
         let id_list = node_B.connection_id_list().unwrap();
-        // TODO #159 - When connection event is fully implemented use it instead of
         // referencing node_B's connection list
         let idBA = id_list[0].clone();
         node_B.send(&[&idBA], &payload).unwrap();

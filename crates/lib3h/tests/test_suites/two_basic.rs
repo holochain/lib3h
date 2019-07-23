@@ -92,6 +92,7 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space
+    println!("\n {} joins {}\n", billy.name, space_address);
     let req_id = billy.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -256,8 +257,8 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         1000,
     );
     assert!(store_result.is_none());
-    let (did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(!did_work);
+    let (_did_work, srv_msg_list) = billy.process().unwrap();
+    assert_eq!(srv_msg_list.len(), 0);
 }
 
 /// Entry with two aspects case

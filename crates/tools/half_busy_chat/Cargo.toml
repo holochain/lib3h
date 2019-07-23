@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_half_busy_chat"
-version = "0.0.6"
+version = "0.0.8"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h simulation test framework"
@@ -8,7 +8,7 @@ keywords = ["holochain", "holo"]
 categories = ["development-tools::testing"]
 license = "Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/lib3h_hbc"
+documentation = "https://docs.rs/lib3h_half_busy_chat"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]

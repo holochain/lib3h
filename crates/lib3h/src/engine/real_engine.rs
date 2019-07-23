@@ -8,19 +8,20 @@ use url::Url;
 use crate::{
     dht::{
         dht_protocol::{self, *},
-        dht_trait::{Dht, DhtConfig, DhtFactory},
+        dht_trait::*,
     },
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
+    error::Lib3hResult,
     gateway::P2pGateway,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, Address, DidWork, Lib3hResult,
+    data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
+    protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -41,22 +42,28 @@ impl TransportKeys {
 }
 
 impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
-    /// Constructor
+    /// Constructor with TransportWss
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         name: &str,
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
+        // Create Transport and bind
         let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream(
             config.tls_config.clone(),
         )));
         let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
+        // Generate keys
+        // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        // Generate DHT config and create network_gateway
         let dht_config = DhtConfig {
             this_peer_address: transport_keys.transport_id.clone(),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
+            gossip_interval: config.dht_gossip_interval,
+            timeout_threshold: config.dht_timeout_threshold,
         };
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
@@ -64,6 +71,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             dht_factory,
             &dht_config,
         )));
+        // Done
         Ok(RealEngine {
             crypto,
             config,
@@ -83,6 +91,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
 /// Constructor
 //#[cfg(test)]
 impl<D: Dht> RealEngine<TransportMemory, D> {
+    /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
@@ -100,6 +109,8 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             this_peer_address: format!("{}_tId", name),
             this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
+            gossip_interval: config.dht_gossip_interval,
+            timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
@@ -140,7 +151,7 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
-    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
+    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         // trace!("RealEngine.post(): {:?}", client_msg);
         self.inbox.push_back(client_msg);
         Ok(())
@@ -148,14 +159,10 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
 
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
         trace!("");
-        trace!(
-            "{} - RealEngine.process() START - {}",
-            self.name,
-            self.process_count
-        );
+        trace!("{} - process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -165,9 +172,9 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
         trace!(
-            "RealEngine.process() END - {} (outbox: {})\n",
+            "process() END - {} (outbox: {})\n",
             self.process_count,
-            outbox.len()
+            outbox.len(),
         );
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
@@ -189,7 +196,21 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        // TODO #159
+        let mut result = Ok(());
+        for space_gatway in self.space_gateway_map.values_mut() {
+            let res = space_gatway.close_all();
+            // Continue closing connections even if some failed
+            if let Err(e) = res {
+                if result.is_ok() {
+                    result = Err(e);
+                }
+            }
+        }
+        // Done
+        self.network_gateway.borrow_mut().close_all().map_err(|e| {
+            error!("Closing of some connection failed: {:?}", e);
+            e
+        })?;
         Ok(())
     }
 
@@ -215,7 +236,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} serving: {:?}", self.name.clone(), client_msg);
+        debug!("{} serving: {:?}", self.name, client_msg);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match client_msg {
@@ -456,13 +477,15 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
-        let this_peer_transport =
+        let this_peer_transport_id_as_uri =
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transport:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
+            Url::parse(format!("transportId:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
-            this_peer_uri: this_peer_transport,
+            this_peer_uri: this_peer_transport_id_as_uri,
             custom: self.config.dht_custom_config.clone(),
+            gossip_interval: self.config.dht_gossip_interval,
+            timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
         let new_space_gateway = P2pGateway::new_with_space(
@@ -482,9 +505,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .unwrap();
         trace!(
             "{} - Broadcasting JoinSpace: {}, {}",
-            self.name.clone(),
+            self.name,
             space_address,
-            peer.peer_address
+            peer.peer_address,
         );
         self.network_gateway.borrow_mut().send_all(&payload).ok();
         // TODO END
@@ -496,11 +519,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         Dht::post(
             space_gateway,
-            DhtCommand::HoldPeer(PeerData {
-                peer_address: dht_config.this_peer_address,
-                peer_uri: dht_config.this_peer_uri,
-                timestamp: 42, // TODO #166
-            }),
+            DhtCommand::HoldPeer(space_gateway.this_peer().clone()),
         )?;
         // Send Get*Lists requests
         let mut list_data = GetListData {

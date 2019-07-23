@@ -1,6 +1,7 @@
 use holochain_persistence_api::hash::HashString;
 use lib3h_protocol::Address;
 use multihash::Hash;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
     /// Networks
@@ -24,6 +25,9 @@ lazy_static! {
     pub static ref ASPECT_ADDRESS_1: Address = generate_address(&*ASPECT_CONTENT_1);
     pub static ref ASPECT_ADDRESS_2: Address = generate_address(&*ASPECT_CONTENT_2);
     pub static ref ASPECT_ADDRESS_3: Address = generate_address(&*ASPECT_CONTENT_3);
+
+    // TODO use port 0 and have transport wss return back actually bound port
+    static ref PORT: Arc<Mutex<u32>> = Arc::new(Mutex::new(64528));
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -49,4 +53,11 @@ pub fn generate_entry(i: u32) -> (Address, Vec<u8>) {
     let address = format!("entry_addr_{}", i);
     let content = format!("hello-{}", i);
     (address.into(), content.as_bytes().to_vec())
+}
+
+#[allow(dead_code)]
+pub fn generate_port() -> u32 {
+    let mut port = PORT.lock().unwrap();
+    *port += 1;
+    *port
 }
