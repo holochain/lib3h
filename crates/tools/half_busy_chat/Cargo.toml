@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_half_busy_chat"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h simulation test framework"
