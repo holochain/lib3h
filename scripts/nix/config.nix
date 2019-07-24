@@ -66,9 +66,9 @@ l3h-release-hook-publish
   # the previous version will be scanned/bumped by release scripts
   # the current version is what the release scripts bump *to*
   version = {
-   current = "0.0.8";
+   current = "0.0.9";
    # not used by version hooks in this repo
-   previous = "0.0.7";
+   previous = "0.0.8";
   };
 
   github = {
