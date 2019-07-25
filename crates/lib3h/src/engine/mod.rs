@@ -1,3 +1,31 @@
+lazy_static! {
+    static ref NEXT_D_ID: std::sync::RwLock<usize> = std::sync::RwLock::new(0);
+}
+
+struct DId(String);
+
+const D_ID_CLR: &[&str] = &["91", "92", "93", "94", "95", "96"];
+
+impl DId {
+    pub fn new() -> Self {
+        let d = {
+            let mut d = NEXT_D_ID.write().unwrap();
+            *d += 1;
+            *d
+        };
+
+        let c = D_ID_CLR[d % D_ID_CLR.len()];
+
+        DId(format!("\x1b[{}m<[{}]>\x1b[0m", c, d))
+    }
+}
+
+macro_rules! e_debug {
+    ($e:ident, $($arg:tt)+) => (
+        debug!("{} {} {}", $e.d_id.0, $e.name, format!($($arg)+));
+    )
+}
+
 mod network_layer;
 pub mod p2p_protocol;
 pub mod real_engine;
@@ -50,6 +78,8 @@ pub struct TransportKeys {
 pub struct RealEngine<T: Transport, D: Dht> {
     /// Identifier
     name: String,
+    /// Identifier,
+    d_id: DId,
     /// Config settings
     config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
