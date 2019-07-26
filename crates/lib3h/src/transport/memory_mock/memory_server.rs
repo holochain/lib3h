@@ -14,6 +14,8 @@ use url::Url;
 // Memory Server MAP
 //--------------------------------------------------------------------------------------------------
 
+pub type ServerInst = std::sync::Arc<Mutex<MemoryServer>>;
+
 /// Type for holding a map of 'url -> InMemoryServer'
 type MemoryServerMap = HashMap<Url, std::sync::Weak<Mutex<MemoryServer>>>;
 
@@ -23,7 +25,7 @@ lazy_static! {
 }
 
 /// Add new MemoryServer to the global server map
-pub fn ensure_server(uri: &Url) -> TransportResult<std::sync::Arc<Mutex<MemoryServer>>> {
+pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
     debug!("MemoryServer::set_server: {}", uri);
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
 
@@ -42,6 +44,24 @@ pub fn ensure_server(uri: &Url) -> TransportResult<std::sync::Arc<Mutex<MemorySe
         Some(s) => s,
         None => std::sync::Weak::upgrade(tmp).unwrap(),
     })
+}
+
+pub struct ServerRef(std::sync::Arc<Mutex<MemoryServer>>);
+impl ServerRef {
+    pub fn get(&self) -> std::sync::MutexGuard<'_, MemoryServer> {
+        self.0.lock().expect("can read MemoryServer")
+    }
+}
+
+pub fn read_ref(uri: &Url) -> TransportResult<ServerRef> {
+    let server_map = MEMORY_SERVER_MAP.read().expect("map exists");
+    let maybe_server = server_map.get(uri);
+    if maybe_server.is_none() {
+        return Err(TransportError::new(format!("No Memory server at {}", uri)));
+    }
+    Ok(ServerRef(
+        std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists"),
+    ))
 }
 
 //--------------------------------------------------------------------------------------------------

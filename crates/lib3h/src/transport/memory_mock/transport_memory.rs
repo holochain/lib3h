@@ -134,22 +134,13 @@ impl Transport for TransportMemory {
             }
             Some(u) => u,
         };
-        // Get other node's server
-        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(uri);
-        if let None = maybe_server {
-            return Err(TransportError::new(format!(
-                "No Memory server at this url address: {}",
-                uri
-            )));
-        }
+        let server = memory_server::read_ref(uri)?;
+        let mut server = server.get();
         // Generate and store a connectionId to act like other Transport types
         self.n_id += 1;
         let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
         self.outbound_connection_map.insert(id.clone(), uri.clone());
         // Connect to it
-        let server = std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists");
-        let mut server = server.lock().unwrap();
         server.request_connect(my_uri, &id)?;
         Ok(id)
     }
@@ -170,18 +161,9 @@ impl Transport for TransportMemory {
             return Err(TransportError::new(format!("Unknown connectionId: {}", id)));
         }
         let other_uri = maybe_other_uri.unwrap();
-        // Get other node's server
-        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_other_server = server_map.get(other_uri);
-        if let None = maybe_other_server {
-            return Err(TransportError::new(format!(
-                "No Memory server at this url: {}",
-                other_uri,
-            )));
-        }
-        let other_server =
-            std::sync::Weak::upgrade(maybe_other_server.unwrap()).expect("server still exists");
-        let mut other_server = other_server.lock().unwrap();
+        let other_server = memory_server::read_ref(other_uri)?;
+        let mut other_server = other_server.get();
+
         // Tell it we closed connection with it
         let _ = other_server.request_close(&my_uri);
         // Locally remove connection
@@ -218,19 +200,8 @@ impl Transport for TransportMemory {
                 continue;
             }
             let uri = maybe_uri.unwrap();
-            // Get the other node's server
-            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let maybe_server = server_map.get(uri);
-            if let None = maybe_server {
-                return Err(TransportError::new(format!(
-                    "No Memory server at this url address: {}",
-                    uri
-                )));
-            }
-            trace!("(TransportMemory).send() {} | {}", uri, payload.len());
-            let server =
-                std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists");
-            let mut server = server.lock().unwrap();
+            let server = memory_server::read_ref(uri)?;
+            let mut server = server.get();
             // Send it data from us
             server
                 .post(&my_uri, payload)
@@ -285,14 +256,8 @@ impl Transport for TransportMemory {
         let mut to_connect_list: Vec<(Url, ConnectionId)> = Vec::new();
         let mut output = Vec::new();
         for my_server_uri in &self.my_servers {
-            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let my_server = std::sync::Weak::upgrade(
-                server_map
-                    .get(my_server_uri)
-                    .expect("My server should exist."),
-            )
-            .expect("server still exists");
-            let mut my_server = my_server.lock().unwrap();
+            let my_server = memory_server::read_ref(my_server_uri)?;
+            let mut my_server = my_server.get();
             let (success, event_list) = my_server.process()?;
             if success {
                 did_work = true;
