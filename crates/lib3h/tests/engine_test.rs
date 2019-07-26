@@ -58,11 +58,18 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
+fn basic_setup_mock_bootstrap(
+    name: &str,
+    bs: Option<Vec<Url>>,
+) -> RealEngine<TransportMemory, MirrorDht> {
+    let bootstrap_nodes = match bs {
+        Some(s) => s,
+        None => vec![],
+    };
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
-        bootstrap_nodes: vec![],
+        bootstrap_nodes,
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
@@ -83,6 +90,10 @@ fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
         name, p2p_binding
     );
     engine
+}
+
+fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
+    basic_setup_mock_bootstrap(name, None)
 }
 
 fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht> {
@@ -135,8 +146,8 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine_a = basic_setup_mock("basic_send_test_mock_node_a");
-    let engine_b = basic_setup_mock("basic_send_test_mock_node_b");
+    let mut engine_a = basic_setup_mock("basic_connect_test_mock_node_a");
+    let engine_b = basic_setup_mock("basic_connect_test_mock_node_b");
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
@@ -149,6 +160,25 @@ fn basic_connect_test_mock() {
     engine_a
         .post(Lib3hClientProtocol::Connect(connect_msg.clone()))
         .unwrap();
+    println!("\nengine_a.process()...");
+    let (did_work, srv_msg_list) = engine_a.process().unwrap();
+    println!("engine_a: {:?}", srv_msg_list);
+    assert!(did_work);
+}
+
+#[test]
+fn basic_connect_bootstrap_test_mock() {
+    enable_logging_for_test(true);
+    // Setup
+    let engine_b = basic_setup_mock("basic_connect_bootstrap_test_node_b");
+    // Get URL
+    let url_b = engine_b.advertise();
+    println!("url_b: {}", url_b);
+
+    // Create a with b as a bootstrap
+    let mut engine_a =
+        basic_setup_mock_bootstrap("basic_connect_bootstrap_test_node_a", Some(vec![url_b]));
+
     println!("\nengine_a.process()...");
     let (did_work, srv_msg_list) = engine_a.process().unwrap();
     println!("engine_a: {:?}", srv_msg_list);

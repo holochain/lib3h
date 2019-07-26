@@ -72,7 +72,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             &dht_config,
         )));
         // Done
-        Ok(RealEngine {
+        let mut real_engine = RealEngine {
             crypto,
             config,
             inbox: VecDeque::new(),
@@ -84,7 +84,9 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
-        })
+        };
+        real_engine.priv_connect_bootstraps()?;
+        Ok(real_engine)
     }
 }
 
@@ -125,7 +127,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             network_gateway.borrow().this_peer()
         );
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-        Ok(RealEngine {
+        let mut real_engine = RealEngine {
             crypto,
             config,
             inbox: VecDeque::new(),
@@ -137,7 +139,24 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
-        })
+        };
+        real_engine.priv_connect_bootstraps()?;
+        Ok(real_engine)
+    }
+}
+
+impl<T: Transport, D: Dht> RealEngine<T, D> {
+    fn priv_connect_bootstraps(&mut self) -> Lib3hProtocolResult<()> {
+        // TODO
+        let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
+        for bs in nodes {
+            self.post(Lib3hClientProtocol::Connect(ConnectData {
+                request_id: "".to_string(), // fire-and-forget
+                peer_uri: bs,
+                network_id: "".to_string(), // unimplemented
+            }))?;
+        }
+        Ok(())
     }
 }
 
