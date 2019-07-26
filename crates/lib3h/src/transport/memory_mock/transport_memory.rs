@@ -14,6 +14,8 @@ use url::Url;
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
 pub struct TransportMemory {
+    /// Reference to our memory servers
+    memory_servers: Vec<Arc<Mutex<memory_server::MemoryServer>>>,
     /// Commands sent to us by owner for async processing
     cmd_inbox: VecDeque<TransportCommand>,
     /// Addresses (url-ish) of all our servers
@@ -41,6 +43,7 @@ impl TransportMemory {
             .expect("could not lock transport count mutex");
         *tc += 1;
         TransportMemory {
+            memory_servers: vec![],
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
             outbound_connection_map: HashMap::new(),
@@ -65,7 +68,14 @@ impl TransportMemory {
                 let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
                 server_map
                     .get(uri)
-                    .map(|server| server.lock().unwrap().get_inbound_uri(id).is_some())
+                    .map(|server| {
+                        std::sync::Weak::upgrade(server)
+                            .expect("server still exists")
+                            .lock()
+                            .unwrap()
+                            .get_inbound_uri(id)
+                            .is_some()
+                    })
                     .unwrap_or(false)
             }
         }
@@ -76,11 +86,6 @@ impl Drop for TransportMemory {
     fn drop(&mut self) {
         // Close all connections
         self.close_all().ok();
-        // Drop my servers
-        for bounded_url in &self.my_servers {
-            memory_server::unset_server(&bounded_url)
-                .expect("unset_server() during drop should never fail");
-        }
     }
 }
 /// Compose Transport
@@ -143,7 +148,8 @@ impl Transport for TransportMemory {
         let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
         self.outbound_connection_map.insert(id.clone(), uri.clone());
         // Connect to it
-        let mut server = maybe_server.unwrap().lock().unwrap();
+        let server = std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists");
+        let mut server = server.lock().unwrap();
         server.request_connect(my_uri, &id)?;
         Ok(id)
     }
@@ -173,7 +179,9 @@ impl Transport for TransportMemory {
                 other_uri,
             )));
         }
-        let mut other_server = maybe_other_server.unwrap().lock().unwrap();
+        let other_server =
+            std::sync::Weak::upgrade(maybe_other_server.unwrap()).expect("server still exists");
+        let mut other_server = other_server.lock().unwrap();
         // Tell it we closed connection with it
         let _ = other_server.request_close(&my_uri);
         // Locally remove connection
@@ -220,7 +228,9 @@ impl Transport for TransportMemory {
                 )));
             }
             trace!("(TransportMemory).send() {} | {}", uri, payload.len());
-            let mut server = maybe_server.unwrap().lock().unwrap();
+            let server =
+                std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists");
+            let mut server = server.lock().unwrap();
             // Send it data from us
             server
                 .post(&my_uri, payload)
@@ -248,7 +258,8 @@ impl Transport for TransportMemory {
     fn bind(&mut self, uri: &Url) -> TransportResult<Url> {
         let bounded_uri = Url::parse(format!("{}_bound", uri).as_str()).unwrap();
         self.maybe_my_uri = Some(bounded_uri.clone());
-        memory_server::set_server(&bounded_uri)?;
+        self.memory_servers
+            .push(memory_server::ensure_server(&bounded_uri)?);
         self.my_servers.insert(bounded_uri.clone());
         Ok(bounded_uri.clone())
     }
@@ -275,11 +286,13 @@ impl Transport for TransportMemory {
         let mut output = Vec::new();
         for my_server_uri in &self.my_servers {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let mut my_server = server_map
-                .get(my_server_uri)
-                .expect("My server should exist.")
-                .lock()
-                .unwrap();
+            let my_server = std::sync::Weak::upgrade(
+                server_map
+                    .get(my_server_uri)
+                    .expect("My server should exist."),
+            )
+            .expect("server still exists");
+            let mut my_server = my_server.lock().unwrap();
             let (success, event_list) = my_server.process()?;
             if success {
                 did_work = true;

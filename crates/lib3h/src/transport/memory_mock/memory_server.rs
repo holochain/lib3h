@@ -15,7 +15,7 @@ use url::Url;
 //--------------------------------------------------------------------------------------------------
 
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
+type MemoryServerMap = HashMap<Url, std::sync::Weak<Mutex<MemoryServer>>>;
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
@@ -23,28 +23,25 @@ lazy_static! {
 }
 
 /// Add new MemoryServer to the global server map
-pub fn set_server(uri: &Url) -> TransportResult<()> {
+pub fn ensure_server(uri: &Url) -> TransportResult<std::sync::Arc<Mutex<MemoryServer>>> {
     debug!("MemoryServer::set_server: {}", uri);
-    // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if server_map.contains_key(uri) {
-        return Ok(());
-    }
-    let server = MemoryServer::new(uri);
-    server_map.insert(uri.clone(), Mutex::new(server));
-    Ok(())
-}
 
-/// Remove a MemoryServer from the global server map
-pub fn unset_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::unset_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if !server_map.contains_key(uri) {
-        return Err(TransportError::new("Server doesn't exist".to_string()));
-    }
-    server_map.remove(uri);
-    Ok(())
+    // make sure we keep a STRONG reference around for the first one,
+    // or it'll get cleaned up before we even send it out.
+    let mut out = None;
+
+    let tmp = server_map.entry(uri.clone()).or_insert_with(|| {
+        let s = std::sync::Arc::new(Mutex::new(MemoryServer::new(uri)));
+        let r = std::sync::Arc::downgrade(&s);
+        out = Some(s);
+        r
+    });
+
+    Ok(match out {
+        Some(s) => s,
+        None => std::sync::Weak::upgrade(tmp).unwrap(),
+    })
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -67,6 +64,11 @@ pub struct MemoryServer {
 impl Drop for MemoryServer {
     fn drop(&mut self) {
         trace!("(MemoryServer) dropped: {:?}", self.this_uri);
+        let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
+        if !server_map.contains_key(&self.this_uri) {
+            panic!("Server doesn't exist");
+        }
+        server_map.remove(&self.this_uri);
     }
 }
 
