@@ -6,22 +6,28 @@
 use net2;
 use std::net;
 
+
+
+#[cfg(not(target_os = "windows"))]
+use net2::unix::UnixUdpBuilderExt;
+
+use std::{
+    net::ToSocketAddrs, // Used to cast (addr, port) to socket
+    collections::HashMap,
+};
+
+pub mod error;
+pub use error::{MulticastDnsError, MulticastDnsResult};
+
+pub mod dns;
+pub use dns::{Answer, Question, Neighbor, Packet};
+
 // 20 byte IP header would mean 65_507... but funky configs can increase that
 // const READ_BUF_SIZE: usize = 60_000;
 // however... we don't want to accept any packets that big...
 // let's stick with one common block size
 const READ_BUF_SIZE: usize = 4_096;
 
-#[cfg(not(target_os = "windows"))]
-use net2::unix::UnixUdpBuilderExt;
-
-use std::net::ToSocketAddrs;
-
-pub mod error;
-pub use error::{MulticastDnsError, MulticastDnsResult};
-
-pub mod dns;
-pub use dns::*;
 
 /// mdns builder
 pub struct MulticastDnsBuilder {
@@ -87,6 +93,7 @@ impl MulticastDnsBuilder {
             multicast_address: self.multicast_address.to_owned(),
             socket,
             buffer: [0; READ_BUF_SIZE],
+            neighbors: HashMap::new(),
         })
     }
 }
@@ -120,6 +127,8 @@ pub struct MulticastDns {
     socket: net::UdpSocket,
     /// The buffer used to store the packet to send/receive messages
     buffer: [u8; READ_BUF_SIZE],
+    /// The lookup table where the neighbors are stored
+    neighbors: HashMap<String, Neighbor>,
 }
 
 impl MulticastDns {

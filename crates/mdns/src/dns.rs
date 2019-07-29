@@ -258,6 +258,36 @@ fn read_qname<T: byteorder::ReadBytesExt>(read: &mut T) -> MulticastDnsResult<Ve
     Ok(out)
 }
 
+
+#[derive(Debug, Clone)]
+pub struct Neighbor {
+    /// Hostname of our neighbor
+    hostname: String,
+    /// IP address in the lan
+    ip: String,
+}
+
+impl Neighbor {
+    pub fn new(name: &str, ip: &str) -> Self {
+        Self {
+            hostname: name.to_string(),
+            ip: ip.to_string(),
+        }
+    }
+
+    /// Returns a reference to the IP address of a neighbor in the LAN.
+    pub fn ip(&self) -> &str {
+        &self.ip
+    }
+
+    /// Returns a reference to the hostname of a neighbor in the LAN.
+    pub fn hostname(&self) -> &str {
+        &self.hostname
+    }
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
