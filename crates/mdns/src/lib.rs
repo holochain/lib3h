@@ -93,7 +93,7 @@ impl MulticastDnsBuilder {
             multicast_address: self.multicast_address.to_owned(),
             socket,
             buffer: [0; READ_BUF_SIZE],
-            neighbors: HashMap::new(),
+            neighbors: HashMap::with_capacity(32),
         })
     }
 }
@@ -132,6 +132,31 @@ pub struct MulticastDns {
 }
 
 impl MulticastDns {
+    /// IP address of the mDNS server.
+    pub fn address(&self) -> &str {
+        &self.bind_address
+    }
+
+    /// the mDNS service port on the machine.
+    pub fn port(&self) -> u16 {
+        self.bind_port
+    }
+
+    /// Returns wether multicasting is set to loop or not.
+    pub fn multicast_loop(&self) -> bool {
+        self.multicast_loop
+    }
+
+    /// Returns the time to live value.
+    pub fn multicast_ttl(&self) -> u32 {
+        self.multicast_ttl
+    }
+
+    /// Returns the multicast address used by mDNS
+    pub fn multicast_address(&self) -> &str {
+        &self.multicast_address
+    }
+
     /// broadcast a dns packet
     pub fn send(&mut self, packet: &Packet) -> Result<(), MulticastDnsError> {
         let addr = (self.multicast_address.as_ref(), self.bind_port)
