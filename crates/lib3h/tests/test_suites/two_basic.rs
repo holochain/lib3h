@@ -65,6 +65,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
     assert_eq!(&msg.entry_address, &entry.entry_address);
+    warn!("{}", String::from_utf8_lossy(&msg.query_result[..]));
     let mut de = Deserializer::new(&msg.query_result[..]);
     let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
         Deserialize::deserialize(&mut de);
