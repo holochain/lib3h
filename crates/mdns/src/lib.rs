@@ -1,9 +1,10 @@
-//! lib3h mdns LAN discovery module
+//! lib3h mDNS LAN discovery module
 
 #![feature(try_trait)]
 
-extern crate byteorder;
-extern crate net2;
+// use byteorder;
+use net2;
+use std::net;
 
 // 20 byte IP header would mean 65_507... but funky configs can increase that
 // const READ_BUF_SIZE: usize = 60_000;
@@ -22,104 +23,109 @@ pub use error::{MulticastDnsError, MulticastDnsResult};
 pub mod dns;
 pub use dns::*;
 
-/// mdns configuration
-#[derive(Clone, Debug)]
-pub struct Config {
-    pub bind_address: String,
-    pub bind_port: u16,
-    pub multicast_loop: bool,
-    pub multicast_ttl: u32,
-    pub multicast_address: String,
-}
-
 /// mdns builder
-pub struct Builder {
-    config: Config,
+pub struct MulticastDnsBuilder {
+    pub(crate) bind_address: String,
+    pub(crate) bind_port: u16,
+    pub(crate) multicast_loop: bool,
+    pub(crate) multicast_ttl: u32,
+    pub(crate) multicast_address: String,
 }
 
-impl Builder {
+impl MulticastDnsBuilder {
     /// create a new mdns builder
     pub fn new() -> Self {
-        Builder {
-            config: Config {
-                bind_address: "0.0.0.0".to_string(),
-                bind_port: 5353,
-                multicast_loop: true,
-                multicast_ttl: 255,
-                multicast_address: "224.0.0.251".to_string(),
-            },
-        }
+        MulticastDnsBuilder::default()
     }
 
     /// specify the network interface to bind to
-    pub fn set_bind_address(&mut self, address: &str) -> &mut Self {
-        self.config.bind_address = address.to_string();
+    pub fn bind_address(&mut self, addr: &str) -> &mut Self {
+        self.bind_address = addr.to_owned();
         self
     }
 
     /// specify the udp port to listen on
-    pub fn set_bind_port(&mut self, port: u16) -> &mut Self {
-        self.config.bind_port = port;
+    pub fn bind_port(&mut self, port: u16) -> &mut Self {
+        self.bind_port = port;
         self
     }
 
     /// should we loop broadcasts back to self?
-    pub fn set_multicast_loop(&mut self, should_loop: bool) -> &mut Self {
-        self.config.multicast_loop = should_loop;
+    pub fn multicast_loop(&mut self, should_loop: bool) -> &mut Self {
+        self.multicast_loop = should_loop;
         self
     }
 
     /// set the multicast ttl
-    pub fn set_multicast_ttl(&mut self, ttl: u32) -> &mut Self {
-        self.config.multicast_ttl = ttl;
+    pub fn multicast_ttl(&mut self, ttl: u32) -> &mut Self {
+        self.multicast_ttl = ttl;
         self
     }
 
     /// set the multicast address
-    pub fn set_multicast_address(&mut self, address: &str) -> &mut Self {
-        self.config.multicast_address = address.to_string();
+    pub fn multicast_address(&mut self, addr: &str) -> &mut Self {
+        self.multicast_address = addr.to_string();
         self
     }
 
     /// construct the actual mdns struct
     pub fn build(&mut self) -> Result<MulticastDns, MulticastDnsError> {
-        MulticastDns::new(self.config.clone())
+        let socket = create_socket(&self.bind_address, self.bind_port)?;
+        socket.set_nonblocking(true)?;
+        socket.set_multicast_loop_v4(self.multicast_loop)?;
+        socket.set_multicast_ttl_v4(self.multicast_ttl)?;
+        socket.join_multicast_v4(
+            &self.multicast_address.parse()?,
+            &self.bind_address.parse()?,
+        )?;
+
+        Ok(MulticastDns {
+            bind_address: self.bind_address.to_owned(),
+            bind_port: self.bind_port,
+            multicast_loop: self.multicast_loop,
+            multicast_ttl: self.multicast_ttl,
+            multicast_address: self.multicast_address.to_owned(),
+            socket,
+            buffer: [0; READ_BUF_SIZE],
+        })
+    }
+}
+
+use std::default::Default;
+impl Default for MulticastDnsBuilder {
+    fn default() -> Self {
+        MulticastDnsBuilder {
+            bind_address: String::from("0.0.0.0"),
+            bind_port: 5353,
+            multicast_loop: true,
+            multicast_ttl: 255,
+            multicast_address: String::from("224.0.0.251"),
+        }
     }
 }
 
 /// an mdns instance that can send and receive dns packets on LAN UDP multicast
 pub struct MulticastDns {
-    config: Config,
-    socket: std::net::UdpSocket,
-    read_buf: [u8; READ_BUF_SIZE],
+    /// Our IP address bound to UDP Socket, default to `0.0.0.0`
+    pub(crate) bind_address: String,
+    /// Port used by thge mDNS protocol: `5353`
+    pub(crate) bind_port: u16,
+    /// If true, multicast packets will be looped back to the local socket
+    pub(crate) multicast_loop: bool,
+    /// Time to Live: default to `255`
+    pub(crate) multicast_ttl: u32,
+    /// Multicast address used by the mDNS protocol: `224.0.0.251`
+    pub(crate) multicast_address: String,
+    /// The socket used by the mDNS service protocol
+    socket: net::UdpSocket,
+    /// The buffer used to store the packet to send/receive messages
+    buffer: [u8; READ_BUF_SIZE],
 }
 
 impl MulticastDns {
-    /// create a new mdns struct instance
-    pub fn new(config: Config) -> Result<Self, MulticastDnsError> {
-        let socket = create_socket(&config.bind_address, config.bind_port)?;
-
-        socket.set_nonblocking(true)?;
-        socket.set_multicast_loop_v4(config.multicast_loop)?;
-        socket.set_multicast_ttl_v4(config.multicast_ttl)?;
-        socket.join_multicast_v4(
-            &config.multicast_address.parse()?,
-            &config.bind_address.parse()?,
-        )?;
-
-        Ok(MulticastDns {
-            config,
-            socket,
-            read_buf: [0; READ_BUF_SIZE],
-        })
-    }
-
     /// broadcast a dns packet
     pub fn send(&mut self, packet: &Packet) -> Result<(), MulticastDnsError> {
-        let addr = (
-            self.config.multicast_address.as_ref(),
-            self.config.bind_port,
-        )
+        let addr = (self.multicast_address.as_ref(), self.bind_port)
             .to_socket_addrs()?
             .next()?;
 
@@ -133,7 +139,7 @@ impl MulticastDns {
     /// try to receive a dns packet
     /// will return None rather than blocking if none are queued
     pub fn recv(&mut self) -> Result<Option<Packet>, MulticastDnsError> {
-        let (read, _) = match self.socket.recv_from(&mut self.read_buf) {
+        let (read, _) = match self.socket.recv_from(&mut self.buffer) {
             Ok(r) => r,
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -144,11 +150,11 @@ impl MulticastDns {
         };
 
         if read > 0 {
-            let packet = Packet::with_raw(&self.read_buf[0..read])?;
-            return Ok(Some(packet));
+            let packet = Packet::with_raw(&self.buffer[0..read])?;
+            Ok(Some(packet))
+        } else {
+            Ok(None)
         }
-
-        Ok(None)
     }
 }
 
@@ -175,12 +181,12 @@ mod tests {
 
     #[test]
     fn it_should_loop_question() {
-        let mut mdns = Builder::new()
-            .set_bind_address("0.0.0.0")
-            .set_bind_port(55000)
-            .set_multicast_loop(true)
-            .set_multicast_ttl(255)
-            .set_multicast_address("224.0.0.251")
+        let mut mdns = MulticastDnsBuilder::new()
+            .bind_address("0.0.0.0")
+            .bind_port(55000)
+            .multicast_loop(true)
+            .multicast_ttl(255)
+            .multicast_address("224.0.0.251")
             .build()
             .expect("build fail");
 
@@ -204,12 +210,12 @@ mod tests {
 
     #[test]
     fn it_should_loop_answer() {
-        let mut mdns = Builder::new()
-            .set_bind_address("0.0.0.0")
-            .set_bind_port(55001)
-            .set_multicast_loop(true)
-            .set_multicast_ttl(255)
-            .set_multicast_address("224.0.0.251")
+        let mut mdns = MulticastDnsBuilder::new()
+            .bind_address("0.0.0.0")
+            .bind_port(55001)
+            .multicast_loop(true)
+            .multicast_ttl(255)
+            .multicast_address("224.0.0.251")
             .build()
             .expect("build fail");
 
