@@ -7,3 +7,14 @@ jobs:
   steps:
    - checkout
    - run: nix-shell --run l3h-test
+ macos:
+  macos:
+   xcode: "10.2.0"
+  steps:
+   - checkout
+   - run:
+      name: tests via nix
+      command: |
+       curl https://nixos.org/nix/install | sh
+       . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+       nix-shell --run l3h-test
