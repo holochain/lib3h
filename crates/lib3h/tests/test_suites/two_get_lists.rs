@@ -4,8 +4,6 @@ use crate::{
     utils::constants::*,
 };
 use lib3h_protocol::{data_types::EntryData, protocol_server::Lib3hServerProtocol};
-use rmp_serde::Deserializer;
-use serde::Deserialize;
 
 lazy_static! {
     pub static ref TWO_NODES_GET_LISTS_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
@@ -201,10 +199,8 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
     assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
-    let mut de = Deserializer::new(&msg.query_result[..]);
-    let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-        Deserialize::deserialize(&mut de);
-    let query_result = maybe_entry.unwrap();
+    let query_result: EntryData =
+        serde_json::from_slice(&msg.query_result[..]).expect("Should have found an entry");
     assert_eq!(query_result.entry_address, ENTRY_ADDRESS_1.clone());
     assert_eq!(query_result.aspect_list.len(), 3);
     assert!(

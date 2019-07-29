@@ -9,8 +9,6 @@ use crate::{
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
-//use rmp_serde::Serializer;
-//use serde::Serialize;
 use std::collections::HashMap;
 
 /// Space layer related private methods
@@ -118,13 +116,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             // FetchEntryResponse: Send back as a query response to Core
             // TODO #169 - Discern Fetch from Query
             DhtEvent::FetchEntryResponse(response) => {
-                /*
-                let mut query_result = Vec::new();
-                response
-                    .entry
-                    .serialize(&mut Serializer::new(&mut query_result))
-                    .unwrap();
-                */
                 let query_result = serde_json::to_string_pretty(&response.entry)
                     .unwrap()
                     .as_bytes()
