@@ -15,9 +15,8 @@ jobs:
    - run:
       name: tests via nix
       command: |
-       curl https://nixos.org/nix/install | sh
-       . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
-       nix-shell --run l3h-test
+       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+       MAKE_ENV=local make
 
 workflows:
  version: 2
