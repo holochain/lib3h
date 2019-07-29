@@ -1,6 +1,6 @@
 // simple p2p mdns usage
 extern crate lib3h_mdns;
-use lib3h_mdns::{dns, Builder, MulticastDns};
+use lib3h_mdns::{dns, MulticastDnsBuilder, MulticastDns};
 
 static SERVICE_NAME: &'static [u8] = b"lib3h.test.service";
 static TARGET_NAME: &'static [u8] = b"lib3h.test.target";
@@ -12,7 +12,7 @@ struct MdnsResponder {
 impl MdnsResponder {
     pub fn new() -> Self {
         let mut out = Self {
-            mdns: Builder::new().build().unwrap(),
+            mdns: MulticastDnsBuilder::new().build().unwrap(),
         };
 
         let mut packet = dns::Packet::new();
