@@ -15,7 +15,7 @@ jobs:
    - run:
       name: tests via nix
       command: |
-       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+       curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
        MAKE_ENV=local make
 
 workflows:
