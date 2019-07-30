@@ -13,7 +13,7 @@ RUST_TAG_WANT = "nightly-2019-07-14"
 FMT_VER_WANT = "rustfmt 1.3.0-nightly (d334502 2019-06-09)"
 CLP_VER_WANT = "clippy 0.0.212 (b029042 2019-07-12)"
 
-ENV = RUSTFLAGS='$(RUSTFLAGS)' OPENSSL_STATIC='1' CARGO_BUILD_JOBS='$(shell nproc)' NUM_JOBS='$(shell nproc)' CARGO_INCREMENTAL='1'
+ENV = RUSTFLAGS='$(RUSTFLAGS)' OPENSSL_STATIC='1' CARGO_BUILD_JOBS='$(shell nproc || sysctl -n hw.physicalcpu)' NUM_JOBS='$(shell nproc || sysctl -n hw.physicalcpu)' CARGO_INCREMENTAL='1'
 
 all: test
 
