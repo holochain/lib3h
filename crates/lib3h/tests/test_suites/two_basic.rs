@@ -1,5 +1,7 @@
 use crate::{node_mock::NodeMock, utils::constants::*};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
+use rmp_serde::Deserializer;
+use serde::Deserialize;
 
 pub type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
@@ -63,8 +65,10 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
     assert_eq!(&msg.entry_address, &entry.entry_address);
-    let mut found_entry: EntryData =
-        serde_json::from_slice(&msg.query_result[..]).expect("Should have found an entry");
+    let mut de = Deserializer::new(&msg.query_result[..]);
+    let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
+        Deserialize::deserialize(&mut de);
+    let mut found_entry = maybe_entry.expect("Should have found an entry");
     found_entry.aspect_list.sort();
     assert_eq!(&found_entry, entry);
 }

@@ -323,7 +323,7 @@ impl NodeMock {
             entry_address,
             request_id: self.generate_request_id(),
             requester_agent_id: self.agent_id.clone(),
-            query: vec![], // empty means give me the EntryData,
+            query: b"test_query".to_vec(),
         };
         self.engine
             .post(Lib3hClientProtocol::QueryEntry(query_data.clone()).into())
@@ -336,18 +336,8 @@ impl NodeMock {
         &mut self,
         query: &QueryEntryData,
     ) -> Result<QueryEntryResultData, GenericResultData> {
-        // Must be empty query
-        if !query.query.is_empty() {
-            let msg_data = GenericResultData {
-                space_address: query.space_address.clone(),
-                request_id: query.request_id.clone(),
-                to_agent_id: query.requester_agent_id.clone(),
-                result_info: "Unknown query request".as_bytes().to_vec(),
-            };
-            self.engine
-                .post(Lib3hClientProtocol::FailureResult(msg_data.clone()).into())
-                .expect("Posting FailureResult failed");
-            return Err(msg_data);
+        if query.query != b"test_query" {
+            panic!("invalid test query opaque data: {:?}", query.query);
         }
         // Convert query to fetch
         let fetch = FetchEntryData {

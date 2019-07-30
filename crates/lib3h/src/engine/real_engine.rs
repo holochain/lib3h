@@ -6,10 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
 use crate::{
-    dht::{
-        dht_protocol::{self, *},
-        dht_trait::*,
-    },
+    dht::{dht_protocol::*, dht_trait::*},
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
@@ -23,8 +20,8 @@ use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
 impl TransportKeys {
@@ -353,7 +350,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     }
                 }
             }
-            // QueryEntry: Converting to DHT FetchEntry for now
             // TODO #169
             Lib3hClientProtocol::QueryEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
@@ -364,17 +360,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 );
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        let msg = dht_protocol::FetchDhtEntryData {
-                            msg_id: msg.request_id,
-                            entry_address: msg.entry_address,
-                        };
-                        let cmd = DhtCommand::FetchEntry(msg);
-                        Dht::post(space_gateway, cmd)?;
+                    Ok(_space_gateway) => {
+                        // TODO #169 reflecting for now...
+                        // ultimately this should get forwarded to the
+                        // correct neighborhood
+                        outbox.push(Lib3hServerProtocol::HandleQueryEntry(msg))
                     }
                 }
             }
-            // HandleQueryEntryResult: Convert into DhtCommand::ProvideEntryResponse
             // TODO #169
             Lib3hClientProtocol::HandleQueryEntryResult(msg) => {
                 let maybe_space = self.get_space_or_fail(
@@ -383,19 +376,13 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     &msg.request_id,
                     None,
                 );
-                let mut de = Deserializer::new(&msg.query_result[..]);
-                let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                let entry = maybe_entry.expect("Deserialization should always work");
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        let msg = dht_protocol::FetchDhtEntryResponseData {
-                            msg_id: msg.request_id,
-                            entry,
-                        };
-                        let cmd = DhtCommand::EntryDataResponse(msg);
-                        Dht::post(space_gateway, cmd)?;
+                    Ok(_space_gateway) => {
+                        // TODO #169 reflecting for now...
+                        // ultimately this should get forwarded to the
+                        // original requestor
+                        outbox.push(Lib3hServerProtocol::QueryEntryResult(msg))
                     }
                 }
             }
