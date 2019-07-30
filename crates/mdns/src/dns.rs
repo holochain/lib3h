@@ -258,19 +258,27 @@ fn read_qname<T: byteorder::ReadBytesExt>(read: &mut T) -> MulticastDnsResult<Ve
     Ok(out)
 }
 
-
 #[derive(Debug, Clone)]
-pub struct Neighbor {
+pub struct Record {
     /// Hostname of our neighbor
     hostname: String,
     /// IP address in the lan
     ip: String,
 }
 
-impl Neighbor {
+impl Record {
+    /// Create a new record respecting the mDNS
+    /// [naming convention](https://tools.ietf.org/html/rfc6762#section-3)
+    /// of the form "single-dns-label.local." with value ending with `.local.`
     pub fn new(name: &str, ip: &str) -> Self {
-        Self {
-            hostname: name.to_string(),
+        let hostname = if name.ends_with(".local.") {
+            name.to_string()
+        } else {
+            format!("{}.local.", name)
+        };
+
+        Record {
+            hostname,
             ip: ip.to_string(),
         }
     }
@@ -285,8 +293,6 @@ impl Neighbor {
         &self.hostname
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
