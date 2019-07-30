@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_crypto_api"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h abstract cryptography traits and data types"

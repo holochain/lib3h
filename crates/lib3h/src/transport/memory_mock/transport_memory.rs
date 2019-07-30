@@ -389,3 +389,17 @@ impl TransportMemory {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[test]
+    fn can_rebind() {
+        let mut transport = TransportMemory::new();
+        let bind_url = url::Url::parse("mem://can_rebind").unwrap();
+        assert!(transport.bind(&bind_url).is_ok());
+        assert!(transport.bind(&bind_url).is_ok());
+    }
+
+}
