@@ -148,7 +148,7 @@ impl Packet {
         for q in self.questions.iter() {
             match q {
                 Question::Unknown => {
-                    return Err(MulticastDnsError::Generic(
+                    return Err(MulticastDnsError::Other(
                         "unknown question type".to_string(),
                     ));
                 }
@@ -172,7 +172,7 @@ impl Packet {
         for a in self.answers.iter() {
             match a {
                 Answer::Unknown(_) => {
-                    return Err(MulticastDnsError::Generic(
+                    return Err(MulticastDnsError::Other(
                         "unknown question type".to_string(),
                     ));
                 }

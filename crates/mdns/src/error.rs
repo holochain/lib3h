@@ -1,6 +1,10 @@
+//! mDNS module error definition.
+
+pub type MulticastDnsResult<T> = Result<T, MulticastDnsError>;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MulticastDnsError {
-    Generic(String),
+    Other(String),
 }
 
 impl std::error::Error for MulticastDnsError {
@@ -17,20 +21,19 @@ impl std::fmt::Display for MulticastDnsError {
 
 impl From<std::io::Error> for MulticastDnsError {
     fn from(error: std::io::Error) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
+        MulticastDnsError::Other(format!("{:?}", error))
     }
 }
 
 impl From<std::option::NoneError> for MulticastDnsError {
     fn from(error: std::option::NoneError) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
+        MulticastDnsError::Other(format!("{:?}", error))
     }
 }
 
 impl From<std::net::AddrParseError> for MulticastDnsError {
     fn from(error: std::net::AddrParseError) -> Self {
-        MulticastDnsError::Generic(format!("{:?}", error))
+        MulticastDnsError::Other(format!("{:?}", error))
     }
 }
 
-pub type MulticastDnsResult<T> = Result<T, MulticastDnsError>;
