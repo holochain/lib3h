@@ -66,7 +66,7 @@ pub mod tests {
         let aspect = EntryAspectData {
             aspect_address: aspect_address.to_owned(),
             type_hint: "dht_test".to_string(),
-            aspect: aspect_content.to_owned(),
+            aspect: aspect_content.into(),
             publish_ts: crate::time::since_epoch_ms(),
         };
         EntryData {

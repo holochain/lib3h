@@ -126,7 +126,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     request_id: response.msg_id.clone(),
                     requester_agent_id: chain_id.1.clone(), // TODO #150 - get requester from channel from p2p-protocol
                     responder_agent_id: chain_id.1.clone(),
-                    query_result,
+                    query_result : query_result.into(),
                 };
                 outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
             }

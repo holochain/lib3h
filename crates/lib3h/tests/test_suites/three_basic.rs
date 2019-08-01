@@ -145,7 +145,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
-    assert_eq!(msg.content, response_content);
+    assert_eq!(msg.content, response_content.into());
     // C should not receive
     let (did_work, srv_msg_list) = camille.process().unwrap();
     assert!(!did_work);
@@ -183,7 +183,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
-    assert_eq!(msg.content, response_content);
+    assert_eq!(msg.content, response_content.into());
     // B should not receive
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(!did_work);

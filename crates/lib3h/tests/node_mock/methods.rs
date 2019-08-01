@@ -208,7 +208,7 @@ impl NodeMock {
             aspect_list.push(EntryAspectData {
                 aspect_address: hash,
                 type_hint: "NodeMock".to_string(),
-                aspect: aspect_content,
+                aspect: aspect_content.into(),
                 publish_ts: 42,
             });
         }
@@ -323,7 +323,7 @@ impl NodeMock {
             entry_address,
             request_id: self.generate_request_id(),
             requester_agent_id: self.agent_id.clone(),
-            query: b"test_query".to_vec(),
+            query: b"test_query".to_vec().into(),
         };
         self.engine
             .post(Lib3hClientProtocol::QueryEntry(query_data.clone()).into())
@@ -336,7 +336,7 @@ impl NodeMock {
         &mut self,
         query: &QueryEntryData,
     ) -> Result<QueryEntryResultData, GenericResultData> {
-        if query.query != b"test_query" {
+        if query.query != b"test_query".to_vec().into() {
             panic!("invalid test query opaque data: {:?}", query.query);
         }
         // Convert query to fetch
@@ -368,7 +368,7 @@ impl NodeMock {
             request_id: query.request_id.clone(),
             requester_agent_id: query.requester_agent_id.clone(),
             responder_agent_id: self.agent_id.clone(),
-            query_result,
+            query_result : query_result.into(),
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
@@ -401,7 +401,7 @@ impl NodeMock {
                 space_address: fetch.space_address.clone(),
                 request_id: fetch.request_id.clone(),
                 to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: "Space is not tracked".as_bytes().to_vec(),
+                result_info: "Space is not tracked".as_bytes().into(),
             };
             return Err(msg_data);
         }
@@ -417,7 +417,7 @@ impl NodeMock {
                 space_address: fetch.space_address.clone(),
                 request_id: fetch.request_id.clone(),
                 to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: "No entry found".as_bytes().to_vec(),
+                result_info: "No entry found".as_bytes().into(),
             };
             return Err(msg_data);
         }
@@ -447,7 +447,7 @@ impl NodeMock {
             request_id: request_id.clone(),
             to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
-            content,
+            content : content.into(),
         };
         let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
         self.engine
@@ -469,7 +469,7 @@ impl NodeMock {
             request_id: request_id.to_owned(),
             to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
-            content: response_content,
+            content: response_content.into(),
         };
         self.engine
             .post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())

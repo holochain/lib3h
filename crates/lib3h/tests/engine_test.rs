@@ -342,7 +342,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         request_id: "dm_1".to_string(),
         to_agent_id: BILLY_AGENT_ID.clone(),
         from_agent_id: ALEX_AGENT_ID.clone(),
-        content: "wah".as_bytes().to_vec(),
+        content: "wah".as_bytes().into(),
     };
     // Send
     println!("\nAlex sends DM to Billy...\n");
@@ -368,7 +368,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     let mut res_dm = req_dm.clone();
     res_dm.to_agent_id = req_dm.from_agent_id.clone();
     res_dm.from_agent_id = req_dm.to_agent_id.clone();
-    res_dm.content = format!("echo: {}", content).as_bytes().to_vec();
+    res_dm.content = format!("echo: {}", content).as_bytes().into();
     billy
         .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
             res_dm.clone(),

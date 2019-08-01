@@ -142,7 +142,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
-    assert_eq!(msg.content, response_content);
+    assert_eq!(msg.content, response_content.into());
 }
 
 /// Test SendDirectMessage and response

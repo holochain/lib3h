@@ -439,7 +439,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                                 let fake_aspect = EntryAspectData {
                                     aspect_address: aspect_address.clone(),
                                     type_hint: String::new(),
-                                    aspect: vec![],
+                                    aspect: vec![].into(),
                                     publish_ts: 0,
                                 };
                                 aspect_list.push(fake_aspect);
@@ -470,12 +470,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             request_id: join_msg.request_id.clone(),
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
-            result_info: vec![],
+            result_info: vec![].into(),
         };
         // Bail if space already joined by agent
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
-            res.result_info = "Already joined space".to_string().into_bytes();
+            res.result_info = "Already joined space".to_string().into_bytes().into();
             return Ok(vec![Lib3hServerProtocol::FailureResult(res)]);
         }
         let mut output = Vec::new();
@@ -564,13 +564,13 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             request_id: msg.request_id.clone(),
             space_address: msg.space_address.clone(),
             to_agent_id: msg.from_agent_id.clone(),
-            result_info: vec![],
+            result_info: vec![].into(),
         };
         // Check if messaging self
         let peer_address = &space_gateway.this_peer().peer_address;
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == &to_agent_id {
-            response.result_info = "Messaging self".as_bytes().to_vec();
+            response.result_info = "Messaging self".as_bytes().to_vec().into();
             return Lib3hServerProtocol::FailureResult(response);
         }
         // Change into P2pProtocol
@@ -588,7 +588,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let peer_address: String = msg.to_agent_id.clone().into();
         let res = space_gateway.send(&[peer_address.as_str()], &payload);
         if let Err(e) = res {
-            response.result_info = e.to_string().as_bytes().to_vec();
+            response.result_info = e.to_string().as_bytes().to_vec().into();
             return Lib3hServerProtocol::FailureResult(response);
         }
         Lib3hServerProtocol::SuccessResult(response)
@@ -606,8 +606,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
             result_info: match res {
-                None => "Agent is not part of the space".to_string().into_bytes(),
-                Some(_) => vec![],
+                None => "Agent is not part of the space".to_string().into_bytes().into(),
+                Some(_) => vec![].into(),
             },
         };
         // Done
@@ -642,7 +642,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 &agent_id, &space_address,
             )
             .as_bytes()
-            .to_vec(),
+            .to_vec().into(),
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }
