@@ -368,7 +368,7 @@ impl NodeMock {
             request_id: query.request_id.clone(),
             requester_agent_id: query.requester_agent_id.clone(),
             responder_agent_id: self.agent_id.clone(),
-            query_result : query_result.into(),
+            query_result: query_result.into(),
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
@@ -447,7 +447,7 @@ impl NodeMock {
             request_id: request_id.clone(),
             to_agent_id: to_agent_id.clone(),
             from_agent_id: self.agent_id.clone(),
-            content : content.into(),
+            content: content.into(),
         };
         let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
         self.engine

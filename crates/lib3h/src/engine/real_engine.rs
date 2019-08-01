@@ -606,7 +606,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
             result_info: match res {
-                None => "Agent is not part of the space".to_string().into_bytes().into(),
+                None => "Agent is not part of the space"
+                    .to_string()
+                    .into_bytes()
+                    .into(),
                 Some(_) => vec![].into(),
             },
         };
@@ -642,7 +645,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 &agent_id, &space_address,
             )
             .as_bytes()
-            .to_vec().into(),
+            .to_vec()
+            .into(),
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }

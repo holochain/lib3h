@@ -16,13 +16,13 @@ impl Opaque {
 }
 
 impl From<Vec<u8>> for Opaque {
-    fn from(vec:Vec<u8>) -> Self {
+    fn from(vec: Vec<u8>) -> Self {
         Opaque(vec)
     }
 }
 
 impl From<&[u8]> for Opaque {
-    fn from(bytes:&[u8]) -> Self {
+    fn from(bytes: &[u8]) -> Self {
         Opaque(Vec::from(bytes))
     }
 }
@@ -37,7 +37,7 @@ impl std::ops::Deref for Opaque {
 
 impl std::ops::DerefMut for Opaque {
     fn deref_mut(&mut self) -> &mut Self::Target {
-       &mut self.0
+        &mut self.0
     }
 }
 
