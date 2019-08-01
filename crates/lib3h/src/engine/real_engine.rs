@@ -329,6 +329,18 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
+                        // MIRROR - reflecting hold for now
+                        for aspect in &msg.entry.aspect_list {
+                            outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData {
+                                request_id: "FIXME".to_string(), // TODO #168
+                                space_address: msg.space_address.clone(),
+                                provider_agent_id: msg.provider_agent_id.clone().into(),
+                                entry_address: msg.entry.entry_address.clone(),
+                                entry_aspect: aspect.clone(),
+                            }));
+                        }
+
+                        // send to other dht nodes
                         let cmd = DhtCommand::BroadcastEntry(msg.entry);
                         Dht::post(space_gateway, cmd)?;
                     }
