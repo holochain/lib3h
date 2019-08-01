@@ -178,7 +178,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -273,7 +273,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 2);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -299,7 +299,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -319,7 +319,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
