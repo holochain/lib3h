@@ -77,15 +77,24 @@ impl EntryData {
 // Generic responses
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Deserialize, Serialize)]
 pub struct GenericResultData {
     pub request_id: String,
     pub space_address: Address,
     pub to_agent_id: Address,
     #[serde(with = "base64")]
+    // TODO Consider change this to Payload<Vec<u8>> or Opaque<Vec<u8>> so we can writ traits over
+    // it
     pub result_info: Vec<u8>,
 }
 
+impl std::fmt::Debug for GenericResultData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let result_info = String::from_utf8_lossy(self.result_info.as_ref());
+        write!(f, "GenericResultData {{ request_id: {:?}, space_address: {:?}, to_agent_id: {:?}, result_info: {:?} }}",
+               self.request_id, self.space_address, self.to_agent_id, result_info)
+    }
+}
 //--------------------------------------------------------------------------------------------------
 // Connection
 //--------------------------------------------------------------------------------------------------
