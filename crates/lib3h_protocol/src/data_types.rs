@@ -6,6 +6,10 @@ use url::Url;
 /// (entry_address, aspect_address)
 pub type AspectKey = (Address, Address);
 
+
+/// Represents an opaque vector of bytes. Lib3h will
+/// store or transfer this data but will never inspect
+/// or interpret its contents
 #[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Opaque(#[serde(with = "base64")] Vec<u8>);
 
@@ -121,7 +125,7 @@ pub struct GenericResultData {
 
 impl std::fmt::Debug for Opaque {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let bytes = String::from_utf8_lossy(self.0.as_ref());
+        let bytes = std::str::from_utf8(self.0.as_ref());
         write!(f, "{:?}", bytes)
     }
 }
