@@ -59,25 +59,25 @@ impl Packet {
 
     /// parse a dns packet into a Packet struct
     pub fn with_raw(packet: &[u8]) -> MulticastDnsResult<Self> {
-        let mut read = std::io::Cursor::new(packet);
+        let mut cursor = std::io::Cursor::new(packet);
         let mut out = Packet::new();
 
-        out.id = read.read_u16::<BigEndian>()?;
-        out.is_query = read.read_u16::<BigEndian>()? == 0;
+        out.id = cursor.read_u16::<BigEndian>()?;
+        out.is_query = cursor.read_u16::<BigEndian>()? == 0;
 
-        let question_count = read.read_u16::<BigEndian>()?;
-        let answer_count = read.read_u16::<BigEndian>()?;
+        let question_count = cursor.read_u16::<BigEndian>()?;
+        let answer_count = cursor.read_u16::<BigEndian>()?;
 
         // nameserver count
-        read.read_u16::<BigEndian>()?;
+        cursor.read_u16::<BigEndian>()?;
 
         // additional count
-        read.read_u16::<BigEndian>()?;
+        cursor.read_u16::<BigEndian>()?;
 
         for _ in 0..question_count {
-            let svc_name = read_qname(&mut read)?;
-            let kind = read.read_u16::<BigEndian>()?;
-            let _class = read.read_u16::<BigEndian>()?;
+            let svc_name = read_qname(&mut cursor)?;
+            let kind = cursor.read_u16::<BigEndian>()?;
+            let _class = cursor.read_u16::<BigEndian>()?;
 
             if kind == 33 {
                 out.questions
@@ -88,18 +88,18 @@ impl Packet {
         }
 
         for _ in 0..answer_count {
-            let svc_name = read_qname(&mut read)?;
-            let kind = read.read_u16::<BigEndian>()?;
-            let _class = read.read_u16::<BigEndian>()?;
-            let ttl_seconds = read.read_u32::<BigEndian>()?;
+            let svc_name = read_qname(&mut cursor)?;
+            let kind = cursor.read_u16::<BigEndian>()?;
+            let _class = cursor.read_u16::<BigEndian>()?;
+            let ttl_seconds = cursor.read_u32::<BigEndian>()?;
 
-            let enc_size = read.read_u16::<BigEndian>()? as usize;
+            let enc_size = cursor.read_u16::<BigEndian>()? as usize;
 
             if kind == 33 {
-                let priority = read.read_u16::<BigEndian>()?;
-                let weight = read.read_u16::<BigEndian>()?;
-                let port = read.read_u16::<BigEndian>()?;
-                let target = read_qname(&mut read)?;
+                let priority = cursor.read_u16::<BigEndian>()?;
+                let weight = cursor.read_u16::<BigEndian>()?;
+                let port = cursor.read_u16::<BigEndian>()?;
+                let target = read_qname(&mut cursor)?;
                 out.answers.push(Answer::Srv(SrvDataA {
                     name: svc_name,
                     ttl_seconds,
@@ -110,7 +110,7 @@ impl Packet {
                 }));
             } else {
                 let mut raw = vec![0; enc_size];
-                read.read_exact(&mut raw)?;
+                cursor.read_exact(&mut raw)?;
                 out.answers.push(Answer::Unknown(raw));
             }
         }

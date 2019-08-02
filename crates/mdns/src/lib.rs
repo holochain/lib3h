@@ -2,25 +2,24 @@
 
 #![feature(try_trait)]
 
+use rand::Rng;
 // use byteorder;
-use net2;
+use net2::UdpSocketExt;
 use std::net;
-
-
 
 #[cfg(not(target_os = "windows"))]
 use net2::unix::UnixUdpBuilderExt;
 
-use std::{
-    net::ToSocketAddrs, // Used to cast (addr, port) to socket
-    collections::HashMap,
-};
+use std::{collections::HashMap, net::ToSocketAddrs, thread, time::Duration};
 
 pub mod error;
 pub use error::{MulticastDnsError, MulticastDnsResult};
 
 pub mod dns;
-pub use dns::{Answer, Question, Neighbor, Packet};
+pub use dns::{Answer, Packet, Question, Record};
+
+pub mod protocol;
+use protocol::Discovery;
 
 // 20 byte IP header would mean 65_507... but funky configs can increase that
 // const READ_BUF_SIZE: usize = 60_000;
@@ -28,6 +27,8 @@ pub use dns::{Answer, Question, Neighbor, Packet};
 // let's stick with one common block size
 const READ_BUF_SIZE: usize = 4_096;
 
+/// Delay between probe query, 250ms by default.
+const PROBE_QUERY_DELAY_MS: u64 = 250;
 
 /// mdns builder
 pub struct MulticastDnsBuilder {
@@ -74,6 +75,7 @@ impl MulticastDnsBuilder {
         self
     }
 
+
     /// construct the actual mdns struct
     pub fn build(&mut self) -> Result<MulticastDns, MulticastDnsError> {
         let socket = create_socket(&self.bind_address, self.bind_port)?;
@@ -93,7 +95,7 @@ impl MulticastDnsBuilder {
             multicast_address: self.multicast_address.to_owned(),
             socket,
             buffer: [0; READ_BUF_SIZE],
-            neighbors: HashMap::with_capacity(32),
+            records: HashMap::with_capacity(32),
         })
     }
 }
@@ -124,11 +126,11 @@ pub struct MulticastDns {
     /// Multicast address used by the mDNS protocol: `224.0.0.251`
     pub(crate) multicast_address: String,
     /// The socket used by the mDNS service protocol
-    socket: net::UdpSocket,
+    pub(crate) socket: net::UdpSocket,
     /// The buffer used to store the packet to send/receive messages
     buffer: [u8; READ_BUF_SIZE],
     /// The lookup table where the neighbors are stored
-    neighbors: HashMap<String, Neighbor>,
+    records: HashMap<String, Record>,
 }
 
 impl MulticastDns {
@@ -157,7 +159,12 @@ impl MulticastDns {
         &self.multicast_address
     }
 
-    /// broadcast a dns packet
+    /// Returns the lookup table of records as a [HashMap]
+    pub fn records(&self) -> &HashMap<String, Record> {
+        &self.records
+    }
+
+    /// broadcast a dns packet.
     pub fn send(&mut self, packet: &Packet) -> Result<(), MulticastDnsError> {
         let addr = (self.multicast_address.as_ref(), self.bind_port)
             .to_socket_addrs()?
@@ -170,7 +177,7 @@ impl MulticastDns {
         Ok(())
     }
 
-    /// try to receive a dns packet
+    /// try to receive a dns packet.
     /// will return None rather than blocking if none are queued
     pub fn recv(&mut self) -> Result<Option<Packet>, MulticastDnsError> {
         let (read, _) = match self.socket.recv_from(&mut self.buffer) {
@@ -190,9 +197,43 @@ impl MulticastDns {
             Ok(None)
         }
     }
+
+    /// Startup phase corresponding to the
+    /// [probing](https://tools.ietf.org/html/rfc6762#section-8.1) and
+    /// [annoncing](https://tools.ietf.org/html/rfc6762#section-8.3) phases.
+    pub fn init(&mut self) -> MulticastDnsResult<()> {
+
+        // Fires up the service listener
+        ..
+
+        // Run the mDNS startup phase
+        self.probe()?;
+        self.annonce()?;
+
+        Ok(())
+    }
+
+
+    /// Run the mDNS service.
+    pub fn run(&mut self) -> MulticastDnsResult<()> {
+        self.init()?;
+
+        thread::spawn(|| {});
+        Ok(())
+    }
+
+
+    /// mDNS Querier
+    fn querier(&mut self) -> MulticastDnsResult<()> {
+        
+        // mDNS querier as an infinit loop
+        // loop {}
+
+        Ok(())
+    }
 }
 
-/// non-windows udp socket bind
+/// non-windows udp socket bind.
 #[cfg(not(target_os = "windows"))]
 fn create_socket(addr: &str, port: u16) -> Result<std::net::UdpSocket, MulticastDnsError> {
     Ok(net2::UdpBuilder::new_v4()?
@@ -201,12 +242,44 @@ fn create_socket(addr: &str, port: u16) -> Result<std::net::UdpSocket, Multicast
         .bind((addr, port))?)
 }
 
-/// windows udp socket bind
+/// windows udp socket bind.
 #[cfg(target_os = "windows")]
 fn create_socket(addr: &str, port: u16) -> Result<std::net::UdpSocket, MulticastDnsError> {
     Ok(net2::UdpBuilder::new_v4()?
         .reuse_address(true)?
         .bind((addr, port))?)
+}
+
+
+impl Discovery for MulticastDns {
+    /// When sending probe queries, a host MUST NOT consult its cache for
+    /// potential answers.  Only conflicting Multicast DNS responses received
+    /// "live" from the network are considered valid for the purposes of
+    /// determining whether probing has succeeded or failed.
+    fn probe(&self) -> MulticastDnsResult<()> {
+        // Let's wait a moment to give time to another nodes to initialize their network
+        let delay_probe_by: u64 = rand::thread_rng().gen_range(0, 250);
+        thread::sleep(Duration::from_millis(delay_probe_by));
+
+        // Create a special socket for probing
+        let probe_socket = create_socket(self.address(), self.port())?;
+        probe_socket.set_nonblocking(true)?;
+        probe_socket.set_read_timeout_ms(Some(PROBE_QUERY_DELAY_MS as u32))?;
+
+        // Send 1st probe packet query
+
+        // Send 2nd query after a delay
+        thread::sleep(Duration::from_millis(PROBE_QUERY_DELAY_MS));
+
+        // Send 3rd query after a delay
+
+        Ok(())
+    }
+
+    fn annonce(&self) -> MulticastDnsResult<()> {
+        Ok(())
+    }
+    fn update(&mut self) {}
 }
 
 #[cfg(test)]

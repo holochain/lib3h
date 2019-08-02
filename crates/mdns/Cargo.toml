@@ -15,3 +15,4 @@ repository = "https://github.com/holochain/lib3h"
 byteorder = "=1.3.1"
 net2 = "=0.2.33"
 rand = { version = "0.7.0", features = ["wasm-bindgen", "stdweb"] }
+crossbeam-channel = "0.3.8"
