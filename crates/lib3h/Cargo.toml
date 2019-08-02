@@ -25,7 +25,7 @@ native-tls = "=0.2.2"
 rmp-serde = "=0.13.7"
 serde = "=1.0.89"
 serde_derive = "=1.0.89"
-log = "=0.4.6"
+log = "=0.4.8"
 # Should be dev only
 lazy_static = "=1.2.0"
 
