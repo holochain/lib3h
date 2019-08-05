@@ -227,8 +227,7 @@ impl Transport for TransportMemory {
 
     /// Create a new server inbox for myself
     fn bind(&mut self, uri: &Url) -> TransportResult<Url> {
-        let bounded_uri = Url::parse(
-            format!("{}_bound/{}", uri, self.own_id).as_str()).unwrap();
+        let bounded_uri = Url::parse(format!("{}_bound/{}", uri, self.own_id).as_str()).unwrap();
         self.maybe_my_uri = Some(bounded_uri.clone());
         self.memory_servers
             .push(memory_server::ensure_server(&bounded_uri)?);
