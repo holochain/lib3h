@@ -14,6 +14,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Removed
 
+- remove duplicate package command from release process
+
 ### Fixed
 
 ### Security
