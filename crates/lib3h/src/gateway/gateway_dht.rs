@@ -4,15 +4,14 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
-    gateway::P2pGateway,
-    transport::transport_trait::Transport,
+    gateway::{Gateway, P2pGateway},
 };
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
 /// Compose DHT
-impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
+impl<D: Dht> Dht for P2pGateway<D> {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.inner_dht.get_peer_list()
@@ -81,7 +80,7 @@ impl<T: Transport, D: Dht> Dht for P2pGateway<T, D> {
 }
 
 /// Private internals
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
         trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);

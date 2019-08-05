@@ -2,7 +2,7 @@
 
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
-    gateway::P2pGateway,
+    gateway::{Gateway, P2pGateway},
     transport::transport_trait::Transport,
 };
 use lib3h_protocol::Address;
@@ -12,25 +12,17 @@ use std::{
     rc::Rc,
 };
 
-/// Public interface
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
-    /// This Gateway's identifier
-    pub fn identifier(&self) -> &str {
-        self.identifier.as_str()
-    }
-}
-
 //--------------------------------------------------------------------------------------------------
 // Constructors
 //--------------------------------------------------------------------------------------------------
 
 /// any Transport Constructor
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        inner_transport: Rc<RefCell<T>>,
+        inner_transport: Rc<RefCell<dyn Transport>>,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
@@ -42,9 +34,16 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             transport_inbox: VecDeque::new(),
         }
     }
+}
+
+impl<D: Dht> Gateway for P2pGateway<D> {
+    /// This Gateway's identifier
+    fn identifier(&self) -> &str {
+        self.identifier.as_str()
+    }
 
     /// Helper for getting a connectionId from a peer_address
-    pub(crate) fn get_connection_id(&self, peer_address: &str) -> Option<String> {
+    fn get_connection_id(&self, peer_address: &str) -> Option<String> {
         // get peer_uri
         let maybe_peer_data = self.inner_dht.get_peer(peer_address);
         if maybe_peer_data.is_none() {
@@ -75,10 +74,10 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
 }
 
 /// P2pGateway Constructor
-impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Constructors
     pub fn new_with_space(
-        network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
+        network_gateway: Rc<RefCell<dyn Transport>>,
         space_address: &Address,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,

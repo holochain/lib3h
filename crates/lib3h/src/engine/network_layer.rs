@@ -4,7 +4,7 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    transport::{protocol::*, transport_trait::Transport, ConnectionIdRef},
+    transport::{protocol::*, ConnectionIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 
@@ -12,15 +12,14 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer related private methods
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<D: Dht> RealEngine<D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network gateway as a Transport
-        let (tranport_did_work, event_list) =
-            Transport::process(&mut *self.network_gateway.borrow_mut())?;
+        let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
         debug!(
             "{} - network_gateway Transport.process(): {} {}",
             self.name,
@@ -34,7 +33,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
         }
         // Process the network gateway as a DHT
-        let (dht_did_work, event_list) = Dht::process(&mut *self.network_gateway.borrow_mut())?;
+        let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
         if dht_did_work {
             for evt in event_list {
                 let mut output = self.handle_netDhtEvent(evt)?;
@@ -63,22 +62,24 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     self.name, peer_data.peer_address, peer_data.peer_uri,
                 );
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
-                Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
+                self.network_gateway.as_transport_mut().post(cmd)?;
             }
             DhtEvent::PeerTimedOut(peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
-                let mut network_gateway = self.network_gateway.borrow_mut();
-                let maybe_connection_id = network_gateway.get_connection_id(&peer_address);
+                //let mut network_gateway = self.network_gateway.borrow_mut();
+                let maybe_connection_id = self
+                    .network_gateway
+                    .as_ref()
+                    .get_connection_id(&peer_address);
                 trace!(
                     "{} -- maybe_connection_id: {:?}",
                     self.name.clone(),
                     maybe_connection_id,
                 );
                 if let Some(connection_id) = maybe_connection_id {
-                    Transport::post(
-                        &mut *network_gateway,
-                        TransportCommand::Close(connection_id),
-                    )?;
+                    self.network_gateway
+                        .as_transport_mut()
+                        .post(TransportCommand::Close(connection_id))?;
                 }
             }
             // No entries in Network DHT
@@ -103,7 +104,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         id: &ConnectionIdRef,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
-        let mut network_gateway = self.network_gateway.borrow_mut();
+        let mut network_gateway = self.network_gateway.as_mut();
         if let Some(uri) = network_gateway.get_uri(id) {
             info!("Network Connection opened: {} ({})", id, uri);
             // TODO #150 - Should do this in next process instead
@@ -215,14 +216,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 });
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    Dht::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
+                    self.network_gateway.as_dht_mut().post(cmd)?;
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        Dht::post(space_gateway, cmd)?;
+                        Dht::post(&mut *space_gateway.as_dht().borrow_mut(), cmd)?;
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -265,7 +266,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data.clone()))?;
+                    Dht::post(
+                        &mut *space_gateway.as_dht().borrow_mut(),
+                        DhtCommand::HoldPeer(peer_data.clone()),
+                    )?;
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -273,7 +277,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data.clone()))?;
+                        Dht::post(
+                            &mut *space_gateway.as_dht().borrow_mut(),
+                            DhtCommand::HoldPeer(peer_data.clone()),
+                        )?;
                     }
                 }
             }

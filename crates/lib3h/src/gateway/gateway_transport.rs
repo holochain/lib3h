@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
-    gateway::P2pGateway,
+    gateway::{Gateway, P2pGateway},
     transport::{
         error::{TransportError, TransportResult},
         protocol::{TransportCommand, TransportEvent},
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
+impl<D: Dht> Transport for P2pGateway<D> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
@@ -155,7 +155,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
 }
 
 /// Private internals
-impl<T: Transport, D: Dht> P2pGateway<T, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
         &self,

@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
-    gateway::P2pGateway,
+    gateway::GatewayWrapper,
     transport::{transport_trait::Transport, ConnectionId},
     transport_wss::TlsConfig,
 };
@@ -47,7 +47,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport, D: Dht> {
+pub struct RealEngine<D: Dht + 'static> {
     /// Identifier
     name: String,
     /// Config settings
@@ -59,13 +59,13 @@ pub struct RealEngine<T: Transport, D: Dht> {
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
-    network_transport: Rc<RefCell<T>>,
+    network_transport: Rc<RefCell<dyn Transport>>,
     /// P2p gateway for the network layer
-    network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
+    network_gateway: GatewayWrapper,
     /// Store active connections?
     network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
+    space_gateway_map: HashMap<ChainId, GatewayWrapper>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

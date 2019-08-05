@@ -19,7 +19,6 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     error::Lib3hResult,
-    transport::memory_mock::transport_memory::TransportMemory,
     transport_wss::TlsConfig,
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address};
@@ -59,7 +58,7 @@ fn construct_mock_engine(
     config: &RealEngineConfig,
     name: &str,
 ) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine<TransportMemory, MirrorDht> = RealEngine::new_mock(
+    let engine: RealEngine<MirrorDht> = RealEngine::new_mock(
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
