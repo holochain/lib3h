@@ -8,14 +8,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- holochain_persistence_api 0.0.6 -> 0.0.7
-
 ### Deprecated
 
 ### Removed
 
-- remove duplicate package command from release process
-
 ### Fixed
 
 ### Security
+
