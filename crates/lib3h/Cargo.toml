@@ -18,6 +18,7 @@ holochain_persistence_api = "=0.0.7"
 # version on the left for release regex
 lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
 lib3h_crypto_api = { version = "=0.0.10", path = "../crypto_api" }
+nanoid = "=0.2.0"
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 url_serde = "=0.2.0"

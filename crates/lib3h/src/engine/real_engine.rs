@@ -5,6 +5,7 @@ use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
+use super::RealEngineTrackerData;
 use crate::{
     dht::{
         dht_protocol::{self, *},
@@ -15,6 +16,7 @@ use crate::{
     },
     error::Lib3hResult,
     gateway::P2pGateway,
+    track::Tracker,
     transport::{protocol::TransportCommand, transport_trait::Transport},
     transport_wss::TransportWss,
 };
@@ -78,6 +80,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
+            request_track: Tracker::new("real_engine_", 2000),
             network_transport,
             network_gateway,
             network_connections: HashSet::new(),
@@ -131,6 +134,7 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
+            request_track: Tracker::new("real_engine_", 2000),
             network_transport,
             network_gateway,
             network_connections: HashSet::new(),
@@ -176,6 +180,11 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
             self.process_count,
             outbox.len(),
         );
+
+        for (timeout_id, timeout_data) in self.request_track.process_timeouts() {
+            error!("timeout {:?} {:?}", timeout_id, timeout_data);
+        }
+
         // Done
         Ok((inbox_did_work || net_did_work, outbox))
     }
@@ -382,6 +391,17 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg) => {
+                if !self.request_track.has(&msg.request_id) {
+                    error!("untracked HandleGetAuthoringEntryListResult");
+                } else {
+                    match self.request_track.remove(&msg.request_id) {
+                        Some(data) => match data {
+                            RealEngineTrackerData::GetAuthoringEntryList => (),
+                            _ => error!("bad track type HandleGetAuthoringEntryListResult"),
+                        },
+                        None => error!("bad track type HandleGetAuthoringEntryListResult"),
+                    };
+                }
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.provider_agent_id,
@@ -418,6 +438,17 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             // Our request for the hold_list has returned
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg) => {
+                if !self.request_track.has(&msg.request_id) {
+                    error!("untracked HandleGetGossipingEntryListResult");
+                } else {
+                    match self.request_track.remove(&msg.request_id) {
+                        Some(data) => match data {
+                            RealEngineTrackerData::GetGossipingEntryList => (),
+                            _ => error!("bad track type HandleGetGossipingEntryListResult"),
+                        },
+                        None => error!("bad track type HandleGetGossipingEntryListResult"),
+                    };
+                }
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.provider_agent_id,
@@ -525,12 +556,20 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),
             provider_agent_id: join_msg.agent_id.clone(),
-            request_id: "gossiping".to_owned(),
+            request_id: self.request_track.reserve(),
         };
+        self.request_track.set(
+            &list_data.request_id,
+            Some(RealEngineTrackerData::GetGossipingEntryList),
+        );
         output.push(Lib3hServerProtocol::HandleGetGossipingEntryList(
             list_data.clone(),
         ));
-        list_data.request_id = "authoring".to_owned();
+        list_data.request_id = self.request_track.reserve();
+        self.request_track.set(
+            &list_data.request_id,
+            Some(RealEngineTrackerData::GetAuthoringEntryList),
+        );
         output.push(Lib3hServerProtocol::HandleGetAuthoringEntryList(list_data));
         // Done
         Ok(output)

@@ -1,6 +1,7 @@
 extern crate hcid;
 extern crate lib3h_crypto_api;
 extern crate lib3h_protocol;
+extern crate nanoid;
 extern crate native_tls;
 extern crate tungstenite;
 extern crate url_serde;
@@ -23,6 +24,7 @@ pub mod engine;
 pub mod error;
 pub mod gateway;
 pub mod time;
+pub mod track;
 pub mod transport;
 pub mod transport_wss;
 
