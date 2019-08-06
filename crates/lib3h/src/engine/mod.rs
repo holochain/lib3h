@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
     gateway::P2pGateway,
+    track::Tracker,
     transport::{transport_trait::Transport, ConnectionId},
     transport_wss::TlsConfig,
 };
@@ -21,6 +22,19 @@ use url::Url;
 pub type ChainId = (Address, Address);
 
 pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RealEngineTrackerData {
+    /// track the actual HandleGetGossipingEntryList request
+    GetGossipingEntryList,
+    /// track the actual HandleGetAuthoringEntryList request
+    GetAuthoringEntryList,
+    /// once we have the AuthoringEntryListResponse, fetch data for entries
+    DataForAuthorEntry,
+    /// gossip has requested we store data, send a hold request to core
+    /// core should respond ??
+    HoldEntryRequested,
+}
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -56,6 +70,8 @@ pub struct RealEngine<T: Transport, D: Dht> {
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
+    /// Tracking request_id's sent to core
+    request_track: Tracker<RealEngineTrackerData>,
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway

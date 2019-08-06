@@ -152,6 +152,12 @@ fn basic_connect_test_mock() {
     println!("\nengine_a.process()...");
     let (did_work, srv_msg_list) = engine_a.process().unwrap();
     println!("engine_a: {:?}", srv_msg_list);
+    match srv_msg_list.get(0).unwrap() {
+        Lib3hServerProtocol::Connected(data) => {
+            assert_eq!("connect_a_1", data.request_id);
+        }
+        _ => panic!("unexpected type: {:?}", srv_msg_list),
+    }
     assert!(did_work);
 }
 
