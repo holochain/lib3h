@@ -286,6 +286,18 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             //   - From GetAuthoringList      : Convert to DhtCommand::BroadcastEntry
             //   - From DHT EntryDataRequested: Convert to DhtCommand::EntryDataResponse
             Lib3hClientProtocol::HandleFetchEntryResult(msg) => {
+                let mut is_data_for_author_list = false;
+                if self.request_track.has(&msg.request_id) {
+                    match self.request_track.remove(&msg.request_id) {
+                        Some(data) => match data {
+                            RealEngineTrackerData::DataForAuthorEntry => {
+                                is_data_for_author_list = true;
+                            }
+                            _ => (),
+                        },
+                        None => (),
+                    };
+                }
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.provider_agent_id,
@@ -295,9 +307,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        // TODO #168 - create a rust equivalent of
-                        // https://github.com/holochain/n3h/blob/master/lib/n3h-common/track.js
-                        if msg.request_id == "__author_list" {
+                        if is_data_for_author_list {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
                             Dht::post(space_gateway, cmd)?;
                         } else {
@@ -417,6 +427,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 None => error!("bad track type HandleGetAuthoringEntryListResult"),
             };
         }
+        let mut request_list = Vec::new();
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
             &msg.provider_agent_id,
@@ -429,7 +440,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let mut msg_data = FetchEntryData {
                     space_address: msg.space_address.clone(),
                     entry_address: "".into(),
-                    request_id: "__author_list".to_string(),
+                    request_id: "".into(),
                     provider_agent_id: msg.provider_agent_id.clone(),
                     aspect_address_list: None,
                 };
@@ -445,10 +456,18 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     }
                     count += 1;
                     msg_data.entry_address = entry_address.clone();
-                    outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
+                    request_list.push(msg_data.clone());
                 }
                 debug!("HandleGetAuthoringEntryListResult: {}", count);
             }
+        }
+        for mut msg_data in request_list {
+            msg_data.request_id = self.request_track.reserve();
+            self.request_track.set(
+                &msg_data.request_id,
+                Some(RealEngineTrackerData::DataForAuthorEntry),
+            );
+            outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
         }
         Ok(())
     }

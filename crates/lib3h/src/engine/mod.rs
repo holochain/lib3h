@@ -25,8 +25,12 @@ pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RealEngineTrackerData {
+    /// track the actual HandleGetGossipingEntryList request
     GetGossipingEntryList,
+    /// track the actual HandleGetAuthoringEntryList request
     GetAuthoringEntryList,
+    /// once we have the AuthoringEntryListResponse, fetch data for entries
+    DataForAuthorEntry,
 }
 
 /// Struct holding all config settings for the RealEngine

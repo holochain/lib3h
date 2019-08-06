@@ -34,8 +34,12 @@ impl<T> Tracker<T> {
         }
     }
 
+    pub fn gen_id(&self) -> TrackId {
+        format!("{}{}", self.id_prefix, nanoid::simple())
+    }
+
     pub fn reserve(&mut self) -> TrackId {
-        let id = format!("{}{}", self.id_prefix, nanoid::simple());
+        let id = self.gen_id();
 
         self.map.insert(id.clone(), self.priv_new_track_item(None));
 
