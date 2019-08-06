@@ -211,7 +211,7 @@ impl MirrorDht {
         );
         GossipToData {
             peer_address_list,
-            bundle: buf.into(),
+            bundle: buf,
         }
     }
 
@@ -299,7 +299,7 @@ impl MirrorDht {
             .unwrap();
         let gossip_evt = GossipToData {
             peer_address_list: self.get_other_peer_list(),
-            bundle: buf.into(),
+            bundle: buf,
         };
         DhtEvent::GossipTo(gossip_evt)
     }
@@ -381,7 +381,7 @@ impl MirrorDht {
                 );
                 let gossip_evt = GossipToData {
                     peer_address_list: others_list,
-                    bundle: buf.into(),
+                    bundle: buf,
                 };
                 event_list.push(DhtEvent::GossipTo(gossip_evt));
 
