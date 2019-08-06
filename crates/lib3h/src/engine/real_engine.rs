@@ -391,100 +391,118 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg) => {
-                if !self.request_track.has(&msg.request_id) {
-                    error!("untracked HandleGetAuthoringEntryListResult");
-                } else {
-                    match self.request_track.remove(&msg.request_id) {
-                        Some(data) => match data {
-                            RealEngineTrackerData::GetAuthoringEntryList => (),
-                            _ => error!("bad track type HandleGetAuthoringEntryListResult"),
-                        },
-                        None => error!("bad track type HandleGetAuthoringEntryListResult"),
-                    };
-                }
-                let maybe_space = self.get_space_or_fail(
-                    &msg.space_address,
-                    &msg.provider_agent_id,
-                    &msg.request_id,
-                    None,
-                );
-                match maybe_space {
-                    Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        let mut msg_data = FetchEntryData {
-                            space_address: msg.space_address.clone(),
-                            entry_address: "".into(),
-                            request_id: "__author_list".to_string(),
-                            provider_agent_id: msg.provider_agent_id.clone(),
-                            aspect_address_list: None,
-                        };
-                        // Request every Entry from Core
-                        let mut count = 0;
-                        for (entry_address, aspect_address_list) in msg.address_map {
-                            // Check aspects and only request entry with new aspects
-                            let maybe_known_aspects = space_gateway.get_aspects_of(&entry_address);
-                            if let Some(known_aspects) = maybe_known_aspects {
-                                if includes(&known_aspects, &aspect_address_list) {
-                                    continue;
-                                }
-                            }
-                            count += 1;
-                            msg_data.entry_address = entry_address.clone();
-                            outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
-                        }
-                        debug!("HandleGetAuthoringEntryListResult: {}", count);
-                    }
-                }
+                self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(&mut outbox, msg)?;
             }
             // Our request for the hold_list has returned
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg) => {
-                if !self.request_track.has(&msg.request_id) {
-                    error!("untracked HandleGetGossipingEntryListResult");
-                } else {
-                    match self.request_track.remove(&msg.request_id) {
-                        Some(data) => match data {
-                            RealEngineTrackerData::GetGossipingEntryList => (),
-                            _ => error!("bad track type HandleGetGossipingEntryListResult"),
-                        },
-                        None => error!("bad track type HandleGetGossipingEntryListResult"),
-                    };
-                }
-                let maybe_space = self.get_space_or_fail(
-                    &msg.space_address,
-                    &msg.provider_agent_id,
-                    &msg.request_id,
-                    None,
-                );
-                match maybe_space {
-                    Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        for (entry_address, aspect_address_list) in msg.address_map {
-                            let mut aspect_list = Vec::new();
-                            for aspect_address in aspect_address_list {
-                                let fake_aspect = EntryAspectData {
-                                    aspect_address: aspect_address.clone(),
-                                    type_hint: String::new(),
-                                    aspect: vec![],
-                                    publish_ts: 0,
-                                };
-                                aspect_list.push(fake_aspect);
-                            }
-                            // Create "fake" entry, in the sense an entry with no actual content,
-                            // but valid addresses.
-                            let fake_entry = EntryData {
-                                entry_address: entry_address.clone(),
-                                aspect_list,
-                            };
-                            Dht::post(
-                                space_gateway,
-                                DhtCommand::HoldEntryAspectAddress(fake_entry),
-                            )?;
-                        }
-                    }
-                }
+                self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(&mut outbox, msg)?;
             }
         }
         Ok(outbox)
+    }
+
+    fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
+        &mut self,
+        outbox: &mut Vec<Lib3hServerProtocol>,
+        msg: EntryListData,
+    ) -> Lib3hResult<()> {
+        if !self.request_track.has(&msg.request_id) {
+            error!("untracked HandleGetAuthoringEntryListResult");
+        } else {
+            match self.request_track.remove(&msg.request_id) {
+                Some(data) => match data {
+                    RealEngineTrackerData::GetAuthoringEntryList => (),
+                    _ => error!("bad track type HandleGetAuthoringEntryListResult"),
+                },
+                None => error!("bad track type HandleGetAuthoringEntryListResult"),
+            };
+        }
+        let maybe_space = self.get_space_or_fail(
+            &msg.space_address,
+            &msg.provider_agent_id,
+            &msg.request_id,
+            None,
+        );
+        match maybe_space {
+            Err(res) => outbox.push(res),
+            Ok(space_gateway) => {
+                let mut msg_data = FetchEntryData {
+                    space_address: msg.space_address.clone(),
+                    entry_address: "".into(),
+                    request_id: "__author_list".to_string(),
+                    provider_agent_id: msg.provider_agent_id.clone(),
+                    aspect_address_list: None,
+                };
+                // Request every Entry from Core
+                let mut count = 0;
+                for (entry_address, aspect_address_list) in msg.address_map {
+                    // Check aspects and only request entry with new aspects
+                    let maybe_known_aspects = space_gateway.get_aspects_of(&entry_address);
+                    if let Some(known_aspects) = maybe_known_aspects {
+                        if includes(&known_aspects, &aspect_address_list) {
+                            continue;
+                        }
+                    }
+                    count += 1;
+                    msg_data.entry_address = entry_address.clone();
+                    outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
+                }
+                debug!("HandleGetAuthoringEntryListResult: {}", count);
+            }
+        }
+        Ok(())
+    }
+
+    fn serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(
+        &mut self,
+        outbox: &mut Vec<Lib3hServerProtocol>,
+        msg: EntryListData,
+    ) -> Lib3hResult<()> {
+        if !self.request_track.has(&msg.request_id) {
+            error!("untracked HandleGetGossipingEntryListResult");
+        } else {
+            match self.request_track.remove(&msg.request_id) {
+                Some(data) => match data {
+                    RealEngineTrackerData::GetGossipingEntryList => (),
+                    _ => error!("bad track type HandleGetGossipingEntryListResult"),
+                },
+                None => error!("bad track type HandleGetGossipingEntryListResult"),
+            };
+        }
+        let maybe_space = self.get_space_or_fail(
+            &msg.space_address,
+            &msg.provider_agent_id,
+            &msg.request_id,
+            None,
+        );
+        match maybe_space {
+            Err(res) => outbox.push(res),
+            Ok(space_gateway) => {
+                for (entry_address, aspect_address_list) in msg.address_map {
+                    let mut aspect_list = Vec::new();
+                    for aspect_address in aspect_address_list {
+                        let fake_aspect = EntryAspectData {
+                            aspect_address: aspect_address.clone(),
+                            type_hint: String::new(),
+                            aspect: vec![],
+                            publish_ts: 0,
+                        };
+                        aspect_list.push(fake_aspect);
+                    }
+                    // Create "fake" entry, in the sense an entry with no actual content,
+                    // but valid addresses.
+                    let fake_entry = EntryData {
+                        entry_address: entry_address.clone(),
+                        aspect_list,
+                    };
+                    Dht::post(
+                        space_gateway,
+                        DhtCommand::HoldEntryAspectAddress(fake_entry),
+                    )?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Create a gateway for this agent in this space, if not already part of it.
