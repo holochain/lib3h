@@ -62,7 +62,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     "{} auto-connect to peer: {} ({})",
                     self.name, peer_data.peer_address, peer_data.peer_uri,
                 );
-                let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
+                let cmd = TransportCommand::Connect(peer_data.peer_uri.clone(), "".to_string());
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             DhtEvent::PeerTimedOut(peer_address) => {
@@ -101,6 +101,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     fn handle_new_connection(
         &mut self,
         id: &ConnectionIdRef,
+        request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
         let mut network_gateway = self.network_gateway.borrow_mut();
@@ -131,10 +132,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
             // Output a Lib3hServerProtocol::Connected if its the first connection
             if self.network_connections.is_empty() {
-                let data = ConnectedData {
-                    request_id: "FIXME".to_string(), // TODO #173
-                    uri,
-                };
+                let data = ConnectedData { request_id, uri };
                 outbox.push(Lib3hServerProtocol::Connected(data));
             }
             let _ = self.network_connections.insert(id.to_owned());
@@ -162,12 +160,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
             }
-            TransportEvent::ConnectResult(id) => {
-                let mut output = self.handle_new_connection(id)?;
+            TransportEvent::ConnectResult(id, request_id) => {
+                let mut output = self.handle_new_connection(id, request_id.clone())?;
                 outbox.append(&mut output);
             }
             TransportEvent::IncomingConnectionEstablished(id) => {
-                let mut output = self.handle_new_connection(id)?;
+                let mut output = self.handle_new_connection(id, "".to_string())?;
                 outbox.append(&mut output);
             }
             TransportEvent::ConnectionClosed(id) => {
