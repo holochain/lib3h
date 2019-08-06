@@ -155,8 +155,8 @@ fn basic_connect_test_mock() {
     match srv_msg_list.get(0).unwrap() {
         Lib3hServerProtocol::Connected(data) => {
             assert_eq!("connect_a_1", data.request_id);
-        },
-        _ => panic!("unexpected type: {:?}", srv_msg_list)
+        }
+        _ => panic!("unexpected type: {:?}", srv_msg_list),
     }
     assert!(did_work);
 }
