@@ -269,10 +269,9 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let mut did_work = false;
 
-        while !self.inbox.is_empty() {
-            let cmd = self.inbox.pop_front().expect("queue not empty");
+        while let Some(ref cmd) = self.inbox.pop_front() {
             did_work = true;
-            self.serve_TransportCommand(&cmd)?;
+            self.serve_TransportCommand(cmd)?;
         }
 
         if self.priv_process_stream_sockets()? {
