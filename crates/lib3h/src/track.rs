@@ -1,13 +1,20 @@
 use std::collections::HashMap;
 
+/// request_id type
 pub type TrackId = String;
+/// request_id ref type
 pub type TrackIdRef = str;
 
+/// internal - data needed to track this async action
 struct TrackItem<T> {
+    /// userdata needed to keep track of this request
     pub value: Option<T>,
+    /// when this request should expire / timeout - set as now + timeout
     pub expires_ms: u64,
 }
 
+/// Helper to keep track of request_ids for message correlation with core or
+/// other p2p nodes
 pub struct Tracker<T> {
     id_prefix: String,
     timeout_ms: u64,
@@ -15,6 +22,9 @@ pub struct Tracker<T> {
 }
 
 impl<T> Tracker<T> {
+    /// create a new tracker instance
+    /// ids will be prefixed with id_prefix
+    /// request_ids will timeout after timeout_ms
     pub fn new(id_prefix: &str, timeout_ms: u64) -> Self {
         Self {
             id_prefix: id_prefix.to_string(),
@@ -23,10 +33,12 @@ impl<T> Tracker<T> {
         }
     }
 
+    /// `true` if we are still tracking `id`
     pub fn has(&self, id: &TrackIdRef) -> bool {
         self.map.contains_key(id)
     }
 
+    /// if we are tracking `id` return a reference to the user data
     pub fn get(&self, id: &TrackIdRef) -> Option<&T> {
         match self.map.get(id) {
             Some(item) => item.value.as_ref(),
@@ -34,10 +46,13 @@ impl<T> Tracker<T> {
         }
     }
 
+    /// generate a request_id for this tracker
     pub fn gen_id(&self) -> TrackId {
         format!("{}{}", self.id_prefix, nanoid::simple())
     }
 
+    /// reserve a space in the tracker for a new request_id
+    /// this will start counting down on the timeout
     pub fn reserve(&mut self) -> TrackId {
         let id = self.gen_id();
 
@@ -46,6 +61,8 @@ impl<T> Tracker<T> {
         id
     }
 
+    /// set userdata for `id`, will return any previous userdata at that id
+    /// if we are not tracking anything for an id, will start a new tracker
     pub fn set(&mut self, id: &TrackIdRef, value: Option<T>) -> Option<T> {
         match self.map.get_mut(id) {
             Some(item) => std::mem::replace(&mut item.value, value),
@@ -57,6 +74,7 @@ impl<T> Tracker<T> {
         }
     }
 
+    /// stop tracking an id, returning the user data
     pub fn remove(&mut self, id: &TrackIdRef) -> Option<T> {
         match self.map.remove(id) {
             Some(s) => s.value,
@@ -64,6 +82,7 @@ impl<T> Tracker<T> {
         }
     }
 
+    /// process our tracking ids, and return all those that have timed out
     pub fn process_timeouts(&mut self) -> Vec<(TrackId, Option<T>)> {
         let mut out = Vec::new();
 
@@ -90,6 +109,7 @@ impl<T> Tracker<T> {
 
     // -- private -- //
 
+    /// helper for creating internal TrackItem instances
     fn priv_new_track_item(&self, value: Option<T>) -> TrackItem<T> {
         TrackItem {
             value,
