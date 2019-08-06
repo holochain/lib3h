@@ -1,5 +1,5 @@
 use crate::dht::PeerAddress;
-use lib3h_protocol::{data_types::EntryData, Address};
+use lib3h_protocol::{data_types::{EntryData, Opaque}, Address};
 use url::Url;
 
 pub type FromPeerAddress = PeerAddress;
@@ -50,13 +50,13 @@ pub enum DhtEvent {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct RemoteGossipBundleData {
     pub from_peer_address: PeerAddress,
-    pub bundle: Vec<u8>,
+    pub bundle: Opaque,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct GossipToData {
     pub peer_address_list: Vec<PeerAddress>,
-    pub bundle: Vec<u8>,
+    pub bundle: Opaque,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
