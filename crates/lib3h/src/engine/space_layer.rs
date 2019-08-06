@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
@@ -104,15 +105,20 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             // -> Send each aspect to Core for validation
             DhtEvent::HoldEntryRequested(from, entry) => {
                 for aspect in entry.aspect_list {
-                    let lib3h_msg =
-                        Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData {
-                            request_id: "FIXME".to_string(), // TODO #168
-                            space_address: chain_id.0.clone(),
-                            provider_agent_id: from.clone().into(),
-                            entry_address: entry.entry_address.clone(),
-                            entry_aspect: aspect,
-                        });
-                    outbox.push(lib3h_msg)
+                    let lib3h_msg = StoreEntryAspectData {
+                        request_id: self.request_track.reserve(),
+                        space_address: chain_id.0.clone(),
+                        provider_agent_id: from.clone().into(),
+                        entry_address: entry.entry_address.clone(),
+                        entry_aspect: aspect,
+                    };
+                    // TODO - not sure what core is expected to send back here
+                    //      - right now these tracks will timeout
+                    self.request_track.set(
+                        &lib3h_msg.request_id,
+                        Some(RealEngineTrackerData::HoldEntryRequested),
+                    );
+                    outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }
             }
             // FetchEntryResponse: Send back as a query response to Core

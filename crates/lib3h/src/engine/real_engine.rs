@@ -260,7 +260,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             Lib3hClientProtocol::Connect(msg) => {
                 // Convert into TransportCommand & post to network gateway
-                let cmd = TransportCommand::Connect(msg.peer_uri);
+                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
                 Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {

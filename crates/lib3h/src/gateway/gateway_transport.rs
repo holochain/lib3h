@@ -226,7 +226,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
                 );
                 self.inner_transport.borrow_mut().close(id)?;
             }
-            TransportEvent::ConnectResult(id) => {
+            TransportEvent::ConnectResult(id, _) => {
                 info!("({}) Outgoing connection opened: {}", self.identifier, id);
                 self.handle_new_connection(id)?;
             }
@@ -284,9 +284,9 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
         trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
         // Note: use same order as the enum
         match cmd {
-            TransportCommand::Connect(url) => {
+            TransportCommand::Connect(url, request_id) => {
                 let id = self.connect(url)?;
-                let evt = TransportEvent::ConnectResult(id);
+                let evt = TransportEvent::ConnectResult(id, request_id.clone());
                 Ok(vec![evt])
             }
             TransportCommand::Send(id_list, payload) => {

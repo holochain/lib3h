@@ -31,6 +31,9 @@ enum RealEngineTrackerData {
     GetAuthoringEntryList,
     /// once we have the AuthoringEntryListResponse, fetch data for entries
     DataForAuthorEntry,
+    /// gossip has requested we store data, send a hold request to core
+    /// core should respond ??
+    HoldEntryRequested,
 }
 
 /// Struct holding all config settings for the RealEngine
