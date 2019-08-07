@@ -21,12 +21,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         // Process the network gateway as a Transport
         let (tranport_did_work, event_list) =
             Transport::process(&mut *self.network_gateway.borrow_mut())?;
-        debug!(
-            "{} - network_gateway Transport.process(): {} {}",
-            self.name,
-            tranport_did_work,
-            event_list.len(),
-        );
+        if !event_list.is_empty() {
+            debug!(
+                "{} - network_gateway Transport.process(): {} {}",
+                self.name,
+                tranport_did_work,
+                event_list.len(),
+            );
+        }
         if tranport_did_work {
             for evt in event_list {
                 let mut output = self.handle_netTransportEvent(&evt)?;
