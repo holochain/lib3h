@@ -339,6 +339,21 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             // PublishEntry: Broadcast on the space DHT
             Lib3hClientProtocol::PublishEntry(msg) => {
+                // MIRROR - reflecting hold for now
+                for aspect in &msg.entry.aspect_list {
+                    let msg = StoreEntryAspectData {
+                        request_id: self.request_track.reserve(),
+                        space_address: msg.space_address.clone(),
+                        provider_agent_id: msg.provider_agent_id.clone(),
+                        entry_address: msg.entry.entry_address.clone(),
+                        entry_aspect: aspect.clone(),
+                    };
+                    self.request_track.set(
+                        &msg.request_id,
+                        Some(RealEngineTrackerData::HoldEntryRequested),
+                    );
+                    outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(msg));
+                }
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.provider_agent_id,
@@ -348,19 +363,6 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        // MIRROR - reflecting hold for now
-                        for aspect in &msg.entry.aspect_list {
-                            outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(
-                                StoreEntryAspectData {
-                                    request_id: "FIXME".to_string(), // TODO #168
-                                    space_address: msg.space_address.clone(),
-                                    provider_agent_id: msg.provider_agent_id.clone(),
-                                    entry_address: msg.entry.entry_address.clone(),
-                                    entry_aspect: aspect.clone(),
-                                },
-                            ));
-                        }
-
                         // send to other dht nodes
                         let cmd = DhtCommand::BroadcastEntry(msg.entry);
                         Dht::post(space_gateway, cmd)?;
