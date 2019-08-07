@@ -4,7 +4,7 @@ use url::Url;
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportCommand {
-    Connect(Url),
+    Connect(Url, /*request_id*/ String),
     Send(Vec<ConnectionId>, Vec<u8>),
     SendAll(Vec<u8>),
     Close(ConnectionId),
@@ -18,7 +18,7 @@ pub enum TransportEvent {
     /// Notify that some TransportError occured
     ErrorOccured(ConnectionId, TransportError),
     /// an outgoing connection has been established
-    ConnectResult(ConnectionId),
+    ConnectResult(ConnectionId, /*request_id*/ String),
     /// we have received an incoming connection
     IncomingConnectionEstablished(ConnectionId),
     /// We have received data from a connection

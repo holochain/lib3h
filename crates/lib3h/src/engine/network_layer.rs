@@ -61,12 +61,11 @@ impl<D: Dht> RealEngine<D> {
                     "{} auto-connect to peer: {} ({})",
                     self.name, peer_data.peer_address, peer_data.peer_uri,
                 );
-                let cmd = TransportCommand::Connect(peer_data.peer_uri.clone());
+                let cmd = TransportCommand::Connect(peer_data.peer_uri.clone(), "".to_string());
                 self.network_gateway.as_transport_mut().post(cmd)?;
             }
             DhtEvent::PeerTimedOut(peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
-                //let mut network_gateway = self.network_gateway.borrow_mut();
                 let maybe_connection_id = self
                     .network_gateway
                     .as_ref()
@@ -102,6 +101,7 @@ impl<D: Dht> RealEngine<D> {
     fn handle_new_connection(
         &mut self,
         id: &ConnectionIdRef,
+        request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
         let mut network_gateway = self.network_gateway.as_mut();
@@ -132,10 +132,7 @@ impl<D: Dht> RealEngine<D> {
 
             // Output a Lib3hServerProtocol::Connected if its the first connection
             if self.network_connections.is_empty() {
-                let data = ConnectedData {
-                    request_id: "FIXME".to_string(), // TODO #173
-                    uri,
-                };
+                let data = ConnectedData { request_id, uri };
                 outbox.push(Lib3hServerProtocol::Connected(data));
             }
             let _ = self.network_connections.insert(id.to_owned());
@@ -163,12 +160,12 @@ impl<D: Dht> RealEngine<D> {
                     outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
             }
-            TransportEvent::ConnectResult(id) => {
-                let mut output = self.handle_new_connection(id)?;
+            TransportEvent::ConnectResult(id, request_id) => {
+                let mut output = self.handle_new_connection(id, request_id.clone())?;
                 outbox.append(&mut output);
             }
             TransportEvent::IncomingConnectionEstablished(id) => {
-                let mut output = self.handle_new_connection(id)?;
+                let mut output = self.handle_new_connection(id, "".to_string())?;
                 outbox.append(&mut output);
             }
             TransportEvent::ConnectionClosed(id) => {
@@ -223,7 +220,7 @@ impl<D: Dht> RealEngine<D> {
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        Dht::post(&mut *space_gateway.as_dht().borrow_mut(), cmd)?;
+                        space_gateway.as_dht_mut().post(cmd)?;
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -266,10 +263,9 @@ impl<D: Dht> RealEngine<D> {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    Dht::post(
-                        &mut *space_gateway.as_dht().borrow_mut(),
-                        DhtCommand::HoldPeer(peer_data.clone()),
-                    )?;
+                    space_gateway
+                        .as_dht_mut()
+                        .post(DhtCommand::HoldPeer(peer_data.clone()))?;
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -277,10 +273,9 @@ impl<D: Dht> RealEngine<D> {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        Dht::post(
-                            &mut *space_gateway.as_dht().borrow_mut(),
-                            DhtCommand::HoldPeer(peer_data.clone()),
-                        )?;
+                        space_gateway
+                            .as_dht_mut()
+                            .post(DhtCommand::HoldPeer(peer_data.clone()))?;
                     }
                 }
             }

@@ -14,7 +14,6 @@ for crate in \
  p2p_protocol \
  lib3h
 do
- cargo package --manifest-path "crates/$crate/Cargo.toml"
  cargo publish --manifest-path "crates/$crate/Cargo.toml"
 
  sleep 10
