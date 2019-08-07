@@ -27,7 +27,6 @@ use lib3h_protocol::{
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
 
 impl TransportKeys {
     pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
@@ -66,12 +65,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
         };
-        let network_gateway = GatewayWrapper::new(&Arc::new(RwLock::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
             &dht_config,
-        ))));
+        ));
         // Done
         Ok(RealEngine {
             crypto,
@@ -115,12 +114,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = GatewayWrapper::new(&Arc::new(RwLock::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
             &dht_config,
-        ))));
+        ));
         debug!(
             "New MOCK RealEngine {} -> {:?}",
             name,
@@ -558,12 +557,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
-            GatewayWrapper::new(&Arc::new(RwLock::new(P2pGateway::new_with_space(
+            GatewayWrapper::new(P2pGateway::new_with_space(
                 self.network_gateway.as_transport(),
                 &join_msg.space_address,
                 self.dht_factory,
                 &dht_config,
-            ))));
+            ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();

@@ -30,7 +30,8 @@ pub struct GatewayWrapper<'wrap> {
 }
 
 impl<'wrap> GatewayWrapper<'wrap> {
-    pub fn new<T: Gateway + 'wrap>(concrete: &Arc<RwLock<T>>) -> Self {
+    pub fn new<T: Gateway + 'wrap>(concrete: T) -> Self {
+        let concrete = Arc::new(RwLock::new(concrete));
         Self {
             gateway: concrete.clone(),
             transport: TransportWrapper::assume(concrete.clone()),
