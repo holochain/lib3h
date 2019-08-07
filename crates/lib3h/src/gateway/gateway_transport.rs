@@ -17,12 +17,12 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<D: Dht> Transport for P2pGateway<D> {
+impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
         // Connect
-        let connection_id = self.inner_transport.borrow_mut().connect(&uri)?;
+        let connection_id = self.inner_transport.as_mut().connect(&uri)?;
         // Store result in connection map
         self.connection_map
             .insert(uri.clone(), connection_id.clone());
@@ -32,12 +32,12 @@ impl<D: Dht> Transport for P2pGateway<D> {
 
     // TODO #176 - remove conn id conn_map??
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        self.inner_transport.borrow_mut().close(id)
+        self.inner_transport.as_mut().close(id)
     }
 
     // TODO #176
     fn close_all(&mut self) -> TransportResult<()> {
-        self.inner_transport.borrow_mut().close_all()
+        self.inner_transport.as_mut().close_all()
     }
 
     /// id_list =
@@ -68,7 +68,7 @@ impl<D: Dht> Transport for P2pGateway<D> {
         }
         let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
         // Send on the inner Transport
-        self.inner_transport.borrow_mut().send(&ref_list, payload)
+        self.inner_transport.as_mut().send(&ref_list, payload)
     }
 
     ///
@@ -82,7 +82,7 @@ impl<D: Dht> Transport for P2pGateway<D> {
     ///
     fn bind(&mut self, url: &Url) -> TransportResult<Url> {
         trace!("({}) bind() {}", self.identifier, url);
-        self.inner_transport.borrow_mut().bind(url)
+        self.inner_transport.as_mut().bind(url)
     }
 
     ///
@@ -118,7 +118,7 @@ impl<D: Dht> Transport for P2pGateway<D> {
         // Transport::process() on the network gateway,
         // otherwise remove this code and have RealEngine explicitly call the process of the
         // Network transport.
-        let (inner_did_work, mut event_list) = self.inner_transport.borrow_mut().process()?;
+        let (inner_did_work, mut event_list) = self.inner_transport.as_mut().process()?;
         trace!(
             "({}).Transport.inner_process() - output: {} {}",
             self.identifier,
@@ -148,14 +148,14 @@ impl<D: Dht> Transport for P2pGateway<D> {
 
     /// TODO: return a higher-level uri instead
     fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-        self.inner_transport.borrow().get_uri(id)
+        self.inner_transport.as_ref().get_uri(id)
         //let maybe_peer_data = self.inner_dht.get_peer(id);
         //maybe_peer_data.map(|pd| pd.peer_address)
     }
 }
 
 /// Private internals
-impl<D: Dht> P2pGateway<D> {
+impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
         &self,
@@ -208,7 +208,7 @@ impl<D: Dht> P2pGateway<D> {
             our_peer_address,
             id,
         );
-        return self.inner_transport.borrow_mut().send(&[&id], &buf);
+        return self.inner_transport.as_mut().send(&[&id], &buf);
     }
 
     /// Process a transportEvent received from our internal connection.
@@ -224,7 +224,7 @@ impl<D: Dht> P2pGateway<D> {
                     "({}) Connection Error for {}: {}\n Closing connection.",
                     self.identifier, id, e,
                 );
-                self.inner_transport.borrow_mut().close(id)?;
+                self.inner_transport.as_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id, _) => {
                 info!("({}) Outgoing connection opened: {}", self.identifier, id);
@@ -253,7 +253,7 @@ impl<D: Dht> P2pGateway<D> {
                         );
                         let peer_uri = self
                             .inner_transport
-                            .borrow_mut()
+                            .as_mut()
                             .get_uri(connection_id)
                             .expect("FIXME"); // TODO #58
                         debug!("peer_uri of: {} = {}", connection_id, peer_uri);

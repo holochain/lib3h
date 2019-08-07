@@ -84,7 +84,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
     engine
 }
 
-fn basic_setup_wss() -> RealEngine<MirrorDht> {
+fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),

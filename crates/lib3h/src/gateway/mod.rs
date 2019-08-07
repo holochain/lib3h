@@ -4,12 +4,13 @@ pub mod p2p_gateway;
 
 use crate::{
     dht::dht_trait::Dht,
-    transport::{protocol::TransportCommand, transport_trait::Transport, ConnectionId},
+    transport::{
+        protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
+    },
 };
 use std::{
-    cell::RefCell,
     collections::{HashMap, VecDeque},
-    rc::Rc,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 use url::Url;
@@ -22,133 +23,55 @@ pub trait Gateway: Transport + Dht {
 /// since rust doesn't suport upcasting to supertraits
 /// create a super-fat-pointer in this wrapper struct
 #[derive(Clone)]
-pub struct GatewayWrapper {
-    gateway: Rc<RefCell<dyn Gateway>>,
-    transport: Rc<RefCell<dyn Transport>>,
-    dht: Rc<RefCell<dyn Dht>>,
+pub struct GatewayWrapper<'wrap> {
+    gateway: Arc<RwLock<dyn Gateway + 'wrap>>,
+    transport: TransportWrapper<'wrap>,
+    dht: Arc<RwLock<dyn Dht + 'wrap>>,
 }
 
-impl GatewayWrapper {
-    pub fn new<T: Gateway + 'static>(concrete: &Rc<RefCell<T>>) -> Self {
+impl<'wrap> GatewayWrapper<'wrap> {
+    pub fn new<T: Gateway + 'wrap>(concrete: &Arc<RwLock<T>>) -> Self {
         Self {
             gateway: concrete.clone(),
-            transport: concrete.clone(),
+            transport: TransportWrapper::assume(concrete.clone()),
             dht: concrete.clone(),
         }
     }
 
-    pub fn as_transport(&self) -> Rc<RefCell<dyn Transport>> {
+    pub fn as_transport(&self) -> TransportWrapper<'wrap> {
         self.transport.clone()
     }
 
-    pub fn as_transport_ref(&self) -> TransportRef {
-        TransportRef(self.transport.borrow())
+    pub fn as_transport_ref(&self) -> RwLockReadGuard<'_, dyn Transport + 'wrap> {
+        self.transport.as_ref()
     }
 
-    pub fn as_transport_mut(&self) -> TransportRefMut {
-        TransportRefMut(self.transport.borrow_mut())
+    pub fn as_transport_mut(&self) -> RwLockWriteGuard<'_, dyn Transport + 'wrap> {
+        self.transport.as_mut()
     }
 
-    pub fn as_dht(&self) -> Rc<RefCell<dyn Dht>> {
+    pub fn as_dht(&self) -> Arc<RwLock<dyn Dht + 'wrap>> {
         self.dht.clone()
     }
 
-    pub fn as_dht_ref(&self) -> DhtRef {
-        DhtRef(self.dht.borrow())
+    pub fn as_dht_ref(&self) -> RwLockReadGuard<'_, dyn Dht + 'wrap> {
+        self.dht.read().expect("can access")
     }
 
-    pub fn as_dht_mut(&self) -> DhtRefMut {
-        DhtRefMut(self.dht.borrow_mut())
+    pub fn as_dht_mut(&self) -> RwLockWriteGuard<'_, dyn Dht + 'wrap> {
+        self.dht.write().expect("can access")
     }
 
-    pub fn as_gateway(&self) -> Rc<RefCell<dyn Gateway>> {
+    pub fn as_gateway(&self) -> Arc<RwLock<dyn Gateway + 'wrap>> {
         self.gateway.clone()
     }
 
-    pub fn as_ref(&self) -> GatewayRef {
-        GatewayRef(self.gateway.borrow())
+    pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn Gateway + 'wrap> {
+        self.gateway.read().expect("can access")
     }
 
-    pub fn as_mut(&self) -> GatewayRefMut {
-        GatewayRefMut(self.gateway.borrow_mut())
-    }
-}
-
-pub struct TransportRef<'a>(std::cell::Ref<'a, dyn Transport>);
-
-impl<'a> std::ops::Deref for TransportRef<'a> {
-    type Target = dyn Transport + 'a;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-pub struct TransportRefMut<'a>(std::cell::RefMut<'a, dyn Transport>);
-
-impl<'a> std::ops::Deref for TransportRefMut<'a> {
-    type Target = dyn Transport + 'a;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-impl std::ops::DerefMut for TransportRefMut<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
-    }
-}
-
-pub struct DhtRef<'a>(std::cell::Ref<'a, dyn Dht>);
-
-impl<'a> std::ops::Deref for DhtRef<'a> {
-    type Target = dyn Dht + 'a;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-pub struct DhtRefMut<'a>(std::cell::RefMut<'a, dyn Dht>);
-
-impl<'a> std::ops::Deref for DhtRefMut<'a> {
-    type Target = dyn Dht + 'a;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-impl std::ops::DerefMut for DhtRefMut<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
-    }
-}
-
-pub struct GatewayRef<'a>(std::cell::Ref<'a, dyn Gateway>);
-
-impl<'a> std::ops::Deref for GatewayRef<'a> {
-    type Target = dyn Gateway + 'a;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-pub struct GatewayRefMut<'a>(std::cell::RefMut<'a, dyn Gateway>);
-
-impl<'a> std::ops::Deref for GatewayRefMut<'a> {
-    type Target = dyn Gateway + 'a;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-impl std::ops::DerefMut for GatewayRefMut<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
+    pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn Gateway + 'wrap> {
+        self.gateway.write().expect("can access")
     }
 }
 
@@ -156,8 +79,8 @@ impl std::ops::DerefMut for GatewayRefMut<'_> {
 /// Combines a transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
-pub struct P2pGateway<D: Dht> {
-    inner_transport: Rc<RefCell<dyn Transport>>,
+pub struct P2pGateway<'gateway, D: Dht> {
+    inner_transport: TransportWrapper<'gateway>,
     inner_dht: D,
     /// Used for distinguishing gateways
     identifier: String,

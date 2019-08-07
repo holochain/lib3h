@@ -11,7 +11,7 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 
 /// Compose DHT
-impl<D: Dht> Dht for P2pGateway<D> {
+impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.inner_dht.get_peer_list()
@@ -80,7 +80,7 @@ impl<D: Dht> Dht for P2pGateway<D> {
 }
 
 /// Private internals
-impl<D: Dht> P2pGateway<D> {
+impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
         trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);
@@ -110,7 +110,7 @@ impl<D: Dht> P2pGateway<D> {
                         .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
                     self.inner_transport
-                        .borrow_mut()
+                        .as_mut()
                         .send(&[&to_conn_id], &payload)?;
                 }
             }

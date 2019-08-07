@@ -17,7 +17,7 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::TransportCommand, transport_trait::Transport},
+    transport::{protocol::TransportCommand, TransportWrapper},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -27,7 +27,7 @@ use lib3h_protocol::{
 };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, RwLock};
 
 impl TransportKeys {
     pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
@@ -43,7 +43,7 @@ impl TransportKeys {
     }
 }
 
-impl<D: Dht> RealEngine<D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Constructor with TransportWss
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
@@ -52,10 +52,9 @@ impl<D: Dht> RealEngine<D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create Transport and bind
-        let network_transport: Rc<RefCell<dyn Transport>> = Rc::new(RefCell::new(
-            TransportWss::with_std_tcp_stream(config.tls_config.clone()),
-        ));
-        let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
+        let network_transport =
+            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
+        let binding = network_transport.as_mut().bind(&config.bind_url)?;
         // Generate keys
         // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
@@ -67,9 +66,9 @@ impl<D: Dht> RealEngine<D> {
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
         };
-        let network_gateway = GatewayWrapper::new(&Rc::new(RefCell::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(&Arc::new(RwLock::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
-            Rc::clone(&network_transport),
+            network_transport.clone(),
             dht_factory,
             &dht_config,
         ))));
@@ -93,7 +92,7 @@ impl<D: Dht> RealEngine<D> {
 
 /// Constructor
 //#[cfg(test)]
-impl<D: Dht> RealEngine<D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
@@ -102,11 +101,10 @@ impl<D: Dht> RealEngine<D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let network_transport: Rc<RefCell<dyn Transport>> =
-            Rc::new(RefCell::new(TransportMemory::new()));
+        let network_transport = TransportWrapper::new(TransportMemory::new());
         // Bind & create DhtConfig
         let binding = network_transport
-            .borrow_mut()
+            .as_mut()
             .bind(&config.bind_url)
             .expect("TransportMemory.bind() failed. bind-url might not be unique?");
         let dht_config = DhtConfig {
@@ -117,9 +115,9 @@ impl<D: Dht> RealEngine<D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = GatewayWrapper::new(&Rc::new(RefCell::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(&Arc::new(RwLock::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
-            Rc::clone(&network_transport),
+            network_transport.clone(),
             dht_factory,
             &dht_config,
         ))));
@@ -146,7 +144,7 @@ impl<D: Dht> RealEngine<D> {
     }
 }
 
-impl<D: Dht> NetworkEngine for RealEngine<D> {
+impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
     fn advertise(&self) -> Url {
         self.network_gateway
             .as_dht_ref()
@@ -192,7 +190,7 @@ impl<D: Dht> NetworkEngine for RealEngine<D> {
 }
 
 /// Drop
-impl<D: Dht> Drop for RealEngine<D> {
+impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
     fn drop(&mut self) {
         let res = self.shutdown();
         if let Err(e) = res {
@@ -202,7 +200,7 @@ impl<D: Dht> Drop for RealEngine<D> {
 }
 
 /// Private
-impl<D: Dht> RealEngine<D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
@@ -559,9 +557,9 @@ impl<D: Dht> RealEngine<D> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway =
-            GatewayWrapper::new(&Rc::new(RefCell::new(P2pGateway::new_with_space(
-                self.network_gateway.as_transport().clone(),
+        let new_space_gateway: GatewayWrapper<'engine> =
+            GatewayWrapper::new(&Arc::new(RwLock::new(P2pGateway::new_with_space(
+                self.network_gateway.as_transport(),
                 &join_msg.space_address,
                 self.dht_factory,
                 &dht_config,
@@ -704,7 +702,7 @@ impl<D: Dht> RealEngine<D> {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<GatewayWrapper, Lib3hServerProtocol> {
+    ) -> Result<GatewayWrapper<'engine>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));

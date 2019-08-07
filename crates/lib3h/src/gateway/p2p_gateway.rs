@@ -3,26 +3,22 @@
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
-    transport::transport_trait::Transport,
+    transport::TransportWrapper,
 };
 use lib3h_protocol::Address;
-use std::{
-    cell::RefCell,
-    collections::{HashMap, VecDeque},
-    rc::Rc,
-};
+use std::collections::{HashMap, VecDeque};
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
 //--------------------------------------------------------------------------------------------------
 
 /// any Transport Constructor
-impl<D: Dht> P2pGateway<D> {
+impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        inner_transport: Rc<RefCell<dyn Transport>>,
+        inner_transport: TransportWrapper<'gateway>,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
@@ -36,7 +32,7 @@ impl<D: Dht> P2pGateway<D> {
     }
 }
 
-impl<D: Dht> Gateway for P2pGateway<D> {
+impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
     /// This Gateway's identifier
     fn identifier(&self) -> &str {
         self.identifier.as_str()
@@ -74,10 +70,10 @@ impl<D: Dht> Gateway for P2pGateway<D> {
 }
 
 /// P2pGateway Constructor
-impl<D: Dht> P2pGateway<D> {
+impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Constructors
     pub fn new_with_space(
-        network_gateway: Rc<RefCell<dyn Transport>>,
+        network_gateway: TransportWrapper<'gateway>,
         space_address: &Address,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,

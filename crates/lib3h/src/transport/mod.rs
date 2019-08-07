@@ -1,4 +1,7 @@
 //! common types and traits for working with Transport instances
+
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
@@ -8,6 +11,33 @@ pub mod transport_trait;
 /// a connection identifier
 pub type ConnectionId = String;
 pub type ConnectionIdRef = str;
+
+use transport_trait::Transport;
+
+#[derive(Clone)]
+pub struct TransportWrapper<'wrap> {
+    inner: Arc<RwLock<dyn Transport + 'wrap>>,
+}
+
+impl<'wrap> TransportWrapper<'wrap> {
+    pub fn new<T: Transport + 'wrap>(concrete: T) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(concrete)),
+        }
+    }
+
+    pub fn assume(inner: Arc<RwLock<dyn Transport + 'wrap>>) -> Self {
+        Self { inner }
+    }
+
+    pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn Transport + 'wrap> {
+        self.inner.read().expect("can access")
+    }
+
+    pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn Transport + 'wrap> {
+        self.inner.write().expect("can access")
+    }
+}
 
 ///
 #[cfg(test)]

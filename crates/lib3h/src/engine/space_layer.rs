@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<D: Dht> RealEngine<D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
@@ -27,7 +27,7 @@ impl<D: Dht> RealEngine<D> {
     }
 
     /// Return first space gateway for a specified space_address
-    pub fn get_first_space_mut(&mut self, space_address: &str) -> Option<GatewayWrapper> {
+    pub fn get_first_space_mut(&mut self, space_address: &str) -> Option<GatewayWrapper<'engine>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -45,7 +45,7 @@ impl<D: Dht> RealEngine<D> {
         let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            let (did_work, event_list) = Dht::process(&mut *space_gateway.as_dht().borrow_mut())?;
+            let (did_work, event_list) = space_gateway.as_dht_mut().process()?;
             if did_work {
                 // TODO: perf optim, don't copy chain_id
                 dht_outbox.insert(chain_id.clone(), event_list);
@@ -92,10 +92,9 @@ impl<D: Dht> RealEngine<D> {
                     peer_data,
                 );
                 // For now accept all request
-                Dht::post(
-                    &mut *space_gateway.as_dht().borrow_mut(),
-                    DhtCommand::HoldPeer(peer_data),
-                )?;
+                space_gateway
+                    .as_dht_mut()
+                    .post(DhtCommand::HoldPeer(peer_data))?;
             }
             DhtEvent::PeerTimedOut(_peer_address) => {
                 // no-op

@@ -12,7 +12,7 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer related private methods
-impl<D: Dht> RealEngine<D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
