@@ -8,8 +8,7 @@ max_jobs: 20
 
 environment:
   RUST_BACKTRACE: full
-  matrix:
-  - test_p: all
 
 test_script:
- - scripts\windows\do-ci-test.bat
+  - ps: $env:RUST_BACKTRACE"full"
+  - ps: cargo test -p appveyor_fake --target-dir c:\build\lib3h\target --verbose
