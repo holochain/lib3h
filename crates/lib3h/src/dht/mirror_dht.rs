@@ -10,8 +10,8 @@ use crate::{
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use url::Url;
 
 type HasTimedOut = bool;
@@ -314,12 +314,11 @@ impl MirrorDht {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtCommand::HandleGossip(msg) => {
                 trace!("Deserializer msg.bundle: {:?}", msg.bundle);
-                let mut de = Deserializer::new(&msg.bundle[..]);
-                let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
+                let maybe_gossip: Lib3hResult<MirrorGossip> =
+                    crate::lib3h_rmp_deserialize(&msg.bundle[..]);
                 if let Err(e) = maybe_gossip {
                     error!("Failed to deserialize gossip.");
-                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                    return Err(e);
                 }
                 // Handle gossiped data
                 match maybe_gossip.unwrap() {

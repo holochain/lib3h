@@ -25,8 +25,8 @@ use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
 impl TransportKeys {
@@ -383,9 +383,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     &msg.request_id,
                     None,
                 );
-                let mut de = Deserializer::new(&msg.query_result[..]);
-                let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
+                let maybe_entry: Lib3hResult<EntryData> =
+                    crate::lib3h_rmp_deserialize(&msg.query_result[..]);
                 let entry = maybe_entry.expect("Deserialization should always work");
                 match maybe_space {
                     Err(res) => outbox.push(res),

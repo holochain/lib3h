@@ -17,11 +17,31 @@ extern crate rmp_serde;
 #[macro_use]
 extern crate log;
 
+pub mod error;
+
+use rmp_serde::Deserializer;
+use serde::Deserialize;
+
+pub fn lib3h_rmp_deserialize<'a, T: serde::Deserialize<'a>>(
+    payload: &[u8],
+) -> error::Lib3hResult<T> {
+    match std::panic::catch_unwind(|| {
+        let mut de = Deserializer::new(payload);
+        Deserialize::deserialize(&mut de)
+            .map_err(|e| error::Lib3hError::new(error::ErrorKind::RmpSerdeDecodeError(e)))
+    }) {
+        Ok(r) => r,
+        Err(e) => Err(error::Lib3hError::new(error::ErrorKind::Other(format!(
+            "{:?}",
+            e
+        )))),
+    }
+}
+
 // -- mod -- //
 
 pub mod dht;
 pub mod engine;
-pub mod error;
 pub mod gateway;
 pub mod time;
 pub mod track;
