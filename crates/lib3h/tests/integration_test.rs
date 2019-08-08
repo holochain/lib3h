@@ -154,8 +154,16 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 #[test]
 fn test_two_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
+    let mut count = 0;
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
-        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+        count = count + 1;
+        println!("\n\n--- @^@^@ TEST #{} ---\n\n", count);
+        if let Err(e) =  std::panic::catch_unwind(|| {
+            launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+        }) {
+            error!("@^@^@: {:?}", e);
+            panic!(e);
+        }
     }
 }
 
