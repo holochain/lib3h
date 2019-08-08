@@ -61,8 +61,8 @@ impl MirrorDht {
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
-                peer_address: config.this_peer_address.to_owned(),
-                peer_uri: config.this_peer_uri.clone(),
+                peer_address: config.this_peer_address().to_owned(),
+                peer_uri: config.this_peer_uri().clone(),
                 timestamp,
             },
             pending_fetch_request_list: HashSet::new(),
@@ -154,7 +154,7 @@ impl Dht for MirrorDht {
                 continue;
             }
             // Check if timed-out
-            if now - peer.timestamp > self.config.timeout_threshold {
+            if now - peer.timestamp > self.config.timeout_threshold() {
                 debug!("@MirrorDht@ peer {} timed-out", peer_address);
                 outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
                 timed_out_list.push(peer_address.clone());
@@ -170,9 +170,9 @@ impl Dht for MirrorDht {
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
             now,
             self.last_gossip_of_self,
-            self.config.gossip_interval,
+            self.config.gossip_interval(),
         );
-        if now - self.last_gossip_of_self > self.config.gossip_interval {
+        if now - self.last_gossip_of_self > self.config.gossip_interval() {
             self.last_gossip_of_self = now;
             let gossip_data = self.gossip_self(self.get_other_peer_list());
             if gossip_data.peer_address_list.len() > 0 {
@@ -239,7 +239,8 @@ impl MirrorDht {
                     peer.timestamp,
                 );
                 peer.timestamp = peer_info.timestamp;
-                if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold {
+                if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold()
+                {
                     self.timed_out_map
                         .insert(peer_info.peer_address.clone(), false);
                 }

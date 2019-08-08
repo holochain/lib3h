@@ -57,13 +57,11 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
         // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         // Generate DHT config and create network_gateway
-        let dht_config = DhtConfig {
-            this_peer_address: transport_keys.transport_id.clone(),
-            this_peer_uri: binding,
-            custom: config.dht_custom_config.clone(),
-            gossip_interval: config.dht_gossip_interval,
-            timeout_threshold: config.dht_timeout_threshold,
-        };
+        let dht_config = DhtConfig::with_real_engine_config(
+            transport_keys.transport_id.clone().as_str(),
+            &binding,
+            &config,
+        );
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
             Rc::clone(&network_transport),
@@ -107,13 +105,8 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             .borrow_mut()
             .bind(&config.bind_url)
             .expect("TransportMemory.bind() failed. bind-url might not be unique?");
-        let dht_config = DhtConfig {
-            this_peer_address: format!("{}_tId", name),
-            this_peer_uri: binding,
-            custom: config.dht_custom_config.clone(),
-            gossip_interval: config.dht_gossip_interval,
-            timeout_threshold: config.dht_timeout_threshold,
-        };
+        let dht_config =
+            DhtConfig::with_real_engine_config(format!("{}_tId", name).as_str(), &binding, &config);
         // Create network gateway
         let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
@@ -570,13 +563,11 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let this_peer_transport_id_as_uri =
             // TODO #175 - encapsulate this conversion logic
             Url::parse(format!("transportId:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
-        let dht_config = DhtConfig {
-            this_peer_address: agent_id,
-            this_peer_uri: this_peer_transport_id_as_uri,
-            custom: self.config.dht_custom_config.clone(),
-            gossip_interval: self.config.dht_gossip_interval,
-            timeout_threshold: self.config.dht_timeout_threshold,
-        };
+        let dht_config = DhtConfig::with_real_engine_config(
+            agent_id.as_str(),
+            &this_peer_transport_id_as_uri,
+            &self.config,
+        );
         // Create new space gateway for this ChainId
         let new_space_gateway = P2pGateway::new_with_space(
             Rc::clone(&self.network_gateway),
