@@ -10,5 +10,6 @@ environment:
   RUST_BACKTRACE: full
 
 test_script:
-  - ps: $env:RUST_BACKTRACE"full"
-  - ps: cargo test -p appveyor_fake --target-dir c:\build\lib3h\target --verbose
+  - ps: |
+    $env:RUST_BACKTRACE="full"
+    cargo test -p appveyor_fake --target-dir c:\build\lib3h\target --verbose
