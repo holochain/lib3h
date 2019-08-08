@@ -5,7 +5,7 @@ mod tcp;
 
 use crate::transport::{
     error::{TransportError, TransportResult},
-    protocol::{TransportCommand, TransportEvent},
+    protocol::{SendData, SuccessResultData, TransportCommand, TransportEvent},
     transport_trait::Transport,
     ConnectionId, ConnectionIdRef,
 };
@@ -283,12 +283,11 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
 
     /// send a message to one or more remote connected nodes
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        for id in id_list {
-            if let Some(info) = self.stream_sockets.get_mut(&id.to_string()) {
-                info.send_queue.push(payload.to_vec());
-            }
-        }
-
+        self.post(TransportCommand::SendReliable(SendData {
+            id_list: id_list.iter().map(|x| x.to_string()).collect(),
+            payload: payload.to_vec(),
+            request_id: "".to_string(),
+        }))?;
         Ok(())
     }
 
@@ -365,16 +364,10 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 }
             }
             TransportCommand::SendReliable(msg) => {
-                let _id = self.send(
-                    &msg.id_list
-                        .iter()
-                        .map(|x| x.as_str())
-                        .collect::<Vec<&str>>(),
-                    &msg.payload,
-                );
+                self.serve_TransportCommand_SendReliable(msg)?;
             }
             TransportCommand::SendAll(payload) => {
-                let _id = self.send_all(payload)?;
+                self.send_all(payload)?;
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
@@ -393,6 +386,19 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 self.bind(url)?;
             }
         }
+        Ok(())
+    }
+
+    #[allow(non_snake_case)]
+    fn serve_TransportCommand_SendReliable(&mut self, msg: &SendData) -> TransportResult<()> {
+        for id in &msg.id_list {
+            if let Some(info) = self.stream_sockets.get_mut(&id.to_string()) {
+                info.send_queue.push(msg.payload.to_vec());
+            }
+        }
+        self.event_queue.push(TransportEvent::SuccessResult(SuccessResultData {
+            request_id: msg.request_id.clone(),
+        }));
         Ok(())
     }
 
