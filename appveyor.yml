@@ -7,6 +7,7 @@ build: false
 max_jobs: 20
 
 environment:
+  RUST_BACKTRACE: full
   matrix:
   - test_p: all
 
