@@ -191,6 +191,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
                 outbox.append(&mut output);
             }
+            TransportEvent::SuccessResult(msg) => {
+                debug!("SUCCESS RESULT: {:?}", msg);
+            }
+            TransportEvent::FailureResult(msg) => {
+                error!("FAILURE RESULT: {:?}", msg);
+            }
         };
         Ok(outbox)
     }

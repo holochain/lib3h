@@ -1,11 +1,29 @@
 use crate::transport::{error::TransportError, ConnectionId};
 use url::Url;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct SendData {
+    pub id_list: Vec<ConnectionId>,
+    pub payload: Vec<u8>,
+    pub request_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SuccessResultData {
+    pub request_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FailureResultData {
+    pub request_id: String,
+    pub error: Vec<TransportError>,
+}
+
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportCommand {
     Connect(Url, /*request_id*/ String),
-    Send(Vec<ConnectionId>, Vec<u8>),
+    SendReliable(SendData),
     SendAll(Vec<u8>),
     Close(ConnectionId),
     CloseAll,
@@ -15,6 +33,10 @@ pub enum TransportCommand {
 /// Events that can be generated during a `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportEvent {
+    /// Result indicating a generic request success
+    SuccessResult(SuccessResultData),
+    /// Result indicating a generic request failure
+    FailureResult(FailureResultData),
     /// Notify that some TransportError occured
     ErrorOccured(ConnectionId, TransportError),
     /// an outgoing connection has been established

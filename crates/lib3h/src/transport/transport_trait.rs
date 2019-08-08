@@ -20,6 +20,8 @@ pub trait Transport {
     /// close all existing open connections
     fn close_all(&mut self) -> TransportResult<()>;
     /// send a payload to remote nodes
+    /// note: you probably mean to `post` a TransportCommand::SendReliable
+    /// this function does that internally... but you can't get the response
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()>;
     /// send a payload to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()>;

@@ -1,7 +1,7 @@
 use crate::transport::{
     error::{TransportError, TransportResult},
     memory_mock::memory_server,
-    protocol::{TransportCommand, TransportEvent},
+    protocol::{SendData, SuccessResultData, TransportCommand, TransportEvent},
     transport_trait::Transport,
     ConnectionId, ConnectionIdRef,
 };
@@ -196,36 +196,11 @@ impl Transport for TransportMemory {
 
     /// Send payload to known connectionIds in `id_list`
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        if self.maybe_my_uri.is_none() {
-            return Err(TransportError::new(
-                "Cannot send before bounding".to_string(),
-            ));
-        }
-        let my_uri = self.maybe_my_uri.clone().unwrap();
-        for id in id_list {
-            // Get the other node's uri on that connection
-            let maybe_uri = self.outbound_connection_map.get(*id);
-            if let None = maybe_uri {
-                warn!("No known connection for connectionId: {}", id);
-                continue;
-            }
-            let uri = maybe_uri.unwrap();
-            // Get the other node's server
-            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let maybe_server = server_map.get(uri);
-            if let None = maybe_server {
-                return Err(TransportError::new(format!(
-                    "No Memory server at this url address: {}",
-                    uri
-                )));
-            }
-            trace!("(TransportMemory).send() {} | {}", uri, payload.len());
-            let mut server = maybe_server.unwrap().lock().unwrap();
-            // Send it data from us
-            server
-                .post(&my_uri, payload)
-                .expect("Post on memory server should work");
-        }
+        self.post(TransportCommand::SendReliable(SendData {
+            id_list: id_list.iter().map(|x| x.to_string()).collect(),
+            payload: payload.to_vec(),
+            request_id: "".to_string(),
+        }))?;
         Ok(())
     }
 
@@ -349,44 +324,81 @@ impl TransportMemory {
         cmd: &TransportCommand,
     ) -> TransportResult<Vec<TransportEvent>> {
         debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
+        let mut outbox = Vec::new();
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url, request_id) => {
                 let id = self.connect(url)?;
                 let evt = TransportEvent::ConnectResult(id, request_id.clone());
-                Ok(vec![evt])
+                outbox.push(evt);
             }
-            TransportCommand::Send(id_list, payload) => {
-                let mut id_ref_list = Vec::with_capacity(id_list.len());
-                for id in id_list {
-                    id_ref_list.push(id.as_str());
-                }
-                let _id = self.send(&id_ref_list, payload)?;
-                Ok(vec![])
+            TransportCommand::SendReliable(msg) => {
+                self.serve_TransportCommand_SendReliable(&mut outbox, msg)?;
             }
             TransportCommand::SendAll(payload) => {
                 let _id = self.send_all(payload)?;
-                Ok(vec![])
             }
             TransportCommand::Close(id) => {
                 self.close(id)?;
                 let evt = TransportEvent::ConnectionClosed(id.to_string());
-                Ok(vec![evt])
+                outbox.push(evt);
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
-                let mut outbox = Vec::new();
                 for (id, _url) in &self.outbound_connection_map {
                     let evt = TransportEvent::ConnectionClosed(id.to_string());
                     outbox.push(evt);
                 }
-                Ok(outbox)
             }
             TransportCommand::Bind(url) => {
                 self.bind(url)?;
-                Ok(vec![])
             }
         }
+        Ok(outbox)
+    }
+
+    #[allow(non_snake_case)]
+    fn serve_TransportCommand_SendReliable(
+        &mut self,
+        outbox: &mut Vec<TransportEvent>,
+        msg: &SendData,
+    ) -> TransportResult<()> {
+        if self.maybe_my_uri.is_none() {
+            return Err(TransportError::new(
+                "Cannot send before bounding".to_string(),
+            ));
+        }
+        let my_uri = self.maybe_my_uri.clone().unwrap();
+        for id in &msg.id_list {
+            // Get the other node's uri on that connection
+            let maybe_uri = self.outbound_connection_map.get(id);
+            if let None = maybe_uri {
+                warn!("No known connection for connectionId: {}", id);
+                continue;
+            }
+            let uri = maybe_uri.unwrap();
+            // Get the other node's server
+            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+            let maybe_server = server_map.get(uri);
+            if let None = maybe_server {
+                return Err(TransportError::new(format!(
+                    "No Memory server at this url address: {}",
+                    uri
+                )));
+            }
+            trace!("(TransportMemory).send() {} | {}", uri, msg.payload.len());
+            let mut server = maybe_server.unwrap().lock().unwrap();
+            // Send it data from us
+            server
+                .post(&my_uri, &msg.payload)
+                .expect("Post on memory server should work");
+        }
+        // -- //
+        //self.send(&msg.id_list.iter().map(|x|x.as_str()).collect::<Vec<&str>>(), &msg.payload)?;
+        outbox.push(TransportEvent::SuccessResult(SuccessResultData {
+            request_id: msg.request_id.clone(),
+        }));
+        Ok(())
     }
 }
 

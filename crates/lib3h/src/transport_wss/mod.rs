@@ -364,12 +364,14 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                     None => (),
                 }
             }
-            TransportCommand::Send(id_list, payload) => {
-                let mut id_ref_list = Vec::with_capacity(id_list.len());
-                for id in id_list {
-                    id_ref_list.push(id.as_str());
-                }
-                let _id = self.send(&id_ref_list, payload)?;
+            TransportCommand::SendReliable(msg) => {
+                let _id = self.send(
+                    &msg.id_list
+                        .iter()
+                        .map(|x| x.as_str())
+                        .collect::<Vec<&str>>(),
+                    &msg.payload,
+                );
             }
             TransportCommand::SendAll(payload) => {
                 let _id = self.send_all(payload)?;
