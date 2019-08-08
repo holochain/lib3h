@@ -393,8 +393,6 @@ impl TransportMemory {
                 .post(&my_uri, &msg.payload)
                 .expect("Post on memory server should work");
         }
-        // -- //
-        //self.send(&msg.id_list.iter().map(|x|x.as_str()).collect::<Vec<&str>>(), &msg.payload)?;
         outbox.push(TransportEvent::SuccessResult(SuccessResultData {
             request_id: msg.request_id.clone(),
         }));
