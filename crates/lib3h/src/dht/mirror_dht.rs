@@ -211,7 +211,7 @@ impl MirrorDht {
         );
         GossipToData {
             peer_address_list,
-            bundle: buf,
+            bundle: buf.into(),
         }
     }
 
@@ -221,7 +221,7 @@ impl MirrorDht {
         let maybe_peer = self.peer_map.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
-                trace!("@MirrorDht@ Adding peer - OK NEW");
+                debug!("@MirrorDht@ Adding peer - OK NEW");
                 self.peer_map
                     .insert(peer_info.peer_address.clone(), peer_info.clone());
                 self.timed_out_map
@@ -230,13 +230,12 @@ impl MirrorDht {
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
-                    trace!("@MirrorDht@ Adding peer - BAD");
+                    debug!("@MirrorDht@ Adding peer - BAD");
                     return false;
                 }
-                trace!(
+                debug!(
                     "@MirrorDht@ Adding peer - OK UPDATED: {} > {}",
-                    peer_info.timestamp,
-                    peer.timestamp,
+                    peer_info.timestamp, peer.timestamp,
                 );
                 peer.timestamp = peer_info.timestamp;
                 if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold()
@@ -300,7 +299,7 @@ impl MirrorDht {
             .unwrap();
         let gossip_evt = GossipToData {
             peer_address_list: self.get_other_peer_list(),
-            bundle: buf,
+            bundle: buf.into(),
         };
         DhtEvent::GossipTo(gossip_evt)
     }
@@ -382,7 +381,7 @@ impl MirrorDht {
                 );
                 let gossip_evt = GossipToData {
                     peer_address_list: others_list,
-                    bundle: buf,
+                    bundle: buf.into(),
                 };
                 event_list.push(DhtEvent::GossipTo(gossip_evt));
 
