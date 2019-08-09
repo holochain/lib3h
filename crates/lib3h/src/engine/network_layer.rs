@@ -201,12 +201,16 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                             trace!("SUCCESS RESULT: {:?}", msg);
                             // all good :+1:
                         }
-                        TrackType::TransportSendResultUpgrade { lib3h_request_id } => {
+                        TrackType::TransportSendResultUpgrade {
+                            lib3h_request_id,
+                            space_address,
+                            to_agent_id,
+                        } => {
                             self.outbox.push(Lib3hServerProtocol::SuccessResult(
                                 GenericResultData {
                                     request_id: lib3h_request_id,
-                                    space_address: "".into(),
-                                    to_agent_id: "".into(),
+                                    space_address,
+                                    to_agent_id,
                                     result_info: b"".to_vec(),
                                 },
                             ));
@@ -221,12 +225,16 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         TrackType::TransportSendFireAndForget => {
                             error!("FAILURE RESULT: {:?}", msg);
                         }
-                        TrackType::TransportSendResultUpgrade { lib3h_request_id } => {
+                        TrackType::TransportSendResultUpgrade {
+                            lib3h_request_id,
+                            space_address,
+                            to_agent_id,
+                        } => {
                             self.outbox.push(Lib3hServerProtocol::FailureResult(
                                 GenericResultData {
                                     request_id: lib3h_request_id,
-                                    space_address: "".into(),
-                                    to_agent_id: "".into(),
+                                    space_address,
+                                    to_agent_id,
                                     result_info: format!("{:?}", msg.error).into_bytes(),
                                 },
                             ));

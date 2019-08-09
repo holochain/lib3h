@@ -674,6 +674,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let peer_address: String = msg.to_agent_id.clone().into();
         let internal_request_id = self.register_track(TrackType::TransportSendResultUpgrade {
             lib3h_request_id: msg.request_id.clone(),
+            space_address: response.space_address,
+            to_agent_id: response.to_agent_id,
         });
         space_gateway
             .as_transport_mut()
@@ -684,7 +686,6 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             }))
             .map_err(|e| Lib3hError::from(e))?;
         Ok(())
-        // TODO XXX - TRANSPORT SEND RESULT UPGRADE NOT YET IMPLEMENTED!!! //
 
         /*
         let res = space_gateway

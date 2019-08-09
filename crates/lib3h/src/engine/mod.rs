@@ -38,7 +38,11 @@ pub(crate) enum TrackType {
     /// send messages, log errors, do nothing with success
     TransportSendFireAndForget,
     /// upgrade the transport success/failure to a lib3hprotocol success/failure
-    TransportSendResultUpgrade { lib3h_request_id: String },
+    TransportSendResultUpgrade {
+        lib3h_request_id: String,
+        space_address: Address,
+        to_agent_id: Address,
+    },
 }
 
 /// Struct holding all config settings for the RealEngine

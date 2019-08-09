@@ -7,7 +7,7 @@ use crate::{
     error::Lib3hResult,
     track::Tracker,
     transport::{
-        protocol::{TransportCommand, TransportEvent},
+        protocol::{SendData, TransportCommand, TransportEvent},
         transport_trait::Transport,
         ConnectionId, TransportWrapper,
     },
@@ -102,6 +102,14 @@ impl<'wrap> GatewayWrapper<'wrap> {
     }
 }
 
+/// TODO XXX - integrate this into async process workflow system
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SendReliableCheckAddressLoopData {
+    msg: SendData,
+    last_tickle_ms: u64,
+    expires_ms: u64,
+}
+
 /// Gateway to a P2P network.
 /// Combines a transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -119,4 +127,6 @@ pub struct P2pGateway<'gateway, D: Dht> {
     transport_inbox: VecDeque<TransportCommand>,
     /// Own outbox for TransportEvents generated in other process stages
     transport_outbox: Vec<TransportEvent>,
+    /// TODO XXX - make this more generic
+    workflow: Vec<SendReliableCheckAddressLoopData>,
 }

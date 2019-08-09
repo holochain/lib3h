@@ -32,6 +32,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
             transport_outbox: Vec::new(),
+            workflow: Vec::new(),
         }
     }
 
@@ -107,6 +108,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
             transport_outbox: Vec::new(),
+            workflow: Vec::new(),
         }
     }
 }

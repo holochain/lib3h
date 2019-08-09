@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
-    gateway::{Gateway, P2pGateway, TrackType},
+    gateway::{Gateway, P2pGateway, SendReliableCheckAddressLoopData, TrackType},
     transport::{
         error::{TransportError, TransportResult},
         protocol::{
@@ -87,17 +87,21 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
     /// Handle TransportEvents directly
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let mut did_work = false;
+
+        for item in self.workflow.drain(..).collect::<Vec<_>>() {
+            if self.serve_try_send_reliable_check_address_loop_data(item)? {
+                did_work = true;
+            }
+        }
+
         // Process TransportCommand inbox
         loop {
             let cmd = match self.transport_inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            let res = self.serve_TransportCommand(&cmd);
-            if let Ok(mut output) = res {
-                did_work = true;
-                self.transport_outbox.append(&mut output);
-            }
+            did_work = true;
+            self.serve_TransportCommand(&cmd)?;
         }
         trace!(
             "({}).Transport.process() - output: {} {}",
@@ -321,21 +325,17 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
     /// Return a list of TransportEvents to owner.
     #[allow(non_snake_case)]
-    fn serve_TransportCommand(
-        &mut self,
-        cmd: &TransportCommand,
-    ) -> TransportResult<Vec<TransportEvent>> {
+    fn serve_TransportCommand(&mut self, cmd: &TransportCommand) -> TransportResult<()> {
         trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
-        let mut outbox = Vec::new();
         // Note: use same order as the enum
         match cmd {
             TransportCommand::Connect(url, request_id) => {
                 let id = self.connect(url)?;
                 let evt = TransportEvent::ConnectResult(id, request_id.clone());
-                outbox.push(evt);
+                self.transport_outbox.push(evt);
             }
             TransportCommand::SendReliable(msg) => {
-                self.serve_TransportCommand_SendReliable(&mut outbox, msg)?;
+                self.serve_TransportCommand_SendReliable(msg)?;
             }
             TransportCommand::SendAll(payload) => {
                 let _id = self.send_all(payload)?;
@@ -343,7 +343,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             TransportCommand::Close(id) => {
                 self.close(id)?;
                 let evt = TransportEvent::ConnectionClosed(id.to_string());
-                outbox.push(evt);
+                self.transport_outbox.push(evt);
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
@@ -352,13 +352,52 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 self.bind(url)?;
             }
         }
-        Ok(outbox)
+        Ok(())
     }
 
     #[allow(non_snake_case)]
-    fn serve_TransportCommand_SendReliable(
+    fn serve_TransportCommand_SendReliable(&mut self, msg: &SendData) -> TransportResult<()> {
+        self.workflow.push(SendReliableCheckAddressLoopData {
+            msg: msg.clone(),
+            last_tickle_ms: 0,
+            expires_ms: crate::time::since_epoch_ms() + 200,
+        });
+        Ok(())
+    }
+
+    fn serve_try_send_reliable_check_address_loop_data(
         &mut self,
-        _outbox: &mut Vec<TransportEvent>,
+        mut item: SendReliableCheckAddressLoopData,
+    ) -> TransportResult<bool> {
+        let now = crate::time::since_epoch_ms();
+        if now - item.last_tickle_ms < 10 {
+            self.workflow.push(item);
+            return Ok(false);
+        }
+        item.last_tickle_ms = now;
+        match self.serve_try_send_reliable_check_address_loop_data_inner(&item.msg) {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                if item.expires_ms > now {
+                    self.workflow.push(item);
+                    return Ok(true);
+                }
+                if let Some(rid) = item.msg.request_id {
+                    self.transport_outbox
+                        .push(TransportEvent::FailureResult(FailureResultData {
+                            request_id: rid.clone(),
+                            error: vec![e],
+                        }));
+                } else {
+                    error!("failed to send: {:?}", e);
+                }
+                Ok(true)
+            }
+        }
+    }
+
+    fn serve_try_send_reliable_check_address_loop_data_inner(
+        &mut self,
         msg: &SendData,
     ) -> TransportResult<()> {
         // get connectionId from the inner dht first
@@ -384,7 +423,6 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             )
         }
 
-        // TODO XXX - actually pass this forward
         let request_id = msg.request_id.clone().map(|rid| {
             self.register_track(TrackType::TransportSendDelegateLower {
                 gateway_request_id: rid,
@@ -402,7 +440,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         // Send on the inner Transport
         self.inner_transport.as_mut().send(&ref_list, &msg.payload)?;
 
-        outbox.push(TransportEvent::SuccessResult(SuccessResultData {
+        self.outbox.push(TransportEvent::SuccessResult(SuccessResultData {
             request_id: msg.request_id.clone(),
         }));
         Ok(())
