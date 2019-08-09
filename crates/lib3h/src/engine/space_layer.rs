@@ -4,8 +4,7 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
-    gateway::P2pGateway,
-    transport::transport_trait::Transport,
+    gateway::GatewayWrapper,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -16,26 +15,23 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
         for (chainId, space_gateway) in self.space_gateway_map.iter() {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, space_gateway.this_peer().clone()));
+            result.push((space_address, space_gateway.as_ref().this_peer().clone()));
         }
         result
     }
 
     /// Return first space gateway for a specified space_address
-    pub fn get_first_space_mut(
-        &mut self,
-        space_address: &str,
-    ) -> Option<&mut P2pGateway<P2pGateway<T, D>, D>> {
+    pub fn get_first_space_mut(&mut self, space_address: &str) -> Option<GatewayWrapper<'engine>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
-                return Some(space_gateway);
+                return Some(space_gateway.clone());
             }
         }
         None
@@ -49,7 +45,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            let (did_work, event_list) = Dht::process(space_gateway)?;
+            let (did_work, event_list) = space_gateway.as_dht_mut().process()?;
             if did_work {
                 // TODO: perf optim, don't copy chain_id
                 dht_outbox.insert(chain_id.clone(), event_list);
@@ -92,11 +88,13 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 debug!(
                     "{} -- ({}).post() HoldPeer {:?}",
                     self.name,
-                    space_gateway.identifier(),
+                    space_gateway.as_ref().identifier(),
                     peer_data,
                 );
                 // For now accept all request
-                Dht::post(space_gateway, DhtCommand::HoldPeer(peer_data))?;
+                space_gateway
+                    .as_dht_mut()
+                    .post(DhtCommand::HoldPeer(peer_data))?;
             }
             DhtEvent::PeerTimedOut(_peer_address) => {
                 // no-op

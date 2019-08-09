@@ -15,9 +15,9 @@ use crate::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
-    gateway::P2pGateway,
+    gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::TransportCommand, transport_trait::Transport},
+    transport::{protocol::TransportCommand, TransportWrapper},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -27,7 +27,6 @@ use lib3h_protocol::{
 };
 use rmp_serde::Serializer;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
 
 impl TransportKeys {
     pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
@@ -43,7 +42,7 @@ impl TransportKeys {
     }
 }
 
-impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Constructor with TransportWss
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
@@ -52,10 +51,9 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create Transport and bind
-        let network_transport = Rc::new(RefCell::new(TransportWss::with_std_tcp_stream(
-            config.tls_config.clone(),
-        )));
-        let binding = network_transport.borrow_mut().bind(&config.bind_url)?;
+        let network_transport =
+            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
+        let binding = network_transport.as_mut().bind(&config.bind_url)?;
         // Generate keys
         // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
@@ -67,12 +65,12 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
         };
-        let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
-            Rc::clone(&network_transport),
+            network_transport.clone(),
             dht_factory,
             &dht_config,
-        )));
+        ));
         // Done
         Ok(RealEngine {
             crypto,
@@ -93,7 +91,7 @@ impl<D: Dht> RealEngine<TransportWss<std::net::TcpStream>, D> {
 
 /// Constructor
 //#[cfg(test)]
-impl<D: Dht> RealEngine<TransportMemory, D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
@@ -102,10 +100,10 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let network_transport = Rc::new(RefCell::new(TransportMemory::new()));
+        let network_transport = TransportWrapper::new(TransportMemory::new());
         // Bind & create DhtConfig
         let binding = network_transport
-            .borrow_mut()
+            .as_mut()
             .bind(&config.bind_url)
             .expect("TransportMemory.bind() failed. bind-url might not be unique?");
         let dht_config = DhtConfig {
@@ -116,16 +114,16 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = Rc::new(RefCell::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
-            Rc::clone(&network_transport),
+            network_transport.clone(),
             dht_factory,
             &dht_config,
-        )));
+        ));
         debug!(
             "New MOCK RealEngine {} -> {:?}",
             name,
-            network_gateway.borrow().this_peer()
+            network_gateway.as_ref().this_peer()
         );
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         Ok(RealEngine {
@@ -145,10 +143,10 @@ impl<D: Dht> RealEngine<TransportMemory, D> {
     }
 }
 
-impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
+impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
     fn advertise(&self) -> Url {
         self.network_gateway
-            .borrow()
+            .as_dht_ref()
             .this_peer()
             .peer_uri
             .to_owned()
@@ -191,36 +189,40 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
 }
 
 /// Drop
-impl<T: Transport, D: Dht> Drop for RealEngine<T, D> {
+impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
     fn drop(&mut self) {
-        let res = self.shutdown();
-        if let Err(e) = res {
+        self.shutdown().unwrap_or_else(|e| {
             warn!("Graceful shutdown failed: {}", e);
-        }
+        });
     }
 }
 
 /// Private
-impl<T: Transport, D: Dht> RealEngine<T, D> {
+impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        let mut result = Ok(());
+        let mut result: Lib3hResult<()> = Ok(());
+
         for space_gatway in self.space_gateway_map.values_mut() {
-            let res = space_gatway.close_all();
+            let res = space_gatway.as_transport_mut().close_all();
             // Continue closing connections even if some failed
             if let Err(e) = res {
                 if result.is_ok() {
-                    result = Err(e);
+                    result = Err(e.into());
                 }
             }
         }
         // Done
-        self.network_gateway.borrow_mut().close_all().map_err(|e| {
-            error!("Closing of some connection failed: {:?}", e);
-            e
-        })?;
-        Ok(())
+        self.network_gateway
+            .as_transport_mut()
+            .close_all()
+            .map_err(|e| {
+                error!("Closing of some connection failed: {:?}", e);
+                e
+            })?;
+
+        result
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
@@ -261,7 +263,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             Lib3hClientProtocol::Connect(msg) => {
                 // Convert into TransportCommand & post to network gateway
                 let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
-                Transport::post(&mut *self.network_gateway.borrow_mut(), cmd)?;
+                self.network_gateway.as_transport_mut().post(cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
@@ -309,14 +311,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                            Dht::post(space_gateway, cmd)?;
+                            space_gateway.as_dht_mut().post(cmd)?;
                         } else {
                             let response = FetchDhtEntryResponseData {
                                 msg_id: msg.request_id.clone(),
                                 entry: msg.entry.clone(),
                             };
                             let cmd = DhtCommand::EntryDataResponse(response);
-                            Dht::post(space_gateway, cmd)?;
+                            space_gateway.as_dht_mut().post(cmd)?;
                         }
                     }
                 }
@@ -333,7 +335,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                        Dht::post(space_gateway, cmd)?;
+                        space_gateway.as_dht_mut().post(cmd)?;
                     }
                 }
             }
@@ -349,7 +351,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
-                        Dht::post(space_gateway, cmd)?;
+                        space_gateway.as_dht_mut().post(cmd)?;
                     }
                 }
             }
@@ -370,7 +372,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                             entry_address: msg.entry_address,
                         };
                         let cmd = DhtCommand::FetchEntry(msg);
-                        Dht::post(space_gateway, cmd)?;
+                        space_gateway.as_dht_mut().post(cmd)?;
                     }
                 }
             }
@@ -394,7 +396,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                             entry,
                         };
                         let cmd = DhtCommand::EntryDataResponse(msg);
-                        Dht::post(space_gateway, cmd)?;
+                        space_gateway.as_dht_mut().post(cmd)?;
                     }
                 }
             }
@@ -447,7 +449,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 let mut count = 0;
                 for (entry_address, aspect_address_list) in msg.address_map {
                     // Check aspects and only request entry with new aspects
-                    let maybe_known_aspects = space_gateway.get_aspects_of(&entry_address);
+                    let maybe_known_aspects = space_gateway.as_ref().get_aspects_of(&entry_address);
                     if let Some(known_aspects) = maybe_known_aspects {
                         if includes(&known_aspects, &aspect_address_list) {
                             continue;
@@ -513,10 +515,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                         entry_address: entry_address.clone(),
                         aspect_list,
                     };
-                    Dht::post(
-                        space_gateway,
-                        DhtCommand::HoldEntryAspectAddress(fake_entry),
-                    )?;
+                    space_gateway
+                        .as_dht_mut()
+                        .post(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
                 }
             }
         }
@@ -543,10 +544,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         output.push(Lib3hServerProtocol::SuccessResult(res));
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
-        let this_net_peer = self.network_gateway.borrow().this_peer().clone();
-        let this_peer_transport_id_as_uri =
+        let this_peer_transport_id_as_uri = {
+            let gateway = self.network_gateway.as_ref();
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", this_net_peer.peer_address.clone()).as_str()).expect("can parse url");
+            Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
+                .expect("can parse url")
+        };
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
             this_peer_uri: this_peer_transport_id_as_uri,
@@ -555,16 +558,17 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway = P2pGateway::new_with_space(
-            Rc::clone(&self.network_gateway),
-            &join_msg.space_address,
-            self.dht_factory,
-            &dht_config,
-        );
+        let new_space_gateway: GatewayWrapper<'engine> =
+            GatewayWrapper::new(P2pGateway::new_with_space(
+                self.network_gateway.as_transport(),
+                &join_msg.space_address,
+                self.dht_factory,
+                &dht_config,
+            ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
-        let peer = new_space_gateway.this_peer().to_owned();
+        let peer = new_space_gateway.as_ref().this_peer().to_owned();
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
         p2p_msg
@@ -576,7 +580,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             space_address,
             peer.peer_address,
         );
-        self.network_gateway.borrow_mut().send_all(&payload).ok();
+        self.network_gateway
+            .as_transport_mut()
+            .send_all(&payload)
+            .ok();
         // TODO END
 
         // Add it to space map
@@ -584,10 +591,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .insert(chain_id.clone(), new_space_gateway);
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        Dht::post(
-            space_gateway,
-            DhtCommand::HoldPeer(space_gateway.this_peer().clone()),
-        )?;
+        let this_peer = { space_gateway.as_ref().this_peer().clone() };
+        space_gateway
+            .as_dht_mut()
+            .post(DhtCommand::HoldPeer(this_peer))?;
         // Send Get*Lists requests
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),
@@ -636,7 +643,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             result_info: vec![],
         };
         // Check if messaging self
-        let peer_address = &space_gateway.this_peer().peer_address;
+        let peer_address = &space_gateway.as_ref().this_peer().peer_address.clone();
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == &to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();
@@ -655,7 +662,9 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .unwrap();
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
-        let res = space_gateway.send(&[peer_address.as_str()], &payload);
+        let res = space_gateway
+            .as_transport_mut()
+            .send(&[peer_address.as_str()], &payload);
         if let Err(e) = res {
             response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
@@ -694,12 +703,12 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut P2pGateway<P2pGateway<T, D>, D>, Lib3hServerProtocol> {
+    ) -> Result<GatewayWrapper<'engine>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
         if let Some(space_gateway) = maybe_space {
-            return Ok(space_gateway);
+            return Ok(space_gateway.clone());
         }
         let to_agent_id = maybe_sender_agent_id.unwrap_or(agent_id);
         let res = GenericResultData {
