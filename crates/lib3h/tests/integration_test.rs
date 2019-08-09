@@ -88,7 +88,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
+        bind_url: url::parse(format!("mem://{}/{}", fn_name, name).as_str()),
         dht_gossip_interval: 500,
         dht_timeout_threshold: 3000,
         dht_custom_config: vec![],
@@ -108,8 +108,7 @@ fn setup_wss_node(
         TlsConfig::Unencrypted => "ws",
         TlsConfig::SuppliedCertificate(_) | TlsConfig::FakeServer => "wss",
     };
-    let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
-        .expect("invalid web socket url");
+    let bind_url = url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str());
 
     let config = RealEngineConfig {
         tls_config: tls_config,

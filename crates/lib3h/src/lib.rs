@@ -28,6 +28,7 @@ pub mod time;
 pub mod track;
 pub mod transport;
 pub mod transport_wss;
+pub mod url;
 
 #[cfg(test)]
 pub mod tests {

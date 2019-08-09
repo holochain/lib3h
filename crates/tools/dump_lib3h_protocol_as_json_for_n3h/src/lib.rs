@@ -37,7 +37,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
 
     test_client(Lib3hClientProtocol::Connect(ConnectData {
         request_id: "rid".to_string(),
-        peer_uri: url::Url::parse("hc:id").unwrap(),
+        peer_uri: url::Url::parse("hc:id").expect("hc:id to be a valid url"),
         network_id: "nid".to_string(),
     }));
 
@@ -189,7 +189,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
 
     test_server(Lib3hServerProtocol::Connected(ConnectedData {
         request_id: "rid".to_string(),
-        uri: url::Url::parse("hc:id").unwrap(),
+        uri: url::Url::parse("hc:id").expect("hc:id is a valid url"),
     }));
 
     test_server(Lib3hServerProtocol::Disconnected(DisconnectedData {

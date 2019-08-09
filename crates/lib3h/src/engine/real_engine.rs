@@ -562,7 +562,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let this_net_peer = self.network_gateway.borrow().this_peer().clone();
         let this_peer_transport_id_as_uri =
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
+            crate::url::parse(format!("transportId:{}", this_net_peer.peer_address.clone()).as_str());
         let dht_config = DhtConfig::with_real_engine_config(
             agent_id.as_str(),
             &this_peer_transport_id_as_uri,

@@ -227,7 +227,7 @@ impl Transport for TransportMemory {
 
     /// Create a new server inbox for myself
     fn bind(&mut self, uri: &Url) -> TransportResult<Url> {
-        let bounded_uri = Url::parse(format!("{}_bound/{}", uri, self.own_id).as_str()).unwrap();
+        let bounded_uri = crate::url::parse(format!("{}_bound/{}", uri, self.own_id).as_str());
         self.maybe_my_uri = Some(bounded_uri.clone());
         self.memory_servers
             .push(memory_server::ensure_server(&bounded_uri)?);
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn can_rebind() {
         let mut transport = TransportMemory::new();
-        let bind_url = url::Url::parse("mem://can_rebind").unwrap();
+        let bind_url = url::parse("mem://can_rebind");
         assert!(transport.bind(&bind_url).is_ok());
         assert!(transport.bind(&bind_url).is_ok());
     }
