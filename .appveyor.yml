@@ -11,4 +11,5 @@ environment:
 
 test_script:
   - ps: $env:RUST_BACKTRACE="full"
-  - ps: cargo test -p lib3h --target-dir c:\build\lib3h\target --verbose -- --nocapture 2>&1 | %{ "$_" }
+  - ps: cargo test --doc -p lib3h --target-dir c:\build\lib3h\target --verbose -- --nocapture 2>&1 | %{ "$_" }
+#  - ps: cargo test -p lib3h --target-dir c:\build\lib3h\target --verbose -- --nocapture 2>&1 | %{ "$_" }
