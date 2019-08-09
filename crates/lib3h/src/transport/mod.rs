@@ -14,32 +14,38 @@ pub type ConnectionIdRef = str;
 
 use transport_trait::Transport;
 
+/// Hide complexity of Arc<RwLock<dyn Transport>>
+/// making it more ergonomic to work with
 #[derive(Clone)]
 pub struct TransportWrapper<'wrap> {
     inner: Arc<RwLock<dyn Transport + 'wrap>>,
 }
 
 impl<'wrap> TransportWrapper<'wrap> {
+    /// wrap a concrete Transport into an Arc<RwLock<dyn Transport>>
     pub fn new<T: Transport + 'wrap>(concrete: T) -> Self {
         Self {
             inner: Arc::new(RwLock::new(concrete)),
         }
     }
 
+    /// if we already have an Arc<RwLock<dyn Transport>>,
+    /// us it directly as our inner
     pub fn assume(inner: Arc<RwLock<dyn Transport + 'wrap>>) -> Self {
         Self { inner }
     }
 
+    /// get an immutable ref to Transport trait object
     pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn Transport + 'wrap> {
-        self.inner.read().expect("can access")
+        self.inner.read().expect("failed to obtain read lock")
     }
 
+    /// get a mutable ref to Transport trait object
     pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn Transport + 'wrap> {
-        self.inner.write().expect("can access")
+        self.inner.write().expect("failed to obtain write lock")
     }
 }
 
-///
 #[cfg(test)]
 pub mod tests {
     #![allow(non_snake_case)]

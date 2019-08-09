@@ -191,10 +191,9 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
 /// Drop
 impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
     fn drop(&mut self) {
-        let res = self.shutdown();
-        if let Err(e) = res {
+        self.shutdown().unwrap_or_else(|e| {
             warn!("Graceful shutdown failed: {}", e);
-        }
+        });
     }
 }
 
@@ -203,13 +202,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        let mut result = Ok(());
+        let mut result: Lib3hResult<()> = Ok(());
+
         for space_gatway in self.space_gateway_map.values_mut() {
             let res = space_gatway.as_transport_mut().close_all();
             // Continue closing connections even if some failed
             if let Err(e) = res {
                 if result.is_ok() {
-                    result = Err(e);
+                    result = Err(e.into());
                 }
             }
         }
@@ -221,7 +221,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 error!("Closing of some connection failed: {:?}", e);
                 e
             })?;
-        Ok(())
+
+        result
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
@@ -544,10 +545,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         output.push(Lib3hServerProtocol::SuccessResult(res));
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
-        let this_net_peer = self.network_gateway.as_ref().this_peer().clone();
-        let this_peer_transport_id_as_uri =
+        let this_peer_transport_id_as_uri = {
+            let gateway = self.network_gateway.as_ref();
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", this_net_peer.peer_address.clone()).as_str()).unwrap();
+            Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
+                .expect("can parse url")
+        };
         let dht_config = DhtConfig {
             this_peer_address: agent_id,
             this_peer_uri: this_peer_transport_id_as_uri,
