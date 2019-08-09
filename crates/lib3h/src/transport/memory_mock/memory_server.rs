@@ -219,7 +219,7 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!("(MemoryServer {}) received: {:?}", self.this_uri, payload);
-                let evt = TransportEvent::ReceivedData(id.to_string(), payload);
+                let evt = TransportEvent::ReceivedData(id.to_string(), payload.into());
                 outbox.push(evt);
             }
         }

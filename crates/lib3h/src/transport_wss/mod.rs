@@ -595,7 +595,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
 
                         if let Some(msg) = qmsg {
                             self.event_queue
-                                .push(TransportEvent::ReceivedData(info.id.clone(), msg));
+                                .push(TransportEvent::ReceivedData(info.id.clone(), msg.into()));
                         }
                         info.stateful_socket = WebsocketStreamState::ReadyWs(socket);
                         Ok(())
@@ -634,7 +634,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
 
                         if let Some(msg) = qmsg {
                             self.event_queue
-                                .push(TransportEvent::ReceivedData(info.id.clone(), msg));
+                                .push(TransportEvent::ReceivedData(info.id.clone(), msg.into()));
                         }
                         info.stateful_socket = WebsocketStreamState::ReadyWss(socket);
                         Ok(())
