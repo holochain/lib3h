@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
+    track::Tracker,
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::P2pGateway,
     transport::transport_trait::Transport,
@@ -18,6 +19,15 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
     pub fn identifier(&self) -> &str {
         self.identifier.as_str()
     }
+
+    pub fn process(&mut self) -> OENTUHNOTEHUNTHENOU {
+        //putting this here so we don't forget
+
+        for (timeout_id, timeout_data) in self.request_track.process_timeouts() {
+            error!("timeout {:?} {:?}", timeout_id, timeout_data);
+        }
+    }
+
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -38,6 +48,7 @@ impl<T: Transport, D: Dht> P2pGateway<T, D> {
             inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
+            request_track: Tracker::new("gateway_", 2000),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
         }
@@ -88,6 +99,7 @@ impl<T: Transport, D: Dht> P2pGateway<P2pGateway<T, D>, D> {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
+            request_track: Tracker::new("gateway_", 2000),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
         }

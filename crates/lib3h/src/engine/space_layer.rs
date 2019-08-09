@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use super::RealEngineTrackerData;
+use super::TrackType;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
@@ -116,7 +116,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                     //      - right now these tracks will timeout
                     self.request_track.set(
                         &lib3h_msg.request_id,
-                        Some(RealEngineTrackerData::HoldEntryRequested),
+                        Some(TrackType::HoldEntryRequested),
                     );
                     outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }

@@ -35,9 +35,11 @@ impl<T: Transport> Transport for TransportCrypto<T> {
         self.inner_transport.close_all()
     }
 
+    /*
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         self.inner_transport.send(id_list, payload)
     }
+    */
 
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
         self.inner_transport.send_all(payload)

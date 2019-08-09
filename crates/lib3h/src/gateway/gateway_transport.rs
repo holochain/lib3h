@@ -43,6 +43,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
     /// id_list =
     ///   - Network : transportId
     ///   - space   : agentId
+    /*
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         Transport::post(self, TransportCommand::SendReliable(SendData {
             id_list: id_list.iter().map(|x| x.to_string()).collect(),
@@ -51,6 +52,7 @@ impl<T: Transport, D: Dht> Transport for P2pGateway<T, D> {
         }))?;
         Ok(())
     }
+    */
 
     ///
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {

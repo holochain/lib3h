@@ -195,6 +195,7 @@ impl Transport for TransportMemory {
     }
 
     /// Send payload to known connectionIds in `id_list`
+    /*
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         self.post(TransportCommand::SendReliable(SendData {
             id_list: id_list.iter().map(|x| x.to_string()).collect(),
@@ -203,13 +204,18 @@ impl Transport for TransportMemory {
         }))?;
         Ok(())
     }
+    */
 
     /// Send to all known connectionIds
+    /// TODO XXX - we don't actually want a send_all command
+    ///            once we are sharded
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
         let id_list = self.connection_id_list()?;
-        for id in id_list {
-            self.send(&[id.as_str()], payload)?;
-        }
+        self.post(TransportCommand::SendReliable(SendData {
+            id_list,
+            payload: payload.to_vec(),
+            request_id: "".to_string(),
+        }))?;
         Ok(())
     }
 

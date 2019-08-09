@@ -5,7 +5,7 @@ use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
-use super::RealEngineTrackerData;
+use super::TrackType;
 use crate::{
     dht::{
         dht_protocol::{self, *},
@@ -17,7 +17,7 @@ use crate::{
     error::Lib3hResult,
     gateway::P2pGateway,
     track::Tracker,
-    transport::{protocol::TransportCommand, transport_trait::Transport},
+    transport::{protocol::{SendData, TransportCommand}, transport_trait::Transport},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -167,8 +167,11 @@ impl<T: Transport, D: Dht> NetworkEngine for RealEngine<T, D> {
         self.process_count += 1;
         trace!("");
         trace!("{} - process() START - {}", self.name, self.process_count);
+        let mut outbox = Vec::new();
+
         // Process all received Lib3hClientProtocol messages from Core
-        let (inbox_did_work, mut outbox) = self.process_inbox()?;
+        let inbox_did_work = self.process_inbox(&mut outbox)?;
+
         // Process the network layer
         let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
         outbox.append(&mut net_outbox);
@@ -202,6 +205,15 @@ impl<T: Transport, D: Dht> Drop for RealEngine<T, D> {
 
 /// Private
 impl<T: Transport, D: Dht> RealEngine<T, D> {
+    /// register a followup tracker id
+    pub(crate) fn register_track(&mut self, user_data: TrackType) -> String {
+        let id = self.request_track.gen_id();
+        if let Some(_) = self.request_track.set(&id, Some(user_data)) {
+            panic!("unexpected id already used!! {} {:?}", id, user_data);
+        }
+        id
+    }
+
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
@@ -224,18 +236,16 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
-    fn process_inbox(&mut self) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let mut outbox = Vec::new();
+    fn process_inbox(&mut self, outbox: &mut Vec<Lib3hServerProtocol>) -> Lib3hResult<DidWork> {
         let did_work = self.inbox.len() > 0;
         loop {
             let client_msg = match self.inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            let mut output = self.serve_Lib3hClientProtocol(client_msg)?;
-            outbox.append(&mut output);
+            self.serve_Lib3hClientProtocol(outbox, client_msg)?;
         }
-        Ok((did_work, outbox))
+        Ok(did_work)
     }
 
     /// Process a Lib3hClientProtocol message sent to us (by Core)
@@ -243,10 +253,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
     /// Return a list of Lib3hServerProtocol messages to send back to core or others?
     fn serve_Lib3hClientProtocol(
         &mut self,
+        outbox: &mut Vec<Lib3hServerProtocol>,
         client_msg: Lib3hClientProtocol,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    ) -> Lib3hResult<()> {
         debug!("{} serving: {:?}", self.name, client_msg);
-        let mut outbox = Vec::new();
         // Note: use same order as the enum
         match client_msg {
             Lib3hClientProtocol::Shutdown => {
@@ -272,12 +282,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 outbox.push(srv_msg);
             }
             Lib3hClientProtocol::SendDirectMessage(msg) => {
-                let srv_msg = self.serve_DirectMessage(msg, false);
-                outbox.push(srv_msg);
+                self.serve_DirectMessage(outbox, msg, false)?;
             }
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
-                let srv_msg = self.serve_DirectMessage(msg, true);
-                outbox.push(srv_msg);
+                self.serve_DirectMessage(outbox, msg, true);
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // TODO #169
@@ -290,7 +298,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 if self.request_track.has(&msg.request_id) {
                     match self.request_track.remove(&msg.request_id) {
                         Some(data) => match data {
-                            RealEngineTrackerData::DataForAuthorEntry => {
+                            TrackType::DataForAuthorEntry => {
                                 is_data_for_author_list = true;
                             }
                             _ => (),
@@ -401,14 +409,14 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg) => {
-                self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(&mut outbox, msg)?;
+                self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(outbox, msg)?;
             }
             // Our request for the hold_list has returned
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg) => {
-                self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(&mut outbox, msg)?;
+                self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(outbox, msg)?;
             }
         }
-        Ok(outbox)
+        Ok(())
     }
 
     fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
@@ -421,7 +429,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         } else {
             match self.request_track.remove(&msg.request_id) {
                 Some(data) => match data {
-                    RealEngineTrackerData::GetAuthoringEntryList => (),
+                    TrackType::GetAuthoringEntryList => (),
                     _ => error!("bad track type HandleGetAuthoringEntryListResult"),
                 },
                 None => error!("bad track type HandleGetAuthoringEntryListResult"),
@@ -465,7 +473,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             msg_data.request_id = self.request_track.reserve();
             self.request_track.set(
                 &msg_data.request_id,
-                Some(RealEngineTrackerData::DataForAuthorEntry),
+                Some(TrackType::DataForAuthorEntry),
             );
             outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
         }
@@ -482,7 +490,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         } else {
             match self.request_track.remove(&msg.request_id) {
                 Some(data) => match data {
-                    RealEngineTrackerData::GetGossipingEntryList => (),
+                    TrackType::GetGossipingEntryList => (),
                     _ => error!("bad track type HandleGetGossipingEntryListResult"),
                 },
                 None => error!("bad track type HandleGetGossipingEntryListResult"),
@@ -597,7 +605,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         };
         self.request_track.set(
             &list_data.request_id,
-            Some(RealEngineTrackerData::GetGossipingEntryList),
+            Some(TrackType::GetGossipingEntryList),
         );
         output.push(Lib3hServerProtocol::HandleGetGossipingEntryList(
             list_data.clone(),
@@ -605,7 +613,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         list_data.request_id = self.request_track.reserve();
         self.request_track.set(
             &list_data.request_id,
-            Some(RealEngineTrackerData::GetAuthoringEntryList),
+            Some(TrackType::GetAuthoringEntryList),
         );
         output.push(Lib3hServerProtocol::HandleGetAuthoringEntryList(list_data));
         // Done
@@ -614,9 +622,10 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
 
     fn serve_DirectMessage(
         &mut self,
+        outbox: &mut Vec<Lib3hServerProtocol>,
         msg: DirectMessageData,
         is_response: bool,
-    ) -> Lib3hServerProtocol {
+    ) -> Lib3hResult<()> {
         // Check if space is joined by sender
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
@@ -626,7 +635,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         );
         // Return failure if not
         if let Err(failure_msg) = maybe_space {
-            return failure_msg;
+            outbox.push(failure_msg);
+            return Ok(());
         }
         let space_gateway = maybe_space.unwrap();
         // Prepare response
@@ -641,7 +651,8 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == &to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();
-            return Lib3hServerProtocol::FailureResult(response);
+            outbox.push(Lib3hServerProtocol::FailureResult(response));
+            return Ok(());
         }
         // Change into P2pProtocol
         let net_msg = if is_response {
@@ -656,12 +667,24 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             .unwrap();
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
+        let internal_request_id = self.register_track(TrackType::TransportSendResultUpgrade {
+            lib3h_request_id: msg.request_id.clone(),
+        });
+        Transport::post(&mut *space_gateway, TransportCommand::SendReliable(SendData {
+            id_list: vec![peer_address],
+            payload,
+            request_id: internal_request_id,
+        })).map_err(|e|e.into())
+        // TODO XXX - TRANSPORT SEND RESULT UPGRADE NOT YET IMPLEMENTED!!! //
+
+        /*
         let res = space_gateway.send(&[peer_address.as_str()], &payload);
         if let Err(e) = res {
             response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
         }
         Lib3hServerProtocol::SuccessResult(response)
+        */
     }
 
     /// Destroy gateway for this agent in this space, if part of it.

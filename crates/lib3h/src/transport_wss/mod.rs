@@ -282,6 +282,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     /// send a message to one or more remote connected nodes
+    /*
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         self.post(TransportCommand::SendReliable(SendData {
             id_list: id_list.iter().map(|x| x.to_string()).collect(),
@@ -290,6 +291,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         }))?;
         Ok(())
     }
+    */
 
     /// send a message to all remote nodes
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {

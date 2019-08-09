@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use super::TrackType;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
@@ -126,7 +127,13 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
             let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
             if let Some(peer_data) = maybe_peer_data {
                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                network_gateway.send(&[&peer_data.peer_address], &buf)?;
+                //network_gateway.send(&[&peer_data.peer_address], &buf)?;
+                let request_id = self.register_track(TrackType::TransportSendFireAndForget);
+                Transport::post(&mut *network_gateway, TransportCommand::SendReliable(SendData {
+                    id_list: vec![peer_data.peer_address],
+                    payload: buf,
+                    request_id
+                }))?;
             }
             // TODO END
 

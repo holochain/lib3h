@@ -24,7 +24,7 @@ pub type ChainId = (Address, Address);
 pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum RealEngineTrackerData {
+enum TrackType {
     /// track the actual HandleGetGossipingEntryList request
     GetGossipingEntryList,
     /// track the actual HandleGetAuthoringEntryList request
@@ -34,6 +34,12 @@ enum RealEngineTrackerData {
     /// gossip has requested we store data, send a hold request to core
     /// core should respond ??
     HoldEntryRequested,
+    /// send messages, log errors, do nothing with success
+    TransportSendFireAndForget,
+    /// upgrade the transport success/failure to a lib3hprotocol success/failure
+    TransportSendResultUpgrade {
+        lib3h_request_id: String,
+    },
 }
 
 /// Struct holding all config settings for the RealEngine
@@ -70,8 +76,8 @@ pub struct RealEngine<T: Transport, D: Dht> {
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
-    /// Tracking request_id's sent to core
-    request_track: Tracker<RealEngineTrackerData>,
+    /// Tracking request_id's
+    request_track: Tracker<TrackType>,
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
