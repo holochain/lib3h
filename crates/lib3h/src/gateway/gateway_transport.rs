@@ -3,10 +3,10 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
-    gateway::{Gateway, P2pGateway},
+    gateway::{TrackType, Gateway, P2pGateway},
     transport::{
         error::{TransportError, TransportResult},
-        protocol::{SendData, SuccessResultData, TransportCommand, TransportEvent},
+        protocol::{SendData, TransportCommand, TransportEvent},
         transport_trait::Transport,
         ConnectionId, ConnectionIdRef,
     },
@@ -57,9 +57,14 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
     ///
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
         let connection_list = self.connection_id_list()?;
-        let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
-        trace!("({}) send_all() {:?}", self.identifier, dht_id_list);
-        self.send(&dht_id_list, payload)
+        let id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
+        trace!("({}) send_all() {:?}", &self.identifier, &id_list);
+        //self.send(&dht_id_list, payload)
+        Transport::post(self, TransportCommand::SendReliable(SendData {
+            id_list: id_list.iter().map(|x| x.to_string()).collect(),
+            payload: payload.to_vec(),
+            request_id: "".to_string(),
+        }))
     }
 
     ///
@@ -191,7 +196,13 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             our_peer_address,
             id,
         );
-        return self.inner_transport.as_mut().send(&[&id], &buf);
+        let request_id = self.register_track(TrackType::TransportSendFireAndForget);
+        self.inner_transport.as_mut().post(TransportCommand::SendReliable(SendData {
+            id_list: vec![id.to_string()],
+            payload: buf,
+            request_id,
+        }))
+        //return self.inner_transport.as_mut().send(&[&id], &buf);
     }
 
     /// Process a transportEvent received from our internal connection.
@@ -303,7 +314,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     #[allow(non_snake_case)]
     fn serve_TransportCommand_SendReliable(
         &mut self,
-        outbox: &mut Vec<TransportEvent>,
+        _outbox: &mut Vec<TransportEvent>,
         msg: &SendData,
     ) -> TransportResult<()> {
         // get connectionId from the inner dht first
@@ -317,10 +328,10 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             msg.payload.len(),
         );
         // Get connectionIds for the inner Transport.
-        let mut conn_list = Vec::new();
+        let mut conn_list: Vec<String> = Vec::new();
         for dht_uri in dht_uri_list {
             let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri);
+            conn_list.push(net_uri.to_string());
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
                 self.identifier,
@@ -328,7 +339,18 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 net_uri,
             )
         }
-        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
+
+        // TODO XXX - actually pass this forward
+        let request_id = self.register_track(TrackType::TransportSendDelegateLower {
+            gateway_request_id: msg.request_id.clone(),
+        });
+        self.inner_transport.as_mut().post(TransportCommand::SendReliable(SendData {
+            id_list: conn_list,
+            payload: msg.payload.clone(),
+            request_id,
+        }))
+
+        /*
         // Send on the inner Transport
         self.inner_transport.as_mut().send(&ref_list, &msg.payload)?;
 
@@ -336,5 +358,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             request_id: msg.request_id.clone(),
         }));
         Ok(())
+        */
+
     }
 }

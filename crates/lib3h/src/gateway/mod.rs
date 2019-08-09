@@ -3,6 +3,7 @@ pub mod gateway_transport;
 pub mod p2p_gateway;
 
 use crate::{
+    error::Lib3hResult,
     track::Tracker,
     dht::dht_trait::Dht,
     transport::{
@@ -17,9 +18,13 @@ use std::{
 use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TrackType {
+pub(crate) enum TrackType {
     /// send messages, log errors, do nothing with success
     TransportSendFireAndForget,
+    /// we compose another transport, return the send result from our inner
+    TransportSendDelegateLower {
+        gateway_request_id: String,
+    },
 }
 
 /// describes a super construct of a Transport and a Dht allowing
@@ -27,6 +32,7 @@ enum TrackType {
 pub trait Gateway: Transport + Dht {
     fn identifier(&self) -> &str;
     fn get_connection_id(&self, peer_address: &str) -> Option<String>;
+    fn process(&mut self) -> Lib3hResult<()>;
 }
 
 /// since rust doesn't suport upcasting to supertraits

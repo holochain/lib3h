@@ -4,7 +4,7 @@ use super::TrackType;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
-    gateway::GatewayWrapper,
+    gateway::{Gateway, GatewayWrapper},
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -50,6 +50,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 // TODO: perf optim, don't copy chain_id
                 dht_outbox.insert(chain_id.clone(), event_list);
             }
+            // TODO XXX - we're not processing transport events here
+            //            do we need to??
+            Gateway::process(&mut *space_gateway.as_mut())?;
         }
         // Process all gateway DHT events
         for (chain_id, evt_list) in dht_outbox {

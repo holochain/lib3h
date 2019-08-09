@@ -2,6 +2,7 @@
 
 use super::TrackType;
 use crate::{
+    gateway::Gateway,
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
     error::{ErrorKind, Lib3hError, Lib3hResult},
@@ -19,6 +20,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
+
         // Process the network gateway as a Transport
         let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
         debug!(
@@ -33,6 +35,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 outbox.append(&mut output);
             }
         }
+
         // Process the network gateway as a DHT
         let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
         if dht_did_work {
@@ -41,6 +44,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 outbox.append(&mut output);
             }
         }
+
+        // Process the network gateway as a Gateway
+        Gateway::process(&mut *self.network_gateway.as_mut())?;
+
         Ok((tranport_did_work || dht_did_work, outbox))
     }
 
@@ -105,8 +112,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
-        let mut network_gateway = self.network_gateway.as_mut();
-        if let Some(uri) = network_gateway.get_uri(id) {
+        //let mut network_gateway = self.network_gateway.as_mut();
+        let maybe_uri = self.network_gateway.as_ref().get_uri(id).clone();
+        if let Some(uri) = maybe_uri {
             info!("Network Connection opened: {} ({})", id, uri);
             // TODO #150 - Should do this in next process instead
             // Send to other node our Joined Spaces
@@ -122,15 +130,15 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 id
             );
             // id is connectionId but we need a transportId, so search for it in the DHT
-            let peer_list = network_gateway.get_peer_list();
+            let peer_list = self.network_gateway.as_ref().get_peer_list();
             trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
             let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
             if let Some(peer_data) = maybe_peer_data {
                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                 //network_gateway.send(&[&peer_data.peer_address], &buf)?;
                 let request_id = self.register_track(TrackType::TransportSendFireAndForget);
-                Transport::post(&mut *network_gateway, TransportCommand::SendReliable(SendData {
-                    id_list: vec![peer_data.peer_address],
+                self.network_gateway.as_transport_mut().post(TransportCommand::SendReliable(SendData {
+                    id_list: vec![peer_data.peer_address.clone()],
                     payload: buf,
                     request_id
                 }))?;

@@ -23,7 +23,7 @@ pub type ChainId = (Address, Address);
 pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TrackType {
+pub(crate) enum TrackType {
     /// track the actual HandleGetGossipingEntryList request
     GetGossipingEntryList,
     /// track the actual HandleGetAuthoringEntryList request

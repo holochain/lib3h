@@ -14,10 +14,10 @@ use crate::{
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
-    error::Lib3hResult,
+    error::{Lib3hResult, Lib3hError},
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{TransportWrapper, protocol::{SendData, TransportCommand}, transport_trait::Transport},
+    transport::{TransportWrapper, protocol::{SendData, TransportCommand}},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -205,7 +205,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// register a followup tracker id
     pub(crate) fn register_track(&mut self, user_data: TrackType) -> String {
         let id = self.request_track.gen_id();
-        if let Some(_) = self.request_track.set(&id, Some(user_data)) {
+        if let Some(_) = self.request_track.set(&id, Some(user_data.clone())) {
             panic!("unexpected id already used!! {} {:?}", id, user_data);
         }
         id
@@ -677,11 +677,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let internal_request_id = self.register_track(TrackType::TransportSendResultUpgrade {
             lib3h_request_id: msg.request_id.clone(),
         });
-        Transport::post(&mut *space_gateway, TransportCommand::SendReliable(SendData {
+        space_gateway.as_transport_mut().post(TransportCommand::SendReliable(SendData {
             id_list: vec![peer_address],
             payload,
             request_id: internal_request_id,
-        })).map_err(|e|e.into())
+        })).map_err(|e|Lib3hError::from(e))?;
+        Ok(())
         // TODO XXX - TRANSPORT SEND RESULT UPGRADE NOT YET IMPLEMENTED!!! //
 
         /*

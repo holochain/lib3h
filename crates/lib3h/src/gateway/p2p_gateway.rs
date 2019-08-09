@@ -1,9 +1,10 @@
 #![allow(non_snake_case)]
 
 use crate::{
+    error::Lib3hResult,
     track::Tracker,
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
-    gateway::{Gateway, P2pGateway},
+    gateway::{Gateway, P2pGateway, TrackType},
     transport::TransportWrapper,
 };
 use lib3h_protocol::Address;
@@ -32,6 +33,16 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             transport_inbox: VecDeque::new(),
         }
     }
+
+    /// register a followup tracker id
+    pub(crate) fn register_track(&mut self, user_data: TrackType) -> String {
+        let id = self.request_track.gen_id();
+        if let Some(_) = self.request_track.set(&id, Some(user_data.clone())) {
+            panic!("unexpected id already used!! {} {:?}", id, user_data);
+        }
+        id
+    }
+
 }
 
 impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
@@ -70,12 +81,11 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
         Some(conn_id)
     }
 
-    pub fn process(&mut self) -> OENTUHNOTEHUNTHENOU {
-        //putting this here so we don't forget
-
+    fn process(&mut self) -> Lib3hResult<()> {
         for (timeout_id, timeout_data) in self.request_track.process_timeouts() {
             error!("timeout {:?} {:?}", timeout_id, timeout_data);
         }
+        Ok(())
     }
 }
 
