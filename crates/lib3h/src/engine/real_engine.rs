@@ -14,10 +14,13 @@ use crate::{
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
-    error::{Lib3hResult, Lib3hError},
+    error::{Lib3hError, Lib3hResult},
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{TransportWrapper, protocol::{SendData, TransportCommand}},
+    transport::{
+        protocol::{SendData, TransportCommand},
+        TransportWrapper,
+    },
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -287,7 +290,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 self.serve_DirectMessage(outbox, msg, false)?;
             }
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
-                self.serve_DirectMessage(outbox, msg, true);
+                self.serve_DirectMessage(outbox, msg, true)?;
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // TODO #169
@@ -473,10 +476,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         }
         for mut msg_data in request_list {
             msg_data.request_id = self.request_track.reserve();
-            self.request_track.set(
-                &msg_data.request_id,
-                Some(TrackType::DataForAuthorEntry),
-            );
+            self.request_track
+                .set(&msg_data.request_id, Some(TrackType::DataForAuthorEntry));
             outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
         }
         Ok(())
@@ -677,11 +678,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let internal_request_id = self.register_track(TrackType::TransportSendResultUpgrade {
             lib3h_request_id: msg.request_id.clone(),
         });
-        space_gateway.as_transport_mut().post(TransportCommand::SendReliable(SendData {
-            id_list: vec![peer_address],
-            payload,
-            request_id: internal_request_id,
-        })).map_err(|e|Lib3hError::from(e))?;
+        space_gateway
+            .as_transport_mut()
+            .post(TransportCommand::SendReliable(SendData {
+                id_list: vec![peer_address],
+                payload,
+                request_id: internal_request_id,
+            }))
+            .map_err(|e| Lib3hError::from(e))?;
         Ok(())
         // TODO XXX - TRANSPORT SEND RESULT UPGRADE NOT YET IMPLEMENTED!!! //
 

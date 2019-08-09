@@ -3,7 +3,7 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
-    gateway::{TrackType, Gateway, P2pGateway},
+    gateway::{Gateway, P2pGateway, TrackType},
     transport::{
         error::{TransportError, TransportResult},
         protocol::{SendData, TransportCommand, TransportEvent},
@@ -60,11 +60,14 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         let id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
         trace!("({}) send_all() {:?}", &self.identifier, &id_list);
         //self.send(&dht_id_list, payload)
-        Transport::post(self, TransportCommand::SendReliable(SendData {
-            id_list: id_list.iter().map(|x| x.to_string()).collect(),
-            payload: payload.to_vec(),
-            request_id: "".to_string(),
-        }))
+        Transport::post(
+            self,
+            TransportCommand::SendReliable(SendData {
+                id_list: id_list.iter().map(|x| x.to_string()).collect(),
+                payload: payload.to_vec(),
+                request_id: "".to_string(),
+            }),
+        )
     }
 
     ///
@@ -197,11 +200,13 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             id,
         );
         let request_id = self.register_track(TrackType::TransportSendFireAndForget);
-        self.inner_transport.as_mut().post(TransportCommand::SendReliable(SendData {
-            id_list: vec![id.to_string()],
-            payload: buf,
-            request_id,
-        }))
+        self.inner_transport
+            .as_mut()
+            .post(TransportCommand::SendReliable(SendData {
+                id_list: vec![id.to_string()],
+                payload: buf,
+                request_id,
+            }))
         //return self.inner_transport.as_mut().send(&[&id], &buf);
     }
 
@@ -344,11 +349,13 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         let request_id = self.register_track(TrackType::TransportSendDelegateLower {
             gateway_request_id: msg.request_id.clone(),
         });
-        self.inner_transport.as_mut().post(TransportCommand::SendReliable(SendData {
-            id_list: conn_list,
-            payload: msg.payload.clone(),
-            request_id,
-        }))
+        self.inner_transport
+            .as_mut()
+            .post(TransportCommand::SendReliable(SendData {
+                id_list: conn_list,
+                payload: msg.payload.clone(),
+                request_id,
+            }))
 
         /*
         // Send on the inner Transport
@@ -359,6 +366,5 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         }));
         Ok(())
         */
-
     }
 }

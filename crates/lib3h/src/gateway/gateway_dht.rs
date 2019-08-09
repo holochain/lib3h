@@ -5,7 +5,7 @@ use crate::{
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
     gateway::{Gateway, P2pGateway, TrackType},
-    transport::protocol::{TransportCommand, SendData},
+    transport::protocol::{SendData, TransportCommand},
 };
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
@@ -111,11 +111,13 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
                     let request_id = self.register_track(TrackType::TransportSendFireAndForget);
-                    self.inner_transport.as_mut().post(TransportCommand::SendReliable(SendData {
-                        id_list: vec![to_conn_id],
-                        payload: payload,
-                        request_id,
-                    }))?;
+                    self.inner_transport
+                        .as_mut()
+                        .post(TransportCommand::SendReliable(SendData {
+                            id_list: vec![to_conn_id],
+                            payload: payload,
+                            request_id,
+                        }))?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

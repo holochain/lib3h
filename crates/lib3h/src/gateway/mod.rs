@@ -3,9 +3,9 @@ pub mod gateway_transport;
 pub mod p2p_gateway;
 
 use crate::{
+    dht::dht_trait::Dht,
     error::Lib3hResult,
     track::Tracker,
-    dht::dht_trait::Dht,
     transport::{
         protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
     },
@@ -22,9 +22,7 @@ pub(crate) enum TrackType {
     /// send messages, log errors, do nothing with success
     TransportSendFireAndForget,
     /// we compose another transport, return the send result from our inner
-    TransportSendDelegateLower {
-        gateway_request_id: String,
-    },
+    TransportSendDelegateLower { gateway_request_id: String },
 }
 
 /// describes a super construct of a Transport and a Dht allowing

@@ -115,10 +115,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     };
                     // TODO - not sure what core is expected to send back here
                     //      - right now these tracks will timeout
-                    self.request_track.set(
-                        &lib3h_msg.request_id,
-                        Some(TrackType::HoldEntryRequested),
-                    );
+                    self.request_track
+                        .set(&lib3h_msg.request_id, Some(TrackType::HoldEntryRequested));
                     outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }
             }

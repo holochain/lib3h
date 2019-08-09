@@ -51,9 +51,7 @@ pub mod tests {
     #![allow(non_snake_case)]
 
     use crate::{
-        transport::{
-            memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
-        },
+        transport::{memory_mock::transport_memory, protocol::*, transport_trait::Transport},
         transport_wss::{TlsConfig, TransportWss},
     };
 
@@ -114,8 +112,15 @@ pub mod tests {
         let (_did_work, _event_list) = node_B.process().unwrap();
 
         // Send A -> B
-        let payload = [1, 2, 3, 4];
-        node_A.send(&[&idAB], &payload).unwrap();
+        let payload = vec![1, 2, 3, 4];
+        //node_A.send(&[&idAB], &payload).unwrap();
+        node_A
+            .post(TransportCommand::SendReliable(SendData {
+                id_list: vec![idAB.clone()],
+                payload: payload.clone(),
+                request_id: "".to_string(),
+            }))
+            .unwrap();
         let mut did_work = false;
         let mut event_list = Vec::new();
 
@@ -151,11 +156,18 @@ pub mod tests {
         let (_did_work, _event_list) = node_A.process().unwrap();
 
         // Send B -> A
-        let payload = [4, 2, 1, 3];
+        let payload = vec![4, 2, 1, 3];
         let id_list = node_B.connection_id_list().unwrap();
         // referencing node_B's connection list
         let idBA = id_list[0].clone();
-        node_B.send(&[&idBA], &payload).unwrap();
+        //node_B.send(&[&idBA], &payload).unwrap();
+        node_B
+            .post(TransportCommand::SendReliable(SendData {
+                id_list: vec![idBA.clone()],
+                payload: payload.clone(),
+                request_id: "".to_string(),
+            }))
+            .unwrap();
         did_work = false;
         event_list.clear();
         for _x in 0..NUM_PROCESS_LOOPS {

@@ -1,10 +1,10 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    error::Lib3hResult,
-    track::Tracker,
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
+    error::Lib3hResult,
     gateway::{Gateway, P2pGateway, TrackType},
+    track::Tracker,
     transport::TransportWrapper,
 };
 use lib3h_protocol::Address;
@@ -42,7 +42,6 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         }
         id
     }
-
 }
 
 impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {

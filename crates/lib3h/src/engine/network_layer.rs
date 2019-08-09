@@ -2,10 +2,10 @@
 
 use super::TrackType;
 use crate::{
-    gateway::Gateway,
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
     error::{ErrorKind, Lib3hError, Lib3hResult},
+    gateway::Gateway,
     transport::{protocol::*, ConnectionIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
@@ -137,11 +137,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                 //network_gateway.send(&[&peer_data.peer_address], &buf)?;
                 let request_id = self.register_track(TrackType::TransportSendFireAndForget);
-                self.network_gateway.as_transport_mut().post(TransportCommand::SendReliable(SendData {
-                    id_list: vec![peer_data.peer_address.clone()],
-                    payload: buf,
-                    request_id
-                }))?;
+                self.network_gateway
+                    .as_transport_mut()
+                    .post(TransportCommand::SendReliable(SendData {
+                        id_list: vec![peer_data.peer_address.clone()],
+                        payload: buf,
+                        request_id,
+                    }))?;
             }
             // TODO END
 

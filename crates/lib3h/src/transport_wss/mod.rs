@@ -398,9 +398,10 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 info.send_queue.push(msg.payload.to_vec());
             }
         }
-        self.event_queue.push(TransportEvent::SuccessResult(SuccessResultData {
-            request_id: msg.request_id.clone(),
-        }));
+        self.event_queue
+            .push(TransportEvent::SuccessResult(SuccessResultData {
+                request_id: msg.request_id.clone(),
+            }));
         Ok(())
     }
 
