@@ -124,7 +124,7 @@ pub struct GenericResultData {
 
 impl std::fmt::Debug for Opaque {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let bytes = std::str::from_utf8(self.0.as_ref());
+        let bytes = String::from_utf8_lossy(self.0.as_ref());
         write!(f, "{:?}", bytes)
     }
 }
