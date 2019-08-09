@@ -7,15 +7,14 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
-    gateway::P2pGateway,
+    gateway::GatewayWrapper,
     track::Tracker,
-    transport::{transport_trait::Transport, ConnectionId},
+    transport::{ConnectionId, TransportWrapper},
     transport_wss::TlsConfig,
 };
 
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
-use std::{cell::RefCell, rc::Rc};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
@@ -67,7 +66,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport, D: Dht> {
+pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// Identifier
     name: String,
     /// Config settings
@@ -81,13 +80,13 @@ pub struct RealEngine<T: Transport, D: Dht> {
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
-    network_transport: Rc<RefCell<T>>,
+    network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
+    network_gateway: GatewayWrapper<'engine>,
     /// Store active connections?
     network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
+    space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
