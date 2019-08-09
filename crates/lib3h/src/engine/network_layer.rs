@@ -16,11 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Network layer related private methods
 impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Process whatever the network has in for us.
-    pub(crate) fn process_network_gateway(
-        &mut self,
-    ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let mut outbox = Vec::new();
-
+    pub(crate) fn process_network_gateway(&mut self) -> Lib3hResult<DidWork> {
         // Process the network gateway as a Transport
         let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
         debug!(
@@ -31,8 +27,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         );
         if tranport_did_work {
             for evt in event_list {
-                let mut output = self.handle_netTransportEvent(&evt)?;
-                outbox.append(&mut output);
+                self.handle_netTransportEvent(&evt)?;
             }
         }
 
@@ -40,21 +35,19 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
         if dht_did_work {
             for evt in event_list {
-                let mut output = self.handle_netDhtEvent(evt)?;
-                outbox.append(&mut output);
+                self.handle_netDhtEvent(evt)?;
             }
         }
 
         // Process the network gateway as a Gateway
         Gateway::process(&mut *self.network_gateway.as_mut())?;
 
-        Ok((tranport_did_work || dht_did_work, outbox))
+        Ok(tranport_did_work || dht_did_work)
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<()> {
         debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
-        let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {
                 // no-op
@@ -103,15 +96,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 unreachable!();
             }
         }
-        Ok(outbox)
+        Ok(())
     }
 
     fn handle_new_connection(
         &mut self,
         id: &ConnectionIdRef,
         request_id: String,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let mut outbox = Vec::new();
+    ) -> Lib3hResult<()> {
         //let mut network_gateway = self.network_gateway.as_mut();
         let maybe_uri = self.network_gateway.as_ref().get_uri(id).clone();
         if let Some(uri) = maybe_uri {
@@ -142,7 +134,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     .post(TransportCommand::SendReliable(SendData {
                         id_list: vec![peer_data.peer_address.clone()],
                         payload: buf,
-                        request_id,
+                        request_id: Some(request_id),
                     }))?;
             }
             // TODO END
@@ -150,20 +142,16 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             // Output a Lib3hServerProtocol::Connected if its the first connection
             if self.network_connections.is_empty() {
                 let data = ConnectedData { request_id, uri };
-                outbox.push(Lib3hServerProtocol::Connected(data));
+                self.outbox.push(Lib3hServerProtocol::Connected(data));
             }
             let _ = self.network_connections.insert(id.to_owned());
         }
-        Ok(outbox)
+        Ok(())
     }
 
     /// Handle a TransportEvent sent to us by our network gateway
-    fn handle_netTransportEvent(
-        &mut self,
-        evt: &TransportEvent,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_netTransportEvent(&mut self, evt: &TransportEvent) -> Lib3hResult<()> {
         debug!("{} << handle_netTransportEvent: {:?}", self.name, evt);
-        let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
             TransportEvent::ErrorOccured(id, e) => {
@@ -174,16 +162,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     let data = DisconnectedData {
                         network_id: "FIXME".to_string(), // TODO #172
                     };
-                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+                    self.outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
             }
             TransportEvent::ConnectResult(id, request_id) => {
-                let mut output = self.handle_new_connection(id, request_id.clone())?;
-                outbox.append(&mut output);
+                self.handle_new_connection(id, request_id.clone())?;
             }
             TransportEvent::IncomingConnectionEstablished(id) => {
-                let mut output = self.handle_new_connection(id, "".to_string())?;
-                outbox.append(&mut output);
+                self.handle_new_connection(id, "".to_string())?;
             }
             TransportEvent::ConnectionClosed(id) => {
                 self.network_connections.remove(id);
@@ -192,7 +178,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     let data = DisconnectedData {
                         network_id: "FIXME".to_string(), // TODO #172
                     };
-                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+                    self.outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
             }
             TransportEvent::ReceivedData(id, payload) => {
@@ -206,16 +192,51 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
                 let p2p_msg = maybe_msg.unwrap();
                 let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
-                outbox.append(&mut output);
+                self.outbox.append(&mut output);
             }
             TransportEvent::SuccessResult(msg) => {
-                debug!("SUCCESS RESULT: {:?}", msg);
+                if let Some(track_type) = self.request_track.remove(&msg.request_id) {
+                    match track_type {
+                        TrackType::TransportSendFireAndForget => {
+                            trace!("SUCCESS RESULT: {:?}", msg);
+                            // all good :+1:
+                        }
+                        TrackType::TransportSendResultUpgrade { lib3h_request_id } => {
+                            self.outbox.push(Lib3hServerProtocol::SuccessResult(
+                                GenericResultData {
+                                    request_id: lib3h_request_id,
+                                    space_address: "".into(),
+                                    to_agent_id: "".into(),
+                                    result_info: b"".to_vec(),
+                                },
+                            ));
+                        }
+                        _ => (), // TODO - ahh, fix this
+                    }
+                }
             }
             TransportEvent::FailureResult(msg) => {
-                error!("FAILURE RESULT: {:?}", msg);
+                if let Some(track_type) = self.request_track.remove(&msg.request_id) {
+                    match track_type {
+                        TrackType::TransportSendFireAndForget => {
+                            error!("FAILURE RESULT: {:?}", msg);
+                        }
+                        TrackType::TransportSendResultUpgrade { lib3h_request_id } => {
+                            self.outbox.push(Lib3hServerProtocol::FailureResult(
+                                GenericResultData {
+                                    request_id: lib3h_request_id,
+                                    space_address: "".into(),
+                                    to_agent_id: "".into(),
+                                    result_info: format!("{:?}", msg.error).into_bytes(),
+                                },
+                            ));
+                        }
+                        _ => (), // TODO - ahh, fix this
+                    }
+                }
             }
         };
-        Ok(outbox)
+        Ok(())
     }
 
     /// Serve a P2pProtocol sent to us by the network.

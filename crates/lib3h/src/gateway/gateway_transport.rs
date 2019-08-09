@@ -6,7 +6,9 @@ use crate::{
     gateway::{Gateway, P2pGateway, TrackType},
     transport::{
         error::{TransportError, TransportResult},
-        protocol::{SendData, TransportCommand, TransportEvent},
+        protocol::{
+            FailureResultData, SendData, SuccessResultData, TransportCommand, TransportEvent,
+        },
         transport_trait::Transport,
         ConnectionId, ConnectionIdRef,
     },
@@ -65,7 +67,7 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             TransportCommand::SendReliable(SendData {
                 id_list: id_list.iter().map(|x| x.to_string()).collect(),
                 payload: payload.to_vec(),
-                request_id: "".to_string(),
+                request_id: None,
             }),
         )
     }
@@ -84,7 +86,6 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 
     /// Handle TransportEvents directly
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        let mut outbox = Vec::new();
         let mut did_work = false;
         // Process TransportCommand inbox
         loop {
@@ -95,14 +96,14 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             let res = self.serve_TransportCommand(&cmd);
             if let Ok(mut output) = res {
                 did_work = true;
-                outbox.append(&mut output);
+                self.transport_outbox.append(&mut output);
             }
         }
         trace!(
             "({}).Transport.process() - output: {} {}",
             self.identifier,
             did_work,
-            outbox.len(),
+            self.transport_outbox.len(),
         );
         // Process inner transport
         // Its okay to process inner transport as long as NetworkEngine only calls
@@ -116,15 +117,25 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             inner_did_work,
             event_list.len()
         );
+
         if inner_did_work {
             did_work = true;
-            outbox.append(&mut event_list);
         }
+
+        if !event_list.is_empty() {
+            self.transport_outbox.append(&mut event_list);
+        }
+
+        // TODO XXX - I don't think we want to process ALL these in BOTH places
+        //            we should iterate locally and selectively forward to
+        //            our outbox
+
         // Handle TransportEvents
-        for evt in outbox.clone().iter() {
+        for evt in self.transport_outbox.clone().iter() {
             self.handle_TransportEvent(&evt)?;
         }
-        Ok((did_work, outbox))
+
+        Ok((did_work, self.transport_outbox.drain(..).collect()))
     }
 
     /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
@@ -205,7 +216,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             .post(TransportCommand::SendReliable(SendData {
                 id_list: vec![id.to_string()],
                 payload: buf,
-                request_id,
+                request_id: Some(request_id),
             }))
         //return self.inner_transport.as_mut().send(&[&id], &buf);
     }
@@ -270,10 +281,38 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 }
             }
             TransportEvent::SuccessResult(msg) => {
-                debug!("SUCCESS RESULT: {:?}", msg);
+                if let Some(track_type) = self.request_track.remove(&msg.request_id) {
+                    match track_type {
+                        TrackType::TransportSendFireAndForget => {
+                            trace!("SUCCESS RESULT: {:?}", msg);
+                            // all good :+1:
+                        }
+                        TrackType::TransportSendDelegateLower { gateway_request_id } => {
+                            self.transport_outbox.push(TransportEvent::SuccessResult(
+                                SuccessResultData {
+                                    request_id: gateway_request_id,
+                                },
+                            ));
+                        }
+                    }
+                }
             }
             TransportEvent::FailureResult(msg) => {
-                error!("FAILURE RESULT: {:?}", msg);
+                if let Some(track_type) = self.request_track.remove(&msg.request_id) {
+                    match track_type {
+                        TrackType::TransportSendFireAndForget => {
+                            error!("FAILURE RESULT: {:?}", msg);
+                        }
+                        TrackType::TransportSendDelegateLower { gateway_request_id } => {
+                            self.transport_outbox.push(TransportEvent::FailureResult(
+                                FailureResultData {
+                                    request_id: gateway_request_id,
+                                    error: msg.error.clone(),
+                                },
+                            ));
+                        }
+                    }
+                }
             }
         };
         Ok(())
@@ -335,19 +374,21 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         // Get connectionIds for the inner Transport.
         let mut conn_list: Vec<String> = Vec::new();
         for dht_uri in dht_uri_list {
-            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri.to_string());
+            let net_id = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
+            conn_list.push(net_id.to_string());
             trace!(
                 "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
                 self.identifier,
                 dht_uri,
-                net_uri,
+                net_id,
             )
         }
 
         // TODO XXX - actually pass this forward
-        let request_id = self.register_track(TrackType::TransportSendDelegateLower {
-            gateway_request_id: msg.request_id.clone(),
+        let request_id = msg.request_id.clone().map(|rid| {
+            self.register_track(TrackType::TransportSendDelegateLower {
+                gateway_request_id: rid,
+            })
         });
         self.inner_transport
             .as_mut()

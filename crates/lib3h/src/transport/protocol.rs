@@ -5,7 +5,7 @@ use url::Url;
 pub struct SendData {
     pub id_list: Vec<ConnectionId>,
     pub payload: Vec<u8>,
-    pub request_id: String,
+    pub request_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

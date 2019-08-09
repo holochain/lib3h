@@ -31,6 +31,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             request_track: Tracker::new("gateway_", 2000),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
+            transport_outbox: Vec::new(),
         }
     }
 
@@ -105,6 +106,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             request_track: Tracker::new("gateway_", 2000),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
+            transport_outbox: Vec::new(),
         }
     }
 }

@@ -7,7 +7,9 @@ use crate::{
     error::Lib3hResult,
     track::Tracker,
     transport::{
-        protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
+        protocol::{TransportCommand, TransportEvent},
+        transport_trait::Transport,
+        ConnectionId, TransportWrapper,
     },
 };
 use std::{
@@ -115,4 +117,6 @@ pub struct P2pGateway<'gateway, D: Dht> {
     connection_map: HashMap<Url, ConnectionId>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
+    /// Own outbox for TransportEvents generated in other process stages
+    transport_outbox: Vec<TransportEvent>,
 }

@@ -116,7 +116,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .post(TransportCommand::SendReliable(SendData {
                             id_list: vec![to_conn_id],
                             payload: payload,
-                            request_id,
+                            request_id: Some(request_id),
                         }))?;
                 }
             }

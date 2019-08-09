@@ -118,7 +118,7 @@ pub mod tests {
             .post(TransportCommand::SendReliable(SendData {
                 id_list: vec![idAB.clone()],
                 payload: payload.clone(),
-                request_id: "".to_string(),
+                request_id: None,
             }))
             .unwrap();
         let mut did_work = false;
@@ -165,7 +165,7 @@ pub mod tests {
             .post(TransportCommand::SendReliable(SendData {
                 id_list: vec![idBA.clone()],
                 payload: payload.clone(),
-                request_id: "".to_string(),
+                request_id: None,
             }))
             .unwrap();
         did_work = false;

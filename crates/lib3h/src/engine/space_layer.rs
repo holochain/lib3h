@@ -38,11 +38,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     }
 
     /// Process all space gateways
-    pub(crate) fn process_space_gateways(
-        &mut self,
-    ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
+    pub(crate) fn process_space_gateways(&mut self) -> Lib3hProtocolResult<()> {
         // Process all gateways' DHT
-        let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
             let (did_work, event_list) = space_gateway.as_dht_mut().process()?;
@@ -57,11 +54,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Process all gateway DHT events
         for (chain_id, evt_list) in dht_outbox {
             for evt in evt_list {
-                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
-                outbox.append(&mut output);
+                self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
             }
         }
-        Ok(outbox)
+        Ok(())
     }
 
     /// Handle a DhtEvent sent to us by a space gateway
@@ -69,12 +65,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         &mut self,
         chain_id: &ChainId,
         cmd: DhtEvent,
-    ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
+    ) -> Lib3hProtocolResult<()> {
         debug!(
             "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
             self.name, chain_id, cmd,
         );
-        let mut outbox = Vec::new();
         let space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
@@ -117,7 +112,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     //      - right now these tracks will timeout
                     self.request_track
                         .set(&lib3h_msg.request_id, Some(TrackType::HoldEntryRequested));
-                    outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
+                    self.outbox
+                        .push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }
             }
             // FetchEntryResponse: Send back as a query response to Core
@@ -136,7 +132,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     responder_agent_id: chain_id.1.clone(),
                     query_result,
                 };
-                outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
+                self.outbox
+                    .push(Lib3hServerProtocol::QueryEntryResult(msg_data))
             }
             DhtEvent::EntryPruned(_address) => {
                 // TODO #174
@@ -150,9 +147,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     provider_agent_id: chain_id.1.clone(),
                     aspect_address_list: None,
                 };
-                outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data))
+                self.outbox
+                    .push(Lib3hServerProtocol::HandleFetchEntry(msg_data))
             }
         }
-        Ok(outbox)
+        Ok(())
     }
 }

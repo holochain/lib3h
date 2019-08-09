@@ -79,6 +79,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             crypto,
             config,
             inbox: VecDeque::new(),
+            outbox: Vec::new(),
             name: name.to_string(),
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
@@ -133,6 +134,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             crypto,
             config,
             inbox: VecDeque::new(),
+            outbox: Vec::new(),
             name: name.to_string(),
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
@@ -168,21 +170,18 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
         self.process_count += 1;
         trace!("");
         trace!("{} - process() START - {}", self.name, self.process_count);
-        let mut outbox = Vec::new();
 
         // Process all received Lib3hClientProtocol messages from Core
-        let inbox_did_work = self.process_inbox(&mut outbox)?;
+        let inbox_did_work = self.process_inbox()?;
 
         // Process the network layer
-        let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
-        outbox.append(&mut net_outbox);
+        let net_did_work = self.process_network_gateway()?;
         // Process the space layer
-        let mut p2p_output = self.process_space_gateways()?;
-        outbox.append(&mut p2p_output);
+        self.process_space_gateways()?;
         trace!(
             "process() END - {} (outbox: {})\n",
             self.process_count,
-            outbox.len(),
+            self.outbox.len(),
         );
 
         for (timeout_id, timeout_data) in self.request_track.process_timeouts() {
@@ -190,7 +189,10 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
         }
 
         // Done
-        Ok((inbox_did_work || net_did_work, outbox))
+        Ok((
+            inbox_did_work || net_did_work,
+            self.outbox.drain(..).collect(),
+        ))
     }
 }
 
@@ -241,14 +243,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     }
 
     /// Progressively serve every Lib3hClientProtocol received in inbox
-    fn process_inbox(&mut self, outbox: &mut Vec<Lib3hServerProtocol>) -> Lib3hResult<DidWork> {
+    fn process_inbox(&mut self) -> Lib3hResult<DidWork> {
         let did_work = self.inbox.len() > 0;
         loop {
             let client_msg = match self.inbox.pop_front() {
                 None => break,
                 Some(msg) => msg,
             };
-            self.serve_Lib3hClientProtocol(outbox, client_msg)?;
+            self.serve_Lib3hClientProtocol(client_msg)?;
         }
         Ok(did_work)
     }
@@ -256,11 +258,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Process a Lib3hClientProtocol message sent to us (by Core)
     /// Side effects: Might add other messages to sub-components' inboxes.
     /// Return a list of Lib3hServerProtocol messages to send back to core or others?
-    fn serve_Lib3hClientProtocol(
-        &mut self,
-        outbox: &mut Vec<Lib3hServerProtocol>,
-        client_msg: Lib3hClientProtocol,
-    ) -> Lib3hResult<()> {
+    fn serve_Lib3hClientProtocol(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hResult<()> {
         debug!("{} serving: {:?}", self.name, client_msg);
         // Note: use same order as the enum
         match client_msg {
@@ -280,17 +278,17 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
-                outbox.append(&mut output);
+                self.outbox.append(&mut output);
             }
             Lib3hClientProtocol::LeaveSpace(msg) => {
                 let srv_msg = self.serve_LeaveSpace(&msg);
-                outbox.push(srv_msg);
+                self.outbox.push(srv_msg);
             }
             Lib3hClientProtocol::SendDirectMessage(msg) => {
-                self.serve_DirectMessage(outbox, msg, false)?;
+                self.serve_DirectMessage(msg, false)?;
             }
             Lib3hClientProtocol::HandleSendDirectMessageResult(msg) => {
-                self.serve_DirectMessage(outbox, msg, true)?;
+                self.serve_DirectMessage(msg, true)?;
             }
             Lib3hClientProtocol::FetchEntry(_msg) => {
                 // TODO #169
@@ -318,7 +316,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     None,
                 );
                 match maybe_space {
-                    Err(res) => outbox.push(res),
+                    Err(res) => self.outbox.push(res),
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
@@ -343,7 +341,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     None,
                 );
                 match maybe_space {
-                    Err(res) => outbox.push(res),
+                    Err(res) => self.outbox.push(res),
                     Ok(space_gateway) => {
                         let cmd = DhtCommand::BroadcastEntry(msg.entry);
                         space_gateway.as_dht_mut().post(cmd)?;
@@ -359,7 +357,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     None,
                 );
                 match maybe_space {
-                    Err(res) => outbox.push(res),
+                    Err(res) => self.outbox.push(res),
                     Ok(space_gateway) => {
                         let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
                         space_gateway.as_dht_mut().post(cmd)?;
@@ -376,7 +374,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     None,
                 );
                 match maybe_space {
-                    Err(res) => outbox.push(res),
+                    Err(res) => self.outbox.push(res),
                     Ok(space_gateway) => {
                         let msg = dht_protocol::FetchDhtEntryData {
                             msg_id: msg.request_id,
@@ -401,7 +399,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     Deserialize::deserialize(&mut de);
                 let entry = maybe_entry.expect("Deserialization should always work");
                 match maybe_space {
-                    Err(res) => outbox.push(res),
+                    Err(res) => self.outbox.push(res),
                     Ok(space_gateway) => {
                         let msg = dht_protocol::FetchDhtEntryResponseData {
                             msg_id: msg.request_id,
@@ -414,11 +412,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg) => {
-                self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(outbox, msg)?;
+                self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg)?;
             }
             // Our request for the hold_list has returned
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg) => {
-                self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(outbox, msg)?;
+                self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg)?;
             }
         }
         Ok(())
@@ -426,7 +424,6 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
 
     fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
         &mut self,
-        outbox: &mut Vec<Lib3hServerProtocol>,
         msg: EntryListData,
     ) -> Lib3hResult<()> {
         if !self.request_track.has(&msg.request_id) {
@@ -448,7 +445,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             None,
         );
         match maybe_space {
-            Err(res) => outbox.push(res),
+            Err(res) => self.outbox.push(res),
             Ok(space_gateway) => {
                 let mut msg_data = FetchEntryData {
                     space_address: msg.space_address.clone(),
@@ -478,14 +475,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             msg_data.request_id = self.request_track.reserve();
             self.request_track
                 .set(&msg_data.request_id, Some(TrackType::DataForAuthorEntry));
-            outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
+            self.outbox
+                .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
         }
         Ok(())
     }
 
     fn serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(
         &mut self,
-        outbox: &mut Vec<Lib3hServerProtocol>,
         msg: EntryListData,
     ) -> Lib3hResult<()> {
         if !self.request_track.has(&msg.request_id) {
@@ -506,7 +503,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             None,
         );
         match maybe_space {
-            Err(res) => outbox.push(res),
+            Err(res) => self.outbox.push(res),
             Ok(space_gateway) => {
                 for (entry_address, aspect_address_list) in msg.address_map {
                     let mut aspect_list = Vec::new();
@@ -630,7 +627,6 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
 
     fn serve_DirectMessage(
         &mut self,
-        outbox: &mut Vec<Lib3hServerProtocol>,
         msg: DirectMessageData,
         is_response: bool,
     ) -> Lib3hResult<()> {
@@ -643,7 +639,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         );
         // Return failure if not
         if let Err(failure_msg) = maybe_space {
-            outbox.push(failure_msg);
+            self.outbox.push(failure_msg);
             return Ok(());
         }
         let space_gateway = maybe_space.unwrap();
@@ -659,7 +655,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == &to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();
-            outbox.push(Lib3hServerProtocol::FailureResult(response));
+            self.outbox
+                .push(Lib3hServerProtocol::FailureResult(response));
             return Ok(());
         }
         // Change into P2pProtocol
@@ -683,7 +680,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             .post(TransportCommand::SendReliable(SendData {
                 id_list: vec![peer_address],
                 payload,
-                request_id: internal_request_id,
+                request_id: Some(internal_request_id),
             }))
             .map_err(|e| Lib3hError::from(e))?;
         Ok(())

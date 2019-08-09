@@ -14,7 +14,9 @@ use crate::{
 };
 
 use lib3h_crypto_api::{Buffer, CryptoSystem};
-use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
+use lib3h_protocol::{
+    protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
+};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
@@ -71,6 +73,8 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
+    /// additional outgoing messages generated during processing
+    outbox: Vec<Lib3hServerProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
     /// Tracking request_id's

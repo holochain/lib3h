@@ -214,7 +214,7 @@ impl Transport for TransportMemory {
         self.post(TransportCommand::SendReliable(SendData {
             id_list,
             payload: payload.to_vec(),
-            request_id: "".to_string(),
+            request_id: None,
         }))?;
         Ok(())
     }
@@ -399,9 +399,11 @@ impl TransportMemory {
                 .post(&my_uri, &msg.payload)
                 .expect("Post on memory server should work");
         }
-        outbox.push(TransportEvent::SuccessResult(SuccessResultData {
-            request_id: msg.request_id.clone(),
-        }));
+        if let Some(request_id) = &msg.request_id {
+            outbox.push(TransportEvent::SuccessResult(SuccessResultData {
+                request_id: request_id.clone(),
+            }));
+        }
         Ok(())
     }
 }
