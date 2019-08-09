@@ -12,8 +12,7 @@ extern crate lib3h_sodium;
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
-    transport::{memory_mock::transport_memory::TransportMemory, transport_trait::Transport},
-    transport_wss::{TlsConfig, TransportWss},
+    transport_wss::TlsConfig,
 };
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
@@ -58,10 +57,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap(
-    name: &str,
-    bs: Option<Vec<Url>>,
-) -> RealEngine<TransportMemory, MirrorDht> {
+fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine<MirrorDht> {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
@@ -92,11 +88,11 @@ fn basic_setup_mock_bootstrap(
     engine
 }
 
-fn basic_setup_mock(name: &str) -> RealEngine<TransportMemory, MirrorDht> {
+fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
     basic_setup_mock_bootstrap(name, None)
 }
 
-fn basic_setup_wss() -> RealEngine<TransportWss<std::net::TcpStream>, MirrorDht> {
+fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
@@ -207,7 +203,7 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<T: Transport, D: Dht>(engine: &mut RealEngine<T, D>) {
+fn basic_track_test<D: Dht>(engine: &mut RealEngine<D>) {
     // Test
     let mut track_space = SpaceData {
         request_id: "track_a_1".into(),

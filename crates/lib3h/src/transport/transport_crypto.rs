@@ -9,21 +9,21 @@ use lib3h_protocol::DidWork;
 use url::Url;
 
 /// Wraps any transport and adds cryptography
-pub struct TransportCrypto<T: Transport> {
-    inner_transport: T,
+pub struct TransportCrypto {
+    inner_transport: Box<dyn Transport>,
 }
 
 /// Constructor
 /// TODO #177 - Consume inner_tranport or have it be a reference?
-impl<T: Transport> TransportCrypto<T> {
-    pub fn new(inner_transport: T) -> Self {
+impl TransportCrypto {
+    pub fn new(inner_transport: Box<dyn Transport>) -> Self {
         TransportCrypto { inner_transport }
     }
 }
 
 /// Implement Transport trait by composing inner transport
 /// TODO #177 - passthrough for now
-impl<T: Transport> Transport for TransportCrypto<T> {
+impl Transport for TransportCrypto {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         self.inner_transport.connect(&uri)
     }
