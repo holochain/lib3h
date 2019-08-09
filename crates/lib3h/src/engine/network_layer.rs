@@ -211,7 +211,7 @@ impl<T: Transport, D: Dht> RealEngine<T, D> {
                 // Prepare remoteGossipTo to post to dht
                 let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
                     from_peer_address: msg.from_peer_address.clone().into(),
-                    bundle: msg.bundle.clone().into(),
+                    bundle: msg.bundle.clone(),
                 });
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
