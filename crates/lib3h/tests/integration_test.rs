@@ -158,7 +158,7 @@ fn test_two_memory_nodes_basic_suite() {
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
         count = count + 1;
         println!("\n\n--- @^@^@ TEST #{} ---\n\n", count);
-        if let Err(e) =  std::panic::catch_unwind(|| {
+        if let Err(e) = std::panic::catch_unwind(|| {
             launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
         }) {
             error!("@^@^@: {:?}", e);
