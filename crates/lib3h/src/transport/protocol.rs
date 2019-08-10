@@ -1,12 +1,14 @@
-use crate::transport::{error::TransportError, ConnectionId};
+use crate::{
+    lib3h_protocol::data_types::Opaque,
+    transport::{error::TransportError, ConnectionId},
+};
 use url::Url;
-
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportCommand {
     Connect(Url, /*request_id*/ String),
-    Send(Vec<ConnectionId>, Vec<u8>),
-    SendAll(Vec<u8>),
+    Send(Vec<ConnectionId>, Opaque),
+    SendAll(Opaque),
     Close(ConnectionId),
     CloseAll,
     Bind(Url),
@@ -22,7 +24,7 @@ pub enum TransportEvent {
     /// we have received an incoming connection
     IncomingConnectionEstablished(ConnectionId),
     /// We have received data from a connection
-    ReceivedData(ConnectionId, Vec<u8>),
+    ReceivedData(ConnectionId, Opaque),
     /// A connection closed for whatever reason
     ConnectionClosed(ConnectionId),
 }
