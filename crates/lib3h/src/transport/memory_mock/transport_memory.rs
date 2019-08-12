@@ -215,6 +215,7 @@ impl Transport for TransportMemory {
             id_list,
             payload: payload.to_vec(),
             request_id: None,
+            chain_id: None,
         }))?;
         Ok(())
     }
@@ -369,6 +370,7 @@ impl TransportMemory {
         outbox: &mut Vec<TransportEvent>,
         msg: &SendData,
     ) -> TransportResult<()> {
+        let chain_id = msg.chain_id.clone();
         if self.maybe_my_uri.is_none() {
             return Err(TransportError::new(
                 "Cannot send before bounding".to_string(),
@@ -402,6 +404,7 @@ impl TransportMemory {
         if let Some(request_id) = &msg.request_id {
             outbox.push(TransportEvent::SuccessResult(SuccessResultData {
                 request_id: request_id.clone(),
+                chain_id,
             }));
         }
         Ok(())

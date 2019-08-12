@@ -5,6 +5,7 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
     gateway::{Gateway, GatewayWrapper},
+    transport::{protocol::*, ConnectionIdRef},
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -41,20 +42,30 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     pub(crate) fn process_space_gateways(&mut self) -> Lib3hProtocolResult<()> {
         // Process all gateways' DHT
         let mut dht_outbox = HashMap::new();
+        let mut transport_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
             let (did_work, event_list) = space_gateway.as_dht_mut().process()?;
-            if did_work {
+            if !event_list.is_empty() {
                 // TODO: perf optim, don't copy chain_id
                 dht_outbox.insert(chain_id.clone(), event_list);
             }
-            // TODO XXX - we're not processing transport events here
-            //            do we need to??
+            let (did_work, event_list) = space_gateway.as_transport_mut().process()?;
+            if !event_list.is_empty() {
+                error!("HANDLE THIS: {:?}", event_list);
+                transport_outbox.insert(chain_id.clone(), event_list);
+            }
             Gateway::process(&mut *space_gateway.as_mut())?;
         }
         // Process all gateway DHT events
         for (chain_id, evt_list) in dht_outbox {
             for evt in evt_list {
                 self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
+            }
+        }
+        // Process all gateway Transport events
+        for (chain_id, evt_list) in transport_outbox {
+            for evt in evt_list {
+                self.handle_spaceTransportEvent(&chain_id, &evt)?;
             }
         }
         Ok(())
@@ -149,6 +160,76 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 };
                 self.outbox
                     .push(Lib3hServerProtocol::HandleFetchEntry(msg_data))
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle a TransportEvent sent to us by our space gateway
+    fn handle_spaceTransportEvent(
+        &mut self,
+        chain_id: &ChainId,
+        evt: &TransportEvent,
+    ) -> Lib3hProtocolResult<()> {
+        debug!("{} << handle_spaceTransportEvent: {:?}", self.name, evt);
+        // Note: use same order as the enum
+        match evt {
+            TransportEvent::SuccessResult(msg) => {
+                if let Some(track_type) = self.request_track.remove(&msg.request_id) {
+                    match track_type {
+                        TrackType::TransportSendFireAndForget => {
+                            trace!("TransportSendFireAndForget Success: {:?}", msg);
+                            // all good :+1:
+                        }
+                        TrackType::TransportSendResultUpgrade {
+                            lib3h_request_id,
+                            space_address,
+                            to_agent_id,
+                        } => {
+                            trace!("TransportSendResultUpgrade Success: {:?} {} {} {}", msg, lib3h_request_id, space_address, to_agent_id);
+                            self.outbox.push(Lib3hServerProtocol::SuccessResult(
+                                GenericResultData {
+                                    request_id: lib3h_request_id,
+                                    space_address,
+                                    to_agent_id,
+                                    result_info: b"".to_vec(),
+                                },
+                            ));
+                        }
+                        _ => (), // TODO - ahh, fix this
+                    }
+                } else {
+                    error!("NO REQUEST ID: {:?}", msg);
+                }
+            }
+            TransportEvent::FailureResult(msg) => {
+                if let Some(track_type) = self.request_track.remove(&msg.request_id) {
+                    match track_type {
+                        TrackType::TransportSendFireAndForget => {
+                            error!("FAILURE RESULT: {:?}", msg);
+                        }
+                        TrackType::TransportSendResultUpgrade {
+                            lib3h_request_id,
+                            space_address,
+                            to_agent_id,
+                        } => {
+                            self.outbox.push(Lib3hServerProtocol::FailureResult(
+                                GenericResultData {
+                                    request_id: lib3h_request_id,
+                                    space_address,
+                                    to_agent_id,
+                                    result_info: format!("{:?}", msg.error).into_bytes(),
+                                },
+                            ));
+                        }
+                        _ => (), // TODO - ahh, fix this
+                    }
+                } else {
+                    error!("NO REQUEST ID: {:?}", msg);
+                }
+            }
+            _ => {
+                error!("BAD BAD BAD HANDLE THIS: {:?}", evt);
             }
         }
         Ok(())

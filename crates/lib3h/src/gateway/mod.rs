@@ -16,6 +16,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
+use lib3h_protocol::Address;
 
 use url::Url;
 
@@ -24,7 +25,7 @@ pub(crate) enum TrackType {
     /// send messages, log errors, do nothing with success
     TransportSendFireAndForget,
     /// we compose another transport, return the send result from our inner
-    TransportSendDelegateLower { gateway_request_id: String },
+    TransportSendDelegateLower { gateway_request_id: String, chain_id: Option<(Address, Address)> },
 }
 
 /// describes a super construct of a Transport and a Dht allowing

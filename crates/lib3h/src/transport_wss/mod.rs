@@ -402,6 +402,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             self.event_queue
                 .push(TransportEvent::SuccessResult(SuccessResultData {
                     request_id: request_id.clone(),
+                    chain_id: msg.chain_id.clone(),
                 }));
         }
         Ok(())

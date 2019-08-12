@@ -24,11 +24,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
+        let track_prefix = format!("gateway_{}_", &identifier);
         P2pGateway {
             inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
-            request_track: Tracker::new("gateway_", 2000),
+            request_track: Tracker::new(&track_prefix, 2000),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
             transport_outbox: Vec::new(),
@@ -100,11 +101,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         dht_config: &DhtConfig,
     ) -> Self {
         let identifier: String = space_address.clone().into();
+        let track_prefix = format!("gateway_{}_", &identifier);
         P2pGateway {
             inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
-            request_track: Tracker::new("gateway_", 2000),
+            request_track: Tracker::new(&track_prefix, 2000),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
             transport_outbox: Vec::new(),

@@ -630,6 +630,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         msg: DirectMessageData,
         is_response: bool,
     ) -> Lib3hResult<()> {
+        let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
+
         // Check if space is joined by sender
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
@@ -677,12 +679,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             space_address: response.space_address,
             to_agent_id: response.to_agent_id,
         });
+        trace!("registering {} to satisfy core request_id {}", internal_request_id, &msg.request_id);
         space_gateway
             .as_transport_mut()
             .post(TransportCommand::SendReliable(SendData {
                 id_list: vec![peer_address],
                 payload,
                 request_id: Some(internal_request_id),
+                chain_id: Some(chain_id),
             }))
             .map_err(|e| Lib3hError::from(e))?;
         Ok(())

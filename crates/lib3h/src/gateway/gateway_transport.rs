@@ -68,6 +68,7 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
                 id_list: id_list.iter().map(|x| x.to_string()).collect(),
                 payload: payload.to_vec(),
                 request_id: None,
+                chain_id: None,
             }),
         )
     }
@@ -80,6 +81,7 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 
     ///
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
+        trace!("({}) posting {:?}", &self.identifier, &command);
         self.transport_inbox.push_back(command);
         Ok(())
     }
@@ -221,6 +223,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 id_list: vec![id.to_string()],
                 payload: buf,
                 request_id: Some(request_id),
+                chain_id: None,
             }))
         //return self.inner_transport.as_mut().send(&[&id], &buf);
     }
@@ -291,10 +294,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                             trace!("SUCCESS RESULT: {:?}", msg);
                             // all good :+1:
                         }
-                        TrackType::TransportSendDelegateLower { gateway_request_id } => {
+                        TrackType::TransportSendDelegateLower { gateway_request_id, chain_id } => {
+                            trace!("@^@^@ {} DELEGATE LOWER TRIGGER {:?} {}", self.identifier, &msg, gateway_request_id);
                             self.transport_outbox.push(TransportEvent::SuccessResult(
                                 SuccessResultData {
                                     request_id: gateway_request_id,
+                                    chain_id,
                                 },
                             ));
                         }
@@ -307,11 +312,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         TrackType::TransportSendFireAndForget => {
                             error!("FAILURE RESULT: {:?}", msg);
                         }
-                        TrackType::TransportSendDelegateLower { gateway_request_id } => {
+                        TrackType::TransportSendDelegateLower { gateway_request_id, chain_id } => {
                             self.transport_outbox.push(TransportEvent::FailureResult(
                                 FailureResultData {
                                     request_id: gateway_request_id,
                                     error: msg.error.clone(),
+                                    chain_id,
                                 },
                             ));
                         }
@@ -357,6 +363,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
 
     #[allow(non_snake_case)]
     fn serve_TransportCommand_SendReliable(&mut self, msg: &SendData) -> TransportResult<()> {
+        trace!("registering workflow {:?}", msg);
         self.workflow.push(SendReliableCheckAddressLoopData {
             msg: msg.clone(),
             last_tickle_ms: 0,
@@ -371,6 +378,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     ) -> TransportResult<bool> {
         let now = crate::time::since_epoch_ms();
         if now - item.last_tickle_ms < 10 {
+            trace!("NOT READY {:?}", &item);
             self.workflow.push(item);
             return Ok(false);
         }
@@ -387,6 +395,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .push(TransportEvent::FailureResult(FailureResultData {
                             request_id: rid.clone(),
                             error: vec![e],
+                            chain_id: item.msg.chain_id.clone(),
                         }));
                 } else {
                     error!("failed to send: {:?}", e);
@@ -400,6 +409,8 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         &mut self,
         msg: &SendData,
     ) -> TransportResult<()> {
+        trace!("try send {:?}", &msg);
+
         // get connectionId from the inner dht first
         let dht_uri_list = self.dht_address_to_uri_list(msg.id_list.as_slice())?;
         // send
@@ -426,14 +437,17 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         let request_id = msg.request_id.clone().map(|rid| {
             self.register_track(TrackType::TransportSendDelegateLower {
                 gateway_request_id: rid,
+                chain_id: msg.chain_id.clone(),
             })
         });
+        trace!("maybe registering {:?} to satisfy request_id {:?}", &request_id, &msg.request_id);
         self.inner_transport
             .as_mut()
             .post(TransportCommand::SendReliable(SendData {
                 id_list: conn_list,
                 payload: msg.payload.clone(),
                 request_id,
+                chain_id: msg.chain_id.clone(),
             }))
 
         /*

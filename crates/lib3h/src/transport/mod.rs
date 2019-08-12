@@ -119,6 +119,7 @@ pub mod tests {
                 id_list: vec![idAB.clone()],
                 payload: payload.clone(),
                 request_id: None,
+                chain_id: None,
             }))
             .unwrap();
         let mut did_work = false;
@@ -166,6 +167,7 @@ pub mod tests {
                 id_list: vec![idBA.clone()],
                 payload: payload.clone(),
                 request_id: None,
+                chain_id: None,
             }))
             .unwrap();
         did_work = false;

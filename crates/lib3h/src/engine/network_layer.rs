@@ -135,6 +135,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         id_list: vec![peer_data.peer_address.clone()],
                         payload: buf,
                         request_id: Some(request_id),
+                        chain_id: None,
                     }))?;
             }
             // TODO END
@@ -198,7 +199,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 if let Some(track_type) = self.request_track.remove(&msg.request_id) {
                     match track_type {
                         TrackType::TransportSendFireAndForget => {
-                            trace!("SUCCESS RESULT: {:?}", msg);
+                            trace!("TransportSendFireAndForget Success: {:?}", msg);
                             // all good :+1:
                         }
                         TrackType::TransportSendResultUpgrade {
@@ -206,6 +207,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                             space_address,
                             to_agent_id,
                         } => {
+                            trace!("TransportSendResultUpgrade Success: {:?} {} {} {}", msg, lib3h_request_id, space_address, to_agent_id);
                             self.outbox.push(Lib3hServerProtocol::SuccessResult(
                                 GenericResultData {
                                     request_id: lib3h_request_id,
@@ -216,6 +218,17 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                             ));
                         }
                         _ => (), // TODO - ahh, fix this
+                    }
+                } else {
+                    if msg.chain_id.is_some() && self.space_gateway_map.contains_key(&msg.chain_id.as_ref().unwrap()) {
+                        warn!("@^@^@ forwarding up the chain: {:?}", msg.chain_id);
+                        let space_gateway = self
+                            .space_gateway_map
+                            .get_mut(msg.chain_id.as_ref().unwrap()).unwrap();
+                        panic!("HOW DO WE SEND THIS IN??");
+
+                    } else {
+                        error!("NO REQUEST ID: {:?}", msg);
                     }
                 }
             }
@@ -241,6 +254,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         }
                         _ => (), // TODO - ahh, fix this
                     }
+                } else {
+                    error!("NO REQUEST ID: {:?}", msg);
                 }
             }
         };

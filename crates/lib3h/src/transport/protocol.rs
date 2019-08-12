@@ -1,22 +1,29 @@
 use crate::transport::{error::TransportError, ConnectionId};
 use url::Url;
+use lib3h_protocol::Address;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SendData {
     pub id_list: Vec<ConnectionId>,
     pub payload: Vec<u8>,
     pub request_id: Option<String>,
+    /// TODO XXX - HACK until we have channels
+    pub chain_id: Option<(Address, Address)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SuccessResultData {
     pub request_id: String,
+    /// TODO XXX - HACK until we have channels
+    pub chain_id: Option<(Address, Address)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FailureResultData {
     pub request_id: String,
     pub error: Vec<TransportError>,
+    /// TODO XXX - HACK until we have channels
+    pub chain_id: Option<(Address, Address)>,
 }
 
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`

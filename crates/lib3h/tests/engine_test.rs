@@ -323,6 +323,16 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     println!("\nAlex sends DM to Billy...\n");
     alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
         .unwrap();
+
+    alex.process().unwrap();
+    billy.process().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    alex.process().unwrap();
+    billy.process().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    alex.process().unwrap();
+    billy.process().unwrap();
+
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);

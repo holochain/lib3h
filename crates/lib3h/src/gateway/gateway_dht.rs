@@ -117,6 +117,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                             id_list: vec![to_conn_id],
                             payload: payload,
                             request_id: Some(request_id),
+                            chain_id: None,
                         }))?;
                 }
             }
