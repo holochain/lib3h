@@ -21,7 +21,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Process the network gateway as a Transport
         let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
         if !event_list.is_empty() {
-            debug!(
+            trace!(
                 "{} - network_gateway Transport.process(): {} {}",
                 self.name,
                 tranport_did_work,
@@ -147,7 +147,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         &mut self,
         evt: &TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netTransportEvent: {:?}", self.name, evt);
+        trace!("{} << handle_netTransportEvent: {:?}", self.name, evt);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match evt {
@@ -181,7 +181,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
             }
             TransportEvent::ReceivedData(id, payload) => {
-                debug!("Received message from: {} | {}", id, payload.len());
+                trace!("Received message from: {} | {}", id, payload.len());
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
