@@ -213,8 +213,8 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
 
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
-        debug!(
-            "FISH <<< '({})' recv transport event: {:?}",
+        trace!(
+            "<<< '({})' recv transport event: {:?}",
             self.identifier, evt
         );
         // Note: use same order as the enum

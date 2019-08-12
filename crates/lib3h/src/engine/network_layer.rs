@@ -47,7 +47,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
 
     /// Handle a DhtEvent sent to us by our network gateway
     fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
+        trace!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
         let outbox = Vec::new();
         match cmd {
             DhtEvent::GossipTo(_data) => {

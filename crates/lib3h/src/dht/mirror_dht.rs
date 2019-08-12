@@ -308,7 +308,7 @@ impl MirrorDht {
     /// Return a list of DhtEvent to owner.
     #[allow(non_snake_case)]
     fn serve_DhtCommand(&mut self, cmd: &DhtCommand) -> Lib3hResult<Vec<DhtEvent>> {
-        debug!("@MirrorDht@ serving cmd: {:?}", cmd);
+        trace!("@MirrorDht@ serving cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip

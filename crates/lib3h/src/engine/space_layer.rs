@@ -65,7 +65,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         chain_id: &ChainId,
         cmd: DhtEvent,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
-        debug!(
+        trace!(
             "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
             self.name, chain_id, cmd,
         );
