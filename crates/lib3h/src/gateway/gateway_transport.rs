@@ -214,7 +214,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Process a transportEvent received from our internal connection.
     pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
         debug!(
-            "<<< '({})' recv transport event: {:?}",
+            "FISH <<< '({})' recv transport event: {:?}",
             self.identifier, evt
         );
         // Note: use same order as the enum
@@ -238,7 +238,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 // TODO #176
             }
             TransportEvent::ReceivedData(connection_id, payload) => {
-                debug!("Received message from: {}", connection_id);
+//                debug!("Received message from: {}", connection_id);
                 // trace!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
