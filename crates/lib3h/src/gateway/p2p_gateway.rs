@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
-    transport::TransportWrapper,
+    transport::{transport_crypto::TransportCrypto, TransportWrapper},
 };
 use lib3h_protocol::Address;
 use std::collections::{HashMap, VecDeque};
@@ -23,7 +23,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
-            inner_transport,
+            inner_transport: TransportWrapper::new(TransportCrypto::new(inner_transport)),
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
             connection_map: HashMap::new(),
@@ -80,7 +80,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     ) -> Self {
         let identifier: String = space_address.clone().into();
         P2pGateway {
-            inner_transport: network_gateway,
+            inner_transport: TransportWrapper::new(TransportCrypto::new(network_gateway)),
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
             connection_map: HashMap::new(),
