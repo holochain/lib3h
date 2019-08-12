@@ -316,10 +316,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     None,
                 );
                 match maybe_space {
-                    Err(res) => outbox.push(res),
+                    Err(res) => {
+                        error!("HandleFetchEntryResult: error: {:?}", res);
+                        outbox.push(res)
+                    },
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
+                            debug!("HandleFetchEntryResult: Broadcasting: {:?}", cmd);
                             space_gateway.as_dht_mut().post(cmd)?;
                         } else {
                             let response = FetchDhtEntryResponseData {
@@ -327,6 +331,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                                 entry: msg.entry.clone(),
                             };
                             let cmd = DhtCommand::EntryDataResponse(response);
+                            debug!("HandleFetchEntryResult: EntryDataResponse: {:?}", cmd);
                             space_gateway.as_dht_mut().post(cmd)?;
                         }
                     }
