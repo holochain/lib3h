@@ -137,11 +137,12 @@ impl From<CryptoError> for Lib3hError {
     }
 }
 
-// I'm not so sure about this...
+// TODO I'm not so sure about this...
 impl From<Lib3hError> for Lib3hProtocolError {
-    fn from(_err: Lib3hError) -> Self {
-        Lib3hProtocolError::new(Lib3hProtocolErrorKind::Other(String::from(
-            "Lib3hProtocolError occuring in Lib3h.",
+    fn from(err: Lib3hError) -> Self {
+        Lib3hProtocolError::new(Lib3hProtocolErrorKind::Other(format!(
+            "Lib3hProtocolError occuring in Lib3h: {:?}",
+            err
         )))
     }
 }
