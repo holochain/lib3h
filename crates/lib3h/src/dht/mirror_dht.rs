@@ -19,7 +19,7 @@ type HasTimedOut = bool;
 /// Enum holding all types of gossip messages used by MirrorDht
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 enum MirrorGossip {
-    Entry(EntryData),
+    Entries(Vec<EntryData>),
     Peer(PeerData),
 }
 
@@ -292,7 +292,7 @@ impl MirrorDht {
 
     /// Create GossipTo event for entry to all known peers
     fn gossip_entry(&self, entry: &EntryData) -> DhtEvent {
-        let entry_gossip = MirrorGossip::Entry(entry.clone());
+        let entry_gossip = MirrorGossip::Entries(vec![entry.clone()]);
         let mut buf = Vec::new();
         entry_gossip
             .serialize(&mut Serializer::new(&mut buf))
@@ -323,15 +323,18 @@ impl MirrorDht {
                 }
                 // Handle gossiped data
                 match maybe_gossip.unwrap() {
-                    MirrorGossip::Entry(entry) => {
-                        let diff = self.diff_aspects(&entry);
-                        if diff.len() > 0 {
-                            return Ok(vec![DhtEvent::HoldEntryRequested(
-                                self.this_peer.peer_address.clone(),
-                                entry,
-                            )]);
+                    MirrorGossip::Entries(entries) => {
+                        let mut dht_events = Vec::new();
+                        for entry in entries {
+                            let diff = self.diff_aspects(&entry);
+                            if diff.len() > 0 {
+                                dht_events.push(DhtEvent::HoldEntryRequested(
+                                    self.this_peer.peer_address.clone(),
+                                    entry,
+                                ));
+                            }
                         }
-                        return Ok(vec![]);
+                        Ok(dht_events)
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
                         let maybe_known_peer = self.get_peer(&gossiped_peer.peer_address);
