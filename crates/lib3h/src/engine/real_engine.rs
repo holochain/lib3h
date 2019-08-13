@@ -172,7 +172,6 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
-        trace!("");
         trace!("{} - process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
