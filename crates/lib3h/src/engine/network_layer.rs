@@ -19,14 +19,17 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network gateway as a Transport
-        let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
+        //let (transport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
+        // Erm... don't process the gateway directly for transports
+        // we want to treat it as the multiplexer...
+        let (transport_did_work, event_list) = self.network_multiplex.process()?;
         debug!(
             "{} - network_gateway Transport.process(): {} {}",
             self.name,
-            tranport_did_work,
+            transport_did_work,
             event_list.len(),
         );
-        if tranport_did_work {
+        if transport_did_work {
             for evt in event_list {
                 let mut output = self.handle_netTransportEvent(&evt)?;
                 outbox.append(&mut output);
@@ -40,7 +43,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 outbox.append(&mut output);
             }
         }
-        Ok((tranport_did_work || dht_did_work, outbox))
+        Ok((transport_did_work || dht_did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway

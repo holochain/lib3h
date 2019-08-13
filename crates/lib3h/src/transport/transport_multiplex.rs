@@ -13,20 +13,24 @@ use std::{
 
 use url::Url;
 
+/// our hashmap uses this struct for keys
 #[derive(Serialize, Deserialize, Clone, Debug, PartialOrd, Ord, Hash, PartialEq, Eq)]
-struct ChannelSpec {
+struct LocalChannelSpec {
     space_address: Address,
-    agent_id: Address,
+    local_agent_id: Address,
 }
 
-/// Wraps any transport and adds cryptography
+/// Split a transport into "channels" -- sub-transports that act on behalf of
+/// a single space_address / local agent combination
 pub struct TransportMultiplex<'mplex> {
     inner_transport: TransportWrapper<'mplex>,
-    channels: HashMap<ChannelSpec, Arc<RwLock<TransportUniplex<'mplex>>>>,
+    channels: HashMap<LocalChannelSpec, Arc<RwLock<TransportUniplex<'mplex>>>>,
 }
 
 /// Constructor
 impl<'mplex> TransportMultiplex<'mplex> {
+    /// multiplex a transport by constructing a TransportMultiplex around it
+    /// then calling "get_channel" to fetch the sub-transports
     pub fn new(inner_transport: TransportWrapper<'mplex>) -> Self {
         TransportMultiplex {
             inner_transport,
@@ -34,15 +38,16 @@ impl<'mplex> TransportMultiplex<'mplex> {
         }
     }
 
-    /// get a transport channel that will communicate between given space address and agent id pair
+    /// get a transport channel that will communicate between given space_address / local_agent_id
+    /// pair and any remote agent ids in the same space_address
     pub fn get_channel(
         &mut self,
-        space_address: Address,
-        local_agent_id: Address,
+        space_address: &Address,
+        local_agent_id: &Address,
     ) -> TransportResult<TransportWrapper<'mplex>> {
-        let channel = ChannelSpec {
-            space_address,
-            agent_id: local_agent_id,
+        let channel = LocalChannelSpec {
+            space_address: space_address.clone(),
+            local_agent_id: local_agent_id.clone(),
         };
         match self.channels.get(&channel) {
             Some(w) => Ok(TransportWrapper::assume(w.clone())),
@@ -51,6 +56,7 @@ impl<'mplex> TransportMultiplex<'mplex> {
                     inner_transport: self.inner_transport.clone(),
                     channel: channel.clone(),
                     outbox: Vec::new(),
+                    con_id_to_agent: HashMap::new(),
                 }));
                 self.channels.insert(channel, out.clone());
                 Ok(TransportWrapper::assume(out))
@@ -58,6 +64,9 @@ impl<'mplex> TransportMultiplex<'mplex> {
         }
     }
 
+    /// process any incoming messages... messages destined for a sub-channel
+    /// are routed to the sub-transports to be seen on their "process" functions
+    /// any other messages will be returned here.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
         let (did_work, evt_list) = self.inner_transport.as_mut().process()?;
         let mut out_events = Vec::new();
@@ -69,7 +78,11 @@ impl<'mplex> TransportMultiplex<'mplex> {
                     let maybe_channel_msg: Result<ChannelWrappedIn, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
                     if let Ok(msg) = maybe_channel_msg {
-                        match self.channels.get_mut(&msg.channel) {
+                        let channel = LocalChannelSpec {
+                            space_address: msg.space_address.clone(),
+                            local_agent_id: msg.local_agent_id.clone(),
+                        };
+                        match self.channels.get_mut(&channel) {
                             Some(c) => {
                                 c.write()
                                     .expect("failed to obtain write lock")
@@ -90,32 +103,40 @@ impl<'mplex> TransportMultiplex<'mplex> {
     }
 }
 
+/// inner private structure representing a sub-transport (channel)
+/// this is only exposed out of this function as a trait-object
+/// TransportWrapper
 struct TransportUniplex<'mplex> {
     inner_transport: TransportWrapper<'mplex>,
-    channel: ChannelSpec,
+    channel: LocalChannelSpec,
     outbox: Vec<TransportEvent>,
+    con_id_to_agent: HashMap<ConnectionId, Address>,
 }
 
 #[derive(Serialize)]
 struct ChannelWrappedOut<'a> {
-    channel: &'a ChannelSpec,
+    space_address: &'a Address,
+    remote_agent_id: &'a Address,
     payload: &'a [u8],
 }
 
 #[derive(Deserialize, Debug)]
 struct ChannelWrappedIn {
-    channel: ChannelSpec,
+    space_address: Address,
+    local_agent_id: Address,
     payload: Vec<u8>,
 }
 
 impl<'mplex> TransportUniplex<'mplex> {
+    /// when we actually implement the p2p multiplexing protocol
+    /// it will register symbolic indexes to channel space_address/agent pairs
+    /// to more economically communicate the info.
+    /// For now, we're just sending it on every message.
     fn wrap_payload(&self, to_address: &Address, payload: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
         ChannelWrappedOut {
-            channel: &ChannelSpec {
-                space_address: self.channel.space_address.clone(),
-                agent_id: to_address.clone(),
-            },
+            space_address: &self.channel.space_address,
+            remote_agent_id: to_address,
             payload,
         }
         .serialize(&mut rmp_serde::Serializer::new(&mut out))
@@ -127,9 +148,16 @@ impl<'mplex> TransportUniplex<'mplex> {
 /// Implement Transport trait by composing inner transport
 impl<'mplex> Transport for TransportUniplex<'mplex> {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
-        // TODO XXX - we need to associate the dest agent id with the returned ConnectionId
-        self.inner_transport.as_mut().connect(&uri)
+        let id = self.inner_transport.as_mut().connect(&uri)?;
+        let prev = self
+            .con_id_to_agent
+            .insert(id.clone(), uri.path().to_string().into());
+        if prev.is_some() {
+            return Err(format!("{} already mapped to {:?}", id, prev).into());
+        }
+        Ok(id)
     }
+
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
         self.inner_transport.as_mut().close(id)
     }
@@ -139,11 +167,17 @@ impl<'mplex> Transport for TransportUniplex<'mplex> {
     }
 
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        let to_address: Address = "".to_string().into();
-        // TODO XXX - we need to look up the agent address for this con id
-        self.inner_transport
-            .as_mut()
-            .send(id_list, &self.wrap_payload(&to_address, payload))
+        for id in id_list {
+            let to_address = self.con_id_to_agent.get(&id.to_string());
+            if to_address.is_none() {
+                return Err(format!("no connection for {}", id).into());
+            }
+            let to_address = to_address.unwrap();
+            self.inner_transport
+                .as_mut()
+                .send(&[id], &self.wrap_payload(&to_address, payload))?;
+        }
+        Ok(())
     }
 
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {

@@ -17,7 +17,9 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::TransportCommand, TransportWrapper},
+    transport::{
+        protocol::TransportCommand, transport_multiplex::TransportMultiplex, TransportWrapper,
+    },
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -71,6 +73,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             dht_factory,
             &dht_config,
         ));
+        let network_multiplex = TransportMultiplex::new(network_gateway.as_transport());
         // Done
         Ok(RealEngine {
             crypto,
@@ -81,6 +84,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             request_track: Tracker::new("real_engine_", 2000),
             network_transport,
             network_gateway,
+            network_multiplex,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
@@ -120,6 +124,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             dht_factory,
             &dht_config,
         ));
+        let network_multiplex = TransportMultiplex::new(network_gateway.as_transport());
         debug!(
             "New MOCK RealEngine {} -> {:?}",
             name,
@@ -135,6 +140,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             request_track: Tracker::new("real_engine_", 2000),
             network_transport,
             network_gateway,
+            network_multiplex,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
@@ -561,7 +567,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
             GatewayWrapper::new(P2pGateway::new_with_space(
-                self.network_gateway.as_transport(),
+                self.network_multiplex
+                    .get_channel(&join_msg.space_address, &join_msg.agent_id)?,
                 &join_msg.space_address,
                 self.dht_factory,
                 &dht_config,

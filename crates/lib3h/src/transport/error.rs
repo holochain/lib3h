@@ -32,6 +32,25 @@ impl std::error::Error for TransportError {
         None
     }
 }
+
+impl From<String> for TransportError {
+    fn from(e: String) -> Self {
+        Self(e)
+    }
+}
+
+impl From<&String> for TransportError {
+    fn from(e: &String) -> Self {
+        e.clone().into()
+    }
+}
+
+impl From<&str> for TransportError {
+    fn from(e: &str) -> Self {
+        e.to_string().into()
+    }
+}
+
 /*
 impl From<std::io::Error> for TransportError {
     fn from(error: std::io::Error) -> Self {
