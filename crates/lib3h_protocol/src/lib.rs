@@ -1,5 +1,6 @@
 //! This module provides the api definition for working with lib3h
 
+extern crate backtrace;
 extern crate holochain_persistence_api;
 extern crate serde;
 #[macro_use]
