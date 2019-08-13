@@ -140,9 +140,24 @@ impl From<CryptoError> for Lib3hError {
 // I'm not so sure about this...
 impl From<Lib3hError> for Lib3hProtocolError {
     fn from(err: Lib3hError) -> Self {
-        Lib3hProtocolError::new(Lib3hProtocolErrorKind::Other(format!(
-            "lib3h internal: {:?}",
-            err
-        )))
+        let bt = backtrace::Backtrace::new();
+        Lib3hProtocolError::new(Lib3hProtocolErrorKind::Lib3hError(
+            format!("lib3h internal: {:?}", err),
+            Some(bt),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_should_upgrade_and_backtrace_lib3h_protocol_errors() {
+        let e: Lib3hProtocolError =
+            Lib3hError::new(ErrorKind::Other("test-str-abcdefg".to_string())).into();
+        let res = format!("{:?}", e);
+        assert!(res.contains("test-str-abcdefg"));
+        assert!(res.contains("it_should_upgrade_and_backtrace_lib3h_protocol_errors"));
     }
 }
