@@ -297,11 +297,15 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             //   - From DHT EntryDataRequested: Convert to DhtCommand::EntryDataResponse
             Lib3hClientProtocol::HandleFetchEntryResult(msg) => {
                 let mut is_data_for_author_list = false;
+                let mut is_data_for_gossip_to = false;
                 if self.request_track.has(&msg.request_id) {
                     match self.request_track.remove(&msg.request_id) {
                         Some(data) => match data {
                             RealEngineTrackerData::DataForAuthorEntry => {
                                 is_data_for_author_list = true;
+                            }
+                            RealEngineTrackerData::DataForGossipTo => {
+                                is_data_for_gossip_to = true;
                             }
                             _ => (),
                         },
@@ -320,9 +324,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         outbox.push(res)
                     },
                     Ok(space_gateway) => {
-                        if is_data_for_author_list {
+                        if is_data_for_author_list ||  is_data_for_gossip_to  {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                            debug!("HandleFetchEntryResult: Broadcasting: {:?}", cmd);
+                            debug!("HandleFetchEntryResult: Broadcasting: {:?} {:?}", cmd, is_data_for_gossip_to);
                             space_gateway.as_dht_mut().post(cmd)?;
                         } else {
                             let response = FetchDhtEntryResponseData {

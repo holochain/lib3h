@@ -174,9 +174,20 @@ impl Dht for MirrorDht {
         );
         if now - self.last_gossip_of_self > self.config.gossip_interval() {
             self.last_gossip_of_self = now;
-            let gossip_data = self.gossip_self(self.get_other_peer_list());
-            if gossip_data.peer_address_list.len() > 0 {
-                outbox.push(DhtEvent::GossipTo(gossip_data));
+
+            let peer_address_list = self.get_other_peer_list();
+            if peer_address_list.len() > 0 {
+                // gossip our peer id
+                outbox.push(DhtEvent::GossipTo(self.gossip_self(peer_address_list.clone())));
+
+                // gossip our entry list
+                let mut x = Vec::new();
+                let entries_to_gossip = self.get_entry_address_list();
+                for e in entries_to_gossip {
+                    x.push(e.clone());
+                }
+                outbox.push(DhtEvent::GossipEntriesToRequest(x));
+
                 did_work = true;
             }
         }
@@ -292,9 +303,13 @@ impl MirrorDht {
 
     /// Create GossipTo event for entry to all known peers
     fn gossip_entry(&self, entry: &EntryData) -> DhtEvent {
-        let entry_gossip = MirrorGossip::Entries(vec![entry.clone()]);
+        self.gossip_entries(MirrorGossip::Entries(vec![entry.clone()]))
+    }
+
+    /// Create GossipTo event for entries to all known peers
+    fn gossip_entries(&self, entries_gossip: MirrorGossip) -> DhtEvent {
         let mut buf = Vec::new();
-        entry_gossip
+        entries_gossip
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
         let gossip_evt = GossipToData {
@@ -308,12 +323,11 @@ impl MirrorDht {
     /// Return a list of DhtEvent to owner.
     #[allow(non_snake_case)]
     fn serve_DhtCommand(&mut self, cmd: &DhtCommand) -> Lib3hResult<Vec<DhtEvent>> {
-        debug!("@MirrorDht@ serving cmd: {:?}", cmd);
+        trace!("@MirrorDht@ serving cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtCommand::HandleGossip(msg) => {
-                trace!("Deserializer msg.bundle: {:?}", msg.bundle);
                 let mut de = Deserializer::new(&msg.bundle[..]);
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -321,6 +335,7 @@ impl MirrorDht {
                     error!("Failed to deserialize gossip.");
                     return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                 }
+                trace!("@MirrorDht@ DhtCommand::HandleGossip: {:?}", maybe_gossip);
                 // Handle gossiped data
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entries(entries) => {
@@ -334,6 +349,7 @@ impl MirrorDht {
                                 ));
                             }
                         }
+                        trace!("@MirrorDht@ MirrorGossip::Entries {:?}", dht_events);
                         Ok(dht_events)
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
@@ -419,12 +435,16 @@ impl MirrorDht {
             // Bookkeep address and gossip entry to every known peer.
             DhtCommand::BroadcastEntry(entry) => {
                 // Store address
-                let received_new_content = self.add_entry_aspects(&entry);
+                let _received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
-                if !received_new_content {
-                    return Ok(vec![]);
-                }
+          //      if !received_new_content {
+          //          return Ok(vec![]);
+          //      }
                 let gossip_evt = self.gossip_entry(entry);
+                trace!(
+                    "@MirrorDht@ broadcasting entry: {:?}",
+                    gossip_evt
+                );
                 // Done
                 Ok(vec![gossip_evt])
             }

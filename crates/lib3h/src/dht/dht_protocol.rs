@@ -48,6 +48,8 @@ pub enum DhtEvent {
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),
+    /// Request to get EntryData from core, and gossip it
+    GossipEntriesToRequest(Vec<Address>)
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]

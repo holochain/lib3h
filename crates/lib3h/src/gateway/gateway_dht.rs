@@ -85,6 +85,9 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
         trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);
         match evt {
+            DhtEvent::GossipEntriesToRequest(_) => {
+                // handled in space
+            }
             DhtEvent::GossipTo(data) => {
                 // DHT should give us the peer_transport
                 for to_peer_address in data.peer_address_list {
@@ -93,6 +96,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                     if &to_peer_address == me {
                         continue;
                     }
+
                     // TODO END
                     // Convert DHT Gossip to P2P Gossip
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
@@ -109,6 +113,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .get_connection_id(&to_peer_address)
                         .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
+                    trace!("Creating P2pProtocolGossip: {:?}", p2p_gossip.clone());
                     self.inner_transport
                         .as_mut()
                         .send(&[&to_conn_id], &payload)?;

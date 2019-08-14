@@ -75,6 +75,24 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
         match cmd {
+            DhtEvent::GossipEntriesToRequest(request_list) => {
+                let mut msg_data = FetchEntryData {
+                    space_address: chain_id.0.clone(),
+                    entry_address: "".into(),
+                    request_id: "".into(),
+                    provider_agent_id: "".into(), //???
+                    aspect_address_list: None,
+                };
+                for address in request_list {
+                    msg_data.request_id = self.request_track.reserve();
+                    msg_data.entry_address = address;
+                    self.request_track.set(
+                        &msg_data.request_id,
+                        Some(RealEngineTrackerData::DataForGossipTo),
+                    );
+                    outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data.clone()));
+                }
+            }
             DhtEvent::GossipTo(_gossip_data) => {
                 // n/a - should have been handled by gateway
             }

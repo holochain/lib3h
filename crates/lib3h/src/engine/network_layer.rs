@@ -50,6 +50,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         trace!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
         let outbox = Vec::new();
         match cmd {
+            DhtEvent::GossipEntriesToRequest(_request_list) => {
+                // no-op
+                // this event is handled in the space layer
+            }
             DhtEvent::GossipTo(_data) => {
                 // no-op
             }
@@ -202,9 +206,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// TODO #150
     fn serve_P2pProtocol(
         &mut self,
-        _from_id: &ConnectionIdRef,
+        from_id: &ConnectionIdRef,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        trace!("({:?}).serve_P2pProtocol() msg: {:?}", from_id, p2p_msg);
         let mut outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
@@ -215,6 +220,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 });
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
+                    trace!("Posting to network gateway");
                     self.network_gateway.as_dht_mut().post(cmd)?;
                 } else {
                     // otherwise should be for one of our space
@@ -222,6 +228,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
+                        trace!("Posting to space gateway");
                         space_gateway.as_dht_mut().post(cmd)?;
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
