@@ -182,7 +182,22 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
             }
             TransportEvent::ReceivedData(id, payload) => {
-                debug!("Received message from: {} | {}", id, payload.len());
+                debug!("Received message from: {} | {} | {}", id, payload.len(), String::from_utf8_lossy(payload));
+                {
+                    let mut de = Deserializer::new(&payload[..]);
+                    let maybe_msg: Result<ChannelWrappedIn, rmp_serde::decode::Error> = Deserialize::deserialize(&mut de);
+                    if let Ok(msg) = maybe_msg {
+                        let space_gateway = self
+                            .space_gateway_map
+                            .get_mut(&(msg.space_address.to_owned(), msg.local_agent_id.to_owned()));
+                        if space_gateway.is_none() {
+                            panic!("could not deliver message {:?}", msg);
+                        }
+                        let space_gateway = space_gateway.unwrap();
+                        panic!("GOT SPACE GATEWAY MESSAGE {:?}", msg);
+                    }
+                }
+
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -285,4 +300,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         Ok(outbox)
     }
+}
+
+use lib3h_protocol::Address;
+
+#[derive(Deserialize, Debug)]
+struct ChannelWrappedIn {
+    space_address: Address,
+    local_agent_id: Address,
+    payload: Vec<u8>,
 }

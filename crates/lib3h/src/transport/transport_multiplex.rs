@@ -110,6 +110,7 @@ struct TransportUniplex<'mplex> {
     inner_transport: TransportWrapper<'mplex>,
     channel: LocalChannelSpec,
     outbox: Vec<TransportEvent>,
+    #[allow(dead_code)]
     con_id_to_agent: HashMap<ConnectionId, Address>,
 }
 
@@ -149,12 +150,14 @@ impl<'mplex> TransportUniplex<'mplex> {
 impl<'mplex> Transport for TransportUniplex<'mplex> {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         let id = self.inner_transport.as_mut().connect(&uri)?;
+        /* TODO XXX -
         let prev = self
             .con_id_to_agent
             .insert(id.clone(), uri.path().to_string().into());
         if prev.is_some() {
             return Err(format!("{} already mapped to {:?}", id, prev).into());
         }
+        */
         Ok(id)
     }
 
@@ -167,6 +170,9 @@ impl<'mplex> Transport for TransportUniplex<'mplex> {
     }
 
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
+        // TODO XXX - we're jamming addresses into the connectionId field
+        //            need to actually use connect
+        /*
         for id in id_list {
             let to_address = self.con_id_to_agent.get(&id.to_string());
             if to_address.is_none() {
@@ -177,6 +183,15 @@ impl<'mplex> Transport for TransportUniplex<'mplex> {
                 .as_mut()
                 .send(&[id], &self.wrap_payload(&to_address, payload))?;
         }
+        */
+        // BEGIN HACK
+        for id in id_list {
+            let address: Address = id.to_string().into();
+            self.inner_transport
+                .as_mut()
+                .send(&[id], &self.wrap_payload(&address, payload))?;
+        }
+        // END HACK
         Ok(())
     }
 
