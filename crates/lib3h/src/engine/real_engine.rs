@@ -66,6 +66,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
+            NETWORK_GATEWAY_ID.to_string().into(),
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -115,6 +116,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         // Create network gateway
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
+            NETWORK_GATEWAY_ID.to_string().into(),
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -559,13 +561,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway: GatewayWrapper<'engine> =
-            GatewayWrapper::new(P2pGateway::new_with_space(
-                self.network_gateway.as_transport(),
-                &join_msg.space_address,
-                self.dht_factory,
-                &dht_config,
-            ));
+        let new_space_gateway: GatewayWrapper<'engine> = GatewayWrapper::new(P2pGateway::new(
+            join_msg.space_address.clone(),
+            &format!("{:?}", &chain_id),
+            self.network_gateway.as_transport(),
+            self.dht_factory,
+            &dht_config,
+        ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();

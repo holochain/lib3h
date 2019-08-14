@@ -5,9 +5,12 @@ pub mod p2p_gateway;
 use crate::{
     dht::dht_trait::Dht,
     transport::{
-        protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
+        protocol::{TransportCommand, TransportEvent},
+        transport_trait::Transport,
+        ConnectionId, TransportWrapper,
     },
 };
+use lib3h_protocol::Address;
 use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -94,6 +97,8 @@ impl<'wrap> GatewayWrapper<'wrap> {
 /// Tracks distributed data for that P2P network in a DHT.
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
 pub struct P2pGateway<'gateway, D: Dht> {
+    space_address: Address,
+    transport_outbox: HashMap<Address, Vec<TransportEvent>>,
     inner_transport: TransportWrapper<'gateway>,
     inner_dht: D,
     /// Used for distinguishing gateways

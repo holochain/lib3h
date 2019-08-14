@@ -5,6 +5,7 @@ use crate::{
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
     gateway::{Gateway, P2pGateway},
+    transport::transport_trait::Transport,
 };
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
@@ -105,6 +106,8 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .expect("P2pProtocol::Gossip serialization failed");
+                    self.send(&[&to_peer_address], &payload)?;
+                    /*
                     let to_conn_id = self
                         .get_connection_id(&to_peer_address)
                         .expect("Should gossip to a known peer");
@@ -112,6 +115,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                     self.inner_transport
                         .as_mut()
                         .send(&[&to_conn_id], &payload)?;
+                    */
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
