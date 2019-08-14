@@ -68,23 +68,3 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
         Some(conn_id)
     }
 }
-
-/// P2pGateway Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
-    /// Constructors
-    pub fn new_with_space(
-        network_gateway: TransportWrapper<'gateway>,
-        space_address: &Address,
-        dht_factory: DhtFactory<D>,
-        dht_config: &DhtConfig,
-    ) -> Self {
-        let identifier: String = space_address.clone().into();
-        P2pGateway {
-            inner_transport: TransportWrapper::new(TransportCrypto::new(network_gateway)),
-            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
-            identifier,
-            connection_map: HashMap::new(),
-            transport_inbox: VecDeque::new(),
-        }
-    }
-}

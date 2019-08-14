@@ -1,10 +1,13 @@
-use crate::transport::{
-    error::TransportResult,
-    protocol::{TransportCommand, TransportEvent},
-    transport_trait::Transport,
-    ConnectionId, ConnectionIdRef, TransportWrapper,
+use crate::{
+    engine::p2p_protocol::P2pProtocol,
+    transport::{
+        error::TransportResult,
+        protocol::{TransportCommand, TransportEvent},
+        transport_trait::Transport,
+        ConnectionId, ConnectionIdRef, TransportWrapper,
+    },
 };
-use lib3h_protocol::{Address, DidWork};
+use lib3h_protocol::{Address, DidWork, data_types::*};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -45,6 +48,7 @@ impl<'mplex> TransportMultiplex<'mplex> {
         space_address: &Address,
         local_agent_id: &Address,
     ) -> TransportResult<TransportWrapper<'mplex>> {
+        trace!("@^@^@ CREATE CHANNEL {} {}", space_address, local_agent_id);
         let channel = LocalChannelSpec {
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
@@ -72,8 +76,10 @@ impl<'mplex> TransportMultiplex<'mplex> {
         let mut out_events = Vec::new();
 
         for evt in evt_list {
+            trace!("@^@^@ MP PROC {:?}", evt);
             match evt {
                 TransportEvent::ReceivedData(ref _id, ref payload) => {
+                    trace!("@^@^@ MP PROC RD {}", String::from_utf8_lossy(payload));
                     let mut de = rmp_serde::Deserializer::new(&payload[..]);
                     let maybe_channel_msg: Result<ChannelWrappedIn, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
@@ -89,13 +95,23 @@ impl<'mplex> TransportMultiplex<'mplex> {
                                     .outbox
                                     .push(evt);
                             }
-                            None => out_events.push(evt),
+                            None => {
+                                warn!("@^@^@ failed to get channel {} {}",
+                                      channel.space_address,
+                                      channel.local_agent_id,
+                                      );
+                                out_events.push(evt)
+                            }
                         }
                     } else {
+                        warn!("@^@^@ failed to deserialize");
                         out_events.push(evt);
                     }
                 }
-                _ => out_events.push(evt),
+                _ => {
+                    warn!("@^@^@ not a received data");
+                    out_events.push(evt)
+                }
             }
         }
 
@@ -134,15 +150,29 @@ impl<'mplex> TransportUniplex<'mplex> {
     /// to more economically communicate the info.
     /// For now, we're just sending it on every message.
     fn wrap_payload(&self, to_address: &Address, payload: &[u8]) -> Vec<u8> {
-        let mut out = Vec::new();
+        trace!("@^@^@ MP WRAP {} {:?}", to_address, backtrace::Backtrace::new());
+        let mut inner = Vec::new();
         ChannelWrappedOut {
             space_address: &self.channel.space_address,
             remote_agent_id: to_address,
             payload,
-        }
-        .serialize(&mut rmp_serde::Serializer::new(&mut out))
-        .expect("P2pProtocol::Gossip serialization failed");
-        out
+        }.serialize(&mut rmp_serde::Serializer::new(&mut inner))
+            .expect("serialization failed");
+
+        inner
+            /*
+        let mut outer = Vec::new();
+        P2pProtocol::DirectMessage(DirectMessageData {
+            space_address: self.channel.space_address.clone(),
+            request_id: "".to_string(),
+            to_agent_id: to_address.clone(),
+            from_agent_id: self.channel.local_agent_id.clone(),
+            content: inner,
+        }).serialize(&mut rmp_serde::Serializer::new(&mut outer))
+            .expect("serialization failed");
+
+        outer
+        */
     }
 }
 
@@ -187,6 +217,7 @@ impl<'mplex> Transport for TransportUniplex<'mplex> {
         // BEGIN HACK
         for id in id_list {
             let address: Address = id.to_string().into();
+            trace!("@^@^@ {} {} sending to {}", self.channel.space_address, self.channel.local_agent_id, address);
             self.inner_transport
                 .as_mut()
                 .send(&[id], &self.wrap_payload(&address, payload))?;

@@ -566,10 +566,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
-            GatewayWrapper::new(P2pGateway::new_with_space(
+            GatewayWrapper::new(P2pGateway::new(
+                &format!("{:?}", chain_id),
                 self.network_multiplex
                     .get_channel(&join_msg.space_address, &join_msg.agent_id)?,
-                &join_msg.space_address,
                 self.dht_factory,
                 &dht_config,
             ));

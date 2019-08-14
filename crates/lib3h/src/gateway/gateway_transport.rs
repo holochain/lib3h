@@ -68,6 +68,8 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         }
         let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
         // Send on the inner Transport
+        let bt = backtrace::Backtrace::new();
+        trace!("@^@^@ GW INNER SEND {} {:?} {} {:?}", self.identifier, ref_list, String::from_utf8_lossy(payload), bt);
         self.inner_transport.as_mut().send(&ref_list, payload)
     }
 
