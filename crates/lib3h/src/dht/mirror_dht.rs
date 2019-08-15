@@ -433,13 +433,13 @@ impl MirrorDht {
             }
             // Owner has some entry and wants it stored on the network
             // Bookkeep address and gossip entry to every known peer.
-            DhtCommand::BroadcastEntry(entry) => {
+            DhtCommand::BroadcastEntry(entry, force) => {
                 // Store address
-                let _received_new_content = self.add_entry_aspects(&entry);
+                let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
-          //      if !received_new_content {
-          //          return Ok(vec![]);
-          //      }
+                if !force && !received_new_content {
+                    return Ok(vec![]);
+                }
                 let gossip_evt = self.gossip_entry(entry);
                 trace!(
                     "@MirrorDht@ broadcasting entry: {:?}",

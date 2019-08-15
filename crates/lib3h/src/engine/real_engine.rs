@@ -325,7 +325,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     },
                     Ok(space_gateway) => {
                         if is_data_for_author_list ||  is_data_for_gossip_to  {
-                            let cmd = DhtCommand::BroadcastEntry(msg.entry);
+                            let cmd = DhtCommand::BroadcastEntry(msg.entry,is_data_for_gossip_to);
                             debug!("HandleFetchEntryResult: Broadcasting: {:?} {:?}", cmd, is_data_for_gossip_to);
                             space_gateway.as_dht_mut().post(cmd)?;
                         } else {
@@ -367,7 +367,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         // send to other dht nodes
-                        let cmd = DhtCommand::BroadcastEntry(msg.entry);
+                        let cmd = DhtCommand::BroadcastEntry(msg.entry,false);
                         space_gateway.as_dht_mut().post(cmd)?;
                     }
                 }

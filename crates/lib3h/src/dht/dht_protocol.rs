@@ -19,7 +19,7 @@ pub enum DhtCommand {
     /// Note: Need an EntryData to know the aspect addresses, but aspects' content can be empty.
     HoldEntryAspectAddress(EntryData),
     /// Owner wants us to bookkeep an entry and broadcast it to neighbors
-    BroadcastEntry(EntryData),
+    BroadcastEntry(EntryData, bool),
     /// Owner notifies us that is is not holding an entry anymore.
     DropEntryAddress(Address),
     /// Owner's response to ProvideEntry request
