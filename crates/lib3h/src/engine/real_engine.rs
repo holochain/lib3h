@@ -587,7 +587,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             space_address,
             peer.peer_address,
         );
-        for address in self.network_gateway.as_transport_ref().connection_list()? {
+        let addresses = { self.network_gateway.as_transport_ref().connection_list()? };
+        for address in addresses {
             self.network_gateway
                 .as_transport_mut()
                 .send("".to_string(), address, payload.clone())

@@ -259,22 +259,45 @@ fn setup_only(_alex: &mut Box<dyn NetworkEngine>, _billy: &mut Box<dyn NetworkEn
     // n/a
 }
 
+fn proc(note: &str, mut nodes: Vec<&mut Box<dyn NetworkEngine>>) -> Vec<Vec<Lib3hServerProtocol>> {
+    let mut out = Vec::new();
+    for _i in 0..nodes.len() {
+        out.push(Vec::new());
+    }
+
+    for _x in 0..10 {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        for i in 0..nodes.len() {
+            let (_, mut t) = nodes[i].process().unwrap();
+            out[i].append(&mut t);
+        }
+    }
+
+    println!("@PROCESS@:{} {:?}", note, &out);
+
+    out
+}
+
 ///
 fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
     // Connect Alex to Billy
-    let req_connect = ConnectData {
+    let mut req_connect = ConnectData {
         request_id: "connect".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
+    req_connect.peer_uri = alex.advertise();
+    billy
+        .post(Lib3hClientProtocol::Connect(req_connect.clone()))
+        .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
     println!("connected_msg = {:?}", connected_msg);
-    assert_eq!(connected_msg.uri, req_connect.peer_uri);
+    assert_eq!(connected_msg.uri, billy.advertise());
     // More process: Have Billy process P2p::PeerAddress of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
@@ -289,9 +312,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     };
     alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    // More process
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    proc("join-a", vec![alex, billy]);
 
     // Billy joins space A
     println!("\n Billy joins space \n");
@@ -299,12 +320,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     billy
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    // More process
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    proc("join-b", vec![alex, billy]);
 
     println!("DONE basic_two_setup DONE \n\n\n");
 }
@@ -319,22 +335,21 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         from_agent_id: ALEX_AGENT_ID.clone(),
         content: "wah".as_bytes().to_vec(),
     };
+
     // Send
     println!("\nAlex sends DM to Billy...\n");
     alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
+
+    let res_1 = proc("dm-1", vec![alex, billy]);
+
+    let msg_1 = res_1.get(0).unwrap().get(0).unwrap();
     one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
         assert_eq!(response.request_id, req_dm.request_id);
     });
-    // Receive
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
+
+    let msg = unwrap_to!(res_1.get(1).unwrap().get(0).unwrap() => Lib3hServerProtocol::HandleSendDirectMessage);
+
     assert_eq!(msg, &req_dm);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("HandleSendDirectMessage: {}", content);

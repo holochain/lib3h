@@ -41,6 +41,22 @@ pub fn set_server(uri: &Url) -> TransportResult<()> {
     Ok(())
 }
 
+pub fn with_server<'a, T>(
+    uri: &Url,
+    e: Box<dyn Fn(&mut MemoryServer) -> TransportResult<T> + 'a>,
+) -> TransportResult<T> {
+    warn!("START ACCESS {}", uri);
+    let out = e(&mut MEMORY_SERVER_MAP
+        .read()
+        .unwrap()
+        .get(uri)
+        .unwrap()
+        .lock()
+        .unwrap());
+    warn!("END ACCESS {}", uri);
+    out
+}
+
 /// Remove a MemoryServer from the global server map
 pub fn unset_server(uri: &Url) -> TransportResult<()> {
     debug!("MemoryServer::unset_server: {}", uri);

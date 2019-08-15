@@ -99,6 +99,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
+        warn!(
+            "@^@^@ priv_send to {} ({}): {}",
+            &address,
+            payload.len(),
+            String::from_utf8_lossy(&payload)
+        );
         let address: String = address.path().to_string();
         let peer = self.inner_dht.get_peer(&address);
         if peer.is_none() {

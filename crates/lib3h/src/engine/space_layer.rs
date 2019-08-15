@@ -44,13 +44,19 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Process all gateways' DHT
         let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
+        let mut transport_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            let (did_work, event_list) = space_gateway.as_dht_mut().process()?;
-            if did_work {
+            let (_did_work, event_list) = space_gateway.as_dht_mut().process()?;
+            if !event_list.is_empty() {
                 // TODO: perf optim, don't copy chain_id
                 dht_outbox.insert(chain_id.clone(), event_list);
             }
+            let (_did_work, event_list) = space_gateway.as_transport_mut().process()?;
+            if !event_list.is_empty() {
+                transport_outbox.insert(chain_id.clone(), event_list);
+            }
         }
+        error!("WHAT TO DO WITH THESE!?! {:?}", transport_outbox);
         // Process all gateway DHT events
         for (chain_id, evt_list) in dht_outbox {
             for evt in evt_list {
