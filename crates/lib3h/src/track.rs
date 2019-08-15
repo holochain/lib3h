@@ -96,7 +96,7 @@ impl<T> Tracker<T> {
     }
 
     pub fn keys(&self) -> Vec<TrackId> {
-        self.map.keys().map(|x|x.clone()).collect()
+        self.map.keys().map(|x| x.clone()).collect()
     }
 
     /// `true` if we are still tracking `id`
@@ -264,10 +264,7 @@ mod tests {
     pub fn it_should_workflow() {
         let mut z = ZZ {
             stage: 0,
-            steps: vec![
-                Box::new(ZZ::check_stage_1),
-                Box::new(ZZ::check_stage_2),
-            ],
+            steps: vec![Box::new(ZZ::check_stage_1), Box::new(ZZ::check_stage_2)],
             string: "".to_string(),
         };
         assert!(!z.process());
@@ -281,18 +278,17 @@ mod tests {
 
     #[test]
     pub fn it_should_workflow_in_tracker() {
-        let mut t: Tracker<Box<ZZ>> =
-            Tracker::new("test3_", 1000);
+        let mut t: Tracker<Box<ZZ>> = Tracker::new("test3_", 1000);
 
         let rid = t.reserve();
-        t.set(&rid, Some(Box::new(ZZ {
-            stage: 0,
-            steps: vec![
-                Box::new(ZZ::check_stage_1),
-                Box::new(ZZ::check_stage_2),
-            ],
-            string: "".to_string(),
-        })));
+        t.set(
+            &rid,
+            Some(Box::new(ZZ {
+                stage: 0,
+                steps: vec![Box::new(ZZ::check_stage_1), Box::new(ZZ::check_stage_2)],
+                string: "".to_string(),
+            })),
+        );
 
         let mut completed = Vec::new();
 

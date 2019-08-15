@@ -70,7 +70,9 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         let peer_data_list = self.inner_dht.get_peer_list();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
-            id_list.push(Url::parse(&format!("hc:{}", peer_data.peer_address)).expect("can parse url"));
+            id_list.push(
+                Url::parse(&format!("hc:{}", peer_data.peer_address)).expect("can parse url"),
+            );
         }
         Ok(id_list)
     }
@@ -109,7 +111,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// id_list =
     ///   - Network : transportId
     ///   - space   : agentId
-    fn priv_send(&mut self, request_id: RequestId, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+    fn priv_send(
+        &mut self,
+        request_id: RequestId,
+        address: Url,
+        payload: Vec<u8>,
+    ) -> TransportResult<()> {
         /*
         // get connectionId from the inner dht first
         let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
@@ -183,8 +190,10 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             our_peer_address,
             address,
         );
-        return self.inner_transport.as_mut().send(
-            "".to_string(), address, buf);
+        return self
+            .inner_transport
+            .as_mut()
+            .send("".to_string(), address, buf);
     }
 
     /// Process a transportEvent received from our internal connection.
@@ -255,22 +264,20 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
     /// Return a list of TransportEvents to owner.
     #[allow(non_snake_case)]
-    fn serve_TransportCommand(
-        &mut self,
-        cmd: TransportCommand,
-    ) -> TransportResult<()> {
+    fn serve_TransportCommand(&mut self, cmd: TransportCommand) -> TransportResult<()> {
         trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
         // Note: use same order as the enum
         match cmd {
-            TransportCommand::Bind { request_id, spec } => {
-                self.priv_bind(request_id, spec)
-            }
-            TransportCommand::Connect { request_id, address } => {
-                self.priv_connect(request_id, address)
-            }
-            TransportCommand::SendMessage { request_id, address, payload } => {
-                self.priv_send(request_id, address, payload)
-            }
+            TransportCommand::Bind { request_id, spec } => self.priv_bind(request_id, spec),
+            TransportCommand::Connect {
+                request_id,
+                address,
+            } => self.priv_connect(request_id, address),
+            TransportCommand::SendMessage {
+                request_id,
+                address,
+                payload,
+            } => self.priv_send(request_id, address, payload),
         }
     }
 }

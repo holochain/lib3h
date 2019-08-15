@@ -87,10 +87,7 @@ impl MemoryServer {
     /// Another node requested to connect with us.
     /// This creates a new connection: An inbox is created for receiving payloads from this requester.
     /// This also generates a request for us to connect to the other node in the other way.
-    pub fn request_connect(
-        &mut self,
-        other_uri: &Url,
-    ) -> TransportResult<()> {
+    pub fn request_connect(&mut self, other_uri: &Url) -> TransportResult<()> {
         info!(
             "(MemoryServer) {} creates inbox for {}",
             self.this_uri, other_uri
@@ -110,8 +107,7 @@ impl MemoryServer {
         // Establish inbound connection
         let prev = self.inbox_map.insert(other_uri.clone(), VecDeque::new());
         assert!(prev.is_none());
-        self.inbound_connections
-            .insert(other_uri.clone());
+        self.inbound_connections.insert(other_uri.clone());
         // Notify our TransportMemory (so it can connect back)
         self.connection_inbox.push((other_uri.clone(), true));
         // Done
@@ -167,9 +163,13 @@ impl MemoryServer {
                 is_new,
             );
             let event = if *is_new {
-                TransportEvent::IncomingConnection { address: address.clone() }
+                TransportEvent::IncomingConnection {
+                    address: address.clone(),
+                }
             } else {
-                TransportEvent::ConnectionClosed { address: address.clone() }
+                TransportEvent::ConnectionClosed {
+                    address: address.clone(),
+                }
             };
             trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
             outbox.push(event);
@@ -185,7 +185,10 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!("(MemoryServer {}) received: {:?}", self.this_uri, payload);
-                let evt = TransportEvent::ReceivedData { address: address.clone(), payload };
+                let evt = TransportEvent::ReceivedData {
+                    address: address.clone(),
+                    payload,
+                };
                 outbox.push(evt);
             }
         }

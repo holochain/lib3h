@@ -165,7 +165,7 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
 impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     /// get a list of all open transport ids
     fn connection_list(&self) -> TransportResult<Vec<Url>> {
-        Ok(self.stream_sockets.keys().map(|x|x.clone()).collect())
+        Ok(self.stream_sockets.keys().map(|x| x.clone()).collect())
     }
 
     /// record message to process on "process"
@@ -199,7 +199,10 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
             let mut out = None;
             for evt in evt_list {
                 match &evt {
-                    TransportEvent::BindSuccess { request_id, bound_address } => {
+                    TransportEvent::BindSuccess {
+                        request_id,
+                        bound_address,
+                    } => {
                         if request_id == &rid {
                             out = Some(bound_address.clone());
                         }
@@ -235,15 +238,16 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     #[allow(non_snake_case)]
     fn serve_TransportCommand(&mut self, cmd: TransportCommand) -> TransportResult<()> {
         match cmd {
-            TransportCommand::Bind { request_id, spec } => {
-                self.priv_bind(request_id, spec)
-            }
-            TransportCommand::Connect { request_id, address } => {
-                self.priv_connect(request_id, address)
-            }
-            TransportCommand::SendMessage { request_id, address, payload } => {
-                self.priv_send(request_id, address, payload)
-            }
+            TransportCommand::Bind { request_id, spec } => self.priv_bind(request_id, spec),
+            TransportCommand::Connect {
+                request_id,
+                address,
+            } => self.priv_connect(request_id, address),
+            TransportCommand::SendMessage {
+                request_id,
+                address,
+                payload,
+            } => self.priv_send(request_id, address, payload),
         }
     }
 
@@ -268,9 +272,11 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     fn priv_connect(&mut self, request_id: RequestId, address: Url) -> TransportResult<()> {
         let host_port = format!(
             "{}:{}",
-            address.host_str()
+            address
+                .host_str()
                 .ok_or_else(|| TransportError("bad connect host".into()))?,
-            address.port()
+            address
+                .port()
                 .ok_or_else(|| TransportError("bad connect port".into()))?,
         );
         let socket = (self.stream_factory)(&host_port)?;
@@ -281,15 +287,19 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     }
 
     /// send a message to one or more remote connected nodes
-    fn priv_send(&mut self, request_id: RequestId, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+    fn priv_send(
+        &mut self,
+        request_id: RequestId,
+        address: Url,
+        payload: Vec<u8>,
+    ) -> TransportResult<()> {
         if let Some(info) = self.stream_sockets.get_mut(&address) {
             info.send_queue.push(payload);
         }
 
         // TODO XXX - give success after it actually sends
-        self.event_queue.push(TransportEvent::SendMessageSuccess {
-            request_id
-        });
+        self.event_queue
+            .push(TransportEvent::SendMessageSuccess { request_id });
 
         Ok(())
     }
@@ -325,8 +335,10 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
 
         for (url, mut info) in sockets {
             if let Err(e) = self.priv_process_socket(&mut did_work, &mut info) {
-                self.event_queue
-                    .push(TransportEvent::ConnectionError { address: info.url.clone(), error: e });
+                self.event_queue.push(TransportEvent::ConnectionError {
+                    address: info.url.clone(),
+                    error: e,
+                });
             }
             if let WebsocketStreamState::None = info.stateful_socket {
                 self.event_queue
@@ -455,7 +467,8 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 Ok(())
             }
             WebsocketStreamState::WssSrvMidHandshake(socket) => {
-                info.stateful_socket = self.priv_wss_srv_handshake(&info.url, socket.handshake())?;
+                info.stateful_socket =
+                    self.priv_wss_srv_handshake(&info.url, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::ReadyWs(mut socket) => {
@@ -489,8 +502,10 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                         };
 
                         if let Some(msg) = qmsg {
-                            self.event_queue
-                                .push(TransportEvent::ReceivedData { address: info.url.clone(), payload: msg });
+                            self.event_queue.push(TransportEvent::ReceivedData {
+                                address: info.url.clone(),
+                                payload: msg,
+                            });
                         }
                         info.stateful_socket = WebsocketStreamState::ReadyWs(socket);
                         Ok(())
@@ -528,8 +543,10 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                         };
 
                         if let Some(msg) = qmsg {
-                            self.event_queue
-                                .push(TransportEvent::ReceivedData { address: info.url.clone(), payload: msg });
+                            self.event_queue.push(TransportEvent::ReceivedData {
+                                address: info.url.clone(),
+                                payload: msg,
+                            });
                         }
                         info.stateful_socket = WebsocketStreamState::ReadyWss(socket);
                         Ok(())
@@ -624,8 +641,9 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok(socket) => {
-                self.event_queue
-                    .push(TransportEvent::IncomingConnection { address: address.clone() });
+                self.event_queue.push(TransportEvent::IncomingConnection {
+                    address: address.clone(),
+                });
                 Ok(WebsocketStreamState::ReadyWs(Box::new(socket)))
             }
         }
@@ -643,8 +661,9 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok(socket) => {
-                self.event_queue
-                    .push(TransportEvent::IncomingConnection { address: address.clone() });
+                self.event_queue.push(TransportEvent::IncomingConnection {
+                    address: address.clone(),
+                });
                 Ok(WebsocketStreamState::ReadyWss(Box::new(socket)))
             }
         }

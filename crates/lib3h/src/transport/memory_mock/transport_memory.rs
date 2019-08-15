@@ -58,8 +58,7 @@ impl TransportMemory {
 
     /// Create a new server inbox for myself
     fn priv_bind(&mut self, request_id: RequestId, spec: Url) -> TransportResult<()> {
-        let bound_address = Url::parse(format!("{}/bound", spec).as_str())
-            .expect("can parse url");
+        let bound_address = Url::parse(format!("{}/bound", spec).as_str()).expect("can parse url");
         self.maybe_my_uri = Some(bound_address.clone());
         memory_server::set_server(&bound_address)?;
         self.my_servers.insert(bound_address.clone());
@@ -76,7 +75,7 @@ impl TransportMemory {
         if self.connections.contains(&address) {
             self.evt_outbox.push(TransportEvent::ConnectSuccess {
                 request_id,
-                address
+                address,
             });
             return Ok(());
         }
@@ -106,14 +105,19 @@ impl TransportMemory {
 
         self.evt_outbox.push(TransportEvent::ConnectSuccess {
             request_id,
-            address
+            address,
         });
 
         Ok(())
     }
 
     /// Send payload to known connectionIds in `id_list`
-    fn priv_send(&mut self, request_id: RequestId, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+    fn priv_send(
+        &mut self,
+        request_id: RequestId,
+        address: Url,
+        payload: Vec<u8>,
+    ) -> TransportResult<()> {
         if self.maybe_my_uri.is_none() {
             return Err(TransportError::new(
                 "Cannot send before binding".to_string(),
@@ -136,9 +140,8 @@ impl TransportMemory {
             .post(&address, &payload)
             .expect("Post on memory server should work");
 
-        self.evt_outbox.push(TransportEvent::SendMessageSuccess {
-            request_id
-        });
+        self.evt_outbox
+            .push(TransportEvent::SendMessageSuccess { request_id });
 
         Ok(())
     }
@@ -159,7 +162,7 @@ impl Drop for TransportMemory {
 impl Transport for TransportMemory {
     /// Get list of known connectionIds
     fn connection_list(&self) -> TransportResult<Vec<Url>> {
-        Ok(self.my_servers.iter().map(|x|x.clone()).collect())
+        Ok(self.my_servers.iter().map(|x| x.clone()).collect())
     }
 
     /// Add Command to inbox
@@ -211,7 +214,8 @@ impl Transport for TransportMemory {
             self.connections.insert(address.clone());
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
-            self.evt_outbox.insert(0, TransportEvent::IncomingConnection { address });
+            self.evt_outbox
+                .insert(0, TransportEvent::IncomingConnection { address });
         }
         // process other messages
         for event in output {
@@ -220,13 +224,12 @@ impl Transport for TransportMemory {
                     // convert inbound connectionId to outbound connectionId.
                     // let out_cid = self.inbound_connection_map.get(&in_cid).expect("Should have outbound at this stage");
                     self.connections.remove(&address);
-                    self.evt_outbox.push(TransportEvent::ConnectionClosed { address });
+                    self.evt_outbox
+                        .push(TransportEvent::ConnectionClosed { address });
                 }
                 TransportEvent::ReceivedData { address, payload } => {
-                    self.evt_outbox.push(TransportEvent::ReceivedData {
-                        address,
-                        payload,
-                    });
+                    self.evt_outbox
+                        .push(TransportEvent::ReceivedData { address, payload });
                 }
                 // We are not expecting anything else from the MemoryServer
                 _ => unreachable!(),
@@ -244,7 +247,10 @@ impl Transport for TransportMemory {
             let mut out = None;
             for evt in evt_list {
                 match &evt {
-                    TransportEvent::BindSuccess { request_id, bound_address } => {
+                    TransportEvent::BindSuccess {
+                        request_id,
+                        bound_address,
+                    } => {
                         if request_id == &rid {
                             out = Some(bound_address.clone());
                         }
@@ -266,22 +272,20 @@ impl TransportMemory {
     /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
     /// Return a list of TransportEvents to owner.
     #[allow(non_snake_case)]
-    fn serve_TransportCommand(
-        &mut self,
-        cmd: TransportCommand,
-    ) -> TransportResult<()> {
+    fn serve_TransportCommand(&mut self, cmd: TransportCommand) -> TransportResult<()> {
         debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
-            TransportCommand::Bind { request_id, spec } => {
-                self.priv_bind(request_id, spec)
-            }
-            TransportCommand::Connect { request_id, address } => {
-                self.priv_connect(request_id, address)
-            }
-            TransportCommand::SendMessage { request_id, address, payload } => {
-                self.priv_send(request_id, address, payload)
-            }
+            TransportCommand::Bind { request_id, spec } => self.priv_bind(request_id, spec),
+            TransportCommand::Connect {
+                request_id,
+                address,
+            } => self.priv_connect(request_id, address),
+            TransportCommand::SendMessage {
+                request_id,
+                address,
+                payload,
+            } => self.priv_send(request_id, address, payload),
         }
     }
 }

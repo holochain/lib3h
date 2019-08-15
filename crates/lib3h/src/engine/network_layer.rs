@@ -8,9 +8,9 @@ use crate::{
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 
-use url::Url;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 /// Network layer related private methods
 impl<'engine, D: Dht> RealEngine<'engine, D> {
@@ -62,8 +62,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     "{} auto-connect to peer: {} ({})",
                     self.name, peer_data.peer_address, peer_data.peer_uri,
                 );
-                self.network_gateway.as_transport_mut().connect(
-                    "".to_string(), peer_data.peer_uri.clone())?;
+                self.network_gateway
+                    .as_transport_mut()
+                    .connect("".to_string(), peer_data.peer_uri.clone())?;
             }
             DhtEvent::PeerTimedOut(peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
@@ -133,7 +134,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             network_gateway.send(
                 "".to_string(),
                 Url::parse(&format!("hc:{}", &peer_data.peer_address)).expect("can parse url"),
-                buf)?;
+                buf,
+            )?;
         }
         // TODO END
 
@@ -162,14 +164,18 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             TransportEvent::FailureResult { request_id, error } => {
                 error!("network_layer failure {} {}", request_id, error);
             }
-            TransportEvent::BindSuccess { request_id, bound_address } => {
-            }
-            TransportEvent::ConnectSuccess { request_id, address } => {
+            TransportEvent::BindSuccess {
+                request_id,
+                bound_address,
+            } => {}
+            TransportEvent::ConnectSuccess {
+                request_id,
+                address,
+            } => {
                 let mut output = self.handle_new_connection(address, request_id)?;
                 outbox.append(&mut output);
             }
-            TransportEvent::SendMessageSuccess { request_id } => {
-            }
+            TransportEvent::SendMessageSuccess { request_id } => {}
             TransportEvent::ConnectionError { address, error } => {
                 self.network_connections.remove(&address);
                 error!("{} Network error from {} : {:?}", self.name, address, error);

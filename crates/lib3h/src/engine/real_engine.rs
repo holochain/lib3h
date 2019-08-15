@@ -17,7 +17,7 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::*, TransportWrapper, transport_trait::Transport},
+    transport::{protocol::*, transport_trait::Transport, TransportWrapper},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -51,8 +51,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create Transport and bind
-        let network_transport = TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
-        let binding = network_transport.as_mut().bind_sync(config.bind_url.clone())?;
+        let network_transport =
+            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
+        let binding = network_transport
+            .as_mut()
+            .bind_sync(config.bind_url.clone())?;
 
         // Generate keys
         // TODO #209 - Check persistence first before generating
@@ -101,7 +104,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
         let network_transport = TransportWrapper::new(TransportMemory::new());
-        let binding = network_transport.as_mut().bind_sync(config.bind_url.clone())?;
+        let binding = network_transport
+            .as_mut()
+            .bind_sync(config.bind_url.clone())?;
 
         let dht_config = DhtConfig {
             this_peer_address: format!("{}_tId", name),
@@ -263,7 +268,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             Lib3hClientProtocol::Connect(msg) => {
                 // TODO XXX - use local request_id... we don't know
                 // if our source is unique or not
-                self.network_gateway.as_transport_mut().connect(msg.request_id, msg.peer_uri)?;
+                self.network_gateway
+                    .as_transport_mut()
+                    .connect(msg.request_id, msg.peer_uri)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
@@ -559,13 +566,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway: GatewayWrapper<'engine> =
-            GatewayWrapper::new(P2pGateway::new(
-                &format!("{:?}", &chain_id),
-                self.network_gateway.as_transport(),
-                self.dht_factory,
-                &dht_config,
-            ));
+        let new_space_gateway: GatewayWrapper<'engine> = GatewayWrapper::new(P2pGateway::new(
+            &format!("{:?}", &chain_id),
+            self.network_gateway.as_transport(),
+            self.dht_factory,
+            &dht_config,
+        ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
@@ -665,9 +671,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             .unwrap();
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
-        let res = space_gateway
-            .as_transport_mut()
-            .send("".to_string(), Url::parse(&format!("hc:{}", peer_address)).expect("can parse url"), payload);
+        let res = space_gateway.as_transport_mut().send(
+            "".to_string(),
+            Url::parse(&format!("hc:{}", peer_address)).expect("can parse url"),
+            payload,
+        );
         if let Err(e) = res {
             response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);

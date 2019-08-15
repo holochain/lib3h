@@ -1,7 +1,4 @@
-use crate::transport::{
-    error::TransportResult,
-    protocol::*,
-};
+use crate::transport::{error::TransportResult, protocol::*};
 
 use url::Url;
 
@@ -29,10 +26,7 @@ pub trait Transport {
 
     /// Bind to a network interface
     fn bind(&mut self, request_id: RequestId, spec: Url) -> TransportResult<()> {
-        self.post(TransportCommand::Bind {
-            request_id,
-            spec,
-        })
+        self.post(TransportCommand::Bind { request_id, spec })
     }
 
     /// establish a connection to a remote node
@@ -44,7 +38,12 @@ pub trait Transport {
     }
 
     /// send a payload to remote nodes
-    fn send(&mut self, request_id: RequestId, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+    fn send(
+        &mut self,
+        request_id: RequestId,
+        address: Url,
+        payload: Vec<u8>,
+    ) -> TransportResult<()> {
         self.post(TransportCommand::SendMessage {
             request_id,
             address,

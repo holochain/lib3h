@@ -12,16 +12,26 @@ pub enum TransportCommand {
     /// establish a connection with a remote node
     Connect { request_id: RequestId, address: Url },
     /// send a message to a remote node, may first establish a connection
-    SendMessage { request_id: RequestId, address: Url, payload: Vec<u8> },
+    SendMessage {
+        request_id: RequestId,
+        address: Url,
+        payload: Vec<u8>,
+    },
 }
 
 /// Events that can be generated during a `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportEvent {
     /// Any TransportCommand can asyncronously generate a FailureResult
-    FailureResult { request_id: RequestId, error: TransportError },
+    FailureResult {
+        request_id: RequestId,
+        error: TransportError,
+    },
     /// Success response to TransportCommand::Bind
-    BindSuccess { request_id: RequestId, bound_address: Url },
+    BindSuccess {
+        request_id: RequestId,
+        bound_address: Url,
+    },
     /// Success response to TransportCommand::Connect
     ConnectSuccess { request_id: RequestId, address: Url },
     /// Success response to TransportCommand::SendMessage

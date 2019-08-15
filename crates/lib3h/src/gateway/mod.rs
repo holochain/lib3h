@@ -4,9 +4,7 @@ pub mod p2p_gateway;
 
 use crate::{
     dht::dht_trait::Dht,
-    transport::{
-        protocol::TransportCommand, transport_trait::Transport, TransportWrapper,
-    },
+    transport::{protocol::TransportCommand, transport_trait::Transport, TransportWrapper},
 };
 use std::{
     collections::{HashMap, HashSet, VecDeque},

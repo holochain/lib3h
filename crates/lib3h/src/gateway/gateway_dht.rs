@@ -44,9 +44,7 @@ impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
                 );
                 // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
                 // to get the transportId
-                self.connections.insert(
-                    peer_data.peer_uri.clone()
-                );
+                self.connections.insert(peer_data.peer_uri.clone());
             }
         }
         self.inner_dht.post(cmd)
@@ -99,9 +97,11 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .serialize(&mut Serializer::new(&mut payload))
                         .expect("P2pProtocol::Gossip serialization failed");
                     // Forward gossip to the inner_transport
-                    self.inner_transport
-                        .as_mut()
-                        .send("".to_string(), Url::parse(&format!("hc:{}", to_peer_address)).expect("can parse url"), payload)?;
+                    self.inner_transport.as_mut().send(
+                        "".to_string(),
+                        Url::parse(&format!("hc:{}", to_peer_address)).expect("can parse url"),
+                        payload,
+                    )?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {
