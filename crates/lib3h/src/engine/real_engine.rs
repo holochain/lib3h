@@ -561,7 +561,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Bail if space already joined by agent
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
-            res.result_info = "Already joined space".to_string().into_bytes().into();
+            res.result_info = "Already joined space".to_string().into();
             return Ok(vec![Lib3hServerProtocol::FailureResult(res)]);
         }
         let mut output = Vec::new();
