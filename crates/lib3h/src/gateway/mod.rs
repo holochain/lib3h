@@ -19,7 +19,6 @@ use url::Url;
 /// Transport access via peer discovery handled by the Dht
 pub trait Gateway: Transport + Dht {
     fn identifier(&self) -> &str;
-    fn get_connection_id(&self, peer_address: &str) -> Option<String>;
 }
 
 /// since rust doesn't suport upcasting to supertraits

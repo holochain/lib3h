@@ -65,7 +65,7 @@ impl TransportMemory {
         self.my_servers.insert(bound_address.clone());
         self.evt_outbox.push(TransportEvent::BindSuccess {
             request_id,
-            address: bound_address,
+            bound_address,
         });
         Ok(())
     }
@@ -73,7 +73,7 @@ impl TransportMemory {
     /// Connect to another node's "bind".
     /// Get server from the uri and connect to it with a new connectionId for ourself.
     fn priv_connect(&mut self, request_id: RequestId, address: Url) -> TransportResult<()> {
-        if self.connections.contains(address) {
+        if self.connections.contains(&address) {
             self.evt_outbox.push(TransportEvent::ConnectSuccess {
                 request_id,
                 address
@@ -92,7 +92,7 @@ impl TransportMemory {
         };
         // Get other node's server
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(address);
+        let maybe_server = server_map.get(&address);
         if let None = maybe_server {
             return Err(TransportError::new(format!(
                 "No Memory server at this url address: {}",
@@ -102,7 +102,7 @@ impl TransportMemory {
         self.connections.insert(address.clone());
         // Connect to it
         let mut server = maybe_server.unwrap().lock().unwrap();
-        server.request_connect(my_uri, &address)?;
+        server.request_connect(my_uri)?;
 
         self.evt_outbox.push(TransportEvent::ConnectSuccess {
             request_id,
@@ -122,7 +122,7 @@ impl TransportMemory {
         let my_uri = self.maybe_my_uri.clone().unwrap();
 
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(address);
+        let maybe_server = server_map.get(&address);
         if let None = maybe_server {
             return Err(TransportError::new(format!(
                 "No Memory server at this url address: {}",
@@ -133,7 +133,7 @@ impl TransportMemory {
         let mut server = maybe_server.unwrap().lock().unwrap();
         // Send it data from us
         server
-            .post(address, payload)
+            .post(&address, &payload)
             .expect("Post on memory server should work");
 
         self.evt_outbox.push(TransportEvent::SendMessageSuccess {
@@ -147,7 +147,7 @@ impl TransportMemory {
 impl Drop for TransportMemory {
     fn drop(&mut self) {
         // Close all connections
-        self.close_all().ok();
+        //self.close_all().ok();
         // Drop my servers
         for bounded_url in &self.my_servers {
             memory_server::unset_server(&bounded_url)
@@ -159,7 +159,7 @@ impl Drop for TransportMemory {
 impl Transport for TransportMemory {
     /// Get list of known connectionIds
     fn connection_list(&self) -> TransportResult<Vec<Url>> {
-        Ok(self.my_servers.keys().clone())
+        Ok(self.my_servers.iter().map(|x|x.clone()).collect())
     }
 
     /// Add Command to inbox
@@ -178,11 +178,8 @@ impl Transport for TransportMemory {
                 None => break,
                 Some(msg) => msg,
             };
-            let res = self.serve_TransportCommand(&cmd);
-            if let Ok(mut output) = res {
-                did_work = true;
-                self.evt_outbox.append(&mut output);
-            }
+            did_work = true;
+            self.serve_TransportCommand(cmd)?;
         }
         // Process my Servers: process IncomingConnectionEstablished first
         let mut to_connect_list: Vec<Url> = Vec::new();
@@ -200,10 +197,7 @@ impl Transport for TransportMemory {
 
                 for event in event_list {
                     if let TransportEvent::IncomingConnection { address } = event {
-                        let to_connect_uri = my_server
-                            .get_inbound_uri(&address)
-                            .expect("Should always have uri");
-                        to_connect_list.push(to_connect_uri.clone());
+                        to_connect_list.push(address);
                     } else {
                         output.push(event);
                     }
@@ -214,7 +208,7 @@ impl Transport for TransportMemory {
         for address in to_connect_list {
             trace!("(TransportMemory) {} <- {:?}", address, self.maybe_my_uri);
             self.connect("".to_string(), address.clone())?;
-            self.connections.insert(address);
+            self.connections.insert(address.clone());
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
             self.evt_outbox.insert(0, TransportEvent::IncomingConnection { address });
@@ -241,6 +235,31 @@ impl Transport for TransportMemory {
         // Done
         Ok((did_work, self.evt_outbox.drain(..).collect()))
     }
+
+    fn bind_sync(&mut self, spec: Url) -> TransportResult<Url> {
+        let rid = nanoid::simple();
+        self.bind(rid.clone(), spec);
+        for _x in 0..100 {
+            let (_, evt_list) = self.process()?;
+            let mut out = None;
+            for evt in evt_list {
+                match &evt {
+                    TransportEvent::BindSuccess { request_id, bound_address } => {
+                        if request_id == &rid {
+                            out = Some(bound_address.clone());
+                        }
+                        self.evt_outbox.push(evt);
+                    }
+                    _ => self.evt_outbox.push(evt),
+                }
+            }
+            if out.is_some() {
+                return Ok(out.unwrap());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        Err(TransportError::new("bind fail".to_string().into()))
+    }
 }
 
 impl TransportMemory {
@@ -249,7 +268,7 @@ impl TransportMemory {
     #[allow(non_snake_case)]
     fn serve_TransportCommand(
         &mut self,
-        cmd: &TransportCommand,
+        cmd: TransportCommand,
     ) -> TransportResult<()> {
         debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
@@ -275,8 +294,8 @@ mod tests {
     fn can_rebind() {
         let mut transport = TransportMemory::new();
         let bind_url = url::Url::parse("mem://can_rebind").unwrap();
-        assert!(transport.bind(&bind_url).is_ok());
-        assert!(transport.bind(&bind_url).is_ok());
+        assert!(transport.bind_sync(bind_url.clone()).is_ok());
+        assert!(transport.bind_sync(bind_url).is_ok());
     }
 
 }

@@ -100,17 +100,17 @@ pub mod tests {
         uri_B: &Url,
     ) {
         // Connect
-        let _actual_bind_uri_a = node_A.bind(uri_A).unwrap();
-        let actual_bind_uri_b = node_B.bind(uri_B).unwrap();
-        let idAB = node_A.connect(&actual_bind_uri_b).unwrap();
-        trace!("actual_bind_uri_b: {}, idAB: {}", actual_bind_uri_b, idAB);
+        let _actual_bind_uri_a = node_A.bind_sync(uri_A.clone()).unwrap();
+        let actual_bind_uri_b = node_B.bind_sync(uri_B.clone()).unwrap();
+        node_A.connect("".to_string(), actual_bind_uri_b.clone()).unwrap();
+        trace!("actual_bind_uri_b: {}", actual_bind_uri_b);
 
         let (_did_work, _event_list) = node_A.process().unwrap();
         let (_did_work, _event_list) = node_B.process().unwrap();
 
         // Send A -> B
         let payload = [1, 2, 3, 4];
-        node_A.send(&[&idAB], &payload).unwrap();
+        node_A.send("".to_string(), uri_A.clone(), payload.to_vec()).unwrap();
         let mut did_work = false;
         let mut event_list = Vec::new();
 
@@ -125,32 +125,17 @@ pub mod tests {
         assert!(event_list.len() >= 1);
         let recv_event = event_list.last().unwrap().clone();
         let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::ReceivedData { a, b } => (a, b),
+            TransportEvent::ReceivedData { address, payload } => (address, payload),
             e => panic!("Received wrong TransportEvent type: {:?}", e),
         };
-        assert!(node_A.get_uri(idAB.as_str()).is_some());
-        assert!(node_B.get_uri(recv_id.as_str()).is_some());
-
-        debug!(
-            "node_A.get_uri({:?}): {:?}",
-            idAB,
-            node_A.get_uri(idAB.as_str()).unwrap()
-        );
-        debug!(
-            "node_B.get_uri({:?}): {:?}",
-            recv_id,
-            node_B.get_uri(recv_id.as_str()).unwrap()
-        );
 
         assert_eq!(payload, recv_payload.as_slice());
         let (_did_work, _event_list) = node_A.process().unwrap();
 
         // Send B -> A
         let payload = [4, 2, 1, 3];
-        let id_list = node_B.connection_id_list().unwrap();
         // referencing node_B's connection list
-        let idBA = id_list[0].clone();
-        node_B.send(&[&idBA], &payload).unwrap();
+        node_B.send("".to_string(), uri_B.clone(), payload.to_vec()).unwrap();
         did_work = false;
         event_list.clear();
         for _x in 0..NUM_PROCESS_LOOPS {
@@ -163,11 +148,9 @@ pub mod tests {
         assert_eq!(event_list.len(), 1);
         let recv_event = event_list[0].clone();
         let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::ReceivedData { a, b } => (a, b),
+            TransportEvent::ReceivedData { address, payload } => (address, payload),
             _ => panic!("Received wrong TransportEvent type"),
         };
-        assert!(node_A.get_uri(recv_id.as_str()).is_some());
-        assert!(node_B.get_uri(idBA.as_str()).is_some());
 
         assert_eq!(payload, recv_payload.as_slice());
     }

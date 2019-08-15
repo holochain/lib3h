@@ -190,6 +190,31 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
 
         Ok((did_work, self.event_queue.drain(..).collect()))
     }
+
+    fn bind_sync(&mut self, spec: Url) -> TransportResult<Url> {
+        let rid = nanoid::simple();
+        self.bind(rid.clone(), spec);
+        for _x in 0..100 {
+            let (_, evt_list) = self.process()?;
+            let mut out = None;
+            for evt in evt_list {
+                match &evt {
+                    TransportEvent::BindSuccess { request_id, bound_address } => {
+                        if request_id == &rid {
+                            out = Some(bound_address.clone());
+                        }
+                        self.event_queue.push(evt);
+                    }
+                    _ => self.event_queue.push(evt),
+                }
+            }
+            if out.is_some() {
+                return Ok(out.unwrap());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        Err(TransportError::new("bind fail".to_string().into()))
+    }
 }
 
 impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {

@@ -9,6 +9,7 @@ use crate::{
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
 use serde::Serialize;
+use url::Url;
 
 /// Compose DHT
 impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
@@ -43,17 +44,9 @@ impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
                 );
                 // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
                 // to get the transportId
-                let maybe_previous = self.connection_map.insert(
-                    peer_data.peer_uri.clone(),
-                    String::from(peer_data.peer_uri.path()),
+                self.connections.insert(
+                    peer_data.peer_uri.clone()
                 );
-                if let Some(previous_cId) = maybe_previous {
-                    debug!(
-                        "Replaced connectionId for {} ; was: {}",
-                        peer_data.peer_uri.clone(),
-                        previous_cId
-                    );
-                }
             }
         }
         self.inner_dht.post(cmd)
@@ -105,13 +98,10 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .expect("P2pProtocol::Gossip serialization failed");
-                    let to_conn_id = self
-                        .get_connection_id(&to_peer_address)
-                        .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
                     self.inner_transport
                         .as_mut()
-                        .send(&[&to_conn_id], &payload)?;
+                        .send("".to_string(), Url::parse(&format!("hc:{}", to_peer_address)).expect("can parse url"), payload)?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

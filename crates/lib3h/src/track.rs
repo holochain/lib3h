@@ -13,6 +13,63 @@ struct TrackItem<T> {
     pub expires_ms: u64,
 }
 
+/// helps code clarity
+pub type Done = bool;
+
+/// return false if we should try again later
+pub type WorkflowStep<T> = Box<dyn Fn(&mut T) -> Done>;
+
+/// we have some actions we'd like to take, pending asyncronouse state change
+pub trait Workflow<T> {
+    /// accessor for the task stack
+    fn get_steps(&mut self) -> &mut Vec<WorkflowStep<T>>;
+
+    /// accessor for concrete type
+    fn as_mut(&mut self) -> &mut T;
+
+    /// privided process function
+    /// will execute the first step
+    ///   on false - leave the step in the stack
+    ///    on true - remove it
+    /// if there are no steps left in the stack, will return true
+    fn process(&mut self) -> Done {
+        let step = {
+            let steps = self.get_steps();
+            if steps.is_empty() {
+                return true;
+            }
+            steps.remove(0)
+        };
+        if !step(self.as_mut()) {
+            self.get_steps().insert(0, step);
+        }
+        self.get_steps().is_empty()
+    }
+}
+
+pub fn process_tracker_workflows<T, W: Workflow<T>>(
+    tracker: &mut Tracker<Box<W>>,
+    mut completed: Option<&mut Vec<Box<W>>>,
+) -> Done {
+    let mut done: Done = true;
+
+    for key in tracker.keys() {
+        if let Some(w) = tracker.get_mut(&key) {
+            if w.process() {
+                if completed.as_ref().is_some() {
+                    if let Some(w) = tracker.remove(&key) {
+                        completed.as_mut().unwrap().push(w);
+                    }
+                }
+            } else {
+                done = false;
+            }
+        }
+    }
+
+    done
+}
+
 /// Helper to keep track of request_ids for message correlation with core or
 /// other p2p nodes
 pub struct Tracker<T> {
@@ -33,6 +90,15 @@ impl<T> Tracker<T> {
         }
     }
 
+    /// generate a request_id for this tracker
+    pub fn gen_id(&self) -> TrackId {
+        format!("{}{}", self.id_prefix, nanoid::simple())
+    }
+
+    pub fn keys(&self) -> Vec<TrackId> {
+        self.map.keys().map(|x|x.clone()).collect()
+    }
+
     /// `true` if we are still tracking `id`
     pub fn has(&self, id: &TrackIdRef) -> bool {
         self.map.contains_key(id)
@@ -46,9 +112,12 @@ impl<T> Tracker<T> {
         }
     }
 
-    /// generate a request_id for this tracker
-    pub fn gen_id(&self) -> TrackId {
-        format!("{}{}", self.id_prefix, nanoid::simple())
+    /// if we are tracking `id` return a mutable ref to the user data
+    pub fn get_mut(&mut self, id: &TrackIdRef) -> Option<&mut T> {
+        match self.map.get_mut(id) {
+            Some(item) => item.value.as_mut(),
+            None => None,
+        }
     }
 
     /// reserve a space in the tracker for a new request_id
@@ -156,5 +225,87 @@ mod tests {
             let value = value.unwrap();
             assert!(&value == "test_a" || &value == "test_b");
         }
+    }
+
+    struct ZZ {
+        stage: u8,
+        steps: Vec<WorkflowStep<ZZ>>,
+        string: String,
+    }
+
+    impl ZZ {
+        fn check_stage_1(z: &mut ZZ) -> Done {
+            if z.stage == 1 {
+                z.string.push_str("hello ");
+                return true;
+            }
+            false
+        }
+
+        fn check_stage_2(z: &mut ZZ) -> Done {
+            if z.stage == 2 {
+                z.string.push_str("world");
+                return true;
+            }
+            false
+        }
+    }
+
+    impl Workflow<ZZ> for ZZ {
+        fn get_steps(&mut self) -> &mut Vec<WorkflowStep<ZZ>> {
+            return &mut self.steps;
+        }
+        fn as_mut(&mut self) -> &mut ZZ {
+            &mut *self
+        }
+    }
+
+    #[test]
+    pub fn it_should_workflow() {
+        let mut z = ZZ {
+            stage: 0,
+            steps: vec![
+                Box::new(ZZ::check_stage_1),
+                Box::new(ZZ::check_stage_2),
+            ],
+            string: "".to_string(),
+        };
+        assert!(!z.process());
+        assert!(!z.process());
+        z.stage = 1;
+        assert!(!z.process());
+        z.stage = 2;
+        assert!(z.process());
+        assert_eq!(&z.string, "hello world");
+    }
+
+    #[test]
+    pub fn it_should_workflow_in_tracker() {
+        let mut t: Tracker<Box<ZZ>> =
+            Tracker::new("test3_", 1000);
+
+        let rid = t.reserve();
+        t.set(&rid, Some(Box::new(ZZ {
+            stage: 0,
+            steps: vec![
+                Box::new(ZZ::check_stage_1),
+                Box::new(ZZ::check_stage_2),
+            ],
+            string: "".to_string(),
+        })));
+
+        let mut completed = Vec::new();
+
+        assert!(!process_tracker_workflows(&mut t, Some(&mut completed)));
+        assert_eq!(0, completed.len());
+        assert!(!process_tracker_workflows(&mut t, Some(&mut completed)));
+        assert_eq!(0, completed.len());
+        t.get_mut(&rid).unwrap().stage = 1;
+        assert!(!process_tracker_workflows(&mut t, Some(&mut completed)));
+        assert_eq!(0, completed.len());
+        t.get_mut(&rid).unwrap().stage = 2;
+        assert!(process_tracker_workflows(&mut t, Some(&mut completed)));
+        assert_eq!(1, completed.len());
+        assert_eq!(completed[0].string, "hello world");
     }
 }

@@ -21,6 +21,9 @@ pub trait Transport {
     /// get a list of all open connection addresses
     fn connection_list(&self) -> TransportResult<Vec<Url>>;
 
+    /// THIS IS A HACK, REMOVE IT
+    fn bind_sync(&mut self, spec: Url) -> TransportResult<Url>;
+
     // -- Asynchronous -- //
     // the following are just helpers to post(TransportCommand::*)
 

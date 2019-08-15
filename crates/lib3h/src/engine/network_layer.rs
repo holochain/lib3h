@@ -141,7 +141,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         if self.network_connections.is_empty() {
             let data = ConnectedData {
                 request_id,
-                uri: address
+                uri: address.clone(),
             };
             outbox.push(Lib3hServerProtocol::Connected(data));
         }

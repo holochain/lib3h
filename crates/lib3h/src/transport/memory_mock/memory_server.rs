@@ -81,7 +81,7 @@ impl MemoryServer {
     }
 
     pub fn has_inbound_address(&self, address: &Url) -> bool {
-        self.inbound_connections.has(address)
+        self.inbound_connections.contains(address)
     }
 
     /// Another node requested to connect with us.
@@ -131,9 +131,7 @@ impl MemoryServer {
         }
         trace!("(MemoryServer {}). close event", self.this_uri);
         // Remove inbound connection
-        self.inbound_connections
-            .remove(other_uri)
-            .expect("Should have connectionId for this uri");
+        self.inbound_connections.remove(other_uri);
         // Notify our TransportMemory
         self.connection_inbox.push((other_uri.clone(), false));
         // Done
@@ -169,9 +167,9 @@ impl MemoryServer {
                 is_new,
             );
             let event = if *is_new {
-                TransportEvent::IncomingConnection { address }
+                TransportEvent::IncomingConnection { address: address.clone() }
             } else {
-                TransportEvent::ConnectionClosed { address }
+                TransportEvent::ConnectionClosed { address: address.clone() }
             };
             trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
             outbox.push(event);
@@ -187,7 +185,7 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!("(MemoryServer {}) received: {:?}", self.this_uri, payload);
-                let evt = TransportEvent::ReceivedData { address, payload };
+                let evt = TransportEvent::ReceivedData { address: address.clone(), payload };
                 outbox.push(evt);
             }
         }

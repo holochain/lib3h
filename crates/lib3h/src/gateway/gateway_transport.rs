@@ -33,11 +33,8 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
                 None => break,
                 Some(msg) => msg,
             };
-            let res = self.serve_TransportCommand(&cmd);
-            if let Ok(mut output) = res {
-                did_work = true;
-                outbox.append(&mut output);
-            }
+            did_work = true;
+            self.serve_TransportCommand(cmd)?;
         }
         trace!(
             "({}).Transport.process() - output: {} {}",
@@ -73,9 +70,13 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         let peer_data_list = self.inner_dht.get_peer_list();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
-            id_list.push(Url::parse(&format!("hc:{}", peer_data.peer_address).expect("can parse url")));
+            id_list.push(Url::parse(&format!("hc:{}", peer_data.peer_address)).expect("can parse url"));
         }
         Ok(id_list)
+    }
+
+    fn bind_sync(&mut self, spec: Url) -> TransportResult<Url> {
+        unimplemented!();
     }
 }
 
@@ -91,7 +92,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     }
 
     // TODO #176 - Return a higher-level uri instead?
-    fn priv_connect(&mut self, request_id: RequestId, address: &Url) -> TransportResult<()> {
+    fn priv_connect(&mut self, request_id: RequestId, address: Url) -> TransportResult<()> {
         /*
         trace!("({}).connect() {}", self.identifier, uri);
         // Connect
@@ -163,7 +164,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     fn handle_new_connection(&mut self, address: Url) -> TransportResult<()> {
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
-        self.connection.insert(address.clone);
+        self.connections.insert(address.clone());
 
         // Send to other node our PeerAddress
         let this_peer = self.this_peer().clone();
@@ -256,7 +257,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     #[allow(non_snake_case)]
     fn serve_TransportCommand(
         &mut self,
-        cmd: &TransportCommand,
+        cmd: TransportCommand,
     ) -> TransportResult<()> {
         trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
         // Note: use same order as the enum
