@@ -21,6 +21,16 @@ lazy_static! {
     pub(crate) static ref MEMORY_SERVER_MAP: RwLock<MemoryServerMap> = RwLock::new(HashMap::new());
 }
 
+/// DEBUGGING : )
+pub fn dump_server() {
+    let server_map = MEMORY_SERVER_MAP.write().unwrap();
+    debug!("-- BEGIN MEMORY SERVER DUMP --");
+    for (url, server) in server_map.iter() {
+        debug!("{}: {:?}", url, server.lock().unwrap());
+    }
+    debug!("--  END MEMORY SERVER DUMP  --");
+}
+
 /// Add new MemoryServer to the global server map
 pub fn set_server(uri: &Url) -> TransportResult<()> {
     debug!("MemoryServer::set_server: {}", uri);
@@ -51,6 +61,7 @@ pub fn unset_server(uri: &Url) -> TransportResult<()> {
 //--------------------------------------------------------------------------------------------------
 
 /// We use the uri as the connectionId
+#[derive(Debug)]
 pub struct MemoryServer {
     /// Address of this server
     this_uri: Url,
@@ -137,14 +148,15 @@ impl MemoryServer {
     /// Receive payload from another node, i.e. fill our inbox for this connectionId
     pub fn post(&mut self, from_uri: &Url, payload: &[u8]) -> TransportResult<()> {
         let maybe_inbox = self.inbox_map.get_mut(from_uri);
-        if let None = maybe_inbox {
-            return Err(TransportError::new(format!(
+        if maybe_inbox.is_none() {
+            Err(TransportError::new(format!(
                 "(MemoryServer {}) Unknown from_uri {}",
                 self.this_uri, from_uri
-            )));
+            )))
+        } else {
+            maybe_inbox.unwrap().push_back(payload.to_vec());
+            Ok(())
         }
-        maybe_inbox.unwrap().push_back(payload.to_vec());
-        Ok(())
     }
 
     /// Process all inboxes: payload inboxes and incoming connections inbox.

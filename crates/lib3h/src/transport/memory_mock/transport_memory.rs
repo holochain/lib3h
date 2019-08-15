@@ -55,7 +55,8 @@ impl TransportMemory {
 
     /// Create a new server inbox for myself
     fn priv_bind(&mut self, request_id: RequestId, spec: Url) -> TransportResult<()> {
-        let bound_address = Url::parse(format!("{}/bound", spec).as_str()).expect("can parse url");
+        let mut bound_address = spec.clone();
+        bound_address.set_path("bound");
         self.maybe_my_uri = Some(bound_address.clone());
         memory_server::set_server(&bound_address)?;
         self.my_servers.insert(bound_address.clone());
@@ -115,26 +116,32 @@ impl TransportMemory {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
-        if self.maybe_my_uri.is_none() {
-            return Err(TransportError::new(
-                "Cannot send before binding".to_string(),
-            ));
-        }
+        let res = {
+            if self.maybe_my_uri.is_none() {
+                return Err(TransportError::new(
+                    "Cannot send before binding".to_string(),
+                ));
+            }
 
-        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(&address);
-        if let None = maybe_server {
-            return Err(TransportError::new(format!(
-                "No Memory server at this url address: {}",
-                address
-            )));
-        }
-        trace!("(TransportMemory).send() {} | {}", address, payload.len());
-        let mut server = maybe_server.unwrap().lock().unwrap();
+            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+            let maybe_server = server_map.get(&address);
+            if let None = maybe_server {
+                return Err(TransportError::new(format!(
+                    "No Memory server at this url address: {}",
+                    address
+                )));
+            }
+            trace!("(TransportMemory).send() {} | {}", address, payload.len());
+            let mut server = maybe_server.unwrap().lock().unwrap();
+
+            server.post(self.maybe_my_uri.as_ref().expect("should be bound"), &payload)
+        };
+
         // Send it data from us
-        server
-            .post(&address, &payload)
-            .expect("Post on memory server should work");
+        if let Err(e) = res {
+            memory_server::dump_server();
+            panic!(e);
+        }
 
         self.evt_outbox
             .push(TransportEvent::SendMessageSuccess { request_id });
@@ -207,7 +214,6 @@ impl Transport for TransportMemory {
         for address in to_connect_list {
             trace!("(TransportMemory) {} <- {:?}", address, self.maybe_my_uri);
             self.connect("".to_string(), address.clone())?;
-            self.connections.insert(address.clone());
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
             self.evt_outbox
