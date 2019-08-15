@@ -128,7 +128,7 @@ pub mod tests {
         assert!(did_work);
         assert!(event_list.len() >= 1);
         let recv_event = event_list.last().unwrap().clone();
-        let (recv_id, recv_payload) = match recv_event {
+        let (_, recv_payload) = match recv_event {
             TransportEvent::ReceivedData { address, payload } => (address, payload),
             e => panic!("Received wrong TransportEvent type: {:?}", e),
         };
@@ -153,7 +153,7 @@ pub mod tests {
         assert!(did_work);
         assert_eq!(event_list.len(), 1);
         let recv_event = event_list[0].clone();
-        let (recv_id, recv_payload) = match recv_event {
+        let (_, recv_payload) = match recv_event {
             TransportEvent::ReceivedData { address, payload } => (address, payload),
             _ => panic!("Received wrong TransportEvent type"),
         };

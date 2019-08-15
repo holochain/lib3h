@@ -5,8 +5,7 @@ use crate::{
     gateway::{Gateway, P2pGateway},
     transport::TransportWrapper,
 };
-use lib3h_protocol::Address;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 //--------------------------------------------------------------------------------------------------
 // Constructors

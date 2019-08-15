@@ -1,5 +1,4 @@
 use crate::transport::error::TransportError;
-use lib3h_protocol::Address;
 use url::Url;
 
 pub type RequestId = String;

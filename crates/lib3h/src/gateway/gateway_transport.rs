@@ -4,11 +4,7 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
     gateway::{Gateway, P2pGateway},
-    transport::{
-        error::{TransportError, TransportResult},
-        protocol::*,
-        transport_trait::Transport,
-    },
+    transport::{error::TransportResult, protocol::*, transport_trait::Transport},
 };
 use lib3h_protocol::DidWork;
 use rmp_serde::{Deserializer, Serializer};
@@ -59,8 +55,8 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             outbox.append(&mut event_list);
         }
         // Handle TransportEvents
-        for evt in outbox.clone().iter() {
-            self.handle_TransportEvent(&evt)?;
+        for evt in outbox.clone() {
+            self.handle_TransportEvent(evt)?;
         }
         Ok((did_work, outbox))
     }
@@ -77,7 +73,7 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         Ok(id_list)
     }
 
-    fn bind_sync(&mut self, spec: Url) -> TransportResult<Url> {
+    fn bind_sync(&mut self, _spec: Url) -> TransportResult<Url> {
         unimplemented!();
     }
 }
@@ -85,27 +81,13 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 /// Private internals
 impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     ///
-    fn priv_bind(&mut self, request_id: RequestId, spec: Url) -> TransportResult<()> {
-        /*
-        trace!("({}) bind() {}", self.identifier, url);
-        self.inner_transport.as_mut().bind(url)
-        */
-        Ok(())
+    fn priv_bind(&mut self, _request_id: RequestId, _spec: Url) -> TransportResult<()> {
+        unimplemented!();
     }
 
     // TODO #176 - Return a higher-level uri instead?
-    fn priv_connect(&mut self, request_id: RequestId, address: Url) -> TransportResult<()> {
-        /*
-        trace!("({}).connect() {}", self.identifier, uri);
-        // Connect
-        let connection_id = self.inner_transport.as_mut().connect(&uri)?;
-        // Store result in connection map
-        self.connection_map
-            .insert(uri.clone(), connection_id.clone());
-        // Done
-        Ok(connection_id)
-        */
-        Ok(())
+    fn priv_connect(&mut self, _request_id: RequestId, _address: Url) -> TransportResult<()> {
+        unimplemented!();
     }
 
     /// id_list =
@@ -117,55 +99,15 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
-        /*
-        // get connectionId from the inner dht first
-        let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
-        // send
-        trace!(
-            "({}).send() {:?} -> {:?} | {}",
-            self.identifier,
-            dht_id_list,
-            dht_uri_list,
-            payload.len(),
-        );
-        // Get connectionIds for the inner Transport.
-        let mut conn_list = Vec::new();
-        for dht_uri in dht_uri_list {
-            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri);
-            trace!(
-                "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
-                self.identifier,
-                dht_uri,
-                net_uri,
-            )
+        let address: String = address.path().to_string();
+        let peer = self.inner_dht.get_peer(&address);
+        if peer.is_none() {
+            return Err(format!("unknown peer {}", address).into());
         }
-        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
-        // Send on the inner Transport
-        self.inner_transport.as_mut().send(&ref_list, payload)
-        */
-        Ok(())
-    }
-
-    /// Get Uris from DHT peer_address'
-    pub(crate) fn dht_address_to_uri_list(
-        &self,
-        address_list: &[&str],
-    ) -> TransportResult<Vec<Url>> {
-        let mut uri_list = Vec::with_capacity(address_list.len());
-        for address in address_list {
-            let maybe_peer = self.inner_dht.get_peer(address);
-            match maybe_peer {
-                None => {
-                    return Err(TransportError::new(format!(
-                        "Unknown peerAddress: {}",
-                        address
-                    )));
-                }
-                Some(peer) => uri_list.push(peer.peer_uri),
-            }
-        }
-        Ok(uri_list)
+        let peer = peer.unwrap();
+        self.inner_transport
+            .as_mut()
+            .send(request_id, peer.peer_uri.clone(), payload)
     }
 
     fn handle_new_connection(&mut self, address: Url) -> TransportResult<()> {
@@ -197,34 +139,52 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     }
 
     /// Process a transportEvent received from our internal connection.
-    pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
+    pub(crate) fn handle_TransportEvent(&mut self, evt: TransportEvent) -> TransportResult<()> {
         debug!(
             "<<< '({})' recv transport event: {:?}",
             self.identifier, evt
         );
         // Note: use same order as the enum
-        /*
         match evt {
-            TransportEvent::ErrorOccured(id, e) => {
+            TransportEvent::FailureResult { request_id, error } => {
+                error!(
+                    "gateway transport FailureResult: {} {:?}",
+                    request_id, error
+                );
+            }
+            TransportEvent::BindSuccess {
+                request_id: _,
+                bound_address: _,
+            } => {}
+            TransportEvent::SendMessageSuccess { request_id: _ } => {}
+            TransportEvent::ConnectionError { address, error } => {
                 error!(
                     "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier, id, e,
+                    self.identifier, address, error,
                 );
-                self.inner_transport.as_mut().close(id)?;
             }
-            TransportEvent::ConnectResult(id, _) => {
-                info!("({}) Outgoing connection opened: {}", self.identifier, id);
-                self.handle_new_connection(id)?;
+            TransportEvent::ConnectSuccess {
+                request_id: _,
+                address,
+            } => {
+                info!(
+                    "({}) Outgoing connection opened: {}",
+                    self.identifier, address
+                );
+                self.handle_new_connection(address)?;
             }
-            TransportEvent::IncomingConnectionEstablished(id) => {
-                info!("({}) Incoming connection opened: {}", self.identifier, id);
-                self.handle_new_connection(id)?;
+            TransportEvent::IncomingConnection { address } => {
+                info!(
+                    "({}) Incoming connection opened: {}",
+                    self.identifier, address
+                );
+                self.handle_new_connection(address)?;
             }
-            TransportEvent::ConnectionClosed(_id) => {
+            TransportEvent::ConnectionClosed { address: _ } => {
                 // TODO #176
             }
-            TransportEvent::ReceivedData(connection_id, payload) => {
-                debug!("Received message from: {}", connection_id);
+            TransportEvent::ReceivedData { address, payload } => {
+                debug!("Received message from: {}", address);
                 // trace!("Deserialize msg: {:?}", payload);
                 let mut de = Deserializer::new(&payload[..]);
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
@@ -237,16 +197,11 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                             "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier
                         );
-                        let peer_uri = self
-                            .inner_transport
-                            .as_mut()
-                            .get_uri(connection_id)
-                            .expect("FIXME"); // TODO #58
-                        debug!("peer_uri of: {} = {}", connection_id, peer_uri);
+
                         if self.identifier == gateway_id {
                             let peer = PeerData {
                                 peer_address: peer_address.clone(),
-                                peer_uri,
+                                peer_uri: address,
                                 timestamp: peer_timestamp,
                             };
                             Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
@@ -257,7 +212,6 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 }
             }
         };
-        */
         Ok(())
     }
 

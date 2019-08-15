@@ -193,7 +193,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
 
     fn bind_sync(&mut self, spec: Url) -> TransportResult<Url> {
         let rid = nanoid::simple();
-        self.bind(rid.clone(), spec);
+        self.bind(rid.clone(), spec)?;
         for _x in 0..100 {
             let (_, evt_list) = self.process()?;
             let mut out = None;
@@ -216,7 +216,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        Err(TransportError::new("bind fail".to_string().into()))
+        Err(TransportError::new("bind fail".into()))
     }
 }
 
@@ -280,7 +280,8 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 .ok_or_else(|| TransportError("bad connect port".into()))?,
         );
         let socket = (self.stream_factory)(&host_port)?;
-        let info = WssInfo::client(address.clone(), socket);
+        let mut info = WssInfo::client(address.clone(), socket);
+        info.request_id = request_id;
         self.stream_sockets.insert(address, info);
 
         Ok(())

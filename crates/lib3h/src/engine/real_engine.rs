@@ -17,7 +17,7 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::*, transport_trait::Transport, TransportWrapper},
+    transport::TransportWrapper,
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};

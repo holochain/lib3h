@@ -66,7 +66,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     .as_transport_mut()
                     .connect("".to_string(), peer_data.peer_uri.clone())?;
             }
-            DhtEvent::PeerTimedOut(peer_address) => {
+            DhtEvent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
                 /*
                 let maybe_connection_id = self
@@ -165,8 +165,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 error!("network_layer failure {} {}", request_id, error);
             }
             TransportEvent::BindSuccess {
-                request_id,
-                bound_address,
+                request_id: _,
+                bound_address: _,
             } => {}
             TransportEvent::ConnectSuccess {
                 request_id,
@@ -175,7 +175,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 let mut output = self.handle_new_connection(address, request_id)?;
                 outbox.append(&mut output);
             }
-            TransportEvent::SendMessageSuccess { request_id } => {}
+            TransportEvent::SendMessageSuccess { request_id: _ } => {}
             TransportEvent::ConnectionError { address, error } => {
                 self.network_connections.remove(&address);
                 error!("{} Network error from {} : {:?}", self.name, address, error);

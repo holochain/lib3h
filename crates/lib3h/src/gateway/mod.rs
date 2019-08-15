@@ -7,7 +7,7 @@ use crate::{
     transport::{protocol::TransportCommand, transport_trait::Transport, TransportWrapper},
 };
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 

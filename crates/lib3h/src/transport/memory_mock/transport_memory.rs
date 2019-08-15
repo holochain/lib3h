@@ -5,10 +5,7 @@ use crate::transport::{
     transport_trait::Transport,
 };
 use lib3h_protocol::DidWork;
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::{Arc, Mutex},
-};
+use std::collections::{HashSet, VecDeque};
 use url::Url;
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
@@ -123,7 +120,6 @@ impl TransportMemory {
                 "Cannot send before binding".to_string(),
             ));
         }
-        let my_uri = self.maybe_my_uri.clone().unwrap();
 
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(&address);
@@ -241,7 +237,7 @@ impl Transport for TransportMemory {
 
     fn bind_sync(&mut self, spec: Url) -> TransportResult<Url> {
         let rid = nanoid::simple();
-        self.bind(rid.clone(), spec);
+        self.bind(rid.clone(), spec)?;
         for _x in 0..100 {
             let (_, evt_list) = self.process()?;
             let mut out = None;
@@ -264,7 +260,7 @@ impl Transport for TransportMemory {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        Err(TransportError::new("bind fail".to_string().into()))
+        Err(TransportError::new("bind fail".into()))
     }
 }
 
