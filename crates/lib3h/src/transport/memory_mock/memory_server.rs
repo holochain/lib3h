@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::{TransportError, TransportResult},
+    error::TransportResult,
     protocol::TransportEvent,
 };
 use lib3h_protocol::DidWork;
@@ -50,7 +50,7 @@ pub fn unset_server(uri: &Url) -> TransportResult<()> {
     // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
     if !server_map.contains_key(uri) {
-        return Err(TransportError::new("Server doesn't exist".to_string()));
+        return Err("Server doesn't exist".into());
     }
     server_map.remove(uri);
     Ok(())
@@ -104,16 +104,16 @@ impl MemoryServer {
             self.this_uri, other_uri
         );
         if other_uri == &self.this_uri {
-            return Err(TransportError::new(format!(
+            return Err(format!(
                 "Server {} cannot connect to self",
                 self.this_uri,
-            )));
+            ).into());
         }
         if self.inbox_map.contains_key(other_uri) {
-            return Err(TransportError::new(format!(
+            return Err(format!(
                 "Server {}, is already connected to {}",
                 self.this_uri, other_uri,
-            )));
+            ).into());
         }
         // Establish inbound connection
         let prev = self.inbox_map.insert(other_uri.clone(), VecDeque::new());
@@ -131,10 +131,10 @@ impl MemoryServer {
         // delete this connectionId's inbox
         let res = self.inbox_map.remove(other_uri);
         if res.is_none() {
-            return Err(TransportError::new(format!(
+            return Err(format!(
                 "connectionId '{}' unknown for server {}",
                 other_uri, self.this_uri
-            )));
+            ).into());
         }
         trace!("(MemoryServer {}). close event", self.this_uri);
         // Remove inbound connection
@@ -149,10 +149,10 @@ impl MemoryServer {
     pub fn post(&mut self, from_uri: &Url, payload: &[u8]) -> TransportResult<()> {
         let maybe_inbox = self.inbox_map.get_mut(from_uri);
         if maybe_inbox.is_none() {
-            Err(TransportError::new(format!(
+            Err(format!(
                 "(MemoryServer {}) Unknown from_uri {}",
                 self.this_uri, from_uri
-            )))
+            ).into())
         } else {
             maybe_inbox.unwrap().push_back(payload.to_vec());
             Ok(())

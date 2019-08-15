@@ -72,7 +72,7 @@ pub mod tests {
     }
 
     #[test]
-    fn wss_send_test() {
+    fn wss_send_test_un() {
         enable_logging_for_test(true);
         let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
         let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
@@ -93,6 +93,13 @@ pub mod tests {
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
 
+    fn proc(node: &mut impl Transport) -> (bool, Vec<TransportEvent>) {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let out = node.process().unwrap();
+        debug!("process node {:?}", &out);
+        out
+    }
+
     fn send_test(
         node_A: &mut impl Transport,
         node_B: &mut impl Transport,
@@ -102,20 +109,17 @@ pub mod tests {
         // Connect
         let actual_bind_uri_a = node_A.bind_sync(uri_A.clone()).unwrap();
         let actual_bind_uri_b = node_B.bind_sync(uri_B.clone()).unwrap();
-        trace!("actual_bind_uri_a: {}", actual_bind_uri_a);
-        trace!("actual_bind_uri_b: {}", actual_bind_uri_b);
+        debug!("actual_bind_uri_a: {}", actual_bind_uri_a);
+        debug!("actual_bind_uri_b: {}", actual_bind_uri_b);
         node_A
             .connect("".to_string(), actual_bind_uri_b.clone())
             .unwrap();
+        node_B
+            .connect("".to_string(), actual_bind_uri_a.clone())
+            .unwrap();
 
-        let (_did_work, _event_list) = node_A.process().unwrap();
-        let (_did_work, _event_list) = node_B.process().unwrap();
-        let (_did_work, _event_list) = node_A.process().unwrap();
-        let (_did_work, _event_list) = node_B.process().unwrap();
-        let (_did_work, _event_list) = node_A.process().unwrap();
-        let (_did_work, _event_list) = node_B.process().unwrap();
-        let (_did_work, _event_list) = node_A.process().unwrap();
-        let (_did_work, _event_list) = node_B.process().unwrap();
+        proc(node_A);
+        proc(node_B);
 
         // Send A -> B
         let payload = [1, 2, 3, 4];
@@ -127,8 +131,8 @@ pub mod tests {
 
         // TODO consider making this a while loop with timeout
         for _x in 0..NUM_PROCESS_LOOPS {
-            let (did_work_B, mut event_list_B) = node_B.process().unwrap();
-            let (_did_work_A, _event_list_A) = node_A.process().unwrap();
+            let (did_work_B, mut event_list_B) = proc(node_B);
+            let (_did_work_A, _event_list_A) = proc(node_A);
             event_list.append(&mut event_list_B);
             did_work |= did_work_B;
         }
@@ -141,7 +145,6 @@ pub mod tests {
         };
 
         assert_eq!(payload, recv_payload.as_slice());
-        let (_did_work, _event_list) = node_A.process().unwrap();
 
         // Send B -> A
         let payload = [4, 2, 1, 3];
@@ -152,8 +155,8 @@ pub mod tests {
         did_work = false;
         event_list.clear();
         for _x in 0..NUM_PROCESS_LOOPS {
-            let (did_work_A, mut event_list_A) = node_A.process().unwrap();
-            let (_did_work_B, _event_list_B) = node_B.process().unwrap();
+            let (did_work_A, mut event_list_A) = proc(node_A);
+            let (_did_work_B, _event_list_B) = proc(node_B);
             did_work |= did_work_A;
             event_list.append(&mut event_list_A);
         }

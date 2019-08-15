@@ -92,7 +92,7 @@ pub struct WssInfo<T: Read + Write + std::fmt::Debug> {
     request_id: String,
     url: url::Url,
     last_msg: std::time::Instant,
-    send_queue: Vec<Vec<u8>>,
+    send_queue: Vec<(RequestId, Vec<u8>)>,
     stateful_socket: WebsocketStreamState<T>,
 }
 
@@ -216,7 +216,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        Err(TransportError::new("bind fail".into()))
+        Err("bind fail".into())
     }
 }
 
@@ -229,7 +229,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             event_queue: Vec::new(),
             inbox: VecDeque::new(),
             bind,
-            acceptor: Err(TransportError("acceptor not initialized".into())),
+            acceptor: Err("acceptor not initialized".into()),
         }
     }
 
@@ -274,10 +274,10 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             "{}:{}",
             address
                 .host_str()
-                .ok_or_else(|| TransportError("bad connect host".into()))?,
+                .ok_or_else(|| TransportError::from("bad connect host"))?,
             address
                 .port()
-                .ok_or_else(|| TransportError("bad connect port".into()))?,
+                .ok_or_else(|| TransportError::from("bad connect port"))?,
         );
         let socket = (self.stream_factory)(&host_port)?;
         let mut info = WssInfo::client(address.clone(), socket);
@@ -294,15 +294,14 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
-        if let Some(info) = self.stream_sockets.get_mut(&address) {
-            info.send_queue.push(payload);
+
+        match self.stream_sockets.get_mut(&address) {
+            Some(info) => {
+                info.send_queue.push((request_id, payload));
+                Ok(())
+            }
+            None => Err(format!("{} not connected", address).into())
         }
-
-        // TODO XXX - give success after it actually sends
-        self.event_queue
-            .push(TransportEvent::SendMessageSuccess { request_id });
-
-        Ok(())
     }
 
     fn priv_process_accept(&mut self) -> DidWork {
@@ -314,11 +313,14 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             Ok(acceptor) => (acceptor)()
                 .map(move |wss_info| {
                     let address = wss_info.url.clone();
+                    info!("WS? new connection, start handshake: {}", &address);
                     let _insert_result = self.stream_sockets.insert(address, wss_info);
                     true
                 })
                 .unwrap_or_else(|err| {
-                    warn!("did not accept any connections: {:?}", err);
+                    if !err.is_io_would_block() {
+                        trace!("did not accept any connections: {:?}", err);
+                    }
                     false
                 }),
         }
@@ -374,7 +376,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         // move the socket out, to be replaced
         let socket = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
 
-        debug!("transport_wss: socket={:?}", socket);
+        trace!("transport_wss: socket={:?}", socket);
         // TODO remove?
         std::io::stdout().flush().ok().expect("flush stdout");
         match socket {
@@ -474,10 +476,13 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             WebsocketStreamState::ReadyWs(mut socket) => {
                 // This seems to be wrong. Messages shouldn't be drained.
-                let msgs: Vec<Vec<u8>> = info.send_queue.drain(..).collect();
-                for msg in msgs {
+                let msgs: Vec<(RequestId, Vec<u8>)> = info.send_queue.drain(..).collect();
+                for (request_id, msg) in msgs {
                     // TODO: fix this line! if there is an error, all the remaining messages will be lost!
+                    debug!("sending to {}: ({}) {}", &info.url, msg.len(), String::from_utf8_lossy(&msg));
                     socket.write_message(tungstenite::Message::Binary(msg))?;
+                    self.event_queue
+                        .push(TransportEvent::SendMessageSuccess { request_id });
                 }
 
                 match socket.read_message() {
@@ -503,6 +508,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                         };
 
                         if let Some(msg) = qmsg {
+                            debug!("WS got data ({}) {}", msg.len(), String::from_utf8_lossy(&msg));
                             self.event_queue.push(TransportEvent::ReceivedData {
                                 address: info.url.clone(),
                                 payload: msg,
@@ -515,10 +521,13 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             WebsocketStreamState::ReadyWss(mut socket) => {
                 // This seems to be wrong. Messages shouldn't be drained.
-                let msgs: Vec<Vec<u8>> = info.send_queue.drain(..).collect();
-                for msg in msgs {
+                let msgs: Vec<(RequestId, Vec<u8>)> = info.send_queue.drain(..).collect();
+                for (request_id, msg) in msgs {
                     // TODO: fix this line! if there is an error, all the remaining messages will be lost!
+                    debug!("sending to {}: ({}) {}", &info.url, msg.len(), String::from_utf8_lossy(&msg));
                     socket.write_message(tungstenite::Message::Binary(msg))?;
+                    self.event_queue
+                        .push(TransportEvent::SendMessageSuccess { request_id });
                 }
 
                 match socket.read_message() {
@@ -544,6 +553,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                         };
 
                         if let Some(msg) = qmsg {
+                            debug!("WSS got data ({}) {}", msg.len(), String::from_utf8_lossy(&msg));
                             self.event_queue.push(TransportEvent::ReceivedData {
                                 address: info.url.clone(),
                                 payload: msg,
@@ -599,6 +609,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
+                info!("WS Connection Success {}", &address);
                 self.event_queue.push(TransportEvent::ConnectSuccess {
                     request_id: request_id.to_string(),
                     address: address.clone(),
@@ -621,6 +632,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
+                info!("WSS Connection Success {}", &address);
                 self.event_queue.push(TransportEvent::ConnectSuccess {
                     request_id: request_id.to_string(),
                     address: address.clone(),
@@ -642,6 +654,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok(socket) => {
+                info!("WS IncomingConnection {}", &address);
                 self.event_queue.push(TransportEvent::IncomingConnection {
                     address: address.clone(),
                 });
@@ -662,6 +675,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             }
             Err(e) => Err(e.into()),
             Ok(socket) => {
+                info!("WSS IncomingConnection {}", &address);
                 self.event_queue.push(TransportEvent::IncomingConnection {
                     address: address.clone(),
                 });

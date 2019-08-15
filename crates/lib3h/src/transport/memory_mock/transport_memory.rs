@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::{TransportError, TransportResult},
+    error::TransportResult,
     memory_mock::memory_server,
     protocol::*,
     transport_trait::Transport,
@@ -80,21 +80,17 @@ impl TransportMemory {
 
         // Get my uri
         let my_uri = match &self.maybe_my_uri {
-            None => {
-                return Err(TransportError::new(
-                    "Must bind before connecting".to_string(),
-                ));
-            }
+            None => return Err("Must bind before connecting".into()),
             Some(u) => u,
         };
         // Get other node's server
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(&address);
         if let None = maybe_server {
-            return Err(TransportError::new(format!(
+            return Err(format!(
                 "No Memory server at this url address: {}",
                 address
-            )));
+            ).into());
         }
         self.connections.insert(address.clone());
         // Connect to it
@@ -118,18 +114,16 @@ impl TransportMemory {
     ) -> TransportResult<()> {
         let res = {
             if self.maybe_my_uri.is_none() {
-                return Err(TransportError::new(
-                    "Cannot send before binding".to_string(),
-                ));
+                return Err("Cannot send before binding".into());
             }
 
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
             let maybe_server = server_map.get(&address);
             if let None = maybe_server {
-                return Err(TransportError::new(format!(
+                return Err(format!(
                     "No Memory server at this url address: {}",
                     address
-                )));
+                ).into());
             }
             trace!("(TransportMemory).send() {} | {}", address, payload.len());
             let mut server = maybe_server.unwrap().lock().unwrap();
@@ -266,7 +260,7 @@ impl Transport for TransportMemory {
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        Err(TransportError::new("bind fail".into()))
+        Err("bind fail".into())
     }
 }
 

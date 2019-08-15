@@ -43,7 +43,7 @@ pub mod tests {
         }
         let _ = env_logger::builder()
             .default_format_timestamp(false)
-            .default_format_module_path(false)
+            //.default_format_module_path(false)
             .is_test(enable)
             .try_init();
     }
