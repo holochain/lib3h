@@ -99,7 +99,8 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .expect("P2pProtocol::Gossip serialization failed");
                     self.send(
                         "".to_string(),
-                        Url::parse(&format!("hc:{}", to_peer_address)).expect("can parse url"),
+                        Url::parse(&format!("{}:{}", self.address_url_scheme, to_peer_address))
+                            .expect("can parse url"),
                         payload,
                     )?;
                 }

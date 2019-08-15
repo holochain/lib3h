@@ -91,6 +91,7 @@ impl<'wrap> GatewayWrapper<'wrap> {
 /// Tracks distributed data for that P2P network in a DHT.
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
 pub struct P2pGateway<'gateway, D: Dht> {
+    address_url_scheme: String,
     inner_transport: TransportWrapper<'gateway>,
     inner_dht: D,
     /// Used for distinguishing gateways

@@ -69,6 +69,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
+            "transportid",
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -117,6 +118,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         // Create network gateway
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
+            "transportid",
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -555,7 +557,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let this_peer_transport_id_as_uri = {
             let gateway = self.network_gateway.as_ref();
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
+            Url::parse(format!("transportid:{}", gateway.this_peer().peer_address).as_str())
                 .expect("can parse url")
         };
         let dht_config = DhtConfig {
@@ -567,6 +569,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> = GatewayWrapper::new(P2pGateway::new(
+            "hc",
             &format!("{:?}", &chain_id),
             self.network_gateway.as_transport(),
             self.dht_factory,

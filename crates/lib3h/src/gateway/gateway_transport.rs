@@ -67,7 +67,11 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
             id_list.push(
-                Url::parse(&format!("hc:{}", peer_data.peer_address)).expect("can parse url"),
+                Url::parse(&format!(
+                    "{}:{}",
+                    self.address_url_scheme, peer_data.peer_address
+                ))
+                .expect("can parse url"),
             );
         }
         Ok(id_list)
@@ -99,6 +103,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
+        if address.scheme() != self.address_url_scheme {
+            panic!(
+                "gateway expecting scheme {}, got {}",
+                self.address_url_scheme, &address
+            );
+        }
         warn!(
             "@^@^@ priv_send to {} ({}): {}",
             &address,
@@ -118,6 +128,14 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     }
 
     fn handle_new_connection(&mut self, address: Url) -> TransportResult<()> {
+        if address.scheme() != self.address_url_scheme {
+            error!(
+                "gateway expecting scheme {}, got {}",
+                self.address_url_scheme, &address
+            );
+            // TODO XXX - ignoring this for now (eek!)
+            return Ok(());
+        }
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         self.connections.insert(address.clone());

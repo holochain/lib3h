@@ -241,6 +241,9 @@ fn launch_two_nodes_test_with_memory_network(
     let mut billy: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("billy"));
     if can_setup {
         basic_two_setup(&mut alex, &mut billy);
+        //drop(alex); drop(billy);
+        //std::thread::sleep(std::time::Duration::from_millis(10));
+        //std::process::exit(127);
     }
 
     // Execute test
@@ -265,8 +268,8 @@ fn proc(note: &str, mut nodes: Vec<&mut Box<dyn NetworkEngine>>) -> Vec<Vec<Lib3
         out.push(Vec::new());
     }
 
-    for _x in 0..10 {
-        std::thread::sleep(std::time::Duration::from_millis(1));
+    for _x in 0..3 {
+        std::thread::sleep(std::time::Duration::from_millis(3));
         for i in 0..nodes.len() {
             let (_, mut t) = nodes[i].process().unwrap();
             out[i].append(&mut t);
@@ -281,27 +284,22 @@ fn proc(note: &str, mut nodes: Vec<&mut Box<dyn NetworkEngine>>) -> Vec<Vec<Lib3
 ///
 fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
     // Connect Alex to Billy
-    let mut req_connect = ConnectData {
+    let req_connect = ConnectData {
         request_id: "connect".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    req_connect.peer_uri = alex.advertise();
-    billy
-        .post(Lib3hClientProtocol::Connect(req_connect.clone()))
-        .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
+
+    let res = proc("connects", vec![alex, billy]);
+    let connected_msg =
+        unwrap_to!(res.get(0).unwrap().get(0).unwrap() => Lib3hServerProtocol::Connected);
+
     println!("connected_msg = {:?}", connected_msg);
     assert_eq!(connected_msg.uri, billy.advertise());
-    // More process: Have Billy process P2p::PeerAddress of alex
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+
+    proc("p2p", vec![alex, billy]);
 
     // Alex joins space A
     println!("\n Alex joins space \n");
@@ -312,7 +310,6 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     };
     alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    proc("join-a", vec![alex, billy]);
 
     // Billy joins space A
     println!("\n Billy joins space \n");
@@ -320,6 +317,8 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     billy
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
+
+    proc("join-a", vec![alex, billy]);
     proc("join-b", vec![alex, billy]);
 
     println!("DONE basic_two_setup DONE \n\n\n");

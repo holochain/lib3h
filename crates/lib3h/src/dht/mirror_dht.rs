@@ -46,6 +46,16 @@ pub struct MirrorDht {
     config: DhtConfig,
 }
 
+impl Drop for MirrorDht {
+    fn drop(&mut self) {
+        trace!(
+            "DHT {:?} closing with peers {:?}",
+            self.this_peer,
+            self.peer_map
+        );
+    }
+}
+
 /// Constructors
 impl MirrorDht {
     pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Self {
@@ -334,6 +344,7 @@ impl MirrorDht {
                         return Ok(vec![]);
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
+                        trace!("{:?} GOT PEER {:?}", self.this_peer, gossiped_peer);
                         let maybe_known_peer = self.get_peer(&gossiped_peer.peer_address);
                         if maybe_known_peer.is_none() {
                             return Ok(vec![DhtEvent::HoldPeerRequested(gossiped_peer)]);

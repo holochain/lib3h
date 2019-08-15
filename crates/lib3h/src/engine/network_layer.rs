@@ -133,7 +133,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
             network_gateway.send(
                 "".to_string(),
-                Url::parse(&format!("hc:{}", &peer_data.peer_address)).expect("can parse url"),
+                Url::parse(&format!("transportid:{}", &peer_data.peer_address))
+                    .expect("can parse url"),
                 buf,
             )?;
         }

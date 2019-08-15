@@ -16,12 +16,14 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
+        address_url_scheme: &str,
         identifier: &str,
         inner_transport: TransportWrapper<'gateway>,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
+            address_url_scheme: address_url_scheme.to_string(),
             inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
