@@ -196,7 +196,7 @@ impl Transport for TransportMemory {
             // Get the other node's uri on that connection
             let maybe_uri = self.outbound_connection_map.get(*id);
             if let None = maybe_uri {
-//                warn!("No known connection for connectionId: {}", id);
+                warn!("No known connection for connectionId: {}", id);
                 continue;
             }
             let uri = maybe_uri.unwrap();
