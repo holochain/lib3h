@@ -268,8 +268,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             Lib3hClientProtocol::Connect(msg) => {
                 // TODO XXX - use local request_id... we don't know
                 // if our source is unique or not
-                self.network_gateway
-                    .as_transport_mut()
+                self.network_transport
+                    .as_mut()
                     .connect(msg.request_id, msg.peer_uri)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {

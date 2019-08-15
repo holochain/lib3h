@@ -105,6 +105,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             return Err(format!("unknown peer {}", address).into());
         }
         let peer = peer.unwrap();
+        warn!("@^@^@ SENDING TO {}", peer.peer_uri);
         self.inner_transport
             .as_mut()
             .send(request_id, peer.peer_uri.clone(), payload)

@@ -294,13 +294,12 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
-
         match self.stream_sockets.get_mut(&address) {
             Some(info) => {
                 info.send_queue.push((request_id, payload));
                 Ok(())
             }
-            None => Err(format!("{} not connected", address).into())
+            None => Err(format!("{} not connected", address).into()),
         }
     }
 
@@ -479,7 +478,12 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 let msgs: Vec<(RequestId, Vec<u8>)> = info.send_queue.drain(..).collect();
                 for (request_id, msg) in msgs {
                     // TODO: fix this line! if there is an error, all the remaining messages will be lost!
-                    debug!("sending to {}: ({}) {}", &info.url, msg.len(), String::from_utf8_lossy(&msg));
+                    debug!(
+                        "sending to {}: ({}) {}",
+                        &info.url,
+                        msg.len(),
+                        String::from_utf8_lossy(&msg)
+                    );
                     socket.write_message(tungstenite::Message::Binary(msg))?;
                     self.event_queue
                         .push(TransportEvent::SendMessageSuccess { request_id });
@@ -508,7 +512,11 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                         };
 
                         if let Some(msg) = qmsg {
-                            debug!("WS got data ({}) {}", msg.len(), String::from_utf8_lossy(&msg));
+                            debug!(
+                                "WS got data ({}) {}",
+                                msg.len(),
+                                String::from_utf8_lossy(&msg)
+                            );
                             self.event_queue.push(TransportEvent::ReceivedData {
                                 address: info.url.clone(),
                                 payload: msg,
@@ -524,7 +532,12 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 let msgs: Vec<(RequestId, Vec<u8>)> = info.send_queue.drain(..).collect();
                 for (request_id, msg) in msgs {
                     // TODO: fix this line! if there is an error, all the remaining messages will be lost!
-                    debug!("sending to {}: ({}) {}", &info.url, msg.len(), String::from_utf8_lossy(&msg));
+                    debug!(
+                        "sending to {}: ({}) {}",
+                        &info.url,
+                        msg.len(),
+                        String::from_utf8_lossy(&msg)
+                    );
                     socket.write_message(tungstenite::Message::Binary(msg))?;
                     self.event_queue
                         .push(TransportEvent::SendMessageSuccess { request_id });
@@ -553,7 +566,11 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                         };
 
                         if let Some(msg) = qmsg {
-                            debug!("WSS got data ({}) {}", msg.len(), String::from_utf8_lossy(&msg));
+                            debug!(
+                                "WSS got data ({}) {}",
+                                msg.len(),
+                                String::from_utf8_lossy(&msg)
+                            );
                             self.event_queue.push(TransportEvent::ReceivedData {
                                 address: info.url.clone(),
                                 payload: msg,

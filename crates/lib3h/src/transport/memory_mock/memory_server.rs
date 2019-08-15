@@ -1,7 +1,4 @@
-use crate::transport::{
-    error::TransportResult,
-    protocol::TransportEvent,
-};
+use crate::transport::{error::TransportResult, protocol::TransportEvent};
 use lib3h_protocol::DidWork;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -104,16 +101,14 @@ impl MemoryServer {
             self.this_uri, other_uri
         );
         if other_uri == &self.this_uri {
-            return Err(format!(
-                "Server {} cannot connect to self",
-                self.this_uri,
-            ).into());
+            return Err(format!("Server {} cannot connect to self", self.this_uri,).into());
         }
         if self.inbox_map.contains_key(other_uri) {
             return Err(format!(
                 "Server {}, is already connected to {}",
                 self.this_uri, other_uri,
-            ).into());
+            )
+            .into());
         }
         // Establish inbound connection
         let prev = self.inbox_map.insert(other_uri.clone(), VecDeque::new());
@@ -134,7 +129,8 @@ impl MemoryServer {
             return Err(format!(
                 "connectionId '{}' unknown for server {}",
                 other_uri, self.this_uri
-            ).into());
+            )
+            .into());
         }
         trace!("(MemoryServer {}). close event", self.this_uri);
         // Remove inbound connection
@@ -152,7 +148,8 @@ impl MemoryServer {
             Err(format!(
                 "(MemoryServer {}) Unknown from_uri {}",
                 self.this_uri, from_uri
-            ).into())
+            )
+            .into())
         } else {
             maybe_inbox.unwrap().push_back(payload.to_vec());
             Ok(())

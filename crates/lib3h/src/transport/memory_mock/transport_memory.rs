@@ -1,8 +1,5 @@
 use crate::transport::{
-    error::TransportResult,
-    memory_mock::memory_server,
-    protocol::*,
-    transport_trait::Transport,
+    error::TransportResult, memory_mock::memory_server, protocol::*, transport_trait::Transport,
 };
 use lib3h_protocol::DidWork;
 use std::collections::{HashSet, VecDeque};
@@ -87,10 +84,7 @@ impl TransportMemory {
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(&address);
         if let None = maybe_server {
-            return Err(format!(
-                "No Memory server at this url address: {}",
-                address
-            ).into());
+            return Err(format!("No Memory server at this url address: {}", address).into());
         }
         self.connections.insert(address.clone());
         // Connect to it
@@ -120,15 +114,15 @@ impl TransportMemory {
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
             let maybe_server = server_map.get(&address);
             if let None = maybe_server {
-                return Err(format!(
-                    "No Memory server at this url address: {}",
-                    address
-                ).into());
+                return Err(format!("No Memory server at this url address: {}", address).into());
             }
             trace!("(TransportMemory).send() {} | {}", address, payload.len());
             let mut server = maybe_server.unwrap().lock().unwrap();
 
-            server.post(self.maybe_my_uri.as_ref().expect("should be bound"), &payload)
+            server.post(
+                self.maybe_my_uri.as_ref().expect("should be bound"),
+                &payload,
+            )
         };
 
         // Send it data from us
