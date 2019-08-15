@@ -231,7 +231,7 @@ pub mod tests {
         // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a
-            .post(DhtCommand::BroadcastEntry(entry_data.clone()), false)
+            .post(DhtCommand::BroadcastEntry(entry_data.clone(), false))
             .unwrap();
         let (did_work, gossip_list) = dht_a.process().unwrap();
         assert!(did_work);
