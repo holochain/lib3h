@@ -5,12 +5,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
-pub mod transport_crypto;
 pub mod transport_trait;
-
-/// a connection identifier
-pub type ConnectionId = String;
-pub type ConnectionIdRef = str;
 
 use transport_trait::Transport;
 
@@ -130,7 +125,7 @@ pub mod tests {
         assert!(event_list.len() >= 1);
         let recv_event = event_list.last().unwrap().clone();
         let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::ReceivedData(a, b) => (a, b),
+            TransportEvent::ReceivedData { a, b } => (a, b),
             e => panic!("Received wrong TransportEvent type: {:?}", e),
         };
         assert!(node_A.get_uri(idAB.as_str()).is_some());
@@ -168,7 +163,7 @@ pub mod tests {
         assert_eq!(event_list.len(), 1);
         let recv_event = event_list[0].clone();
         let (recv_id, recv_payload) = match recv_event {
-            TransportEvent::ReceivedData(a, b) => (a, b),
+            TransportEvent::ReceivedData { a, b } => (a, b),
             _ => panic!("Received wrong TransportEvent type"),
         };
         assert!(node_A.get_uri(recv_id.as_str()).is_some());

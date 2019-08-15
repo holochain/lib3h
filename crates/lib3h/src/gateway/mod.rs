@@ -5,11 +5,11 @@ pub mod p2p_gateway;
 use crate::{
     dht::dht_trait::Dht,
     transport::{
-        protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
+        protocol::TransportCommand, transport_trait::Transport, TransportWrapper,
     },
 };
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
@@ -98,8 +98,8 @@ pub struct P2pGateway<'gateway, D: Dht> {
     inner_dht: D,
     /// Used for distinguishing gateways
     identifier: String,
-    /// Map holding the reversed mapping between connection url and connectionId response
-    connection_map: HashMap<Url, ConnectionId>,
+    /// Map holding the open connections we have
+    connections: HashSet<Url>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
 }

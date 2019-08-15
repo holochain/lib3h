@@ -17,7 +17,7 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::TransportCommand, TransportWrapper},
+    transport::TransportWrapper,
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -53,7 +53,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Create Transport and bind
         let network_transport =
             TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
-        let binding = network_transport.as_mut().bind(&config.bind_url)?;
+        let binding = network_transport.as_mut().bind("".to_string(), config.bind_url)?;
         // Generate keys
         // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
@@ -261,9 +261,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 // TODO #168
             }
             Lib3hClientProtocol::Connect(msg) => {
-                // Convert into TransportCommand & post to network gateway
-                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
-                self.network_gateway.as_transport_mut().post(cmd)?;
+                // TODO XXX - use local request_id... we don't know
+                // if our source is unique or not
+                self.network_gateway.as_transport_mut().connect(msg.request_id, msg.peer_uri)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;

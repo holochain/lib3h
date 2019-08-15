@@ -6,9 +6,8 @@ use crate::{
     gateway::{Gateway, P2pGateway},
     transport::{
         error::{TransportError, TransportResult},
-        protocol::{TransportCommand, TransportEvent},
+        protocol::*,
         transport_trait::Transport,
-        ConnectionId, ConnectionIdRef,
     },
 };
 use lib3h_protocol::DidWork;
@@ -18,73 +17,6 @@ use url::Url;
 
 /// Compose Transport
 impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
-    // TODO #176 - Return a higher-level uri instead?
-    fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
-        trace!("({}).connect() {}", self.identifier, uri);
-        // Connect
-        let connection_id = self.inner_transport.as_mut().connect(&uri)?;
-        // Store result in connection map
-        self.connection_map
-            .insert(uri.clone(), connection_id.clone());
-        // Done
-        Ok(connection_id)
-    }
-
-    // TODO #176 - remove conn id conn_map??
-    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        self.inner_transport.as_mut().close(id)
-    }
-
-    // TODO #176
-    fn close_all(&mut self) -> TransportResult<()> {
-        self.inner_transport.as_mut().close_all()
-    }
-
-    /// id_list =
-    ///   - Network : transportId
-    ///   - space   : agentId
-    fn send(&mut self, dht_id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        // get connectionId from the inner dht first
-        let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
-        // send
-        trace!(
-            "({}).send() {:?} -> {:?} | {}",
-            self.identifier,
-            dht_id_list,
-            dht_uri_list,
-            payload.len(),
-        );
-        // Get connectionIds for the inner Transport.
-        let mut conn_list = Vec::new();
-        for dht_uri in dht_uri_list {
-            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri);
-            trace!(
-                "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
-                self.identifier,
-                dht_uri,
-                net_uri,
-            )
-        }
-        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
-        // Send on the inner Transport
-        self.inner_transport.as_mut().send(&ref_list, payload)
-    }
-
-    ///
-    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        let connection_list = self.connection_id_list()?;
-        let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
-        trace!("({}) send_all() {:?}", self.identifier, dht_id_list);
-        self.send(&dht_id_list, payload)
-    }
-
-    ///
-    fn bind(&mut self, url: &Url) -> TransportResult<Url> {
-        trace!("({}) bind() {}", self.identifier, url);
-        self.inner_transport.as_mut().bind(url)
-    }
-
     ///
     fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
         self.transport_inbox.push_back(command);
@@ -137,25 +69,76 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
     }
 
     /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
+    fn connection_list(&self) -> TransportResult<Vec<Url>> {
         let peer_data_list = self.inner_dht.get_peer_list();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
-            id_list.push(peer_data.peer_address);
+            id_list.push(Url::parse(&format!("hc:{}", peer_data.peer_address).expect("can parse url")));
         }
         Ok(id_list)
-    }
-
-    /// TODO: return a higher-level uri instead
-    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-        self.inner_transport.as_ref().get_uri(id)
-        //let maybe_peer_data = self.inner_dht.get_peer(id);
-        //maybe_peer_data.map(|pd| pd.peer_address)
     }
 }
 
 /// Private internals
 impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+    ///
+    fn priv_bind(&mut self, request_id: RequestId, spec: Url) -> TransportResult<()> {
+        /*
+        trace!("({}) bind() {}", self.identifier, url);
+        self.inner_transport.as_mut().bind(url)
+        */
+        Ok(())
+    }
+
+    // TODO #176 - Return a higher-level uri instead?
+    fn priv_connect(&mut self, request_id: RequestId, address: &Url) -> TransportResult<()> {
+        /*
+        trace!("({}).connect() {}", self.identifier, uri);
+        // Connect
+        let connection_id = self.inner_transport.as_mut().connect(&uri)?;
+        // Store result in connection map
+        self.connection_map
+            .insert(uri.clone(), connection_id.clone());
+        // Done
+        Ok(connection_id)
+        */
+        Ok(())
+    }
+
+    /// id_list =
+    ///   - Network : transportId
+    ///   - space   : agentId
+    fn priv_send(&mut self, request_id: RequestId, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+        /*
+        // get connectionId from the inner dht first
+        let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
+        // send
+        trace!(
+            "({}).send() {:?} -> {:?} | {}",
+            self.identifier,
+            dht_id_list,
+            dht_uri_list,
+            payload.len(),
+        );
+        // Get connectionIds for the inner Transport.
+        let mut conn_list = Vec::new();
+        for dht_uri in dht_uri_list {
+            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
+            conn_list.push(net_uri);
+            trace!(
+                "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
+                self.identifier,
+                dht_uri,
+                net_uri,
+            )
+        }
+        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
+        // Send on the inner Transport
+        self.inner_transport.as_mut().send(&ref_list, payload)
+        */
+        Ok(())
+    }
+
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
         &self,
@@ -177,19 +160,10 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         Ok(uri_list)
     }
 
-    fn handle_new_connection(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        let maybe_uri = self.get_uri(id);
-        if maybe_uri.is_none() {
-            return Ok(());
-        }
-        let uri = maybe_uri.unwrap();
-        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id,);
+    fn handle_new_connection(&mut self, address: Url) -> TransportResult<()> {
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
-        let maybe_previous = self.connection_map.insert(uri.clone(), id.to_string());
-        if let Some(previous_cId) = maybe_previous {
-            debug!("Replaced connectionId for {} ; was: {}", uri, previous_cId,);
-        }
+        self.connection.insert(address.clone);
 
         // Send to other node our PeerAddress
         let this_peer = self.this_peer().clone();
@@ -206,9 +180,10 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
             self.identifier,
             our_peer_address,
-            id,
+            address,
         );
-        return self.inner_transport.as_mut().send(&[&id], &buf);
+        return self.inner_transport.as_mut().send(
+            "".to_string(), address, buf);
     }
 
     /// Process a transportEvent received from our internal connection.
@@ -218,6 +193,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             self.identifier, evt
         );
         // Note: use same order as the enum
+        /*
         match evt {
             TransportEvent::ErrorOccured(id, e) => {
                 error!(
@@ -271,6 +247,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 }
             }
         };
+        */
         Ok(())
     }
 
@@ -280,40 +257,18 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     fn serve_TransportCommand(
         &mut self,
         cmd: &TransportCommand,
-    ) -> TransportResult<Vec<TransportEvent>> {
+    ) -> TransportResult<()> {
         trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
         // Note: use same order as the enum
         match cmd {
-            TransportCommand::Connect(url, request_id) => {
-                let id = self.connect(url)?;
-                let evt = TransportEvent::ConnectResult(id, request_id.clone());
-                Ok(vec![evt])
+            TransportCommand::Bind { request_id, spec } => {
+                self.priv_bind(request_id, spec)
             }
-            TransportCommand::Send(id_list, payload) => {
-                let mut id_ref_list = Vec::with_capacity(id_list.len());
-                for id in id_list {
-                    id_ref_list.push(id.as_str());
-                }
-                let _id = self.send(&id_ref_list, payload)?;
-                Ok(vec![])
+            TransportCommand::Connect { request_id, address } => {
+                self.priv_connect(request_id, address)
             }
-            TransportCommand::SendAll(payload) => {
-                let _id = self.send_all(payload)?;
-                Ok(vec![])
-            }
-            TransportCommand::Close(id) => {
-                self.close(id)?;
-                let evt = TransportEvent::ConnectionClosed(id.to_string());
-                Ok(vec![evt])
-            }
-            TransportCommand::CloseAll => {
-                self.close_all()?;
-                let outbox = Vec::new();
-                Ok(outbox)
-            }
-            TransportCommand::Bind(url) => {
-                self.bind(url)?;
-                Ok(vec![])
+            TransportCommand::SendMessage { request_id, address, payload } => {
+                self.priv_send(request_id, address, payload)
             }
         }
     }

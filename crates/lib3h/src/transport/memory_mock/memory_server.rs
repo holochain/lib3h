@@ -1,11 +1,10 @@
 use crate::transport::{
     error::{TransportError, TransportResult},
     protocol::TransportEvent,
-    ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{Mutex, RwLock},
 };
 use url::Url;
@@ -59,9 +58,9 @@ pub struct MemoryServer {
     inbox_map: HashMap<Url, VecDeque<Vec<u8>>>,
     /// Inbox of connection state change requests
     /// (true = incoming connection, false = connection closed)
-    connection_inbox: Vec<(ConnectionId, bool)>,
+    connection_inbox: Vec<(Url, bool)>,
     /// Store of all established connections
-    inbound_connections: HashMap<Url, ConnectionId>,
+    inbound_connections: HashSet<Url>,
 }
 
 impl Drop for MemoryServer {
@@ -77,15 +76,12 @@ impl MemoryServer {
             this_uri: uri.clone(),
             inbox_map: HashMap::new(),
             connection_inbox: Vec::new(),
-            inbound_connections: HashMap::new(),
+            inbound_connections: HashSet::new(),
         }
     }
 
-    pub fn get_inbound_uri(&self, arg_id: &ConnectionIdRef) -> Option<&Url> {
-        self.inbound_connections
-            .iter()
-            .find(|(_, id)| *id == arg_id)
-            .map(|(uri, _)| uri)
+    pub fn has_inbound_address(&self, address: &Url) -> bool {
+        self.inbound_connections.has(address)
     }
 
     /// Another node requested to connect with us.
@@ -94,11 +90,10 @@ impl MemoryServer {
     pub fn request_connect(
         &mut self,
         other_uri: &Url,
-        in_cid: &ConnectionIdRef,
     ) -> TransportResult<()> {
         info!(
-            "(MemoryServer) {} creates inbox for {} ({})",
-            self.this_uri, other_uri, in_cid
+            "(MemoryServer) {} creates inbox for {}",
+            self.this_uri, other_uri
         );
         if other_uri == &self.this_uri {
             return Err(TransportError::new(format!(
@@ -116,9 +111,9 @@ impl MemoryServer {
         let prev = self.inbox_map.insert(other_uri.clone(), VecDeque::new());
         assert!(prev.is_none());
         self.inbound_connections
-            .insert(other_uri.clone(), in_cid.to_string());
+            .insert(other_uri.clone());
         // Notify our TransportMemory (so it can connect back)
-        self.connection_inbox.push((in_cid.to_string(), true));
+        self.connection_inbox.push((other_uri.clone(), true));
         // Done
         Ok(())
     }
@@ -136,12 +131,11 @@ impl MemoryServer {
         }
         trace!("(MemoryServer {}). close event", self.this_uri);
         // Remove inbound connection
-        let in_cid = self
-            .inbound_connections
+        self.inbound_connections
             .remove(other_uri)
             .expect("Should have connectionId for this uri");
         // Notify our TransportMemory
-        self.connection_inbox.push((in_cid.clone(), false));
+        self.connection_inbox.push((other_uri.clone(), false));
         // Done
         Ok(())
     }
@@ -167,17 +161,17 @@ impl MemoryServer {
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connection inbox
-        for (in_cid, is_new) in self.connection_inbox.iter() {
+        for (address, is_new) in self.connection_inbox.iter() {
             trace!(
                 "(MemoryServer {}). connection_inbox: {} | {}",
                 self.this_uri,
-                in_cid,
+                address,
                 is_new,
             );
             let event = if *is_new {
-                TransportEvent::IncomingConnectionEstablished(in_cid.to_string())
+                TransportEvent::IncomingConnection { address }
             } else {
-                TransportEvent::ConnectionClosed(in_cid.to_string())
+                TransportEvent::ConnectionClosed { address }
             };
             trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
             outbox.push(event);
@@ -185,11 +179,7 @@ impl MemoryServer {
         }
         self.connection_inbox.clear();
         // Process msg inboxes
-        for (uri, inbox) in self.inbox_map.iter_mut() {
-            let id = self
-                .inbound_connections
-                .get(uri)
-                .expect("Should always have id for a connected uri (msg)");
+        for (address, inbox) in self.inbox_map.iter_mut() {
             loop {
                 let payload = match inbox.pop_front() {
                     None => break,
@@ -197,7 +187,7 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!("(MemoryServer {}) received: {:?}", self.this_uri, payload);
-                let evt = TransportEvent::ReceivedData(id.to_string(), payload);
+                let evt = TransportEvent::ReceivedData { address, payload };
                 outbox.push(evt);
             }
         }

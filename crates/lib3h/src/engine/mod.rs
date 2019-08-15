@@ -9,7 +9,7 @@ use crate::{
     dht::dht_trait::{Dht, DhtFactory},
     gateway::GatewayWrapper,
     track::Tracker,
-    transport::{ConnectionId, TransportWrapper},
+    transport::TransportWrapper,
     transport_wss::TlsConfig,
 };
 
@@ -78,7 +78,7 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// P2p gateway for the network layer
     network_gateway: GatewayWrapper<'engine>,
     /// Store active connections?
-    network_connections: HashSet<ConnectionId>,
+    network_connections: HashSet<Url>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
     #[allow(dead_code)]
