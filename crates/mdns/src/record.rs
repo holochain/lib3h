@@ -14,6 +14,8 @@ pub struct Record {
     pub(crate) hostname: String,
     /// IP address in the lan
     pub(crate) addrs: Vec<Ipv4Addr>,
+    /// Time to live
+    pub(crate) ttl: u32,
     // /// When this resource was recorded
     // timestamp: Option<>
 }
@@ -28,6 +30,7 @@ impl Record {
         Record {
             hostname,
             addrs: addr.to_vec(),
+            ttl: 60,
         }
     }
 
@@ -39,6 +42,11 @@ impl Record {
     /// Returns a reference to the hostname of a neighbor in the LAN.
     pub fn hostname(&self) -> &str {
         &self.hostname
+    }
+
+    /// Returns the time to leave value oif a [`Record`].
+    pub fn ttl(&self) -> u32 {
+        self.ttl
     }
 
     /// Build a host own record. If there we fail to gather IPv4 addresses from the system,
@@ -69,7 +77,9 @@ impl Record {
                 .expect("Fail to parse default IPv4 address.")]
         }
 
-        Record { hostname, addrs }
+        let ttl = 120;
+
+        Record { hostname, addrs, ttl }
     }
 
     /// Convert a [`Packet`](crate::dns::Packet) to a [`Record`].

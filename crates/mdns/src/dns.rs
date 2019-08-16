@@ -113,7 +113,7 @@ impl Packet {
                 // eprintln!("Unknown raw: enc_size = {}", enc_size);
                 // let mut raw = vec![0; enc_size];
                 let mut raw = vec![0; crate::READ_BUF_SIZE];
-                // cursor.read_exact(&mut raw)?;
+                cursor.read_exact(&mut raw)?;
                 out.answers.push(Answer::Unknown(raw));
             }
         }

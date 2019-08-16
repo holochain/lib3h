@@ -348,6 +348,12 @@ impl MulticastDns {
         let query_packet = self.build_query_packet();
         self.broadcast(&query_packet)?;
 
+        for (name, record) in self.map_record.iter_mut() {
+            if record.ttl > 1 {
+                record.ttl -= 1;
+            }
+        }
+
         // Set receive timeout to 2sec. And poll connection every 1sec for 3sec
         // let _response = self.recv_timely(2_000, 1_000, 3_000);
 
@@ -479,9 +485,9 @@ impl MulticastDns {
     fn build_query_packet(&self) -> Packet {
         let questions = self
             .map_record
-            .keys()
-            .filter_map(|name| {
-                if name != self.own_record.hostname() {
+            .iter()
+            .filter_map(|(name, rec)| {
+                if name != self.own_record.hostname() && rec.ttl() > 1 {
                     Some(Question::Srv(SrvDataQ {
                         name: name.as_bytes().to_vec(),
                     }))
