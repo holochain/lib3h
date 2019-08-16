@@ -6,7 +6,7 @@ use crate::{
     gateway::{Gateway, P2pGateway},
     transport::{error::TransportResult, protocol::*, transport_trait::Transport},
 };
-use lib3h_protocol::DidWork;
+use lib3h_protocol::{data_types::*, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -52,11 +52,16 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
         );
         if inner_did_work {
             did_work = true;
+        }
+        if !event_list.is_empty() {
             outbox.append(&mut event_list);
         }
         // Handle TransportEvents
-        for evt in outbox.clone() {
-            self.handle_TransportEvent(evt)?;
+        // only sending out those that belong at a higher level
+        for evt in outbox.drain(..).collect::<Vec<_>>() {
+            if let Some(evt) = self.handle_TransportEvent(evt)? {
+                outbox.push(evt);
+            }
         }
         Ok((did_work, outbox))
     }
@@ -99,14 +104,15 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     ///   - space   : agentId
     fn priv_send(
         &mut self,
+        origin_stack: String,
         request_id: RequestId,
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         if address.scheme() != self.address_url_scheme {
             panic!(
-                "gateway expecting scheme {}, got {}",
-                self.address_url_scheme, &address
+                "gateway expecting scheme {}, got {}\n{}",
+                self.address_url_scheme, &address, origin_stack
             );
         }
         warn!(
@@ -122,16 +128,35 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         }
         let peer = peer.unwrap();
         warn!("@^@^@ SENDING TO {}", peer.peer_uri);
+        let mut inner_payload = Vec::new();
+        P2pProtocol::DirectMessage(DirectMessageData {
+            space_address: self.space_address.clone(),
+            request_id: "".to_string(),
+            to_agent_id: address.into(),
+            from_agent_id: self.inner_dht.this_peer().peer_address.clone().into(),
+            content: payload.to_vec(),
+        })
+        .serialize(&mut rmp_serde::Serializer::new(&mut inner_payload))
+        .expect("serialization failed");
+
         self.inner_transport
             .as_mut()
-            .send(request_id, peer.peer_uri.clone(), payload)
+            .send(request_id, peer.peer_uri.clone(), inner_payload)
     }
 
-    fn handle_new_connection(&mut self, address: Url) -> TransportResult<()> {
+    fn handle_new_connection(&mut self, uri: Url) -> TransportResult<()> {
+        // send our handshake to the remote end
+
+        /*
+        let peer = match self.inner_dht.get_peer_by_uri(&address) {
+            Some(peer) => peer,
+            None => panic!("ACK {:?}", address),
+        };
+        panic!("got peer {:?}", peer);
         if address.scheme() != self.address_url_scheme {
             error!(
-                "gateway expecting scheme {}, got {}",
-                self.address_url_scheme, &address
+                "gateway expecting scheme {}, got {}\n{:?}",
+                self.address_url_scheme, &address, backtrace::Backtrace::new()
             );
             // TODO XXX - ignoring this for now (eek!)
             return Ok(());
@@ -139,6 +164,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         self.connections.insert(address.clone());
+        */
 
         // Send to other node our PeerAddress
         let this_peer = self.this_peer().clone();
@@ -155,16 +181,16 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
             self.identifier,
             our_peer_address,
-            address,
+            uri,
         );
-        return self
-            .inner_transport
-            .as_mut()
-            .send("".to_string(), address, buf);
+        return self.inner_transport.as_mut().send("".to_string(), uri, buf);
     }
 
     /// Process a transportEvent received from our internal connection.
-    pub(crate) fn handle_TransportEvent(&mut self, evt: TransportEvent) -> TransportResult<()> {
+    pub(crate) fn handle_TransportEvent(
+        &mut self,
+        evt: TransportEvent,
+    ) -> TransportResult<Option<TransportEvent>> {
         debug!(
             "<<< '({})' recv transport event: {:?}",
             self.identifier, evt
@@ -215,6 +241,8 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
                 if let Ok(p2p_msg) = maybe_p2p_msg {
+                    return self.handle_TransportEvent_P2pProtocol(address, p2p_msg);
+                    /*
                     if let P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) =
                         p2p_msg
                     {
@@ -234,10 +262,59 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                             Dht::process(self).expect("HACK");
                         }
                     }
+                    */
                 }
             }
         };
-        Ok(())
+        Ok(None)
+    }
+
+    fn handle_TransportEvent_P2pProtocol(
+        &mut self,
+        address: Url,
+        p2p_msg: P2pProtocol,
+    ) -> TransportResult<Option<TransportEvent>> {
+        match p2p_msg {
+            P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) => {
+                debug!(
+                    "Received PeerAddress: {} | {} ({})",
+                    peer_address, gateway_id, self.identifier
+                );
+                if &self.identifier == &gateway_id {
+                    let peer = PeerData {
+                        peer_address: peer_address.clone(),
+                        peer_uri: address,
+                        timestamp: peer_timestamp,
+                    };
+                    Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
+                                                                                 // TODO #150 - Should not call process manually
+                    Dht::process(self).expect("HACK");
+                }
+                Ok(None)
+            }
+            P2pProtocol::DirectMessage(mut dm_data) => {
+                if dm_data.space_address != self.space_address {
+                    return Err(format!(
+                        "Gateway DM: Bad Space Address, wanted {} got {}",
+                        self.space_address, dm_data.space_address
+                    )
+                    .into());
+                }
+                error!(
+                    "Do we need to check the to_agent_id against something?? {}",
+                    dm_data.to_agent_id
+                );
+                Ok(Some(TransportEvent::ReceivedData {
+                    address: Url::parse(&format!(
+                        "{}:{}",
+                        self.address_url_scheme, dm_data.from_agent_id
+                    ))
+                    .expect("can parse url"),
+                    payload: std::mem::replace(&mut dm_data.content, vec![]),
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
@@ -253,10 +330,11 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                 address,
             } => self.priv_connect(request_id, address),
             TransportCommand::SendMessage {
+                origin_stack,
                 request_id,
                 address,
                 payload,
-            } => self.priv_send(request_id, address, payload),
+            } => self.priv_send(origin_stack, request_id, address, payload),
         }
     }
 }

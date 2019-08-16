@@ -227,7 +227,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         _address: Url,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let mut outbox = Vec::new();
+        let outbox = Vec::new();
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
@@ -250,7 +250,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     }
                 }
             }
-            P2pProtocol::DirectMessage(dm_data) => {
+            P2pProtocol::DirectMessage(_dm_data) => {
+                unimplemented!();
+                /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
                     dm_data.space_address.to_owned(),
                     dm_data.to_agent_id.to_owned(),
@@ -265,8 +267,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         dm_data.space_address,
                     );
                 }
+                */
             }
-            P2pProtocol::DirectMessageResult(dm_data) => {
+            P2pProtocol::DirectMessageResult(_dm_data) => {
+                unimplemented!();
+                /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
                     dm_data.space_address.to_owned(),
                     dm_data.to_agent_id.to_owned(),
@@ -280,6 +285,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         dm_data.space_address,
                     );
                 }
+                */
             }
             P2pProtocol::PeerAddress(_, _, _) => {
                 // no-op

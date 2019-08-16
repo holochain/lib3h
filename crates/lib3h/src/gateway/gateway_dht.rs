@@ -21,6 +21,9 @@ impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
     fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht.get_peer(peer_address)
     }
+    fn get_peer_by_uri(&self, peer_uri: &Url) -> Option<PeerData> {
+        self.inner_dht.get_peer_by_uri(peer_uri)
+    }
     fn this_peer(&self) -> &PeerData {
         self.inner_dht.this_peer()
     }
@@ -97,6 +100,10 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .expect("P2pProtocol::Gossip serialization failed");
+                    error!(
+                        "@^@^@ our schema {} self.send {}",
+                        self.address_url_scheme, to_peer_address
+                    );
                     self.send(
                         "".to_string(),
                         Url::parse(&format!("{}:{}", self.address_url_scheme, to_peer_address))

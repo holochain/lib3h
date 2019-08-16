@@ -45,6 +45,7 @@ pub trait Transport {
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         self.post(TransportCommand::SendMessage {
+            origin_stack: format!("{:?}", backtrace::Backtrace::new()),
             request_id,
             address,
             payload,

@@ -41,6 +41,7 @@ pub trait Dht {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData>;
     fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData>;
+    fn get_peer_by_uri(&self, peer_uri: &Url) -> Option<PeerData>;
     fn this_peer(&self) -> &PeerData;
     /// Entry
     fn get_entry_address_list(&self) -> Vec<&Address>;

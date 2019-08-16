@@ -45,6 +45,11 @@ impl Dht for RrDht {
         None
     }
 
+    fn get_peer_by_uri(&self, _peer_uri: &Url) -> Option<PeerData> {
+        // FIXME
+        None
+    }
+
     fn this_peer(&self) -> &PeerData {
         &self.this_peer
     }

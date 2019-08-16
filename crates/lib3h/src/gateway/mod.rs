@@ -4,13 +4,14 @@ pub mod p2p_gateway;
 
 use crate::{
     dht::dht_trait::Dht,
-    transport::{protocol::TransportCommand, transport_trait::Transport, TransportWrapper},
+    transport::{protocol::*, transport_trait::Transport, TransportWrapper},
 };
 use std::{
     collections::{HashSet, VecDeque},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
+use lib3h_protocol::Address;
 use url::Url;
 
 /// describes a super construct of a Transport and a Dht allowing
@@ -92,6 +93,7 @@ impl<'wrap> GatewayWrapper<'wrap> {
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
 pub struct P2pGateway<'gateway, D: Dht> {
     address_url_scheme: String,
+    space_address: Address,
     inner_transport: TransportWrapper<'gateway>,
     inner_dht: D,
     /// Used for distinguishing gateways

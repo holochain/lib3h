@@ -94,6 +94,7 @@ impl TransportMemory {
     /// Send payload to known connectionIds in `id_list`
     fn priv_send(
         &mut self,
+        _origin_stack: String,
         request_id: RequestId,
         address: Url,
         payload: Vec<u8>,
@@ -256,10 +257,11 @@ impl TransportMemory {
                 address,
             } => self.priv_connect(request_id, address),
             TransportCommand::SendMessage {
+                origin_stack,
                 request_id,
                 address,
                 payload,
-            } => self.priv_send(request_id, address, payload),
+            } => self.priv_send(origin_stack, request_id, address, payload),
         }
     }
 }

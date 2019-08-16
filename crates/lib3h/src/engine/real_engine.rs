@@ -70,6 +70,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
             "transportid",
+            NETWORK_GATEWAY_ID.into(),
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -119,6 +120,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Create network gateway
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
             "transportid",
+            NETWORK_GATEWAY_ID.into(),
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -167,8 +169,7 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process_count += 1;
-        trace!("");
-        trace!("{} - process() START - {}", self.name, self.process_count);
+        trace!("\n{} - process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
@@ -570,6 +571,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> = GatewayWrapper::new(P2pGateway::new(
             "hc",
+            join_msg.space_address.clone(),
             &format!("{:?}", &chain_id),
             self.network_gateway.as_transport(),
             self.dht_factory,

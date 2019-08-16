@@ -31,7 +31,7 @@ impl PartialEq for ErrorKind {
 impl Clone for ErrorKind {
     fn clone(&self) -> Self {
         match self {
-            ErrorKind::Io(i) => ErrorKind::Io(i.kind().clone().into()),
+            ErrorKind::Io(i) => ErrorKind::Io(i.kind().into()),
             ErrorKind::Other(s) => ErrorKind::Other(s.clone()),
         }
     }

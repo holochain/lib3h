@@ -12,6 +12,7 @@ pub enum TransportCommand {
     Connect { request_id: RequestId, address: Url },
     /// send a message to a remote node, may first establish a connection
     SendMessage {
+        origin_stack: String,
         request_id: RequestId,
         address: Url,
         payload: Vec<u8>,

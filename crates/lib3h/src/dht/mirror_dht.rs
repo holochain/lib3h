@@ -99,6 +99,16 @@ impl Dht for MirrorDht {
         None
     }
 
+    fn get_peer_by_uri(&self, peer_uri: &Url) -> Option<PeerData> {
+        // make this more efficient
+        for (_, pd) in self.peer_map.iter() {
+            if &pd.peer_uri == peer_uri {
+                return Some(pd.clone());
+            }
+        }
+        None
+    }
+
     fn this_peer(&self) -> &PeerData {
         &self.this_peer
     }

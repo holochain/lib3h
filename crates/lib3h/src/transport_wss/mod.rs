@@ -244,10 +244,11 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
                 address,
             } => self.priv_connect(request_id, address),
             TransportCommand::SendMessage {
+                origin_stack,
                 request_id,
                 address,
                 payload,
-            } => self.priv_send(request_id, address, payload),
+            } => self.priv_send(origin_stack, request_id, address, payload),
         }
     }
 
@@ -290,6 +291,7 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     /// send a message to one or more remote connected nodes
     fn priv_send(
         &mut self,
+        _origin_stack: String,
         request_id: RequestId,
         address: Url,
         payload: Vec<u8>,
