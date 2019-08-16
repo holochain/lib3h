@@ -351,9 +351,9 @@ impl TransportMemory {
         debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
-            TransportCommand::Connect(url) => {
+            TransportCommand::Connect(url, request_id) => {
                 let id = self.connect(url)?;
-                let evt = TransportEvent::ConnectResult(id);
+                let evt = TransportEvent::ConnectResult(id, request_id.clone());
                 Ok(vec![evt])
             }
             TransportCommand::Send(id_list, payload) => {
@@ -388,4 +388,18 @@ impl TransportMemory {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[test]
+    fn can_rebind() {
+        let mut transport = TransportMemory::new();
+        let bind_url = url::Url::parse("mem://can_rebind").unwrap();
+        assert!(transport.bind(&bind_url).is_ok());
+        assert!(transport.bind(&bind_url).is_ok());
+    }
+
 }

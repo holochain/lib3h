@@ -7,20 +7,33 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
-    gateway::P2pGateway,
-    transport::{transport_trait::Transport, ConnectionId},
+    gateway::GatewayWrapper,
+    track::Tracker,
+    transport::{ConnectionId, TransportWrapper},
     transport_wss::TlsConfig,
 };
 
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
-use std::{cell::RefCell, rc::Rc};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
 pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RealEngineTrackerData {
+    /// track the actual HandleGetGossipingEntryList request
+    GetGossipingEntryList,
+    /// track the actual HandleGetAuthoringEntryList request
+    GetAuthoringEntryList,
+    /// once we have the AuthoringEntryListResponse, fetch data for entries
+    DataForAuthorEntry,
+    /// gossip has requested we store data, send a hold request to core
+    /// core should respond ??
+    HoldEntryRequested,
+}
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -47,7 +60,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<T: Transport, D: Dht> {
+pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// Identifier
     name: String,
     /// Config settings
@@ -56,16 +69,18 @@ pub struct RealEngine<T: Transport, D: Dht> {
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
     dht_factory: DhtFactory<D>,
+    /// Tracking request_id's sent to core
+    request_track: Tracker<RealEngineTrackerData>,
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
-    network_transport: Rc<RefCell<T>>,
+    network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: Rc<RefCell<P2pGateway<T, D>>>,
+    network_gateway: GatewayWrapper<'engine>,
     /// Store active connections?
     network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, P2pGateway<P2pGateway<T, D>, D>>,
+    space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

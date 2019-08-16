@@ -1,6 +1,6 @@
 [package]
 name = "lib3h"
-version = "0.0.8"
+version = "0.0.10"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
@@ -13,11 +13,13 @@ documentation = "https://docs.rs/lib3h"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
+backtrace = "=0.3.26"
 hcid = "=0.0.6"
-holochain_persistence_api = "=0.0.6"
+holochain_persistence_api = "=0.0.7"
 # version on the left for release regex
-lib3h_protocol = { version = "=0.0.8", path = "../lib3h_protocol" }
-lib3h_crypto_api = { version = "=0.0.8", path = "../crypto_api" }
+lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
+lib3h_crypto_api = { version = "=0.0.10", path = "../crypto_api" }
+nanoid = "=0.2.0"
 tungstenite = "=0.6.1"
 url = "=1.7.2"
 url_serde = "=0.2.0"
@@ -25,14 +27,13 @@ native-tls = "=0.2.2"
 rmp-serde = "=0.13.7"
 serde = "=1.0.89"
 serde_derive = "=1.0.89"
-log = "=0.4.6"
+log = "=0.4.8"
 # Should be dev only
 lazy_static = "=1.2.0"
 
 [dev-dependencies]
-lib3h_sodium = { version = "=0.0.8", path = "../sodium" }
+lib3h_sodium = { version = "=0.0.10", path = "../sodium" }
 unwrap_to = "=0.1.0"
-backtrace = "=0.3.14"
 env_logger = "=0.6.1"
 bincode = "=1.1.4"
 multihash = "=0.8.0"

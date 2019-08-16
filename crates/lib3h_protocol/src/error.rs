@@ -16,12 +16,6 @@ impl Lib3hProtocolError {
         Lib3hProtocolError(Box::new(kind))
     }
 
-    /// Helper function to build [Lib3h errors](https://github.com/holochain/lib3h) because we
-    /// cannot import them in order to avoid circular dependency.
-    pub fn new_lib3h_error(s: &str) -> Self {
-        Lib3hProtocolError::new(ErrorKind::Lib3hError(s.to_owned()))
-    }
-
     /// Return the specific type of this error.
     pub fn kind(&self) -> &ErrorKind {
         &self.0
@@ -44,7 +38,7 @@ pub enum ErrorKind {
     DeserializeError(DeserializeError),
     /// Error occuring in [Lib3h](https://github.com/holochain/lib3h/). This is kind of a hacky way
     /// to do it but it's a viable option to avoid circular dependency.
-    Lib3hError(String),
+    Lib3hError(String, Option<backtrace::Backtrace>),
     /// Yet undefined error.
     Other(String),
     /// Hints that destructuring should not be exhaustive.
@@ -62,9 +56,8 @@ impl StdError for Lib3hProtocolError {
         match *self.0 {
             ErrorKind::Io(ref err) => Some(err),
             ErrorKind::DeserializeError(ref err) => Some(err),
-            ErrorKind::Lib3hError(ref _s)
-            | ErrorKind::Other(ref _s)
-            | ErrorKind::TransportError(ref _s) => None,
+            ErrorKind::Lib3hError(ref _s, ref _bt) => None,
+            ErrorKind::Other(ref _s) | ErrorKind::TransportError(ref _s) => None,
             _ => unreachable!(),
         }
     }
@@ -76,7 +69,7 @@ impl fmt::Display for Lib3hProtocolError {
             ErrorKind::Io(ref err) => err.fmt(f),
             ErrorKind::TransportError(ref s) => write!(f, "TransportError: '{}'.", s),
             ErrorKind::DeserializeError(ref err) => err.fmt(f),
-            ErrorKind::Lib3hError(ref s) => write!(f, "Li3hError encountered: '{}'.", s),
+            ErrorKind::Lib3hError(ref s, ref _bt) => write!(f, "Li3hError encountered: '{}'.", s),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
