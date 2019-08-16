@@ -9,10 +9,19 @@ pub enum CryptoError {
     WriteOverflow,
     BadHashSize,
     BadSaltSize,
+    BadOutBufferSize,
+    BadParentSize,
+    BadContextSize,
     BadSeedSize,
     BadPublicKeySize,
     BadSecretKeySize,
     BadSignatureSize,
+    BadTxSessionKeySize,
+    BadRxSessionKeySize,
+    BadCipherSize,
+    BadNonceSize,
+    BadMessageSize,
+    CouldNotDecrypt,
 }
 
 impl CryptoError {
