@@ -280,12 +280,28 @@ impl FullSuite {
         let mut s_rx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
         let mut s_tx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
 
-        self.crypto
-            .kx_client_session_keys(&mut c_rx, &mut c_tx, &c_pk, &c_sk, &s_pk)
-            .unwrap();
-        self.crypto
-            .kx_server_session_keys(&mut s_rx, &mut s_tx, &s_pk, &s_sk, &c_pk)
-            .unwrap();
+        //self.crypto
+        //    .kx_client_session_keys(&mut c_rx, &mut c_tx, &c_pk, &c_sk, &s_pk)
+        //    .unwrap();
+        kx_client_session_keys!(self.crypto =>
+            client_rx: &mut c_rx,
+            client_tx: &mut c_tx,
+            client_pk: &c_pk,
+            client_sk: &c_sk,
+            server_pk: &s_pk,
+        )
+        .unwrap();
+        //self.crypto
+        //    .kx_server_session_keys(&mut s_rx, &mut s_tx, &s_pk, &s_sk, &c_pk)
+        //    .unwrap();
+        kx_server_session_keys!(self.crypto =>
+            server_rx: &mut s_rx,
+            server_tx: &mut s_tx,
+            server_pk: &s_pk,
+            server_sk: &s_sk,
+            client_pk: &c_pk,
+        )
+        .unwrap();
 
         assert_ne!(&format!("{:?}", c_rx), &format!("{:?}", s_rx));
         assert_ne!(&format!("{:?}", c_tx), &format!("{:?}", s_tx));
@@ -306,16 +322,32 @@ impl FullSuite {
 
         let mut cipher: Box<dyn Buffer> = Box::new(vec![0; 16 + self.crypto.aead_auth_bytes()]);
 
-        self.crypto
-            .aead_encrypt(&mut cipher, &message, Some(&adata), &nonce, &secret)
-            .unwrap();
+        //self.crypto
+        //    .aead_encrypt(&mut cipher, &message, Some(&adata), &nonce, &secret)
+        //    .unwrap();
+        aead_encrypt!(self.crypto =>
+            cipher: &mut cipher,
+            message: &message,
+            adata: Some(&adata),
+            nonce: &nonce,
+            secret: &secret,
+        )
+        .unwrap();
 
         let mut msg_out: Box<dyn Buffer> =
             Box::new(vec![0; cipher.len() - self.crypto.aead_auth_bytes()]);
 
-        self.crypto
-            .aead_decrypt(&mut msg_out, &cipher, Some(&adata), &nonce, &secret)
-            .unwrap();
+        //self.crypto
+        //    .aead_decrypt(&mut msg_out, &cipher, Some(&adata), &nonce, &secret)
+        //    .unwrap();
+        aead_decrypt!(self.crypto =>
+            message: &mut msg_out,
+            cipher: &cipher,
+            adata: Some(&adata),
+            nonce: &nonce,
+            secret: &secret,
+        )
+        .unwrap();
 
         assert_eq!(&format!("{:?}", message), &format!("{:?}", msg_out));
     }

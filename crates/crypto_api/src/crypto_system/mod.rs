@@ -1,5 +1,93 @@
 use crate::{Buffer, CryptoResult};
 
+/// syntactic sugar for named parameters to clarify buffer usage
+/// # Example
+///
+/// ```compile_fail
+/// kx_client_session_keys!(self.crypto =>
+///     client_rx: &mut c_rx,
+///     client_tx: &mut c_tx,
+///     client_pk: &c_pk,
+///     client_sk: &c_sk,
+///     server_pk: &s_pk,
+/// ).unwrap();
+/// ```
+#[macro_export]
+macro_rules! kx_client_session_keys {
+    ($cs:expr => client_rx: $c_rx:expr, client_tx: $c_tx:expr, client_pk: $c_pk:expr, client_sk: $c_sk:expr, server_pk: $s_pk:expr) => {
+        $cs.kx_client_session_keys($c_rx, $c_tx, $c_pk, $c_sk, $s_pk)
+    };
+    ($cs:expr => client_rx: $c_rx:expr, client_tx: $c_tx:expr, client_pk: $c_pk:expr, client_sk: $c_sk:expr, server_pk: $s_pk:expr,) => {
+        $cs.kx_client_session_keys($c_rx, $c_tx, $c_pk, $c_sk, $s_pk)
+    };
+}
+
+/// syntactic sugar for named parameters to clarify buffer usage
+/// # Example
+///
+/// ```compile_fail
+/// kx_server_session_keys!(self.crypto =>
+///     server_rx: &mut s_rx,
+///     server_tx: &mut s_tx,
+///     server_pk: &s_pk,
+///     server_sk: &s_sk,
+///     client_pk: &c_pk,
+/// ).unwrap();
+/// ```
+#[macro_export]
+macro_rules! kx_server_session_keys {
+    ($cs:expr => server_rx: $s_rx:expr, server_tx: $s_tx:expr, server_pk: $s_pk:expr, server_sk: $s_sk:expr, client_pk: $c_pk:expr) => {
+        $cs.kx_server_session_keys($s_rx, $s_tx, $s_pk, $s_sk, $c_pk)
+    };
+    ($cs:expr => server_rx: $s_rx:expr, server_tx: $s_tx:expr, server_pk: $s_pk:expr, server_sk: $s_sk:expr, client_pk: $c_pk:expr,) => {
+        $cs.kx_server_session_keys($s_rx, $s_tx, $s_pk, $s_sk, $c_pk)
+    };
+}
+
+/// syntactic sugar for named parameters to clarify buffer usage
+/// # Example
+///
+/// ```compile_fail
+/// aead_encrypt!(self.crypto =>
+///     cipher: &mut cipher,
+///     message: &message,
+///     adata: Some(&adata),
+///     nonce: &nonce,
+///     secret: &secret,
+/// ).unwrap();
+/// ```
+#[macro_export]
+macro_rules! aead_encrypt {
+    ($cs:expr => cipher: $c:expr, message: $m:expr, adata: $a:expr, nonce: $n:expr, secret: $s:expr) => {
+        $cs.aead_encrypt($c, $m, $a, $n, $s)
+    };
+    ($cs:expr => cipher: $c:expr, message: $m:expr, adata: $a:expr, nonce: $n:expr, secret: $s:expr,) => {
+        $cs.aead_encrypt($c, $m, $a, $n, $s)
+    };
+}
+
+/// syntactic sugar for named parameters to clarify buffer usage
+/// # Example
+///
+/// ```compile_fail
+/// aead_decrypt!(self.crypto =>
+///     message: &mut msg_out,
+///     cipher: &cipher,
+///     adata: Some(&adata),
+///     nonce: &nonce,
+///     secret: &secret,
+/// ).unwrap();
+/// ```
+#[macro_export]
+macro_rules! aead_decrypt {
+    ($cs:expr => message: $m:expr, cipher: $c:expr, adata: $a:expr, nonce: $n:expr, secret: $s:expr) => {
+        $cs.aead_decrypt($m, $c, $a, $n, $s)
+    };
+    ($cs:expr => message: $m:expr, cipher: $c:expr, adata: $a:expr, nonce: $n:expr, secret: $s:expr,) => {
+        $cs.aead_decrypt($m, $c, $a, $n, $s)
+    };
+}
+
 /// A trait describing a cryptographic system implementation compatible
 /// with Lib3h and Holochain.
 #[allow(clippy::borrowed_box)]
@@ -150,6 +238,8 @@ pub trait CryptoSystem: Sync {
     ) -> CryptoResult<()>;
 
     /// generate key exchange session keys from "client" perspective
+    /// for named arguments for code clarity, consider using the macro:
+    ///   kx_client_session_keys!
     fn kx_client_session_keys(
         &self,
         client_rx: &mut Box<dyn Buffer>,
@@ -160,6 +250,8 @@ pub trait CryptoSystem: Sync {
     ) -> CryptoResult<()>;
 
     /// generate key exchange session keys from "server" perspective
+    /// for named arguments for code clarity, consider using the macro:
+    ///   kx_server_session_keys!
     fn kx_server_session_keys(
         &self,
         server_rx: &mut Box<dyn Buffer>,
@@ -180,6 +272,9 @@ pub trait CryptoSystem: Sync {
     /// bytelength of aead symmetric key
     fn aead_secret_bytes(&self) -> usize;
 
+    /// encrypt `message` into buffer `cipher`
+    /// for named arguments for code clarity, consider using the macro:
+    ///   aead_encrypt!
     fn aead_encrypt(
         &self,
         cipher: &mut Box<dyn Buffer>,
@@ -189,6 +284,9 @@ pub trait CryptoSystem: Sync {
         secret: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
 
+    /// decrypt `cipher` into buffer `message`
+    /// for named arguments for code clarity, consider using the macro:
+    ///   aead_encrypt!
     fn aead_decrypt(
         &self,
         message: &mut Box<dyn Buffer>,
