@@ -107,6 +107,7 @@ impl MulticastDnsBuilder {
     /// construct the actual mdns struct
     pub fn build(&mut self) -> Result<MulticastDns, MulticastDnsError> {
         let recv_socket = create_socket(&self.bind_address, self.bind_port)?;
+        // recv_socket.set_nonblocking(false)?;
         recv_socket.set_nonblocking(true)?;
         recv_socket.set_multicast_loop_v4(self.multicast_loop)?;
         recv_socket.set_multicast_ttl_v4(self.multicast_ttl)?;
@@ -346,10 +347,11 @@ impl MulticastDns {
     /// One-Shot Multicast DNS Queries
     pub fn query(&mut self) -> MulticastDnsResult<()> {
         let query_packet = self.build_query_packet();
+        // let query_packet = self.build_probe_packet();
         self.broadcast(&query_packet)?;
 
         for (name, record) in self.map_record.iter_mut() {
-            if record.ttl > 1 {
+            if record.ttl > 1 && name != self.own_record.hostname() {
                 record.ttl -= 1;
             }
         }
@@ -369,8 +371,10 @@ impl MulticastDns {
     fn responder(&mut self) -> MulticastDnsResult<!> {
         let resp_packet = self.build_defensive_packet();
         let mut query_every = 1u64;
+        let mut counter = 0;
 
         'service_loop: loop {
+            counter += 1;
             eprintln!("Records : {:#?}", self.records());
 
             // // Send query every once in a while
@@ -379,11 +383,11 @@ impl MulticastDns {
             {
                 // Sends Query
                 self.query()?;
-                eprintln!("{} - Querying...", query_every);
+                eprintln!("\n\n[{:>3}] : waiting {} - Querying...", counter, query_every);
 
                 // Listen to incoming UDP packets for 5sec, without sleep between listening
                 // connection for 500ms
-                if let Some((resp, sender_socket_addr)) = self.recv_timely(1_000, 10, 500)? {
+                if let Some((resp, sender_socket_addr)) = self.recv_timely(1000, 10, query_every)? {
                     if resp.is_query {
                         // if this is a query, we detect conflict and defend our name if we need to
                         if resp.questions.len() > 0 {
@@ -429,7 +433,8 @@ impl MulticastDns {
             if query_every < 30 {
                 query_every += 1;
             }
-            sleep_ms(query_every * 1000);
+            // sleep_ms(query_every * 1000);
+            sleep_ms(1000);
         }
 
         // Ok(())
