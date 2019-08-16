@@ -7,9 +7,10 @@
 /// steps below: [Probing](https://tools.ietf.org/html/rfc6762#section-8.1)
 /// and [Announcing](https://tools.ietf.org/html/rfc6762#section-8.3).
 
-use crate::error::MulticastDnsResult;
+// use crate::error::MulticastDnsResult;
+
 pub trait Discovery {
-    fn probe(&self) -> MulticastDnsResult<()>;
-    fn annonce(&self) -> MulticastDnsResult<()>;
+    fn startup(&mut self);
     fn update(&mut self);
+    fn flush(&mut self);
 }

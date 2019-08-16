@@ -20,7 +20,7 @@ impl MdnsResponder {
         packet.questions.push(dns::Question::Srv(dns::SrvDataQ {
             name: SERVICE_NAME.to_vec(),
         }));
-        out.mdns.send(&packet).unwrap();
+        out.mdns.broadcast(&packet).unwrap();
 
         out
     }
@@ -41,7 +41,7 @@ impl MdnsResponder {
                         port: 0,
                         target: TARGET_NAME.to_vec(),
                     }));
-                    self.mdns.send(&packet).expect("send fail");
+                    self.mdns.broadcast(&packet).expect("send fail");
                 }
             }
             if let Some(dns::Answer::Srv(s)) = q.answers.get(0) {

@@ -58,7 +58,7 @@ impl Packet {
     }
 
     /// parse a dns packet into a Packet struct
-    pub fn with_raw(packet: &[u8]) -> MulticastDnsResult<Self> {
+    pub fn from_raw(packet: &[u8]) -> MulticastDnsResult<Self> {
         let mut cursor = std::io::Cursor::new(packet);
         let mut out = Packet::new();
 
@@ -90,6 +90,7 @@ impl Packet {
         for _ in 0..answer_count {
             let svc_name = read_qname(&mut cursor)?;
             let kind = cursor.read_u16::<BigEndian>()?;
+            dbg!(&kind);
             let _class = cursor.read_u16::<BigEndian>()?;
             let ttl_seconds = cursor.read_u32::<BigEndian>()?;
 
@@ -109,8 +110,10 @@ impl Packet {
                     target,
                 }));
             } else {
-                let mut raw = vec![0; enc_size];
-                cursor.read_exact(&mut raw)?;
+                // eprintln!("Unknown raw: enc_size = {}", enc_size);
+                // let mut raw = vec![0; enc_size];
+                let mut raw = vec![0; crate::READ_BUF_SIZE];
+                // cursor.read_exact(&mut raw)?;
                 out.answers.push(Answer::Unknown(raw));
             }
         }
@@ -148,9 +151,7 @@ impl Packet {
         for q in self.questions.iter() {
             match q {
                 Question::Unknown => {
-                    return Err(MulticastDnsError::Other(
-                        "unknown question type".to_string(),
-                    ));
+                    return Err(MulticastDnsError::new_other("unknown question type"));
                 }
                 Question::Srv(q) => {
                     write_qname(&mut out, &q.name)?;
@@ -172,9 +173,7 @@ impl Packet {
         for a in self.answers.iter() {
             match a {
                 Answer::Unknown(_) => {
-                    return Err(MulticastDnsError::Other(
-                        "unknown question type".to_string(),
-                    ));
+                    return Err(MulticastDnsError::new_other("unknown question type"));
                 }
                 Answer::Srv(a) => {
                     write_qname(&mut out, &a.name)?;
@@ -221,6 +220,7 @@ impl Packet {
 fn write_qname<T: byteorder::WriteBytesExt>(out: &mut T, data: &[u8]) -> MulticastDnsResult<u16> {
     let mut len = 0;
 
+    // Write the name of the node to which the query pertains
     for part in data.split(|&c| c == b'.') {
         out.write_u8(part.len() as u8)?;
         len += 1;
@@ -258,42 +258,6 @@ fn read_qname<T: byteorder::ReadBytesExt>(read: &mut T) -> MulticastDnsResult<Ve
     Ok(out)
 }
 
-#[derive(Debug, Clone)]
-pub struct Record {
-    /// Hostname of our neighbor
-    hostname: String,
-    /// IP address in the lan
-    ip: String,
-}
-
-impl Record {
-    /// Create a new record respecting the mDNS
-    /// [naming convention](https://tools.ietf.org/html/rfc6762#section-3)
-    /// of the form "single-dns-label.local." with value ending with `.local.`
-    pub fn new(name: &str, ip: &str) -> Self {
-        let hostname = if name.ends_with(".local.") {
-            name.to_string()
-        } else {
-            format!("{}.local.", name)
-        };
-
-        Record {
-            hostname,
-            ip: ip.to_string(),
-        }
-    }
-
-    /// Returns a reference to the IP address of a neighbor in the LAN.
-    pub fn ip(&self) -> &str {
-        &self.ip
-    }
-
-    /// Returns a reference to the hostname of a neighbor in the LAN.
-    pub fn hostname(&self) -> &str {
-        &self.hostname
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,7 +275,7 @@ mod tests {
             &format!("{:?}", raw),
             "[189, 189, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0, 0, 33, 0, 1]"
         );
-        assert_eq!(packet, Packet::with_raw(&raw).unwrap());
+        assert_eq!(packet, Packet::from_raw(&raw).unwrap());
     }
 
     #[test]
@@ -321,17 +285,19 @@ mod tests {
         packet.is_query = false;
         packet.answers.push(Answer::Srv(SrvDataA {
             name: b"svc.name.test".to_vec(),
-            ttl_seconds: 0x12345678,
+            ttl_seconds: 0x255,
             priority: 0x2222,
             weight: 0x3333,
-            port: 0x4444,
-            target: b"svc.name.test".to_vec(),
+            port: 0x2189,
+            target: b"153.1.09.7.90".to_vec(),
+            // target: b"svc.name.test".to_vec(),
         }));
         let raw = packet.to_raw().unwrap();
         assert_eq!(
             &format!("{:?}", raw),
-            "[189, 189, 132, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0, 0, 33, 0, 1, 18, 52, 86, 120, 0, 21, 34, 34, 51, 51, 68, 68, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0]"
+            "[189, 189, 132, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0, 0, 33, 0, 1, 0, 0, 2, 85, 0, 21, 34, 34, 51, 51, 33, 137, 3, 49, 53, 51, 1, 49, 2, 48, 57, 1, 55, 2, 57, 48, 0]"
+            // "[189, 189, 132, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0, 0, 33, 0, 1, 18, 52, 86, 120, 0, 21, 34, 34, 51, 51, 68, 68, 3, 115, 118, 99, 4, 110, 97, 109, 101, 4, 116, 101, 115, 116, 0]"
         );
-        assert_eq!(packet, Packet::with_raw(&raw).unwrap());
+        assert_eq!(packet, Packet::from_raw(&raw).unwrap());
     }
 }
