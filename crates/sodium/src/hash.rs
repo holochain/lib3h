@@ -14,6 +14,7 @@ pub const BYTES512: usize = rust_sodium_sys::crypto_hash_sha512_BYTES as usize;
 /// @param {SecBuf} input - the data to hash
 ///
 /// @param {SecBuf} output - Empty Buffer to be used as output
+#[deprecated(note = "use CryptoSystem")]
 pub fn sha256(input: &mut SecBuf, output: &mut SecBuf) -> Result<(), CryptoError> {
     check_init();
     let input_len = input.len() as libc::c_ulonglong;
@@ -34,6 +35,7 @@ pub fn sha256(input: &mut SecBuf, output: &mut SecBuf) -> Result<(), CryptoError
 /// @param {Buffer} input - the data to hash
 ///
 /// @param {SecBuf} output - Empty Buffer to be used as output
+#[deprecated(note = "use CryptoSystem")]
 pub fn sha512(input: &mut SecBuf, output: &mut SecBuf) -> Result<(), CryptoError> {
     check_init();
     let input = input.read_lock();
