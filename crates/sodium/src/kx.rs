@@ -12,6 +12,7 @@ pub const SESSIONKEYBYTES: usize = rust_sodium_sys::crypto_kx_SESSIONKEYBYTES as
 /// @param {SecBuf} pk - Empty Buffer to be used as publicKey return
 ///
 /// @param {SecBuf} sk - Empty Buffer to be used as secretKey return
+#[deprecated(note = "use CryptoSystem")]
 pub fn keypair(pk: &mut SecBuf, sk: &mut SecBuf) -> Result<(), CryptoError> {
     check_init();
     let mut pk = pk.write_lock();
@@ -29,6 +30,7 @@ pub fn keypair(pk: &mut SecBuf, sk: &mut SecBuf) -> Result<(), CryptoError> {
 /// @param {SecBuf} pk - Empty Buffer to be used as publicKey return
 ///
 /// @param {SecBuf} sk - Empty Buffer to be used as secretKey return
+#[deprecated(note = "use CryptoSystem")]
 pub fn seed_keypair(
     seed: &mut SecBuf,
     pk: &mut SecBuf,
@@ -59,6 +61,7 @@ pub fn seed_keypair(
 /// @param {SecBuf} rx - Empty Buffer to be used as secretKey return
 ///
 /// @param {SecBuf} tx - Empty Buffer to be used as secretKey return
+#[deprecated(note = "use CryptoSystem")]
 pub fn client_session(
     client_pk: &mut SecBuf,
     client_sk: &mut SecBuf,
@@ -95,6 +98,7 @@ pub fn client_session(
 /// @param {SecBuf} rx - Empty Buffer to be used as secretKey return
 ///
 /// @param {SecBuf} tx - Empty Buffer to be used as secretKey return
+#[deprecated(note = "use CryptoSystem")]
 pub fn server_session(
     server_pk: &mut SecBuf,
     server_sk: &mut SecBuf,
