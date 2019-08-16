@@ -820,14 +820,26 @@ mod test {
                 return Err(CryptoError::BadSecretKeySize);
             }
 
+            // the goal is to be able to validate that we "encrypted"
+            // the message with given secret, nonce, and adata
+            // we're just going to store two bytes of each of these
+            // then the unencrypted message
+            // validations will have a chance of false positive
+            // for each out of 2^16
+
+            // zero out the cipher buffer
             cipher.zero();
+            // store two bytes of nonce here
             cipher.write(2, &nonce.read_lock()[..2])?;
+            // store two bytes of secret here
             cipher.write(4, &secret.read_lock()[..2])?;
 
             if let Some(adata) = adata {
+                // if we have adata, store two bytes of it here
                 cipher.write(6, &adata.read_lock()[..2])?;
             }
 
+            // write our full message out here
             cipher.write(8, &message.read_lock())?;
 
             Ok(())
@@ -855,20 +867,24 @@ mod test {
 
             let cipher = cipher.read_lock();
 
+            // check that this "cipher" used this nonce
             if &cipher[2..4] != &nonce.read_lock()[..2] {
                 return Err(CryptoError::CouldNotDecrypt);
             }
 
+            // check that this "cipher" used this secret
             if &cipher[4..6] != &secret.read_lock()[..2] {
                 return Err(CryptoError::CouldNotDecrypt);
             }
 
             if let Some(adata) = adata {
+                // check that this "cipher" used this adata
                 if &cipher[6..8] != &adata.read_lock()[..2] {
                     return Err(CryptoError::CouldNotDecrypt);
                 }
             }
 
+            // return the unencrypted cipher
             message.write(0, &cipher[8..])?;
 
             Ok(())
