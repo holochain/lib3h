@@ -222,6 +222,7 @@ impl MulticastDns {
 
     /// Update our cache of resource records.
     pub fn update_cache(&mut self, records: &MapRecord) {
+        dbg!(&records);
         for (_name, new_record) in records.iter() {
             if let Some(rec) = self.map_record.get(&new_record.hostname) {
                 let new_addr = new_record.addrs.first().expect("Empty list of address.");
@@ -403,6 +404,7 @@ impl MulticastDns {
                                                 sender_socket_addr,
                                             )?;
                                         } else {
+                                            dbg!("Somewhere else.");
                                             sleep_ms(rand_delay(250, 500));
                                             if let Some(resp_to_query_record) =
                                                 self.map_record.get(q_name)
@@ -415,6 +417,8 @@ impl MulticastDns {
                                                     &resp_to_query_record_packet,
                                                     &sender_socket_addr,
                                                 );
+                                            } else {
+                                                eprintln!("Oh man, where the hell am I ?!");
                                             }
                                         }
                                     }
@@ -423,6 +427,7 @@ impl MulticastDns {
                             }
                         }
                     } else {
+                        eprintln!(">> Not a Query received.");
                         // Otherwise we update our cache with the info our neighbour just gave us
                         let map_record_from_neighbour = Record::from_packet(&resp);
                         self.update_cache(&map_record_from_neighbour);

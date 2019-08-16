@@ -103,6 +103,8 @@ impl Record {
             })
             .collect();
 
+        dbg!(&records);
+
         let mut map_record = MapRecord::with_capacity(records.len());
         for new_record in records.iter() {
             if let Some(rec) = map_record.get(&new_record.hostname) {
