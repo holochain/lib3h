@@ -27,7 +27,7 @@ pub mod dns;
 pub use dns::{Answer, Packet, Question, SrvDataA, SrvDataQ};
 
 pub mod protocol;
-use protocol::Discovery;
+pub use protocol::Discovery;
 
 pub mod record;
 use record::{MapRecord, Record};
@@ -107,7 +107,6 @@ impl MulticastDnsBuilder {
     /// construct the actual mdns struct
     pub fn build(&mut self) -> Result<MulticastDns, MulticastDnsError> {
         let recv_socket = create_socket(&self.bind_address, self.bind_port)?;
-        // recv_socket.set_nonblocking(false)?;
         recv_socket.set_nonblocking(true)?;
         recv_socket.set_multicast_loop_v4(self.multicast_loop)?;
         recv_socket.set_multicast_ttl_v4(self.multicast_ttl)?;
@@ -252,24 +251,41 @@ impl MulticastDns {
 
     /// try to receive a dns packet.
     /// will return None rather than blocking if none are queued
-    pub fn recv(&mut self) -> Result<Option<Packet>, MulticastDnsError> {
+    pub fn recv(&mut self) -> MulticastDnsResult<Option<(Packet, SocketAddr)>> {
         self.clean_buffer();
-        let (read, _) = match self.recv_socket.recv_from(&mut self.buffer) {
-            Ok(r) => r,
+
+        match self.recv_socket.recv_from(&mut self.buffer) {
+            Ok((0, _)) => Ok(None),
+            Ok((read_size, addr)) => {
+                let packet = Packet::from_raw(&self.buffer[..read_size])?;
+                Ok(Some((packet, addr)))
+            },
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock {
-                    return Ok(None);
+                    Ok(None)
+                } else {
+                    Err(e.into())
                 }
-                return Err(e.into());
             }
-        };
-
-        if read > 0 {
-            let packet = Packet::from_raw(&self.buffer[0..read])?;
-            Ok(Some(packet))
-        } else {
-            Ok(None)
         }
+
+        // let (read_size, addr) = match self.recv_socket.recv_from(&mut self.buffer) {
+        //     Ok(r) => r,
+        //     Err(e) => {
+        //         if e.kind() == std::io::ErrorKind::WouldBlock {
+        //             return Ok(None);
+        //         } else {
+        //             return Err(e.into());
+        //         }
+        //     }
+        // };
+        //
+        // if read_size > 0 {
+        //     let packet = Packet::from_raw(&self.buffer[0..read_size])?;
+        //     Ok(Some((packet, addr)))
+        // } else {
+        //     Ok(None)
+        // }
     }
 
     /// Try to receive a DNS packet and set timeout and wait time doing so.
@@ -333,7 +349,7 @@ impl MulticastDns {
     // }
 
     /// Run the mDNS service.
-    pub fn run(&mut self) -> MulticastDnsResult<()> {
+    pub fn run(&mut self) -> MulticastDnsResult<!> {
         println!("Startuping.");
         self.startup();
 
@@ -341,7 +357,7 @@ impl MulticastDns {
         println!("Responder service started.");
         self.responder()?;
 
-        Ok(())
+        // Ok(())
     }
 
     /// mDNS Querier
@@ -416,7 +432,7 @@ impl MulticastDns {
                                                 self.send_socket.send_to(
                                                     &resp_to_query_record_packet,
                                                     &sender_socket_addr,
-                                                );
+                                                )?;
                                             } else {
                                                 eprintln!("Oh man, where the hell am I ?!");
                                             }
@@ -429,8 +445,9 @@ impl MulticastDns {
                     } else {
                         eprintln!(">> Not a Query received.");
                         // Otherwise we update our cache with the info our neighbour just gave us
-                        let map_record_from_neighbour = Record::from_packet(&resp);
-                        self.update_cache(&map_record_from_neighbour);
+                        if let Some(map_record_from_neighbour) = Record::from_packet(&resp) {
+                            self.update_cache(&map_record_from_neighbour);
+                        }
                     }
                 }
             }
@@ -519,14 +536,14 @@ impl MulticastDns {
     /// potential answers.  Only conflicting Multicast DNS responses received
     /// "live" from the network are considered valid for the purposes of
     /// determining whether probing has succeeded or failed.
-    fn probe(&mut self) -> MulticastDnsResult<()> {
+   fn probe(&mut self) -> MulticastDnsResult<()> {
         // Making sure our cache is empty before probing
         self.map_record.clear();
 
         let probe_packet = self.build_probe_packet();
 
         // Let's wait a moment to give time to other nodes to initialize their network
-        let delay_probe_by: u64 = rand_delay(0, 250);
+        let delay_probe_by: u64 = rand_delay(0, PROBE_QUERY_DELAY_MS);
         sleep_ms(delay_probe_by);
 
         // Abitrary value to prevent any infinite loop if there is some mischief happening on the
@@ -537,23 +554,25 @@ impl MulticastDns {
             fail_safe += 1;
             self.broadcast(&probe_packet)?;
             if let Some((resp, _sender_socket_addr)) = self.recv_timely(750, 0, 500)? {
-                let map_record_from_response = Record::from_packet(&resp);
-                if let Some(record_from_response) =
-                    map_record_from_response.get(self.own_record.hostname())
-                {
-                    // If confict, then change name and loop back to probe step 1
-                    if self.detect_conflict(&record_from_response) {
-                        self.resolve_conflict()?;
-                        retry = 0;
+                if let Some(map_record_from_response) = Record::from_packet(&resp) {
+                    if let Some(record_from_response) =
+                        map_record_from_response.get(self.own_record.hostname())
+                    {
+                        // If confict, then change name and loop back to probe step 1
+                        if self.detect_conflict(&record_from_response) {
+                            self.resolve_conflict()?;
+                            retry = 0;
+                        } else {
+                            // Let's take authority on our hostname and update our cache accordingly
+                            self.map_record
+                                .insert(self.own_record.hostname.clone(), self.own_record.clone());
+                            break;
+                        }
                     } else {
-                        // Let's take authority on our hostname and update our cache accordingly
-                        self.map_record
-                            .insert(self.own_record.hostname.clone(), self.own_record.clone());
-                        break;
+                        retry += 1
                     }
-                } else {
-                    retry += 1
                 }
+                retry += 1
             } else {
                 retry += 1;
             }
@@ -622,6 +641,7 @@ impl MulticastDns {
 
         Ok(confict_free_hostname)
     }
+
 }
 
 /// non-windows udp socket bind.
@@ -641,7 +661,7 @@ fn create_socket(addr: &str, port: u16) -> Result<std::net::UdpSocket, Multicast
         .bind((addr, port))?)
 }
 
-fn sleep_ms(duration: u64) {
+pub fn sleep_ms(duration: u64) {
     thread::sleep(Duration::from_millis(duration));
 }
 
@@ -654,13 +674,14 @@ where
 }
 
 impl Discovery for MulticastDns {
+    /// Make yourself known on the network.
     fn startup(&mut self) {
         for _retry in 0..15 {
             match self.probe() {
                 Ok(_) => break,
                 Err(ref err) => match err.kind() {
                     error::ErrorKind::ProbeError => {
-                        thread::sleep(Duration::from_secs(1));
+                        sleep_ms(1_000);
                     }
                     _ => panic!("Unrecoverable error encountered during probe step."),
                 },
@@ -670,11 +691,28 @@ impl Discovery for MulticastDns {
         self.announcing().expect("Fail to announce during startup.");
     }
 
+    /// Read the UDP stack and update our cache accordingly.
     fn update(&mut self) {
+        // Process all element of the UDP socket stack
+        loop {
+            match self.recv() {
+                Ok(Some((packet, _sender_addr))) => {
+                    if let Some(new_map_record) = Record::from_packet(&packet) {
+                        self.update_cache(&new_map_record);
+                    }
+                },
+                Ok(None) => {
+                    break
+                },
+                Err(e) => eprintln!("Something went wrong while processing the UDP stack during update: '{}'", e)
+            }
+        }
+
         self.announcing()
             .expect("Fail to update mDNS records during update phase.");
     }
 
+    /// Clear our cache from resource records.
     fn flush(&mut self) {
         self.map_record.clear();
     }
@@ -688,7 +726,7 @@ mod tests {
     fn it_should_loop_question() {
         let mut mdns = MulticastDnsBuilder::new()
             .bind_address("0.0.0.0")
-            .bind_port(55000)
+            .bind_port(55055)
             .multicast_loop(true)
             .multicast_ttl(255)
             .multicast_address("224.0.0.251")

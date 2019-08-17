@@ -94,7 +94,7 @@ impl Packet {
             let _class = cursor.read_u16::<BigEndian>()?;
             let ttl_seconds = cursor.read_u32::<BigEndian>()?;
 
-            let enc_size = cursor.read_u16::<BigEndian>()? as usize;
+            let _enc_size = cursor.read_u16::<BigEndian>()? as usize;
 
             if kind == 33 {
                 let priority = cursor.read_u16::<BigEndian>()?;
@@ -112,7 +112,7 @@ impl Packet {
             } else {
                 // eprintln!("Unknown raw: enc_size = {}", enc_size);
                 // let mut raw = vec![0; enc_size];
-                let mut raw = vec![0; crate::READ_BUF_SIZE];
+                let raw = vec![0; 1];
                 // cursor.read_exact(&mut raw)?;
                 out.answers.push(Answer::Unknown(raw));
             }
