@@ -17,9 +17,14 @@ impl FullSuite {
         self.test_random();
         self.test_hash();
         self.test_pwhash();
+        self.test_kdf();
         self.test_sign_keypair_sizes();
         self.test_sign_keypair_generation();
         self.test_sign();
+        self.test_kx_keypair_sizes();
+        self.test_kx_keypair_generation();
+        self.test_kx();
+        self.test_aead();
     }
 
     fn test_sec_buf(&self) {
@@ -78,6 +83,35 @@ impl FullSuite {
         let mut hash2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.pwhash_bytes()]);
         self.crypto.pwhash(&mut hash2, &pw, &salt).unwrap();
         assert_eq!(&format!("{:?}", hash1), &format!("{:?}", hash2));
+    }
+
+    fn test_kdf(&self) {
+        let ctx1: Box<dyn Buffer> = Box::new(vec![1; self.crypto.kdf_context_bytes()]);
+        let ctx2: Box<dyn Buffer> = Box::new(vec![2; self.crypto.kdf_context_bytes()]);
+
+        let root: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut a_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut a_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut a_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut b_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut b_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut b_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+
+        self.crypto.kdf(&mut a_1_1, 1, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut a_2_1, 2, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut a_1_2, 1, &ctx2, &root).unwrap();
+
+        self.crypto.kdf(&mut b_1_1, 1, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut b_2_1, 2, &ctx1, &root).unwrap();
+        self.crypto.kdf(&mut b_1_2, 1, &ctx2, &root).unwrap();
+
+        assert_eq!(&format!("{:?}", a_1_1), &format!("{:?}", b_1_1));
+        assert_eq!(&format!("{:?}", a_2_1), &format!("{:?}", b_2_1));
+        assert_eq!(&format!("{:?}", a_1_2), &format!("{:?}", b_1_2));
+
+        assert_ne!(&format!("{:?}", a_1_1), &format!("{:?}", a_2_1));
+        assert_ne!(&format!("{:?}", a_1_1), &format!("{:?}", a_1_2));
+        assert_ne!(&format!("{:?}", a_2_1), &format!("{:?}", a_1_2));
     }
 
     fn test_sign_keypair_sizes(&self) {
@@ -163,6 +197,160 @@ impl FullSuite {
         self.crypto.randombytes_buf(&mut sig).unwrap();
         assert!(!self.crypto.sign_verify(&sig, &msg, &pk).unwrap());
     }
+
+    fn test_kx_keypair_sizes(&self) {
+        let seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes() + 1]);
+        let mut pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        assert_eq!(
+            CryptoError::BadSeedSize,
+            self.crypto
+                .kx_seed_keypair(&seed, &mut pk, &mut sk)
+                .unwrap_err()
+        );
+
+        let seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes()]);
+        let mut pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes() + 1]);
+        let mut sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        assert_eq!(
+            CryptoError::BadPublicKeySize,
+            self.crypto
+                .kx_seed_keypair(&seed, &mut pk, &mut sk)
+                .unwrap_err()
+        );
+        assert_eq!(
+            CryptoError::BadPublicKeySize,
+            self.crypto.kx_keypair(&mut pk, &mut sk).unwrap_err()
+        );
+
+        let seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes()]);
+        let mut pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes() + 1]);
+        assert_eq!(
+            CryptoError::BadSecretKeySize,
+            self.crypto
+                .kx_seed_keypair(&seed, &mut pk, &mut sk)
+                .unwrap_err()
+        );
+        assert_eq!(
+            CryptoError::BadSecretKeySize,
+            self.crypto.kx_keypair(&mut pk, &mut sk).unwrap_err()
+        );
+    }
+
+    fn test_kx_keypair_generation(&self) {
+        let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_seed_bytes()]);
+        let mut pk1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        let mut pk2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut sk2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+
+        self.crypto
+            .kx_seed_keypair(&seed, &mut pk1, &mut sk1)
+            .unwrap();
+        self.crypto
+            .kx_seed_keypair(&seed, &mut pk2, &mut sk2)
+            .unwrap();
+        assert_eq!(&format!("{:?}", pk1), &format!("{:?}", pk2));
+        assert_eq!(&format!("{:?}", sk1), &format!("{:?}", sk2));
+
+        self.crypto.randombytes_buf(&mut seed).unwrap();
+        self.crypto
+            .kx_seed_keypair(&seed, &mut pk2, &mut sk2)
+            .unwrap();
+        assert_ne!(&format!("{:?}", pk1), &format!("{:?}", pk2));
+        assert_ne!(&format!("{:?}", sk1), &format!("{:?}", sk2));
+
+        self.crypto.kx_keypair(&mut pk1, &mut sk1).unwrap();
+        assert_ne!(&format!("{:?}", pk1), &format!("{:?}", pk2));
+        assert_ne!(&format!("{:?}", sk1), &format!("{:?}", sk2));
+    }
+
+    fn test_kx(&self) {
+        let mut c_pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut c_sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+        let mut s_pk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_public_key_bytes()]);
+        let mut s_sk: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_secret_key_bytes()]);
+
+        self.crypto.kx_keypair(&mut c_pk, &mut c_sk).unwrap();
+        self.crypto.kx_keypair(&mut s_pk, &mut s_sk).unwrap();
+
+        let mut c_rx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+        let mut c_tx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+        let mut s_rx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+        let mut s_tx: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kx_session_key_bytes()]);
+
+        //self.crypto
+        //    .kx_client_session_keys(&mut c_rx, &mut c_tx, &c_pk, &c_sk, &s_pk)
+        //    .unwrap();
+        kx_client_session_keys!(self.crypto =>
+            client_rx: &mut c_rx,
+            client_tx: &mut c_tx,
+            client_pk: &c_pk,
+            client_sk: &c_sk,
+            server_pk: &s_pk,
+        )
+        .unwrap();
+        //self.crypto
+        //    .kx_server_session_keys(&mut s_rx, &mut s_tx, &s_pk, &s_sk, &c_pk)
+        //    .unwrap();
+        kx_server_session_keys!(self.crypto =>
+            server_rx: &mut s_rx,
+            server_tx: &mut s_tx,
+            server_pk: &s_pk,
+            server_sk: &s_sk,
+            client_pk: &c_pk,
+        )
+        .unwrap();
+
+        assert_ne!(&format!("{:?}", c_rx), &format!("{:?}", s_rx));
+        assert_ne!(&format!("{:?}", c_tx), &format!("{:?}", s_tx));
+
+        assert_eq!(&format!("{:?}", c_rx), &format!("{:?}", s_tx));
+        assert_eq!(&format!("{:?}", c_tx), &format!("{:?}", s_rx));
+    }
+
+    fn test_aead(&self) {
+        let mut secret: Box<dyn Buffer> = Box::new(vec![0; self.crypto.aead_secret_bytes()]);
+        self.crypto.randombytes_buf(&mut secret).unwrap();
+        let mut nonce: Box<dyn Buffer> = Box::new(vec![0; self.crypto.aead_nonce_bytes()]);
+        self.crypto.randombytes_buf(&mut nonce).unwrap();
+        let mut message: Box<dyn Buffer> = Box::new(vec![0; 16]);
+        self.crypto.randombytes_buf(&mut message).unwrap();
+        let mut adata: Box<dyn Buffer> = Box::new(vec![0; 16]);
+        self.crypto.randombytes_buf(&mut adata).unwrap();
+
+        let mut cipher: Box<dyn Buffer> = Box::new(vec![0; 16 + self.crypto.aead_auth_bytes()]);
+
+        //self.crypto
+        //    .aead_encrypt(&mut cipher, &message, Some(&adata), &nonce, &secret)
+        //    .unwrap();
+        aead_encrypt!(self.crypto =>
+            cipher: &mut cipher,
+            message: &message,
+            adata: Some(&adata),
+            nonce: &nonce,
+            secret: &secret,
+        )
+        .unwrap();
+
+        let mut msg_out: Box<dyn Buffer> =
+            Box::new(vec![0; cipher.len() - self.crypto.aead_auth_bytes()]);
+
+        //self.crypto
+        //    .aead_decrypt(&mut msg_out, &cipher, Some(&adata), &nonce, &secret)
+        //    .unwrap();
+        aead_decrypt!(self.crypto =>
+            message: &mut msg_out,
+            cipher: &cipher,
+            adata: Some(&adata),
+            nonce: &nonce,
+            secret: &secret,
+        )
+        .unwrap();
+
+        assert_eq!(&format!("{:?}", message), &format!("{:?}", msg_out));
+    }
 }
 
 /// run a full suite of common CryptoSystem verification functions
@@ -174,12 +362,20 @@ pub fn full_suite(crypto: Box<dyn CryptoSystem>) {
 mod test {
     use super::*;
     use crate::{CryptoResult, ProtectState};
+    use rand::{Rng, SeedableRng};
     use sha2::Digest;
     use std::ops::{Deref, DerefMut};
 
     #[test]
     fn fake_should_pass_crypto_system_full_suite() {
-        full_suite(Box::new(FakeCryptoSystem));
+        let seed: [u8; 32] = [
+            143, 106, 67, 237, 112, 106, 175, 150, 195, 103, 30, 19, 109, 13, 220, 160, 31, 212,
+            59, 142, 251, 44, 63, 50, 123, 52, 6, 104, 201, 223, 19, 140,
+        ];
+        full_suite(Box::new(FakeCryptoSystem {
+            seed: seed.clone(),
+            rng: std::sync::RwLock::new(rand::rngs::StdRng::from_seed(seed)),
+        }));
     }
 
     #[derive(Debug, Clone)]
@@ -253,11 +449,17 @@ mod test {
         }
     }
 
-    struct FakeCryptoSystem;
+    struct FakeCryptoSystem {
+        seed: [u8; 32],
+        rng: std::sync::RwLock<rand::rngs::StdRng>,
+    }
 
     impl CryptoSystem for FakeCryptoSystem {
         fn box_clone(&self) -> Box<dyn CryptoSystem> {
-            Box::new(FakeCryptoSystem)
+            Box::new(FakeCryptoSystem {
+                seed: self.seed.clone(),
+                rng: std::sync::RwLock::new(rand::rngs::StdRng::from_seed(self.seed.clone())),
+            })
         }
 
         fn as_crypto_system(&self) -> &dyn CryptoSystem {
@@ -272,7 +474,7 @@ mod test {
             let mut buffer = buffer.write_lock();
 
             for i in 0..buffer.len() {
-                buffer[i] = rand::random();
+                buffer[i] = self.rng.write().unwrap().gen();
             }
 
             Ok(())
@@ -283,12 +485,6 @@ mod test {
         }
         fn hash_sha512_bytes(&self) -> usize {
             64
-        }
-        fn pwhash_salt_bytes(&self) -> usize {
-            8
-        }
-        fn pwhash_bytes(&self) -> usize {
-            16
         }
 
         fn hash_sha256(
@@ -321,6 +517,13 @@ mod test {
             Ok(())
         }
 
+        fn pwhash_salt_bytes(&self) -> usize {
+            8
+        }
+        fn pwhash_bytes(&self) -> usize {
+            16
+        }
+
         fn pwhash(
             &self,
             hash: &mut Box<dyn Buffer>,
@@ -342,6 +545,45 @@ mod test {
                 password.len()
             };
             hash.write(8, &password.read_lock()[0..plen])?;
+
+            Ok(())
+        }
+
+        fn kdf_context_bytes(&self) -> usize {
+            1
+        }
+
+        fn kdf_min_bytes(&self) -> usize {
+            8
+        }
+
+        fn kdf_max_bytes(&self) -> usize {
+            8
+        }
+
+        fn kdf(
+            &self,
+            out_buffer: &mut Box<dyn Buffer>,
+            index: u64,
+            context: &Box<dyn Buffer>,
+            parent: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if out_buffer.len() < self.kdf_min_bytes() || out_buffer.len() > self.kdf_max_bytes() {
+                return Err(CryptoError::BadOutBufferSize);
+            }
+
+            if parent.len() < self.kdf_min_bytes() || parent.len() > self.kdf_max_bytes() {
+                return Err(CryptoError::BadParentSize);
+            }
+
+            if context.len() != self.kdf_context_bytes() {
+                return Err(CryptoError::BadContextSize);
+            }
+
+            out_buffer.write(0, parent)?;
+            let mut out_buffer = out_buffer.write_lock();
+            out_buffer[4] = (index % 256) as u8;
+            out_buffer[5] = context.read_lock()[0];
 
             Ok(())
         }
@@ -445,6 +687,239 @@ mod test {
 
             Ok(&signature[0..8] == &public_key.read_lock()[0..8]
                 && &signature[8..mlen + 8] == &message.read_lock()[0..mlen])
+        }
+
+        fn kx_seed_bytes(&self) -> usize {
+            8
+        }
+        fn kx_public_key_bytes(&self) -> usize {
+            32
+        }
+        fn kx_secret_key_bytes(&self) -> usize {
+            8
+        }
+        fn kx_session_key_bytes(&self) -> usize {
+            8
+        }
+
+        fn kx_seed_keypair(
+            &self,
+            seed: &Box<dyn Buffer>,
+            public_key: &mut Box<dyn Buffer>,
+            secret_key: &mut Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if seed.len() != self.kx_seed_bytes() {
+                return Err(CryptoError::BadSeedSize);
+            }
+
+            if public_key.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if secret_key.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            secret_key.write(0, &seed.read_lock())?;
+
+            public_key.zero();
+            public_key.write(0, &seed.read_lock())?;
+
+            Ok(())
+        }
+
+        fn kx_keypair(
+            &self,
+            public_key: &mut Box<dyn Buffer>,
+            secret_key: &mut Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if public_key.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if secret_key.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            let mut seed: Box<dyn Buffer> = Box::new(vec![0; self.sign_seed_bytes()]);
+            self.randombytes_buf(&mut seed)?;
+            self.kx_seed_keypair(&seed, public_key, secret_key)?;
+
+            Ok(())
+        }
+
+        fn kx_client_session_keys(
+            &self,
+            client_rx: &mut Box<dyn Buffer>,
+            client_tx: &mut Box<dyn Buffer>,
+            client_pk: &Box<dyn Buffer>,
+            client_sk: &Box<dyn Buffer>,
+            server_pk: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if client_rx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadRxSessionKeySize);
+            }
+
+            if client_tx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadTxSessionKeySize);
+            }
+
+            if client_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if client_sk.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            if server_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            client_rx.write(0, &client_pk.read_lock()[..4])?;
+            client_rx.write(4, &server_pk.read_lock()[..4])?;
+            client_tx.write(0, &server_pk.read_lock()[..4])?;
+            client_tx.write(4, &client_pk.read_lock()[..4])?;
+
+            Ok(())
+        }
+
+        fn kx_server_session_keys(
+            &self,
+            server_rx: &mut Box<dyn Buffer>,
+            server_tx: &mut Box<dyn Buffer>,
+            server_pk: &Box<dyn Buffer>,
+            server_sk: &Box<dyn Buffer>,
+            client_pk: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if server_rx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadRxSessionKeySize);
+            }
+
+            if server_tx.len() != self.kx_session_key_bytes() {
+                return Err(CryptoError::BadTxSessionKeySize);
+            }
+
+            if server_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            if server_sk.len() != self.kx_secret_key_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            if client_pk.len() != self.kx_public_key_bytes() {
+                return Err(CryptoError::BadPublicKeySize);
+            }
+
+            server_rx.write(0, &server_pk.read_lock()[..4])?;
+            server_rx.write(4, &client_pk.read_lock()[..4])?;
+            server_tx.write(0, &client_pk.read_lock()[..4])?;
+            server_tx.write(4, &server_pk.read_lock()[..4])?;
+
+            Ok(())
+        }
+
+        fn aead_nonce_bytes(&self) -> usize {
+            8
+        }
+
+        fn aead_auth_bytes(&self) -> usize {
+            8
+        }
+
+        fn aead_secret_bytes(&self) -> usize {
+            8
+        }
+
+        fn aead_encrypt(
+            &self,
+            cipher: &mut Box<dyn Buffer>,
+            message: &Box<dyn Buffer>,
+            adata: Option<&Box<dyn Buffer>>,
+            nonce: &Box<dyn Buffer>,
+            secret: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if cipher.len() != message.len() + self.aead_auth_bytes() {
+                return Err(CryptoError::BadCipherSize);
+            }
+
+            if nonce.len() != self.aead_nonce_bytes() {
+                return Err(CryptoError::BadNonceSize);
+            }
+
+            if secret.len() != self.aead_secret_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            // the goal is to be able to validate that we "encrypted"
+            // the message with given secret, nonce, and adata
+            // we're just going to store two bytes of each of these
+            // then the unencrypted message
+            // validations will have a chance of false positive
+            // for each out of 2^16
+
+            // zero out the cipher buffer
+            cipher.zero();
+            // store two bytes of nonce here
+            cipher.write(2, &nonce.read_lock()[..2])?;
+            // store two bytes of secret here
+            cipher.write(4, &secret.read_lock()[..2])?;
+
+            if let Some(adata) = adata {
+                // if we have adata, store two bytes of it here
+                cipher.write(6, &adata.read_lock()[..2])?;
+            }
+
+            // write our full message out here
+            cipher.write(8, &message.read_lock())?;
+
+            Ok(())
+        }
+
+        fn aead_decrypt(
+            &self,
+            message: &mut Box<dyn Buffer>,
+            cipher: &Box<dyn Buffer>,
+            adata: Option<&Box<dyn Buffer>>,
+            nonce: &Box<dyn Buffer>,
+            secret: &Box<dyn Buffer>,
+        ) -> CryptoResult<()> {
+            if message.len() != cipher.len() - self.aead_auth_bytes() {
+                return Err(CryptoError::BadMessageSize);
+            }
+
+            if nonce.len() != self.aead_nonce_bytes() {
+                return Err(CryptoError::BadNonceSize);
+            }
+
+            if secret.len() != self.aead_secret_bytes() {
+                return Err(CryptoError::BadSecretKeySize);
+            }
+
+            let cipher = cipher.read_lock();
+
+            // check that this "cipher" used this nonce
+            if &cipher[2..4] != &nonce.read_lock()[..2] {
+                return Err(CryptoError::CouldNotDecrypt);
+            }
+
+            // check that this "cipher" used this secret
+            if &cipher[4..6] != &secret.read_lock()[..2] {
+                return Err(CryptoError::CouldNotDecrypt);
+            }
+
+            if let Some(adata) = adata {
+                // check that this "cipher" used this adata
+                if &cipher[6..8] != &adata.read_lock()[..2] {
+                    return Err(CryptoError::CouldNotDecrypt);
+                }
+            }
+
+            // return the unencrypted cipher
+            message.write(0, &cipher[8..])?;
+
+            Ok(())
         }
     }
 }
