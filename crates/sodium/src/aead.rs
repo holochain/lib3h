@@ -22,7 +22,6 @@ pub const ABYTES: usize = rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_AB
 /// @param {SecBuf} nonce - sometimes called initialization vector (iv)
 ///
 /// @param {SecBuf} cipher - Empty Buffer (needed when you want to Decrypt the meassage)
-#[deprecated(note = "use CryptoSystem")]
 pub fn enc(
     message: &mut SecBuf,
     secret: &mut SecBuf,
@@ -73,7 +72,6 @@ pub fn enc(
 /// @param {Buffer} nonce - sometimes called initialization vector (iv)
 ///
 /// @param {Buffer} cipher - the cipher text
-#[deprecated(note = "use CryptoSystem")]
 pub fn dec(
     decrypted_message: &mut SecBuf,
     secret: &mut SecBuf,
