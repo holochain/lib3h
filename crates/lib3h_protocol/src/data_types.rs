@@ -30,6 +30,18 @@ impl From<&[u8]> for Opaque {
     }
 }
 
+impl From<String> for Opaque {
+    fn from(str: String) -> Self {
+        str.as_bytes().into()
+    }
+}
+
+impl From<&String> for Opaque {
+    fn from(str: &String) -> Self {
+        str.clone().into()
+    }
+}
+
 impl std::ops::Deref for Opaque {
     type Target = Vec<u8>;
 

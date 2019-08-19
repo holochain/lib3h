@@ -38,7 +38,6 @@ pub const SECRETKEYBYTES: usize = rust_sodium_sys::crypto_sign_SECRETKEYBYTES as
 /// @param {SecBuf} seed - the seed to derive a keypair from
 ///
 /// @UseReturn {SecBuf} - { publicKey, privateKey }
-#[deprecated(note = "use CryptoSystem")]
 pub fn seed_keypair(
     public_key: &mut SecBuf,
     secret_key: &mut SecBuf,
@@ -67,7 +66,6 @@ pub fn seed_keypair(
 /// @param {SecBuf} signature - Empty Buffer to be used as signature return
 ///
 /// @UseReturn {SecBuf} {signature}
-#[deprecated(note = "use CryptoSystem")]
 pub fn sign(
     message: &mut SecBuf,
     secret_key: &mut SecBuf,
@@ -97,7 +95,6 @@ pub fn sign(
 /// @param {Buffer} message
 ///
 /// @param {Buffer} publicKey
-#[deprecated(note = "use CryptoSystem")]
 pub fn verify(signature: &mut SecBuf, message: &mut SecBuf, public_key: &mut SecBuf) -> bool {
     check_init();
     let signature = signature.read_lock();
