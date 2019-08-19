@@ -3,10 +3,11 @@
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
-    transport::{protocol::*, TransportWrapper},
+    transport::protocol::*,
 };
 use lib3h_protocol::Address;
 use std::collections::{HashSet, VecDeque};
+use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -45,7 +46,11 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
         self.identifier.as_str()
     }
 
-    fn inject_event(&mut self, evt: TransportEvent) {
+    fn inject_transport_event(&mut self, evt: TransportEvent) {
         self.transport_injected_events.push(evt);
+    }
+
+    fn drain_transport_sends(&mut self) -> Vec<(String, Url, Vec<u8>)> {
+        self.transport_sends.drain(..).collect()
     }
 }

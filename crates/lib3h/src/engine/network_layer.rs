@@ -20,6 +20,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut did_work = false;
         let mut outbox = Vec::new();
+
         // Process the network gateway as a Transport
         //let (transport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
         let (transport_did_work, event_list) = self.network_transport.as_mut().process()?;
@@ -36,6 +37,16 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             let mut output = self.handle_netTransportEvent(evt)?;
             outbox.append(&mut output);
         }
+
+        // Process our gateway (as a transport)... don't care about the events
+        let (gateway_did_work, _event_list) = self.network_gateway.as_transport_mut().process()?;
+        if gateway_did_work {
+            did_work = true
+        }
+        for (request_id, address, payload) in self.network_gateway.as_mut().drain_transport_sends() {
+            self.network_transport.as_mut().send(request_id, address, payload)?;
+        }
+
         // Process the network gateway as a DHT
         let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
         if dht_did_work {
@@ -162,6 +173,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         &mut self,
         evt: TransportEvent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        // TODO!!! We don't want all these
+        self.network_gateway.as_mut().inject_transport_event(evt.clone());
+
         debug!("{} << handle_netTransportEvent: {:?}", self.name, &evt);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
@@ -254,8 +268,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     }
                 }
             }
-            P2pProtocol::DirectMessage(_dm_data) => {
-                error!("HEYY!!! WE GOTTA MESSAGE {:?}", _dm_data);
+            P2pProtocol::DirectMessage(dm_data) => {
+                let mut de = Deserializer::new(&dm_data.content[..]);
+                let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                    Deserialize::deserialize(&mut de);
+
+                error!("HEYY!!! WE GOTTA MESSAGE {:?}", maybe_msg);
                 unimplemented!();
                 /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(

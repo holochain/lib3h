@@ -18,7 +18,8 @@ use url::Url;
 /// Transport access via peer discovery handled by the Dht
 pub trait Gateway: Transport + Dht {
     fn identifier(&self) -> &str;
-    fn inject_event(&mut self, evt: TransportEvent);
+    fn inject_transport_event(&mut self, evt: TransportEvent);
+    fn drain_transport_sends(&mut self) -> Vec<(String, Url, Vec<u8>)>;
 }
 
 /// since rust doesn't suport upcasting to supertraits
