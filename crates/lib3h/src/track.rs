@@ -83,6 +83,7 @@ impl<T> Tracker<T> {
     }
 
     /// process our tracking ids, and return all those that have timed out
+    /// Remove any ids which have timed out from the tracker
     pub fn process_timeouts(&mut self) -> Vec<(TrackId, Option<T>)> {
         let mut out = Vec::new();
 

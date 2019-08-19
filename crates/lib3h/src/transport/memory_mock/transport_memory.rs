@@ -151,7 +151,7 @@ impl Transport for TransportMemory {
         trace!("TransportMemory[{}].close({})", self.own_id, id);
         if self.maybe_my_uri.is_none() {
             return Err(TransportError::new(
-                "Cannot close a connection before bounding".to_string(),
+                "Cannot close a connection before binding".to_string(),
             ));
         }
         let my_uri = self.maybe_my_uri.clone().unwrap();

@@ -25,6 +25,9 @@ use lib3h_protocol::{
 use rmp_serde::Serializer;
 use serde::Serialize;
 
+/// Default value for when tracker requests are purged from its cache and considered timed out
+static DEFAULT_TRACKER_TIMEOUT : u64 = 20000;
+
 impl TransportKeys {
     pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
         let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
@@ -73,7 +76,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
-            request_track: Tracker::new("real_engine_", 2000),
+            request_track: Tracker::new("real_engine_", DEFAULT_TRACKER_TIMEOUT),
             network_transport,
             network_gateway,
             network_connections: HashSet::new(),
@@ -124,7 +127,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             inbox: VecDeque::new(),
             name: name.to_string(),
             dht_factory,
-            request_track: Tracker::new("real_engine_", 2000),
+            request_track: Tracker::new("real_engine_", DEFAULT_TRACKER_TIMEOUT),
             network_transport,
             network_gateway,
             network_connections: HashSet::new(),
@@ -150,6 +153,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         }
         Ok(())
     }
+
 }
 
 impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
@@ -175,7 +179,7 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
         trace!("{} - process() START - {}", self.name, self.process_count);
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
-        // Process the network layer
+         // Process the network layer
         let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
         outbox.append(&mut net_outbox);
         // Process the space layer
@@ -210,6 +214,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
+        trace!("{} shutting down real engine", self.name);
         let mut result: Lib3hResult<()> = Ok(());
 
         for space_gatway in self.space_gateway_map.values_mut() {
@@ -324,7 +329,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                         outbox.push(res)
                     },
                     Ok(space_gateway) => {
-                        if is_data_for_author_list ||  is_data_for_gossip_to  {
+                        if is_data_for_author_list || is_data_for_gossip_to  {
                             let cmd = DhtCommand::BroadcastEntry(msg.entry,is_data_for_gossip_to);
                             debug!("HandleFetchEntryResult: Broadcasting: {:?} {:?}", cmd, is_data_for_gossip_to);
                             space_gateway.as_dht_mut().post(cmd)?;
