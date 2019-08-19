@@ -7,7 +7,6 @@ use super::check_init;
 use lib3h_crypto_api::CryptoError;
 
 /// a trait for structures that can be used as a backing store for SecBuf
-#[deprecated(note = "use CryptoSystem")]
 pub trait Bufferable: Send {
     fn new(s: usize) -> Box<Bufferable>
     where
@@ -146,7 +145,6 @@ pub enum ProtectState {
 /// A SecBuf is a memory buffer for use with libsodium functions.
 /// It can be backed by insecure (raw) memory for things like public keys,
 /// or secure (mlocked / mprotected) memory for things like private keys.
-#[deprecated(note = "use CryptoSystem")]
 pub struct SecBuf {
     t: SecurityType,
     b: Box<Bufferable>,
