@@ -27,7 +27,7 @@ lazy_static! {
 /// Add new MemoryServer to the global server map
 pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
     debug!("MemoryServer::set_server: {}", uri);
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
+    let mut server_map = MEMORY_SERVER_MAP.try_write().unwrap();
 
     // make sure we keep a STRONG reference around for the first one,
     // or it'll get cleaned up before we even send it out.
@@ -49,12 +49,12 @@ pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
 pub struct ServerRef(std::sync::Arc<Mutex<MemoryServer>>);
 impl ServerRef {
     pub fn get(&self) -> std::sync::MutexGuard<'_, MemoryServer> {
-        self.0.lock().expect("can read MemoryServer")
+        self.0.try_lock().expect("can read MemoryServer")
     }
 }
 
 pub fn read_ref(uri: &Url) -> TransportResult<ServerRef> {
-    let server_map = MEMORY_SERVER_MAP.read().expect("map exists");
+    let server_map = MEMORY_SERVER_MAP.try_read().expect("map exists");
     let maybe_server = server_map.get(uri);
     if maybe_server.is_none() {
         return Err(TransportError::new(format!("No Memory server at {}", uri)));
@@ -84,7 +84,7 @@ pub struct MemoryServer {
 impl Drop for MemoryServer {
     fn drop(&mut self) {
         trace!("(MemoryServer) dropped: {:?}", self.this_uri);
-        let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
+        let mut server_map = MEMORY_SERVER_MAP.try_write().unwrap();
         if !server_map.contains_key(&self.this_uri) {
             panic!("Server doesn't exist");
         }

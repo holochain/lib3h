@@ -135,12 +135,6 @@ impl CryptoSystem for SodiumCryptoSystem {
     fn hash_sha512_bytes(&self) -> usize {
         rust_sodium_sys::crypto_hash_sha512_BYTES as usize
     }
-    fn pwhash_salt_bytes(&self) -> usize {
-        rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
-    }
-    fn pwhash_bytes(&self) -> usize {
-        32
-    }
 
     fn hash_sha256(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()> {
         if hash.len() != self.hash_sha256_bytes() {
@@ -150,11 +144,14 @@ impl CryptoSystem for SodiumCryptoSystem {
         unsafe {
             let mut hash = hash.write_lock();
             let data = data.read_lock();
-            rust_sodium_sys::crypto_hash_sha256(
+            if rust_sodium_sys::crypto_hash_sha256(
                 raw_ptr_char!(hash),
                 raw_ptr_char_immut!(data),
                 data.len() as libc::c_ulonglong,
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -176,6 +173,13 @@ impl CryptoSystem for SodiumCryptoSystem {
         }
 
         Ok(())
+    }
+
+    fn pwhash_salt_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
+    }
+    fn pwhash_bytes(&self) -> usize {
+        32
     }
 
     fn pwhash(
@@ -215,6 +219,57 @@ impl CryptoSystem for SodiumCryptoSystem {
         }
     }
 
+    fn kdf_context_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_CONTEXTBYTES as usize
+    }
+
+    fn kdf_min_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_BYTES_MIN as usize
+    }
+
+    fn kdf_max_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_BYTES_MAX as usize
+    }
+
+    fn kdf(
+        &self,
+        out_buffer: &mut Box<dyn Buffer>,
+        index: u64,
+        context: &Box<dyn Buffer>,
+        parent: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if out_buffer.len() < self.kdf_min_bytes() || out_buffer.len() > self.kdf_max_bytes() {
+            return Err(CryptoError::BadOutBufferSize);
+        }
+
+        if parent.len() < self.kdf_min_bytes() || parent.len() > self.kdf_max_bytes() {
+            return Err(CryptoError::BadParentSize);
+        }
+
+        if context.len() != self.kdf_context_bytes() {
+            return Err(CryptoError::BadContextSize);
+        }
+
+        let mut out_buffer = out_buffer.write_lock();
+        let context = context.read_lock();
+        let parent = parent.read_lock();
+
+        unsafe {
+            if rust_sodium_sys::crypto_kdf_derive_from_key(
+                raw_ptr_char!(out_buffer),
+                out_buffer.len(),
+                index,
+                raw_ptr_ichar_immut!(context),
+                raw_ptr_char_immut!(parent),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
     fn sign_seed_bytes(&self) -> usize {
         rust_sodium_sys::crypto_sign_SEEDBYTES as usize
     }
@@ -251,11 +306,14 @@ impl CryptoSystem for SodiumCryptoSystem {
         let seed = seed.read_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_sign_seed_keypair(
+            if rust_sodium_sys::crypto_sign_seed_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
                 raw_ptr_char_immut!(seed),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -278,10 +336,13 @@ impl CryptoSystem for SodiumCryptoSystem {
         let mut secret_key = secret_key.write_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_sign_keypair(
+            if rust_sodium_sys::crypto_sign_keypair(
                 raw_ptr_char!(public_key),
                 raw_ptr_char!(secret_key),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -306,13 +367,16 @@ impl CryptoSystem for SodiumCryptoSystem {
         let mut signature = signature.write_lock();
 
         unsafe {
-            rust_sodium_sys::crypto_sign_detached(
+            if rust_sodium_sys::crypto_sign_detached(
                 raw_ptr_char!(signature),
                 std::ptr::null_mut(),
                 raw_ptr_char_immut!(message),
                 message.len() as libc::c_ulonglong,
                 raw_ptr_char_immut!(secret_key),
-            );
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
         }
 
         Ok(())
@@ -339,7 +403,304 @@ impl CryptoSystem for SodiumCryptoSystem {
                 message.len() as libc::c_ulonglong,
                 raw_ptr_char_immut!(public_key),
             )
-        } == 0)
+        } == 0 as libc::c_int)
+    }
+
+    fn kx_seed_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_SEEDBYTES as usize
+    }
+    fn kx_public_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_PUBLICKEYBYTES as usize
+    }
+    fn kx_secret_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_SECRETKEYBYTES as usize
+    }
+    fn kx_session_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kx_SESSIONKEYBYTES as usize
+    }
+
+    fn kx_seed_keypair(
+        &self,
+        seed: &Box<dyn Buffer>,
+        public_key: &mut Box<dyn Buffer>,
+        secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if seed.len() != self.kx_seed_bytes() {
+            return Err(CryptoError::BadSeedSize);
+        }
+
+        if public_key.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if secret_key.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let mut public_key = public_key.write_lock();
+        let mut secret_key = secret_key.write_lock();
+        let seed = seed.read_lock();
+
+        unsafe {
+            if rust_sodium_sys::crypto_kx_seed_keypair(
+                raw_ptr_char!(public_key),
+                raw_ptr_char!(secret_key),
+                raw_ptr_char_immut!(seed),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn kx_keypair(
+        &self,
+        public_key: &mut Box<dyn Buffer>,
+        secret_key: &mut Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if public_key.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if secret_key.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let mut public_key = public_key.write_lock();
+        let mut secret_key = secret_key.write_lock();
+
+        unsafe {
+            if rust_sodium_sys::crypto_kx_keypair(
+                raw_ptr_char!(public_key),
+                raw_ptr_char!(secret_key),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn kx_client_session_keys(
+        &self,
+        client_rx: &mut Box<dyn Buffer>,
+        client_tx: &mut Box<dyn Buffer>,
+        client_pk: &Box<dyn Buffer>,
+        client_sk: &Box<dyn Buffer>,
+        server_pk: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if client_rx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadRxSessionKeySize);
+        }
+
+        if client_tx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadTxSessionKeySize);
+        }
+
+        if client_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if client_sk.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        if server_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        unsafe {
+            let mut client_rx = client_rx.write_lock();
+            let mut client_tx = client_tx.write_lock();
+            let client_pk = client_pk.read_lock();
+            let client_sk = client_sk.read_lock();
+            let server_pk = server_pk.read_lock();
+            if rust_sodium_sys::crypto_kx_client_session_keys(
+                raw_ptr_char!(client_rx),
+                raw_ptr_char!(client_tx),
+                raw_ptr_char_immut!(client_pk),
+                raw_ptr_char_immut!(client_sk),
+                raw_ptr_char_immut!(server_pk),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn kx_server_session_keys(
+        &self,
+        server_rx: &mut Box<dyn Buffer>,
+        server_tx: &mut Box<dyn Buffer>,
+        server_pk: &Box<dyn Buffer>,
+        server_sk: &Box<dyn Buffer>,
+        client_pk: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if server_rx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadRxSessionKeySize);
+        }
+
+        if server_tx.len() != self.kx_session_key_bytes() {
+            return Err(CryptoError::BadTxSessionKeySize);
+        }
+
+        if server_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        if server_sk.len() != self.kx_secret_key_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        if client_pk.len() != self.kx_public_key_bytes() {
+            return Err(CryptoError::BadPublicKeySize);
+        }
+
+        unsafe {
+            let mut server_rx = server_rx.write_lock();
+            let mut server_tx = server_tx.write_lock();
+            let server_pk = server_pk.read_lock();
+            let server_sk = server_sk.read_lock();
+            let client_pk = client_pk.read_lock();
+            if rust_sodium_sys::crypto_kx_server_session_keys(
+                raw_ptr_char!(server_rx),
+                raw_ptr_char!(server_tx),
+                raw_ptr_char_immut!(server_pk),
+                raw_ptr_char_immut!(server_sk),
+                raw_ptr_char_immut!(client_pk),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn aead_nonce_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_NPUBBYTES as usize
+    }
+
+    fn aead_auth_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_ABYTES as usize
+    }
+
+    fn aead_secret_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_KEYBYTES as usize
+    }
+
+    fn aead_encrypt(
+        &self,
+        cipher: &mut Box<dyn Buffer>,
+        message: &Box<dyn Buffer>,
+        adata: Option<&Box<dyn Buffer>>,
+        nonce: &Box<dyn Buffer>,
+        secret: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if cipher.len() != message.len() + self.aead_auth_bytes() {
+            return Err(CryptoError::BadCipherSize);
+        }
+
+        if nonce.len() != self.aead_nonce_bytes() {
+            return Err(CryptoError::BadNonceSize);
+        }
+
+        if secret.len() != self.aead_secret_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let my_adata_locker;
+        let mut my_adata = std::ptr::null();
+        let mut my_ad_len = 0 as libc::c_ulonglong;
+        if let Some(adata) = adata {
+            my_adata_locker = adata.read_lock();
+            my_adata = raw_ptr_char_immut!(my_adata_locker);
+            my_ad_len = my_adata_locker.len() as libc::c_ulonglong;
+        }
+
+        let mut cipher = cipher.write_lock();
+        let message = message.read_lock();
+        let nonce = nonce.read_lock();
+        let secret = secret.read_lock();
+
+        unsafe {
+            if rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_encrypt(
+                raw_ptr_char!(cipher),
+                std::ptr::null_mut(),
+                raw_ptr_char_immut!(message),
+                message.len() as libc::c_ulonglong,
+                my_adata,
+                my_ad_len,
+                std::ptr::null_mut(),
+                raw_ptr_char_immut!(nonce),
+                raw_ptr_char_immut!(secret),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::Generic("libsodium fail".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn aead_decrypt(
+        &self,
+        message: &mut Box<dyn Buffer>,
+        cipher: &Box<dyn Buffer>,
+        adata: Option<&Box<dyn Buffer>>,
+        nonce: &Box<dyn Buffer>,
+        secret: &Box<dyn Buffer>,
+    ) -> CryptoResult<()> {
+        if message.len() != cipher.len() - self.aead_auth_bytes() {
+            return Err(CryptoError::BadMessageSize);
+        }
+
+        if nonce.len() != self.aead_nonce_bytes() {
+            return Err(CryptoError::BadNonceSize);
+        }
+
+        if secret.len() != self.aead_secret_bytes() {
+            return Err(CryptoError::BadSecretKeySize);
+        }
+
+        let my_adata_locker;
+        let mut my_adata = std::ptr::null();
+        let mut my_ad_len = 0 as libc::c_ulonglong;
+
+        if let Some(adata) = adata {
+            my_adata_locker = adata.read_lock();
+            my_adata = raw_ptr_char_immut!(my_adata_locker);
+            my_ad_len = my_adata_locker.len() as libc::c_ulonglong;
+        }
+
+        let mut message = message.write_lock();
+        let cipher = cipher.read_lock();
+        let nonce = nonce.read_lock();
+        let secret = secret.read_lock();
+
+        unsafe {
+            if rust_sodium_sys::crypto_aead_xchacha20poly1305_ietf_decrypt(
+                raw_ptr_char!(message),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                raw_ptr_char_immut!(cipher),
+                cipher.len() as libc::c_ulonglong,
+                my_adata,
+                my_ad_len,
+                raw_ptr_char_immut!(nonce),
+                raw_ptr_char_immut!(secret),
+            ) != 0 as libc::c_int
+            {
+                return Err(CryptoError::CouldNotDecrypt);
+            }
+        }
+
+        Ok(())
     }
 }
 
