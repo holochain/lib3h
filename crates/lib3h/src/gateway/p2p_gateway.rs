@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
-    transport::TransportWrapper,
+    transport::{protocol::*, TransportWrapper},
 };
 use lib3h_protocol::Address;
 use std::collections::{HashSet, VecDeque};
@@ -20,18 +20,21 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         address_url_scheme: &str,
         space_address: Address,
         identifier: &str,
-        inner_transport: TransportWrapper<'gateway>,
+        //inner_transport: TransportWrapper<'gateway>,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
             address_url_scheme: address_url_scheme.to_string(),
             space_address,
-            inner_transport,
+            //inner_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
             connections: HashSet::new(),
             transport_inbox: VecDeque::new(),
+            transport_injected_events: Vec::new(),
+            transport_sends: Vec::new(),
+            phantom_data: std::marker::PhantomData,
         }
     }
 }
@@ -40,5 +43,9 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
     /// This Gateway's identifier
     fn identifier(&self) -> &str {
         self.identifier.as_str()
+    }
+
+    fn inject_event(&mut self, evt: TransportEvent) {
+        self.transport_injected_events.push(evt);
     }
 }

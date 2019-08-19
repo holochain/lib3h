@@ -72,7 +72,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             "transportid",
             NETWORK_GATEWAY_ID.into(),
             NETWORK_GATEWAY_ID,
-            network_transport.clone(),
+            //network_transport.clone(),
             dht_factory,
             &dht_config,
         ));
@@ -122,7 +122,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             "transportid",
             NETWORK_GATEWAY_ID.into(),
             NETWORK_GATEWAY_ID,
-            network_transport.clone(),
+            //network_transport.clone(),
             dht_factory,
             &dht_config,
         ));
@@ -573,7 +573,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             "hc",
             join_msg.space_address.clone(),
             &format!("{:?}", &chain_id),
-            self.network_gateway.as_transport(),
+            //self.network_gateway.as_transport(),
             self.dht_factory,
             &dht_config,
         ));

@@ -38,12 +38,28 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             did_work,
             outbox.len(),
         );
+
+        // -------------------------
+
+        //let (inner_did_work, event_list) = self.inner_transport.as_mut().process()?;
+        for evt in self.transport_injected_events.drain(..).collect::<Vec<_>>() {
+            did_work = true;
+            if let Some(evt) = self.handle_TransportEvent(evt)? {
+                outbox.push(evt)
+            }
+        }
+
+        Ok((did_work, outbox))
+
+        // -------------------------
+
         // Process inner transport
         // Its okay to process inner transport as long as NetworkEngine only calls
         // Transport::process() on the network gateway,
         // otherwise remove this code and have RealEngine explicitly call the process of the
         // Network transport.
-        let (inner_did_work, mut event_list) = self.inner_transport.as_mut().process()?;
+        /*
+        //let (inner_did_work, mut event_list) = self.inner_transport.as_mut().process()?;
         trace!(
             "({}).Transport.inner_process() - output: {} {}",
             self.identifier,
@@ -64,6 +80,7 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             }
         }
         Ok((did_work, outbox))
+        */
     }
 
     /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
@@ -139,9 +156,13 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         .serialize(&mut rmp_serde::Serializer::new(&mut inner_payload))
         .expect("serialization failed");
 
-        self.inner_transport
+        self.transport_sends.push((request_id, peer.peer_uri.clone(), inner_payload));
+        Ok(())
+        /*
+        //self.inner_transport
             .as_mut()
             .send(request_id, peer.peer_uri.clone(), inner_payload)
+        */
     }
 
     fn handle_new_connection(&mut self, uri: Url) -> TransportResult<()> {
@@ -183,7 +204,9 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             our_peer_address,
             uri,
         );
-        return self.inner_transport.as_mut().send("".to_string(), uri, buf);
+        self.transport_sends.push(("".to_string(), uri, buf));
+        Ok(())
+        //return self.inner_transport.as_mut().send("".to_string(), uri, buf);
     }
 
     /// Process a transportEvent received from our internal connection.

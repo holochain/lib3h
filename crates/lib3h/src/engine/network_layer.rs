@@ -18,30 +18,34 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     pub(crate) fn process_network_gateway(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        let mut did_work = false;
         let mut outbox = Vec::new();
         // Process the network gateway as a Transport
-        let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
+        //let (transport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
+        let (transport_did_work, event_list) = self.network_transport.as_mut().process()?;
         debug!(
             "{} - network_gateway Transport.process(): {} {}",
             self.name,
-            tranport_did_work,
+            transport_did_work,
             event_list.len(),
         );
-        if tranport_did_work {
-            for evt in event_list {
-                let mut output = self.handle_netTransportEvent(evt)?;
-                outbox.append(&mut output);
-            }
+        if transport_did_work {
+            did_work = true;
+        }
+        for evt in event_list {
+            let mut output = self.handle_netTransportEvent(evt)?;
+            outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
         let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
         if dht_did_work {
-            for evt in event_list {
-                let mut output = self.handle_netDhtEvent(evt)?;
-                outbox.append(&mut output);
-            }
+            did_work = true;
         }
-        Ok((tranport_did_work || dht_did_work, outbox))
+        for evt in event_list {
+            let mut output = self.handle_netDhtEvent(evt)?;
+            outbox.append(&mut output);
+        }
+        Ok((did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
@@ -251,6 +255,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
             }
             P2pProtocol::DirectMessage(_dm_data) => {
+                error!("HEYY!!! WE GOTTA MESSAGE {:?}", _dm_data);
                 unimplemented!();
                 /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(

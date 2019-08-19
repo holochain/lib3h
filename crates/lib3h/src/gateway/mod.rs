@@ -18,6 +18,7 @@ use url::Url;
 /// Transport access via peer discovery handled by the Dht
 pub trait Gateway: Transport + Dht {
     fn identifier(&self) -> &str;
+    fn inject_event(&mut self, evt: TransportEvent);
 }
 
 /// since rust doesn't suport upcasting to supertraits
@@ -91,10 +92,11 @@ impl<'wrap> GatewayWrapper<'wrap> {
 /// Combines a transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
+#[allow(dead_code)]
 pub struct P2pGateway<'gateway, D: Dht> {
     address_url_scheme: String,
     space_address: Address,
-    inner_transport: TransportWrapper<'gateway>,
+    //inner_transport: TransportWrapper<'gateway>,
     inner_dht: D,
     /// Used for distinguishing gateways
     identifier: String,
@@ -102,4 +104,7 @@ pub struct P2pGateway<'gateway, D: Dht> {
     connections: HashSet<Url>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
+    transport_injected_events: Vec<TransportEvent>,
+    transport_sends: Vec<(String, Url, Vec<u8>)>,
+    phantom_data: std::marker::PhantomData<&'gateway i8>,
 }
