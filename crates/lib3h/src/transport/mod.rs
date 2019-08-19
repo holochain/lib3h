@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
+pub mod transport_template;
 pub mod transport_trait;
 
 use transport_trait::Transport;
