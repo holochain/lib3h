@@ -300,7 +300,7 @@ impl MulticastDns {
         timeout: u64,
         every: u64,
         for_duration: u64,
-    ) -> Result<Option<(Packet, SocketAddr)>, MulticastDnsError> {
+    ) -> Result<Option<(Vec<u8>, SocketAddr)>, MulticastDnsError> {
         self.clean_buffer();
         // Sets a timeout for other host to respond
         self.recv_socket
@@ -311,13 +311,15 @@ impl MulticastDns {
         while start.elapsed().as_millis() < for_duration as u128 {
             match self.recv_socket.recv_from(&mut self.buffer) {
                 Ok((num_bytes, sender_socket_addr)) => {
+                    let packet = self.buffer[..num_bytes].to_vec();
+
                     eprintln!(
                         "I received '{}' bytes: {:?}",
                         num_bytes,
-                        &self.buffer.to_vec()[..num_bytes]
+                        &packet
                     );
+
                     // TODO check if sender_addr match local link
-                    let packet = Packet::from_raw(&self.buffer[..num_bytes])?;
                     return Ok(Some((packet, sender_socket_addr)));
                 }
                 Err(err) => {
@@ -470,14 +472,12 @@ impl MulticastDns {
 
     /// Builds mDNS probe packet with the proper bit set up in order to check if a host record is
     /// available.
-    fn build_probe_packet(&self) -> Packet {
-        Packet {
-            id: 0x0,
-            is_query: true,
-            questions: vec![Question::Srv(SrvDataQ {
-                name: self.own_record.hostname().as_bytes().to_vec(),
-            })],
-            answers: vec![],
+    fn build_probe_packet(&self) -> DnsMessage {
+        let questions = vec![QuerySection::new(&self.own_record.hostname)];
+        DnsMessage {
+            nb_questions: 1,
+            questions,
+            ..Default::default()
         }
     }
 
@@ -533,67 +533,85 @@ impl MulticastDns {
     /// "live" from the network are considered valid for the purposes of
     /// determining whether probing has succeeded or failed.
    fn probe(&mut self) -> MulticastDnsResult<()> {
-        // // Making sure our cache is empty before probing
-        // self.map_record.clear();
-        //
-        // let probe_packet = self.build_probe_packet();
-        //
-        // // Let's wait a moment to give time to other nodes to initialize their network
-        // let delay_probe_by: u64 = rand_delay(0, PROBE_QUERY_DELAY_MS);
-        // sleep_ms(delay_probe_by);
-        //
-        // // Abitrary value to prevent any infinite loop if there is some mischief happening on the
-        // // network
-        // let mut fail_safe = 0;
-        // let mut retry = 0;
-        // while retry < 3 && fail_safe < 1000 {
-        //     fail_safe += 1;
-        //     self.broadcast(&probe_packet)?;
-        //     if let Some((resp, _sender_socket_addr)) = self.recv_timely(750, 0, 500)? {
-        //
-        //        // match DnsMessage::from_raw(&resp) {
-        //        //     Ok(dmesg) => {
-        //        //         if let Some(map_record_from_response) = Record::from_
-        //        //     },
-        //        //     Err(_) => eprintln!("Unknown packet on the network.")
-        //        // } 
-        //
-        //         if let Some(map_record_from_response) = Record::from_packet(&resp) {
-        //             if let Some(record_from_response) =
-        //                 map_record_from_response.get(self.own_record.hostname())
-        //             {
-        //                 // If confict, then change name and loop back to probe step 1
-        //                 if self.detect_conflict(&record_from_response) {
-        //                     self.resolve_conflict()?;
-        //                     retry = 0;
-        //                 } else {
-        //                     // Let's take authority on our hostname and update our cache accordingly
-        //                     self.map_record
-        //                         .insert(self.own_record.hostname.clone(), self.own_record.clone());
-        //                     break;
-        //                 }
-        //             } else {
-        //                 retry += 1
-        //             }
-        //         }
-        //         retry += 1
-        //     } else {
-        //         retry += 1;
-        //     }
-        // }
-        //
-        // if retry == 3 && self.map_record.is_empty() {
-        //     // Nobody complained on the network about our hostname,
-        //     // so let's take authority on our hostname and update our cache accordingly
-        //     self.map_record
-        //         .insert(self.own_record.hostname.clone(), self.own_record.clone());
-        // } else if fail_safe == 1000 {
-        //     panic!("Fail safe triggered during probe step. Something is wrong in the network Sir.");
-        // }
-        //
-        // // Set back the read time of the receiving socket
-        // self.recv_socket
-        //     .set_read_timeout(Some(Duration::from_millis(5_000)))?;
+        // Making sure our cache is empty before probing
+        self.map_record.clear();
+
+        let probe_packet = self.build_probe_packet();
+
+        // Let's wait a moment to give time to other nodes to initialize their network
+        let delay_probe_by: u64 = rand_delay(0, PROBE_QUERY_DELAY_MS);
+        sleep_ms(delay_probe_by);
+
+        // Abitrary value to prevent any infinite loop if there is some mischief happening on the
+        // network
+        let mut fail_safe = 0;
+        let mut retry = 0;
+        while retry < 3 && fail_safe < 1000 {
+            fail_safe += 1;
+            self.broadcast(&probe_packet)?;
+            if let Some((resp, _sender_socket_addr)) = self.recv_timely(750, 0, 500)? {
+
+               match MapRecord::from_dns_message(&DnsMessage::from_raw(&resp)?) {
+                   Some(other_map_record) => {
+                       for (hostname, record) in other_map_record.iter() {
+                            if self.detect_conflict_during_probe(&record) {
+                                self.resolve_conflict()?;
+                                retry = 0;
+                            }
+                       }
+                       // // If confict, then change name and loop back to probe step 1
+                       // if self.detect_conflict_during_probe(&record) {
+                       //      self.resolve_conflict()?;
+                       //      retry = 0;
+                       //  } else {
+                       //      // Let's take authority on our hostname and update our cache accordingly
+                       //      self.map_record
+                       //          .insert(self.own_record.hostname.clone(), self.own_record.clone());
+                       //      break;
+                       //  }
+                   },
+                   _ => {
+                       eprintln!("Unknown packet on the network.");
+                       retry += 1;
+                   }
+               } 
+
+                // if let Some(map_record_from_response) = Record::from_packet(&resp) {
+                //     if let Some(record_from_response) =
+                //         map_record_from_response.get(self.own_record.hostname())
+                //     {
+                //         // If confict, then change name and loop back to probe step 1
+                //         if self.detect_conflict(&record_from_response) {
+                //             self.resolve_conflict()?;
+                //             retry = 0;
+                //         } else {
+                //             // Let's take authority on our hostname and update our cache accordingly
+                //             self.map_record
+                //                 .insert(self.own_record.hostname.clone(), self.own_record.clone());
+                //             break;
+                //         }
+                //     } else {
+                //         retry += 1
+                //     }
+                // }
+                // retry += 1
+            } else {
+                retry += 1;
+            }
+        }
+
+        if retry == 3 && self.map_record.is_empty() {
+            // Nobody complained on the network about our hostname,
+            // so let's take authority on our hostname and update our cache accordingly
+            self.map_record
+                .insert(self.own_record.hostname.clone(), self.own_record.clone());
+        } else if fail_safe == 1000 {
+            panic!("Fail safe triggered during probe step. Something is wrong in the network Sir.");
+        }
+
+        // Set back the read time of the receiving socket
+        self.recv_socket
+            .set_read_timeout(Some(Duration::from_millis(5_000)))?;
         Ok(())
     }
 
@@ -612,11 +630,11 @@ impl MulticastDns {
     }
 
     /// Detects confict: check if a record already exist in the cache.
-    pub fn detect_conflict(&self, record: &Record) -> bool {
+    pub fn detect_conflict_during_probe(&self, other_record: &Record) -> bool {
         if self.map_record.is_empty() {
             return false;
         } else {
-            match self.map_record.get(record.hostname()) {
+            match self.map_record.get(&other_record.hostname) {
                 Some(_) => return true,
                 None => return false,
             }
