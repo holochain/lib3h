@@ -31,10 +31,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             did_work = true;
         }
         for evt in &event_list {
-            self.network_gateway.as_mut().transport_inject_event(evt.clone());
+            self.network_gateway
+                .as_mut()
+                .transport_inject_event(evt.clone());
         }
         {
-            let (gateway_did_work, _event_list) = self.network_gateway.as_transport_mut().process()?;
+            let (gateway_did_work, _event_list) =
+                self.network_gateway.as_transport_mut().process()?;
             if gateway_did_work {
                 did_work = true;
             }

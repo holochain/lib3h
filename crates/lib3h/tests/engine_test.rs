@@ -8,6 +8,9 @@ extern crate backtrace;
 extern crate lib3h;
 extern crate lib3h_protocol;
 extern crate lib3h_sodium;
+extern crate predicates;
+
+use predicates::prelude::*;
 
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
@@ -130,6 +133,81 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 // Custom tests
 //--------------------------------------------------------------------------------------------------
 
+#[derive(Clone)]
+struct ProcessorArgs {
+    did_work: bool,
+    engine_name: String,
+    events: Vec<Lib3hServerProtocol>,
+    previous: Vec<ProcessorArgs>,
+}
+
+impl ProcessorArgs {}
+
+pub enum ProcessorResult {
+    Continue,
+    Fail(String),
+    Pass,
+}
+
+/// A function that produces accepted sockets of type R wrapped in a TransportInfo
+type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
+
+const MAX_PROCESSING_LOOPS: u64 = 200;
+
+pub fn process_until_event<'a>(
+    mut engine: &mut RealEngine<'a, MirrorDht>,
+    predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
+    _expect: String,
+) -> ProcessorResult {
+    let mut f: Processor = Box::new(move |processor_args: ProcessorArgs| {
+        if processor_args
+            .events
+            .iter()
+            .find(|e| predicate.eval(e))
+            .is_some()
+        {
+            ProcessorResult::Pass
+        } else {
+            ProcessorResult::Continue
+        }
+    });
+    process_until(&mut engine, &mut f)
+}
+
+fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) -> ProcessorResult {
+    let mut previous = Vec::new();
+    for epoch in 0..MAX_PROCESSING_LOOPS {
+        println!("EPOCH: {:?}", epoch);
+        //for mut engine in engines.iter() {
+        let (did_work, events) = engine
+            .process()
+            .map_err(|err| dbg!(err))
+            .unwrap_or((false, vec![]));
+        let processor_args = ProcessorArgs {
+            did_work,
+            events,
+            engine_name: "UNSUPPORTED".into(),
+            previous: previous.clone(),
+        };
+        let result = (f)(processor_args.clone());
+        match result {
+            ProcessorResult::Continue => (),
+            ProcessorResult::Fail(err) => panic!(err),
+            ProcessorResult::Pass => break,
+        };
+        previous.push(processor_args.clone());
+        //}
+    }
+    ProcessorResult::Fail("Max number of process iterations exceeded without passing!".into())
+}
+
+fn is_connected(x: &Lib3hServerProtocol, request_id: &str) -> bool {
+    match x {
+        Lib3hServerProtocol::Connected(data) => data.request_id == request_id,
+        _ => false,
+    }
+}
+
 #[test]
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
@@ -140,8 +218,9 @@ fn basic_connect_test_mock() {
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
     // Send Connect Command
+    let request_id: String = "connect_a_1".into();
     let connect_msg = ConnectData {
-        request_id: "connect_a_1".into(),
+        request_id: request_id.clone(),
         peer_uri: url_b.clone(),
         network_id: NETWORK_A_ID.clone(),
     };
@@ -149,6 +228,14 @@ fn basic_connect_test_mock() {
         .post(Lib3hClientProtocol::Connect(connect_msg.clone()))
         .unwrap();
     println!("\nengine_a.process()...");
+    let is_connected = Box::new(predicate::function(|x| is_connected(x, "connect_a_1")));
+
+    process_until_event(
+        &mut engine_a,
+        is_connected,
+        "Lib3hServerProtocol::Connected".into(),
+    );
+    /*
     let (did_work, srv_msg_list) = engine_a.process().unwrap();
     println!("engine_a: {:?}", srv_msg_list);
     match srv_msg_list.get(0).unwrap() {
@@ -157,7 +244,7 @@ fn basic_connect_test_mock() {
         }
         _ => panic!("unexpected type: {:?}", srv_msg_list),
     }
-    assert!(did_work);
+    assert!(did_work);*/
 }
 
 #[test]

@@ -90,3 +90,10 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// debug: count number of calls to process()
     process_count: u64,
 }
+
+impl<'engine, D: Dht + 'engine> RealEngine<'engine, D> {
+    /// User provided identifier for this engine
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+}
