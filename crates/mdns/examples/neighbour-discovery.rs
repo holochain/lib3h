@@ -11,7 +11,7 @@ fn discover_neighbourhood() {
     mdns.startup();
     for _ in 0..100 {
         mdns.update();
-        eprintln!("mDNS neighbourhood : {:?}", &mdns.records());
+        eprintln!("mDNS neighbourhood : {:#?}", &mdns.records());
 
         mdns::sleep_ms(5_000);
     }
