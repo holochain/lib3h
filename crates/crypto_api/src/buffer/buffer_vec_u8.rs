@@ -19,4 +19,21 @@ impl Buffer for Vec<u8> {
     fn set_no_access(&self) {}
     fn set_readable(&self) {}
     fn set_writable(&self) {}
+
+    fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32 {
+        let l = self.len();
+        if l != b.len() {
+            return 1;
+        }
+        let a = self.read_lock();
+        let b = b.read_lock();
+        let mut i = 0;
+        while i < l {
+            if a[i] != b[i] {
+                return 1;
+            }
+            i = i+1;
+        }
+        return 0;
+    }
 }
