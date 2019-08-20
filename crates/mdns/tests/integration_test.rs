@@ -1,6 +1,6 @@
 // simple p2p mdns usage
 extern crate lib3h_mdns;
-use lib3h_mdns::{dns, MulticastDns, MulticastDnsBuilder};
+use lib3h_mdns::{dns_old as dns, MulticastDns, MulticastDnsBuilder};
 
 static SERVICE_NAME: &'static [u8] = b"lib3h.test.service";
 static TARGET_NAME: &'static [u8] = b"lib3h.test.target";
@@ -27,11 +27,11 @@ impl MdnsResponder {
 
     pub fn process(&mut self) -> Option<Vec<u8>> {
         if let Some(q) = self.mdns.recv().unwrap() {
-            if let Some(dns::Question::Srv(s)) = q.questions.get(0) {
+            if let Some(dns::Question::Srv(s)) = q.0.questions.get(0) {
                 if s.name.as_slice() == SERVICE_NAME {
                     // we got a query about our service! send a response
                     let mut packet = dns::Packet::new();
-                    packet.id = q.id;
+                    packet.id = q.0.id;
                     packet.is_query = false;
                     packet.answers.push(dns::Answer::Srv(dns::SrvDataA {
                         name: SERVICE_NAME.to_vec(),
@@ -44,7 +44,7 @@ impl MdnsResponder {
                     self.mdns.broadcast(&packet).expect("send fail");
                 }
             }
-            if let Some(dns::Answer::Srv(s)) = q.answers.get(0) {
+            if let Some(dns::Answer::Srv(s)) = q.0.answers.get(0) {
                 if s.name.as_slice() == SERVICE_NAME {
                     return Some(s.target.clone());
                 }
