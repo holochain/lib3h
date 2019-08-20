@@ -43,13 +43,6 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
     /// (note, this is a no-op for Vec<u8>s)
     fn set_writable(&self);
 
-    /// compare this buffer to another buffer
-    /// Return :
-    /// | if a > b; return 1
-    /// | if a < b; return -1
-    /// | if a == b; return 0
-    fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32;
-
     /// return a locker object that marks this Buffer readable
     /// until the locker goes out of scope
     fn read_lock(&self) -> ReadLocker {
@@ -79,6 +72,28 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
             std::ptr::copy(data.as_ptr(), (*b).as_mut_ptr().add(offset), data.len());
         }
         Ok(())
+    }
+
+    /// compare this buffer to another buffer
+    /// Return :
+    /// | if a > b; return 1
+    /// | if a < b; return -1
+    /// | if a == b; return 0
+    fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32 {
+        let l = self.len();
+        if l != b.len() {
+            return 1;
+        }
+        let a = self.read_lock();
+        let b = b.read_lock();
+        let mut i = 0;
+        while i < l {
+            if a[i] != b[i] {
+                return 1;
+            }
+            i = i+1;
+        }
+        return 0;
     }
 }
 
