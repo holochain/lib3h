@@ -1,10 +1,31 @@
 //! lib3h mDNS LAN discovery module
+//!
+//! Our simple use case is the following:
+//! ```rust
+//! use lib3h_mdns as mdns;
+//! use lib3h_mdns::Discovery;
+//!
+//! let mut mdns = mdns::MulticastDnsBuilder::new()
+//!     .bind_port(8585)
+//!     .build()
+//!     .expect("Fail to build mDNS.");
+//!
+//! mdns.startup();
+//! // Let's listen to the network for a few moment...
+//! for _ in 0..5 {
+//!     mdns.update();
+//!     eprintln!("mDNS neighbourhood : {:#?}", &mdns.records());
+//!
+//!     mdns::sleep_ms(100);
+//! }
+//! ```
 
 #![feature(try_trait)]
 #![feature(never_type)]
 
 use rand::Rng;
 use regex;
+use log::debug;
 use std::net;
 
 #[cfg(not(target_os = "windows"))]
@@ -249,13 +270,11 @@ impl MulticastDns {
         match self.recv_socket.recv_from(&mut self.buffer) {
             Ok((0, _)) => Ok(None),
             Ok((num_bytes, addr)) => {
-
-                    eprintln!(
+                    debug!(
                         "Received '{}' bytes: {:?}",
                         num_bytes,
                         &self.buffer.to_vec()[..num_bytes]
                     );
-
                 let packet = self.buffer[..num_bytes].to_vec();
                 Ok(Some((packet, addr)))
             },
@@ -287,13 +306,11 @@ impl MulticastDns {
             match self.recv_socket.recv_from(&mut self.buffer) {
                 Ok((num_bytes, sender_socket_addr)) => {
                     let packet = self.buffer[..num_bytes].to_vec();
-
-                    eprintln!(
+                    debug!(
                         "I received '{}' bytes: {:?}",
                         num_bytes,
                         &packet
                     );
-
                     // TODO check if sender_addr match local link
                     return Ok(Some((packet, sender_socket_addr)));
                 }
@@ -331,31 +348,18 @@ impl MulticastDns {
 
     /// mDNS Querier
     /// One-Shot Multicast DNS Queries
-    /// Not used in our actual mDNS implementation.
+    /// Not used in our actual mDNS implementation use case.
     pub fn query(&mut self) -> MulticastDnsResult<()> {
-        // let query_packet = self.build_query_packet();
-        // // let query_packet = self.build_probe_packet();
-        // self.broadcast(&query_packet)?;
-        //
-        // for (name, record) in self.map_record.iter_mut() {
-        //     if record.ttl > 1 && name != self.own_record.hostname() {
-        //         record.ttl -= 1;
-        //     }
+        // if let Some(query_message) = self.build_query_message() {
+        //     self.broadcast(&query_message)?;
         // }
-        //
-        // // Set receive timeout to 2sec. And poll connection every 1sec for 3sec
-        // // let _response = self.recv_timely(2_000, 1_000, 3_000);
-        //
-        // // TODO handle response:
-        // // - detect confict
-        // // - if no conflict, update cache ?
 
         Ok(())
     }
 
     /// A mDNS Responder that listen to the network in order to defend its name and respond to
     /// queries
-    /// Not used in our actual mDNS implementation.
+    /// Not used in our actual mDNS implementation use case.
     fn responder(&mut self) -> MulticastDnsResult<()> {
         // let resp_packet = self.build_defensive_packet();
         // let mut query_every = 1u64;
@@ -467,7 +471,7 @@ impl MulticastDns {
     }
 
     /// Builds a query packet to be used by one-shot mDNS implementation.
-    pub fn build_query_packet(&self, hostname: &str) -> Option<DnsMessage> {
+    pub fn build_query_message(&self, hostname: &str) -> Option<DnsMessage> {
         if let Some(record) = self.map_record.get(hostname) {
             let questions = vec![QuerySection::new(&record.hostname)];
             Some(DnsMessage {
@@ -513,8 +517,8 @@ impl MulticastDns {
                             }
                        }
                    },
-                   _ => {
-                       eprintln!("Unknown packet on the network.");
+                   None => {
+                       debug!("Unknown packet on the network.");
                        retry += 1;
                    }
                } 
@@ -629,6 +633,13 @@ impl Discovery for MulticastDns {
         }
 
         self.announcing()?;
+
+        for (name, record) in self.map_record.iter_mut() {
+            if record.ttl > 1 && name != self.own_record.hostname() {
+                record.ttl -= 1;
+            }
+        }
+
         Ok(())
     }
 
