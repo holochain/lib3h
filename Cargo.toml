@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+  "crates/ghost_actor",
   "crates/crypto_api",
   "crates/sodium",
   "crates/lib3h_protocol",

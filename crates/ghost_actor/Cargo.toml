@@ -1,0 +1,15 @@
+[package]
+name = "lib3h_ghost_actor"
+version = "0.0.10"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+description = "lib3h actor request tracking module"
+keywords = ["holochain", "holo"]
+categories = ["asynchronous"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/lib3h_ghost_actor"
+repository = "https://github.com/holochain/lib3h"
+
+[dependencies]
+shrinkwraprs = "0.2.1"
