@@ -145,7 +145,7 @@ impl ProcessorArgs {}
 
 #[derive(Debug, Eq, Clone, PartialEq)]
 pub enum ProcessorResult {
-    Continue,
+    Continue(String),
     Fail(String),
     Pass,
 }
@@ -158,7 +158,7 @@ const MAX_PROCESSING_LOOPS: u64 = 20;
 pub fn process_until_event<'a>(
     mut engine: &mut RealEngine<'a, MirrorDht>,
     predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
-    _expect: String,
+    expect: String,
 ) -> ProcessorResult {
     let mut f: Processor = Box::new(move |processor_args: ProcessorArgs| {
         if processor_args
@@ -169,7 +169,8 @@ pub fn process_until_event<'a>(
         {
             ProcessorResult::Pass
         } else {
-            ProcessorResult::Continue
+            ProcessorResult::Continue(
+                format!("Expected: {:?}", expect.clone()))
         }
     });
     process_until(&mut engine, &mut f)
@@ -177,6 +178,7 @@ pub fn process_until_event<'a>(
 
 fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) -> ProcessorResult {
     let mut previous = Vec::new();
+    let mut errors = Vec::new();
     for epoch in 0..MAX_PROCESSING_LOOPS {
         println!("[{:?}] {:?}", epoch, previous);
         //for mut engine in engines.iter() {
@@ -184,6 +186,7 @@ fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) 
             .process()
             .map_err(|err| dbg!(err))
             .unwrap_or((false, vec![]));
+        let events = dbg!(events);
         let processor_args = ProcessorArgs {
             did_work,
             events,
@@ -192,7 +195,7 @@ fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) 
         };
         let result = (f)(processor_args.clone());
         match result {
-            ProcessorResult::Continue => (),
+            ProcessorResult::Continue(err) => { errors.push(err); () },
             ProcessorResult::Fail(err) => return ProcessorResult::Fail(err),
             ProcessorResult::Pass => return ProcessorResult::Pass,
         };
@@ -201,7 +204,8 @@ fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) 
         }
         //}
     }
-    ProcessorResult::Fail("Max number of process iterations exceeded without passing!".into())
+    ProcessorResult::Fail(
+        format!("Max number of process iterations exceeded. Errors: {:?}", errors))
 }
 
 fn is_connected(x: &Lib3hServerProtocol, request_id: &str) -> bool {
@@ -237,7 +241,7 @@ fn basic_connect_test_mock() {
         process_until_event(
             &mut engine_a,
             is_connected,
-            "Lib3hServerProtocol::Connected".into(),
+            "Connected".into(),
         ),
         ProcessorResult::Pass
     )
