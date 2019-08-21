@@ -128,6 +128,27 @@ pub trait CryptoSystem: Sync {
     /// compute a sha512 hash for `data`, storing it in `hash`
     fn hash_sha512(&self, hash: &mut Box<dyn Buffer>, data: &Box<dyn Buffer>) -> CryptoResult<()>;
 
+    /// min bytelength of generic hash output
+    fn generic_hash_min_bytes(&self) -> usize;
+
+    /// max bytelength of generic hash output
+    fn generic_hash_max_bytes(&self) -> usize;
+
+    /// min bytelength of generic hash key
+    fn generic_hash_key_min_bytes(&self) -> usize;
+
+    /// max bytelength of generic hash key
+    fn generic_hash_key_max_bytes(&self) -> usize;
+
+    /// compute a deterministic (BLAKE2b) generic hash for given data
+    /// key can be `None`
+    fn generic_hash(
+        &self,
+        hash: &mut Box<dyn Buffer>,
+        data: &Box<dyn Buffer>,
+        key: Option<&Box<dyn Buffer>>,
+    ) -> CryptoResult<()>;
+
     /// bytelength of pwhash salt
     fn pwhash_salt_bytes(&self) -> usize;
 
