@@ -133,7 +133,7 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 // Custom tests
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct ProcessorArgs {
     did_work: bool,
     engine_name: String,
@@ -143,6 +143,7 @@ struct ProcessorArgs {
 
 impl ProcessorArgs {}
 
+#[derive(Debug, Eq, Clone, PartialEq)]
 pub enum ProcessorResult {
     Continue,
     Fail(String),
@@ -152,7 +153,7 @@ pub enum ProcessorResult {
 /// A function that produces accepted sockets of type R wrapped in a TransportInfo
 type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 
-const MAX_PROCESSING_LOOPS: u64 = 200;
+const MAX_PROCESSING_LOOPS: u64 = 20;
 
 pub fn process_until_event<'a>(
     mut engine: &mut RealEngine<'a, MirrorDht>,
@@ -177,7 +178,7 @@ pub fn process_until_event<'a>(
 fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) -> ProcessorResult {
     let mut previous = Vec::new();
     for epoch in 0..MAX_PROCESSING_LOOPS {
-        println!("EPOCH: {:?}", epoch);
+        println!("[{:?}] {:?}", epoch, previous);
         //for mut engine in engines.iter() {
         let (did_work, events) = engine
             .process()
@@ -186,16 +187,18 @@ fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) 
         let processor_args = ProcessorArgs {
             did_work,
             events,
-            engine_name: "UNSUPPORTED".into(),
+            engine_name: "test_engine".into(),
             previous: previous.clone(),
         };
         let result = (f)(processor_args.clone());
         match result {
             ProcessorResult::Continue => (),
-            ProcessorResult::Fail(err) => panic!(err),
-            ProcessorResult::Pass => break,
+            ProcessorResult::Fail(err) => return ProcessorResult::Fail(err),
+            ProcessorResult::Pass => return ProcessorResult::Pass,
         };
-        previous.push(processor_args.clone());
+        if processor_args.did_work {
+            previous.push(processor_args.clone());
+        }
         //}
     }
     ProcessorResult::Fail("Max number of process iterations exceeded without passing!".into())
@@ -230,11 +233,12 @@ fn basic_connect_test_mock() {
     println!("\nengine_a.process()...");
     let is_connected = Box::new(predicate::function(|x| is_connected(x, "connect_a_1")));
 
-    process_until_event(
+    assert_eq!
+        (process_until_event(
         &mut engine_a,
         is_connected,
         "Lib3hServerProtocol::Connected".into(),
-    );
+    ), ProcessorResult::Pass)
     /*
     let (did_work, srv_msg_list) = engine_a.process().unwrap();
     println!("engine_a: {:?}", srv_msg_list);
