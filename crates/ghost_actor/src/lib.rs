@@ -45,11 +45,14 @@ impl From<RequestId> for String {
 }
 
 mod ghost_tracker;
-pub use ghost_tracker::{GhostActorState, GhostTracker};
+pub use ghost_tracker::{GhostCallbackData, GhostCallback, GhostTracker};
+
+mod ghost_actor_state;
+pub use ghost_actor_state::GhostActorState;
 
 mod ghost_actor;
 pub use ghost_actor::GhostActor;
 
 pub mod prelude {
-    pub use super::{GhostActor, GhostActorState, GhostTracker};
+    pub use super::{GhostActor, GhostActorState, GhostTracker, GhostCallbackData, GhostCallback};
 }
