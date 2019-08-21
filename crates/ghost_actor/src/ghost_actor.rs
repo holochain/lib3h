@@ -26,7 +26,10 @@ pub trait GhostActor<
     );
 
     fn process(&mut self) -> Result<DidWork, E> {
-        self.get_actor_state().process()
+        let mut actor_state = self.take_actor_state();
+        actor_state.process(self.as_mut())?;
+        self.put_actor_state(actor_state);
+        Ok(true.into())
     }
 
     // our parent is making a request of us
