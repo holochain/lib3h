@@ -70,16 +70,20 @@ impl FullSuite {
         let mut d = self.crypto.buf_new_secure(2);
         {
             let mut d = d.write_lock();
-            d[1] = 45;
+            d[0] = 45;
+            d[1] = 0;
         }
-        let val_1 = a.compare(&mut b);
-        let val_2 = b.compare(&mut a);
-        let val_3 = b.compare(&mut c);
-        assert_eq!(1, val_1);
-        assert_eq!(-1, val_2);
-        assert_eq!(0, val_3);
-        let val_4 = c.compare(&mut d);
-        assert_eq!(-1, val_4);
+        let mut e = self.crypto.buf_new_secure(2);
+        {
+            let mut e = e.write_lock();
+            e[1] = 1;
+        }
+        assert_eq!(1, a.compare(&mut b));
+        assert_eq!(-1, b.compare(&mut a));
+        assert_eq!(0, b.compare(&mut c));
+        assert_eq!(0, c.compare(&mut d));
+        assert_eq!(1, a.compare(&mut d));
+        assert_eq!(-1, c.compare(&mut e));
     }
 
     fn test_random(&self) {

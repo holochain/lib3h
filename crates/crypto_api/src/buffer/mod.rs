@@ -80,22 +80,21 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
     /// | if a < b; return -1
     /// | if a == b; return 0
     fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32 {
-        let l = self.len();
-        if l < b.len() {
-            return -1;
-        } else if l > b.len() {
-            return 1;
-        }
+        println!("comparing {:?} to {:?}", self, b);
+        let al = self.len();
+        let bl = b.len();
+        let l = if al > bl { al } else { bl };
         let a = self.read_lock();
         let b = b.read_lock();
-        let mut i = 0;
-        while i < l {
-            if a[i] > b[i] {
+        for i in (0..l).rev() {
+            let av = if i >= al { 0 } else { a[i] };
+            let bv = if i >= bl { 0 } else { b[i] };
+            println!("comparing av:{} to bv:{} at i:{}", av, bv, i);
+            if av > bv {
                 return 1;
-            } else if a[i] < b[i] {
+            } else if av < bv {
                 return -1;
             };
-            i = i + 1;
         }
         return 0;
     }
