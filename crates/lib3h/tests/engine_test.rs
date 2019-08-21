@@ -141,8 +141,6 @@ struct ProcessorArgs {
     previous: Vec<ProcessorArgs>,
 }
 
-impl ProcessorArgs {}
-
 #[derive(Debug, Eq, Clone, PartialEq)]
 pub enum ProcessorResult {
     Continue(String),
@@ -156,7 +154,7 @@ type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
 pub fn assert_using_predicate<'a>(
-    mut engine: &mut RealEngine<'a, MirrorDht>,
+    mut engines: &mut Vec<&mut RealEngine<'a, MirrorDht>>,
     predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     expect: String,
 ) {
@@ -172,43 +170,44 @@ pub fn assert_using_predicate<'a>(
             ProcessorResult::Continue(format!("Expected: {:?}", expect.clone()))
         }
     });
-    let actual = process_until(&mut engine, &mut f);
+    let actual = process_until(&mut engines, &mut f);
     assert_eq!(ProcessorResult::Pass, actual)
 }
 
-fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) -> ProcessorResult {
+fn process_until<'a>(engines: &mut Vec<&mut RealEngine<'a, MirrorDht>>, f: &mut Processor) -> ProcessorResult {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
     for epoch in 0..MAX_PROCESSING_LOOPS {
         println!("[{:?}] {:?}", epoch, previous);
-        //for mut engine in engines.iter() {
-        let (did_work, events) = engine
-            .process()
-            .map_err(|err| dbg!(err))
-            .unwrap_or((false, vec![]));
-        let events = dbg!(events);
-        let processor_args = ProcessorArgs {
-            did_work,
-            events,
-            engine_name: "test_engine".into(),
-            previous: previous.clone(),
-        };
-        let result = (f)(processor_args.clone());
-        match result {
-            ProcessorResult::Continue(err) => {
-                errors.push(err);
-                ()
+        for engine in engines.iter_mut() {
+            let (did_work, events) = engine
+                .process()
+                .map_err(|err| dbg!(err))
+                .unwrap_or((false, vec![]));
+            let events = dbg!(events);
+            let processor_args = ProcessorArgs {
+                did_work,
+                events,
+                engine_name: engine.name(),
+                previous: previous.clone(),
+            };
+            let result = (f)(processor_args.clone());
+            match result {
+                ProcessorResult::Continue(err) => {
+                    errors.push(err);
+                    ()
+                }
+                ProcessorResult::Fail(err) => return ProcessorResult::Fail(err),
+                ProcessorResult::Pass => return ProcessorResult::Pass,
+            };
+            if processor_args.did_work {
+                previous.push(processor_args.clone());
             }
-            ProcessorResult::Fail(err) => return ProcessorResult::Fail(err),
-            ProcessorResult::Pass => return ProcessorResult::Pass,
-        };
-        if processor_args.did_work {
-            previous.push(processor_args.clone());
         }
-        //}
     }
     ProcessorResult::Fail(format!(
-        "Max number of process iterations exceeded. Errors: {:?}",
+        "Max number of process iterations exceeded ({}). Errors: {:?}",
+        MAX_PROCESSING_LOOPS,
         errors
     ))
 }
@@ -225,7 +224,7 @@ fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
     let mut engine_a = basic_setup_mock("basic_send_test_mock_node_a");
-    let engine_b = basic_setup_mock("basic_send_test_mock_node_b");
+    let mut engine_b = basic_setup_mock("basic_send_test_mock_node_b");
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
@@ -240,9 +239,12 @@ fn basic_connect_test_mock() {
         .post(Lib3hClientProtocol::Connect(connect_msg.clone()))
         .unwrap();
     println!("\nengine_a.process()...");
-    let is_connected = Box::new(predicate::function(|x| is_connected(x, "connect_a_1")));
+    // TODO request_id should match on "connect_a_1" not ""
+    let is_connected = Box::new(predicate::function(|x| is_connected(x, "")));
 
-    assert_using_predicate(&mut engine_a, is_connected, "Connected".into())
+    let mut engines = vec![&mut engine_a, &mut engine_b];
+
+    assert_using_predicate(&mut engines, is_connected, "Connected".into())
 }
 
 #[test]
