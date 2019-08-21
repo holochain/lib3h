@@ -155,11 +155,11 @@ type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
-pub fn process_until_event<'a>(
+pub fn assert_using_predicate<'a>(
     mut engine: &mut RealEngine<'a, MirrorDht>,
     predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     expect: String,
-) -> ProcessorResult {
+) {
     let mut f: Processor = Box::new(move |processor_args: ProcessorArgs| {
         if processor_args
             .events
@@ -172,7 +172,8 @@ pub fn process_until_event<'a>(
             ProcessorResult::Continue(format!("Expected: {:?}", expect.clone()))
         }
     });
-    process_until(&mut engine, &mut f)
+    let actual = process_until(&mut engine, &mut f);
+    assert_eq!(ProcessorResult::Pass, actual)
 }
 
 fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) -> ProcessorResult {
@@ -241,20 +242,7 @@ fn basic_connect_test_mock() {
     println!("\nengine_a.process()...");
     let is_connected = Box::new(predicate::function(|x| is_connected(x, "connect_a_1")));
 
-    assert_eq!(
-        process_until_event(&mut engine_a, is_connected, "Connected".into(),),
-        ProcessorResult::Pass
-    )
-    /*
-    let (did_work, srv_msg_list) = engine_a.process().unwrap();
-    println!("engine_a: {:?}", srv_msg_list);
-    match srv_msg_list.get(0).unwrap() {
-        Lib3hServerProtocol::Connected(data) => {
-            assert_eq!("connect_a_1", data.request_id);
-        }
-        _ => panic!("unexpected type: {:?}", srv_msg_list),
-    }
-    assert!(did_work);*/
+    assert_using_predicate(&mut engine_a, is_connected, "Connected".into())
 }
 
 #[test]
