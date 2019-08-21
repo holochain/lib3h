@@ -19,5 +19,5 @@ crossbeam-channel = "0.3.8"
 hostname = "^0.1"
 get_if_addrs = "0.5.3"
 regex = "1.1.2"
-lib3h = { version = "=0.0.10", path = "../lib3h" }
 log = "0.4.8"
+# lib3h = { version = "=0.0.10", path = "../lib3h" }
