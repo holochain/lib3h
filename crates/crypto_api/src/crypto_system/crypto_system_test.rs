@@ -50,6 +50,36 @@ impl FullSuite {
             "[42, 88, 132, 56, 12, 254, 212, 88]",
             &format!("{:?}", &b2.read_lock())
         );
+
+        // test compare
+        let mut a = self.crypto.buf_new_secure(1);
+        {
+            let mut a = a.write_lock();
+            a[0] = 50;
+        }
+        let mut b = self.crypto.buf_new_secure(1);
+        {
+            let mut b = b.write_lock();
+            b[0] = 45;
+        }
+        let mut c = self.crypto.buf_new_secure(1);
+        {
+            let mut c = c.write_lock();
+            c[0] = 45;
+        }
+        let mut d = self.crypto.buf_new_secure(2);
+        {
+            let mut d = d.write_lock();
+            d[1] = 45;
+        }
+        let val_1 = a.compare(&mut b);
+        let val_2 = b.compare(&mut a);
+        let val_3 = b.compare(&mut c);
+        assert_eq!(1, val_1);
+        assert_eq!(-1, val_2);
+        assert_eq!(0, val_3);
+        let val_4 = c.compare(&mut d);
+        assert_eq!(-1, val_4);
     }
 
     fn test_random(&self) {
