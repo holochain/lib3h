@@ -10,7 +10,7 @@ fn discover_neighbourhood() {
     // mdns.run().expect("Fail to run mDNS service.");
     mdns.startup();
     for _ in 0..100 {
-        mdns.update();
+        mdns.update().expect("Fail to update mDNS.");
         eprintln!("mDNS neighbourhood : {:#?}", &mdns.records());
 
         mdns::sleep_ms(5_000);
@@ -19,11 +19,5 @@ fn discover_neighbourhood() {
 }
 
 fn main() {
-    // let own_record = mdns::record::Record::new_own();
-    // println!("{:#?}", own_record);
-
-    // let v = 65280;
-    // println!("{:#?}", v.as_bytes());
-
     discover_neighbourhood();
 }
