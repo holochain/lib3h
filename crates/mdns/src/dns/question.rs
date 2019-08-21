@@ -17,7 +17,6 @@ pub enum Question {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuerySection {
     pub(crate) dn_len: u16,
-    // pub(crate) domain_name: Vec<u8>,
     pub(crate) domain_name: String,
     /// Not used at the moment
     pub(crate) query_type: u16,
@@ -50,7 +49,7 @@ impl QuerySection {
         })
     }
 
-    pub fn write(&self, mut packet: &mut Vec<u8>) -> MulticastDnsResult<()> {
+    pub fn write(&self, packet: &mut Vec<u8>) -> MulticastDnsResult<()> {
         packet.write_u16::<BigEndian>(self.dn_len)?;
 
         for byte in self.domain_name.as_bytes().to_vec() {

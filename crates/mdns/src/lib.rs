@@ -4,9 +4,6 @@
 #![feature(never_type)]
 
 use rand::Rng;
-// use byteorder;
-// use hostname;
-// use net2::UdpSocketExt;
 use regex;
 use std::net;
 
@@ -483,7 +480,7 @@ impl MulticastDns {
 
     /// Builds an mDNS reponse packet containing all the registered ressource records of the host
     /// in the "Answer Section".
-    fn build_response_packet(&self, record: &Record) -> DnsMessage {
+    pub fn build_response_packet(&self, record: &Record) -> DnsMessage {
         let resp_record = self.map_record
             .get(record.hostname())
             .expect("Missing record.");
@@ -492,7 +489,7 @@ impl MulticastDns {
     }
 
     /// Build a packet to defend our name.
-    fn build_defensive_packet(&self) -> DnsMessage {
+    pub fn build_defensive_packet(&self) -> DnsMessage {
         let mr = MapRecord::new(&self.own_record.hostname, &self.own_record);
         mr.to_dns_reponse_message()
     }
@@ -504,28 +501,18 @@ impl MulticastDns {
     }
 
     /// Builds a query packet to be used by one-shot mDNS implementation.
-    /// Questions requesting Unicast responses.
-    fn build_query_packet(&self) -> Packet {
-        let questions = self
-            .map_record
-            .iter()
-            .filter_map(|(name, rec)| {
-                if name != self.own_record.hostname() && rec.ttl() > 1 {
-                    Some(Question::Srv(SrvDataQ {
-                        name: name.as_bytes().to_vec(),
-                    }))
-                } else {
-                    None
-                }
+    pub fn build_query_packet(&self, hostname: &str) -> Option<DnsMessage> {
+        if let Some(record) = self.map_record.get(hostname) {
+            let questions = vec![QuerySection::new(&record.hostname)];
+            Some(DnsMessage {
+                nb_questions: 1,
+                questions,
+                ..Default::default()
             })
-            .collect();
-
-        Packet {
-            id: 0x0,
-            is_query: true,
-            questions,
-            answers: vec![],
+        } else {
+            None
         }
+
     }
 
     /// When sending probe queries, a host MUST NOT consult its cache for
@@ -553,48 +540,18 @@ impl MulticastDns {
 
                match MapRecord::from_dns_message(&DnsMessage::from_raw(&resp)?) {
                    Some(other_map_record) => {
-                       for (hostname, record) in other_map_record.iter() {
+                       for (_hostname, record) in other_map_record.iter() {
                             if self.detect_conflict_during_probe(&record) {
                                 self.resolve_conflict()?;
                                 retry = 0;
                             }
                        }
-                       // // If confict, then change name and loop back to probe step 1
-                       // if self.detect_conflict_during_probe(&record) {
-                       //      self.resolve_conflict()?;
-                       //      retry = 0;
-                       //  } else {
-                       //      // Let's take authority on our hostname and update our cache accordingly
-                       //      self.map_record
-                       //          .insert(self.own_record.hostname.clone(), self.own_record.clone());
-                       //      break;
-                       //  }
                    },
                    _ => {
                        eprintln!("Unknown packet on the network.");
                        retry += 1;
                    }
                } 
-
-                // if let Some(map_record_from_response) = Record::from_packet(&resp) {
-                //     if let Some(record_from_response) =
-                //         map_record_from_response.get(self.own_record.hostname())
-                //     {
-                //         // If confict, then change name and loop back to probe step 1
-                //         if self.detect_conflict(&record_from_response) {
-                //             self.resolve_conflict()?;
-                //             retry = 0;
-                //         } else {
-                //             // Let's take authority on our hostname and update our cache accordingly
-                //             self.map_record
-                //                 .insert(self.own_record.hostname.clone(), self.own_record.clone());
-                //             break;
-                //         }
-                //     } else {
-                //         retry += 1
-                //     }
-                // }
-                // retry += 1
             } else {
                 retry += 1;
             }
@@ -761,21 +718,20 @@ mod tests {
             .build()
             .expect("build fail");
 
-        let mut packet = dns_old::Packet::new();
-        packet.is_query = true;
-        packet.questions.push(dns_old::Question::Srv(dns_old::SrvDataQ {
-            name: b"lib3h.test.service".to_vec(),
-        }));
-        mdns.broadcast(&packet).expect("send fail");
+        let mut dmesg = DnsMessage::new();
+        dmesg.nb_questions = 1;
+        dmesg.questions = vec![QuerySection::new("lib3h.test.service")];
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let resp = mdns.recv().expect("recv fail");
+        // Let's empty the UDP socket stack from other test packets before sending our test packet
+        let _ = mdns.recv().expect("Fail to receive from the UDP socket.");
+        let _ = mdns.recv().expect("Fail to receive from the UDP socket.");
 
-        match resp.unwrap().0.questions[0] {
-            Question::Srv(ref q) => {
-                assert_eq!(b"lib3h.test.service".to_vec(), q.name);
-            }
-            _ => panic!("BAD TYPE"),
+        mdns.broadcast(&dmesg).expect("Fail to broadcast DNS Message.");
+
+        // std::thread::sleep(std::time::Duration::from_millis(100));
+        if let Some((resp, _addr)) = mdns.recv().expect("Fail to receive from the UDP socket.") {
+            let dmesg_from_resp = DnsMessage::from_raw(&resp).unwrap();
+            assert_eq!(&dmesg_from_resp.questions[0].domain_name, "lib3h.test.service");
         }
     }
 
@@ -783,39 +739,35 @@ mod tests {
     fn it_should_loop_answer() {
         let mut mdns = MulticastDnsBuilder::new()
             .bind_address("0.0.0.0")
-            .bind_port(55001)
+            .bind_port(55055)
             .multicast_loop(true)
             .multicast_ttl(255)
             .multicast_address("224.0.0.251")
             .build()
             .expect("build fail");
 
-        let mut packet = dns_old::Packet::new();
-        packet.id = 0xbdbd;
-        packet.is_query = false;
-        packet.answers.push(dns_old::Answer::Srv(dns_old::SrvDataA {
-            name: b"lib3h.test.service".to_vec(),
-            ttl_seconds: 0x12345678,
-            priority: 0x1111,
-            weight: 0x2222,
-            port: 0x3333,
-            target: b"lib3h.test.target".to_vec(),
-        }));
-        mdns.broadcast(&packet).expect("send fail");
+        let mut dmesg = DnsMessage::new();
+        let answers = vec![
+            AnswerSection::new("holonaute.local.", &[Target::new("wss://192.168.0.88")]),
+            AnswerSection::new("mistral.local.", &[Target::new("wss://192.168.0.77")]),
+        ];
+        dmesg.nb_answers = answers.len() as u16;
+        dmesg.answers = answers;
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let resp = mdns.recv().expect("recv fail");
+        // Let's empty the UDP socket stack from other test packets before sending our test packet
+        let _ = mdns.recv().expect("Fail to receive from the UDP socket.");
+        let _ = mdns.recv().expect("Fail to receive from the UDP socket.");
+        let _ = mdns.recv().expect("Fail to receive from the UDP socket.");
 
-        match resp.unwrap().0.answers[0] {
-            Answer::Srv(ref a) => {
-                assert_eq!(b"lib3h.test.service".to_vec(), a.name);
-                assert_eq!(0x12345678, a.ttl_seconds);
-                assert_eq!(0x1111, a.priority);
-                assert_eq!(0x2222, a.weight);
-                assert_eq!(0x3333, a.port);
-                assert_eq!(b"lib3h.test.target".to_vec(), a.target);
-            }
-            _ => panic!("BAD TYPE"),
+        mdns.broadcast(&dmesg).expect("Fail to broadcast DNS Message.");
+
+        // std::thread::sleep(std::time::Duration::from_millis(100));
+        if let Some((resp, _addr)) = mdns.recv().expect("Fail to receive from the UDP socket.") {
+            let dmesg_from_resp = DnsMessage::from_raw(&resp).unwrap();
+            println!("dmesg = {:#?}", &dmesg);
+            println!("dmesg_from_resp = {:#?}", &dmesg_from_resp);
+
+            assert_eq!(dmesg, dmesg_from_resp);
         }
     }
 

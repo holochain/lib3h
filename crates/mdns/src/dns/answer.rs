@@ -148,7 +148,7 @@ impl Target {
         })
     }
 
-    pub fn write(&self, mut packet: &mut Vec<u8>) -> MulticastDnsResult<()> {
+    pub fn write(&self, packet: &mut Vec<u8>) -> MulticastDnsResult<()> {
         packet.write_u16::<BigEndian>(self.target_len)?;
         for byte in self.target.as_bytes().to_vec() {
             packet.write_u8(byte)?;
