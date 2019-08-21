@@ -1,35 +1,52 @@
-use crate::{DidWork, GhostTracker, RequestId};
+use crate::{DidWork, GhostActorState, RequestId};
 
-pub trait GhostActor<'ga, GA, FromChild, ToChild, FromParent, ToParent, E> {
+pub trait GhostActor<
+    'ga,
+    GA,
+    RequestAsChild,
+    ResponseAsChild,
+    RequestFromParent,
+    ResponseToParent,
+    E,
+>
+{
     fn as_mut(&mut self) -> &mut GA;
 
-    fn get_tracker(&mut self) -> &mut GhostTracker<'ga, GA, FromChild, ToChild, ToParent, E>;
+    fn get_actor_state(
+        &mut self,
+    ) -> &mut GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>;
 
-    fn take_tracker(&mut self) -> GhostTracker<'ga, GA, FromChild, ToChild, ToParent, E>;
+    fn take_actor_state(
+        &mut self,
+    ) -> GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>;
 
-    fn put_tracker(&mut self, tracker: GhostTracker<'ga, GA, FromChild, ToChild, ToParent, E>);
+    fn put_actor_state(
+        &mut self,
+        tracker: GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>,
+    );
 
     fn process(&mut self) -> Result<DidWork, E> {
-        self.get_tracker().process()
+        self.get_actor_state().process()
     }
 
-    // our parent is making a request DOWN to us
-    fn request(&mut self, request_id: Option<RequestId>, request: FromParent);
+    // our parent is making a request of us
+    fn request(&mut self, request_id: Option<RequestId>, request: RequestFromParent);
 
-    // these are response to our parent from the request they made DOWN to us
-    fn drain_responses(&mut self) -> Vec<(RequestId, ToParent)> {
-        self.get_tracker().drain_responses()
+    // these are response to our parent from the request they made of us
+    fn drain_responses(&mut self) -> Vec<(RequestId, ResponseToParent)> {
+        self.get_actor_state().drain_responses()
     }
 
-    // called by parent, these are our requests going UP
-    fn drain_requests(&mut self) -> Vec<(Option<RequestId>, FromChild)> {
-        self.get_tracker().drain_requests()
+    // called by parent, these are our requests goint to them
+    fn drain_requests(&mut self) -> Vec<(Option<RequestId>, RequestAsChild)> {
+        self.get_actor_state().drain_requests()
     }
 
     // called by parest, these are responses to requests in drain_request
-    fn respond(&mut self, request_id: RequestId, response: ToChild) {
-        let mut tracker = self.take_tracker();
-        tracker.handle_out_response(self.as_mut(), request_id, response);
-        self.put_tracker(core);
+    fn respond(&mut self, request_id: RequestId, response: ResponseAsChild) -> Result<(), E> {
+        let mut actor_state = self.take_actor_state();
+        let out = actor_state.handle_response(self.as_mut(), request_id, response);
+        self.put_actor_state(actor_state);
+        out
     }
 }

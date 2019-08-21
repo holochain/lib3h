@@ -1,3 +1,4 @@
+extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
 
@@ -21,6 +22,16 @@ impl From<DidWork> for bool {
 #[shrinkwrap(mutable)]
 pub struct RequestId(pub String);
 
+impl RequestId {
+    pub fn new() -> Self {
+        Self::with_prefix("")
+    }
+
+    pub fn with_prefix(prefix: &str) -> Self {
+        Self(format!("{}{}", prefix, nanoid::simple()))
+    }
+}
+
 impl From<String> for RequestId {
     fn from(s: String) -> Self {
         RequestId(s)
@@ -34,11 +45,11 @@ impl From<RequestId> for String {
 }
 
 mod ghost_tracker;
-pub use ghost_tracker::GhostTracker;
+pub use ghost_tracker::{GhostActorState, GhostTracker};
 
 mod ghost_actor;
 pub use ghost_actor::GhostActor;
 
 pub mod prelude {
-    pub use super::{GhostActor, GhostTracker};
+    pub use super::{GhostActor, GhostActorState, GhostTracker};
 }
