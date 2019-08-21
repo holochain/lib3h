@@ -1,4 +1,4 @@
-use crate::{DidWork, RequestId, GhostTracker, GhostCallback};
+use crate::{DidWork, GhostCallback, GhostTracker, RequestId};
 
 pub struct GhostActorState<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E> {
     callbacks: GhostTracker<'gas, GA, ResponseAsChild, E>,
@@ -25,10 +25,7 @@ impl<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
     }
 
     /// called by concrete implementation
-    pub fn send_event_to_parent(
-        &mut self,
-        event: RequestAsChild,
-    ) {
+    pub fn send_event_to_parent(&mut self, event: RequestAsChild) {
         self.requests_to_parent.push((None, event));
     }
 
@@ -53,7 +50,12 @@ impl<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
         self.callbacks.handle(request_id, ga, response)
     }
 
-    pub fn post_in_response(&mut self, request_id: RequestId, response: ResponseToParent) {
+    /// our parent sent in a request
+    /// we have a response to that request
+    /// post it, so they can get the response through `drain_responses()`
+    /// if this was a synchronous action, this will be called inside
+    /// GhostActor::request()
+    pub fn respond_to_parent(&mut self, request_id: RequestId, response: ResponseToParent) {
         self.responses_to_parent.push((request_id, response));
     }
 

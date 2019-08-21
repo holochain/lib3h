@@ -7,7 +7,8 @@ pub enum GhostCallbackData<CbData> {
     Timeout,
 }
 
-pub type GhostCallback<'cb, GA, CbData, E> = Box<dyn Fn(&mut GA, GhostCallbackData<CbData>) -> Result<(), E> + 'cb>;
+pub type GhostCallback<'cb, GA, CbData, E> =
+    Box<dyn Fn(&mut GA, GhostCallbackData<CbData>) -> Result<(), E> + 'cb>;
 
 struct GhostTrackerEntry<'gte, GA, CbData, E> {
     expires: std::time::SystemTime,
@@ -53,12 +54,21 @@ impl<'gtrack, GA, CbData, E> GhostTracker<'gtrack, GA, CbData, E> {
         Ok(())
     }
 
-    pub fn bookmark(&mut self, timeout: std::time::Duration, cb: GhostCallback<'gtrack, GA, CbData, E>) -> RequestId {
+    pub fn bookmark(
+        &mut self,
+        timeout: std::time::Duration,
+        cb: GhostCallback<'gtrack, GA, CbData, E>,
+    ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
-        self.pending.insert(request_id.clone(), GhostTrackerEntry {
-            expires: std::time::SystemTime::now().checked_add(timeout).expect("can add timeout to SystemTime::now()"),
-            cb
-        });
+        self.pending.insert(
+            request_id.clone(),
+            GhostTrackerEntry {
+                expires: std::time::SystemTime::now()
+                    .checked_add(timeout)
+                    .expect("can add timeout to SystemTime::now()"),
+                cb,
+            },
+        );
         request_id
     }
 
@@ -68,9 +78,7 @@ impl<'gtrack, GA, CbData, E> GhostTracker<'gtrack, GA, CbData, E> {
                 println!("request_id {:?} not found", request_id);
                 Ok(())
             }
-            Some(entry) => {
-                (entry.cb)(ga, GhostCallbackData::Response(data))
-            }
+            Some(entry) => (entry.cb)(ga, GhostCallbackData::Response(data)),
         }
     }
 }

@@ -22,7 +22,7 @@ pub trait GhostActor<
 
     fn put_actor_state(
         &mut self,
-        tracker: GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>,
+        actor_state: GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>,
     );
 
     fn process(&mut self) -> Result<DidWork, E> {
