@@ -95,7 +95,7 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
             } else if a[i] < b[i] {
                 return -1;
             };
-            i = i+1;
+            i = i + 1;
         }
         return 0;
     }
