@@ -42,7 +42,7 @@ impl<'gtrack, GA, FromChild, ToChild, ToParent, E>
 
     pub fn handle_out_response(&mut self, m: &mut GA, request_id: RequestId, response: ToChild) {
         match self.expected_to_child.remove(&request_id) {
-            None => println!("no pending for request_id {}", request_id.0),
+            None => println!("nothing expected for request_id {}", request_id.0),
             Some(cb) => cb(m, response),
         }
     }
