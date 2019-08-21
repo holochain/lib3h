@@ -16,6 +16,7 @@ impl FullSuite {
         self.test_sec_buf();
         self.test_random();
         self.test_hash();
+        self.test_generic_hash();
         self.test_pwhash();
         self.test_kdf();
         self.test_sign_keypair_sizes();
@@ -71,6 +72,19 @@ impl FullSuite {
         let mut hash512: Box<dyn Buffer> = Box::new(vec![0; self.crypto.hash_sha512_bytes()]);
         self.crypto.hash_sha512(&mut hash512, &data).unwrap();
         assert_eq!("[105, 206, 48, 255, 80, 134, 192, 184, 108, 217, 124, 49, 193, 43, 2, 219, 148, 27, 91, 154, 89, 69, 229, 78, 13, 74, 51, 57, 52, 201, 186, 25, 109, 206, 155, 242, 249, 8, 179, 34, 106, 170, 160, 158, 11, 89, 85, 25, 22, 70, 70, 150, 84, 221, 184, 130, 245, 196, 101, 192, 160, 225, 160, 253]", &format!("{:?}", hash512));
+    }
+
+    fn test_generic_hash(&self) {
+        let data: Box<dyn Buffer> = Box::new(vec![42, 1, 38, 2, 155, 212, 3, 11]);
+
+        let mut hash1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.generic_hash_min_bytes()]);
+        let mut hash2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.generic_hash_min_bytes()]);
+
+        self.crypto.generic_hash(&mut hash1, &data, None).unwrap();
+        assert_ne!(*hash1.read_lock(), *hash2.read_lock());
+
+        self.crypto.generic_hash(&mut hash2, &data, None).unwrap();
+        assert_eq!(*hash1.read_lock(), *hash2.read_lock());
     }
 
     fn test_pwhash(&self) {
@@ -514,6 +528,47 @@ mod test {
             let mut hasher = sha2::Sha512::new();
             hasher.input(data.read_lock().deref());
             hash.write(0, &hasher.result())?;
+            Ok(())
+        }
+
+        fn generic_hash_min_bytes(&self) -> usize {
+            8
+        }
+
+        fn generic_hash_max_bytes(&self) -> usize {
+            8
+        }
+
+        fn generic_hash_key_min_bytes(&self) -> usize {
+            8
+        }
+
+        fn generic_hash_key_max_bytes(&self) -> usize {
+            8
+        }
+
+        fn generic_hash(
+            &self,
+            hash: &mut Box<dyn Buffer>,
+            data: &Box<dyn Buffer>,
+            key: Option<&Box<dyn Buffer>>,
+        ) -> CryptoResult<()> {
+            if hash.len() < self.generic_hash_min_bytes()
+                || hash.len() > self.generic_hash_max_bytes()
+            {
+                return Err(CryptoError::BadHashSize);
+            }
+
+            if key.is_some()
+                && (key.unwrap().len() < self.generic_hash_key_min_bytes()
+                    || key.unwrap().len() > self.generic_hash_key_max_bytes())
+            {
+                return Err(CryptoError::BadKeySize);
+            }
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.input(data.read_lock().deref());
+            hash.write(0, &hasher.result()[..hash.len()])?;
             Ok(())
         }
 
