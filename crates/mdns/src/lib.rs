@@ -43,9 +43,6 @@ const PROBE_QUERY_DELAY_MS: u64 = 250;
 /// Listening port of this mDNS service.
 const SERVICE_LISTENER_PORT: u16 = 8585;
 
-// /// Type helper corresponding to the resource record of a host.
-// pub type MapRecord = MapRecord<HashMap<String, Record>>;
-
 /// mdns builder
 pub struct MulticastDnsBuilder {
     pub(crate) bind_address: String,
@@ -217,7 +214,6 @@ impl MulticastDns {
 
     /// Update our cache of resource records.
     pub fn update_cache(&mut self, records: &MapRecord) {
-        // dbg!(&records);
         for (_name, new_record) in records.iter() {
             if let Some(rec) = self.map_record.get(&new_record.hostname) {
                 let new_addr = new_record.addrs.first().expect("Empty list of address.");
@@ -271,24 +267,6 @@ impl MulticastDns {
                 }
             }
         }
-
-        // let (read_size, addr) = match self.recv_socket.recv_from(&mut self.buffer) {
-        //     Ok(r) => r,
-        //     Err(e) => {
-        //         if e.kind() == std::io::ErrorKind::WouldBlock {
-        //             return Ok(None);
-        //         } else {
-        //             return Err(e.into());
-        //         }
-        //     }
-        // };
-        //
-        // if read_size > 0 {
-        //     let packet = Packet::from_raw(&self.buffer[0..read_size])?;
-        //     Ok(Some((packet, addr)))
-        // } else {
-        //     Ok(None)
-        // }
     }
 
     /// Try to receive a DNS packet and set timeout and wait time doing so.
@@ -339,20 +317,6 @@ impl MulticastDns {
         }
     }
 
-    // /// Startup phase corresponding to the
-    // /// [probing](https://tools.ietf.org/html/rfc6762#section-8.1) and
-    // /// [annoncing](https://tools.ietf.org/html/rfc6762#section-8.3) phases.
-    // pub fn init(&mut self) -> MulticastDnsResult<()> {
-    //     // Fires up the service listener
-    //     ..
-    //
-    //     // Run the mDNS startup phase
-    //     self.probe()?;
-    //     self.announcing()?;
-    //
-    //     Ok(())
-    // }
-
     /// Run the mDNS service.
     pub fn run(&mut self) -> MulticastDnsResult<()> {
         println!("Startuping.");
@@ -367,6 +331,7 @@ impl MulticastDns {
 
     /// mDNS Querier
     /// One-Shot Multicast DNS Queries
+    /// Not used in our actual mDNS implementation.
     pub fn query(&mut self) -> MulticastDnsResult<()> {
         // let query_packet = self.build_query_packet();
         // // let query_packet = self.build_probe_packet();
@@ -390,6 +355,7 @@ impl MulticastDns {
 
     /// A mDNS Responder that listen to the network in order to defend its name and respond to
     /// queries
+    /// Not used in our actual mDNS implementation.
     fn responder(&mut self) -> MulticastDnsResult<()> {
         // let resp_packet = self.build_defensive_packet();
         // let mut query_every = 1u64;
