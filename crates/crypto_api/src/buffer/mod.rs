@@ -80,7 +80,6 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
     /// | if a < b; return -1
     /// | if a == b; return 0
     fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32 {
-        println!("comparing {:?} to {:?}", self, b);
         let al = self.len();
         let bl = b.len();
         let l = if al > bl { al } else { bl };
@@ -89,7 +88,6 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
         for i in (0..l).rev() {
             let av = if i >= al { 0 } else { a[i] };
             let bv = if i >= bl { 0 } else { b[i] };
-            println!("comparing av:{} to bv:{} at i:{}", av, bv, i);
             if av > bv {
                 return 1;
             } else if av < bv {
