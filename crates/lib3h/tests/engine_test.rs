@@ -233,12 +233,14 @@ fn basic_connect_test_mock() {
     println!("\nengine_a.process()...");
     let is_connected = Box::new(predicate::function(|x| is_connected(x, "connect_a_1")));
 
-    assert_eq!
-        (process_until_event(
-        &mut engine_a,
-        is_connected,
-        "Lib3hServerProtocol::Connected".into(),
-    ), ProcessorResult::Pass)
+    assert_eq!(
+        process_until_event(
+            &mut engine_a,
+            is_connected,
+            "Lib3hServerProtocol::Connected".into(),
+        ),
+        ProcessorResult::Pass
+    )
     /*
     let (did_work, srv_msg_list) = engine_a.process().unwrap();
     println!("engine_a: {:?}", srv_msg_list);
