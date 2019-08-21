@@ -154,7 +154,7 @@ type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
 pub fn assert_using_predicate<'a>(
-    mut engines: &mut Vec<&mut RealEngine<'a, MirrorDht>>,
+    mut engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     expect: String,
 ) {
@@ -174,7 +174,10 @@ pub fn assert_using_predicate<'a>(
     assert_eq!(ProcessorResult::Pass, actual)
 }
 
-fn process_until<'a>(engines: &mut Vec<&mut RealEngine<'a, MirrorDht>>, f: &mut Processor) -> ProcessorResult {
+fn process_until<'a>(
+    engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
+    f: &mut Processor,
+) -> ProcessorResult {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
     for epoch in 0..MAX_PROCESSING_LOOPS {
@@ -207,8 +210,7 @@ fn process_until<'a>(engines: &mut Vec<&mut RealEngine<'a, MirrorDht>>, f: &mut 
     }
     ProcessorResult::Fail(format!(
         "Max number of process iterations exceeded ({}). Errors: {:?}",
-        MAX_PROCESSING_LOOPS,
-        errors
+        MAX_PROCESSING_LOOPS, errors
     ))
 }
 
@@ -223,8 +225,10 @@ fn is_connected(x: &Lib3hServerProtocol, request_id: &str) -> bool {
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine_a = basic_setup_mock("basic_send_test_mock_node_a");
-    let mut engine_b = basic_setup_mock("basic_send_test_mock_node_b");
+    let mut engine_a: Box<dyn NetworkEngine> =
+        Box::new(basic_setup_mock("basic_send_test_mock_node_a"));
+    let mut engine_b: Box<dyn NetworkEngine> =
+        Box::new(basic_setup_mock("basic_send_test_mock_node_b"));
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
@@ -363,6 +367,8 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     println!("connected_msg = {:?}", connected_msg);
     assert_eq!(connected_msg.uri, req_connect.peer_uri);
     // More process: Have Billy process P2p::PeerAddress of alex
+    //    assert_using_predicate(alex
+
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
