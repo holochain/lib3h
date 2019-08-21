@@ -625,7 +625,7 @@ impl Discovery for MulticastDns {
                     }
                 },
                 Ok(None) => {
-                    eprintln!(">> Nothing on the UDP stack");
+                    debug!(">> Nothing on the UDP stack");
                     break
                 },
                 Err(e) => eprintln!("Something went wrong while processing the UDP stack during update: '{}'", e)
