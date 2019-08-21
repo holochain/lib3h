@@ -175,6 +175,65 @@ impl CryptoSystem for SodiumCryptoSystem {
         Ok(())
     }
 
+    fn generic_hash_min_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_generichash_BYTES_MIN as usize
+    }
+
+    fn generic_hash_max_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_generichash_BYTES_MAX as usize
+    }
+
+    fn generic_hash_key_min_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_generichash_KEYBYTES_MIN as usize
+    }
+
+    fn generic_hash_key_max_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_generichash_KEYBYTES_MAX as usize
+    }
+
+    fn generic_hash(
+        &self,
+        hash: &mut Box<dyn Buffer>,
+        data: &Box<dyn Buffer>,
+        key: Option<&Box<dyn Buffer>>,
+    ) -> CryptoResult<()> {
+        if hash.len() < self.generic_hash_min_bytes() || hash.len() > self.generic_hash_max_bytes()
+        {
+            return Err(CryptoError::BadHashSize);
+        }
+
+        if key.is_some()
+            && (key.unwrap().len() < self.generic_hash_key_min_bytes()
+                || key.unwrap().len() > self.generic_hash_key_max_bytes())
+        {
+            return Err(CryptoError::BadKeySize);
+        }
+
+        let my_key_locker;
+        let mut my_key = std::ptr::null();
+        let mut my_key_len = 0 as usize;
+        if let Some(key) = key {
+            my_key_locker = key.read_lock();
+            my_key = raw_ptr_char_immut!(my_key_locker);
+            my_key_len = my_key_locker.len() as usize;
+        }
+
+        unsafe {
+            let mut hash = hash.write_lock();
+            let data = data.read_lock();
+            rust_sodium_sys::crypto_generichash(
+                raw_ptr_char!(hash),
+                hash.len() as usize,
+                raw_ptr_char_immut!(data),
+                data.len() as libc::c_ulonglong,
+                my_key,
+                my_key_len,
+            );
+        }
+
+        Ok(())
+    }
+
     fn pwhash_salt_bytes(&self) -> usize {
         rust_sodium_sys::crypto_pwhash_SALTBYTES as usize
     }
