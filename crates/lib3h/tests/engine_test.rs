@@ -169,8 +169,7 @@ pub fn process_until_event<'a>(
         {
             ProcessorResult::Pass
         } else {
-            ProcessorResult::Continue(
-                format!("Expected: {:?}", expect.clone()))
+            ProcessorResult::Continue(format!("Expected: {:?}", expect.clone()))
         }
     });
     process_until(&mut engine, &mut f)
@@ -195,7 +194,10 @@ fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) 
         };
         let result = (f)(processor_args.clone());
         match result {
-            ProcessorResult::Continue(err) => { errors.push(err); () },
+            ProcessorResult::Continue(err) => {
+                errors.push(err);
+                ()
+            }
             ProcessorResult::Fail(err) => return ProcessorResult::Fail(err),
             ProcessorResult::Pass => return ProcessorResult::Pass,
         };
@@ -204,8 +206,10 @@ fn process_until<'a>(engine: &mut RealEngine<'a, MirrorDht>, f: &mut Processor) 
         }
         //}
     }
-    ProcessorResult::Fail(
-        format!("Max number of process iterations exceeded. Errors: {:?}", errors))
+    ProcessorResult::Fail(format!(
+        "Max number of process iterations exceeded. Errors: {:?}",
+        errors
+    ))
 }
 
 fn is_connected(x: &Lib3hServerProtocol, request_id: &str) -> bool {
@@ -238,11 +242,7 @@ fn basic_connect_test_mock() {
     let is_connected = Box::new(predicate::function(|x| is_connected(x, "connect_a_1")));
 
     assert_eq!(
-        process_until_event(
-            &mut engine_a,
-            is_connected,
-            "Connected".into(),
-        ),
+        process_until_event(&mut engine_a, is_connected, "Connected".into(),),
         ProcessorResult::Pass
     )
     /*
