@@ -3,16 +3,18 @@
 //! Our simple use case is the following:
 //! ```rust
 //! use lib3h_mdns as mdns;
-//! use lib3h_mdns::Discovery;
+//! use lib3h_discovery::Discovery;
 //!
 //! let mut mdns = mdns::MulticastDnsBuilder::new()
 //!     .bind_port(8585)
 //!     .build()
 //!     .expect("Fail to build mDNS.");
 //!
-//! mdns.advertise();
+//! // Make myself known on the network and find a name for myself
+//! mdns.advertise()
+//!     .expect("Fail to advertise my existence to the world.");
 //!
-//! // Let's listen to the network for a few moment...
+//! // Let's listen to the network for a few moments...
 //! for _ in 0..5 {
 //!     mdns.discover();
 //!     eprintln!("mDNS neighbourhood : {:#?}", &mdns.records());
@@ -24,7 +26,7 @@
 #![feature(try_trait)]
 #![feature(never_type)]
 
-use log::debug;
+use log::{debug, error};
 use rand::Rng;
 use regex;
 use std::net;
@@ -38,17 +40,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+use lib3h_discovery::{error::DiscoveryResult, Discovery};
+
 pub mod error;
 pub use error::{MulticastDnsError, MulticastDnsResult};
 
-pub mod dns_old;
-pub use dns_old::{Answer, Packet, Question, SrvDataA, SrvDataQ};
-
 pub mod dns;
 pub use dns::*;
-
-pub mod protocol;
-pub use protocol::Discovery;
 
 pub mod record;
 use record::{HashMapRecord, MapRecord, Record};
@@ -64,6 +62,12 @@ const PROBE_QUERY_DELAY_MS: u64 = 250;
 
 /// Listening port of this mDNS service.
 const SERVICE_LISTENER_PORT: u16 = 8585;
+
+/// mDNS multicast IPv4 address.
+const MDNS_MULCAST_IPV4_ADRESS: &str = "224.0.0.251";
+
+/// Default bind adress.
+const DEFAULT_BIND_ADRESS: &str = "0.0.0.0";
 
 /// mdns builder
 pub struct MulticastDnsBuilder {
@@ -130,7 +134,7 @@ impl MulticastDnsBuilder {
             &self.bind_address.parse()?,
         )?;
 
-        let send_socket = create_socket("0.0.0.0", get_available_port("0.0.0.0")?)?;
+        let send_socket = create_socket(DEFAULT_BIND_ADRESS, get_available_port(DEFAULT_BIND_ADRESS)?)?;
         send_socket.set_nonblocking(true)?;
 
         Ok(MulticastDns {
@@ -154,11 +158,11 @@ use std::default::Default;
 impl Default for MulticastDnsBuilder {
     fn default() -> Self {
         MulticastDnsBuilder {
-            bind_address: String::from("0.0.0.0"),
+            bind_address: String::from(DEFAULT_BIND_ADRESS),
             bind_port: SERVICE_LISTENER_PORT,
             multicast_loop: true,
             multicast_ttl: 255,
-            multicast_address: String::from("224.0.0.251"),
+            multicast_address: String::from(MDNS_MULCAST_IPV4_ADRESS),
             own_record: Record::new_own(),
         }
     }
@@ -166,14 +170,11 @@ impl Default for MulticastDnsBuilder {
 
 fn get_available_port(addr: &str) -> MulticastDnsResult<u16> {
     for port in SERVICE_LISTENER_PORT + 1..65535 {
-        match net::UdpSocket::bind((addr, port)) {
-            Ok(_) => return Ok(port),
-            _ => (),
+        if net::UdpSocket::bind((addr, port)).is_ok() {
+            return Ok(port)
         }
     }
-    Err(MulticastDnsError::new_other(
-        "Fail to get an ephemeral mDNS sending port.",
-    ))
+    Err(MulticastDnsError::new(crate::error::ErrorKind::NoAvailablePort))
 }
 
 /// an mdns instance that can send and receive dns packets on LAN UDP multicast
@@ -257,7 +258,7 @@ impl MulticastDns {
     }
 
     /// Broadcasts a packet.
-    pub fn broadcast(&self, data: &Vec<u8>) -> Result<usize, MulticastDnsError> {
+    pub fn broadcast(&self, data: &[u8]) -> Result<usize, MulticastDnsError> {
         let addr = (self.multicast_address.as_ref(), self.bind_port)
             .to_socket_addrs()?
             .next()?;
@@ -305,7 +306,7 @@ impl MulticastDns {
 
         let start = Instant::now();
 
-        while start.elapsed().as_millis() < for_duration as u128 {
+        while start.elapsed().as_millis() < u128::from(for_duration) {
             match self.recv_socket.recv_from(&mut self.buffer) {
                 Ok((num_bytes, sender_socket_addr)) => {
                     let packet = self.buffer[..num_bytes].to_vec();
@@ -352,7 +353,7 @@ impl MulticastDns {
     /// Run the mDNS service.
     pub fn run(&mut self) -> MulticastDnsResult<()> {
         println!("Startuping.");
-        self.advertise();
+        self.advertise()?;
 
         // Run this async
         println!("Responder service started.");
@@ -579,12 +580,9 @@ impl MulticastDns {
     /// Detects confict: check if a record already exist in the cache.
     pub fn detect_conflict_during_probe(&self, other_record: &Record) -> bool {
         if self.map_record.is_empty() {
-            return false;
+            false
         } else {
-            match self.map_record.get(&other_record.hostname) {
-                Some(_) => return true,
-                None => return false,
-            }
+            self.map_record.get(&other_record.hostname).is_some()
         }
     }
 
@@ -614,7 +612,7 @@ impl MulticastDns {
 
 impl Discovery for MulticastDns {
     /// Make yourself known on the network.
-    fn advertise(&mut self) {
+    fn advertise(&mut self) -> DiscoveryResult<()> {
         for _retry in 0..15 {
             match self.probe() {
                 Ok(_) => break,
@@ -628,14 +626,15 @@ impl Discovery for MulticastDns {
         }
 
         self.announcing().expect("Fail to announce during startup.");
+        Ok(())
     }
 
     /// Read the UDP stack and update our cache accordingly.
-    fn discover(&mut self) -> MulticastDnsResult<()> {
+    fn discover(&mut self) -> DiscoveryResult<()> {
         // Process all element of the UDP socket stack
         loop {
             match self.recv() {
-                Ok(Some((packet, _sender_addr))) => {
+                Ok(Some((packet, sender_addr))) => {
                     let dmesg = DnsMessage::from_raw(&packet)?;
                     if dmesg.nb_answers > 0 {
                         if let Some(new_map_record) = MapRecord::from_dns_message(&dmesg) {
@@ -649,8 +648,7 @@ impl Discovery for MulticastDns {
                         for question in dmesg.questions.iter() {
                             if question.domain_name == self.own_record.hostname {
                                 let response = self.build_defensive_message();
-                                self.send_socket
-                                    .send_to(&response.to_raw()?, _sender_addr)?;
+                                self.send_socket.send_to(&response.to_raw()?, sender_addr)?;
                             }
                         }
                     }
@@ -659,10 +657,13 @@ impl Discovery for MulticastDns {
                     debug!(">> Nothing on the UDP stack");
                     break;
                 }
-                Err(e) => eprintln!(
-                    "Something went wrong while processing the UDP stack during update: '{}'",
-                    e
-                ),
+                Err(e) => {
+                    error!(
+                        "Something went wrong while processing the UDP stack during update: '{}'",
+                        e
+                    );
+                    break;
+                }
             }
         }
 
@@ -680,17 +681,20 @@ impl Discovery for MulticastDns {
     }
 
     /// Release itself from the available participants in a network.
-    fn release(&mut self) {
+    fn release(&mut self) -> DiscoveryResult<()> {
         self.own_record.ttl = 0;
         self.map_record
             .insert(self.own_record.hostname.clone(), self.own_record.clone());
         self.broadcast_message(&self.build_release_message())
             .expect("Fail to broadcast release message.");
+
+        Ok(())
     }
 
     /// Clear our cache from resource records.
-    fn flush(&mut self) {
+    fn flush(&mut self) -> DiscoveryResult<()> {
         self.map_record.clear();
+        Ok(())
     }
 }
 
@@ -734,7 +738,7 @@ mod tests {
             .bind_port(55055)
             .multicast_loop(true)
             .multicast_ttl(255)
-            .multicast_address("224.0.0.251")
+            .multicast_address("224.0.0.247")
             .build()
             .expect("build fail");
 
@@ -766,7 +770,7 @@ mod tests {
             .bind_port(55055)
             .multicast_loop(true)
             .multicast_ttl(255)
-            .multicast_address("224.0.0.251")
+            .multicast_address("224.0.0.248")
             .build()
             .expect("build fail");
 
@@ -798,16 +802,21 @@ mod tests {
 
     #[test]
     fn resolve_conflict_test() {
-        let mut mdns = MulticastDnsBuilder::new()
-            .build()
-            .expect("Fail to build mDNS.");
+        let resolve_conflict_name = {
+            let mut mdns = MulticastDnsBuilder::new()
+                .multicast_address("224.0.0.249")
+                .build()
+                .expect("Fail to build mDNS.");
 
-        let own_record = Record::new_own();
-        let resolve_confict_name = mdns.resolve_conflict().expect("Fail to resolve confict.");
-        assert_ne!(own_record.hostname(), resolve_confict_name);
+            let own_record = Record::new_own();
+            let resolve_conflict_name = mdns.resolve_conflict().expect("Fail to resolve confict.");
+            assert_ne!(own_record.hostname(), resolve_conflict_name);
+            resolve_conflict_name
+        };
 
         let mut mdns = MulticastDnsBuilder::new()
-            .own_record(&resolve_confict_name, &["0.0.0.0"])
+            .own_record(&resolve_conflict_name, &["0.0.0.0"])
+            .multicast_address("224.0.0.249")
             .build()
             .expect("Fail to build mDNS.");
 
@@ -817,6 +826,7 @@ mod tests {
 
         let mut mdns = MulticastDnsBuilder::new()
             .own_record("asgard.1.2", &["0.0.0.0"])
+            .multicast_address("224.0.0.249")
             .build()
             .expect("Fail to build mDNS.");
 
@@ -830,6 +840,7 @@ mod tests {
         let own_record = Record::new("holonaute.local.", &["0.0.0.0".to_string()], 255);
         // This is the one from which we want to see another node disapearing from its cache
         let mut mdns = MulticastDnsBuilder::new()
+            .multicast_address("224.0.0.250")
             .own_record("holonaute", &["0.0.0.0"])
             .build()
             .expect("Fail to build mDNS.");
@@ -839,17 +850,20 @@ mod tests {
 
         let mut mdns_releaser = MulticastDnsBuilder::new()
             .own_record("holonaute-to-release", &["0.0.0.0"])
+            .multicast_address("224.0.0.250")
             .build()
             .expect("Fail to build mDNS.");
 
         // Make itself known ion the network
-        mdns_releaser.advertise();
+        mdns_releaser.advertise()
+            .expect("Fail to advertise my existence during release test.");
 
         // Discovering the soon leaving participant
         mdns.discover().expect("Fail to discover.");
 
         // Leaving the party
-        mdns_releaser.release();
+        mdns_releaser.release()
+            .expect("Fail to release myself from the participants on the network.");
 
         // Updating the cache
         mdns.discover().expect("Fail to discover.");

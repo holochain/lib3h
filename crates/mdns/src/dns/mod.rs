@@ -1,5 +1,9 @@
 //! mDNS message serializer.
 
+// Allow the use of &Vec<u8> for packet type definition, otherwise it will create diffult to track
+// errors while using cursor and byteorder.
+#![allow(clippy::ptr_arg)]
+
 use super::error::MulticastDnsResult;
 #[allow(unused_imports)]
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};

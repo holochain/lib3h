@@ -1,9 +1,6 @@
-//! mDNS resource record.
+//! mDNS resource record definition.
 
-// use crate::dns_old::{Answer, Packet, Question, SrvDataA, SrvDataQ};
-// use crate::dns::{Answer, AnswerSection, Question, QuerySection, DnsMessage};
 use crate::dns::{AnswerSection, DnsMessage, QuerySection, Target};
-// use crate::error::MulticastDnsResult;
 use get_if_addrs;
 use hostname;
 use std::{
@@ -64,7 +61,7 @@ impl MapRecord {
 
     /// Builds a [`MapRecord`] from a [`DnsMessage`].
     pub fn from_dns_message(dmesg: &DnsMessage) -> Option<MapRecord> {
-        if dmesg.answers.len() > 0 {
+        if !dmesg.answers.is_empty() {
             let records: Vec<Record> = dmesg
                 .answers
                 .iter()
@@ -157,10 +154,9 @@ impl Record {
     /// we fall back to "0.0.0.0" address.
     pub fn new_own() -> Self {
         let hostname = convert_to_mdns_hostname(
-            &hostname::get_hostname().unwrap_or(String::from("Anonymous-host")),
+            &hostname::get_hostname().unwrap_or_else(|| String::from("Anonymous-host")),
         );
 
-        // TODO : Use "lib3h_protocol > engine > Advertise" here
         let mut addrs: Vec<String> = get_if_addrs::get_if_addrs()
             .expect("Fail to retrieve host network interfaces.")
             .iter()

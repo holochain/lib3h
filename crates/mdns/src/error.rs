@@ -1,5 +1,6 @@
 //! mDNS module error definition.
 
+use lib3h_discovery::error::DiscoveryError;
 use regex;
 use std::{error::Error as StdError, fmt, io, net};
 
@@ -43,10 +44,14 @@ pub enum ErrorKind {
     AddrParseError(net::AddrParseError),
     /// Error during probe.
     ProbeError,
+    /// Error occuring while we try to get an available port from the host.
+    NoAvailablePort,
     /// Error occuring while using Regex crate.
     RegexError(regex::Error),
     /// Error occuring while converting bytes to String.
     Utf8Error(std::str::Utf8Error),
+    /// Error occuring while discovering participants on a network.
+    DiscoveryError(DiscoveryError),
     /// Yet undefined error.
     Other(String),
     /// Hints that destructuring should not be exhaustive.
@@ -65,9 +70,11 @@ impl StdError for MulticastDnsError {
             ErrorKind::Io(ref err) => Some(err),
             ErrorKind::NoneError(ref _err) => None,
             ErrorKind::AddrParseError(ref err) => Some(err),
-            ErrorKind::Utf8Error(ref err) => Some(err),
-            ErrorKind::Other(ref _s) => None,
             ErrorKind::ProbeError => None,
+            ErrorKind::NoAvailablePort => None,
+            ErrorKind::Utf8Error(ref err) => Some(err),
+            ErrorKind::DiscoveryError(ref err) => Some(err),
+            ErrorKind::Other(ref _s) => None,
             _ => unreachable!(),
         }
     }
@@ -79,8 +86,10 @@ impl fmt::Display for MulticastDnsError {
             ErrorKind::Io(ref err) => err.fmt(f),
             ErrorKind::NoneError(ref _err) => write!(f, "None value encountered."),
             ErrorKind::AddrParseError(ref err) => err.fmt(f),
-            ErrorKind::Utf8Error(ref err) => err.fmt(f),
             ErrorKind::ProbeError => write!(f, "Error during probe."),
+            ErrorKind::NoAvailablePort => write!(f, "No available port found on the host."),
+            ErrorKind::Utf8Error(ref err) => err.fmt(f),
+            ErrorKind::DiscoveryError(ref err) => err.fmt(f),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
@@ -114,5 +123,17 @@ impl From<regex::Error> for MulticastDnsError {
 impl From<std::str::Utf8Error> for MulticastDnsError {
     fn from(err: std::str::Utf8Error) -> Self {
         MulticastDnsError::new(ErrorKind::Utf8Error(err))
+    }
+}
+
+impl From<DiscoveryError> for MulticastDnsError {
+    fn from(err: DiscoveryError) -> Self {
+        MulticastDnsError::new(ErrorKind::DiscoveryError(err))
+    }
+}
+
+impl From<MulticastDnsError> for DiscoveryError {
+    fn from(err: MulticastDnsError) -> DiscoveryError {
+        DiscoveryError::new_other(&format!("{}", err))
     }
 }
