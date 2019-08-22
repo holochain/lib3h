@@ -13,7 +13,7 @@ extern crate predicates;
 use predicates::prelude::*;
 
 use lib3h::{
-    dht::{dht_trait::Dht, mirror_dht::MirrorDht},
+    dht::{mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
     transport_wss::TlsConfig,
 };
@@ -141,19 +141,116 @@ struct ProcessorArgs {
     previous: Vec<ProcessorArgs>,
 }
 
-#[derive(Debug, Eq, Clone, PartialEq)]
-pub enum ProcessorResult {
-    Continue(String),
-    Fail(String),
-    Pass,
+trait Processor : Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
+
+    fn name(&self) -> String {
+        "default_processor".into()
+    }
+
+    fn test(&self, args: &ProcessorArgs) {
+        panic!("{} test failed with inputs {:?}", self.name(), args);
+    }
+
+    fn fmt(&self, f:&mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
 }
 
-/// A function that produces accepted sockets of type R wrapped in a TransportInfo
-type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
+
+trait AssertEquals<T:PartialEq+std::fmt::Debug> : Processor {
+
+   fn actual(&self, args:&ProcessorArgs) -> Option<T>;
+
+   fn expected(&self) -> T;
+
+   fn eval(&self, args:&ProcessorArgs) -> bool {
+       if let Some(actual) = self.actual(args) {
+          actual == self.expected()  
+       } else {
+           false
+       }
+   }
+
+   fn test(&self, args:&ProcessorArgs) {
+       assert_eq!(Some(self.expected()), self.actual(args));
+   }
+
+}
+
+#[derive(PartialEq, Debug)]
+struct Lib3hServerProtocolEquals(Lib3hServerProtocol);
+
+impl AssertEquals<Lib3hServerProtocol> for Lib3hServerProtocolEquals {
+
+    fn actual(&self, args:&ProcessorArgs) -> Option<Lib3hServerProtocol> {
+        let x = args.events.first().clone();
+        x.map(|x|x.clone())
+    }
+    fn expected(&self) -> Lib3hServerProtocol { self.0.clone() }
+}
+
+impl std::fmt::Display for Lib3hServerProtocolEquals {
+    fn fmt(&self, f:&mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl predicates::Predicate<ProcessorArgs> for Lib3hServerProtocolEquals {
+
+   fn eval(&self, args:&ProcessorArgs) -> bool {
+       if let Some(actual) = self.actual(args) {
+          actual == self.expected()  
+       } else {
+           false
+       }
+   }
+
+}
+
+impl Processor for Lib3hServerProtocolEquals {
+   fn test(&self, args:&ProcessorArgs) {
+       assert_eq!(Some(self.expected()), self.actual(args));
+   }
+}
+
+impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
+
+
+//type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
-pub fn assert_using_predicate<'a>(
+/*
+pub fn assert_using_predicates(
+    mut engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
+    predicates: Vec<(String, Box<dyn Predicate<Lib3hServerProtocol>>)>,
+) {
+
+    let processors = predicates.iter_mut().map(
+        |(predicate_name, predicate)| {
+
+        let mut processor : Processor = Box::new(|processor_args: ProcessorArgs| {
+            if processor_args
+                .events
+                    .iter()
+                    .find(|e| predicate.eval(e))
+                    .is_some()
+            {
+                ProcessorResult::Pass
+            } else {
+                ProcessorResult::Continue(
+                    String::from("TODO"))
+            }
+        });
+        (String::from(predicate_name), &mut processor)
+    }).collect();
+    let actual = process_until(&mut engines, &mut processors);
+    drop(processors);
+    assert_eq!(ProcessorResult::Pass, actual)
+}
+*/
+/*
+pub fn assert_using_predicate(
     mut engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     expect: String,
@@ -170,19 +267,29 @@ pub fn assert_using_predicate<'a>(
             ProcessorResult::Continue(format!("Expected: {:?}", expect.clone()))
         }
     });
-    let actual = process_until(&mut engines, &mut f);
+    let mut processors : Vec<(String, &mut Processor)> = vec![("is_connected".into(), &mut f)];
+    let actual = process_until(&mut engines, &mut processors);
     assert_eq!(ProcessorResult::Pass, actual)
 }
+*/
 
-fn process_until<'a>(
+fn assert_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
-    f: &mut Processor,
-) -> ProcessorResult {
+    processors: &Vec<Box<impl Processor>>,
+) {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
+
+    for p in processors {
+        errors.push((p,None))
+    }
+
     for epoch in 0..MAX_PROCESSING_LOOPS {
+    
         println!("[{:?}] {:?}", epoch, previous);
-        for engine in engines.iter_mut() {
+
+        
+       for engine in engines.iter_mut() {
             let (did_work, events) = engine
                 .process()
                 .map_err(|err| dbg!(err))
@@ -194,31 +301,53 @@ fn process_until<'a>(
                 engine_name: engine.name(),
                 previous: previous.clone(),
             };
-            let result = (f)(processor_args.clone());
-            match result {
-                ProcessorResult::Continue(err) => {
-                    errors.push(err);
-                    ()
+            let mut failed2 = Vec::new();
+
+            for (processor,_) in errors.drain(..) {
+                let result = processor.eval(&processor_args.clone());
+                if result { 
+                   processor.test(&processor_args.clone());
+                  // processor passed!
+                } else
+                {
+                    failed2.push((processor, Some(processor_args.clone())));
                 }
-                ProcessorResult::Fail(err) => return ProcessorResult::Fail(err),
-                ProcessorResult::Pass => return ProcessorResult::Pass,
+
             };
+            if failed2.is_empty() {
+                return;
+            }
+            errors.append(&mut failed2);
             if processor_args.did_work {
                 previous.push(processor_args.clone());
             }
         }
     }
-    ProcessorResult::Fail(format!(
-        "Max number of process iterations exceeded ({}). Errors: {:?}",
-        MAX_PROCESSING_LOOPS, errors
-    ))
+
+  for (p, args) in errors {
+    if let Some(args) = args {
+        p.test(&args)  
+    } else {
+        panic!(format!(
+                "Never tested predicate: TODO"))
+    }
+  }
 }
 
-fn is_connected(x: &Lib3hServerProtocol, request_id: &str) -> bool {
+fn is_connected(request_id: &str, uri:url::Url) -> Lib3hServerProtocolEquals {
+    Lib3hServerProtocolEquals(Lib3hServerProtocol::Connected(ConnectedData{
+        request_id : request_id.into(),
+        uri
+    }))
+}
+
+fn _is_success_result(x: &Lib3hServerProtocol, expected : GenericResultData) -> bool {
     match x {
-        Lib3hServerProtocol::Connected(data) => data.request_id == request_id,
+        Lib3hServerProtocol::SuccessResult(actual) =>
+            expected == *actual,
         _ => false,
     }
+
 }
 
 #[test]
@@ -244,18 +373,20 @@ fn basic_connect_test_mock() {
         .unwrap();
     println!("\nengine_a.process()...");
     // TODO request_id should match on "connect_a_1" not ""
-    let is_connected = Box::new(predicate::function(|x| is_connected(x, "")));
+    //let is_connected = Box::new(predicate::function(|x| is_connected(x, "")));
+
+    let is_connected = Box::new(is_connected("", url::Url::parse("foo://bar").unwrap()));// engine_a.advertise()));
 
     let mut engines = vec![&mut engine_a, &mut engine_b];
 
-    assert_using_predicate(&mut engines, is_connected, "Connected".into())
+    assert_processed(&mut engines, &vec![is_connected]);
 }
 
 #[test]
 fn basic_track_test_wss() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine = basic_setup_wss();
+    let mut engine : Box<dyn NetworkEngine> = Box::new(basic_setup_wss());
     basic_track_test(&mut engine);
 }
 
@@ -263,11 +394,11 @@ fn basic_track_test_wss() {
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine = basic_setup_mock("basic_track_test_mock");
+    let mut engine : Box<dyn NetworkEngine> = Box::new(basic_setup_mock("basic_track_test_mock"));
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<D: Dht>(engine: &mut RealEngine<D>) {
+fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
     // Test
     let mut track_space = SpaceData {
         request_id: "track_a_1".into(),
@@ -281,6 +412,19 @@ fn basic_track_test<D: Dht>(engine: &mut RealEngine<D>) {
     let (did_work, srv_msg_list) = engine.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 3);
+
+    let mut engines = vec![engine];
+
+ /*   let is_success_result = 
+        Box::new(predicate::function(|x| 
+         is_success_result(x, GenericResultData {
+            request_id:"track_a_1".into(), 
+            space_address:SPACE_ADDRESS_A.clone(), 
+            to_agent_id:ALEX_AGENT_ID.clone(),
+            result_info : vec![].into()})));
+
+    assert_using_predicate(&mut engines, is_success_result, "Track Space Success Result".into());
+*/
     let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
     assert_eq!(res_msg.request_id, "track_a_1".to_string());
     assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
@@ -293,10 +437,16 @@ fn basic_track_test<D: Dht>(engine: &mut RealEngine<D>) {
     let _ = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::HandleGetAuthoringEntryList);
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
-    engine
-        .post(Lib3hClientProtocol::JoinSpace(track_space))
-        .unwrap();
-    let (did_work, srv_msg_list) = engine.process().unwrap();
+
+    let mut engines2 = Vec::new();
+    for engine in engines.drain(..) {
+        engine
+            .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+            .unwrap();
+        engines2.push(engine);
+    }
+
+ /*   let (did_work, srv_msg_list) = engine.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::FailureResult);
@@ -306,7 +456,7 @@ fn basic_track_test<D: Dht>(engine: &mut RealEngine<D>) {
     println!(
         "FailureResult info: {}",
         std::str::from_utf8(res_msg.result_info.as_slice()).unwrap()
-    );
+    );*/
 }
 
 #[test]
