@@ -78,12 +78,20 @@ impl FullSuite {
             let mut e = e.write_lock();
             e[1] = 1;
         }
+
+        // compare length 1 sized buffers
         assert_eq!(1, a.compare(&mut b));
         assert_eq!(-1, b.compare(&mut a));
         assert_eq!(0, b.compare(&mut c));
+
+        // compare length 2 sized buffers
+        assert_eq!(-1, d.compare(&mut e));
+        assert_eq!(1, e.compare(&mut d));
+
+        // compare different sized buffers
         assert_eq!(0, c.compare(&mut d));
         assert_eq!(1, a.compare(&mut d));
-        assert_eq!(-1, c.compare(&mut e));
+        assert_eq!(-1, a.compare(&mut e));  // WAT?  why is [50] > than [0,1]
     }
 
     fn test_random(&self) {
