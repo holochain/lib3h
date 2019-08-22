@@ -146,10 +146,10 @@ trait Processor: Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
         "default_processor".into()
     }
 
-    fn test(&self, args : &ProcessorArgs);
+    fn test(&self, args: &ProcessorArgs);
 }
 
-trait AssertEquals<T: PartialEq + std::fmt::Debug> : Processor {
+trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
     fn actual(&self, args: &ProcessorArgs) -> Option<T>;
 
     fn expected(&self) -> T;
@@ -169,7 +169,6 @@ trait AssertEquals<T: PartialEq + std::fmt::Debug> : Processor {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.name())
     }
-
 }
 
 #[derive(PartialEq, Debug)]
@@ -209,7 +208,6 @@ impl Processor for Lib3hServerProtocolEquals {
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
 
-
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
 fn assert_processed(
@@ -231,8 +229,7 @@ fn assert_processed(
                 .process()
                 .map_err(|err| dbg!(err))
                 .unwrap_or((false, vec![]));
-            if events.is_empty()
-            {
+            if events.is_empty() {
                 continue;
             }
 
@@ -260,7 +257,7 @@ fn assert_processed(
             }
 
             if errors.is_empty() {
-                return; 
+                return;
             }
         }
     }
@@ -329,7 +326,7 @@ fn basic_track_test_mock() {
 
 fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
     // Test
-    let mut track_space = SpaceData {
+    let track_space = SpaceData {
         request_id: "track_a_1".into(),
         space_address: SPACE_ADDRESS_A.clone(),
         agent_id: ALEX_AGENT_ID.clone(),
@@ -338,43 +335,40 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
     engine
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = engine.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-
     let mut engines = vec![engine];
 
-    /*   let is_success_result =
-            Box::new(predicate::function(|x|
-             is_success_result(x, GenericResultData {
-                request_id:"track_a_1".into(),
-                space_address:SPACE_ADDRESS_A.clone(),
-                to_agent_id:ALEX_AGENT_ID.clone(),
-                result_info : vec![].into()})));
+    let is_success_result = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::SuccessResult(GenericResultData {
+            request_id: "track_a_1".into(),
+            space_address: SPACE_ADDRESS_A.clone(),
+            to_agent_id: ALEX_AGENT_ID.clone(),
+            result_info: vec![].into(),
+        }),
+    ));
 
-        assert_using_predicate(&mut engines, is_success_result, "Track Space Success Result".into());
+    let processors = vec![is_success_result];
+    assert_processed(&mut engines, &processors);
+
+    /*    let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
+        assert_eq!(res_msg.request_id, "track_a_1".to_string());
+        assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
+        assert_eq!(res_msg.to_agent_id, *ALEX_AGENT_ID);
     */
-    let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
-    assert_eq!(res_msg.request_id, "track_a_1".to_string());
-    assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
-    assert_eq!(res_msg.to_agent_id, *ALEX_AGENT_ID);
-    println!(
-        "SuccessResult info: {}",
-        std::str::from_utf8(res_msg.result_info.as_slice()).unwrap()
-    );
-    let _ = unwrap_to!(srv_msg_list[1] => Lib3hServerProtocol::HandleGetGossipingEntryList);
-    let _ = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::HandleGetAuthoringEntryList);
-    // Track same again, should fail
-    track_space.request_id = "track_a_2".into();
 
-    let mut engines2 = Vec::new();
-    for engine in engines.drain(..) {
-        engine
-            .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-            .unwrap();
-        engines2.push(engine);
-    }
+    /*
+        let _ = unwrap_to!(srv_msg_list[1] => Lib3hServerProtocol::HandleGetGossipingEntryList);
+        let _ = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::HandleGetAuthoringEntryList);
+        // Track same again, should fail
+        track_space.request_id = "track_a_2".into();
 
+        let mut engines2 = Vec::new();
+        for engine in engines.drain(..) {
+            engine
+                .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+                .unwrap();
+            engines2.push(engine);
+        }
+    */
     /*   let (did_work, srv_msg_list) = engine.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
