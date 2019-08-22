@@ -81,7 +81,8 @@ mod tests {
 
         #[derive(Debug)]
         pub enum ResponseAsChild {
-            Idle,
+            Allowed,
+            Disallowed,
         }
     }
 
@@ -154,7 +155,7 @@ mod tests {
                     address: "test".to_string(),
                 },
                 Box::new(|_m, r| {
-                    println!("got: {:?}", r);
+                    println!("response from parent to IncomingConnection got: {:?}", r);
                     Ok(())
                 }),
             );
@@ -169,16 +170,39 @@ mod tests {
         ResponseToParent,
         String,
     >;
+    use crate::RequestId;
 
     #[test]
     fn test_wss_transport() {
+        // the body of this test simulates an object that contains a actor, i.e. a parent.
+        // it would usually just be another ghost_actor but here we test it out explicitly
+        // so first instantiate the "child" actor
         let mut t_actor: Box<TransportActor> = Box::new(WssTransport::new());
+
+        // allow the actor to run this actor always createss a simulated incomming
+        // connection each time it processes
         t_actor.process().unwrap();
+
+        // now process any requests the actor may have made of us (as parent)
         for (rid, ev) in t_actor.drain_requests() {
-            println!("got: {:?} {:?}", rid, ev);
+            println!("in drain_requests got: {:?} {:?}", rid, ev);
             if let Some(rid) = rid {
-                t_actor.respond(rid, ResponseAsChild::Idle).unwrap();
+                // we might allow or disallow connections for example
+                let response = ResponseAsChild::Allowed;
+                t_actor.respond(rid, response).unwrap();
             }
+        }
+
+        // now make a request of the child,
+        // to make such a request the parent would normally will also instantiate trackers so that it can
+        // handle responses when they come back as callbacks.
+        // here we simply watch that we got a response back as expected
+        let request_id = RequestId::with_prefix("test_parent");
+        t_actor.request(Some(request_id), RequestFromParent::Bind{url: "addres_to_bind_to".to_string()} );
+
+        // now process the responses the actor has made to our quests
+        for (rid, ev) in t_actor.drain_responses() {
+            println!("in drain_responses got: {:?} {:?}", rid, ev);
         }
     }
 }
