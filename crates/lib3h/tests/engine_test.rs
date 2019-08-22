@@ -13,7 +13,7 @@ extern crate predicates;
 use predicates::prelude::*;
 
 use lib3h::{
-    dht::{mirror_dht::MirrorDht},
+    dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     transport_wss::TlsConfig,
 };
@@ -141,8 +141,7 @@ struct ProcessorArgs {
     previous: Vec<ProcessorArgs>,
 }
 
-trait Processor : Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
-
+trait Processor: Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
     fn name(&self) -> String {
         "default_processor".into()
     }
@@ -151,70 +150,65 @@ trait Processor : Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
         panic!("{} test failed with inputs {:?}", self.name(), args);
     }
 
-    fn fmt(&self, f:&mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.name())
     }
 }
 
+trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
+    fn actual(&self, args: &ProcessorArgs) -> Option<T>;
 
-trait AssertEquals<T:PartialEq+std::fmt::Debug> : Processor {
+    fn expected(&self) -> T;
 
-   fn actual(&self, args:&ProcessorArgs) -> Option<T>;
+    fn eval(&self, args: &ProcessorArgs) -> bool {
+        if let Some(actual) = self.actual(args) {
+            actual == self.expected()
+        } else {
+            false
+        }
+    }
 
-   fn expected(&self) -> T;
-
-   fn eval(&self, args:&ProcessorArgs) -> bool {
-       if let Some(actual) = self.actual(args) {
-          actual == self.expected()  
-       } else {
-           false
-       }
-   }
-
-   fn test(&self, args:&ProcessorArgs) {
-       assert_eq!(Some(self.expected()), self.actual(args));
-   }
-
+    fn test(&self, args: &ProcessorArgs) {
+        assert_eq!(Some(self.expected()), self.actual(args));
+    }
 }
 
 #[derive(PartialEq, Debug)]
 struct Lib3hServerProtocolEquals(Lib3hServerProtocol);
 
 impl AssertEquals<Lib3hServerProtocol> for Lib3hServerProtocolEquals {
-
-    fn actual(&self, args:&ProcessorArgs) -> Option<Lib3hServerProtocol> {
+    fn actual(&self, args: &ProcessorArgs) -> Option<Lib3hServerProtocol> {
         let x = args.events.first().clone();
-        x.map(|x|x.clone())
+        x.map(|x| x.clone())
     }
-    fn expected(&self) -> Lib3hServerProtocol { self.0.clone() }
+    fn expected(&self) -> Lib3hServerProtocol {
+        self.0.clone()
+    }
 }
 
 impl std::fmt::Display for Lib3hServerProtocolEquals {
-    fn fmt(&self, f:&mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
 impl predicates::Predicate<ProcessorArgs> for Lib3hServerProtocolEquals {
-
-   fn eval(&self, args:&ProcessorArgs) -> bool {
-       if let Some(actual) = self.actual(args) {
-          actual == self.expected()  
-       } else {
-           false
-       }
-   }
-
+    fn eval(&self, args: &ProcessorArgs) -> bool {
+        if let Some(actual) = self.actual(args) {
+            actual == self.expected()
+        } else {
+            false
+        }
+    }
 }
 
 impl Processor for Lib3hServerProtocolEquals {
-   fn test(&self, args:&ProcessorArgs) {
-       assert_eq!(Some(self.expected()), self.actual(args));
-   }
+    fn test(&self, args: &ProcessorArgs) {
+        assert_eq!(Some(self.expected()), self.actual(args));
+    }
 }
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
-
 
 //type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 
@@ -281,15 +275,13 @@ fn assert_processed(
     let mut errors = Vec::new();
 
     for p in processors {
-        errors.push((p,None))
+        errors.push((p, None))
     }
 
     for epoch in 0..MAX_PROCESSING_LOOPS {
-    
         println!("[{:?}] {:?}", epoch, previous);
 
-        
-       for engine in engines.iter_mut() {
+        for engine in engines.iter_mut() {
             let (did_work, events) = engine
                 .process()
                 .map_err(|err| dbg!(err))
@@ -303,17 +295,15 @@ fn assert_processed(
             };
             let mut failed2 = Vec::new();
 
-            for (processor,_) in errors.drain(..) {
+            for (processor, _) in errors.drain(..) {
                 let result = processor.eval(&processor_args.clone());
-                if result { 
-                   processor.test(&processor_args.clone());
-                  // processor passed!
-                } else
-                {
+                if result {
+                    processor.test(&processor_args.clone());
+                // processor passed!
+                } else {
                     failed2.push((processor, Some(processor_args.clone())));
                 }
-
-            };
+            }
             if failed2.is_empty() {
                 return;
             }
@@ -324,30 +314,27 @@ fn assert_processed(
         }
     }
 
-  for (p, args) in errors {
-    if let Some(args) = args {
-        p.test(&args)  
-    } else {
-        panic!(format!(
-                "Never tested predicate: TODO"))
+    for (p, args) in errors {
+        if let Some(args) = args {
+            p.test(&args)
+        } else {
+            panic!(format!("Never tested predicate: TODO"))
+        }
     }
-  }
 }
 
-fn is_connected(request_id: &str, uri:url::Url) -> Lib3hServerProtocolEquals {
-    Lib3hServerProtocolEquals(Lib3hServerProtocol::Connected(ConnectedData{
-        request_id : request_id.into(),
-        uri
+fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEquals {
+    Lib3hServerProtocolEquals(Lib3hServerProtocol::Connected(ConnectedData {
+        request_id: request_id.into(),
+        uri,
     }))
 }
 
-fn _is_success_result(x: &Lib3hServerProtocol, expected : GenericResultData) -> bool {
+fn _is_success_result(x: &Lib3hServerProtocol, expected: GenericResultData) -> bool {
     match x {
-        Lib3hServerProtocol::SuccessResult(actual) =>
-            expected == *actual,
+        Lib3hServerProtocol::SuccessResult(actual) => expected == *actual,
         _ => false,
     }
-
 }
 
 #[test]
@@ -375,7 +362,7 @@ fn basic_connect_test_mock() {
     // TODO request_id should match on "connect_a_1" not ""
     //let is_connected = Box::new(predicate::function(|x| is_connected(x, "")));
 
-    let is_connected = Box::new(is_connected("", url::Url::parse("foo://bar").unwrap()));// engine_a.advertise()));
+    let is_connected = Box::new(is_connected("", url::Url::parse("foo://bar").unwrap())); // engine_a.advertise()));
 
     let mut engines = vec![&mut engine_a, &mut engine_b];
 
@@ -386,7 +373,7 @@ fn basic_connect_test_mock() {
 fn basic_track_test_wss() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine : Box<dyn NetworkEngine> = Box::new(basic_setup_wss());
+    let mut engine: Box<dyn NetworkEngine> = Box::new(basic_setup_wss());
     basic_track_test(&mut engine);
 }
 
@@ -394,7 +381,7 @@ fn basic_track_test_wss() {
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine : Box<dyn NetworkEngine> = Box::new(basic_setup_mock("basic_track_test_mock"));
+    let mut engine: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("basic_track_test_mock"));
     basic_track_test(&mut engine);
 }
 
@@ -415,16 +402,16 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
 
     let mut engines = vec![engine];
 
- /*   let is_success_result = 
-        Box::new(predicate::function(|x| 
-         is_success_result(x, GenericResultData {
-            request_id:"track_a_1".into(), 
-            space_address:SPACE_ADDRESS_A.clone(), 
-            to_agent_id:ALEX_AGENT_ID.clone(),
-            result_info : vec![].into()})));
+    /*   let is_success_result =
+            Box::new(predicate::function(|x|
+             is_success_result(x, GenericResultData {
+                request_id:"track_a_1".into(),
+                space_address:SPACE_ADDRESS_A.clone(),
+                to_agent_id:ALEX_AGENT_ID.clone(),
+                result_info : vec![].into()})));
 
-    assert_using_predicate(&mut engines, is_success_result, "Track Space Success Result".into());
-*/
+        assert_using_predicate(&mut engines, is_success_result, "Track Space Success Result".into());
+    */
     let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
     assert_eq!(res_msg.request_id, "track_a_1".to_string());
     assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
@@ -446,7 +433,7 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
         engines2.push(engine);
     }
 
- /*   let (did_work, srv_msg_list) = engine.process().unwrap();
+    /*   let (did_work, srv_msg_list) = engine.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
     let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::FailureResult);
