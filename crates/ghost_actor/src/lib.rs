@@ -227,7 +227,7 @@ mod tests {
             },
         );
 
-        // now process the responses the actor has made to our quests
+        // now process the responses the actor has made to our requests
         for (rid, ev) in t_actor.drain_responses() {
             println!("in drain_responses got: {:?} {:?}", rid, ev);
         }
