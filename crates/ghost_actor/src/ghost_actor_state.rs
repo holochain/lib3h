@@ -1,15 +1,15 @@
 use crate::{DidWork, GhostCallback, GhostTracker, RequestId};
 use std::any::Any;
 
-pub struct GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E> {
-    callbacks: GhostTracker<ResponseAsChild, E>,
-    requests_to_parent: Vec<(Option<RequestId>, RequestAsChild)>,
-    responses_to_parent: Vec<(RequestId, ResponseToParent)>,
+pub struct GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, E> {
+    callbacks: GhostTracker<RequestToParentResponse, E>,
+    requests_to_parent: Vec<(Option<RequestId>, RequestToParent)>,
+    responses_to_parent: Vec<(RequestId, RequestToChildResponse)>,
     phantom_error: std::marker::PhantomData<E>,
 }
 
-impl<RequestAsChild, ResponseAsChild, ResponseToParent, E>
-    GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E>
+impl<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
+    GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
 {
     pub fn new() -> Self {
         Self {
@@ -26,7 +26,7 @@ impl<RequestAsChild, ResponseAsChild, ResponseToParent, E>
     }
 
     /// called by concrete implementation
-    pub fn send_event_to_parent(&mut self, event: RequestAsChild) {
+    pub fn send_event_to_parent(&mut self, event: RequestToParent) {
         self.requests_to_parent.push((None, event));
     }
 
@@ -34,8 +34,8 @@ impl<RequestAsChild, ResponseAsChild, ResponseToParent, E>
     pub fn send_request_to_parent(
         &mut self,
         timeout: std::time::Duration,
-        request: RequestAsChild,
-        cb: GhostCallback<ResponseAsChild, E>,
+        request: RequestToParent,
+        cb: GhostCallback<RequestToParentResponse, E>,
     ) {
         let request_id = self.callbacks.bookmark(timeout, cb);
         self.requests_to_parent.push((Some(request_id), request));
@@ -46,7 +46,7 @@ impl<RequestAsChild, ResponseAsChild, ResponseToParent, E>
         &mut self,
         ga: &mut dyn Any,
         request_id: RequestId,
-        response: ResponseAsChild,
+        response: RequestToParentResponse,
     ) -> Result<(), E> {
         self.callbacks.handle(request_id, ga, response)
     }
@@ -56,15 +56,15 @@ impl<RequestAsChild, ResponseAsChild, ResponseToParent, E>
     /// post it, so they can get the response through `drain_responses()`
     /// if this was a synchronous action, this will be called inside
     /// GhostActor::request()
-    pub fn respond_to_parent(&mut self, request_id: RequestId, response: ResponseToParent) {
+    pub fn respond_to_parent(&mut self, request_id: RequestId, response: RequestToChildResponse) {
         self.responses_to_parent.push((request_id, response));
     }
 
-    pub fn drain_requests(&mut self) -> Vec<(Option<RequestId>, RequestAsChild)> {
+    pub fn drain_requests(&mut self) -> Vec<(Option<RequestId>, RequestToParent)> {
         self.requests_to_parent.drain(..).collect()
     }
 
-    pub fn drain_responses(&mut self) -> Vec<(RequestId, ResponseToParent)> {
+    pub fn drain_responses(&mut self) -> Vec<(RequestId, RequestToChildResponse)> {
         self.responses_to_parent.drain(..).collect()
     }
 }

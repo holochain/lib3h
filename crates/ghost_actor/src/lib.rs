@@ -65,22 +65,22 @@ mod tests {
     #[allow(dead_code)]
     mod transport_protocol {
         #[derive(Debug)]
-        pub enum RequestFromParent {
+        pub enum RequestToChild {
             Bind { url: String },
         }
 
         #[derive(Debug)]
-        pub enum ResponseToParent {
+        pub enum RequestToChildResponse {
             BindResult { bound_url: Result<String, String> },
         }
 
         #[derive(Debug)]
-        pub enum RequestAsChild {
+        pub enum RequestToParent {
             IncomingConnection { address: String },
         }
 
         #[derive(Debug)]
-        pub enum ResponseAsChild {
+        pub enum RequestToParentResponse {
             Allowed,
             Disallowed,
         }
@@ -89,8 +89,14 @@ mod tests {
     use transport_protocol::*;
 
     struct WssTransport {
-        actor_state:
-            Option<GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String>>,
+        actor_state: Option<
+            GhostActorState<
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChildResponse,
+                String,
+            >,
+        >,
     }
 
     impl WssTransport {
@@ -101,8 +107,14 @@ mod tests {
         }
     }
 
-    impl GhostActor<RequestAsChild, ResponseAsChild, RequestFromParent, ResponseToParent, String>
-        for WssTransport
+    impl
+        GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            String,
+        > for WssTransport
     {
         fn as_any(&mut self) -> &mut dyn Any {
             &mut *self
@@ -110,28 +122,38 @@ mod tests {
 
         fn get_actor_state(
             &mut self,
-        ) -> &mut GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String>
-        {
+        ) -> &mut GhostActorState<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChildResponse,
+            String,
+        > {
             self.actor_state.as_mut().unwrap()
         }
 
         fn take_actor_state(
             &mut self,
-        ) -> GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String> {
+        ) -> GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, String>
+        {
             std::mem::replace(&mut self.actor_state, None).unwrap()
         }
 
         fn put_actor_state(
             &mut self,
-            actor_state: GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String>,
+            actor_state: GhostActorState<
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChildResponse,
+                String,
+            >,
         ) {
             std::mem::replace(&mut self.actor_state, Some(actor_state));
         }
 
         // our parent is making a request of us
-        fn request(&mut self, request_id: Option<RequestId>, request: RequestFromParent) {
+        fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild) {
             match request {
-                RequestFromParent::Bind { url: _u } => {
+                RequestToChild::Bind { url: _u } => {
                     // do some internal bind
                     // we get a bound_url
                     let bound_url = "bound_url".to_string();
@@ -139,7 +161,7 @@ mod tests {
                     if let Some(request_id) = request_id {
                         self.get_actor_state().respond_to_parent(
                             request_id,
-                            ResponseToParent::BindResult {
+                            RequestToChildResponse::BindResult {
                                 bound_url: Ok(bound_url),
                             },
                         );
@@ -151,7 +173,7 @@ mod tests {
         fn process_concrete(&mut self) -> Result<DidWork, String> {
             self.get_actor_state().send_request_to_parent(
                 std::time::Duration::from_millis(2000),
-                RequestAsChild::IncomingConnection {
+                RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
                 Box::new(|_m, r| {
@@ -164,10 +186,10 @@ mod tests {
     }
 
     type TransportActor = dyn GhostActor<
-        RequestAsChild,
-        ResponseAsChild,
-        RequestFromParent,
-        ResponseToParent,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
         String,
     >;
     use crate::RequestId;
@@ -188,7 +210,7 @@ mod tests {
             println!("in drain_requests got: {:?} {:?}", rid, ev);
             if let Some(rid) = rid {
                 // we might allow or disallow connections for example
-                let response = ResponseAsChild::Allowed;
+                let response = RequestToParentResponse::Allowed;
                 t_actor.respond(rid, response).unwrap();
             }
         }
@@ -198,7 +220,12 @@ mod tests {
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
         let request_id = RequestId::with_prefix("test_parent");
-        t_actor.request(Some(request_id), RequestFromParent::Bind{url: "address_to_bind_to".to_string()} );
+        t_actor.request(
+            Some(request_id),
+            RequestToChild::Bind {
+                url: "address_to_bind_to".to_string(),
+            },
+        );
 
         // now process the responses the actor has made to our quests
         for (rid, ev) in t_actor.drain_responses() {
