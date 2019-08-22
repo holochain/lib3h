@@ -2,11 +2,14 @@
 
 // use crate::dns_old::{Answer, Packet, Question, SrvDataA, SrvDataQ};
 // use crate::dns::{Answer, AnswerSection, Question, QuerySection, DnsMessage};
-use crate::dns::{AnswerSection, QuerySection, DnsMessage, Target};
+use crate::dns::{AnswerSection, DnsMessage, QuerySection, Target};
 // use crate::error::MulticastDnsResult;
 use get_if_addrs;
 use hostname;
-use std::{collections::HashMap, ops::{Deref, DerefMut}};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
 /// Helper type.
 pub type HashMapRecord = HashMap<String, Record>;
@@ -25,21 +28,18 @@ impl Deref for MapRecord {
     }
 }
 
- impl DerefMut for MapRecord {
+impl DerefMut for MapRecord {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.value
     }
 }
-
 
 impl MapRecord {
     pub fn new(hostname: &str, record: &Record) -> Self {
         let mut hmr = HashMapRecord::new();
         hmr.insert(hostname.to_string(), record.clone());
 
-        Self {
-            value: hmr
-        }
+        Self { value: hmr }
     }
 
     /// Update the [`MapRecord`]'s vectors of addresses.
@@ -62,18 +62,22 @@ impl MapRecord {
         }
     }
 
-
     /// Builds a [`MapRecord`] from a [`DnsMessage`].
     pub fn from_dns_message(dmesg: &DnsMessage) -> Option<MapRecord> {
-
         if dmesg.answers.len() > 0 {
-            let records: Vec<Record> = dmesg.answers.iter()
+            let records: Vec<Record> = dmesg
+                .answers
+                .iter()
                 .map(|a_sec| {
-                    let targets: Vec<String> = a_sec.data.iter().map(|t| t.target.clone()).collect();
-                    Record::new(&a_sec.domain_name, &targets)
-                }).collect();
+                    let targets: Vec<String> =
+                        a_sec.data.iter().map(|t| t.target.clone()).collect();
+                    Record::new(&a_sec.domain_name, &targets, a_sec.ttl)
+                })
+                .collect();
 
-            let mut map_record = MapRecord { value: HashMapRecord::with_capacity(records.len()) };
+            let mut map_record = MapRecord {
+                value: HashMapRecord::with_capacity(records.len()),
+            };
             for new_record in records.iter() {
                 if let Some(rec) = map_record.get(&new_record.hostname) {
                     let new_addr = new_record.addrs.first().expect("Empty list of address.");
@@ -96,9 +100,11 @@ impl MapRecord {
 
     /// Builds a [`DnsMessage`] from a [`MapRecord`].
     pub fn to_dns_reponse_message(&self) -> DnsMessage {
-        let answers: Vec<AnswerSection> = self.value.values().map(|record| {
-            record.to_answers_section()
-        }).collect();
+        let answers: Vec<AnswerSection> = self
+            .value
+            .values()
+            .map(|record| record.to_answers_section())
+            .collect();
 
         DnsMessage {
             nb_answers: answers.len() as u16,
@@ -108,8 +114,7 @@ impl MapRecord {
     }
 }
 
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     /// Hostname of our neighbor
     pub(crate) hostname: String,
@@ -123,13 +128,13 @@ impl Record {
     /// Create a new record respecting the mDNS
     /// [naming convention](https://tools.ietf.org/html/rfc6762#section-3)
     /// of the form "single-dns-label.local." with value ending with `.local.`
-    pub fn new(name: &str, addr: &[String]) -> Self {
+    pub fn new(name: &str, addr: &[String], ttl: u32) -> Self {
         let hostname = convert_to_mdns_hostname(&name);
 
         Record {
             hostname,
             addrs: addr.to_vec(),
-            ttl: 255,
+            ttl,
         }
     }
 
@@ -169,7 +174,7 @@ impl Record {
                     None
                 }
             })
-        .collect();
+            .collect();
 
         if addrs.is_empty() {
             addrs = vec!["0.0.0.0"
@@ -177,10 +182,12 @@ impl Record {
                 .expect("Fail to parse default IPv4 address.")]
         }
 
-        Record { hostname, addrs, ttl: 255 }
+        Record {
+            hostname,
+            addrs,
+            ttl: 255,
+        }
     }
-
-
 
     // /// Convert multiple [`Record`] to a vector of [`Answer Response`](crate::dns::Answer).
     // pub fn to_vector_answers(&self) -> Vec<Answer> {
@@ -210,9 +217,7 @@ impl Record {
     }
 
     pub fn to_targets(&self) -> Vec<Target> {
-        self.addrs.iter().map(|addr| {
-            Target::new(addr)
-        }).collect()
+        self.addrs.iter().map(|addr| Target::new(addr)).collect()
     }
 }
 
@@ -223,7 +228,6 @@ fn convert_to_mdns_hostname(hostname: &str) -> String {
         format!("{}.local.", hostname)
     }
 }
-
 
 // /// Convert a [`Packet`](crate::dns::Packet) to a [`Record`].
 // pub fn from_packet(packet: &Packet) -> Option<MapRecord> {
@@ -268,6 +272,3 @@ fn convert_to_mdns_hostname(hostname: &str) -> String {
 //         None
 //     }
 // }
-
-
-
