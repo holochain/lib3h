@@ -197,12 +197,16 @@ mod tests {
         >,
     >;
 
+    type Url = String;
+    type TransportError = String;
+
     #[allow(dead_code)]
     mod transport_protocol {
         #[derive(Debug)]
         pub enum RequestToChild {
-            Bind { url: String },
-            SendMessage { address: String, payload: Vec<u8> },
+            Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
+            Bootstrap { address: Url },
+            SendMessage { address: Url, payload: Vec<u8> },
         }
 
         #[derive(Debug)]
@@ -212,19 +216,22 @@ mod tests {
 
         #[derive(Debug)]
         pub enum RequestToChildResponse {
-            Bind(Result<BindResultData, String>),
-            SendMessage(Result<(), String>),
+            Bind(Result<BindResultData, TransportError>),
+            Bootstrap(Result<(), TransportError>),
+            SendMessage(Result<(), TransportError>),
         }
 
         #[derive(Debug)]
         pub enum RequestToParent {
-            IncomingConnection { address: String },
+            IncomingConnection { address: Url },
+            ReceivedData { adress: Url, payload: Vec<u8> },
+            TransportError { error: TransportError },
         }
 
         #[derive(Debug)]
         pub enum RequestToParentResponse {
-            Allowed,
-            Disallowed,
+            Allowed,     // just for testing
+            Disallowed,  // just for testing
         }
     }
 
