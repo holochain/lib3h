@@ -134,7 +134,10 @@ impl MulticastDnsBuilder {
             &self.bind_address.parse()?,
         )?;
 
-        let send_socket = create_socket(DEFAULT_BIND_ADRESS, get_available_port(DEFAULT_BIND_ADRESS)?)?;
+        let send_socket = create_socket(
+            DEFAULT_BIND_ADRESS,
+            get_available_port(DEFAULT_BIND_ADRESS)?,
+        )?;
         send_socket.set_nonblocking(true)?;
 
         Ok(MulticastDns {
@@ -171,10 +174,12 @@ impl Default for MulticastDnsBuilder {
 fn get_available_port(addr: &str) -> MulticastDnsResult<u16> {
     for port in SERVICE_LISTENER_PORT + 1..65535 {
         if net::UdpSocket::bind((addr, port)).is_ok() {
-            return Ok(port)
+            return Ok(port);
         }
     }
-    Err(MulticastDnsError::new(crate::error::ErrorKind::NoAvailablePort))
+    Err(MulticastDnsError::new(
+        crate::error::ErrorKind::NoAvailablePort,
+    ))
 }
 
 /// an mdns instance that can send and receive dns packets on LAN UDP multicast
@@ -855,14 +860,16 @@ mod tests {
             .expect("Fail to build mDNS.");
 
         // Make itself known ion the network
-        mdns_releaser.advertise()
+        mdns_releaser
+            .advertise()
             .expect("Fail to advertise my existence during release test.");
 
         // Discovering the soon leaving participant
         mdns.discover().expect("Fail to discover.");
 
         // Leaving the party
-        mdns_releaser.release()
+        mdns_releaser
+            .release()
             .expect("Fail to release myself from the participants on the network.");
 
         // Updating the cache

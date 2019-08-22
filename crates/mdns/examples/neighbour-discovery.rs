@@ -1,5 +1,5 @@
-use lib3h_mdns as mdns;
 use lib3h_discovery::Discovery;
+use lib3h_mdns as mdns;
 
 fn discover_neighbourhood() {
     let mut mdns = mdns::MulticastDnsBuilder::new()
