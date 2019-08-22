@@ -1,9 +1,9 @@
 //! DNS Answer part.
 
-use std::{io::Cursor, default::Default};
+use crate::error::MulticastDnsResult;
 #[allow(unused_imports)]
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
-use crate::error::MulticastDnsResult;
+use std::{default::Default, io::Cursor};
 
 /// Response answer
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -11,7 +11,6 @@ pub enum Answer {
     Unknown(Vec<u8>),
     Data(AnswerSection),
 }
-
 
 /// Answer section of a DNS message packet.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,7 +35,7 @@ impl Default for AnswerSection {
             answer_class: 1,
             ttl: 255,
             data_len: 0,
-            data: Vec::new()
+            data: Vec::new(),
         }
     }
 }
@@ -70,20 +69,17 @@ impl AnswerSection {
         let dn_len = cursor.read_u16::<BigEndian>()?;
         let mut domain_name: Vec<u8> = Vec::with_capacity(dn_len as usize);
         for _ in 0..dn_len {
-            domain_name.push(
-                cursor.read_u8()?
-            );
+            domain_name.push(cursor.read_u8()?);
         }
         let answer_type = cursor.read_u16::<BigEndian>()?;
         let answer_class = cursor.read_u16::<BigEndian>()?;
         let ttl = cursor.read_u32::<BigEndian>()?;
         let data_len = cursor.read_u16::<BigEndian>()?;
         let mut data = Vec::with_capacity(data_len as usize);
-        
+
         for _ in 0..data_len {
             data.push(Target::from_raw(&mut cursor)?);
         }
-
 
         Ok(Self {
             dn_len,
@@ -103,7 +99,6 @@ impl AnswerSection {
             packet.write_u8(byte)?;
         }
 
-
         packet.write_u16::<BigEndian>(self.answer_type)?;
         packet.write_u16::<BigEndian>(self.answer_class)?;
         packet.write_u32::<BigEndian>(self.ttl)?;
@@ -113,12 +108,9 @@ impl AnswerSection {
             target.write(&mut packet)?;
         }
 
-
-
         Ok(())
     }
 }
-
 
 /// Correspond to the URL [`advertised`](https://docs.rs/lib3h_protocol/0.0.10/lib3h_protocol/network_engine/trait.NetworkEngine.html#tymethod.advertise)
 /// by the [`NetworkEngine`](https://docs.rs/lib3h_protocol/0.0.10/lib3h_protocol/network_engine/trait.NetworkEngine.html) from [`Lib3h_protocol`](https://crates.io/crates/lib3h_protocol).
@@ -132,7 +124,7 @@ impl Target {
     pub fn new(record: &str) -> Self {
         Self {
             target_len: record.len() as u16,
-            target: record.to_owned()
+            target: record.to_owned(),
         }
     }
     pub fn from_raw(cursor: &mut Cursor<&Vec<u8>>) -> MulticastDnsResult<Self> {
@@ -163,10 +155,13 @@ fn target_io_test() {
     let target = Target::new("wss:/192.168.0.88");
 
     let mut buffer = Vec::new();
-    target.write(&mut buffer).expect("Fail to write target to buffer.");
+    target
+        .write(&mut buffer)
+        .expect("Fail to write target to buffer.");
 
     let mut cursor = Cursor::new(&buffer);
-    let target_from_raw = Target::from_raw(&mut cursor).expect("Fail to deserialize target from byte buffer.");
+    let target_from_raw =
+        Target::from_raw(&mut cursor).expect("Fail to deserialize target from byte buffer.");
 
     assert_eq!(target, target_from_raw);
 }
@@ -178,10 +173,13 @@ fn answer_with_target_test() {
     let answer = AnswerSection::new(name, &targets);
 
     let mut buffer = vec![];
-    answer.write(&mut buffer).expect("Fail to write AnswerSection to buffer.");
+    answer
+        .write(&mut buffer)
+        .expect("Fail to write AnswerSection to buffer.");
 
     let mut cursor = Cursor::new(&buffer);
-    let answer_from_raw = AnswerSection::from_raw(&mut cursor).expect("Fail to deserialize AnswerSection from byte buffer.");
+    let answer_from_raw = AnswerSection::from_raw(&mut cursor)
+        .expect("Fail to deserialize AnswerSection from byte buffer.");
 
     assert_eq!(answer, answer_from_raw);
 }

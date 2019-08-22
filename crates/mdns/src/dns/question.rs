@@ -1,9 +1,9 @@
 //! DNS Question part.
 
-use std::io::Cursor;
+use crate::error::MulticastDnsResult;
 #[allow(unused_imports)]
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
-use crate::error::MulticastDnsResult;
+use std::io::Cursor;
 
 /// Query question
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -11,7 +11,6 @@ pub enum Question {
     Unknown(Vec<u8>),
     Data(QuerySection),
 }
-
 
 /// Query section of a DNS message packet.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,9 +35,7 @@ impl QuerySection {
     pub fn from_raw(dn_len: u16, cursor: &mut Cursor<&Vec<u8>>) -> MulticastDnsResult<Self> {
         let mut domain_name: Vec<u8> = Vec::with_capacity(dn_len as usize);
         for _ in 0..dn_len {
-            domain_name.push(
-                cursor.read_u8()?
-            );
+            domain_name.push(cursor.read_u8()?);
         }
 
         Ok(Self {

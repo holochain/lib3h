@@ -7,15 +7,14 @@ fn discover_neighbourhood() {
         .build()
         .expect("Fail to build mDNS.");
 
-    // mdns.run().expect("Fail to run mDNS service.");
-    mdns.startup();
+    // Make myself known on the network and find a name for myself
+    mdns.advertise();
     for _ in 0..100 {
-        mdns.update().expect("Fail to update mDNS.");
+        mdns.discover().expect("Fail to update mDNS.");
         eprintln!("mDNS neighbourhood : {:#?}", &mdns.records());
 
         mdns::sleep_ms(5_000);
     }
-
 }
 
 fn main() {

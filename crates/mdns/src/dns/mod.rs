@@ -14,7 +14,6 @@ pub use question::QuerySection;
 // pub use answer::{Answer, AnswerSection, Target};
 // pub use question::{Question, QuerySection};
 
-
 /// Structure matching a DNS message format.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DnsMessage {
@@ -27,7 +26,6 @@ pub struct DnsMessage {
     pub(crate) questions: Vec<QuerySection>,
     pub(crate) answers: Vec<AnswerSection>,
 }
-
 
 impl std::default::Default for DnsMessage {
     fn default() -> Self {
@@ -44,12 +42,10 @@ impl std::default::Default for DnsMessage {
     }
 }
 
-
 impl DnsMessage {
     pub fn new() -> Self {
         DnsMessage::default()
     }
-
 
     pub fn from_raw(packet: &Vec<u8>) -> MulticastDnsResult<Self> {
         let mut dmesg = DnsMessage::new();
@@ -74,7 +70,6 @@ impl DnsMessage {
             let answer = AnswerSection::from_raw(&mut cursor)?;
             dmesg.answers.push(answer);
         }
-
 
         Ok(dmesg)
     }
@@ -112,17 +107,19 @@ fn dns_message_question_test() {
 
     println!("dmesg Query = {:#?}", &dmesg);
 
-    let packet = dmesg.to_raw().expect("Fail to convert DnsMessage to bytes.");
+    let packet = dmesg
+        .to_raw()
+        .expect("Fail to convert DnsMessage to bytes.");
     println!("packet = {:?}", &packet);
 
-    let dmesg_from_raw = DnsMessage::from_raw(&packet).expect("Fail to deserialize DnsMessage from bytes");
+    let dmesg_from_raw =
+        DnsMessage::from_raw(&packet).expect("Fail to deserialize DnsMessage from bytes");
 
     assert_eq!(dmesg, dmesg_from_raw);
 }
 
 #[test]
 fn dns_message_answer_test() {
-
     let targets = vec![Target::new("wss://192.168.0.88")];
     let answer = AnswerSection::new("holonaute.local.", &targets);
 
@@ -134,18 +131,19 @@ fn dns_message_answer_test() {
 
     println!("dmesg Response = {:#?}", &dmesg);
 
-    let packet = dmesg.to_raw().expect("Fail to convert DnsMessage to bytes.");
+    let packet = dmesg
+        .to_raw()
+        .expect("Fail to convert DnsMessage to bytes.");
     println!("packet = {:?}", &packet);
 
-    let dmesg_from_raw = DnsMessage::from_raw(&packet).expect("Fail to deserialize DnsMessage from bytes");
+    let dmesg_from_raw =
+        DnsMessage::from_raw(&packet).expect("Fail to deserialize DnsMessage from bytes");
 
     assert_eq!(dmesg, dmesg_from_raw);
 }
 
-
 #[test]
 fn dns_message_multiple_question_and_answer_test() {
-    
     let questions = vec![
         QuerySection::new("holonaute.local."),
         QuerySection::new("mistral.local."),
@@ -167,10 +165,13 @@ fn dns_message_multiple_question_and_answer_test() {
     };
 
     println!("dmesg Response = {:#?}", &dmesg);
-    let packet = dmesg.to_raw().expect("Fail to convert DnsMessage to bytes.");
+    let packet = dmesg
+        .to_raw()
+        .expect("Fail to convert DnsMessage to bytes.");
     println!("packet = {:?}", &packet);
 
-    let dmesg_from_raw = DnsMessage::from_raw(&packet).expect("Fail to deserialize DnsMessage from bytes");
+    let dmesg_from_raw =
+        DnsMessage::from_raw(&packet).expect("Fail to deserialize DnsMessage from bytes");
 
     assert_eq!(dmesg, dmesg_from_raw);
 }
