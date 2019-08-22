@@ -200,7 +200,7 @@ mod tests {
         let request_id = RequestId::with_prefix("test_parent");
         t_actor.request(Some(request_id), RequestFromParent::Bind{url: "address_to_bind_to".to_string()} );
 
-        // now process the responses the actor has made to our quests
+        // now process the responses the actor has made to our requests
         for (rid, ev) in t_actor.drain_responses() {
             println!("in drain_responses got: {:?} {:?}", rid, ev);
         }
