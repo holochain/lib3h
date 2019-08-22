@@ -60,6 +60,7 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::any::Any;
 
     #[allow(dead_code)]
     mod transport_protocol {
@@ -80,20 +81,12 @@ mod tests {
 
     use transport_protocol::*;
 
-    struct WssTransport<'wsst> {
-        actor_state: Option<
-            GhostActorState<
-                'wsst,
-                WssTransport<'wsst>,
-                RequestAsChild,
-                ResponseAsChild,
-                ResponseToParent,
-                String,
-            >,
-        >,
+    struct WssTransport {
+        actor_state:
+            Option<GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String>>,
     }
 
-    impl<'wsst> WssTransport<'wsst> {
+    impl WssTransport {
         pub fn new() -> Self {
             Self {
                 actor_state: Some(GhostActorState::new()),
@@ -101,57 +94,29 @@ mod tests {
         }
     }
 
-    impl<'wsst>
-        GhostActor<
-            'wsst,
-            WssTransport<'wsst>,
-            RequestAsChild,
-            ResponseAsChild,
-            RequestFromParent,
-            ResponseToParent,
-            String,
-        > for WssTransport<'wsst>
+    impl GhostActor<RequestAsChild, ResponseAsChild, RequestFromParent, ResponseToParent, String>
+        for WssTransport
     {
-        fn as_mut(&mut self) -> &mut WssTransport<'wsst> {
+        fn as_any(&mut self) -> &mut dyn Any {
             &mut *self
         }
 
         fn get_actor_state(
             &mut self,
-        ) -> &mut GhostActorState<
-            'wsst,
-            WssTransport<'wsst>,
-            RequestAsChild,
-            ResponseAsChild,
-            ResponseToParent,
-            String,
-        > {
+        ) -> &mut GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String>
+        {
             self.actor_state.as_mut().unwrap()
         }
 
         fn take_actor_state(
             &mut self,
-        ) -> GhostActorState<
-            'wsst,
-            WssTransport<'wsst>,
-            RequestAsChild,
-            ResponseAsChild,
-            ResponseToParent,
-            String,
-        > {
+        ) -> GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String> {
             std::mem::replace(&mut self.actor_state, None).unwrap()
         }
 
         fn put_actor_state(
             &mut self,
-            actor_state: GhostActorState<
-                'wsst,
-                WssTransport<'wsst>,
-                RequestAsChild,
-                ResponseAsChild,
-                ResponseToParent,
-                String,
-            >,
+            actor_state: GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, String>,
         ) {
             std::mem::replace(&mut self.actor_state, Some(actor_state));
         }
@@ -177,9 +142,7 @@ mod tests {
         }
     }
 
-    type TransportActor<'a> = dyn GhostActor<
-        'a,
-        WssTransport<'a>,
+    type TransportActor = dyn GhostActor<
         RequestAsChild,
         ResponseAsChild,
         RequestFromParent,
@@ -190,6 +153,6 @@ mod tests {
     #[test]
     fn test_wss_transport() {
         let concrete = WssTransport::new();
-        let _: &TransportActor<'_> = &concrete;
+        let _: &TransportActor = &concrete;
     }
 }

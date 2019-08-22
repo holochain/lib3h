@@ -1,33 +1,25 @@
 use crate::{DidWork, GhostActorState, RequestId};
+use std::any::Any;
 
-pub trait GhostActor<
-    'ga,
-    GA,
-    RequestAsChild,
-    ResponseAsChild,
-    RequestFromParent,
-    ResponseToParent,
-    E,
->
-{
-    fn as_mut(&mut self) -> &mut GA;
+pub trait GhostActor<RequestAsChild, ResponseAsChild, RequestFromParent, ResponseToParent, E> {
+    fn as_any(&mut self) -> &mut dyn Any;
 
     fn get_actor_state(
         &mut self,
-    ) -> &mut GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>;
+    ) -> &mut GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E>;
 
     fn take_actor_state(
         &mut self,
-    ) -> GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>;
+    ) -> GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E>;
 
     fn put_actor_state(
         &mut self,
-        actor_state: GhostActorState<'ga, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>,
+        actor_state: GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E>,
     );
 
     fn process(&mut self) -> Result<DidWork, E> {
         let mut actor_state = self.take_actor_state();
-        actor_state.process(self.as_mut())?;
+        actor_state.process(self.as_any())?;
         self.put_actor_state(actor_state);
         Ok(true.into())
     }
@@ -48,7 +40,7 @@ pub trait GhostActor<
     // called by parest, these are responses to requests in drain_request
     fn respond(&mut self, request_id: RequestId, response: ResponseAsChild) -> Result<(), E> {
         let mut actor_state = self.take_actor_state();
-        let out = actor_state.handle_response(self.as_mut(), request_id, response);
+        let out = actor_state.handle_response(self.as_any(), request_id, response);
         self.put_actor_state(actor_state);
         out
     }

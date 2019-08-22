@@ -1,14 +1,15 @@
 use crate::{DidWork, GhostCallback, GhostTracker, RequestId};
+use std::any::Any;
 
-pub struct GhostActorState<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E> {
-    callbacks: GhostTracker<'gas, GA, ResponseAsChild, E>,
+pub struct GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E> {
+    callbacks: GhostTracker<ResponseAsChild, E>,
     requests_to_parent: Vec<(Option<RequestId>, RequestAsChild)>,
     responses_to_parent: Vec<(RequestId, ResponseToParent)>,
     phantom_error: std::marker::PhantomData<E>,
 }
 
-impl<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
-    GhostActorState<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
+impl<RequestAsChild, ResponseAsChild, ResponseToParent, E>
+    GhostActorState<RequestAsChild, ResponseAsChild, ResponseToParent, E>
 {
     pub fn new() -> Self {
         Self {
@@ -19,7 +20,7 @@ impl<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
         }
     }
 
-    pub fn process(&mut self, ga: &mut GA) -> Result<DidWork, E> {
+    pub fn process(&mut self, ga: &mut dyn Any) -> Result<DidWork, E> {
         self.callbacks.process(ga)?;
         Ok(true.into())
     }
@@ -34,7 +35,7 @@ impl<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
         &mut self,
         timeout: std::time::Duration,
         request: RequestAsChild,
-        cb: GhostCallback<'gas, GA, ResponseAsChild, E>,
+        cb: GhostCallback<ResponseAsChild, E>,
     ) {
         let request_id = self.callbacks.bookmark(timeout, cb);
         self.requests_to_parent.push((Some(request_id), request));
@@ -43,7 +44,7 @@ impl<'gas, GA, RequestAsChild, ResponseAsChild, ResponseToParent, E>
     /// this is called by GhostActor when a parent calls `ga.respond()`
     pub(crate) fn handle_response(
         &mut self,
-        ga: &mut GA,
+        ga: &mut dyn Any,
         request_id: RequestId,
         response: ResponseAsChild,
     ) -> Result<(), E> {
