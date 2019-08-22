@@ -146,16 +146,10 @@ trait Processor: Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
         "default_processor".into()
     }
 
-    fn test(&self, args: &ProcessorArgs) {
-        panic!("{} test failed with inputs {:?}", self.name(), args);
-    }
-
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.name())
-    }
+    fn test(&self, args : &ProcessorArgs);
 }
 
-trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
+trait AssertEquals<T: PartialEq + std::fmt::Debug> : Processor {
     fn actual(&self, args: &ProcessorArgs) -> Option<T>;
 
     fn expected(&self) -> T;
@@ -171,6 +165,11 @@ trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
     fn test(&self, args: &ProcessorArgs) {
         assert_eq!(Some(self.expected()), self.actual(args));
     }
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+
 }
 
 #[derive(PartialEq, Debug)]
@@ -210,62 +209,8 @@ impl Processor for Lib3hServerProtocolEquals {
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
 
-//type Processor = Box<dyn FnMut(ProcessorArgs) -> ProcessorResult>;
 
 const MAX_PROCESSING_LOOPS: u64 = 20;
-
-/*
-pub fn assert_using_predicates(
-    mut engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
-    predicates: Vec<(String, Box<dyn Predicate<Lib3hServerProtocol>>)>,
-) {
-
-    let processors = predicates.iter_mut().map(
-        |(predicate_name, predicate)| {
-
-        let mut processor : Processor = Box::new(|processor_args: ProcessorArgs| {
-            if processor_args
-                .events
-                    .iter()
-                    .find(|e| predicate.eval(e))
-                    .is_some()
-            {
-                ProcessorResult::Pass
-            } else {
-                ProcessorResult::Continue(
-                    String::from("TODO"))
-            }
-        });
-        (String::from(predicate_name), &mut processor)
-    }).collect();
-    let actual = process_until(&mut engines, &mut processors);
-    drop(processors);
-    assert_eq!(ProcessorResult::Pass, actual)
-}
-*/
-/*
-pub fn assert_using_predicate(
-    mut engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
-    predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
-    expect: String,
-) {
-    let mut f: Processor = Box::new(move |processor_args: ProcessorArgs| {
-        if processor_args
-            .events
-            .iter()
-            .find(|e| predicate.eval(e))
-            .is_some()
-        {
-            ProcessorResult::Pass
-        } else {
-            ProcessorResult::Continue(format!("Expected: {:?}", expect.clone()))
-        }
-    });
-    let mut processors : Vec<(String, &mut Processor)> = vec![("is_connected".into(), &mut f)];
-    let actual = process_until(&mut engines, &mut processors);
-    assert_eq!(ProcessorResult::Pass, actual)
-}
-*/
 
 fn assert_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
@@ -286,6 +231,11 @@ fn assert_processed(
                 .process()
                 .map_err(|err| dbg!(err))
                 .unwrap_or((false, vec![]));
+            if events.is_empty()
+            {
+                continue;
+            }
+
             let events = dbg!(events);
             let processor_args = ProcessorArgs {
                 did_work,
@@ -295,7 +245,7 @@ fn assert_processed(
             };
             let mut failed2 = Vec::new();
 
-            for (processor, _) in errors.drain(..) {
+            for (processor, _orig_processor_args) in errors.drain(..) {
                 let result = processor.eval(&processor_args.clone());
                 if result {
                     processor.test(&processor_args.clone());
@@ -304,12 +254,13 @@ fn assert_processed(
                     failed2.push((processor, Some(processor_args.clone())));
                 }
             }
-            if failed2.is_empty() {
-                return;
-            }
             errors.append(&mut failed2);
-            if processor_args.did_work {
+            if !processor_args.events.is_empty() {
                 previous.push(processor_args.clone());
+            }
+
+            if errors.is_empty() {
+                return; 
             }
         }
     }
