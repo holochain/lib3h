@@ -2,6 +2,7 @@ use crate::{DidWork, GhostActorState, RequestId};
 use std::any::Any;
 
 pub trait GhostActor<
+    Context,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -13,15 +14,22 @@ pub trait GhostActor<
 
     fn get_actor_state(
         &mut self,
-    ) -> &mut GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>;
+    ) -> &mut GhostActorState<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChildResponse,
+        E,
+    >;
 
     fn take_actor_state(
         &mut self,
-    ) -> GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>;
+    ) -> GhostActorState<Context, RequestToParent, RequestToParentResponse, RequestToChildResponse, E>;
 
     fn put_actor_state(
         &mut self,
         actor_state: GhostActorState<
+            Context,
             RequestToParent,
             RequestToParentResponse,
             RequestToChildResponse,

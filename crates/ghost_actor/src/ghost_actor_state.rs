@@ -1,22 +1,26 @@
 use crate::{DidWork, GhostCallback, GhostTracker, RequestId};
 use std::any::Any;
 
-pub struct GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, E> {
-    callbacks: GhostTracker<RequestToParentResponse, E>,
+pub struct GhostActorState<
+    Context,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChildResponse,
+    E,
+> {
+    callbacks: GhostTracker<Context, RequestToParentResponse, E>,
     requests_to_parent: Vec<(Option<RequestId>, RequestToParent)>,
     responses_to_parent: Vec<(RequestId, RequestToChildResponse)>,
-    phantom_error: std::marker::PhantomData<E>,
 }
 
-impl<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
-    GhostActorState<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
+impl<Context, RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
+    GhostActorState<Context, RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
 {
     pub fn new() -> Self {
         Self {
             callbacks: GhostTracker::new("testing"),
             requests_to_parent: Vec::new(),
             responses_to_parent: Vec::new(),
-            phantom_error: std::marker::PhantomData,
         }
     }
 
@@ -35,9 +39,10 @@ impl<RequestToParent, RequestToParentResponse, RequestToChildResponse, E>
         &mut self,
         timeout: std::time::Duration,
         request: RequestToParent,
-        cb: GhostCallback<RequestToParentResponse, E>,
+        context: Context,
+        cb: GhostCallback<Context, RequestToParentResponse, E>,
     ) {
-        let request_id = self.callbacks.bookmark(timeout, cb);
+        let request_id = self.callbacks.bookmark(timeout, context, cb);
         self.requests_to_parent.push((Some(request_id), request));
     }
 

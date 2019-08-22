@@ -8,21 +8,22 @@ pub enum GhostCallbackData<CbData> {
     Timeout,
 }
 
-pub type GhostCallback<CbData, E> =
-    Box<dyn Fn(&mut dyn Any, GhostCallbackData<CbData>) -> Result<(), E> + 'static>;
+pub type GhostCallback<Context, CbData, E> =
+    Box<dyn Fn(&mut dyn Any, Context, GhostCallbackData<CbData>) -> Result<(), E> + 'static>;
 
-struct GhostTrackerEntry<CbData, E> {
+struct GhostTrackerEntry<Context, CbData, E> {
     expires: std::time::SystemTime,
-    cb: GhostCallback<CbData, E>,
+    context: Context,
+    cb: GhostCallback<Context, CbData, E>,
 }
 
-pub struct GhostTracker<CbData, E> {
+pub struct GhostTracker<Context, CbData, E> {
     request_id_prefix: String,
-    pending: HashMap<RequestId, GhostTrackerEntry<CbData, E>>,
+    pending: HashMap<RequestId, GhostTrackerEntry<Context, CbData, E>>,
     phantom_error: std::marker::PhantomData<E>,
 }
 
-impl<CbData, E> GhostTracker<CbData, E> {
+impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
     pub fn new(request_id_prefix: &str) -> Self {
         Self {
             request_id_prefix: request_id_prefix.to_string(),
@@ -47,7 +48,7 @@ impl<CbData, E> GhostTracker<CbData, E> {
             match self.pending.remove(&request_id) {
                 None => (),
                 Some(entry) => {
-                    (entry.cb)(ga, GhostCallbackData::Timeout)?;
+                    (entry.cb)(ga, entry.context, GhostCallbackData::Timeout)?;
                 }
             }
         }
@@ -58,7 +59,8 @@ impl<CbData, E> GhostTracker<CbData, E> {
     pub fn bookmark(
         &mut self,
         timeout: std::time::Duration,
-        cb: GhostCallback<CbData, E>,
+        context: Context,
+        cb: GhostCallback<Context, CbData, E>,
     ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
         self.pending.insert(
@@ -67,6 +69,7 @@ impl<CbData, E> GhostTracker<CbData, E> {
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
+                context,
                 cb,
             },
         );
@@ -84,7 +87,7 @@ impl<CbData, E> GhostTracker<CbData, E> {
                 println!("request_id {:?} not found", request_id);
                 Ok(())
             }
-            Some(entry) => (entry.cb)(ga, GhostCallbackData::Response(data)),
+            Some(entry) => (entry.cb)(ga, entry.context, GhostCallbackData::Response(data)),
         }
     }
 }
