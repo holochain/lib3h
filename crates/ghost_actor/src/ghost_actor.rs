@@ -21,8 +21,10 @@ pub trait GhostActor<RequestAsChild, ResponseAsChild, RequestFromParent, Respons
         let mut actor_state = self.take_actor_state();
         actor_state.process(self.as_any())?;
         self.put_actor_state(actor_state);
-        Ok(true.into())
+        self.process_concrete()
     }
+
+    fn process_concrete(&mut self) -> Result<DidWork, E>;
 
     // our parent is making a request of us
     fn request(&mut self, request_id: Option<RequestId>, request: RequestFromParent);
@@ -37,7 +39,7 @@ pub trait GhostActor<RequestAsChild, ResponseAsChild, RequestFromParent, Respons
         self.get_actor_state().drain_requests()
     }
 
-    // called by parest, these are responses to requests in drain_request
+    // called by parent, these are responses to requests in drain_request
     fn respond(&mut self, request_id: RequestId, response: ResponseAsChild) -> Result<(), E> {
         let mut actor_state = self.take_actor_state();
         let out = actor_state.handle_response(self.as_any(), request_id, response);

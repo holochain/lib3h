@@ -64,19 +64,25 @@ mod tests {
 
     #[allow(dead_code)]
     mod transport_protocol {
+        #[derive(Debug)]
         pub enum RequestFromParent {
             Bind { url: String },
         }
 
+        #[derive(Debug)]
         pub enum ResponseToParent {
             BindResult { bound_url: Result<String, String> },
         }
 
+        #[derive(Debug)]
         pub enum RequestAsChild {
             IncomingConnection { address: String },
         }
 
-        pub enum ResponseAsChild {}
+        #[derive(Debug)]
+        pub enum ResponseAsChild {
+            Idle,
+        }
     }
 
     use transport_protocol::*;
@@ -140,6 +146,20 @@ mod tests {
                 }
             }
         }
+
+        fn process_concrete(&mut self) -> Result<DidWork, String> {
+            self.get_actor_state().send_request_to_parent(
+                std::time::Duration::from_millis(2000),
+                RequestAsChild::IncomingConnection {
+                    address: "test".to_string(),
+                },
+                Box::new(|_m, r| {
+                    println!("got: {:?}", r);
+                    Ok(())
+                }),
+            );
+            Ok(true.into())
+        }
     }
 
     type TransportActor = dyn GhostActor<
@@ -152,7 +172,13 @@ mod tests {
 
     #[test]
     fn test_wss_transport() {
-        let concrete = WssTransport::new();
-        let _: &TransportActor = &concrete;
+        let mut t_actor: Box<TransportActor> = Box::new(WssTransport::new());
+        t_actor.process().unwrap();
+        for (rid, ev) in t_actor.drain_requests() {
+            println!("got: {:?} {:?}", rid, ev);
+            if let Some(rid) = rid {
+                t_actor.respond(rid, ResponseAsChild::Idle).unwrap();
+            }
+        }
     }
 }

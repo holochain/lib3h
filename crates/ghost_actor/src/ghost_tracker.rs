@@ -2,6 +2,7 @@ use std::{any::Any, collections::HashMap};
 
 use crate::RequestId;
 
+#[derive(Debug)]
 pub enum GhostCallbackData<CbData> {
     Response(CbData),
     Timeout,
