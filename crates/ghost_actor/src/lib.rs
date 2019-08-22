@@ -179,7 +179,7 @@ mod tests {
         // so first instantiate the "child" actor
         let mut t_actor: Box<TransportActor> = Box::new(WssTransport::new());
 
-        // allow the actor to run this actor always createss a simulated incomming
+        // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
         t_actor.process().unwrap();
 
@@ -198,7 +198,7 @@ mod tests {
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
         let request_id = RequestId::with_prefix("test_parent");
-        t_actor.request(Some(request_id), RequestFromParent::Bind{url: "addres_to_bind_to".to_string()} );
+        t_actor.request(Some(request_id), RequestFromParent::Bind{url: "address_to_bind_to".to_string()} );
 
         // now process the responses the actor has made to our quests
         for (rid, ev) in t_actor.drain_responses() {
