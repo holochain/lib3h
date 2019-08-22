@@ -1,7 +1,7 @@
 // // simple p2p mdns usage
 // extern crate lib3h_mdns;
-// use lib3h_mdns::{dns_old as dns, MulticastDns, MulticastDnsBuilder};
-// // use lib3h::engine::RealEngineConfig;
+// use lib3h_mdns::{dns, MulticastDns, MulticastDnsBuilder};
+// use lib3h::engine::RealEngineConfig;
 //
 // static SERVICE_NAME: &'static [u8] = b"lib3h.test.service";
 // static TARGET_NAME: &'static [u8] = b"lib3h.test.target";
