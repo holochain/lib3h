@@ -281,13 +281,6 @@ fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEquals {
     }))
 }
 
-fn _is_success_result(x: &Lib3hServerProtocol, expected: GenericResultData) -> bool {
-    match x {
-        Lib3hServerProtocol::SuccessResult(actual) => expected == *actual,
-        _ => false,
-    }
-}
-
 #[test]
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
@@ -310,10 +303,8 @@ fn basic_connect_test_mock() {
         .post(Lib3hClientProtocol::Connect(connect_msg.clone()))
         .unwrap();
     println!("\nengine_a.process()...");
-    // TODO request_id should match on "connect_a_1" not ""
-    //let is_connected = Box::new(predicate::function(|x| is_connected(x, "")));
 
-    let is_connected = Box::new(is_connected("", url::Url::parse("foo://bar").unwrap())); // engine_a.advertise()));
+    let is_connected = Box::new(is_connected("", engine_a.advertise()));
 
     let mut engines = vec![&mut engine_a, &mut engine_b];
 
