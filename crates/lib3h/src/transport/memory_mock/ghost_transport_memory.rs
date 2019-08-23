@@ -258,6 +258,8 @@ impl
             None => return Ok(false.into()),
         };
 
+        println!("Processing for: {}",my_addr);
+
         // get our own server
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(&my_addr);
@@ -278,25 +280,14 @@ impl
                             .get_inbound_uri(&in_cid)
                             .expect("Should always have uri");
                         to_connect_list.push((to_connect_uri.clone(), in_cid.clone()));
-                        self.get_actor_state().send_request_to_parent(
-                            std::time::Duration::from_millis(2000),
+                        self.get_actor_state().send_event_to_parent(
                             RequestToParent::IncomingConnection {
                                 address: to_connect_uri.clone(),
                             },
-                            RequestToParentContext::Source {
-                                address: to_connect_uri.clone(),
-                            },
-                            Box::new(|_m, c, r| {
-                                println!(
-                                    "response from parent to IncomingConnection got: {:?} with context {:?}",
-                                    r, c
-                                );
-                                Ok(())
-                            }),
                         );
                     }
                     TransportEvent::ReceivedData(in_cid, payload) => {
-                        trace!("RecivedData--- cid:{:?} payload:{:?}", in_cid, payload);
+                        println!("RecivedData--- cid:{:?} payload:{:?}", in_cid, payload);
                         let out_cid = self
                             .inbound_connection_map
                             .get(&in_cid)
@@ -307,22 +298,11 @@ impl
                             .get(&out_cid)
                             .expect("Should have outbound at this stage")
                             .clone();
-                        self.get_actor_state().send_request_to_parent(
-                            std::time::Duration::from_millis(2000),
+                        self.get_actor_state().send_event_to_parent(
                             RequestToParent::ReceivedData {
                                 address: out_addr.clone(),
                                 payload,
-                            },
-                            RequestToParentContext::Source {
-                                address: out_addr.clone(),
-                            },
-                            Box::new(|_m, c, r| {
-                                println!(
-                                    "response from parent to Source got: {:?} with context {:?}",
-                                    r, c
-                                );
-                                Ok(())
-                            }),
+                            }
                         );
                     }
                     _ => panic!(format!("WHAT: {:?}", event)), //                    output.push(event);
@@ -331,7 +311,7 @@ impl
 
             // Connect back to received connections if not already connected to them
             for (uri, in_cid) in to_connect_list {
-                trace!("(GhostTransportMemory) {} <- {:?}", uri, my_addr);
+                println!("(GhostTransportMemory)connecting {} <- {:?}", uri, my_addr);
                 // Check if already connected
                 let maybe_cid = self
                     .outbound_connection_map
@@ -838,6 +818,6 @@ mod tests {
 
         let mut r = transport2.drain_requests();
         let (_rid, request) = r.pop().unwrap();
-        assert_eq!("ReceivedData { address: \"mem://addr_2/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] }", format!("{:?}", request));
+        assert_eq!("ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] }", format!("{:?}", request));
     }
 }
