@@ -202,6 +202,8 @@ mod tests {
 
     #[allow(dead_code)]
     mod transport_protocol {
+        use super::*;
+
         #[derive(Debug)]
         pub enum RequestToChild {
             Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
@@ -230,8 +232,8 @@ mod tests {
 
         #[derive(Debug)]
         pub enum RequestToParentResponse {
-            Allowed,     // just for testing
-            Disallowed,  // just for testing
+            Allowed,    // just for testing
+            Disallowed, // just for testing
         }
     }
 
@@ -326,7 +328,7 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild) {
             match request {
-                RequestToChild::Bind { url: _u } => {
+                RequestToChild::Bind { spec: _u } => {
                     // do some internal bind
                     // we get a bound_url
                     let bound_url = "bound_url".to_string();
@@ -340,6 +342,7 @@ mod tests {
                         );
                     }
                 }
+                RequestToChild::Bootstrap { address: _ } => {}
                 RequestToChild::SendMessage {
                     address,
                     payload: _,
@@ -492,7 +495,7 @@ mod tests {
         t_actor.request(
             Some(request_id),
             RequestToChild::Bind {
-                url: "address_to_bind_to".to_string(),
+                spec: "address_to_bind_to".to_string(),
             },
         );
 
