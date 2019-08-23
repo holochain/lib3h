@@ -1,4 +1,4 @@
-use crate::{WorkWasDone, GhostActorState, RequestId};
+use crate::{GhostActorState, RequestId, WorkWasDone};
 use std::any::Any;
 
 pub trait GhostActor<

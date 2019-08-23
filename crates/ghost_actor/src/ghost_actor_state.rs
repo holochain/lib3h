@@ -1,4 +1,4 @@
-use crate::{WorkWasDone, GhostCallback, GhostTracker, RequestId};
+use crate::{GhostCallback, GhostTracker, RequestId, WorkWasDone};
 use std::any::Any;
 
 pub struct GhostActorState<
