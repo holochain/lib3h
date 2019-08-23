@@ -50,7 +50,7 @@ pub enum RequestToChildResponse {
 #[derive(Debug)]
 pub enum RequestToParent {
     IncomingConnection { address: Url },
-    ReceivedData { adress: Url, payload: Vec<u8> },
+    ReceivedData { address: Url, payload: Vec<u8> },
     TransportError { error: TransportError },
 }
 
