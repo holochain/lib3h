@@ -31,7 +31,6 @@ pub enum TransportEvent {
 #[derive(Debug)]
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    Bootstrap { address: Url },
     SendMessage { address: Url, payload: Vec<u8> },
 }
 
@@ -43,7 +42,6 @@ pub struct BindResultData {
 #[derive(Debug)]
 pub enum RequestToChildResponse {
     Bind(Result<BindResultData, TransportError>),
-    Bootstrap(Result<(), TransportError>),
     SendMessage(Result<(), TransportError>),
 }
 

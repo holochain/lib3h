@@ -191,6 +191,28 @@ impl
                 }
                 let mut server = maybe_server.unwrap().lock().unwrap();
 
+                // Check if already connected
+                let maybe_cid = self
+                    .outbound_connection_map
+                    .iter()
+                    .find(|(_, cur_uri)| *cur_uri.to_string() == address.to_string());
+
+                // if not
+                if maybe_cid.is_none() {
+                    // Generate and store a connectionId to act like other Transport types
+                    self.n_id += 1;
+                    let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
+                    self.outbound_connection_map
+                        .insert(id.clone(), address.clone());
+                    // Connect to it
+                    let result = server.request_connect(&my_addr, &id);
+                    if result.is_err() {
+                        self.respond_with(&request_id, RequestToChildResponse::SendMessage(result));
+                        return;
+                    }
+                };
+
+
                 trace!(
                     "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
                     my_addr,
@@ -203,50 +225,6 @@ impl
                     .expect("Post on memory server should work");
 
                 self.respond_with(&request_id, RequestToChildResponse::SendMessage(Ok(())));
-            }
-            RequestToChild::Bootstrap { address } => {
-                // make sure we have bound and get our address if so
-                let my_addr = is_bound!(self, request_id, Bootstrap);
-
-                // Get the other node's server
-                // TODO: convert to macro:
-                //    let server = get_server!(self,request_id,Bootstrap)
-                let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                let maybe_server = server_map.get(&address);
-                if let None = maybe_server {
-                    self.respond_with(
-                        &request_id,
-                        RequestToChildResponse::Bootstrap(Err(TransportError::new(format!(
-                            "No Memory server at this address: {}",
-                            my_addr
-                        )))),
-                    );
-
-                    return;
-                }
-                let mut server = maybe_server.unwrap().lock().unwrap();
-
-                // Check if already connected
-                let maybe_cid = self
-                    .outbound_connection_map
-                    .iter()
-                    .find(|(_, cur_uri)| *cur_uri.to_string() == address.to_string());
-
-                if maybe_cid.is_none() {
-                    // Generate and store a connectionId to act like other Transport types
-                    self.n_id += 1;
-                    let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
-                    self.outbound_connection_map
-                        .insert(id.clone(), address.clone());
-                    // Connect to it
-                    let result = server.request_connect(&my_addr, &id);
-                    if result.is_err() {
-                        self.respond_with(&request_id, RequestToChildResponse::Bootstrap(result));
-                        return;
-                    }
-                };
-
-                self.respond_with(&request_id, RequestToChildResponse::Bootstrap(Ok(())));
             }
         }
     }
@@ -773,18 +751,15 @@ mod tests {
             _ => assert!(false),
         }
 
-        // now bootstrap a connection between transport 1 & 2
-        let bootstrap_request1 = RequestId::with_prefix("test_parent");
+        // now send a message from transport1 to transport2 over the bound addresses
+        let send_request1 = RequestId::with_prefix("test_parent");
         transport1.request(
-            Some(bootstrap_request1),
-            RequestToChild::Bootstrap {
+            Some(send_request1),
+            RequestToChild::SendMessage {
                 address: Url::parse("mem://addr_2").unwrap(),
+                payload: b"test message".to_vec(),
             },
         );
-
-        let mut r = transport1.drain_responses();
-        let (_rid, response) = r.pop().unwrap();
-        assert_eq!("Bootstrap(Ok(()))", format!("{:?}", response));
 
         // call process on both transports so queues can fill
         transport1.process().unwrap();
@@ -795,16 +770,6 @@ mod tests {
         assert_eq!(
             "IncomingConnection { address: \"mem://addr_1/\" }",
             format!("{:?}", request)
-        );
-
-        // now send a message from transport1 to transport2 over the bound addresses
-        let send_request1 = RequestId::with_prefix("test_parent");
-        transport1.request(
-            Some(send_request1),
-            RequestToChild::SendMessage {
-                address: Url::parse("mem://addr_2").unwrap(),
-                payload: b"test message".to_vec(),
-            },
         );
 
         let mut r = transport1.drain_responses();
