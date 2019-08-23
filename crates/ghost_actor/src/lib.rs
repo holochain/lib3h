@@ -4,16 +4,16 @@ extern crate shrinkwraprs;
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
-pub struct DidWork(pub bool);
+pub struct WorkWasDone(pub bool);
 
-impl From<bool> for DidWork {
+impl From<bool> for WorkWasDone {
     fn from(b: bool) -> Self {
-        DidWork(b)
+        WorkWasDone(b)
     }
 }
 
-impl From<DidWork> for bool {
-    fn from(d: DidWork) -> Self {
+impl From<WorkWasDone> for bool {
+    fn from(d: WorkWasDone) -> Self {
         d.0
     }
 }
@@ -181,7 +181,7 @@ mod tests {
             }
         }
 
-        fn process_concrete(&mut self) -> Result<DidWork, String> {
+        fn process_concrete(&mut self) -> Result<WorkWasDone, String> {
             Ok(true.into())
         }
     }
@@ -425,7 +425,7 @@ mod tests {
             }
         }
 
-        fn process_concrete(&mut self) -> Result<DidWork, String> {
+        fn process_concrete(&mut self) -> Result<WorkWasDone, String> {
             self.get_actor_state().send_request_to_parent(
                 std::time::Duration::from_millis(2000),
                 RequestToParent::IncomingConnection {

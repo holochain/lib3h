@@ -1,4 +1,4 @@
-use crate::{DidWork, GhostActorState, RequestId};
+use crate::{WorkWasDone, GhostActorState, RequestId};
 use std::any::Any;
 
 pub trait GhostActor<
@@ -37,14 +37,14 @@ pub trait GhostActor<
         >,
     );
 
-    fn process(&mut self) -> Result<DidWork, E> {
+    fn process(&mut self) -> Result<WorkWasDone, E> {
         let mut actor_state = self.take_actor_state();
         actor_state.process(self.as_any())?;
         self.put_actor_state(actor_state);
         self.process_concrete()
     }
 
-    fn process_concrete(&mut self) -> Result<DidWork, E>;
+    fn process_concrete(&mut self) -> Result<WorkWasDone, E>;
 
     // our parent is making a request of us
     fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild);

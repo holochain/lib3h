@@ -6,7 +6,7 @@ use crate::transport::{
 use lib3h_protocol::DidWork;
 use std::{
     collections::{HashMap, VecDeque},
-    sync::{Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 use url::Url;
 
@@ -20,6 +20,15 @@ type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
 // this is the actual memory space for our in-memory servers
 lazy_static! {
     pub(crate) static ref MEMORY_SERVER_MAP: RwLock<MemoryServerMap> = RwLock::new(HashMap::new());
+    static ref URL_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+}
+
+pub fn new_url() -> Url {
+    let mut tc = URL_COUNT
+        .lock()
+        .expect("could not lock transport count mutex");
+    *tc += 1;
+    Url::parse(&format!("mem://addr_{}", *tc).as_str()).unwrap()
 }
 
 /// Add new MemoryServer to the global server map
