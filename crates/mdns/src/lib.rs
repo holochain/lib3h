@@ -17,7 +17,7 @@
 //! // Let's listen to the network for a few moments...
 //! for _ in 0..5 {
 //!     mdns.discover();
-//!     eprintln!("mDNS neighbourhood : {:#?}", &mdns.records());
+//!     println!("mDNS neighbourhood : {:#?}", &mdns.records());
 //!
 //!     mdns::sleep_ms(100);
 //! }
@@ -26,7 +26,7 @@
 #![feature(try_trait)]
 #![feature(never_type)]
 
-use log::{debug, error};
+use log::{debug, error, trace, warn};
 use rand::Rng;
 use regex;
 use std::net;
@@ -298,30 +298,38 @@ impl MulticastDns {
     }
 
     /// Try to receive a DNS packet and set timeout and wait time doing so.
-    pub fn recv_timely(
+    pub fn recv_probe_response(
         &mut self,
         timeout: u64,
         every: u64,
-        for_duration: u64,
-    ) -> Result<Option<(Vec<u8>, SocketAddr)>, MulticastDnsError> {
+    ) -> Result<Option<(AnswerSection, SocketAddr)>, MulticastDnsError> {
         self.flush_buffer();
-        // Sets a timeout for other host to respond
-        self.recv_socket
-            .set_read_timeout(Some(Duration::from_millis(timeout)))?;
-
         let start = Instant::now();
 
-        while start.elapsed().as_millis() < u128::from(for_duration) {
+        while start.elapsed().as_millis() < u128::from(timeout) {
             match self.recv_socket.recv_from(&mut self.buffer) {
                 Ok((num_bytes, sender_socket_addr)) => {
                     let packet = self.buffer[..num_bytes].to_vec();
-                    debug!("I received '{}' bytes: {:?}", num_bytes, &packet);
-                    // TODO check if sender_addr match local link
-                    return Ok(Some((packet, sender_socket_addr)));
+                    trace!("I received '{}' bytes: {:?}", num_bytes, &packet);
+
+                    if let Ok(dmesg) = DnsMessage::from_raw(&packet) {
+                        // We discard non authoritative answers
+                        if dmesg.nb_authority < 1 {
+                            continue;
+                        } else {
+                            for answer in dmesg.answers.iter() {
+                                if self.own_record.hostname() == answer.domain_name {
+                                    return Ok(Some((answer.clone(), sender_socket_addr)));
+                                }
+                            }
+                        }
+                    } else {
+                        warn!("Fail to cast DnsMessage from : {:?}", &packet);
+                    }
                 }
                 Err(err) => {
                     if err.kind() != std::io::ErrorKind::WouldBlock {
-                        eprintln!("Something went wrong: {}", err);
+                        error!("Something went wrong: {}", err);
                         return Err(err.into());
                     } else {
                     }
@@ -356,7 +364,7 @@ impl MulticastDns {
     }
 
     /// Run the mDNS service.
-    pub fn run(&mut self) -> MulticastDnsResult<()> {
+    pub fn run(&mut self) -> MulticastDnsResult<!> {
         println!("Startuping.");
         self.advertise()?;
 
@@ -364,7 +372,7 @@ impl MulticastDns {
         println!("Responder service started.");
         self.responder()?;
 
-        Ok(())
+        // Ok(())
     }
 
     /// mDNS Querier
@@ -381,81 +389,48 @@ impl MulticastDns {
     /// A mDNS Responder that listen to the network in order to defend its name and respond to
     /// queries
     /// Not used in our actual mDNS implementation use case.
-    fn responder(&mut self) -> MulticastDnsResult<()> {
-        // let resp_packet = self.build_defensive_packet();
-        // let mut query_every = 1u64;
-        // let mut counter = 0;
-        //
-        // 'service_loop: loop {
-        //     counter += 1;
-        //     eprintln!("Records : {:#?}", self.records());
-        //
-        //     // // Send query every once in a while
-        //     // let start = Instant::now();
-        //     // while start.elapsed().as_secs() < query_every
-        //     {
-        //         // Sends Query
-        //         self.query()?;
-        //         eprintln!("\n\n[{:>3}] : waiting {} - Querying...", counter, query_every);
-        //
-        //         // Listen to incoming UDP packets for 5sec, without sleep between listening
-        //         // connection for 500ms
-        //         if let Some((resp, sender_socket_addr)) = self.recv_timely(1000, 10, query_every)? {
-        //             if resp.is_query {
-        //                 // if this is a query, we detect conflict and defend our name if we need to
-        //                 if resp.questions.len() > 0 {
-        //                     for question in resp.questions.iter() {
-        //                         match question {
-        //                             Question::Srv(sda) => {
-        //                                 let q_name = std::str::from_utf8(&sda.name)?;
-        //                                 if self.own_record.hostname() == q_name {
-        //                                     eprintln!(">> Me !");
-        //                                     // Conflict detected, so we defend our name
-        //                                     self.send_socket.send_to(
-        //                                         &resp_packet.to_raw()?,
-        //                                         sender_socket_addr,
-        //                                     )?;
-        //                                 } else {
-        //                                     dbg!("Somewhere else.");
-        //                                     sleep_ms(rand_delay(250, 500));
-        //                                     if let Some(resp_to_query_record) =
-        //                                         self.map_record.get(q_name)
-        //                                     {
-        //                                         let resp_to_query_record_packet =
-        //                                             resp_to_query_record
-        //                                                 .to_answers_response_packet()
-        //                                                 .to_raw()?;
-        //                                         self.send_socket.send_to(
-        //                                             &resp_to_query_record_packet,
-        //                                             &sender_socket_addr,
-        //                                         )?;
-        //                                     } else {
-        //                                         eprintln!("Oh man, where the hell am I ?!");
-        //                                     }
-        //                                 }
-        //                             }
-        //                             Question::Unknown => (),
-        //                         }
-        //                     }
-        //                 }
-        //             } else {
-        //                 eprintln!(">> Not a Query received.");
-        //                 // Otherwise we update our cache with the info our neighbour just gave us
-        //                 if let Some(map_record_from_neighbour) = Record::from_packet(&resp) {
-        //                     self.update_cache(&map_record_from_neighbour);
-        //                 }
-        //             }
-        //         }
-        //     }
-        //
-        //     if query_every < 30 {
-        //         query_every += 1;
-        //     }
-        //     // sleep_ms(query_every * 1000);
-        //     sleep_ms(1000);
-        // }
+    fn responder(&mut self) -> MulticastDnsResult<!> {
+        let defend_message = self.build_defensive_message();
 
-        Ok(())
+        loop {
+            match self.recv() {
+                Ok(Some((packet, sender_addr))) => {
+                    let dmesg = DnsMessage::from_raw(&packet)?;
+                    if dmesg.nb_answers > 0 {
+                        // Skipping for now...
+                    }
+                    // We send response only for record we have authority on.
+                    // We send the response directly to the sender instead of broadcasting it to
+                    // avoid any unnecessary burden on the network.
+                    if dmesg.nb_questions > 0 {
+                        for question in dmesg.questions.iter() {
+                            if question.domain_name == self.own_record.hostname {
+                                // Apparently this fail on a local network, so we broadcast it
+                                // anyway
+                                self.send_socket
+                                    .send_to(&defend_message.to_raw()?, sender_addr)?;
+                                self.broadcast_message(&defend_message)?;
+                            }
+                        }
+                    }
+                }
+                Ok(None) => {
+                    debug!(">> Nothing on the UDP stack");
+                    // break;
+                }
+                Err(e) => {
+                    error!(
+                        "Something went wrong while processing the UDP stack during update: '{}'",
+                        e
+                    );
+                    // break;
+                    return Err(e);
+                }
+            }
+
+            thread::sleep(Duration::from_millis(1000));
+        }
+        // Ok(())
     }
 
     /// Builds mDNS probe packet with the proper bit set up in order to check if a host record is
@@ -482,7 +457,10 @@ impl MulticastDns {
 
     /// Build a packet to defend our name.
     pub fn build_defensive_message(&self) -> DnsMessage {
-        MapRecord::new(&self.own_record.hostname, &self.own_record).to_dns_reponse_message()
+        let mut def_mesg =
+            MapRecord::new(&self.own_record.hostname, &self.own_record).to_dns_reponse_message();
+        def_mesg.nb_authority = 1;
+        def_mesg
     }
 
     pub fn build_release_message(&self) -> DnsMessage {
@@ -520,8 +498,6 @@ impl MulticastDns {
         // Making sure our cache is empty before probing
         self.map_record.clear();
 
-        let probe_packet = self.build_probe_packet();
-
         // Let's wait a moment to give time to other nodes to initialize their network
         let delay_probe_by: u64 = rand_delay(0, PROBE_QUERY_DELAY_MS);
         sleep_ms(delay_probe_by);
@@ -531,25 +507,15 @@ impl MulticastDns {
         let mut fail_safe = 0;
         let mut retry = 0;
         while retry < 3 && fail_safe < 1000 {
+            let probe_packet = self.build_probe_packet();
             fail_safe += 1;
+            retry += 1;
             self.broadcast_message(&probe_packet)?;
-            if let Some((resp, _sender_socket_addr)) = self.recv_timely(750, 0, 500)? {
-                match MapRecord::from_dns_message(&DnsMessage::from_raw(&resp)?) {
-                    Some(other_map_record) => {
-                        for (_hostname, record) in other_map_record.iter() {
-                            if self.detect_conflict_during_probe(&record) {
-                                self.resolve_conflict()?;
-                                retry = 0;
-                            }
-                        }
-                    }
-                    None => {
-                        debug!("Unknown packet on the network.");
-                        retry += 1;
-                    }
-                }
-            } else {
-                retry += 1;
+
+            // If this function returns, it means that a conflict has been detected
+            if let Some((_answer, _sender_socket_addr)) = self.recv_probe_response(3_000, 10)? {
+                self.resolve_conflict()?;
+                retry = 0;
             }
         }
 
@@ -565,6 +531,7 @@ impl MulticastDns {
         // Set back the read time of the receiving socket
         self.recv_socket
             .set_read_timeout(Some(Duration::from_millis(5_000)))?;
+        self.recv_socket.set_nonblocking(true)?;
         Ok(())
     }
 
@@ -611,6 +578,7 @@ impl MulticastDns {
             None => format!("{}.{}.local.", &base_hostname, 1),
         };
 
+        self.own_record.hostname = confict_free_hostname.clone();
         Ok(confict_free_hostname)
     }
 }
@@ -806,6 +774,30 @@ mod tests {
     }
 
     #[test]
+    fn probe_message_test() {
+        let mdns = MulticastDnsBuilder::new()
+            .bind_address("0.0.0.0")
+            .bind_port(56056)
+            .multicast_loop(true)
+            .multicast_ttl(255)
+            .multicast_address("224.0.0.246")
+            .build()
+            .expect("build fail");
+
+        let probe_message = mdns.build_probe_packet();
+
+        let probe_message_from_raw = DnsMessage::from_raw(
+            &probe_message
+                .to_raw()
+                .expect("Fail to convert probe message to bytes."),
+        )
+        .expect("Fail to convert back probe message from bytes.");
+
+        assert_eq!(probe_message, probe_message_from_raw);
+        assert_ne!(probe_message.nb_questions, 0);
+    }
+
+    #[test]
     fn resolve_conflict_test() {
         let resolve_conflict_name = {
             let mut mdns = MulticastDnsBuilder::new()
@@ -841,11 +833,63 @@ mod tests {
     }
 
     #[test]
+    fn responder_and_conflict_resolver_test() {
+        use std::sync::mpsc::channel;
+
+        let (sx, rx) = channel();
+
+        let _handle = thread::Builder::new()
+            .name(String::from("mDNS Responder"))
+            .spawn(move || {
+                let mut mdns = MulticastDnsBuilder::new()
+                    .own_record("holonaute", &["0.0.0.0"])
+                    .multicast_address("224.0.0.252")
+                    .build()
+                    .expect("Fail to build mDNS.");
+
+                // Skip the advertising step
+                let own_record = Record::new("holonaute.local.", &["0.0.0.0".to_string()], 255);
+                mdns.map_record
+                    .insert("holonaute.local.".to_string(), own_record);
+
+                sx.send(mdns.own_record.clone())
+                    .expect("Fail to send mDNS service through channel.");
+
+                // Listen to the network for a few moment, just the time to defend our name and
+                // return mdns
+
+                mdns.responder()
+                    .expect("Fail to fire up the mDNS responder service.");
+
+                // eprintln!("Exit defending thread.");
+            });
+
+        let mdns_own_record = rx
+            .recv()
+            .expect("Fail to receive mDNS server through channel.");
+
+        drop(_handle);
+        drop(rx);
+
+        let mut mdns_with_resolved_conflict = MulticastDnsBuilder::new()
+            .own_record("holonaute", &["0.0.0.0"])
+            .multicast_address("224.0.0.252")
+            .build()
+            .expect("Fail to build mDNS.");
+
+        mdns_with_resolved_conflict
+            .advertise()
+            .expect("Fail to advertise the conflictual mDNS server.");
+
+        assert_ne!(mdns_own_record, mdns_with_resolved_conflict.own_record);
+    }
+
+    #[test]
     fn release_test() {
         let own_record = Record::new("holonaute.local.", &["0.0.0.0".to_string()], 255);
         // This is the one from which we want to see another node disapearing from its cache
         let mut mdns = MulticastDnsBuilder::new()
-            .multicast_address("224.0.0.250")
+            .multicast_address("224.0.0.251")
             .own_record("holonaute", &["0.0.0.0"])
             .build()
             .expect("Fail to build mDNS.");
@@ -855,7 +899,7 @@ mod tests {
 
         let mut mdns_releaser = MulticastDnsBuilder::new()
             .own_record("holonaute-to-release", &["0.0.0.0"])
-            .multicast_address("224.0.0.250")
+            .multicast_address("224.0.0.251")
             .build()
             .expect("Fail to build mDNS.");
 
