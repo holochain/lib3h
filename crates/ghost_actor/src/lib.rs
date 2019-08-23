@@ -1,3 +1,4 @@
+extern crate crossbeam_channel;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -44,19 +45,26 @@ impl From<RequestId> for String {
     }
 }
 
+mod ghost_error;
+pub use ghost_error::{GhostError, GhostResult};
+
 mod ghost_tracker;
 pub use ghost_tracker::{GhostCallback, GhostCallbackData, GhostTracker};
 
-mod ghost_actor_state;
-pub use ghost_actor_state::GhostActorState;
+mod ghost_channel;
+pub use ghost_channel::{GhostMessage, GhostChannel, create_ghost_channel};
+
+//mod ghost_actor_state;
+//pub use ghost_actor_state::GhostActorState;
 
 mod ghost_actor;
 pub use ghost_actor::GhostActor;
 
 pub mod prelude {
-    pub use super::{GhostActor, GhostActorState, GhostCallback, GhostCallbackData, GhostTracker};
+    pub use super::{GhostError, GhostResult, GhostActor, GhostCallback, GhostCallbackData, GhostTracker, GhostMessage, GhostChannel, create_ghost_channel};
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,3 +529,4 @@ mod tests {
         }
     }
 }
+*/

@@ -1,15 +1,25 @@
 use std::{any::Any, collections::HashMap};
 
-use crate::RequestId;
+use crate::{GhostResult, RequestId};
 
 #[derive(Debug)]
-pub enum GhostCallbackData<CbData> {
-    Response(CbData),
+pub enum GhostCallbackData<CbData, E> {
+    Response(Result<CbData, E>),
     Timeout,
 }
 
 pub type GhostCallback<Context, CbData, E> =
-    Box<dyn Fn(&mut dyn Any, Context, GhostCallbackData<CbData>) -> Result<(), E> + 'static>;
+    Box<dyn Fn(&mut dyn Any, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
+
+#[macro_export]
+macro_rules! ghost_cb_call {
+    ( $cb:expr, $mod:expr, $ctx:expr, $data:expr ) => {{
+        let tmp = std::mem::replace(&mut $cb, Box::new(|_, _, _|{}));
+        let out = tmp($mod, $ctx, $data);
+        std::mem::replace(&mut $cb, tmp);
+        out
+    }}
+}
 
 struct GhostTrackerEntry<Context, CbData, E> {
     expires: std::time::SystemTime,
@@ -33,7 +43,7 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
     }
 
     /// called by ActorState::process(), or GhostActors needing tracking
-    pub fn process(&mut self, ga: &mut dyn Any) -> Result<(), E> {
+    pub fn process(&mut self, ga: &mut dyn Any) -> GhostResult<()> {
         let mut expired = Vec::new();
 
         let now = std::time::SystemTime::now();
@@ -80,8 +90,8 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
         &mut self,
         request_id: RequestId,
         ga: &mut dyn Any,
-        data: CbData,
-    ) -> Result<(), E> {
+        data: Result<CbData, E>,
+    ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
             None => {
                 println!("request_id {:?} not found", request_id);
