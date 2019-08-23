@@ -79,7 +79,50 @@ impl GhostTransportMemory {
             //            dht_callbacks: Some(GhostTracker::new("gateway_transport_dht_")),
         }
     }
+
+    fn respond_with(&mut self, request_id: &Option<RequestId>, response: RequestToChildResponse) {
+        if let Some(request_id) = request_id {
+            self.get_actor_state()
+                .respond_to_parent(request_id.clone(), response);
+        }
+    }
 }
+
+macro_rules! is_bound {
+    ($self:ident, $request_id:ident, $response_type:ident  ) => {
+        match &mut $self.maybe_my_address {
+            Some(my_addr) => my_addr.clone(),
+            None => {
+                $self.respond_with(
+                    &$request_id,
+                    RequestToChildResponse::$response_type(Err(TransportError::new(
+                        "Transport must be bound before sending".to_string(),
+                    ))),
+                );
+                return;
+            }
+        }
+    };
+}
+
+/*
+macro_rules! with_server {
+    ($self:ident, $request_id:ident, $response_type:ident, $address:ident, |$server:ident| $code:expr  ) => {
+        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+        let maybe_server = server_map.get(&$address);
+        if let None = maybe_server {
+            respond_with!($self,$request_id,$response_type,
+                          Err(TransportError::new(format!(
+                              "No Memory server at this url address: {}",
+                              $address
+                          ))));
+            return;
+        }
+        let mut server = maybe_server.unwrap().lock().unwrap();
+        $code
+    }
+}
+ */
 
 impl
     GhostActor<
@@ -122,45 +165,27 @@ impl
                 self.maybe_my_address = Some(bound_url.clone());
 
                 // respond to our parent
-                if let Some(request_id) = request_id {
-                    self.get_actor_state().respond_to_parent(
-                        request_id,
-                        RequestToChildResponse::Bind(Ok(BindResultData {
-                            bound_url: bound_url,
-                        })),
-                    );
-                }
+                self.respond_with(
+                    &request_id,
+                    RequestToChildResponse::Bind(Ok(BindResultData {
+                        bound_url: bound_url,
+                    })),
+                );
             }
             RequestToChild::SendMessage { address, payload } => {
-                // make sure we have bound
-                // TODO: convert to macro is_bound!(self,request_id,SendMessage)
-                if self.maybe_my_address.is_none() {
-                    if let Some(request_id) = request_id {
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            RequestToChildResponse::SendMessage(Err(TransportError::new(
-                                "Transport must be bound before sending".to_string(),
-                            ))),
-                        );
-                    }
-                    return;
-                }
+                // make sure we have bound and get our address if so
+                let my_addr = is_bound!(self, request_id, SendMessage);
 
-                // Get the other node's server
-                // TODO: convert to macro:
-                //    let server = get_server!(self,request_id,SendMessage)
                 let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                let maybe_server = server_map.get(&address);
+                let maybe_server = server_map.get(&my_addr);
                 if let None = maybe_server {
-                    if let Some(request_id) = request_id {
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            RequestToChildResponse::SendMessage(Err(TransportError::new(format!(
-                                "No Memory server at this url address: {}",
-                                address
-                            )))),
-                        );
-                    }
+                    self.respond_with(
+                        &request_id,
+                        RequestToChildResponse::SendMessage(Err(TransportError::new(format!(
+                            "No Memory server at this address: {}",
+                            my_addr
+                        )))),
+                    );
                     return;
                 }
                 let mut server = maybe_server.unwrap().lock().unwrap();
@@ -170,35 +195,16 @@ impl
                     address,
                     payload.len()
                 );
-                if let Some(my_addr) = &self.maybe_my_address {
-                    // Send it data from us
-                    server
-                        .post(&my_addr, &payload)
-                        .expect("Post on memory server should work");
-                }
+                // Send it data from us
+                server
+                    .post(&my_addr, &payload)
+                    .expect("Post on memory server should work");
 
-                // TODO: conver to macro:
-                // respond_ok!(self,request_id,SendMessage);
-                if let Some(request_id) = request_id {
-                    self.get_actor_state()
-                        .respond_to_parent(request_id, RequestToChildResponse::SendMessage(Ok(())));
-                }
+                self.respond_with(&request_id, RequestToChildResponse::SendMessage(Ok(())));
             }
             RequestToChild::Bootstrap { address } => {
-                // make sure we have bound
-                // TODO: convert to macro:
-                // let my_address = is_bound!(self,request_id,Bootstrap)
-                if self.maybe_my_address.is_none() {
-                    if let Some(request_id) = request_id {
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            RequestToChildResponse::Bootstrap(Err(TransportError::new(
-                                "Transport must be bound before sending".to_string(),
-                            ))),
-                        );
-                    }
-                    return;
-                }
+                // make sure we have bound and get our address if so
+                let my_addr = is_bound!(self, request_id, Bootstrap);
 
                 // Get the other node's server
                 // TODO: convert to macro:
@@ -232,26 +238,14 @@ impl
                     self.outbound_connection_map
                         .insert(id.clone(), address.clone());
                     // Connect to it
-                    if let Some(my_addr) = &self.maybe_my_address {
-                        let result = server.request_connect(my_addr, &id);
-                        if result.is_err() {
-                            if let Some(request_id) = request_id {
-                                self.get_actor_state().respond_to_parent(
-                                    request_id,
-                                    RequestToChildResponse::Bootstrap(result),
-                                );
-                            }
-                            return;
-                        }
+                    let result = server.request_connect(&my_addr, &id);
+                    if result.is_err() {
+                        self.respond_with(&request_id, RequestToChildResponse::Bootstrap(result));
+                        return;
                     }
                 };
 
-                // TODO: convert to macro:
-                // respond_ok!(self,request_id,SendMessage);
-                if let Some(request_id) = request_id {
-                    self.get_actor_state()
-                        .respond_to_parent(request_id, RequestToChildResponse::Bootstrap(Ok(())));
-                };
+                self.respond_with(&request_id, RequestToChildResponse::Bootstrap(Ok(())));
             }
         }
     }
@@ -705,8 +699,9 @@ mod tests {
         let (_rid, response) = r.pop().unwrap();
         assert_eq!("Bootstrap(Ok(()))", format!("{:?}", response));
 
-        // TODO: need to call process on memory_server now to get it to send
-        // an incoming request to transport2
+        // call process on both transports so queues can fill
+        transport1.process().unwrap();
+        transport2.process().unwrap();
 
         let mut r = transport2.drain_requests();
         let (_rid, request) = r.pop().unwrap();
