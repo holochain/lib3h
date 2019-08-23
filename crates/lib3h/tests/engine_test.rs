@@ -141,7 +141,7 @@ struct ProcessorArgs {
     previous: Vec<ProcessorArgs>,
 }
 
-trait Processor: Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
+trait Processor: Predicate<ProcessorArgs> {
     fn name(&self) -> String {
         "default_processor".into()
     }
@@ -149,21 +149,24 @@ trait Processor: Predicate<ProcessorArgs> + PartialEq + std::fmt::Display {
     fn test(&self, args: &ProcessorArgs);
 }
 
-trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
-    fn actual(&self, args: &ProcessorArgs) -> Option<T>;
+trait AssertEquals<T: PartialEq + std::fmt::Debug> : Processor {
+    fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
 
     fn expected(&self) -> T;
 
     fn eval(&self, args: &ProcessorArgs) -> bool {
-        if let Some(actual) = self.actual(args) {
-            actual == self.expected()
-        } else {
-            false
-        }
+        let extracted = self.extracted(args);
+        extracted.iter().find
+            (|actual| **actual == self.expected())
+            .is_some()
     }
 
     fn test(&self, args: &ProcessorArgs) {
-        assert_eq!(Some(self.expected()), self.actual(args));
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find
+            (|actual| **actual == self.expected());
+         assert_eq!(Some(&self.expected()), 
+                    actual.or(extracted.first()));
     }
 
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -171,13 +174,110 @@ trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
     }
 }
 
+/*impl<T> Predicate<ProcessorArgs> for dyn AssertEquals<T> where 
+    T : PartialEq + std::fmt::Debug {}
+
+impl<T> Processor for dyn AssertEquals<T> where 
+    T : PartialEq + std::fmt::Debug {}
+*/
+
+trait Assert<T> : Processor {
+    fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
+
+    fn assert_inner(&self, args: &T) -> bool;
+
+    fn eval(&self, args:&ProcessorArgs) -> bool {
+        let extracted = self.extracted(args);
+        extracted.iter().find
+            (|actual| self.assert_inner(*actual))
+            .is_some()
+    }
+
+    fn test(&self, args: &ProcessorArgs) {
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find
+            (move |actual| self.assert_inner(*actual))
+            .or(extracted.first());
+
+        if let Some(actual) = actual {
+            assert!(self.assert_inner(actual));
+        } else {
+            assert!(actual.is_some());
+        }
+    }
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
+
 #[derive(PartialEq, Debug)]
 struct Lib3hServerProtocolEquals(Lib3hServerProtocol);
 
+struct Lib3hServerProtocolAssert(Box<dyn Predicate<Lib3hServerProtocol>>);
+
+impl Processor for Lib3hServerProtocolAssert {
+    fn test(&self, args: &ProcessorArgs) {
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find
+            (move |actual| self.assert_inner(*actual))
+            .or(extracted.first());
+
+        if let Some(actual) = actual {
+            assert!(self.assert_inner(actual));
+        } else {
+            assert!(actual.is_some());
+        }
+    }
+
+ 
+}
+
+impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
+    fn extracted(&self, args: &ProcessorArgs) -> Vec<Lib3hServerProtocol> {
+        args.events.iter().map(|x| x.clone()).collect()
+    }
+
+    fn assert_inner(&self, x:&Lib3hServerProtocol) -> bool {
+        self.0.eval(&x)
+    }
+}
+
+
+impl predicates::Predicate<ProcessorArgs> for Lib3hServerProtocolEquals {
+    fn eval(&self, args: &ProcessorArgs) -> bool {
+        self.extracted(args).iter().find
+            (|actual| **actual == self.expected())
+            .is_some()
+    }
+}
+
+impl Predicate<ProcessorArgs> for Lib3hServerProtocolAssert {
+
+    fn eval(&self, args:&ProcessorArgs) -> bool {
+        let extracted = self.extracted(args);
+        extracted.iter().find
+            (|actual| self.assert_inner(*actual))
+            .is_some()
+    }
+}
+
+
+impl Processor for Lib3hServerProtocolEquals {
+    fn test(&self, args: &ProcessorArgs) {
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find
+            (|actual| **actual == self.expected());
+         assert_eq!(Some(&self.expected()), 
+                    actual.or(extracted.first()));
+    }
+}
+
+
 impl AssertEquals<Lib3hServerProtocol> for Lib3hServerProtocolEquals {
-    fn actual(&self, args: &ProcessorArgs) -> Option<Lib3hServerProtocol> {
-        let x = args.events.first().clone();
-        x.map(|x| x.clone())
+    fn extracted(&self, args: &ProcessorArgs) -> Vec<Lib3hServerProtocol> {
+        args.events.iter().map(|x| x.clone()).collect()
     }
     fn expected(&self) -> Lib3hServerProtocol {
         self.0.clone()
@@ -190,29 +290,22 @@ impl std::fmt::Display for Lib3hServerProtocolEquals {
     }
 }
 
-impl predicates::Predicate<ProcessorArgs> for Lib3hServerProtocolEquals {
-    fn eval(&self, args: &ProcessorArgs) -> bool {
-        if let Some(actual) = self.actual(args) {
-            actual == self.expected()
-        } else {
-            false
-        }
+impl std::fmt::Display for Lib3hServerProtocolAssert {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", "asserter")
     }
 }
 
-impl Processor for Lib3hServerProtocolEquals {
-    fn test(&self, args: &ProcessorArgs) {
-        assert_eq!(Some(self.expected()), self.actual(args));
-    }
-}
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
+impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {}
+
 
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
 fn assert_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
-    processors: &Vec<Box<impl Processor>>,
+    processors: &Vec<Box<dyn Processor>>,
 ) {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
@@ -240,18 +333,21 @@ fn assert_processed(
                 engine_name: engine.name(),
                 previous: previous.clone(),
             };
-            let mut failed2 = Vec::new();
+            let mut failed = Vec::new();
 
             for (processor, _orig_processor_args) in errors.drain(..) {
                 let result = processor.eval(&processor_args.clone());
                 if result {
+                    // Simulate the succesful assertion behavior
                     processor.test(&processor_args.clone());
                 // processor passed!
                 } else {
-                    failed2.push((processor, Some(processor_args.clone())));
+                    // Cache the assertion error and trigger it later if we never
+                    // end up passing
+                    failed.push((processor, Some(processor_args.clone())));
                 }
             }
-            errors.append(&mut failed2);
+            errors.append(&mut failed);
             if !processor_args.events.is_empty() {
                 previous.push(processor_args.clone());
             }
@@ -346,15 +442,20 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
         }),
     ));
 
-    let processors = vec![is_success_result];
+    let handle_get_gosip_entry_list = Box::new(Lib3hServerProtocolAssert(
+        Box::new(predicate::function(
+            |x| { match x { Lib3hServerProtocol::HandleGetGossipingEntryList(_) => true, _ => false} })
+        )));
+    let handle_get_author_entry_list = Box::new(Lib3hServerProtocolAssert(
+            Box::new(predicate::function(
+            |x| { match x { Lib3hServerProtocol::HandleGetAuthoringEntryList(_) => true, _ => false} })
+        )));
+
+    let processors = vec![
+        is_success_result as Box<dyn Processor>, 
+        handle_get_gosip_entry_list as Box<dyn Processor>,
+        handle_get_author_entry_list as Box<dyn Processor>];
     assert_processed(&mut engines, &processors);
-
-    /*    let res_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SuccessResult);
-        assert_eq!(res_msg.request_id, "track_a_1".to_string());
-        assert_eq!(res_msg.space_address, *SPACE_ADDRESS_A);
-        assert_eq!(res_msg.to_agent_id, *ALEX_AGENT_ID);
-    */
-
     /*
         let _ = unwrap_to!(srv_msg_list[1] => Lib3hServerProtocol::HandleGetGossipingEntryList);
         let _ = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::HandleGetAuthoringEntryList);
