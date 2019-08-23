@@ -212,15 +212,14 @@ impl
                 let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
                 let maybe_server = server_map.get(&address);
                 if let None = maybe_server {
-                    if let Some(request_id) = request_id {
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            RequestToChildResponse::Bootstrap(Err(TransportError::new(format!(
-                                "No Memory server at this url address: {}",
-                                address
-                            )))),
-                        );
-                    }
+                    self.respond_with(
+                        &request_id,
+                        RequestToChildResponse::Bootstrap(Err(TransportError::new(format!(
+                            "No Memory server at this address: {}",
+                            my_addr
+                        )))),
+                    );
+
                     return;
                 }
                 let mut server = maybe_server.unwrap().lock().unwrap();
