@@ -60,8 +60,6 @@ pub struct MemoryServer {
     /// Inbox of connection state change requests
     /// (true = incoming connection, false = connection closed)
     connection_inbox: Vec<(Url, bool)>,
-    //    /// Store of all established connections
-    //    inbound_connections: HashSet<Url>,
 }
 
 impl Drop for MemoryServer {
@@ -77,20 +75,12 @@ impl MemoryServer {
             this_uri: uri.clone(),
             inbox_map: HashMap::new(),
             connection_inbox: Vec::new(),
-            //inbound_connections: HashMap::new(),
         }
     }
 
     pub fn is_connected_to(&self, uri: &Url) -> bool {
-        self.inbox_map.get(uri).is_some()
+        self.inbox_map.contains_key(uri)
     }
-
-    //    pub fn get_inbound_uri(&self, arg_id: &ConnectionIdRef) -> Option<&Url> {
-    //        self.inbound_connections
-    //            .iter()
-    //            .find(|(_, id)| *id == arg_id)
-    //            .map(|(uri, _)| uri)
-    //    }
 
     /// Another node requested to connect with us.
     /// This creates a new connection: An inbox is created for receiving payloads from this requester.
@@ -112,7 +102,7 @@ impl MemoryServer {
                 self.this_uri, other_uri,
             )));
         }
-        // Establish inbound connection
+        // Establish connection
         let prev = self.inbox_map.insert(other_uri.clone(), VecDeque::new());
         assert!(prev.is_none());
         // Notify our TransportMemory (so it can connect back)

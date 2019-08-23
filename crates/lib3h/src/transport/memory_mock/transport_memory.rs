@@ -16,14 +16,9 @@ pub struct TransportMemory {
     cmd_inbox: VecDeque<TransportCommand>,
     /// Addresses (url-ish) of all our servers
     my_servers: HashSet<Url>,
-    //    /// Mapping of connectionId -> serverUrl
-    //    outbound_connection_map: HashMap<ConnectionId, Url>,
-    //    /// Mapping of in:connectionId -> out:connectionId
-    //    inbound_connection_map: HashMap<ConnectionId, ConnectionId>,
     /// Addresses of connections to remotes
     connections: HashSet<Url>,
-
-    /// My peer uri on the network layer
+    /// The bound uri of my main server
     maybe_my_bound_uri: Option<Url>,
 }
 
@@ -32,8 +27,6 @@ impl TransportMemory {
         TransportMemory {
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
-            //            outbound_connection_map: HashMap::new(),
-            //            inbound_connection_map: HashMap::new(),
             connections: HashSet::new(),
             maybe_my_bound_uri: None,
         }
@@ -295,13 +288,10 @@ impl Transport for TransportMemory {
                 in_uri,
                 self.maybe_my_bound_uri
             );
-            let in_uri_as_cid = self.connect(&in_uri)?;
+            let cid = self.connect(&in_uri)?;
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
-            outbox.insert(
-                0,
-                TransportEvent::IncomingConnectionEstablished(in_uri_as_cid),
-            );
+            outbox.insert(0, TransportEvent::IncomingConnectionEstablished(cid));
         }
         // process other messages
         for event in output {
