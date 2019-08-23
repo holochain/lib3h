@@ -26,3 +26,36 @@ pub enum TransportEvent {
     /// A connection closed for whatever reason
     ConnectionClosed(ConnectionId),
 }
+
+/// Transport protocol enums for use with GhostActor implementation
+#[derive(Debug)]
+pub enum RequestToChild {
+    Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    Bootstrap { address: Url },
+    SendMessage { address: Url, payload: Vec<u8> },
+}
+
+#[derive(Debug)]
+pub struct BindResultData {
+    pub bound_url: Url,
+}
+
+#[derive(Debug)]
+pub enum RequestToChildResponse {
+    Bind(Result<BindResultData, TransportError>),
+    Bootstrap(Result<(), TransportError>),
+    SendMessage(Result<(), TransportError>),
+}
+
+#[derive(Debug)]
+pub enum RequestToParent {
+    IncomingConnection { address: Url },
+    ReceivedData { adress: Url, payload: Vec<u8> },
+    TransportError { error: TransportError },
+}
+
+#[derive(Debug)]
+pub enum RequestToParentResponse {
+    Allowed,    // just for testing
+    Disallowed, // just for testing
+}

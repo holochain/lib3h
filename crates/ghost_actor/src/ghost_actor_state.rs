@@ -1,4 +1,4 @@
-use crate::{DidWork, GhostCallback, GhostTracker, RequestId};
+use crate::{WorkWasDone, GhostCallback, GhostTracker, RequestId};
 use std::any::Any;
 
 pub struct GhostActorState<
@@ -24,7 +24,7 @@ impl<Context, RequestToParent, RequestToParentResponse, RequestToChildResponse, 
         }
     }
 
-    pub fn process(&mut self, ga: &mut dyn Any) -> Result<DidWork, E> {
+    pub fn process(&mut self, ga: &mut dyn Any) -> Result<WorkWasDone, E> {
         self.callbacks.process(ga)?;
         Ok(true.into())
     }
