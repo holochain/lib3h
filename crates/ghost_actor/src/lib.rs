@@ -52,23 +52,24 @@ mod ghost_tracker;
 pub use ghost_tracker::{GhostCallback, GhostCallbackData, GhostTracker};
 
 mod ghost_channel;
-pub use ghost_channel::{GhostMessage, GhostChannel, create_ghost_channel};
-
-//mod ghost_actor_state;
-//pub use ghost_actor_state::GhostActorState;
+pub use ghost_channel::{create_ghost_channel, GhostChannel, GhostContextChannel, GhostMessage};
 
 mod ghost_actor;
 pub use ghost_actor::GhostActor;
 
 pub mod prelude {
-    pub use super::{GhostError, GhostResult, GhostActor, GhostCallback, GhostCallbackData, GhostTracker, GhostMessage, GhostChannel, create_ghost_channel};
+    pub use super::{
+        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostChannel,
+        GhostContextChannel, GhostError, GhostMessage, GhostResult, GhostTracker,
+    };
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::any::Any;
+
+    type FakeError = String;
 
     #[allow(dead_code)]
     mod dht_protocol {
@@ -84,7 +85,7 @@ mod tests {
 
         #[derive(Debug)]
         pub enum RequestToChildResponse {
-            ResolveAddressForId(Result<ResolveAddressForIdData, String>),
+            ResolveAddressForId(ResolveAddressForIdData),
         }
 
         #[derive(Debug)]
@@ -95,116 +96,100 @@ mod tests {
     }
 
     struct RrDht {
-        actor_state: Option<
-            GhostActorState<
+        channel_parent: Option<
+            GhostChannel<
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
+                dht_protocol::RequestToParent,
+                dht_protocol::RequestToParentResponse,
+                FakeError,
+            >,
+        >,
+        channel_self: Option<
+            GhostContextChannel<
                 i8,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
+                dht_protocol::RequestToChild,
                 dht_protocol::RequestToChildResponse,
-                String,
+                FakeError,
             >,
         >,
     }
 
     impl RrDht {
         pub fn new() -> Self {
+            let (channel_parent, channel_self) = create_ghost_channel();
             Self {
-                actor_state: Some(GhostActorState::new()),
+                channel_parent: Some(channel_parent),
+                channel_self: Some(channel_self.as_context_channel()),
             }
         }
     }
 
     impl
         GhostActor<
-            i8,
             dht_protocol::RequestToParent,
             dht_protocol::RequestToParentResponse,
             dht_protocol::RequestToChild,
             dht_protocol::RequestToChildResponse,
-            String,
+            FakeError,
         > for RrDht
     {
         fn as_any(&mut self) -> &mut dyn Any {
             &mut *self
         }
 
-        fn get_actor_state(
+        fn take_parent_channel(
             &mut self,
-        ) -> &mut GhostActorState<
-            i8,
-            dht_protocol::RequestToParent,
-            dht_protocol::RequestToParentResponse,
-            dht_protocol::RequestToChildResponse,
-            String,
-        > {
-            self.actor_state.as_mut().unwrap()
-        }
-
-        fn take_actor_state(
-            &mut self,
-        ) -> GhostActorState<
-            i8,
-            dht_protocol::RequestToParent,
-            dht_protocol::RequestToParentResponse,
-            dht_protocol::RequestToChildResponse,
-            String,
-        > {
-            std::mem::replace(&mut self.actor_state, None).unwrap()
-        }
-
-        fn put_actor_state(
-            &mut self,
-            actor_state: GhostActorState<
-                i8,
+        ) -> Option<
+            GhostChannel<
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
-                dht_protocol::RequestToChildResponse,
-                String,
+                FakeError,
             >,
-        ) {
-            std::mem::replace(&mut self.actor_state, Some(actor_state));
+        > {
+            std::mem::replace(&mut self.channel_parent, None)
         }
 
-        // our parent is making a request of us
-        fn request(
-            &mut self,
-            request_id: Option<RequestId>,
-            request: dht_protocol::RequestToChild,
-        ) {
-            match request {
-                dht_protocol::RequestToChild::ResolveAddressForId { id } => {
-                    println!("dht got ResolveAddressForId {}", id);
-                    if let Some(request_id) = request_id {
-                        println!("dht ResolveAddressForId responding to parent");
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            dht_protocol::RequestToChildResponse::ResolveAddressForId(Ok(
+        fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            let mut channel_self = std::mem::replace(&mut self.channel_self, None);
+            channel_self
+                .as_mut()
+                .expect("exists")
+                .process(self.as_any())?;
+            std::mem::replace(&mut self.channel_self, channel_self);
+
+            for mut msg in self.channel_self.as_mut().expect("exists").drain_requests() {
+                match msg.take_payload().expect("exists") {
+                    dht_protocol::RequestToChild::ResolveAddressForId { id } => {
+                        println!("dht got ResolveAddressForId {}", id);
+                        msg.respond(Ok(
+                            dht_protocol::RequestToChildResponse::ResolveAddressForId(
                                 dht_protocol::ResolveAddressForIdData {
                                     address: "wss://yada".to_string(),
                                 },
-                            )),
-                        );
+                            ),
+                        ));
                     }
                 }
             }
-        }
 
-        fn process_concrete(&mut self) -> Result<WorkWasDone, String> {
-            Ok(true.into())
+            Ok(false.into())
         }
     }
 
     type DhtActor = Box<
         dyn GhostActor<
-            i8,
             dht_protocol::RequestToParent,
             dht_protocol::RequestToParentResponse,
             dht_protocol::RequestToChild,
             dht_protocol::RequestToChildResponse,
-            String,
+            FakeError,
         >,
     >;
-
     type Url = String;
     type TransportError = String;
 
@@ -226,9 +211,9 @@ mod tests {
 
         #[derive(Debug)]
         pub enum RequestToChildResponse {
-            Bind(Result<BindResultData, TransportError>),
-            Bootstrap(Result<(), TransportError>),
-            SendMessage(Result<(), TransportError>),
+            Bind(BindResultData),
+            Bootstrap,
+            SendMessage,
         }
 
         #[derive(Debug)]
@@ -249,7 +234,9 @@ mod tests {
 
     #[derive(Debug)]
     enum GwDht {
-        ResolveAddressForId { request_id: Option<RequestId> },
+        ResolveAddressForId {
+            msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
+        },
     }
 
     #[derive(Debug)]
@@ -258,32 +245,58 @@ mod tests {
     }
 
     struct GatewayTransport {
-        actor_state: Option<
-            GhostActorState<
+        channel_parent: Option<
+            GhostChannel<
+                RequestToChild,
+                RequestToChildResponse,
+                RequestToParent,
+                RequestToParentResponse,
+                FakeError,
+            >,
+        >,
+        channel_self: Option<
+            GhostContextChannel<
                 RequestToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
+                RequestToChild,
                 RequestToChildResponse,
-                String,
+                FakeError,
             >,
         >,
         dht: DhtActor,
-        dht_callbacks: Option<GhostTracker<GwDht, dht_protocol::RequestToChildResponse, String>>,
+        dht_channel: Option<
+            GhostContextChannel<
+                GwDht,
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
+                dht_protocol::RequestToParent,
+                dht_protocol::RequestToParentResponse,
+                FakeError,
+            >,
+        >,
     }
 
     impl GatewayTransport {
         pub fn new() -> Self {
+            let (channel_parent, channel_self) = create_ghost_channel();
+            let mut dht = Box::new(RrDht::new());
+            let dht_channel = Some(
+                dht.take_parent_channel()
+                    .expect("can take channel")
+                    .as_context_channel(),
+            );
             Self {
-                actor_state: Some(GhostActorState::new()),
-                dht: Box::new(RrDht::new()),
-                dht_callbacks: Some(GhostTracker::new("gateway_transport_dht_")),
+                channel_parent: Some(channel_parent),
+                channel_self: Some(channel_self.as_context_channel()),
+                dht,
+                dht_channel,
             }
         }
     }
 
     impl
         GhostActor<
-            RequestToParentContext,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -295,43 +308,21 @@ mod tests {
             &mut *self
         }
 
-        fn get_actor_state(
+        fn take_parent_channel(
             &mut self,
-        ) -> &mut GhostActorState<
-            RequestToParentContext,
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChildResponse,
-            String,
-        > {
-            self.actor_state.as_mut().unwrap()
-        }
-
-        fn take_actor_state(
-            &mut self,
-        ) -> GhostActorState<
-            RequestToParentContext,
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChildResponse,
-            String,
-        > {
-            std::mem::replace(&mut self.actor_state, None).unwrap()
-        }
-
-        fn put_actor_state(
-            &mut self,
-            actor_state: GhostActorState<
-                RequestToParentContext,
+        ) -> Option<
+            GhostChannel<
+                RequestToChild,
+                RequestToChildResponse,
                 RequestToParent,
                 RequestToParentResponse,
-                RequestToChildResponse,
-                String,
+                FakeError,
             >,
-        ) {
-            std::mem::replace(&mut self.actor_state, Some(actor_state));
+        > {
+            std::mem::replace(&mut self.channel_parent, None)
         }
 
+        /*
         // our parent is making a request of us
         #[allow(irrefutable_let_patterns)]
         fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild) {
@@ -432,14 +423,15 @@ mod tests {
                 }
             }
         }
+        */
 
-        fn process_concrete(&mut self) -> Result<WorkWasDone, String> {
-            self.get_actor_state().send_request_to_parent(
+        fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            self.channel_self.as_mut().expect("exists").request(
                 std::time::Duration::from_millis(2000),
-                RequestToParent::IncomingConnection {
+                RequestToParentContext::IncomingConnection {
                     address: "test".to_string(),
                 },
-                RequestToParentContext::IncomingConnection {
+                RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
                 Box::new(|_m, c, r| {
@@ -451,12 +443,92 @@ mod tests {
                 }),
             );
             self.dht.process()?;
-            for (rid, msg) in self.dht.drain_responses() {
-                let mut cb = std::mem::replace(&mut self.dht_callbacks, None);
-                cb.as_mut()
-                    .expect("exists")
-                    .handle(rid, self.as_any(), msg)?;
-                std::mem::replace(&mut self.dht_callbacks, cb);
+            let mut dht_channel = std::mem::replace(&mut self.dht_channel, None);
+            dht_channel
+                .as_mut()
+                .expect("exists")
+                .process(self.as_any())?;
+            std::mem::replace(&mut self.dht_channel, dht_channel);
+            let mut channel_self = std::mem::replace(&mut self.channel_self, None);
+            channel_self
+                .as_mut()
+                .expect("exists")
+                .process(self.as_any())?;
+            std::mem::replace(&mut self.channel_self, channel_self);
+
+            for mut msg in self.channel_self.as_mut().expect("exists").drain_requests() {
+                match msg.take_payload().expect("exists") {
+                    RequestToChild::Bind { spec } => {
+                        // do some internal bind
+                        // we get a bound_url
+                        let bound_url = "bound_url".to_string();
+                        // respond to our parent
+                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                            bound_url: bound_url,
+                        })));
+                    }
+                    RequestToChild::Bootstrap { address } => {}
+                    RequestToChild::SendMessage { address, payload } => {
+                        self.dht_channel.as_mut().expect("exists").request(
+                            std::time::Duration::from_millis(2000),
+                            GwDht::ResolveAddressForId { msg },
+                            dht_protocol::RequestToChild::ResolveAddressForId { id: address },
+                            Box::new(|m, context, response| {
+                                let m = match m.downcast_mut::<GatewayTransport>() {
+                                    None => panic!("wrong type"),
+                                    Some(m) => m,
+                                };
+
+                                let msg = {
+                                    if let GwDht::ResolveAddressForId { msg } = context {
+                                        msg
+                                    } else {
+                                        panic!("bad context type");
+                                    }
+                                };
+
+                                // got a timeout error
+                                if let GhostCallbackData::Timeout = response {
+                                    msg.respond(Err("Timeout".into()));
+                                    return Ok(());
+                                }
+
+                                let response = {
+                                    if let GhostCallbackData::Response(response) = response {
+                                        response
+                                    } else {
+                                        unimplemented!();
+                                    }
+                                };
+
+                                let response = match response {
+                                    Err(e) => {
+                                        msg.respond(Err(e));
+                                        return Ok(());
+                                    }
+                                    Ok(response) => response,
+                                };
+
+                                let response = {
+                                    if let dht_protocol::RequestToChildResponse::ResolveAddressForId(
+                                        response,
+                                    ) = response
+                                    {
+                                        response
+                                    } else {
+                                        panic!("aaah");
+                                    }
+                                };
+
+                                println!("yay? {:?}", response);
+
+                                msg.respond(Ok(RequestToChildResponse::SendMessage));
+
+                                Ok(())
+                            }),
+                        );
+                    }
+                }
             }
             Ok(true.into())
         }
@@ -464,7 +536,6 @@ mod tests {
 
     type TransportActor = Box<
         dyn GhostActor<
-            RequestToParentContext,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -480,53 +551,64 @@ mod tests {
         // it would usually just be another ghost_actor but here we test it out explicitly
         // so first instantiate the "child" actor
         let mut t_actor: TransportActor = Box::new(GatewayTransport::new());
+        let mut t_actor_channel = t_actor
+            .take_parent_channel()
+            .expect("exists")
+            .as_context_channel::<i8>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
         t_actor.process().unwrap();
+        t_actor_channel.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)
-        for (rid, ev) in t_actor.drain_requests() {
-            println!("in drain_requests got: {:?} {:?}", rid, ev);
-            if let Some(rid) = rid {
-                // we might allow or disallow connections for example
-                let response = RequestToParentResponse::Allowed;
-                t_actor.respond(rid, response).unwrap();
-            }
+        for mut msg in t_actor_channel.drain_requests() {
+            let payload = msg.take_payload();
+            println!("in drain_requests got: {:?}", payload);
+
+            // we might allow or disallow connections for example
+            let response = RequestToParentResponse::Allowed;
+            msg.respond(Ok(response));
         }
+
+        t_actor.process().unwrap();
+        t_actor_channel.process(&mut ());
 
         // now make a request of the child,
         // to make such a request the parent would normally will also instantiate trackers so that it can
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
-        let request_id = RequestId::with_prefix("test_parent");
-        t_actor.request(
-            Some(request_id),
+        t_actor_channel.request(
+            std::time::Duration::from_millis(2000),
+            42_i8,
             RequestToChild::Bind {
                 spec: "address_to_bind_to".to_string(),
             },
+            Box::new(|_, _, r| {
+                println!("in callback 1, got: {:?}", r);
+                Ok(())
+            }),
         );
 
-        // now process the responses the actor has made to our requests
-        for (rid, ev) in t_actor.drain_responses() {
-            println!("in drain_responses got: {:?} {:?}", rid, ev);
-        }
+        t_actor.process().unwrap();
+        t_actor_channel.process(&mut ());
 
-        let request_id = RequestId::with_prefix("test_parent");
-        t_actor.request(
-            Some(request_id),
+        t_actor_channel.request(
+            std::time::Duration::from_millis(2000),
+            42_i8,
             RequestToChild::SendMessage {
                 address: "agent_id_1".to_string(),
                 payload: b"some content".to_vec(),
             },
+            Box::new(|_, _, r| {
+                println!("in callback 2, got: {:?}", r);
+                Ok(())
+            }),
         );
 
         for _x in 0..10 {
             t_actor.process().unwrap();
-            for (rid, ev) in t_actor.drain_responses() {
-                println!("in drain_responses got: {:?} {:?}", rid, ev);
-            }
+            t_actor_channel.process(&mut ());
         }
     }
 }
-*/

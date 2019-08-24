@@ -14,11 +14,11 @@ pub type GhostCallback<Context, CbData, E> =
 #[macro_export]
 macro_rules! ghost_cb_call {
     ( $cb:expr, $mod:expr, $ctx:expr, $data:expr ) => {{
-        let tmp = std::mem::replace(&mut $cb, Box::new(|_, _, _|{}));
+        let tmp = std::mem::replace(&mut $cb, Box::new(|_, _, _| {}));
         let out = tmp($mod, $ctx, $data);
         std::mem::replace(&mut $cb, tmp);
         out
-    }}
+    }};
 }
 
 struct GhostTrackerEntry<Context, CbData, E> {

@@ -1,4 +1,4 @@
-use crate::{WorkWasDone, GhostChannel, RequestId};
+use crate::{GhostChannel, GhostResult, WorkWasDone};
 use std::any::Any;
 
 pub trait GhostActor<
@@ -10,18 +10,21 @@ pub trait GhostActor<
 >
 {
     fn as_any(&mut self) -> &mut dyn Any;
-
-    fn channel(&mut self) -> &mut GhostChannel<RequestToParent, RequestToParentResponse, RequestToChild, RequestToChildResponse, E>;
-
-    fn process(&mut self) -> Result<WorkWasDone, E> {
-        self.channel().process();
-        /*
-        let mut actor_state = self.take_actor_state();
-        actor_state.process(self.as_any())?;
-        self.put_actor_state(actor_state);
-        */
+    fn take_parent_channel(
+        &mut self,
+    ) -> Option<
+        GhostChannel<
+            RequestToChild,
+            RequestToChildResponse,
+            RequestToParent,
+            RequestToParentResponse,
+            E,
+        >,
+    >;
+    fn process(&mut self) -> GhostResult<WorkWasDone> {
         self.process_concrete()
     }
-
-    fn process_concrete(&mut self) -> Result<WorkWasDone, E>;
+    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        Ok(false.into())
+    }
 }
