@@ -1,10 +1,8 @@
-use crate::transport::{
-    error::TransportError, memory_mock::memory_server, protocol::*, ConnectionId,
-};
+use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
 use lib3h_ghost_actor::{GhostActor, GhostActorState, RequestId, WorkWasDone};
 use std::{
     any::Any,
-    collections::HashMap,
+    collections::HashSet,
     sync::{Arc, Mutex},
 };
 use url::Url;
@@ -28,13 +26,8 @@ struct GhostTransportMemory {
     actor_state: Option<GhostTransportMemoryState>,
     /// My peer uri on the network layer (not None after a bind)
     maybe_my_address: Option<Url>,
-    /// Mapping of connectionId -> serverUrl
-    outbound_connection_map: HashMap<ConnectionId, Url>,
-    /// Mapping of in:connectionId -> out:connectionId
-    inbound_connection_map: HashMap<ConnectionId, ConnectionId>,
-    /// Counter for generating new connectionIds
-    n_id: u32,
-    own_id: u32,
+    /// Addresses of connections to remotes
+    connections: HashSet<Url>,
 }
 
 impl GhostTransportMemory {
@@ -47,10 +40,7 @@ impl GhostTransportMemory {
         Self {
             actor_state: Some(GhostActorState::new()),
             maybe_my_address: None,
-            outbound_connection_map: HashMap::new(),
-            inbound_connection_map: HashMap::new(),
-            n_id: 0,
-            own_id: *tc,
+            connections: HashSet::new(),
         }
     }
 
@@ -165,25 +155,14 @@ impl
                 }
                 let mut server = maybe_server.unwrap().lock().unwrap();
 
-                // Check if already connected
-                let maybe_cid = self
-                    .outbound_connection_map
-                    .iter()
-                    .find(|(_, cur_uri)| *cur_uri.to_string() == address.to_string());
-
-                // if not
-                if maybe_cid.is_none() {
-                    // Generate and store a connectionId to act like other Transport types
-                    self.n_id += 1;
-                    let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
-                    self.outbound_connection_map
-                        .insert(id.clone(), address.clone());
-                    // Connect to it
-                    let result = server.request_connect(&my_addr, &id);
+                // if not already connected, request a connections
+                if self.connections.get(&address).is_none() {
+                    let result = server.request_connect(&my_addr);
                     if result.is_err() {
                         self.respond_with(&request_id, RequestToChildResponse::SendMessage(result));
                         return;
                     }
+                    self.connections.insert(address.clone());
                 };
 
                 trace!(
@@ -223,69 +202,55 @@ impl
         let mut server = maybe_server.unwrap().lock().unwrap();
         let (success, event_list) = server.process()?;
         if success {
-            let mut to_connect_list: Vec<(Url, ConnectionId)> = Vec::new();
+            let mut to_connect_list: Vec<(Url)> = Vec::new();
+            let mut non_connect_events = Vec::new();
+
+            // process any connection events
             for event in event_list {
                 match event {
                     TransportEvent::IncomingConnectionEstablished(in_cid) => {
-                        let to_connect_uri = server
-                            .get_inbound_uri(&in_cid)
-                            .expect("Should always have uri");
-                        to_connect_list.push((to_connect_uri.clone(), in_cid.clone()));
+                        let to_connect_uri =
+                            Url::parse(&in_cid).expect("connectionId is not a valid Url");
+                        to_connect_list.push(to_connect_uri.clone());
                         self.get_actor_state().send_event_to_parent(
                             RequestToParent::IncomingConnection {
                                 address: to_connect_uri.clone(),
                             },
                         );
                     }
-                    TransportEvent::ReceivedData(in_cid, payload) => {
-                        println!("RecivedData--- cid:{:?} payload:{:?}", in_cid, payload);
-                        let out_cid = self
-                            .inbound_connection_map
-                            .get(&in_cid)
-                            .expect("Should have inbound at this stage")
-                            .clone();
-                        let out_addr = self
-                            .outbound_connection_map
-                            .get(&out_cid)
-                            .expect("Should have outbound at this stage")
-                            .clone();
+                    _ => non_connect_events.push(event),
+                }
+            }
+
+            // Connect back to received connections if not already connected to them
+            for remote_addr in to_connect_list {
+                println!(
+                    "(GhostTransportMemory)connecting {} <- {:?}",
+                    remote_addr, my_addr
+                );
+
+                // if not already connected, request a connections
+                if self.connections.get(&remote_addr).is_none() {
+                    let _result = server.request_connect(&remote_addr);
+                    self.connections.insert(remote_addr.clone());
+                }
+            }
+
+            // process any other events
+            for event in non_connect_events {
+                match event {
+                    TransportEvent::ReceivedData(from_addr, payload) => {
+                        println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                         self.get_actor_state().send_event_to_parent(
                             RequestToParent::ReceivedData {
-                                address: out_addr.clone(),
+                                address: Url::parse(&from_addr).unwrap(),
                                 payload,
                             },
                         );
                     }
-                    _ => panic!(format!("WHAT: {:?}", event)), //                    output.push(event);
+                    _ => panic!(format!("WHAT: {:?}", event)),
                 };
             }
-
-            // Connect back to received connections if not already connected to them
-            for (uri, in_cid) in to_connect_list {
-                println!("(GhostTransportMemory)connecting {} <- {:?}", uri, my_addr);
-                // Check if already connected
-                let maybe_cid = self
-                    .outbound_connection_map
-                    .iter()
-                    .find(|(_, cur_uri)| *cur_uri.to_string() == my_addr.to_string());
-
-                let out_cid = match maybe_cid {
-                    None => {
-                        // Generate and store a connectionId to act like other Transport types
-                        self.n_id += 1;
-                        let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
-                        self.outbound_connection_map
-                            .insert(id.clone(), my_addr.clone());
-                        // Connect to it
-                        let _result = server.request_connect(&my_addr, &id);
-                        id
-                    }
-                    Some((id, _)) => id.to_string(),
-                };
-                self.inbound_connection_map
-                    .insert(in_cid.clone(), out_cid.clone());
-            }
-
             Ok(true.into())
         } else {
             Ok(false.into())
@@ -374,24 +339,14 @@ mod tests {
         transport1.process().unwrap();
         transport2.process().unwrap();
 
-        let mut r = transport2.drain_requests();
-        let (_rid, request) = r.pop().unwrap();
+        let requests = transport2.drain_requests();
         assert_eq!(
-            "IncomingConnection { address: \"mem://addr_1/\" }",
-            format!("{:?}", request)
+            "[(None, IncomingConnection { address: \"mem://addr_1/\" }), (None, ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })]",
+            format!("{:?}", requests)
         );
 
         let mut r = transport1.drain_responses();
         let (_rid, response) = r.pop().unwrap();
         assert_eq!("SendMessage(Ok(()))", format!("{:?}", response));
-
-        // call process on memory_server now to get it to send
-        // an incoming request to transport2
-        transport1.process().unwrap();
-        transport2.process().unwrap();
-
-        let mut r = transport2.drain_requests();
-        let (_rid, request) = r.pop().unwrap();
-        assert_eq!("ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] }", format!("{:?}", request));
     }
 }
