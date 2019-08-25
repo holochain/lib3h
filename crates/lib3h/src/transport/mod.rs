@@ -104,16 +104,17 @@ pub mod tests {
         uri_A: &Url,
         uri_B: &Url,
     ) {
-        // Connect
-        let _actual_bind_uri_a = node_A.bind(uri_A).unwrap();
-        let actual_bind_uri_b = node_B.bind(uri_B).unwrap();
-        let idAB = node_A.connect(&actual_bind_uri_b).unwrap();
-        trace!("actual_bind_uri_b: {}, idAB: {}", actual_bind_uri_b, idAB);
+        // Bind & connect
+        let _bound_uri_a = node_A.bind(uri_A).unwrap();
+        let bound_uri_b = node_B.bind(uri_B).unwrap();
+        let idAB = node_A.connect(&bound_uri_b).unwrap();
+        trace!("bound_uri_b: {}, idAB: {}", bound_uri_b, idAB);
 
         let (_did_work, _event_list) = node_A.process().unwrap();
         let (_did_work, _event_list) = node_B.process().unwrap();
 
         // Send A -> B
+        trace!("Send A -> B");
         let payload = [1, 2, 3, 4];
         node_A.send(&[&idAB], &payload).unwrap();
         let mut did_work = false;
