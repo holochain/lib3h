@@ -425,6 +425,7 @@ mod tests {
         }
         */
 
+        #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.channel_self.as_mut().expect("exists").request(
                 std::time::Duration::from_millis(2000),
@@ -458,7 +459,7 @@ mod tests {
 
             for mut msg in self.channel_self.as_mut().expect("exists").drain_requests() {
                 match msg.take_payload().expect("exists") {
-                    RequestToChild::Bind { spec } => {
+                    RequestToChild::Bind { spec: _ } => {
                         // do some internal bind
                         // we get a bound_url
                         let bound_url = "bound_url".to_string();
@@ -467,14 +468,14 @@ mod tests {
                             bound_url: bound_url,
                         })));
                     }
-                    RequestToChild::Bootstrap { address } => {}
-                    RequestToChild::SendMessage { address, payload } => {
+                    RequestToChild::Bootstrap { address: _ } => {}
+                    RequestToChild::SendMessage { address, payload: _ } => {
                         self.dht_channel.as_mut().expect("exists").request(
                             std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(|m, context, response| {
-                                let m = match m.downcast_mut::<GatewayTransport>() {
+                                let _m = match m.downcast_mut::<GatewayTransport>() {
                                     None => panic!("wrong type"),
                                     Some(m) => m,
                                 };
@@ -543,7 +544,6 @@ mod tests {
             String,
         >,
     >;
-    use crate::RequestId;
 
     #[test]
     fn test_wss_transport() {
@@ -559,7 +559,7 @@ mod tests {
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
         t_actor.process().unwrap();
-        t_actor_channel.process(&mut ());
+        let _ = t_actor_channel.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)
         for mut msg in t_actor_channel.drain_requests() {
@@ -572,7 +572,7 @@ mod tests {
         }
 
         t_actor.process().unwrap();
-        t_actor_channel.process(&mut ());
+        let _ = t_actor_channel.process(&mut ());
 
         // now make a request of the child,
         // to make such a request the parent would normally will also instantiate trackers so that it can
@@ -591,7 +591,7 @@ mod tests {
         );
 
         t_actor.process().unwrap();
-        t_actor_channel.process(&mut ());
+        let _ = t_actor_channel.process(&mut ());
 
         t_actor_channel.request(
             std::time::Duration::from_millis(2000),
@@ -608,7 +608,7 @@ mod tests {
 
         for _x in 0..10 {
             t_actor.process().unwrap();
-            t_actor_channel.process(&mut ());
+            let _ = t_actor_channel.process(&mut ());
         }
     }
 }
