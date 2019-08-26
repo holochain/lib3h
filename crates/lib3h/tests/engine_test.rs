@@ -668,22 +668,19 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
     println!("\n Alex connects to Billy \n");
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("connected_msg = {:?}", connected_msg);
-    assert_eq!(connected_msg.uri, req_connect.peer_uri);
-    // More process: Have Billy process P2p::PeerAddress of alex
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    let alex_bind_url = alex.advertise();
+    let mut engines = vec![alex, billy];
+
+    let is_connected = Box::new(is_connected("", alex_bind_url));
+
+    assert_one_processed(&mut engines, is_connected);
 
     println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
 
     // Do Send DM test
+    let mut e = engines.iter_mut();
+    let alex = e.next().expect("alex");
+    let billy = e.next().expect("billy");
     basic_two_send_message(alex, billy);
 }
