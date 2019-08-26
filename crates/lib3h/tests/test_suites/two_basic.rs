@@ -27,6 +27,7 @@ pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Connect Alex to Billy
     alex.connect_to(&billy.advertise()).unwrap();
 
+    // TODO Switch to assert_one_processed
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1);
