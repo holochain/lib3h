@@ -11,16 +11,6 @@ pub enum GhostCallbackData<CbData, E> {
 pub type GhostCallback<Context, CbData, E> =
     Box<dyn Fn(&mut dyn Any, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
 
-#[macro_export]
-macro_rules! ghost_cb_call {
-    ( $cb:expr, $mod:expr, $ctx:expr, $data:expr ) => {{
-        let tmp = std::mem::replace(&mut $cb, Box::new(|_, _, _| {}));
-        let out = tmp($mod, $ctx, $data);
-        std::mem::replace(&mut $cb, tmp);
-        out
-    }};
-}
-
 struct GhostTrackerEntry<Context, CbData, E> {
     expires: std::time::SystemTime,
     context: Context,

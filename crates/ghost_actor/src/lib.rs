@@ -1,4 +1,7 @@
 extern crate crossbeam_channel;
+#[allow(unused)]
+#[macro_use]
+extern crate detach;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -67,6 +70,7 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use detach::prelude::*;
     use std::any::Any;
 
     type FakeError = String;
@@ -105,7 +109,7 @@ mod tests {
                 FakeError,
             >,
         >,
-        channel_self: Option<
+        channel_self: Detach<
             GhostContextChannel<
                 i8,
                 dht_protocol::RequestToParent,
@@ -122,7 +126,7 @@ mod tests {
             let (channel_parent, channel_self) = create_ghost_channel();
             Self {
                 channel_parent: Some(channel_parent),
-                channel_self: Some(channel_self.as_context_channel()),
+                channel_self: Detach::new(channel_self.as_context_channel()),
             }
         }
     }
@@ -155,14 +159,11 @@ mod tests {
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            let mut channel_self = std::mem::replace(&mut self.channel_self, None);
-            channel_self
-                .as_mut()
-                .expect("exists")
-                .process(self.as_any())?;
-            std::mem::replace(&mut self.channel_self, channel_self);
+            detach_run!(&mut self.channel_self, |cs| {
+                cs.process(self.as_any())
+            })?;
 
-            for mut msg in self.channel_self.as_mut().expect("exists").drain_requests() {
+            for mut msg in self.channel_self.as_mut().drain_requests() {
                 match msg.take_payload().expect("exists") {
                     dht_protocol::RequestToChild::ResolveAddressForId { id } => {
                         println!("dht got ResolveAddressForId {}", id);
@@ -254,7 +255,7 @@ mod tests {
                 FakeError,
             >,
         >,
-        channel_self: Option<
+        channel_self: Detach<
             GhostContextChannel<
                 RequestToParentContext,
                 RequestToParent,
@@ -265,7 +266,7 @@ mod tests {
             >,
         >,
         dht: DhtActor,
-        dht_channel: Option<
+        dht_channel: Detach<
             GhostContextChannel<
                 GwDht,
                 dht_protocol::RequestToChild,
@@ -281,14 +282,14 @@ mod tests {
         pub fn new() -> Self {
             let (channel_parent, channel_self) = create_ghost_channel();
             let mut dht = Box::new(RrDht::new());
-            let dht_channel = Some(
+            let dht_channel = Detach::new(
                 dht.take_parent_channel()
                     .expect("can take channel")
                     .as_context_channel(),
             );
             Self {
                 channel_parent: Some(channel_parent),
-                channel_self: Some(channel_self.as_context_channel()),
+                channel_self: Detach::new(channel_self.as_context_channel()),
                 dht,
                 dht_channel,
             }
@@ -322,112 +323,9 @@ mod tests {
             std::mem::replace(&mut self.channel_parent, None)
         }
 
-        /*
-        // our parent is making a request of us
-        #[allow(irrefutable_let_patterns)]
-        fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild) {
-            match request {
-                RequestToChild::Bind { spec: _u } => {
-                    // do some internal bind
-                    // we get a bound_url
-                    let bound_url = "bound_url".to_string();
-                    // respond to our parent
-                    if let Some(request_id) = request_id {
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            RequestToChildResponse::Bind(Ok(BindResultData {
-                                bound_url: bound_url,
-                            })),
-                        );
-                    }
-                }
-                RequestToChild::Bootstrap { address: _ } => {}
-                RequestToChild::SendMessage {
-                    address,
-                    payload: _,
-                } => {
-                    //let dht_request_id = self.dht_callbacks.bookmark(DhtUserData::RequestingAddressTranslation(request_id), Box::new(|m, user_data, response| {
-                    let dht_request_id = self.dht_callbacks.as_mut().expect("exists").bookmark(
-                        std::time::Duration::from_millis(2000),
-                        GwDht::ResolveAddressForId { request_id },
-                        Box::new(|m, context, response| {
-                            let m = match m.downcast_mut::<GatewayTransport>() {
-                                None => panic!("wrong type"),
-                                Some(m) => m,
-                            };
-
-                            let request_id = {
-                                if let GwDht::ResolveAddressForId { request_id } = context {
-                                    request_id
-                                } else {
-                                    panic!("bad context type");
-                                }
-                            };
-
-                            // got a timeout error
-                            if let GhostCallbackData::Timeout = response {
-                                if let Some(request_id) = request_id {
-                                    m.get_actor_state().respond_to_parent(
-                                        request_id,
-                                        RequestToChildResponse::SendMessage(Err(
-                                            "Timeout".to_string()
-                                        )),
-                                    );
-                                }
-                                return Ok(());
-                            }
-
-                            let response = {
-                                if let GhostCallbackData::Response(response) = response {
-                                    response
-                                } else {
-                                    unimplemented!();
-                                }
-                            };
-
-                            let response = {
-                                if let dht_protocol::RequestToChildResponse::ResolveAddressForId(
-                                    response,
-                                ) = response
-                                {
-                                    response
-                                } else {
-                                    panic!("aaah");
-                                }
-                            };
-
-                            // got an error during dht address resolution
-                            if let Err(e) = response {
-                                if let Some(request_id) = request_id {
-                                    m.get_actor_state().respond_to_parent(
-                                        request_id,
-                                        RequestToChildResponse::SendMessage(Err(e)),
-                                    );
-                                }
-                                return Ok(());
-                            }
-                            let _sub_address = response.unwrap();
-                            if let Some(request_id) = request_id {
-                                m.get_actor_state().respond_to_parent(
-                                    request_id,
-                                    RequestToChildResponse::SendMessage(Ok(())),
-                                );
-                            }
-                            Ok(())
-                        }),
-                    );
-                    self.dht.request(
-                        Some(dht_request_id),
-                        dht_protocol::RequestToChild::ResolveAddressForId { id: address },
-                    );
-                }
-            }
-        }
-        */
-
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            self.channel_self.as_mut().expect("exists").request(
+            self.channel_self.as_mut().request(
                 std::time::Duration::from_millis(2000),
                 RequestToParentContext::IncomingConnection {
                     address: "test".to_string(),
@@ -444,20 +342,14 @@ mod tests {
                 }),
             );
             self.dht.process()?;
-            let mut dht_channel = std::mem::replace(&mut self.dht_channel, None);
-            dht_channel
-                .as_mut()
-                .expect("exists")
-                .process(self.as_any())?;
-            std::mem::replace(&mut self.dht_channel, dht_channel);
-            let mut channel_self = std::mem::replace(&mut self.channel_self, None);
-            channel_self
-                .as_mut()
-                .expect("exists")
-                .process(self.as_any())?;
-            std::mem::replace(&mut self.channel_self, channel_self);
+            detach_run!(&mut self.dht_channel, |dht_channel| {
+                dht_channel.process(self.as_any())
+            })?;
+            detach_run!(&mut self.channel_self, |channel_self| {
+                channel_self.process(self.as_any())
+            })?;
 
-            for mut msg in self.channel_self.as_mut().expect("exists").drain_requests() {
+            for mut msg in self.channel_self.as_mut().drain_requests() {
                 match msg.take_payload().expect("exists") {
                     RequestToChild::Bind { spec: _ } => {
                         // do some internal bind
@@ -470,7 +362,7 @@ mod tests {
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
                     RequestToChild::SendMessage { address, payload: _ } => {
-                        self.dht_channel.as_mut().expect("exists").request(
+                        self.dht_channel.as_mut().request(
                             std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
