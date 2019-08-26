@@ -58,12 +58,13 @@ mod ghost_channel;
 pub use ghost_channel::{create_ghost_channel, GhostChannel, GhostContextChannel, GhostMessage};
 
 mod ghost_actor;
-pub use ghost_actor::GhostActor;
+pub use ghost_actor::{GhostActor, GhostParentContextChannel};
 
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostChannel,
-        GhostContextChannel, GhostError, GhostMessage, GhostResult, GhostTracker,
+        GhostContextChannel, GhostError, GhostMessage, GhostParentContextChannel, GhostResult,
+        GhostTracker,
     };
 }
 
@@ -180,15 +181,6 @@ mod tests {
         }
     }
 
-    type DhtActor = Box<
-        dyn GhostActor<
-            dht_protocol::RequestToParent,
-            dht_protocol::RequestToParentResponse,
-            dht_protocol::RequestToChild,
-            dht_protocol::RequestToChildResponse,
-            FakeError,
-        >,
-    >;
     type Url = String;
     type TransportError = String;
 
@@ -263,14 +255,13 @@ mod tests {
                 FakeError,
             >,
         >,
-        dht: DhtActor,
-        dht_channel: Detach<
-            GhostContextChannel<
+        dht: Detach<
+            GhostParentContextChannel<
                 GwDht,
-                dht_protocol::RequestToChild,
-                dht_protocol::RequestToChildResponse,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
                 FakeError,
             >,
         >,
@@ -279,17 +270,11 @@ mod tests {
     impl GatewayTransport {
         pub fn new() -> Self {
             let (channel_parent, channel_self) = create_ghost_channel();
-            let mut dht = Box::new(RrDht::new());
-            let dht_channel = Detach::new(
-                dht.take_parent_channel()
-                    .expect("can take channel")
-                    .as_context_channel(),
-            );
+            let dht = Detach::new(GhostParentContextChannel::new(Box::new(RrDht::new())));
             Self {
                 channel_parent: Some(channel_parent),
                 channel_self: Detach::new(channel_self.as_context_channel()),
                 dht,
-                dht_channel,
             }
         }
     }
@@ -339,10 +324,7 @@ mod tests {
                     Ok(())
                 }),
             );
-            self.dht.process()?;
-            detach_run!(&mut self.dht_channel, |dht_channel| {
-                dht_channel.process(self.as_any())
-            })?;
+            detach_run!(&mut self.dht, |dht| { dht.process(self.as_any()) })?;
             detach_run!(&mut self.channel_self, |channel_self| {
                 channel_self.process(self.as_any())
             })?;
@@ -363,7 +345,7 @@ mod tests {
                         address,
                         payload: _,
                     } => {
-                        self.dht_channel.as_mut().request(
+                        self.dht.as_mut().request(
                             std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },

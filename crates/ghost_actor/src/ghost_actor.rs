@@ -1,5 +1,96 @@
-use crate::{GhostChannel, GhostResult, WorkWasDone};
+use crate::{
+    GhostCallback, GhostChannel, GhostContextChannel, GhostMessage, GhostResult, WorkWasDone,
+};
 use std::any::Any;
+
+pub struct GhostParentContextChannel<
+    Context,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    Error,
+> {
+    actor: Box<
+        dyn GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    >,
+    channel: GhostContextChannel<
+        Context,
+        RequestToChild,
+        RequestToChildResponse,
+        RequestToParent,
+        RequestToParentResponse,
+        Error,
+    >,
+}
+
+impl<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+    >
+    GhostParentContextChannel<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+    >
+{
+    pub fn new(
+        mut actor: Box<
+            dyn GhostActor<
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChild,
+                RequestToChildResponse,
+                Error,
+            >,
+        >,
+    ) -> Self {
+        let channel = actor
+            .take_parent_channel()
+            .expect("exists")
+            .as_context_channel();
+        Self { actor, channel }
+    }
+
+    pub fn publish(&mut self, payload: RequestToChild) {
+        self.channel.publish(payload)
+    }
+
+    pub fn request(
+        &mut self,
+        timeout: std::time::Duration,
+        context: Context,
+        payload: RequestToChild,
+        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+    ) {
+        self.channel.request(timeout, context, payload, cb)
+    }
+
+    pub fn drain_requests(
+        &mut self,
+    ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
+        self.channel.drain_requests()
+    }
+
+    pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
+        self.actor.process()?;
+        self.channel.process(actor)?;
+        Ok(())
+    }
+}
 
 pub trait GhostActor<
     RequestToParent,
@@ -9,6 +100,23 @@ pub trait GhostActor<
     E,
 >
 {
+    /// Most of the time we don't want to keep a direct ref to the actor
+    /// we want to interact through it as a channel...
+    /// but we still need to call process on that actor... let us
+    /// create a helper wrapper that handles that
+    /*
+    fn as_parent_context_channel<Context>(self) -> GhostParentContextChannel<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        E
+    > {
+        let channel = self.take_parent_channel().as_context_channel();
+        GhostParentContextChannel::new(self, channel)
+    }*/
+
     /// get a generic reference to ourselves
     /// will be passed into any channel process functions
     fn as_any(&mut self) -> &mut dyn Any;
