@@ -12,11 +12,11 @@ enum GhostChannelMessage<Request, Response, Error> {
     },
 }
 
-pub struct GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error> {
+pub struct GhostMessage<MessageToSelf, MessageToOther, MessageToSelfResponse, Error> {
     request_id: Option<RequestId>,
-    payload: Option<RequestToSelf>,
+    message: Option<MessageToSelf>,
     sender: crossbeam_channel::Sender<
-        GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
+        GhostChannelMessage<MessageToOther, MessageToSelfResponse, Error>,
     >,
 }
 
@@ -33,20 +33,20 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
         request_id: Option<RequestId>,
-        payload: RequestToSelf,
+        message: RequestToSelf,
         sender: crossbeam_channel::Sender<
             GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
     ) -> Self {
         Self {
             request_id,
-            payload: Some(payload),
+            message: Some(message),
             sender,
         }
     }
 
-    pub fn take_payload(&mut self) -> Option<RequestToSelf> {
-        std::mem::replace(&mut self.payload, None)
+    pub fn take_message(&mut self) -> Option<RequestToSelf> {
+        std::mem::replace(&mut self.message, None)
     }
 
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) {
@@ -98,6 +98,7 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
 
     pub fn as_context_channel<Context>(
         self,
+        request_id_prefix: &str,
     ) -> GhostContextChannel<
         Context,
         RequestToOther,
@@ -106,7 +107,7 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
         RequestToSelfResponse,
         Error,
     > {
-        GhostContextChannel::new(self.sender, self.receiver)
+        GhostContextChannel::new(request_id_prefix, self.sender, self.receiver)
     }
 }
 
@@ -124,8 +125,8 @@ pub struct GhostContextChannel<
     receiver: crossbeam_channel::Receiver<
         GhostChannelMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
-    await_request_to_other_response: GhostTracker<Context, RequestToOtherResponse, Error>,
-    outbox_requests_to_self:
+    pending_responses_tracker: GhostTracker<Context, RequestToOtherResponse, Error>,
+    outbox_messages_to_self:
         Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>,
 }
 
@@ -147,6 +148,7 @@ impl<
     >
 {
     fn new(
+        request_id_prefix: &str,
         sender: crossbeam_channel::Sender<
             GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
@@ -157,8 +159,8 @@ impl<
         Self {
             sender,
             receiver,
-            await_request_to_other_response: GhostTracker::new("uuuh?"),
-            outbox_requests_to_self: Vec::new(),
+            pending_responses_tracker: GhostTracker::new(request_id_prefix),
+            outbox_messages_to_self: Vec::new(),
         }
     }
 
@@ -179,7 +181,7 @@ impl<
         cb: GhostCallback<Context, RequestToOtherResponse, Error>,
     ) {
         let request_id = self
-            .await_request_to_other_response
+            .pending_responses_tracker
             .bookmark(timeout, context, cb);
         self.sender
             .send(GhostChannelMessage::Request {
@@ -189,10 +191,10 @@ impl<
             .expect("should send");
     }
 
-    pub fn drain_requests(
+    pub fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>> {
-        self.outbox_requests_to_self.drain(..).collect()
+        self.outbox_messages_to_self.drain(..).collect()
     }
 
     pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
@@ -207,7 +209,7 @@ impl<
                         request_id,
                         payload,
                     } => {
-                        self.outbox_requests_to_self.push(GhostMessage::new(
+                        self.outbox_messages_to_self.push(GhostMessage::new(
                             request_id,
                             payload,
                             self.sender.clone(),
@@ -217,7 +219,7 @@ impl<
                         request_id,
                         payload,
                     } => {
-                        self.await_request_to_other_response
+                        self.pending_responses_tracker
                             .handle(request_id, actor, payload)?;
                     }
                 },

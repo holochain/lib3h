@@ -1,8 +1,5 @@
 use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
-use lib3h_ghost_actor::{
-    create_ghost_channel, GhostActor, GhostChannel, GhostContextChannel, GhostError, GhostResult,
-    WorkWasDone,
-};
+use lib3h_ghost_actor::prelude::*;
 use std::{
     any::Any,
     collections::HashSet,
@@ -49,7 +46,7 @@ impl GhostTransportMemory {
         let (channel_parent, channel_self) = create_ghost_channel();
         Self {
             channel_parent: Some(channel_parent),
-            channel_self: Some(channel_self.as_context_channel()),
+            channel_self: Some(channel_self.as_context_channel("tmem_to_parent")),
             connections: HashSet::new(),
             maybe_my_address: None,
         }
@@ -194,8 +191,8 @@ impl
             .process(self.as_any())?;
         std::mem::replace(&mut self.channel_self, channel_self);
 
-        for mut msg in self.channel_self.as_mut().expect("exists").drain_requests() {
-            match msg.take_payload().expect("exists") {
+        for mut msg in self.channel_self.as_mut().expect("exists").drain_messages() {
+            match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
                     let bound_url = memory_server::new_url();
@@ -355,12 +352,33 @@ mod tests {
         let mut t1_chan = transport1
             .take_parent_channel()
             .expect("exists")
-            .as_context_channel::<Url>();
+            .as_context_channel::<Url>("tmem_to_child1");
+
+        /*
+        let (transport1_channel, child) = ghost_create_channel();
+        let transport1_engine = GhostTransportMemoryEngine::new(child);
+
+        enum TestContex {
+        }
+
+        let mut transport1_actor = GhostLocalActor::new::<TestContext>(
+            transport1_engine, transport1_channel);
+        */
+
+        /*
+        let mut transport1 = GhostParentContextChannel::with_cb(|child| {
+            GhostTransportMemory::new(child)
+        });
+
+        let mut transport1 = GhostParentContextChannel::new(
+            Box::new(GhostTransportMemory::new()));
+        */
+
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_chan = transport2
             .take_parent_channel()
             .expect("exists")
-            .as_context_channel::<Url>();
+            .as_context_channel::<Url>("tmem_to_child2");
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
@@ -376,9 +394,10 @@ mod tests {
             Box::new(|_, _, r| {
                 println!("in transport1 bind callback, got: {:?}", r);
                 match r {
-                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(BindResultData{bound_url}))) =>
-                        assert_eq!(bound_url,Url::parse("mem://addr_1").unwrap()),
-                    _ => assert!(false)
+                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
+                        BindResultData { bound_url },
+                    ))) => assert_eq!(bound_url, Url::parse("mem://addr_1").unwrap()),
+                    _ => assert!(false),
                 }
                 Ok(())
             }),
@@ -397,9 +416,10 @@ mod tests {
                 };
                 println!("in transport2 bind callback, got: {:?}", r);
                 match r {
-                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(BindResultData{bound_url}))) =>
-                        m.maybe_my_address = Some(bound_url.clone()),
-                    _ => assert!(false)
+                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
+                        BindResultData { bound_url },
+                    ))) => m.maybe_my_address = Some(bound_url.clone()),
+                    _ => assert!(false),
                 }
                 Ok(())
             }),
@@ -411,8 +431,10 @@ mod tests {
         transport2.process().unwrap();
         let _ = t2_chan.process(&mut transport2);
 
-        assert_eq!(transport2.maybe_my_address,Some(expected_transport2_address));
-
+        assert_eq!(
+            transport2.maybe_my_address,
+            Some(expected_transport2_address)
+        );
 
         /*
                 let expected_transport1_address = Url::parse("mem://addr_1").unwrap();

@@ -57,11 +57,12 @@ impl<
                 Error,
             >,
         >,
+        request_id_prefix: &str,
     ) -> Self {
         let channel = actor
             .take_parent_channel()
             .expect("exists")
-            .as_context_channel();
+            .as_context_channel(request_id_prefix);
         Self { actor, channel }
     }
 
@@ -79,10 +80,10 @@ impl<
         self.channel.request(timeout, context, payload, cb)
     }
 
-    pub fn drain_requests(
+    pub fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
-        self.channel.drain_requests()
+        self.channel.drain_messages()
     }
 
     pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {

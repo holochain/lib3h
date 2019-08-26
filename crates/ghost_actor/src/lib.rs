@@ -64,7 +64,7 @@ pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostChannel,
         GhostContextChannel, GhostError, GhostMessage, GhostParentContextChannel, GhostResult,
-        GhostTracker,
+        GhostTracker, WorkWasDone,
     };
 }
 
@@ -127,7 +127,7 @@ mod tests {
             let (channel_parent, channel_self) = create_ghost_channel();
             Self {
                 channel_parent: Some(channel_parent),
-                channel_self: Detach::new(channel_self.as_context_channel()),
+                channel_self: Detach::new(channel_self.as_context_channel("dht_to_parent")),
             }
         }
     }
@@ -162,8 +162,8 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             detach_run!(&mut self.channel_self, |cs| { cs.process(self.as_any()) })?;
 
-            for mut msg in self.channel_self.as_mut().drain_requests() {
-                match msg.take_payload().expect("exists") {
+            for mut msg in self.channel_self.as_mut().drain_messages() {
+                match msg.take_message().expect("exists") {
                     dht_protocol::RequestToChild::ResolveAddressForId { id } => {
                         println!("dht got ResolveAddressForId {}", id);
                         msg.respond(Ok(
@@ -270,10 +270,13 @@ mod tests {
     impl GatewayTransport {
         pub fn new() -> Self {
             let (channel_parent, channel_self) = create_ghost_channel();
-            let dht = Detach::new(GhostParentContextChannel::new(Box::new(RrDht::new())));
+            let dht = Detach::new(GhostParentContextChannel::new(
+                Box::new(RrDht::new()),
+                "to_dht",
+            ));
             Self {
                 channel_parent: Some(channel_parent),
-                channel_self: Detach::new(channel_self.as_context_channel()),
+                channel_self: Detach::new(channel_self.as_context_channel("gw_to_parent")),
                 dht,
             }
         }
@@ -329,8 +332,8 @@ mod tests {
                 channel_self.process(self.as_any())
             })?;
 
-            for mut msg in self.channel_self.as_mut().drain_requests() {
-                match msg.take_payload().expect("exists") {
+            for mut msg in self.channel_self.as_mut().drain_messages() {
+                match msg.take_message().expect("exists") {
                     RequestToChild::Bind { spec: _ } => {
                         // do some internal bind
                         // we get a bound_url
@@ -429,7 +432,7 @@ mod tests {
         let mut t_actor_channel = t_actor
             .take_parent_channel()
             .expect("exists")
-            .as_context_channel::<i8>();
+            .as_context_channel::<i8>("test");
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
@@ -437,9 +440,9 @@ mod tests {
         let _ = t_actor_channel.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)
-        for mut msg in t_actor_channel.drain_requests() {
-            let payload = msg.take_payload();
-            println!("in drain_requests got: {:?}", payload);
+        for mut msg in t_actor_channel.drain_messages() {
+            let payload = msg.take_message();
+            println!("in drain_messages got: {:?}", payload);
 
             // we might allow or disallow connections for example
             let response = RequestToParentResponse::Allowed;
