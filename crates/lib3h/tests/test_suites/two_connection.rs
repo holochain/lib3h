@@ -121,6 +121,16 @@ fn test_two_peer_timeout_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
         assert_eq!(response.network_id, "FIXME");
     });
+
+    // Billy also receives a disconnected event
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
+    assert!(did_work);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
+        assert_eq!(response.network_id, "FIXME");
+    });
+
     // So alex reconnects
     println!("\n Reconnecting Alex...\n");
     alex.reconnect().expect("Reconnection failed");
