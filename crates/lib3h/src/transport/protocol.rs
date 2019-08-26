@@ -41,8 +41,8 @@ pub struct BindResultData {
 
 #[derive(Debug)]
 pub enum RequestToChildResponse {
-    Bind(Result<BindResultData, TransportError>),
-    SendMessage(Result<(), TransportError>),
+    Bind(BindResultData),
+    SendMessage,
 }
 
 #[derive(Debug)]
