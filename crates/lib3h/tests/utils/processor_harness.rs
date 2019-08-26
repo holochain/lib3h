@@ -10,7 +10,7 @@ use lib3h_protocol::{
 /// Represents all useful state after a single call to an engine's process function
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
-pub struct ProcessorArgs {
+pub struct ProcessorResult {
     /// Whether the engine denoted by engine_name reported doing work or not
     pub did_work: bool,
     /// The name of the engine which produced these results
@@ -18,14 +18,14 @@ pub struct ProcessorArgs {
     /// All events produced by the last call to process for engine by denoted by engine_name
     pub events: Vec<Lib3hServerProtocol>,
     /// All previously processed results, regardless of engine name
-    pub previous: Vec<ProcessorArgs>,
+    pub previous: Vec<ProcessorResult>,
 }
 
 /// An assertion style processor which provides a
-/// predicate over ProcessorArgs (the eval function) and a
+/// predicate over ProcessorResult (the eval function) and a
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
-pub trait Processor: Predicate<ProcessorArgs> {
+pub trait Processor: Predicate<ProcessorResult> {
     /// Processor name, for debugging and mapping purposes
     fn name(&self) -> String {
         "default_processor".into()
@@ -33,13 +33,16 @@ pub trait Processor: Predicate<ProcessorArgs> {
 
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
-    fn test(&self, args: &ProcessorArgs);
+    fn test(&self, args: &ProcessorResult);
 }
 
-/// Asserts some extracted data from ProcessorArgs is equal to an expected instance.
+/// Asserts some extracted data from ProcessorResult is equal to an expected instance.
 pub trait AssertEquals<T: PartialEq + std::fmt::Debug> {
-    fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
+    /// User defined function for extracting a collection data of a specific
+    /// type from the proessor arguments
+    fn extracted(&self, args: &ProcessorResult) -> Vec<T>;
 
+    /// The expected value to compare to the actual value to
     fn expected(&self) -> T;
 }
 
@@ -53,11 +56,11 @@ impl<T> predicates::reflection::PredicateReflection for dyn AssertEquals<T> wher
 {
 }
 
-impl<T> Predicate<ProcessorArgs> for dyn AssertEquals<T>
+impl<T> Predicate<ProcessorResult> for dyn AssertEquals<T>
 where
     T: PartialEq + std::fmt::Debug,
 {
-    fn eval(&self, args: &ProcessorArgs) -> bool {
+    fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
             .iter()
@@ -66,9 +69,9 @@ where
     }
 }
 
-/// Asserts some extracted data from ProcessorArgs passes a predicate.
+/// Asserts some extracted data from ProcessorResult passes a predicate.
 pub trait Assert<T> {
-    fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
+    fn extracted(&self, args: &ProcessorResult) -> Vec<T>;
 
     fn assert_inner(&self, args: &T) -> bool;
 }
@@ -84,7 +87,7 @@ pub struct Lib3hServerProtocolAssert(pub Box<dyn Predicate<Lib3hServerProtocol>>
 pub struct DidWorkAssert(pub String /* engine name */);
 
 impl Processor for Lib3hServerProtocolAssert {
-    fn test(&self, args: &ProcessorArgs) {
+    fn test(&self, args: &ProcessorResult) {
         let extracted = self.extracted(args);
         let actual = extracted
             .iter()
@@ -100,20 +103,20 @@ impl Processor for Lib3hServerProtocolAssert {
 }
 
 impl Processor for DidWorkAssert {
-    fn test(&self, args: &ProcessorArgs) {
+    fn test(&self, args: &ProcessorResult) {
         assert!(args.engine_name == self.0);
         assert!(args.did_work);
     }
 }
 
-impl Predicate<ProcessorArgs> for DidWorkAssert {
-    fn eval(&self, args: &ProcessorArgs) -> bool {
+impl Predicate<ProcessorResult> for DidWorkAssert {
+    fn eval(&self, args: &ProcessorResult) -> bool {
         args.engine_name == self.0 && args.did_work
     }
 }
 
 impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
-    fn extracted(&self, args: &ProcessorArgs) -> Vec<Lib3hServerProtocol> {
+    fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
         args.events.iter().map(|x| x.clone()).collect()
     }
 
@@ -122,8 +125,8 @@ impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
     }
 }
 
-impl predicates::Predicate<ProcessorArgs> for Lib3hServerProtocolEquals {
-    fn eval(&self, args: &ProcessorArgs) -> bool {
+impl predicates::Predicate<ProcessorResult> for Lib3hServerProtocolEquals {
+    fn eval(&self, args: &ProcessorResult) -> bool {
         self.extracted(args)
             .iter()
             .find(|actual| **actual == self.expected())
@@ -131,8 +134,8 @@ impl predicates::Predicate<ProcessorArgs> for Lib3hServerProtocolEquals {
     }
 }
 
-impl Predicate<ProcessorArgs> for Lib3hServerProtocolAssert {
-    fn eval(&self, args: &ProcessorArgs) -> bool {
+impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert {
+    fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
             .iter()
@@ -142,7 +145,7 @@ impl Predicate<ProcessorArgs> for Lib3hServerProtocolAssert {
 }
 
 impl Processor for Lib3hServerProtocolEquals {
-    fn test(&self, args: &ProcessorArgs) {
+    fn test(&self, args: &ProcessorResult) {
         let extracted = self.extracted(args);
         let actual = extracted.iter().find(|actual| **actual == self.expected());
         assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
@@ -150,7 +153,7 @@ impl Processor for Lib3hServerProtocolEquals {
 }
 
 impl AssertEquals<Lib3hServerProtocol> for Lib3hServerProtocolEquals {
-    fn extracted(&self, args: &ProcessorArgs) -> Vec<Lib3hServerProtocol> {
+    fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
         args.events.iter().map(|x| x.clone()).collect()
     }
     fn expected(&self) -> Lib3hServerProtocol {
@@ -189,12 +192,11 @@ const MAX_PROCESSING_LOOPS: u64 = 20;
 pub fn assert_one_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processor: Box<dyn Processor>,
-) {
+) -> Vec<ProcessorResult> {
     assert_processed(engines, &vec![processor])
 }
 
-// TODO Return back engines
-// TODO return back processor events
+// TODO Return back engines?
 /// Asserts that a collection of engines produce events
 /// matching a set of predicate fucntions. For the program
 /// to continue executing all processors must pass.
@@ -202,11 +204,14 @@ pub fn assert_one_processed(
 /// Multiple calls to process() will be made as needed for
 /// the passed in processors to pass. It will failure after
 /// MAX_PROCESSING_LOOPS iterations regardless.
+///
+/// Returns all observed processor results for use by
+/// subsequent tests.
 #[allow(dead_code)]
 pub fn assert_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processors: &Vec<Box<dyn Processor>>,
-) {
+) -> Vec<ProcessorResult> {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
 
@@ -227,7 +232,7 @@ pub fn assert_processed(
             }
 
             let events = dbg!(events);
-            let processor_args = ProcessorArgs {
+            let processor_result = ProcessorResult {
                 did_work,
                 events,
                 engine_name: engine.name(),
@@ -235,21 +240,21 @@ pub fn assert_processed(
             };
             let mut failed = Vec::new();
 
-            for (processor, _orig_processor_args) in errors.drain(..) {
-                let result = processor.eval(&processor_args.clone());
+            for (processor, _orig_processor_result) in errors.drain(..) {
+                let result = processor.eval(&processor_result.clone());
                 if result {
                     // Simulate the succesful assertion behavior
-                    processor.test(&processor_args.clone());
+                    processor.test(&processor_result.clone());
                 // processor passed!
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing
-                    failed.push((processor, Some(processor_args.clone())));
+                    failed.push((processor, Some(processor_result.clone())));
                 }
             }
             errors.append(&mut failed);
-            if !processor_args.events.is_empty() {
-                previous.push(processor_args.clone());
+            if !processor_result.events.is_empty() {
+                previous.push(processor_result.clone());
             }
 
             if errors.is_empty() {
@@ -265,6 +270,7 @@ pub fn assert_processed(
             panic!(format!("Never tested processor: {}", p.name()))
         }
     }
+    previous
 }
 
 /// Creates a processor that verifies a connected data response is produced
