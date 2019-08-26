@@ -1,10 +1,12 @@
+/// Result type for GhostErrors
 pub type GhostResult<T> = Result<T, GhostError>;
 
+/// GhostError used in GhostResult responses
 #[derive(Debug)]
 pub struct GhostError(Box<ErrorKind>);
 
 impl GhostError {
-    /// A crate private constructor for `Error`.
+    /// create a new `GhostError`.
     pub fn new(kind: ErrorKind) -> Self {
         GhostError(Box::new(kind))
     }
@@ -23,6 +25,7 @@ impl GhostError {
 /// The specific type of an error.
 #[derive(Debug)]
 pub enum ErrorKind {
+    /// Generic stringified errors
     Other(String),
     /// Hints that destructuring should not be exhaustive.
     ///
