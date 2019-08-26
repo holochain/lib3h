@@ -347,6 +347,7 @@ mod tests {
 
     use super::*;
     //use protocol::RequestToChildResponse;
+    use lib3h_ghost_actor::GhostCallbackData;
 
     #[test]
     fn test_gmem_transport() {
@@ -374,32 +375,44 @@ mod tests {
             },
             Box::new(|_, _, r| {
                 println!("in transport1 bind callback, got: {:?}", r);
+                match r {
+                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(BindResultData{bound_url}))) =>
+                        assert_eq!(bound_url,Url::parse("mem://addr_1").unwrap()),
+                    _ => assert!(false)
+                }
                 Ok(())
             }),
         );
-        let _expected_transport2_address = Url::parse("mem://addr_2").unwrap();
+        let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_chan.request(
             std::time::Duration::from_millis(2000),
             Url::parse("mem://_").unwrap(),
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|s, _, r| {
+                let m = match s.downcast_mut::<GhostTransportMemory>() {
+                    None => panic!("wrong type"),
+                    Some(m) => m,
+                };
                 println!("in transport2 bind callback, got: {:?}", r);
-                /*                match r {
-                    Ok(Bind(BindResultData { bound_url })) =>
-                        assert_eq!(bound_url,expected_transport2_address),
+                match r {
+                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(BindResultData{bound_url}))) =>
+                        m.maybe_my_address = Some(bound_url.clone()),
                     _ => assert!(false)
-                }*/
+                }
                 Ok(())
             }),
         );
 
         transport1.process().unwrap();
-        let _ = t1_chan.process(&mut ());
+        let _ = t1_chan.process(&mut transport1);
 
         transport2.process().unwrap();
-        let _ = t2_chan.process(&mut ());
+        let _ = t2_chan.process(&mut transport2);
+
+        assert_eq!(transport2.maybe_my_address,Some(expected_transport2_address));
+
 
         /*
                 let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
