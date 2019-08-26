@@ -189,6 +189,9 @@ struct Lib3hServerProtocolEquals(Lib3hServerProtocol);
 
 struct Lib3hServerProtocolAssert(Box<dyn Predicate<Lib3hServerProtocol>>);
 
+#[derive(PartialEq, Debug)]
+struct DidWorkAssert(String /* engine name */);
+
 impl Processor for Lib3hServerProtocolAssert {
     fn test(&self, args: &ProcessorArgs) {
         let extracted = self.extracted(args);
@@ -202,6 +205,19 @@ impl Processor for Lib3hServerProtocolAssert {
         } else {
             assert!(actual.is_some());
         }
+    }
+}
+
+impl Processor for DidWorkAssert {
+    fn test(&self, args: &ProcessorArgs) {
+        assert!(args.engine_name == self.0);
+        assert!(args.did_work);
+    }
+}
+
+impl Predicate<ProcessorArgs> for DidWorkAssert {
+    fn eval(&self, args: &ProcessorArgs) -> bool {
+        args.engine_name == self.0 && args.did_work
     }
 }
 
@@ -259,12 +275,19 @@ impl std::fmt::Display for Lib3hServerProtocolEquals {
 
 impl std::fmt::Display for Lib3hServerProtocolAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", "asserter")
+        write!(f, "{:?}", "Lib3hServer protocol assertion")
+    }
+}
+
+impl std::fmt::Display for DidWorkAssert {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?} did work", self.0)
     }
 }
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {}
+impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
