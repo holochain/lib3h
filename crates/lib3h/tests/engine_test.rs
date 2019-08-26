@@ -268,6 +268,13 @@ impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {
 
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
+fn assert_one_processed(
+    engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
+    processor: Box<dyn Processor>,
+) {
+    assert_processed(engines, &vec![processor])
+}
+
 fn assert_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processors: &Vec<Box<dyn Processor>>,
@@ -318,7 +325,7 @@ fn assert_processed(
             }
 
             if errors.is_empty() {
-                return;
+                break;
             }
         }
     }
@@ -502,19 +509,16 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     };
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("connected_msg = {:?}", connected_msg);
-    assert_eq!(connected_msg.uri, req_connect.peer_uri);
-    // More process: Have Billy process P2p::PeerAddress of alex
-    //    assert_using_predicate(alex
+    let mut engines = vec![alex];
 
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let is_connected = Box::new(is_connected(
+        req_connect.clone().request_id.as_str(),
+        req_connect.clone().peer_uri,
+    ));
 
+    assert_one_processed(&mut engines, is_connected);
+
+    engines.push(billy);
     // Alex joins space A
     println!("\n Alex joins space \n");
     let mut track_space = SpaceData {
@@ -522,25 +526,22 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
         space_address: SPACE_ADDRESS_A.clone(),
         agent_id: ALEX_AGENT_ID.clone(),
     };
-    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-        .unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    // More process
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
-    // Billy joins space A
-    println!("\n Billy joins space \n");
-    track_space.agent_id = BILLY_AGENT_ID.clone();
-    billy
-        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-        .unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    // More process
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let mut engines2 = Vec::new();
+    for e in engines.drain(..) {
+        if e.name() == "alex" {
+            track_space.agent_id = ALEX_AGENT_ID.clone();
+        } else if e.name() == "billy" {
+            track_space.agent_id = BILLY_AGENT_ID.clone();
+        } else {
+            panic!("unexpected engine name: {}", e.name());
+        }
+        e.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+            .unwrap();
+        engines2.push(e);
+    }
 
+    // TODO check for join space response messages.
     println!("DONE basic_two_setup DONE \n\n\n");
 }
 
