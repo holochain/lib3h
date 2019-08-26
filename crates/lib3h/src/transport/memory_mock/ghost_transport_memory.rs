@@ -1,10 +1,6 @@
 use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use std::{
-    any::Any,
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
+use std::{any::Any, collections::HashSet};
 use url::Url;
 
 #[derive(Debug)]
@@ -22,7 +18,7 @@ type GhostTransportMemoryChannel = GhostChannel<
 >;
 
 type GhostTransportMemoryChannelContext = GhostContextChannel<
-    Url,
+    (),
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -53,43 +49,6 @@ impl GhostTransportMemory {
     }
 }
 
-/*
-macro_rules! is_bound {
-    ($self:ident, $request_id:ident, $response_type:ident  ) => {
-        match &mut $self.maybe_my_address {
-            Some(my_addr) => my_addr.clone(),
-            None => {
-                $self.respond_with(
-                    &$request_id,
-                    RequestToChildResponse::$response_type(Err(TransportError::new(
-                        "Transport must be bound before sending".to_string(),
-                    ))),
-                );
-                return;
-            }
-        }
-    };
-}
-*/
-/*
-macro_rules! with_server {
-    ($self:ident, $request_id:ident, $response_type:ident, $address:ident, |$server:ident| $code:expr  ) => {
-        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(&$address);
-        if let None = maybe_server {
-            respond_with!($self,$request_id,$response_type,
-                          Err(TransportError::new(format!(
-                              "No Memory server at this url address: {}",
-                              $address
-                          ))));
-            return;
-        }
-        let mut server = maybe_server.unwrap().lock().unwrap();
-        $code
-    }
-}
- */
-
 impl From<TransportError> for GhostError {
     fn from(e: TransportError) -> Self {
         format!("TransportError: {}", e).into()
@@ -116,71 +75,6 @@ impl
     }
 
     // BOILERPLATE END----------------------------------
-
-    /*
-    // our parent is making a request of us
-    //#[allow(irrefutable_let_patterns)]
-    fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild) {
-        match request {
-            RequestToChild::Bind { spec: _url } => {
-                // get a new bound url from the memory server (we ignore the spec here)
-                let bound_url = memory_server::new_url();
-                memory_server::set_server(&bound_url).unwrap(); //set_server always returns Ok
-                self.maybe_my_address = Some(bound_url.clone());
-
-                // respond to our parent
-                self.respond_with(
-                    &request_id,
-                    RequestToChildResponse::Bind(Ok(BindResultData {
-                        bound_url: bound_url,
-                    })),
-                );
-            }
-            RequestToChild::SendMessage { address, payload } => {
-                // make sure we have bound and get our address if so
-                let my_addr = is_bound!(self, request_id, SendMessage);
-
-                // get destinations server
-                let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                let maybe_server = server_map.get(&address);
-                if let None = maybe_server {
-                    self.respond_with(
-                        &request_id,
-                        RequestToChildResponse::SendMessage(Err(TransportError::new(format!(
-                            "No Memory server at this address: {}",
-                            my_addr
-                        )))),
-                    );
-                    return;
-                }
-                let mut server = maybe_server.unwrap().lock().unwrap();
-
-                // if not already connected, request a connections
-                if self.connections.get(&address).is_none() {
-                    let result = server.request_connect(&my_addr);
-                    if result.is_err() {
-                        self.respond_with(&request_id, RequestToChildResponse::SendMessage(result));
-                        return;
-                    }
-                    self.connections.insert(address.clone());
-                };
-
-                trace!(
-                    "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
-                    my_addr,
-                    address,
-                    payload
-                );
-                // Send it data from us
-                server
-                    .post(&my_addr, &payload)
-                    .expect("Post on memory server should work");
-
-                self.respond_with(&request_id, RequestToChildResponse::SendMessage(Ok(())));
-            }
-        }
-    }
-     */
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // process the self channel
@@ -334,17 +228,12 @@ impl
     }
 }
 
-lazy_static! {
-    /// Counter of the number of GhostTransportMemory that spawned
-    static ref TRANSPORT_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
-}
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
     //use protocol::RequestToChildResponse;
-    use lib3h_ghost_actor::GhostCallbackData;
+    //    use lib3h_ghost_actor::GhostCallbackData;
 
     #[test]
     fn test_gmem_transport() {
@@ -352,7 +241,7 @@ mod tests {
         let mut t1_chan = transport1
             .take_parent_channel()
             .expect("exists")
-            .as_context_channel::<Url>("tmem_to_child1");
+            .as_context_channel::<()>("tmem_to_child1");
 
         /*
         let (transport1_channel, child) = ghost_create_channel();
@@ -378,118 +267,82 @@ mod tests {
         let mut t2_chan = transport2
             .take_parent_channel()
             .expect("exists")
-            .as_context_channel::<Url>("tmem_to_child2");
+            .as_context_channel::<()>("tmem_to_child2");
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
         assert_eq!(transport2.maybe_my_address, None);
 
-        let _expected_transport1_address = Url::parse("mem://addr_1").unwrap();
+        let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
         t1_chan.request(
             std::time::Duration::from_millis(2000),
-            Url::parse("mem://_").unwrap(),
+            (),
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
             Box::new(|_, _, r| {
-                println!("in transport1 bind callback, got: {:?}", r);
-                match r {
-                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
-                        BindResultData { bound_url },
-                    ))) => assert_eq!(bound_url, Url::parse("mem://addr_1").unwrap()),
-                    _ => assert!(false),
-                }
+                // parent should see the bind event
+                assert_eq!(
+                    "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
+                    &format!("{:?}", r)
+                );
                 Ok(())
             }),
         );
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_chan.request(
             std::time::Duration::from_millis(2000),
-            Url::parse("mem://_").unwrap(),
+            (),
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
-            Box::new(|s, _, r| {
-                let m = match s.downcast_mut::<GhostTransportMemory>() {
-                    None => panic!("wrong type"),
-                    Some(m) => m,
-                };
-                println!("in transport2 bind callback, got: {:?}", r);
-                match r {
-                    GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
-                        BindResultData { bound_url },
-                    ))) => m.maybe_my_address = Some(bound_url.clone()),
-                    _ => assert!(false),
-                }
+            Box::new(|_, _, r| {
+                // parent should see the bind event
+                assert_eq!(
+                    "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
+                    &format!("{:?}", r)
+                );
                 Ok(())
             }),
         );
 
         transport1.process().unwrap();
-        let _ = t1_chan.process(&mut transport1);
+        let _ = t1_chan.process(&mut ());
 
         transport2.process().unwrap();
-        let _ = t2_chan.process(&mut transport2);
+        let _ = t2_chan.process(&mut ());
 
+        assert_eq!(
+            transport1.maybe_my_address,
+            Some(expected_transport1_address)
+        );
         assert_eq!(
             transport2.maybe_my_address,
             Some(expected_transport2_address)
         );
 
-        /*
-                let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
-                assert_eq!(
-                    transport1.maybe_my_address,
-                    Some(expected_transport1_address.clone())
-                );
-                let mut r1 = transport1.drain_responses();
-                let (_rid, response) = r1.pop().unwrap();
-                match response {
-                    RequestToChildResponse::Bind(Ok(bind_result)) => {
-                        // the memory transport server should bind us to the first available url which is a1
-                        assert_eq!(bind_result.bound_url, expected_transport1_address);
-                    }
-                    _ => assert!(false),
-                }
+        // now send a message from transport1 to transport2 over the bound addresses
+        t1_chan.request(
+            std::time::Duration::from_millis(2000),
+            (),
+            RequestToChild::SendMessage {
+                address: Url::parse("mem://addr_2").unwrap(),
+                payload: b"test message".to_vec(),
+            },
+            Box::new(|_, _, r| {
+                // parent should see that the send request was OK
+                assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                Ok(())
+            }),
+        );
 
-                let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
-                assert_eq!(
-                    transport2.maybe_my_address,
-                    Some(expected_transport2_address.clone())
-                );
-                let mut r2 = transport2.drain_responses();
-                let (_rid, response) = r2.pop().unwrap();
-                match response {
-                    RequestToChildResponse::Bind(Ok(bind_result)) => {
-                        // the memory transport server should bind us to the first available url which is a1
-                        assert_eq!(bind_result.bound_url, expected_transport2_address);
-                    }
-                    _ => assert!(false),
-                }
+        transport1.process().unwrap();
+        let _ = t1_chan.process(&mut ());
 
-                // now send a message from transport1 to transport2 over the bound addresses
-                let send_request1 = RequestId::with_prefix("test_parent");
-                transport1.request(
-                    Some(send_request1),
-                    RequestToChild::SendMessage {
-                        address: Url::parse("mem://addr_2").unwrap(),
-                        payload: b"test message".to_vec(),
-                    },
-                );
+        transport2.process().unwrap();
+        let _ = t2_chan.process(&mut ());
 
-                // call process on both transports so queues can fill
-                transport1.process().unwrap();
-                transport2.process().unwrap();
-
-                let requests = transport2.drain_requests();
-                assert_eq!(
-                    "[(None, IncomingConnection { address: \"mem://addr_1/\" }), (None, ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })]",
-                    format!("{:?}", requests)
-                );
-
-                let mut r = transport1.drain_responses();
-                let (_rid, response) = r.pop().unwrap();
-                assert_eq!("SendMessage(Ok(()))", format!("{:?}", response));
-        */
+        let requests = t2_chan.drain_messages();
+        assert_eq!(2, requests.len());
     }
 }
