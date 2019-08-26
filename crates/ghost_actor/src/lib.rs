@@ -546,7 +546,7 @@ mod tests {
     >;
 
     #[test]
-    fn test_wss_transport() {
+    fn test_ghost_example_transport() {
         // the body of this test simulates an object that contains a actor, i.e. a parent.
         // it would usually just be another ghost_actor but here we test it out explicitly
         // so first instantiate the "child" actor
