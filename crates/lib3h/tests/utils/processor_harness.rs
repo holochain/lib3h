@@ -198,7 +198,7 @@ pub fn assert_one_processed(
 
 // TODO Return back engines?
 /// Asserts that a collection of engines produce events
-/// matching a set of predicate fucntions. For the program
+/// matching a set of predicate functions. For the program
 /// to continue executing all processors must pass.
 ///
 /// Multiple calls to process() will be made as needed for
