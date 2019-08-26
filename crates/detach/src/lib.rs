@@ -120,22 +120,20 @@
 //! ```
 
 pub mod prelude {
-    pub use crate::{
-        Detach,
-    };
+    pub use crate::Detach;
 }
 
 #[macro_export]
 macro_rules! detach_run {
     ($item:expr, |$id:ident| $code:block) => {{
         let mut $id = $item.take();
-        let out = (||{ $code })();
+        let out = (|| $code)();
         $item.put($id);
         out
     }};
     ($item:expr, |$id:ident| $code:expr) => {{
         let mut $id = $item.take();
-        let out = (||{ $code })();
+        let out = (|| $code)();
         $item.put($id);
         out
     }};

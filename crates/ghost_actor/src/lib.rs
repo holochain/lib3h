@@ -1,5 +1,5 @@
 extern crate crossbeam_channel;
-#[allow(unused)]
+#[allow(unused_imports)]
 #[macro_use]
 extern crate detach;
 extern crate nanoid;
@@ -159,9 +159,7 @@ mod tests {
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.channel_self, |cs| {
-                cs.process(self.as_any())
-            })?;
+            detach_run!(&mut self.channel_self, |cs| { cs.process(self.as_any()) })?;
 
             for mut msg in self.channel_self.as_mut().drain_requests() {
                 match msg.take_payload().expect("exists") {
@@ -361,7 +359,10 @@ mod tests {
                         })));
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
-                    RequestToChild::SendMessage { address, payload: _ } => {
+                    RequestToChild::SendMessage {
+                        address,
+                        payload: _,
+                    } => {
                         self.dht_channel.as_mut().request(
                             std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },

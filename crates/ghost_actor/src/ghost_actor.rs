@@ -35,7 +35,8 @@ pub trait GhostActor<
 
     /// we, as a ghost actor implement this, it will get called from
     /// process after the subconscious process items have run
-    /*priv*/ fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+    /*priv*/
+    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         Ok(false.into())
     }
 }
