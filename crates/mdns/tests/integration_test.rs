@@ -1,16 +1,15 @@
 // simple p2p mdns usage
 extern crate lib3h_mdns;
-use lib3h_mdns::MulticastDnsBuilder;
-use lib3h_discovery::Discovery;
 use lib3h::{
+    dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     transport_wss::TlsConfig,
-    dht::mirror_dht::MirrorDht,
 };
+use lib3h_discovery::Discovery;
+use lib3h_mdns::MulticastDnsBuilder;
 use lib3h_protocol::network_engine::NetworkEngine;
 use lib3h_sodium::SodiumCryptoSystem;
 use url::Url;
-
 
 fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     let config = RealEngineConfig {
@@ -36,11 +35,8 @@ fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     engine
 }
 
-
-
 #[test]
 fn main() {
-
     let url = basic_setup_wss().advertise();
 
     // In order to avoid using the service loop MulticastDns::responder() in a separate thread
