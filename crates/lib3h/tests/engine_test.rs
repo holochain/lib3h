@@ -149,11 +149,26 @@ trait Processor: Predicate<ProcessorArgs> {
     fn test(&self, args: &ProcessorArgs);
 }
 
-trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
+trait AssertEquals<T: PartialEq + std::fmt::Debug> {
     fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
 
     fn expected(&self) -> T;
+}
 
+impl<T: PartialEq + std::fmt::Debug> std::fmt::Display for dyn AssertEquals<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "assert_equals")
+    }
+}
+impl<T> predicates::reflection::PredicateReflection for dyn AssertEquals<T> where
+    T: PartialEq + std::fmt::Debug
+{
+}
+
+impl<T> Predicate<ProcessorArgs> for dyn AssertEquals<T>
+where
+    T: PartialEq + std::fmt::Debug,
+{
     fn eval(&self, args: &ProcessorArgs) -> bool {
         let extracted = self.extracted(args);
         extracted
@@ -161,55 +176,12 @@ trait AssertEquals<T: PartialEq + std::fmt::Debug>: Processor {
             .find(|actual| **actual == self.expected())
             .is_some()
     }
-
-    fn test(&self, args: &ProcessorArgs) {
-        let extracted = self.extracted(args);
-        let actual = extracted.iter().find(|actual| **actual == self.expected());
-        assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
-    }
-
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.name())
-    }
 }
 
-/*impl<T> Predicate<ProcessorArgs> for dyn AssertEquals<T> where
-    T : PartialEq + std::fmt::Debug {}
-
-impl<T> Processor for dyn AssertEquals<T> where
-    T : PartialEq + std::fmt::Debug {}
-*/
-
-trait Assert<T>: Processor {
+trait Assert<T> {
     fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
 
     fn assert_inner(&self, args: &T) -> bool;
-
-    fn eval(&self, args: &ProcessorArgs) -> bool {
-        let extracted = self.extracted(args);
-        extracted
-            .iter()
-            .find(|actual| self.assert_inner(*actual))
-            .is_some()
-    }
-
-    fn test(&self, args: &ProcessorArgs) {
-        let extracted = self.extracted(args);
-        let actual = extracted
-            .iter()
-            .find(move |actual| self.assert_inner(*actual))
-            .or(extracted.first());
-
-        if let Some(actual) = actual {
-            assert!(self.assert_inner(actual));
-        } else {
-            assert!(actual.is_some());
-        }
-    }
-
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.name())
-    }
 }
 
 #[derive(PartialEq, Debug)]
