@@ -51,6 +51,14 @@ impl DnsMessage {
         DnsMessage::default()
     }
 
+    pub fn nb_questions(&self) -> u16 {
+        self.nb_questions
+    }
+
+    pub fn nb_answers(&self) -> u16 {
+        self.nb_answers
+    }
+
     pub fn from_raw(packet: &Vec<u8>) -> MulticastDnsResult<Self> {
         let mut dmesg = DnsMessage::new();
 

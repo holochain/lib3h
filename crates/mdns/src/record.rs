@@ -185,24 +185,7 @@ impl Record {
         }
     }
 
-    // /// Convert multiple [`Record`] to a vector of [`Answer Response`](crate::dns::Answer).
-    // pub fn to_vector_answers(&self) -> Vec<Answer> {
-    //     let mut answers = Vec::with_capacity(self.addrs.len());
-    //     for addr in &self.addrs {
-    //         answers.push(Answer::Srv(SrvDataA {
-    //             name: self.hostname.as_bytes().to_vec(),
-    //             ttl_seconds: 255,
-    //             priority: 0,
-    //             weight: 0,
-    //             port: crate::SERVICE_LISTENER_PORT,
-    //             target: addr.to_string().as_bytes().to_vec(),
-    //         }))
-    //     }
-    //
-    //     answers
-    // }
-
-    /// Convert a [`Record`] to an [`Answer Reponse`](crate::dns::Answer).
+    /// Convert a [`Record`] to an [`Answer Reponse`](crate::dns::AnswerSection).
     pub fn to_answers_section(&self) -> AnswerSection {
         AnswerSection::new_with_ttl(&self.hostname, &self.to_targets(), self.ttl)
     }
@@ -224,47 +207,3 @@ fn convert_to_mdns_hostname(hostname: &str) -> String {
         format!("{}.local.", hostname)
     }
 }
-
-// /// Convert a [`Packet`](crate::dns::Packet) to a [`Record`].
-// pub fn from_packet(packet: &Packet) -> Option<MapRecord> {
-//     let records: Vec<Record> = packet
-//         .answers
-//         .iter()
-//         .filter_map(|answer| match answer {
-//             Answer::Unknown(_) => None,
-//             Answer::Srv(sda) => {
-//                 let hostname =
-//                     std::str::from_utf8(&sda.name).expect("Fail to convert bytes to hostname.");
-//                 let addr: String = std::str::from_utf8(&sda.target)
-//                     .expect("Fail to convert bytes to IP address.")
-//                     .to_string();
-//                 let addr: Ipv4Addr = addr
-//                     .parse()
-//                     .expect("Fail to parse String IP address to Ipv4Addr.");
-//                 Some(Record::new(&hostname, &[addr]))
-//             }
-//         })
-//     .collect();
-//
-//     if records.len() > 0 {
-//
-//         let mut map_record = MapRecord::with_capacity(records.len());
-//         for new_record in records.iter() {
-//             if let Some(rec) = map_record.get(&new_record.hostname) {
-//                 let new_addr = new_record.addrs.first().expect("Empty list of address.");
-//                 let mut record_to_update = rec.clone();
-//
-//                 if !record_to_update.addrs.contains(new_addr) {
-//                     record_to_update.addrs.push(*new_addr);
-//                 }
-//                 map_record.insert(new_record.hostname.clone(), record_to_update.clone());
-//             } else {
-//                 map_record.insert(new_record.hostname.clone(), new_record.clone());
-//             }
-//         }
-//
-//         Some(map_record)
-//     } else {
-//         None
-//     }
-// }

@@ -232,7 +232,7 @@ impl MulticastDns {
         &self.multicast_address
     }
 
-    /// Returns the lookup table of records as a [HashMap]
+    /// Returns the lookup table of records as a [HashMap](std::collections::HashMap).
     pub fn records(&self) -> &MapRecord {
         &self.map_record
     }
@@ -843,6 +843,7 @@ mod tests {
             .spawn(move || {
                 let mut mdns = MulticastDnsBuilder::new()
                     .own_record("holonaute", &["0.0.0.0"])
+                    .bind_port(8596)
                     .multicast_address("224.0.0.252")
                     .build()
                     .expect("Fail to build mDNS.");
@@ -855,9 +856,7 @@ mod tests {
                 sx.send(mdns.own_record.clone())
                     .expect("Fail to send mDNS service through channel.");
 
-                // Listen to the network for a few moment, just the time to defend our name and
-                // return mdns
-
+                // Listen to the network for a few moment, just the time to defend our name
                 mdns.responder()
                     .expect("Fail to fire up the mDNS responder service.");
 
@@ -873,6 +872,7 @@ mod tests {
 
         let mut mdns_with_resolved_conflict = MulticastDnsBuilder::new()
             .own_record("holonaute", &["0.0.0.0"])
+            .bind_port(8596)
             .multicast_address("224.0.0.252")
             .build()
             .expect("Fail to build mDNS.");

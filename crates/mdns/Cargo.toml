@@ -24,3 +24,6 @@ lib3h_discovery = { version = "=0.0.10", path = "../discovery" }
 
 [dev-dependencies]
 lib3h = { version = "=0.0.10", path = "../lib3h" }
+lib3h_sodium = { version = "=0.0.10", path = "../sodium" }
+lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
+url = "=1.7.2"
