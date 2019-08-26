@@ -1,26 +1,42 @@
+/// A test harness for network engines. Provides specialized assertion functions
+/// to verify predicates have passed, calling the engine process function as many
+/// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
 
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol,
 };
 
+/// Represents all useful state after a single call to an engine's process function
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct ProcessorArgs {
-    did_work: bool,
-    engine_name: String,
-    events: Vec<Lib3hServerProtocol>,
-    previous: Vec<ProcessorArgs>,
+    /// Whether the engine denoted by engine_name reported doing work or not
+    pub did_work: bool,
+    /// The name of the engine which produced these results
+    pub engine_name: String,
+    /// All events produced by the last call to process for engine by denoted by engine_name
+    pub events: Vec<Lib3hServerProtocol>,
+    /// All previously processed results, regardless of engine name
+    pub previous: Vec<ProcessorArgs>,
 }
 
+/// An assertion style processor which provides a
+/// predicate over ProcessorArgs (the eval function) and a
+/// test function which will break control flow similar to
+/// how calling assert! or assert_eq! would.
 pub trait Processor: Predicate<ProcessorArgs> {
+    /// Processor name, for debugging and mapping purposes
     fn name(&self) -> String {
         "default_processor".into()
     }
 
+    /// Test the predicate function. Should interrupt control
+    /// flow with a useful error if self.eval(args) is false.
     fn test(&self, args: &ProcessorArgs);
 }
 
+/// Asserts some extracted data from ProcessorArgs is equal to an expected instance.
 pub trait AssertEquals<T: PartialEq + std::fmt::Debug> {
     fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
 
@@ -50,6 +66,7 @@ where
     }
 }
 
+/// Asserts some extracted data from ProcessorArgs passes a predicate.
 pub trait Assert<T> {
     fn extracted(&self, args: &ProcessorArgs) -> Vec<T>;
 
@@ -166,6 +183,9 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 const MAX_PROCESSING_LOOPS: u64 = 20;
 
 #[allow(dead_code)]
+/// Convenience function that asserts only one particular predicate
+/// passes for a collection of engines. See assert_processed for
+/// more information.
 pub fn assert_one_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processor: Box<dyn Processor>,
@@ -175,6 +195,13 @@ pub fn assert_one_processed(
 
 // TODO Return back engines
 // TODO return back processor events
+/// Asserts that a collection of engines produce events
+/// matching a set of predicate fucntions. For the program
+/// to continue executing all processors must pass.
+///
+/// Multiple calls to process() will be made as needed for
+/// the passed in processors to pass. It will failure after
+/// MAX_PROCESSING_LOOPS iterations regardless.
 #[allow(dead_code)]
 pub fn assert_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
@@ -240,6 +267,8 @@ pub fn assert_processed(
     }
 }
 
+/// Creates a processor that verifies a connected data response is produced
+/// by an engine
 #[allow(dead_code)]
 pub fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEquals {
     Lib3hServerProtocolEquals(Lib3hServerProtocol::Connected(ConnectedData {
