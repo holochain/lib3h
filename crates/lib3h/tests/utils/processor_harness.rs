@@ -314,3 +314,37 @@ pub fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEqual
         uri,
     }))
 }
+
+/// Waits for work to be done
+#[allow(dead_code)]
+pub fn wait_did_work(
+    engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
+    should_abort: bool,
+) -> Vec<ProcessorResult> {
+    let processors: Vec<Box<dyn Processor>> = engines
+        .iter()
+        .map(|e| {
+            let p: Box<dyn Processor> = Box::new(DidWorkAssert(e.name()));
+            p
+        })
+        .collect();
+
+    assert_processed_abort(engines, &processors, should_abort)
+}
+
+/// Continues processing the engine until no work is being done.
+#[allow(dead_code)]
+pub fn wait_until_no_work(engines: &mut Vec<&mut Box<dyn NetworkEngine>>) -> Vec<ProcessorResult> {
+    loop {
+        let result = wait_did_work(engines, false);
+        if result.is_empty() {
+            return result;
+        } else {
+            if result.iter().find(|x| x.did_work).is_some() {
+                continue;
+            } else {
+                return result;
+            }
+        }
+    }
+}

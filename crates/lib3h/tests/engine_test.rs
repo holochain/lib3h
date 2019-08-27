@@ -338,6 +338,8 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     ];
 
     assert_processed(&mut engines2, &processors);
+    wait_until_no_work(&mut engines2);
+
     println!("DONE basic_two_setup DONE \n\n\n");
 }
 
@@ -361,7 +363,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
             request_id: req_dm.clone().request_id,
             space_address: SPACE_ADDRESS_A.clone(),
             to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: req_dm.clone().content,
+            result_info: "".into(),
         }),
     ));
 
@@ -395,8 +397,8 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         Lib3hServerProtocol::SuccessResult(GenericResultData {
             request_id: res_dm.clone().request_id,
             space_address: SPACE_ADDRESS_A.clone(),
-            to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: res_dm.clone().content,
+            to_agent_id: BILLY_AGENT_ID.clone(),
+            result_info: "".into(),
         }),
     ));
 
@@ -451,6 +453,8 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
     assert_one_processed(&mut engines, is_connected);
 
     println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
+
+    wait_until_no_work(&mut engines);
 
     // Do Send DM test
     let mut e = engines.iter_mut();
