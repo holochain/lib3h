@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
+use predicates::prelude::*;
+
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
-use crate::utils::constants::*;
+use crate::utils::{constants::*, processor_harness::*};
 use holochain_persistence_api::hash::HashString;
 use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
@@ -16,7 +18,6 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use std::collections::HashMap;
 use url::Url;
-
 /// Query logs
 impl NodeMock {
     /// Return number of Lib3hServerProtocol message this node has received
@@ -645,12 +646,34 @@ impl NodeMock {
             }
 
             std::thread::sleep(std::time::Duration::from_millis(100));
+            // TODO actually compute elapsed time
             time_ms += 100;
             if time_ms > timeout_ms {
                 info!("({:?})::wait() has TIMEOUT", self.agent_id);
                 return None;
             }
         }
+    }
+
+    pub fn assert(
+        &mut self,
+        predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
+    ) -> Vec<ProcessorResult> {
+        let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolAssert(predicate));
+        assert_one_processed(&mut vec![&mut self.engine], predicate)
+    }
+
+    pub fn assert_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
+        let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(actual.clone()));
+        assert_one_processed(&mut vec![&mut self.engine], predicate)
+    }
+
+    pub fn wait_did_work(&mut self) -> Vec<ProcessorResult> {
+        let engine_name = self.engine.name();
+        assert_one_processed(
+            &mut vec![&mut self.engine],
+            Box::new(DidWorkAssert(engine_name)),
+        )
     }
 
     /// Wait for receiving a message corresponding to predicate
