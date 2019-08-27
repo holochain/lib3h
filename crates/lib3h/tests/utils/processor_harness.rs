@@ -270,9 +270,9 @@ pub fn assert_processed(
             // Make degenerate result which should fail
             p.test(&ProcessorResult {
                 engine_name: "none".into(),
-                previous : vec![],
-                events : vec![],
-                did_work: false
+                previous: vec![],
+                events: vec![],
+                did_work: false,
             })
         }
     }
