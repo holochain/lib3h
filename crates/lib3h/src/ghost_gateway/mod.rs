@@ -18,9 +18,8 @@ pub struct GhostGateway<'gateway, D: Dht> {
     connection_map: HashMap<Url, ConnectionId>,
     /// Internal DHT
     inner_dht: D,
-    /// Hold Endpoint to child actor
-    // inner_transport: TransportWrapper<'gateway>,
-    child_transport: Detach<TransportParentEndpointWithContext>,
+    /// Hold child transport actor
+    child_transport: Detach<TransportParentWrapper>,
     /// Channel to our parent actor
     endpoint_parent: Option<TransportEndpoint>,
     endpoint_self: Option<TransportEndpointWithContext>,
