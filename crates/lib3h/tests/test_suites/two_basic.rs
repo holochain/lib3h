@@ -27,7 +27,7 @@ pub fn setup_two_nodes(alex: &mut NodeMock, mut billy: &mut NodeMock) {
     // Connect Alex to Billy
     let connect_data = alex.connect_to(&billy.advertise()).unwrap();
     alex.wait_connect(&connect_data, &mut billy);
-    
+
     billy.wait_until_no_work();
     alex.wait_until_no_work();
     billy.wait_until_no_work();

@@ -203,11 +203,10 @@ pub fn assert_one_processed(
 pub fn assert_one_processed_abort(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processor: Box<dyn Processor>,
-    should_abort: bool
+    should_abort: bool,
 ) -> Vec<ProcessorResult> {
     assert_processed_abort(engines, &vec![processor], should_abort)
 }
-
 
 #[allow(dead_code)]
 pub fn assert_processed(
@@ -232,7 +231,7 @@ pub fn assert_processed(
 pub fn assert_processed_abort(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processors: &Vec<Box<dyn Processor>>,
-    should_abort : bool,
+    should_abort: bool,
 ) -> Vec<ProcessorResult> {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
@@ -286,7 +285,7 @@ pub fn assert_processed_abort(
     }
 
     if !should_abort {
-        return previous
+        return previous;
     }
 
     for (p, args) in errors {
