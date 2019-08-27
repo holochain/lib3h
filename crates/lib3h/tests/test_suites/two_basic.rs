@@ -23,22 +23,14 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 ///
-pub fn setup_two_nodes(alex: &mut NodeMock, billy: &mut NodeMock) {
+pub fn setup_two_nodes(alex: &mut NodeMock, mut billy: &mut NodeMock) {
     // Connect Alex to Billy
-    alex.connect_to(&billy.advertise()).unwrap();
-
-    // TODO Switch to assert_one_processed
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("connected_msg = {:?}", connected_msg);
-    assert_eq!(&connected_msg.uri, &billy.advertise());
-    // More process: Have Billy process P2p::PeerAddress of alex
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-
+    let connect_data = alex.connect_to(&billy.advertise()).unwrap();
+    alex.wait_connect(&connect_data, &mut billy);
+    
+    billy.wait_until_no_work();
+    alex.wait_until_no_work();
+    billy.wait_until_no_work();
     two_join_space(alex, billy, &SPACE_ADDRESS_A);
 
     println!("DONE setup_two_nodes() DONE \n\n\n");

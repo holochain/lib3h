@@ -65,7 +65,7 @@ impl NodeMock {
 
     /// Try connecting to previously connected_to nodes.
     /// Return Err if all connects failed.
-    pub fn reconnect(&mut self) -> Lib3hProtocolResult<()> {
+    pub fn reconnect(&mut self) -> Lib3hProtocolResult<ConnectData> {
         // re-connect to all nodes
         let mut return_res = Err(Lib3hProtocolError::new(ErrorKind::Other(String::from(
             "Failed to reconnect to any node",
@@ -92,11 +92,11 @@ impl NodeMock {
                 warn!("Failed to rejoin space {}: {:?}", space, e);
             }
         }
-        Ok(())
+        return_res
     }
 
     /// Connect to another peer via its uri
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<()> {
+    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<ConnectData> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
             peer_uri: uri.clone(),
@@ -105,7 +105,7 @@ impl NodeMock {
         self.connected_list.insert(uri.clone());
         return self
             .engine
-            .post(Lib3hClientProtocol::Connect(req_connect.clone()));
+            .post(Lib3hClientProtocol::Connect(req_connect.clone())).map(|_| req_connect);
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
@@ -656,7 +656,7 @@ impl NodeMock {
     }
 
     /// Asserts that some event passes an arbitrary predicate
-    pub fn assert(
+    pub fn wait_assert(
         &mut self,
         predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     ) -> Vec<ProcessorResult> {
@@ -665,26 +665,25 @@ impl NodeMock {
     }
 
     /// Asserts some event produced by produce equals actual
-    pub fn assert_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
+    pub fn wait_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
         let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(actual.clone()));
         assert_one_processed(&mut vec![&mut self.engine], predicate)
     }
 
     /// Waits for work to be done
-    pub fn wait_did_work(&mut self) -> Vec<ProcessorResult> {
+    pub fn wait_did_work(&mut self, should_abort: bool) -> Vec<ProcessorResult> {
         let engine_name = self.engine.name();
-        assert_one_processed(
+        assert_one_processed_abort(
             &mut vec![&mut self.engine],
             Box::new(DidWorkAssert(engine_name)),
+            should_abort
         )
     }
 
     /// Continues processing the engine until no work is being done.
     pub fn wait_until_no_work(&mut self) -> Vec<ProcessorResult> {
         loop {
-            let predicate: Box<dyn Processor> =
-                Box::new(Lib3hServerProtocolAssert(Box::new(predicate::always())));
-            let result = assert_one_processed(&mut vec![&mut self.engine], predicate);
+            let result = self.wait_did_work(false);
             if result.is_empty() {
                 return result;
             } else {
@@ -695,6 +694,18 @@ impl NodeMock {
                 }
             }
         }
+    }
+
+    pub fn wait_connect(&mut self, _connect_data: &ConnectData, other:&mut Self) -> Vec<ProcessorResult> {
+        let connected_data = Lib3hServerProtocol::Connected(
+                ConnectedData {
+                    uri : other.advertise(),
+                    request_id : "".to_string() // TODO fix this bug and uncomment out! connect_data.clone().request_id
+                }
+        );
+        let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(connected_data));
+        assert_one_processed(
+            &mut vec![&mut self.engine, &mut other.engine], predicate)
     }
 
     /// Wait for receiving a message corresponding to predicate

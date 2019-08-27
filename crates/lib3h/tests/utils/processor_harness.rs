@@ -193,7 +193,28 @@ pub fn assert_one_processed(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processor: Box<dyn Processor>,
 ) -> Vec<ProcessorResult> {
-    assert_processed(engines, &vec![processor])
+    assert_one_processed_abort(engines, processor, true)
+}
+
+#[allow(dead_code)]
+/// Convenience function that asserts only one particular predicate
+/// passes for a collection of engines. See assert_processed for
+/// more information.
+pub fn assert_one_processed_abort(
+    engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
+    processor: Box<dyn Processor>,
+    should_abort: bool
+) -> Vec<ProcessorResult> {
+    assert_processed_abort(engines, &vec![processor], should_abort)
+}
+
+
+#[allow(dead_code)]
+pub fn assert_processed(
+    engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
+    processors: &Vec<Box<dyn Processor>>,
+) -> Vec<ProcessorResult> {
+    assert_processed_abort(engines, processors, true)
 }
 
 // TODO Return back engines?
@@ -208,9 +229,10 @@ pub fn assert_one_processed(
 /// Returns all observed processor results for use by
 /// subsequent tests.
 #[allow(dead_code)]
-pub fn assert_processed(
+pub fn assert_processed_abort(
     engines: &mut Vec<&mut Box<dyn NetworkEngine>>,
     processors: &Vec<Box<dyn Processor>>,
+    should_abort : bool,
 ) -> Vec<ProcessorResult> {
     let mut previous = Vec::new();
     let mut errors = Vec::new();
@@ -258,9 +280,13 @@ pub fn assert_processed(
             }
 
             if errors.is_empty() {
-                break;
+                return previous;
             }
         }
+    }
+
+    if !should_abort {
+        return previous
     }
 
     for (p, args) in errors {
@@ -276,7 +302,8 @@ pub fn assert_processed(
             })
         }
     }
-    previous
+
+    panic!("Unreachable code")
 }
 
 /// Creates a processor that verifies a connected data response is produced
