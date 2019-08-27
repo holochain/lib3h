@@ -29,7 +29,7 @@ pub enum TransportEvent {
 }
 
 //--------------------------------------------------------------------------------------------------
-// Transport protocol for GhostEndpoint
+// Transport protocol for GhostActors
 //--------------------------------------------------------------------------------------------------
 
 pub type TransportEndpoint = GhostEndpoint<
@@ -49,7 +49,7 @@ pub type TransportEndpointWithContext = GhostContextEndpoint<
     TransportError,
 >;
 
-pub type TransportParentEndpointWithContext = GhostParentContextEndpoint<
+pub type TransportParentWrapper = GhostParentWrapper<
     TransportContext,
     TransportRequestToParent,
     TransportRequestToParentResponse,
@@ -68,18 +68,10 @@ pub type TransportMessage = GhostMessage<
 #[derive(Debug)]
 enum TransportContext {
     Bind {
-        parent_msg: GhostMessage<
-            TransportRequestToChild,
-            TransportRequestToParent,
-            TransportRequestToChildResponse,
-            TransportError>,
+        parent_msg: TransportMessage,
     },
     SendMessage {
-        parent_msg: GhostMessage<
-            TransportRequestToChild,
-            TransportRequestToParent,
-            TransportRequestToChildResponse,
-            TransportError>,
+        parent_msg: TransportMessage
     },
 }
 

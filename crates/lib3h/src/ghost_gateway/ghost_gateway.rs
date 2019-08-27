@@ -4,7 +4,7 @@ use lib3h_ghost_actor::{
 };
 use crate::transport::memory_mock::ghost_transport_memory::*;
 
-impl<'gateway, D: Dht, > GhostGateway<'gateway, D> {
+impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
     #[allow(dead_code)]
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
@@ -14,7 +14,13 @@ impl<'gateway, D: Dht, > GhostGateway<'gateway, D> {
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
-        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        let (endpoint_parent, endpoint_self) = ghost_channel::create_ghost_channel<
+            TransportRequestToParent,
+            TransportRequestToParentResponse,
+            TransportRequestToChild,
+            TransportRequestToChildResponse,
+            TransportError,
+        >();
         let child_transport = Detach::new(GhostParentContextChannel::new(
             Box::new(inner_transport),
             "to_child_transport",

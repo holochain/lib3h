@@ -1,5 +1,6 @@
 pub mod gateway_actor;
 pub mod ghost_gateway;
+pub mod gateway_dht;
 
 use lib3h_ghost_actor::{
     prelude::*,
