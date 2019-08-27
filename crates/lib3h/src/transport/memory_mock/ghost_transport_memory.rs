@@ -237,31 +237,33 @@ mod tests {
 
     #[test]
     fn test_gmem_transport() {
+        /* Possible other ways we might think of setting up
+               constructors for actor/parent_context_channel pairs:
+
+            let (transport1_channel, child) = ghost_create_channel();
+            let transport1_engine = GhostTransportMemoryEngine::new(child);
+
+            enum TestContex {
+        }
+
+            let mut transport1_actor = GhostLocalActor::new::<TestContext>(
+            transport1_engine, transport1_channel);
+             */
+
+        /*
+            let mut transport1 = GhostParentContextChannel::with_cb(|child| {
+            GhostTransportMemory::new(child)
+        });
+
+            let mut transport1 = GhostParentContextChannel::new(
+            Box::new(GhostTransportMemory::new()));
+             */
+
         let mut transport1 = GhostTransportMemory::new();
         let mut t1_chan = transport1
             .take_parent_channel()
             .expect("exists")
             .as_context_channel::<()>("tmem_to_child1");
-
-        /*
-        let (transport1_channel, child) = ghost_create_channel();
-        let transport1_engine = GhostTransportMemoryEngine::new(child);
-
-        enum TestContex {
-        }
-
-        let mut transport1_actor = GhostLocalActor::new::<TestContext>(
-            transport1_engine, transport1_channel);
-        */
-
-        /*
-        let mut transport1 = GhostParentContextChannel::with_cb(|child| {
-            GhostTransportMemory::new(child)
-        });
-
-        let mut transport1 = GhostParentContextChannel::new(
-            Box::new(GhostTransportMemory::new()));
-        */
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_chan = transport2
@@ -342,7 +344,12 @@ mod tests {
         transport2.process().unwrap();
         let _ = t2_chan.process(&mut ());
 
-        let requests = t2_chan.drain_messages();
+        let mut requests = t2_chan.drain_messages();
         assert_eq!(2, requests.len());
+        assert_eq!(
+            "Some(IncomingConnection { address: \"mem://addr_1/\" })",
+            format!("{:?}", requests[0].take_message())
+        );
+        assert_eq!("Some(ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
     }
 }
