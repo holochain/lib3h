@@ -265,13 +265,13 @@ mod tests {
              */
 
         let mut transport1 = GhostTransportMemory::new();
-        let mut t1_chan = transport1
+        let mut t1_endpoint = transport1
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint::<()>("tmem_to_child1");
 
         let mut transport2 = GhostTransportMemory::new();
-        let mut t2_chan = transport2
+        let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint::<()>("tmem_to_child2");
@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(transport2.maybe_my_address, None);
 
         let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
-        t1_chan.request(
+        t1_endpoint.request(
             std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
@@ -297,7 +297,7 @@ mod tests {
             }),
         );
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
-        t2_chan.request(
+        t2_endpoint.request(
             std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
@@ -314,10 +314,10 @@ mod tests {
         );
 
         transport1.process().unwrap();
-        let _ = t1_chan.process(&mut ());
+        let _ = t1_endpoint.process(&mut ());
 
         transport2.process().unwrap();
-        let _ = t2_chan.process(&mut ());
+        let _ = t2_endpoint.process(&mut ());
 
         assert_eq!(
             transport1.maybe_my_address,
@@ -329,7 +329,7 @@ mod tests {
         );
 
         // now send a message from transport1 to transport2 over the bound addresses
-        t1_chan.request(
+        t1_endpoint.request(
             std::time::Duration::from_millis(2000),
             (),
             RequestToChild::SendMessage {
@@ -344,12 +344,12 @@ mod tests {
         );
 
         transport1.process().unwrap();
-        let _ = t1_chan.process(&mut ());
+        let _ = t1_endpoint.process(&mut ());
 
         transport2.process().unwrap();
-        let _ = t2_chan.process(&mut ());
+        let _ = t2_endpoint.process(&mut ());
 
-        let mut requests = t2_chan.drain_messages();
+        let mut requests = t2_endpoint.drain_messages();
         assert_eq!(2, requests.len());
         assert_eq!(
             "Some(IncomingConnection { address: \"mem://addr_1/\" })",
