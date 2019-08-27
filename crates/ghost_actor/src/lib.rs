@@ -1,3 +1,7 @@
+extern crate crossbeam_channel;
+#[allow(unused_imports)]
+#[macro_use]
+extern crate detach;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -44,23 +48,33 @@ impl From<RequestId> for String {
     }
 }
 
+mod ghost_error;
+pub use ghost_error::{GhostError, GhostResult};
+
 mod ghost_tracker;
 pub use ghost_tracker::{GhostCallback, GhostCallbackData, GhostTracker};
 
-mod ghost_actor_state;
-pub use ghost_actor_state::GhostActorState;
+mod ghost_channel;
+pub use ghost_channel::{create_ghost_channel, GhostContextEndpoint, GhostEndpoint, GhostMessage};
 
 mod ghost_actor;
-pub use ghost_actor::GhostActor;
+pub use ghost_actor::{GhostActor, GhostParentWrapper};
 
 pub mod prelude {
-    pub use super::{GhostActor, GhostActorState, GhostCallback, GhostCallbackData, GhostTracker};
+    pub use super::{
+        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostContextEndpoint,
+        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostResult, GhostTracker,
+        WorkWasDone,
+    };
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use detach::prelude::*;
     use std::any::Any;
+
+    type FakeError = String;
 
     #[allow(dead_code)]
     mod dht_protocol {
@@ -76,7 +90,7 @@ mod tests {
 
         #[derive(Debug)]
         pub enum RequestToChildResponse {
-            ResolveAddressForId(Result<ResolveAddressForIdData, String>),
+            ResolveAddressForId(ResolveAddressForIdData),
         }
 
         #[derive(Debug)]
@@ -87,115 +101,85 @@ mod tests {
     }
 
     struct RrDht {
-        actor_state: Option<
-            GhostActorState<
+        endpoint_parent: Option<
+            GhostEndpoint<
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
+                dht_protocol::RequestToParent,
+                dht_protocol::RequestToParentResponse,
+                FakeError,
+            >,
+        >,
+        endpoint_self: Detach<
+            GhostContextEndpoint<
                 i8,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
+                dht_protocol::RequestToChild,
                 dht_protocol::RequestToChildResponse,
-                String,
+                FakeError,
             >,
         >,
     }
 
     impl RrDht {
         pub fn new() -> Self {
+            let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
-                actor_state: Some(GhostActorState::new()),
+                endpoint_parent: Some(endpoint_parent),
+                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_to_parent")),
             }
         }
     }
 
     impl
         GhostActor<
-            i8,
             dht_protocol::RequestToParent,
             dht_protocol::RequestToParentResponse,
             dht_protocol::RequestToChild,
             dht_protocol::RequestToChildResponse,
-            String,
+            FakeError,
         > for RrDht
     {
         fn as_any(&mut self) -> &mut dyn Any {
             &mut *self
         }
 
-        fn get_actor_state(
+        fn take_parent_endpoint(
             &mut self,
-        ) -> &mut GhostActorState<
-            i8,
-            dht_protocol::RequestToParent,
-            dht_protocol::RequestToParentResponse,
-            dht_protocol::RequestToChildResponse,
-            String,
-        > {
-            self.actor_state.as_mut().unwrap()
-        }
-
-        fn take_actor_state(
-            &mut self,
-        ) -> GhostActorState<
-            i8,
-            dht_protocol::RequestToParent,
-            dht_protocol::RequestToParentResponse,
-            dht_protocol::RequestToChildResponse,
-            String,
-        > {
-            std::mem::replace(&mut self.actor_state, None).unwrap()
-        }
-
-        fn put_actor_state(
-            &mut self,
-            actor_state: GhostActorState<
-                i8,
+        ) -> Option<
+            GhostEndpoint<
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
-                dht_protocol::RequestToChildResponse,
-                String,
+                FakeError,
             >,
-        ) {
-            std::mem::replace(&mut self.actor_state, Some(actor_state));
+        > {
+            std::mem::replace(&mut self.endpoint_parent, None)
         }
 
-        // our parent is making a request of us
-        fn request(
-            &mut self,
-            request_id: Option<RequestId>,
-            request: dht_protocol::RequestToChild,
-        ) {
-            match request {
-                dht_protocol::RequestToChild::ResolveAddressForId { id } => {
-                    println!("dht got ResolveAddressForId {}", id);
-                    if let Some(request_id) = request_id {
-                        println!("dht ResolveAddressForId responding to parent");
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            dht_protocol::RequestToChildResponse::ResolveAddressForId(Ok(
+        fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            detach_run!(&mut self.endpoint_self, |cs| { cs.process(self.as_any()) })?;
+
+            for mut msg in self.endpoint_self.as_mut().drain_messages() {
+                match msg.take_message().expect("exists") {
+                    dht_protocol::RequestToChild::ResolveAddressForId { id } => {
+                        println!("dht got ResolveAddressForId {}", id);
+                        msg.respond(Ok(
+                            dht_protocol::RequestToChildResponse::ResolveAddressForId(
                                 dht_protocol::ResolveAddressForIdData {
                                     address: "wss://yada".to_string(),
                                 },
-                            )),
-                        );
+                            ),
+                        ));
                     }
                 }
             }
-        }
 
-        fn process_concrete(&mut self) -> Result<WorkWasDone, String> {
-            Ok(true.into())
+            Ok(false.into())
         }
     }
-
-    type DhtActor = Box<
-        dyn GhostActor<
-            i8,
-            dht_protocol::RequestToParent,
-            dht_protocol::RequestToParentResponse,
-            dht_protocol::RequestToChild,
-            dht_protocol::RequestToChildResponse,
-            String,
-        >,
-    >;
 
     type Url = String;
     type TransportError = String;
@@ -218,9 +202,9 @@ mod tests {
 
         #[derive(Debug)]
         pub enum RequestToChildResponse {
-            Bind(Result<BindResultData, TransportError>),
-            Bootstrap(Result<(), TransportError>),
-            SendMessage(Result<(), TransportError>),
+            Bind(BindResultData),
+            Bootstrap,
+            SendMessage,
         }
 
         #[derive(Debug)]
@@ -241,7 +225,9 @@ mod tests {
 
     #[derive(Debug)]
     enum GwDht {
-        ResolveAddressForId { request_id: Option<RequestId> },
+        ResolveAddressForId {
+            msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
+        },
     }
 
     #[derive(Debug)]
@@ -250,32 +236,51 @@ mod tests {
     }
 
     struct GatewayTransport {
-        actor_state: Option<
-            GhostActorState<
+        endpoint_parent: Option<
+            GhostEndpoint<
+                RequestToChild,
+                RequestToChildResponse,
+                RequestToParent,
+                RequestToParentResponse,
+                FakeError,
+            >,
+        >,
+        endpoint_self: Detach<
+            GhostContextEndpoint<
                 RequestToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
+                RequestToChild,
                 RequestToChildResponse,
-                String,
+                FakeError,
             >,
         >,
-        dht: DhtActor,
-        dht_callbacks: Option<GhostTracker<GwDht, dht_protocol::RequestToChildResponse, String>>,
+        dht: Detach<
+            GhostParentWrapper<
+                GwDht,
+                dht_protocol::RequestToParent,
+                dht_protocol::RequestToParentResponse,
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
+                FakeError,
+            >,
+        >,
     }
 
     impl GatewayTransport {
         pub fn new() -> Self {
+            let (endpoint_parent, endpoint_self) = create_ghost_channel();
+            let dht = Detach::new(GhostParentWrapper::new(Box::new(RrDht::new()), "to_dht"));
             Self {
-                actor_state: Some(GhostActorState::new()),
-                dht: Box::new(RrDht::new()),
-                dht_callbacks: Some(GhostTracker::new("gateway_transport_dht_")),
+                endpoint_parent: Some(endpoint_parent),
+                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("gw_to_parent")),
+                dht,
             }
         }
     }
 
     impl
         GhostActor<
-            RequestToParentContext,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -287,151 +292,28 @@ mod tests {
             &mut *self
         }
 
-        fn get_actor_state(
+        fn take_parent_endpoint(
             &mut self,
-        ) -> &mut GhostActorState<
-            RequestToParentContext,
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChildResponse,
-            String,
-        > {
-            self.actor_state.as_mut().unwrap()
-        }
-
-        fn take_actor_state(
-            &mut self,
-        ) -> GhostActorState<
-            RequestToParentContext,
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChildResponse,
-            String,
-        > {
-            std::mem::replace(&mut self.actor_state, None).unwrap()
-        }
-
-        fn put_actor_state(
-            &mut self,
-            actor_state: GhostActorState<
-                RequestToParentContext,
+        ) -> Option<
+            GhostEndpoint<
+                RequestToChild,
+                RequestToChildResponse,
                 RequestToParent,
                 RequestToParentResponse,
-                RequestToChildResponse,
-                String,
+                FakeError,
             >,
-        ) {
-            std::mem::replace(&mut self.actor_state, Some(actor_state));
+        > {
+            std::mem::replace(&mut self.endpoint_parent, None)
         }
 
-        // our parent is making a request of us
         #[allow(irrefutable_let_patterns)]
-        fn request(&mut self, request_id: Option<RequestId>, request: RequestToChild) {
-            match request {
-                RequestToChild::Bind { spec: _u } => {
-                    // do some internal bind
-                    // we get a bound_url
-                    let bound_url = "bound_url".to_string();
-                    // respond to our parent
-                    if let Some(request_id) = request_id {
-                        self.get_actor_state().respond_to_parent(
-                            request_id,
-                            RequestToChildResponse::Bind(Ok(BindResultData {
-                                bound_url: bound_url,
-                            })),
-                        );
-                    }
-                }
-                RequestToChild::Bootstrap { address: _ } => {}
-                RequestToChild::SendMessage {
-                    address,
-                    payload: _,
-                } => {
-                    //let dht_request_id = self.dht_callbacks.bookmark(DhtUserData::RequestingAddressTranslation(request_id), Box::new(|m, user_data, response| {
-                    let dht_request_id = self.dht_callbacks.as_mut().expect("exists").bookmark(
-                        std::time::Duration::from_millis(2000),
-                        GwDht::ResolveAddressForId { request_id },
-                        Box::new(|m, context, response| {
-                            let m = match m.downcast_mut::<GatewayTransport>() {
-                                None => panic!("wrong type"),
-                                Some(m) => m,
-                            };
-
-                            let request_id = {
-                                if let GwDht::ResolveAddressForId { request_id } = context {
-                                    request_id
-                                } else {
-                                    panic!("bad context type");
-                                }
-                            };
-
-                            // got a timeout error
-                            if let GhostCallbackData::Timeout = response {
-                                if let Some(request_id) = request_id {
-                                    m.get_actor_state().respond_to_parent(
-                                        request_id,
-                                        RequestToChildResponse::SendMessage(Err(
-                                            "Timeout".to_string()
-                                        )),
-                                    );
-                                }
-                                return Ok(());
-                            }
-
-                            let response = {
-                                if let GhostCallbackData::Response(response) = response {
-                                    response
-                                } else {
-                                    unimplemented!();
-                                }
-                            };
-
-                            let response = {
-                                if let dht_protocol::RequestToChildResponse::ResolveAddressForId(
-                                    response,
-                                ) = response
-                                {
-                                    response
-                                } else {
-                                    panic!("aaah");
-                                }
-                            };
-
-                            // got an error during dht address resolution
-                            if let Err(e) = response {
-                                if let Some(request_id) = request_id {
-                                    m.get_actor_state().respond_to_parent(
-                                        request_id,
-                                        RequestToChildResponse::SendMessage(Err(e)),
-                                    );
-                                }
-                                return Ok(());
-                            }
-                            let _sub_address = response.unwrap();
-                            if let Some(request_id) = request_id {
-                                m.get_actor_state().respond_to_parent(
-                                    request_id,
-                                    RequestToChildResponse::SendMessage(Ok(())),
-                                );
-                            }
-                            Ok(())
-                        }),
-                    );
-                    self.dht.request(
-                        Some(dht_request_id),
-                        dht_protocol::RequestToChild::ResolveAddressForId { id: address },
-                    );
-                }
-            }
-        }
-
-        fn process_concrete(&mut self) -> Result<WorkWasDone, String> {
-            self.get_actor_state().send_request_to_parent(
+        fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            self.endpoint_self.as_mut().request(
                 std::time::Duration::from_millis(2000),
-                RequestToParent::IncomingConnection {
+                RequestToParentContext::IncomingConnection {
                     address: "test".to_string(),
                 },
-                RequestToParentContext::IncomingConnection {
+                RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
                 Box::new(|_m, c, r| {
@@ -442,13 +324,87 @@ mod tests {
                     Ok(())
                 }),
             );
-            self.dht.process()?;
-            for (rid, msg) in self.dht.drain_responses() {
-                let mut cb = std::mem::replace(&mut self.dht_callbacks, None);
-                cb.as_mut()
-                    .expect("exists")
-                    .handle(rid, self.as_any(), msg)?;
-                std::mem::replace(&mut self.dht_callbacks, cb);
+            detach_run!(&mut self.dht, |dht| { dht.process(self.as_any()) })?;
+            detach_run!(&mut self.endpoint_self, |endpoint_self| {
+                endpoint_self.process(self.as_any())
+            })?;
+
+            for mut msg in self.endpoint_self.as_mut().drain_messages() {
+                match msg.take_message().expect("exists") {
+                    RequestToChild::Bind { spec: _ } => {
+                        // do some internal bind
+                        // we get a bound_url
+                        let bound_url = "bound_url".to_string();
+                        // respond to our parent
+                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                            bound_url: bound_url,
+                        })));
+                    }
+                    RequestToChild::Bootstrap { address: _ } => {}
+                    RequestToChild::SendMessage {
+                        address,
+                        payload: _,
+                    } => {
+                        self.dht.as_mut().request(
+                            std::time::Duration::from_millis(2000),
+                            GwDht::ResolveAddressForId { msg },
+                            dht_protocol::RequestToChild::ResolveAddressForId { id: address },
+                            Box::new(|m, context, response| {
+                                let _m = match m.downcast_mut::<GatewayTransport>() {
+                                    None => panic!("wrong type"),
+                                    Some(m) => m,
+                                };
+
+                                let msg = {
+                                    if let GwDht::ResolveAddressForId { msg } = context {
+                                        msg
+                                    } else {
+                                        panic!("bad context type");
+                                    }
+                                };
+
+                                // got a timeout error
+                                if let GhostCallbackData::Timeout = response {
+                                    msg.respond(Err("Timeout".into()));
+                                    return Ok(());
+                                }
+
+                                let response = {
+                                    if let GhostCallbackData::Response(response) = response {
+                                        response
+                                    } else {
+                                        unimplemented!();
+                                    }
+                                };
+
+                                let response = match response {
+                                    Err(e) => {
+                                        msg.respond(Err(e));
+                                        return Ok(());
+                                    }
+                                    Ok(response) => response,
+                                };
+
+                                let response = {
+                                    if let dht_protocol::RequestToChildResponse::ResolveAddressForId(
+                                        response,
+                                    ) = response
+                                    {
+                                        response
+                                    } else {
+                                        panic!("aaah");
+                                    }
+                                };
+
+                                println!("yay? {:?}", response);
+
+                                msg.respond(Ok(RequestToChildResponse::SendMessage));
+
+                                Ok(())
+                            }),
+                        );
+                    }
+                }
             }
             Ok(true.into())
         }
@@ -456,7 +412,6 @@ mod tests {
 
     type TransportActor = Box<
         dyn GhostActor<
-            RequestToParentContext,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -464,60 +419,71 @@ mod tests {
             String,
         >,
     >;
-    use crate::RequestId;
 
     #[test]
-    fn test_wss_transport() {
+    fn test_ghost_example_transport() {
         // the body of this test simulates an object that contains a actor, i.e. a parent.
         // it would usually just be another ghost_actor but here we test it out explicitly
         // so first instantiate the "child" actor
         let mut t_actor: TransportActor = Box::new(GatewayTransport::new());
+        let mut t_actor_endpoint = t_actor
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint::<i8>("test");
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
         t_actor.process().unwrap();
+        let _ = t_actor_endpoint.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)
-        for (rid, ev) in t_actor.drain_requests() {
-            println!("in drain_requests got: {:?} {:?}", rid, ev);
-            if let Some(rid) = rid {
-                // we might allow or disallow connections for example
-                let response = RequestToParentResponse::Allowed;
-                t_actor.respond(rid, response).unwrap();
-            }
+        for mut msg in t_actor_endpoint.drain_messages() {
+            let payload = msg.take_message();
+            println!("in drain_messages got: {:?}", payload);
+
+            // we might allow or disallow connections for example
+            let response = RequestToParentResponse::Allowed;
+            msg.respond(Ok(response));
         }
+
+        t_actor.process().unwrap();
+        let _ = t_actor_endpoint.process(&mut ());
 
         // now make a request of the child,
         // to make such a request the parent would normally will also instantiate trackers so that it can
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
-        let request_id = RequestId::with_prefix("test_parent");
-        t_actor.request(
-            Some(request_id),
+        t_actor_endpoint.request(
+            std::time::Duration::from_millis(2000),
+            42_i8,
             RequestToChild::Bind {
                 spec: "address_to_bind_to".to_string(),
             },
+            Box::new(|_, _, r| {
+                println!("in callback 1, got: {:?}", r);
+                Ok(())
+            }),
         );
 
-        // now process the responses the actor has made to our requests
-        for (rid, ev) in t_actor.drain_responses() {
-            println!("in drain_responses got: {:?} {:?}", rid, ev);
-        }
+        t_actor.process().unwrap();
+        let _ = t_actor_endpoint.process(&mut ());
 
-        let request_id = RequestId::with_prefix("test_parent");
-        t_actor.request(
-            Some(request_id),
+        t_actor_endpoint.request(
+            std::time::Duration::from_millis(2000),
+            42_i8,
             RequestToChild::SendMessage {
                 address: "agent_id_1".to_string(),
                 payload: b"some content".to_vec(),
             },
+            Box::new(|_, _, r| {
+                println!("in callback 2, got: {:?}", r);
+                Ok(())
+            }),
         );
 
         for _x in 0..10 {
             t_actor.process().unwrap();
-            for (rid, ev) in t_actor.drain_responses() {
-                println!("in drain_responses got: {:?} {:?}", rid, ev);
-            }
+            let _ = t_actor_endpoint.process(&mut ());
         }
     }
 }
