@@ -55,15 +55,15 @@ mod ghost_tracker;
 pub use ghost_tracker::{GhostCallback, GhostCallbackData, GhostTracker};
 
 mod ghost_channel;
-pub use ghost_channel::{create_ghost_channel, GhostChannel, GhostContextChannel, GhostMessage};
+pub use ghost_channel::{create_ghost_channel, GhostContextEndpoint, GhostEndpoint, GhostMessage};
 
 mod ghost_actor;
-pub use ghost_actor::{GhostActor, GhostParentContextChannel};
+pub use ghost_actor::{GhostActor, GhostParentContextEndpoint};
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostChannel,
-        GhostContextChannel, GhostError, GhostMessage, GhostParentContextChannel, GhostResult,
+        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostContextEndpoint,
+        GhostEndpoint, GhostError, GhostMessage, GhostParentContextEndpoint, GhostResult,
         GhostTracker, WorkWasDone,
     };
 }
@@ -102,7 +102,7 @@ mod tests {
 
     struct RrDht {
         channel_parent: Option<
-            GhostChannel<
+            GhostEndpoint<
                 dht_protocol::RequestToChild,
                 dht_protocol::RequestToChildResponse,
                 dht_protocol::RequestToParent,
@@ -111,7 +111,7 @@ mod tests {
             >,
         >,
         channel_self: Detach<
-            GhostContextChannel<
+            GhostContextEndpoint<
                 i8,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
@@ -148,7 +148,7 @@ mod tests {
         fn take_parent_channel(
             &mut self,
         ) -> Option<
-            GhostChannel<
+            GhostEndpoint<
                 dht_protocol::RequestToChild,
                 dht_protocol::RequestToChildResponse,
                 dht_protocol::RequestToParent,
@@ -237,7 +237,7 @@ mod tests {
 
     struct GatewayTransport {
         channel_parent: Option<
-            GhostChannel<
+            GhostEndpoint<
                 RequestToChild,
                 RequestToChildResponse,
                 RequestToParent,
@@ -246,7 +246,7 @@ mod tests {
             >,
         >,
         channel_self: Detach<
-            GhostContextChannel<
+            GhostContextEndpoint<
                 RequestToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
@@ -256,7 +256,7 @@ mod tests {
             >,
         >,
         dht: Detach<
-            GhostParentContextChannel<
+            GhostParentContextEndpoint<
                 GwDht,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
@@ -270,7 +270,7 @@ mod tests {
     impl GatewayTransport {
         pub fn new() -> Self {
             let (channel_parent, channel_self) = create_ghost_channel();
-            let dht = Detach::new(GhostParentContextChannel::new(
+            let dht = Detach::new(GhostParentContextEndpoint::new(
                 Box::new(RrDht::new()),
                 "to_dht",
             ));
@@ -298,7 +298,7 @@ mod tests {
         fn take_parent_channel(
             &mut self,
         ) -> Option<
-            GhostChannel<
+            GhostEndpoint<
                 RequestToChild,
                 RequestToChildResponse,
                 RequestToParent,

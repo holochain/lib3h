@@ -9,7 +9,7 @@ enum RequestToParentContext {
     Source { address: Url },
 }
 
-type GhostTransportMemoryChannel = GhostChannel<
+type GhostTransportMemoryEndpoint = GhostEndpoint<
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -17,7 +17,7 @@ type GhostTransportMemoryChannel = GhostChannel<
     TransportError,
 >;
 
-type GhostTransportMemoryChannelContext = GhostContextChannel<
+type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
     (),
     RequestToParent,
     RequestToParentResponse,
@@ -28,8 +28,8 @@ type GhostTransportMemoryChannelContext = GhostContextChannel<
 
 #[allow(dead_code)]
 struct GhostTransportMemory {
-    channel_parent: Option<GhostTransportMemoryChannel>,
-    channel_self: Option<GhostTransportMemoryChannelContext>,
+    channel_parent: Option<GhostTransportMemoryEndpoint>,
+    channel_self: Option<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
     maybe_my_address: Option<Url>,
     /// Addresses of connections to remotes
@@ -70,7 +70,7 @@ impl
         &mut *self
     }
 
-    fn take_parent_channel(&mut self) -> Option<GhostTransportMemoryChannel> {
+    fn take_parent_channel(&mut self) -> Option<GhostTransportMemoryEndpoint> {
         std::mem::replace(&mut self.channel_parent, None)
     }
 
@@ -251,11 +251,11 @@ mod tests {
              */
 
         /*
-            let mut transport1 = GhostParentContextChannel::with_cb(|child| {
+            let mut transport1 = GhostParentContextEndpoint::with_cb(|child| {
             GhostTransportMemory::new(child)
         });
 
-            let mut transport1 = GhostParentContextChannel::new(
+            let mut transport1 = GhostParentContextEndpoint::new(
             Box::new(GhostTransportMemory::new()));
              */
 

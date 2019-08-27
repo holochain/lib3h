@@ -1,9 +1,9 @@
 use crate::{
-    GhostCallback, GhostChannel, GhostContextChannel, GhostMessage, GhostResult, WorkWasDone,
+    GhostCallback, GhostContextEndpoint, GhostEndpoint, GhostMessage, GhostResult, WorkWasDone,
 };
 use std::any::Any;
 
-pub struct GhostParentContextChannel<
+pub struct GhostParentContextEndpoint<
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -20,7 +20,7 @@ pub struct GhostParentContextChannel<
             Error,
         >,
     >,
-    channel: GhostContextChannel<
+    channel: GhostContextEndpoint<
         Context,
         RequestToChild,
         RequestToChildResponse,
@@ -38,7 +38,7 @@ impl<
         RequestToChildResponse,
         Error,
     >
-    GhostParentContextChannel<
+    GhostParentContextEndpoint<
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -106,7 +106,7 @@ pub trait GhostActor<
     /// but we still need to call process on that actor... let us
     /// create a helper wrapper that handles that
     /*
-    fn as_parent_context_channel<Context>(self) -> GhostParentContextChannel<
+    fn as_parent_context_channel<Context>(self) -> GhostParentContextEndpoint<
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -115,7 +115,7 @@ pub trait GhostActor<
         E
     > {
         let channel = self.take_parent_channel().as_context_channel();
-        GhostParentContextChannel::new(self, channel)
+        GhostParentContextEndpoint::new(self, channel)
     }*/
 
     /// get a generic reference to ourselves
@@ -126,7 +126,7 @@ pub trait GhostActor<
     fn take_parent_channel(
         &mut self,
     ) -> Option<
-        GhostChannel<
+        GhostEndpoint<
             RequestToChild,
             RequestToChildResponse,
             RequestToParent,
