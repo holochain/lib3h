@@ -9,27 +9,10 @@ enum RequestToParentContext {
     Source { address: Url },
 }
 
-type GhostTransportMemoryChannel = GhostChannel<
-    RequestToChild<Url>,
-    RequestToChildResponse<Url>,
-    RequestToParent<Url>,
-    RequestToParentResponse,
-    TransportError,
->;
-
-type GhostTransportMemoryChannelContext = GhostContextChannel<
-    (),
-    RequestToParent<Url>,
-    RequestToParentResponse,
-    RequestToChild<Url>,
-    RequestToChildResponse<Url>,
-    TransportError,
->;
-
 #[allow(dead_code)]
 struct GhostTransportMemory {
-    channel_parent: Option<GhostTransportMemoryChannel>,
-    channel_self: Option<GhostTransportMemoryChannelContext>,
+    channel_parent: Option<TransportChannel>,
+    channel_self: Option<TransportChannelWithContext>,
     /// My peer uri on the network layer (not None after a bind)
     maybe_my_address: Option<Url>,
     /// Addresses of connections to remotes
@@ -57,10 +40,10 @@ impl From<TransportError> for GhostError {
 
 impl
     GhostActor<
-        RequestToParent<Url>,
-        RequestToParentResponse,
-        RequestToChild<Url>,
-        RequestToChildResponse<Url>,
+        TransportRequestToParent<Url>,
+        TransportRequestToParentResponse,
+        TransportRequestToChild<Url>,
+        TransportRequestToChildResponse<Url>,
         TransportError,
     > for GhostTransportMemory
 {
@@ -70,7 +53,7 @@ impl
         &mut *self
     }
 
-    fn take_parent_channel(&mut self) -> Option<GhostTransportMemoryChannel> {
+    fn take_parent_channel(&mut self) -> Option<TransportChannel> {
         std::mem::replace(&mut self.channel_parent, None)
     }
 
@@ -87,18 +70,18 @@ impl
 
         for mut msg in self.channel_self.as_mut().expect("exists").drain_messages() {
             match msg.take_message().expect("exists") {
-                RequestToChild::Bind { spec: _url } => {
+                TransportRequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
                     let bound_url = memory_server::new_url();
                     memory_server::set_server(&bound_url).unwrap(); //set_server always returns Ok
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
-                    msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                    msg.respond(Ok(TransportRequestToChildResponse::Bind(BindResultData {
                         bound_url: bound_url,
                     })));
                 }
-                RequestToChild::SendMessage { address, payload } => {
+                TransportRequestToChild::SendMessage { address, payload } => {
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
 
@@ -144,7 +127,7 @@ impl
                                 .post(&my_addr, &payload)
                                 .expect("Post on memory server should work");
 
-                            msg.respond(Ok(RequestToChildResponse::SendMessage));
+                            msg.respond(Ok(TransportRequestToChildResponse::SendMessage));
                         }
                     };
                 }
@@ -180,7 +163,7 @@ impl
                         to_connect_list.push(to_connect_uri.clone());
                         let mut channel_self = std::mem::replace(&mut self.channel_self, None);
                         channel_self.as_mut().expect("exists").publish(
-                            RequestToParent::IncomingConnection {
+                            TransportRequestToParent::IncomingConnection {
                                 address: to_connect_uri.clone(),
                             },
                         );
@@ -211,7 +194,7 @@ impl
                         println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                         let mut channel_self = std::mem::replace(&mut self.channel_self, None);
                         channel_self.as_mut().expect("exists").publish(
-                            RequestToParent::ReceivedData {
+                            TransportRequestToParent::ReceivedData {
                                 address: Url::parse(&from_addr).unwrap(),
                                 payload,
                             },
@@ -279,7 +262,7 @@ mod tests {
         t1_chan.request(
             std::time::Duration::from_millis(2000),
             (),
-            RequestToChild::Bind {
+            TransportRequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
             Box::new(|_, _, r| {
@@ -295,7 +278,7 @@ mod tests {
         t2_chan.request(
             std::time::Duration::from_millis(2000),
             (),
-            RequestToChild::Bind {
+            TransportRequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
             Box::new(|_, _, r| {
@@ -327,7 +310,7 @@ mod tests {
         t1_chan.request(
             std::time::Duration::from_millis(2000),
             (),
-            RequestToChild::SendMessage {
+            TransportRequestToChild::SendMessage {
                 address: Url::parse("mem://addr_2").unwrap(),
                 payload: b"test message".to_vec(),
             },

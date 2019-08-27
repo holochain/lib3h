@@ -1,5 +1,6 @@
 use crate::transport::{error::TransportError, ConnectionId};
 use url::Url;
+use lib3h_ghost_actor::prelude::*;
 
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
@@ -27,32 +28,87 @@ pub enum TransportEvent {
     ConnectionClosed(ConnectionId),
 }
 
+//--------------------------------------------------------------------------------------------------
+// Transport protocol for GhostChannel
+//--------------------------------------------------------------------------------------------------
+
+pub type TransportChannel = GhostChannel<
+    TransportRequestToChild<Url>,
+    TransportRequestToChildResponse<Url>,
+    TransportRequestToParent<Url>,
+    TransportRequestToParentResponse,
+    TransportError,
+>;
+
+pub type TransportChannelWithContext = GhostContextChannel<
+    TransportContext,
+    TransportRequestToParent<Url>,
+    TransportRequestToParentResponse,
+    TransportRequestToChild<Url>,
+    TransportRequestToChildResponse<Url>,
+    TransportError,
+>;
+
+pub type TransportParentChannelWithContext = GhostParentContextChannel<
+    TransportContext,
+    TransportRequestToParent<Url>,
+    TransportRequestToParentResponse,
+    TransportRequestToChild<Url>,
+    TransportRequestToChildResponse<Url>,
+    TransportError,
+>;
+
+pub type TransportMessage = GhostMessage<
+    TransportRequestToParent<Url>,
+    TransportRequestToChild<Url>,
+    TransportRequestToParentResponse,
+    TransportError,
+>;
+
+#[derive(Debug)]
+enum TransportContext {
+    Bind {
+        parent_msg: GhostMessage<
+            TransportRequestToChild<Url>,
+            TransportRequestToParent<Url>,
+            TransportRequestToChildResponse<Url>,
+            TransportError>,
+    },
+    SendMessage {
+        parent_msg: GhostMessage<
+            TransportRequestToChild<Url>,
+            TransportRequestToParent<Url>,
+            TransportRequestToChildResponse<Url>,
+            TransportError>,
+    },
+}
+
 /// Transport protocol enums for use with GhostActor implementation
 #[derive(Debug)]
-pub enum RequestToChild<ADDR> {
+pub enum TransportRequestToChild<ADDR> {
     Bind { spec: ADDR }, // wss://0.0.0.0:0 -> all network interfaces first available port
     SendMessage { address: ADDR, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
-pub struct BindResultData<ADDR> {
-    pub bound_url: ADDR,
-}
-
-#[derive(Debug)]
-pub enum RequestToChildResponse<ADDR> {
+pub enum TransportRequestToChildResponse<ADDR> {
     Bind(BindResultData<ADDR>),
     SendMessage,
 }
 
 #[derive(Debug)]
-pub enum RequestToParent<ADDR> {
+pub enum TransportRequestToParent<ADDR> {
     IncomingConnection { address: ADDR },
     ReceivedData { address: ADDR, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
-pub enum RequestToParentResponse {
+pub enum TransportRequestToParentResponse {
     Allowed,    // just for testing
     Disallowed, // just for testing
+}
+
+#[derive(Debug)]
+pub struct BindResultData<ADDR> {
+    pub bound_url: ADDR,
 }
