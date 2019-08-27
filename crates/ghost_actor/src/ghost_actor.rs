@@ -3,7 +3,11 @@ use crate::{
 };
 use std::any::Any;
 
-pub struct GhostParentContextEndpoint<
+/// helper struct that merges (on the parent side) the actual child
+/// GhostActor instance, with the child's ghost channel endpoint.
+/// You only have to call process() on this one struct, and it provides
+/// all the request / drain_messages etc functions from GhostEndpoint.
+pub struct GhostParentWrapper<
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -20,7 +24,7 @@ pub struct GhostParentContextEndpoint<
             Error,
         >,
     >,
-    channel: GhostContextEndpoint<
+    endpoint: GhostContextEndpoint<
         Context,
         RequestToChild,
         RequestToChildResponse,
@@ -38,7 +42,7 @@ impl<
         RequestToChildResponse,
         Error,
     >
-    GhostParentContextEndpoint<
+    GhostParentWrapper<
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -47,6 +51,7 @@ impl<
         Error,
     >
 {
+    /// wrap a GhostActor instance and it's parent channel endpoint.
     pub fn new(
         mut actor: Box<
             dyn GhostActor<
@@ -59,17 +64,19 @@ impl<
         >,
         request_id_prefix: &str,
     ) -> Self {
-        let channel = actor
-            .take_parent_channel()
+        let endpoint = actor
+            .take_parent_endpoint()
             .expect("exists")
-            .as_context_channel(request_id_prefix);
-        Self { actor, channel }
+            .as_context_endpoint(request_id_prefix);
+        Self { actor, endpoint }
     }
 
+    /// see GhostContextEndpoint::publish
     pub fn publish(&mut self, payload: RequestToChild) {
-        self.channel.publish(payload)
+        self.endpoint.publish(payload)
     }
 
+    /// see GhostContextEndpoint::request
     pub fn request(
         &mut self,
         timeout: std::time::Duration,
@@ -77,18 +84,20 @@ impl<
         payload: RequestToChild,
         cb: GhostCallback<Context, RequestToChildResponse, Error>,
     ) {
-        self.channel.request(timeout, context, payload, cb)
+        self.endpoint.request(timeout, context, payload, cb)
     }
 
+    /// see GhostContextEndpoint::drain_messages
     pub fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
-        self.channel.drain_messages()
+        self.endpoint.drain_messages()
     }
 
+    /// see GhostContextEndpoint::process and GhostActor::process
     pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
         self.actor.process()?;
-        self.channel.process(actor)?;
+        self.endpoint.process(actor)?;
         Ok(())
     }
 }
@@ -101,29 +110,12 @@ pub trait GhostActor<
     E,
 >
 {
-    /// Most of the time we don't want to keep a direct ref to the actor
-    /// we want to interact through it as a channel...
-    /// but we still need to call process on that actor... let us
-    /// create a helper wrapper that handles that
-    /*
-    fn as_parent_context_channel<Context>(self) -> GhostParentContextEndpoint<
-        Context,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        E
-    > {
-        let channel = self.take_parent_channel().as_context_channel();
-        GhostParentContextEndpoint::new(self, channel)
-    }*/
-
     /// get a generic reference to ourselves
-    /// will be passed into any channel process functions
+    /// will be passed into any endpoint process functions
     fn as_any(&mut self) -> &mut dyn Any;
 
     /// our parent gets a reference to the parent side of our channel
-    fn take_parent_channel(
+    fn take_parent_endpoint(
         &mut self,
     ) -> Option<
         GhostEndpoint<
@@ -138,13 +130,12 @@ pub trait GhostActor<
     /// our parent will call this process function
     fn process(&mut self) -> GhostResult<WorkWasDone> {
         // it would be awesome if this trait level could handle things like:
-        //  `self.channel_self.process();`
+        //  `self.endpoint_self.process();`
         self.process_concrete()
     }
 
     /// we, as a ghost actor implement this, it will get called from
     /// process after the subconscious process items have run
-    /*priv*/
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         Ok(false.into())
     }

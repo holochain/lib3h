@@ -28,8 +28,8 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
 
 #[allow(dead_code)]
 struct GhostTransportMemory {
-    channel_parent: Option<GhostTransportMemoryEndpoint>,
-    channel_self: Option<GhostTransportMemoryEndpointContext>,
+    endpoint_parent: Option<GhostTransportMemoryEndpoint>,
+    endpoint_self: Option<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
     maybe_my_address: Option<Url>,
     /// Addresses of connections to remotes
@@ -39,10 +39,10 @@ struct GhostTransportMemory {
 impl GhostTransportMemory {
     #[allow(dead_code)]
     pub fn new() -> Self {
-        let (channel_parent, channel_self) = create_ghost_channel();
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {
-            channel_parent: Some(channel_parent),
-            channel_self: Some(channel_self.as_context_channel("tmem_to_parent")),
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self: Some(endpoint_self.as_context_endpoint("tmem_to_parent")),
             connections: HashSet::new(),
             maybe_my_address: None,
         }
@@ -70,22 +70,27 @@ impl
         &mut *self
     }
 
-    fn take_parent_channel(&mut self) -> Option<GhostTransportMemoryEndpoint> {
-        std::mem::replace(&mut self.channel_parent, None)
+    fn take_parent_endpoint(&mut self) -> Option<GhostTransportMemoryEndpoint> {
+        std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     // BOILERPLATE END----------------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        // process the self channel
-        let mut channel_self = std::mem::replace(&mut self.channel_self, None);
-        channel_self
+        // process the self endpoint
+        let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+        endpoint_self
             .as_mut()
             .expect("exists")
             .process(self.as_any())?;
-        std::mem::replace(&mut self.channel_self, channel_self);
+        std::mem::replace(&mut self.endpoint_self, endpoint_self);
 
-        for mut msg in self.channel_self.as_mut().expect("exists").drain_messages() {
+        for mut msg in self
+            .endpoint_self
+            .as_mut()
+            .expect("exists")
+            .drain_messages()
+        {
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
@@ -178,13 +183,13 @@ impl
                         let to_connect_uri =
                             Url::parse(&in_cid).expect("connectionId is not a valid Url");
                         to_connect_list.push(to_connect_uri.clone());
-                        let mut channel_self = std::mem::replace(&mut self.channel_self, None);
-                        channel_self.as_mut().expect("exists").publish(
+                        let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+                        endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::IncomingConnection {
                                 address: to_connect_uri.clone(),
                             },
                         );
-                        std::mem::replace(&mut self.channel_self, channel_self);
+                        std::mem::replace(&mut self.endpoint_self, endpoint_self);
                     }
                     _ => non_connect_events.push(event),
                 }
@@ -209,14 +214,14 @@ impl
                 match event {
                     TransportEvent::ReceivedData(from_addr, payload) => {
                         println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
-                        let mut channel_self = std::mem::replace(&mut self.channel_self, None);
-                        channel_self.as_mut().expect("exists").publish(
+                        let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+                        endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::ReceivedData {
                                 address: Url::parse(&from_addr).unwrap(),
                                 payload,
                             },
                         );
-                        std::mem::replace(&mut self.channel_self, channel_self);
+                        std::mem::replace(&mut self.endpoint_self, endpoint_self);
                     }
                     _ => panic!(format!("WHAT: {:?}", event)),
                 };
@@ -238,16 +243,16 @@ mod tests {
     #[test]
     fn test_gmem_transport() {
         /* Possible other ways we might think of setting up
-               constructors for actor/parent_context_channel pairs:
+               constructors for actor/parent_context_endpoint pairs:
 
-            let (transport1_channel, child) = ghost_create_channel();
+            let (transport1_endpoint, child) = ghost_create_endpoint();
             let transport1_engine = GhostTransportMemoryEngine::new(child);
 
             enum TestContex {
         }
 
             let mut transport1_actor = GhostLocalActor::new::<TestContext>(
-            transport1_engine, transport1_channel);
+            transport1_engine, transport1_endpoint);
              */
 
         /*
@@ -261,15 +266,15 @@ mod tests {
 
         let mut transport1 = GhostTransportMemory::new();
         let mut t1_chan = transport1
-            .take_parent_channel()
+            .take_parent_endpoint()
             .expect("exists")
-            .as_context_channel::<()>("tmem_to_child1");
+            .as_context_endpoint::<()>("tmem_to_child1");
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_chan = transport2
-            .take_parent_channel()
+            .take_parent_endpoint()
             .expect("exists")
-            .as_context_channel::<()>("tmem_to_child2");
+            .as_context_endpoint::<()>("tmem_to_child2");
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
