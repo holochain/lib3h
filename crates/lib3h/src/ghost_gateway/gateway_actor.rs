@@ -25,7 +25,7 @@ impl<
         &mut *self
     }
 
-    fn take_parent_channel(&mut self) -> Option<TransportChannel> {
+    fn take_parent_endpoint(&mut self) -> Option<TransportEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 

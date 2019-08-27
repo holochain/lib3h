@@ -29,7 +29,7 @@ pub enum TransportEvent {
 }
 
 //--------------------------------------------------------------------------------------------------
-// Transport protocol for GhostChannel
+// Transport protocol for GhostEndpoint
 //--------------------------------------------------------------------------------------------------
 
 pub type TransportEndpoint = GhostEndpoint<

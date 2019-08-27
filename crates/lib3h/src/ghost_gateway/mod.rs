@@ -19,8 +19,8 @@ pub struct GhostGateway<'gateway, D: Dht> {
     inner_dht: D,
     /// Hold Endpoint to child actor
     // inner_transport: TransportWrapper<'gateway>,
-    child_transport: Detach<TransportParentChannelWithContext>,
+    child_transport: Detach<TransportParentEndpointWithContext>,
     /// Channel to our parent actor
-    endpoint_parent: Option<TransportChannel>,
-    endpoint_self: Option<TransportChannelWithContext>,
+    endpoint_parent: Option<TransportEndpoint>,
+    endpoint_self: Option<TransportEndpointWithContext>,
 }
