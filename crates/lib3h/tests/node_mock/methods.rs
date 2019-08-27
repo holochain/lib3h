@@ -655,6 +655,7 @@ impl NodeMock {
         }
     }
 
+    /// Asserts that some event passes an arbitrary predicate
     pub fn assert(
         &mut self,
         predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
@@ -663,17 +664,38 @@ impl NodeMock {
         assert_one_processed(&mut vec![&mut self.engine], predicate)
     }
 
+
+    /// Asserts some event produced by produce equals actual
     pub fn assert_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
         let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(actual.clone()));
         assert_one_processed(&mut vec![&mut self.engine], predicate)
     }
 
+    /// Waits for work to be done
     pub fn wait_did_work(&mut self) -> Vec<ProcessorResult> {
         let engine_name = self.engine.name();
         assert_one_processed(
             &mut vec![&mut self.engine],
             Box::new(DidWorkAssert(engine_name)),
         )
+    }
+
+    /// Continues processing the engine until no work is being done.
+    pub fn wait_until_no_work(&mut self) -> Vec<ProcessorResult> {
+       loop {
+           let predicate: Box<dyn Processor> =
+               Box::new(Lib3hServerProtocolAssert(Box::new(predicate::always())));
+           let result = assert_one_processed(&mut vec![&mut self.engine], predicate);
+            if result.is_empty() {
+                return result
+            } else {
+                if result.iter().find(|x| x.did_work).is_some() {
+                    continue
+                } else {
+                    return result
+                }
+            }
+        }
     }
 
     /// Wait for receiving a message corresponding to predicate

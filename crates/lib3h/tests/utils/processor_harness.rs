@@ -267,7 +267,13 @@ pub fn assert_processed(
         if let Some(args) = args {
             p.test(&args)
         } else {
-            panic!(format!("Never tested processor: {}", p.name()))
+            // Make degenerate result which should fail
+            p.test(&ProcessorResult {
+                engine_name: "none".into(),
+                previous : vec![],
+                events : vec![],
+                did_work: false
+            })
         }
     }
     previous
