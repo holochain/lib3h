@@ -2,8 +2,6 @@
 mod utils;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate unwrap_to;
 extern crate backtrace;
 extern crate lib3h;
 extern crate lib3h_protocol;
@@ -357,47 +355,59 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     println!("\nAlex sends DM to Billy...\n");
     alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_dm.request_id);
-    });
-    // Receive
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
-    assert_eq!(msg, &req_dm);
-    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
-    println!("HandleSendDirectMessage: {}", content);
+    let mut engines = vec![alex, billy];
+    let is_success_result = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::SuccessResult(GenericResultData {
+            request_id: req_dm.clone().request_id,
+            space_address: SPACE_ADDRESS_A.clone(),
+            to_agent_id: ALEX_AGENT_ID.clone(),
+            result_info: req_dm.clone().content,
+        }),
+    ));
+
+    let handle_send_direct_message = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::HandleSendDirectMessage(req_dm.clone()),
+    ));
+
+    // Send / Receive request
+    assert_processed(
+        &mut engines,
+        &vec![is_success_result, handle_send_direct_message],
+    );
 
     // Post response
     let mut res_dm = req_dm.clone();
-    res_dm.to_agent_id = req_dm.from_agent_id.clone();
-    res_dm.from_agent_id = req_dm.to_agent_id.clone();
-    res_dm.content = format!("echo: {}", content).as_bytes().to_vec();
-    billy
+    res_dm.to_agent_id = req_dm.clone().from_agent_id.clone();
+    res_dm.from_agent_id = req_dm.clone().to_agent_id.clone();
+    res_dm.content = format!(
+        "echo: {}",
+        String::from_utf8(req_dm.clone().content).unwrap()
+    )
+    .as_bytes()
+    .to_vec();
+    engines[1]
         .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
             res_dm.clone(),
         ))
         .unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, res_dm.request_id);
-    });
-    // Receive response
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
-    assert_eq!(msg, &res_dm);
-    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
-    println!("SendDirectMessageResult: {}", content);
+
+    let is_success_result = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::SuccessResult(GenericResultData {
+            request_id: res_dm.clone().request_id,
+            space_address: SPACE_ADDRESS_A.clone(),
+            to_agent_id: ALEX_AGENT_ID.clone(),
+            result_info: res_dm.clone().content,
+        }),
+    ));
+
+    let handle_send_direct_message_result = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::SendDirectMessageResult(res_dm.clone()),
+    ));
+
+    let _ = assert_processed(
+        &mut engines,
+        &vec![is_success_result, handle_send_direct_message_result],
+    );
 }
 
 //
