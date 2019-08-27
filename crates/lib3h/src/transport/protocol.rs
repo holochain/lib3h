@@ -32,35 +32,35 @@ pub enum TransportEvent {
 // Transport protocol for GhostChannel
 //--------------------------------------------------------------------------------------------------
 
-pub type TransportChannel = GhostChannel<
-    TransportRequestToChild<Url>,
-    TransportRequestToChildResponse<Url>,
-    TransportRequestToParent<Url>,
+pub type TransportEndpoint = GhostEndpoint<
+    TransportRequestToChild,
+    TransportRequestToChildResponse,
+    TransportRequestToParent,
     TransportRequestToParentResponse,
     TransportError,
 >;
 
-pub type TransportChannelWithContext = GhostContextChannel<
+pub type TransportEndpointWithContext = GhostContextEndpoint<
     TransportContext,
-    TransportRequestToParent<Url>,
+    TransportRequestToParent,
     TransportRequestToParentResponse,
-    TransportRequestToChild<Url>,
-    TransportRequestToChildResponse<Url>,
+    TransportRequestToChild,
+    TransportRequestToChildResponse,
     TransportError,
 >;
 
-pub type TransportParentChannelWithContext = GhostParentContextChannel<
+pub type TransportParentEndpointWithContext = GhostParentContextEndpoint<
     TransportContext,
-    TransportRequestToParent<Url>,
+    TransportRequestToParent,
     TransportRequestToParentResponse,
-    TransportRequestToChild<Url>,
-    TransportRequestToChildResponse<Url>,
+    TransportRequestToChild,
+    TransportRequestToChildResponse,
     TransportError,
 >;
 
 pub type TransportMessage = GhostMessage<
-    TransportRequestToParent<Url>,
-    TransportRequestToChild<Url>,
+    TransportRequestToParent,
+    TransportRequestToChild,
     TransportRequestToParentResponse,
     TransportError,
 >;
@@ -69,37 +69,38 @@ pub type TransportMessage = GhostMessage<
 enum TransportContext {
     Bind {
         parent_msg: GhostMessage<
-            TransportRequestToChild<Url>,
-            TransportRequestToParent<Url>,
-            TransportRequestToChildResponse<Url>,
+            TransportRequestToChild,
+            TransportRequestToParent,
+            TransportRequestToChildResponse,
             TransportError>,
     },
     SendMessage {
         parent_msg: GhostMessage<
-            TransportRequestToChild<Url>,
-            TransportRequestToParent<Url>,
-            TransportRequestToChildResponse<Url>,
+            TransportRequestToChild,
+            TransportRequestToParent,
+            TransportRequestToChildResponse,
             TransportError>,
     },
 }
 
 /// Transport protocol enums for use with GhostActor implementation
 #[derive(Debug)]
-pub enum TransportRequestToChild<ADDR> {
-    Bind { spec: ADDR }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { address: ADDR, payload: Vec<u8> },
+pub enum TransportRequestToChild {
+    Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    SendMessage { address: Url, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
-pub enum TransportRequestToChildResponse<ADDR> {
-    Bind(BindResultData<ADDR>),
+pub enum TransportRequestToChildResponse {
+    Bind(BindResultData),
     SendMessage,
 }
 
 #[derive(Debug)]
-pub enum TransportRequestToParent<ADDR> {
-    IncomingConnection { address: ADDR },
-    ReceivedData { address: ADDR, payload: Vec<u8> },
+pub enum TransportRequestToParent {
+    IncomingConnection { address: Url },
+    ReceivedData { address: Url, payload: Vec<u8> },
+    TransportError { error: TransportError },
 }
 
 #[derive(Debug)]
@@ -109,6 +110,6 @@ pub enum TransportRequestToParentResponse {
 }
 
 #[derive(Debug)]
-pub struct BindResultData<ADDR> {
-    pub bound_url: ADDR,
+pub struct BindResultData {
+    pub bound_url: Url,
 }

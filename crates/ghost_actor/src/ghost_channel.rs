@@ -1,7 +1,9 @@
 use crate::{GhostCallback, GhostResult, GhostTracker, RequestId};
 use std::any::Any;
 
-enum GhostChannelMessage<Request, Response, Error> {
+/// enum used internally as the protocol for our crossbeam_channels
+/// allows us to be explicit about which messages are requests or responses.
+enum GhostEndpointMessage<Request, Response, Error> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
@@ -12,11 +14,14 @@ enum GhostChannelMessage<Request, Response, Error> {
     },
 }
 
+/// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
+/// A GhostMessage contains the incoming request, as well as a hook to
+/// allow a response to automatically be returned.
 pub struct GhostMessage<MessageToSelf, MessageToOther, MessageToSelfResponse, Error> {
     request_id: Option<RequestId>,
     message: Option<MessageToSelf>,
     sender: crossbeam_channel::Sender<
-        GhostChannelMessage<MessageToOther, MessageToSelfResponse, Error>,
+        GhostEndpointMessage<MessageToOther, MessageToSelfResponse, Error>,
     >,
 }
 
@@ -35,7 +40,7 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
         request_id: Option<RequestId>,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
-            GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
     ) -> Self {
         Self {
@@ -45,14 +50,17 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
         }
     }
 
+    /// most often you will want to consume the contents of the request
+    /// using take prevents a clone
     pub fn take_message(&mut self) -> Option<RequestToSelf> {
         std::mem::replace(&mut self.message, None)
     }
 
+    /// send a response back to the origin of this request
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) {
         if let Some(request_id) = &self.request_id {
             self.sender
-                .send(GhostChannelMessage::Response {
+                .send(GhostEndpointMessage::Response {
                     request_id: request_id.clone(),
                     payload,
                 })
@@ -61,7 +69,12 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
     }
 }
 
-pub struct GhostChannel<
+/// `create_ghost_channel` outputs two endpoints,
+/// a parent_endpoint, and a child_endpoint
+/// these raw endpoints are not very useful on their own. When you get them
+/// to the place they will be used, you probably want to call
+/// `as_context_endpoint()` on them.
+pub struct GhostEndpoint<
     RequestToOther,
     RequestToOtherResponse,
     RequestToSelf,
@@ -69,15 +82,15 @@ pub struct GhostChannel<
     Error,
 > {
     sender: crossbeam_channel::Sender<
-        GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
+        GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
     >,
     receiver: crossbeam_channel::Receiver<
-        GhostChannelMessage<RequestToSelf, RequestToOtherResponse, Error>,
+        GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
 }
 
 impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfResponse, Error>
-    GhostChannel<
+    GhostEndpoint<
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -85,21 +98,29 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
         Error,
     >
 {
+    /// internal new, used by `create_ghost_channel()`
     fn new(
         sender: crossbeam_channel::Sender<
-            GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
         receiver: crossbeam_channel::Receiver<
-            GhostChannelMessage<RequestToSelf, RequestToOtherResponse, Error>,
+            GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
         >,
     ) -> Self {
         Self { sender, receiver }
     }
 
-    pub fn as_context_channel<Context>(
+    /// expand a raw endpoint into something usable.
+    /// <Context> let's you store data with individual `request` calls
+    /// that will be available again when the callback is invoked.
+    /// Feel free to use `as_context_endpoint::<()>("prefix")` if you
+    /// don't need any context.
+    /// request_id_prefix is a debugging hint... the request_ids generated
+    /// for tracking request/response pairs will be prepended with this prefix.
+    pub fn as_context_endpoint<Context>(
         self,
         request_id_prefix: &str,
-    ) -> GhostContextChannel<
+    ) -> GhostContextEndpoint<
         Context,
         RequestToOther,
         RequestToOtherResponse,
@@ -107,11 +128,13 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
         RequestToSelfResponse,
         Error,
     > {
-        GhostContextChannel::new(request_id_prefix, self.sender, self.receiver)
+        GhostContextEndpoint::new(request_id_prefix, self.sender, self.receiver)
     }
 }
 
-pub struct GhostContextChannel<
+/// an expanded endpoint usable to send/receive requests/responses/events
+/// see `GhostEndpoint::as_context_endpoint` for additional details
+pub struct GhostContextEndpoint<
     Context,
     RequestToOther,
     RequestToOtherResponse,
@@ -120,10 +143,10 @@ pub struct GhostContextChannel<
     Error,
 > {
     sender: crossbeam_channel::Sender<
-        GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
+        GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
     >,
     receiver: crossbeam_channel::Receiver<
-        GhostChannelMessage<RequestToSelf, RequestToOtherResponse, Error>,
+        GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
     pending_responses_tracker: GhostTracker<Context, RequestToOtherResponse, Error>,
     outbox_messages_to_self:
@@ -138,7 +161,7 @@ impl<
         RequestToSelfResponse,
         Error,
     >
-    GhostContextChannel<
+    GhostContextEndpoint<
         Context,
         RequestToOther,
         RequestToOtherResponse,
@@ -147,13 +170,14 @@ impl<
         Error,
     >
 {
+    /// internal new used by `GhostEndpoint::as_context_endpoint`
     fn new(
         request_id_prefix: &str,
         sender: crossbeam_channel::Sender<
-            GhostChannelMessage<RequestToOther, RequestToSelfResponse, Error>,
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
         receiver: crossbeam_channel::Receiver<
-            GhostChannelMessage<RequestToSelf, RequestToOtherResponse, Error>,
+            GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
         >,
     ) -> Self {
         Self {
@@ -164,15 +188,18 @@ impl<
         }
     }
 
+    /// publish an event to the remote side, not expecting a response
     pub fn publish(&mut self, payload: RequestToOther) {
         self.sender
-            .send(GhostChannelMessage::Request {
+            .send(GhostEndpointMessage::Request {
                 request_id: None,
                 payload,
             })
             .expect("should send");
     }
 
+    /// make a request of the other side. When a response is sent back to us
+    /// the callback will be invoked.
     pub fn request(
         &mut self,
         timeout: std::time::Duration,
@@ -184,28 +211,31 @@ impl<
             .pending_responses_tracker
             .bookmark(timeout, context, cb);
         self.sender
-            .send(GhostChannelMessage::Request {
+            .send(GhostEndpointMessage::Request {
                 request_id: Some(request_id),
                 payload,
             })
             .expect("should send");
     }
 
+    /// fetch any messages (requests or events) sent to us from the other side
     pub fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>> {
         self.outbox_messages_to_self.drain(..).collect()
     }
 
+    /// check for pending responses timeouts or incoming messages
     pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
+        self.pending_responses_tracker.process(actor)?;
         loop {
             let msg: Result<
-                GhostChannelMessage<RequestToSelf, RequestToOtherResponse, Error>,
+                GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
                 crossbeam_channel::TryRecvError,
             > = self.receiver.try_recv();
             match msg {
                 Ok(channel_message) => match channel_message {
-                    GhostChannelMessage::Request {
+                    GhostEndpointMessage::Request {
                         request_id,
                         payload,
                     } => {
@@ -215,7 +245,7 @@ impl<
                             self.sender.clone(),
                         ));
                     }
-                    GhostChannelMessage::Response {
+                    GhostEndpointMessage::Response {
                         request_id,
                         payload,
                     } => {
@@ -228,7 +258,7 @@ impl<
                         break;
                     }
                     crossbeam_channel::TryRecvError::Disconnected => {
-                        return Err("disconnected GhostActor Channel".into());
+                        return Err("disconnected GhostActor Endpoint".into());
                     }
                 },
             }
@@ -237,6 +267,9 @@ impl<
     }
 }
 
+/// We want to create a two-way communication channel between a GhostActor
+/// and its parent. `create_ghost_channel` will output two GhostEndpoint
+/// structures, the first one is the parent side, the second is the child's.
 #[allow(clippy::complexity)]
 pub fn create_ghost_channel<
     RequestToParent,
@@ -245,14 +278,14 @@ pub fn create_ghost_channel<
     RequestToChildResponse,
     Error,
 >() -> (
-    GhostChannel<
+    GhostEndpoint<
         RequestToChild,
         RequestToChildResponse,
         RequestToParent,
         RequestToParentResponse,
         Error,
     >,
-    GhostChannel<
+    GhostEndpoint<
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
@@ -261,13 +294,13 @@ pub fn create_ghost_channel<
     >,
 ) {
     let (child_send, parent_recv) = crossbeam_channel::unbounded::<
-        GhostChannelMessage<RequestToParent, RequestToChildResponse, Error>,
+        GhostEndpointMessage<RequestToParent, RequestToChildResponse, Error>,
     >();
     let (parent_send, child_recv) = crossbeam_channel::unbounded::<
-        GhostChannelMessage<RequestToChild, RequestToParentResponse, Error>,
+        GhostEndpointMessage<RequestToChild, RequestToParentResponse, Error>,
     >();
-    let parent_side = GhostChannel::new(parent_send, parent_recv);
-    let child_side = GhostChannel::new(child_send, child_recv);
+    let parent_side = GhostEndpoint::new(parent_send, parent_recv);
+    let child_side = GhostEndpoint::new(child_send, child_recv);
 
     (parent_side, child_side)
 }

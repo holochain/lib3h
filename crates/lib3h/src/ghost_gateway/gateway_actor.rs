@@ -82,7 +82,7 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
         self.child_transport.as_mut().request(
             std::time::Duration::from_millis(2000), // FIXME magic number
             TransportContext::Bind { parent_msg },
-            TransportRequestToChild<Url>::Bind { spec },
+            TransportRequestToChild::Bind { spec },
             // Should receive a response back from our message.
             // Forward it back to parent
             Box::new(|me, context, response| {
@@ -119,7 +119,7 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
                 };
                 // Must be a SendMessage response
                 let send_response =
-                    if let TransportRequestToChildResponse<Url>::Bind(send_response) = response {
+                    if let TransportRequestToChildResponse::Bind(send_response) = response {
                     send_response
                 } else {
                     panic!("received unexpected response type");
@@ -162,7 +162,7 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
             self.child_transport.as_mut().request(
                 std::time::Duration::from_millis(2000), // FIXME magic number
                 TransportContext::SendMessage { parent_msg },
-                TransportRequestToChild<Url>::SendMessage { address, payload },
+                TransportRequestToChild::SendMessage { address, payload },
                 // Might receive a response back from our message.
                 // Send it back to parent
                 Box::new(|me, context, response| {
@@ -199,9 +199,9 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
                     };
                     // Must be a SendMessage response
                     let send_response = match response {
-                        TransportRequestToChildResponse<Url>::SendMessage(send_response) => send_response,
+                        TransportRequestToChildResponse::SendMessage(send_response) => send_response,
                         _ => panic!("received unexpected response type"),
-                    ;
+                    };
                     println!("yay? {:?}", response);
                     // Act on response: forward to parent
                     parent_msg.respond(response);
