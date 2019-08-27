@@ -10,19 +10,19 @@ enum RequestToParentContext {
 }
 
 type GhostTransportMemoryChannel = GhostChannel<
-    RequestToChild,
-    RequestToChildResponse,
-    RequestToParent,
+    RequestToChild<Url>,
+    RequestToChildResponse<Url>,
+    RequestToParent<Url>,
     RequestToParentResponse,
     TransportError,
 >;
 
 type GhostTransportMemoryChannelContext = GhostContextChannel<
     (),
-    RequestToParent,
+    RequestToParent<Url>,
     RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
+    RequestToChild<Url>,
+    RequestToChildResponse<Url>,
     TransportError,
 >;
 
@@ -57,10 +57,10 @@ impl From<TransportError> for GhostError {
 
 impl
     GhostActor<
-        RequestToParent,
+        RequestToParent<Url>,
         RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
+        RequestToChild<Url>,
+        RequestToChildResponse<Url>,
         TransportError,
     > for GhostTransportMemory
 {
@@ -240,7 +240,7 @@ mod tests {
         /* Possible other ways we might think of setting up
                constructors for actor/parent_context_channel pairs:
 
-            let (transport1_channel, child) = ghost_create_channel();
+            let (transport1_channel, child) = create_create_channel();
             let transport1_engine = GhostTransportMemoryEngine::new(child);
 
             enum TestContex {

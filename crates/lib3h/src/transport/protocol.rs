@@ -29,27 +29,26 @@ pub enum TransportEvent {
 
 /// Transport protocol enums for use with GhostActor implementation
 #[derive(Debug)]
-pub enum RequestToChild {
-    Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { address: Url, payload: Vec<u8> },
+pub enum RequestToChild<ADDR> {
+    Bind { spec: ADDR }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    SendMessage { address: ADDR, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
-pub struct BindResultData {
-    pub bound_url: Url,
+pub struct BindResultData<ADDR> {
+    pub bound_url: ADDR,
 }
 
 #[derive(Debug)]
-pub enum RequestToChildResponse {
-    Bind(BindResultData),
+pub enum RequestToChildResponse<ADDR> {
+    Bind(BindResultData<ADDR>),
     SendMessage,
 }
 
 #[derive(Debug)]
-pub enum RequestToParent {
-    IncomingConnection { address: Url },
-    ReceivedData { address: Url, payload: Vec<u8> },
-    TransportError { error: TransportError },
+pub enum RequestToParent<ADDR> {
+    IncomingConnection { address: ADDR },
+    ReceivedData { address: ADDR, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
