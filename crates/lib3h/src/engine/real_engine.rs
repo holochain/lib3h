@@ -16,6 +16,7 @@ use crate::{
     },
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
+    ghost_gateway::GhostGateway,
     track::Tracker,
     transport::{protocol::TransportCommand, TransportWrapper},
     transport_wss::TransportWss,
@@ -65,7 +66,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
         };
-        let network_gateway = GatewayWrapper::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(GhostGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -114,7 +115,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = GatewayWrapper::new(P2pGateway::new(
+        let network_gateway = GatewayWrapper::new(GhostGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,

@@ -66,7 +66,7 @@ pub type TransportMessage = GhostMessage<
 >;
 
 #[derive(Debug)]
-enum TransportContext {
+pub enum TransportContext {
     Bind { parent_msg: TransportMessage },
     SendMessage { parent_msg: TransportMessage },
 }

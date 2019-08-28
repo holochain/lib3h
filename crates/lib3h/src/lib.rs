@@ -17,6 +17,8 @@ extern crate serde_derive;
 extern crate rmp_serde;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate detach;
 
 // -- mod -- //
 
@@ -24,6 +26,7 @@ pub mod dht;
 pub mod engine;
 pub mod error;
 pub mod gateway;
+pub mod ghost_gateway;
 pub mod time;
 pub mod track;
 pub mod transport;

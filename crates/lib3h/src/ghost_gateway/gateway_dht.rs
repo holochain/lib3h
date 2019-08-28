@@ -4,7 +4,7 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
-    gateway::{Gateway, P2pGateway},
+    ghost_gateway::GhostGateway,
 };
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
