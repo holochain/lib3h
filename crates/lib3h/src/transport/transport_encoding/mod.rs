@@ -21,12 +21,19 @@ enum ToInnerContext {
 
 enum ToKeystoreContext {}
 
+/// Wraps a lower-level transport in either Open or Encrypted communication
+/// Also adds a concept of MachineId and AgentId
+/// This is currently a stub, only the Id concept is in place.
 pub struct TransportEncoding {
     #[allow(dead_code)]
     crypto: Box<dyn CryptoSystem>,
+    // the machine_id or agent_id of this encoding instance
     this_id: String,
+    // the keystore to use for getting signatures for `this_id`
     keystore: Detach<KeystoreActorParentWrapper<ToKeystoreContext>>,
+    // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
+    // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
             ToParentContext,
@@ -37,7 +44,11 @@ pub struct TransportEncoding {
             TransportError,
         >,
     >,
+    // ref to our inner transport
     inner_transport: Detach<TransportActorParentWrapper<ToInnerContext>>,
+    // if we have never sent a message to this node before,
+    // we need to first handshake. Store the send payload && msg object
+    // we will continue the transaction once the handshake completes
     #[allow(clippy::complexity)]
     pending_send_data: HashMap<
         Url,
@@ -46,12 +57,20 @@ pub struct TransportEncoding {
             GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         )>,
     >,
+    // if we have never received data from this remote before, we need to
+    // handshake... this should never exactly happen... we should get a
+    // handshake as the first request they send
     pending_received_data: HashMap<Url, Vec<Vec<u8>>>,
+    // map low-level connection addresses to id connection addresses
+    // i.e. wss://1.1.1.1:55888 -> wss://1.1.1.1:55888?a=HcMyadayada
     connections_no_id_to_id: HashMap<Url, Url>,
+    // map id connection addresses to low-level connection addresses
+    // i.e. wss://1.1.1.1:55888?a=HcMyadayada -> wss://1.1.1.1:55888
     connections_id_to_no_id: HashMap<Url, Url>,
 }
 
 impl TransportEncoding {
+    /// create a new TransportEncoding Instance
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         this_id: String,
@@ -78,6 +97,7 @@ impl TransportEncoding {
         }
     }
 
+    /// private dispatcher for messages from our inner transport
     fn handle_msg_from_inner(
         &mut self,
         mut msg: GhostMessage<
@@ -98,6 +118,7 @@ impl TransportEncoding {
         }
     }
 
+    /// private send a handshake to a remote address
     fn send_handshake(&mut self, address: &Url) {
         self.inner_transport.publish(RequestToChild::SendMessage {
             address: address.clone(),
@@ -105,42 +126,62 @@ impl TransportEncoding {
         });
     }
 
+    /// private handler for inner transport IncomingConnection events
     fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
         match self.connections_no_id_to_id.get(&address) {
             Some(remote_addr) => {
+                // if we've already seen this connection, just forward it?
                 self.endpoint_self
                     .publish(RequestToParent::IncomingConnection {
                         address: remote_addr.clone(),
                     });
             }
             None => {
+                // we've never seen this connection, handshake before
+                // forwarding the IncomingConnection msg
+                // (see handle_recveived_data for where it's actually sent)
                 self.send_handshake(&address);
             }
         }
         Ok(())
     }
 
+    /// private handler for inner transport ReceivedData events
     fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
         match self.connections_no_id_to_id.get(&address) {
             Some(remote_addr) => {
+                // if we've seen this connection before, just forward it
                 self.endpoint_self.publish(RequestToParent::ReceivedData {
                     address: remote_addr.clone(),
                     payload,
                 });
             }
             None => {
+                // never seen this connection before
+                // check if this is a handshake message
+                // note, this is a bit of a hack right now
+                // use capnproto encoding messages
                 if payload.len() == 63 && payload[0] == b'H' && payload[1] == b'c' {
+                    // decode the remote id
                     let remote_id = String::from_utf8_lossy(&payload);
+
+                    // build a higher-level id address
                     let mut remote_url = address.clone();
                     remote_url.query_pairs_mut().append_pair("a", &remote_id);
+
+                    // set up low->high and high->low mappings
                     self.connections_no_id_to_id
                         .insert(address.clone(), remote_url.clone());
                     self.connections_id_to_no_id
                         .insert(remote_url.clone(), address.clone());
+
+                    // forward an IncomingConnection event to our parent
                     self.endpoint_self
                         .publish(RequestToParent::IncomingConnection {
                             address: remote_url.clone(),
                         });
+
+                    // if we have any pending received data, send it up
                     if let Some(items) = self.pending_received_data.remove(&address) {
                         for payload in items {
                             self.endpoint_self.publish(RequestToParent::ReceivedData {
@@ -149,13 +190,19 @@ impl TransportEncoding {
                             });
                         }
                     }
+
+                    // if we have any pending send data, send it down
                     if let Some(items) = self.pending_send_data.remove(&address) {
                         for (payload, msg) in items {
                             self.fwd_send_message_result(msg, address.clone(), payload)?;
                         }
                     }
                 } else {
+                    // for some reason, the remote is sending us data
+                    // without handshaking, let's try to handshake back?
                     self.send_handshake(&address);
+
+                    // store this msg to forward after we handshake
                     let e = self
                         .pending_received_data
                         .entry(address)
@@ -167,12 +214,15 @@ impl TransportEncoding {
         Ok(())
     }
 
+    /// private handler for inner transport TransportError events
     fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
+        // just forward this
         self.endpoint_self
             .publish(RequestToParent::TransportError { error });
         Ok(())
     }
 
+    /// private dispatcher for messages coming from our parent
     fn handle_msg_from_parent(
         &mut self,
         mut msg: GhostMessage<
@@ -190,11 +240,13 @@ impl TransportEncoding {
         }
     }
 
+    /// private handler for Bind requests from our parent
     fn handle_bind(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
+        // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
             std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitBind(msg),
@@ -220,6 +272,8 @@ impl TransportEncoding {
                     }
                 };
                 if let RequestToChildResponse::Bind(mut data) = response {
+                    // we got the bind result, append our id to it
+                    // i.e. wss://1_bound?a=HcMyadyada
                     data.bound_url
                         .query_pairs_mut()
                         .append_pair("a", &m.this_id);
@@ -234,6 +288,9 @@ impl TransportEncoding {
         Ok(())
     }
 
+    /// handshake complete, or established connection
+    /// forward SendMessage payload to our child && respond appropriately to
+    /// our parent
     fn fwd_send_message_result(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
@@ -264,6 +321,7 @@ impl TransportEncoding {
         Ok(())
     }
 
+    /// private handler for SendMessage requests from our parent
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
@@ -272,13 +330,24 @@ impl TransportEncoding {
     ) -> TransportResult<()> {
         match self.connections_id_to_no_id.get(&address) {
             Some(sub_address) => {
+                // we have seen this connection before
+                // we can just forward the message along
                 let sub_address = sub_address.clone();
                 self.fwd_send_message_result(msg, sub_address, payload)?;
             }
             None => {
+                // we don't have an established connection to this remote
+                // we need to handshake first
+
+                // first make a low-level address by removing the ?a=Hcyada
                 let mut sub_address = address.clone();
                 sub_address.query_pairs_mut().clear();
+
+                // send along a handshake message
                 self.send_handshake(&sub_address);
+
+                // store this send_data so we can forward it after handshake
+                // (see handle_received_data for where this is done)
                 let e = self
                     .pending_send_data
                     .entry(sub_address)
