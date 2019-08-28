@@ -26,6 +26,7 @@ pub mod dht;
 pub mod engine;
 pub mod error;
 pub mod gateway;
+pub mod keystore;
 pub mod time;
 pub mod track;
 pub mod transport;
