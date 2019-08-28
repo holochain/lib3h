@@ -1,12 +1,9 @@
 //! This is a stub of the keystore so we can prove out the encoding transport
 
-use std::any::Any;
+use crate::error::{Lib3hError, Lib3hResult};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use crate::error::{
-    Lib3hError,
-    Lib3hResult,
-};
+use std::any::Any;
 
 pub mod keystore_protocol {
     #[derive(Debug)]
@@ -20,17 +17,36 @@ pub mod keystore_protocol {
     }
 
     #[derive(Debug)]
-    pub enum RequestToParent {
-    }
+    pub enum RequestToParent {}
 
     #[derive(Debug)]
-    pub enum RequestToParentResponse {
-    }
+    pub enum RequestToParentResponse {}
 }
 
-pub type KeystoreActor = Box<dyn GhostActor<RequestToParent, RequestToParentResponse, RequestToChild, RequestToChildResponse, Lib3hError>>;
-pub type KeystoreActorParentEndpoint = GhostEndpoint<RequestToParent, RequestToParentResponse, RequestToChild, RequestToChildResponse, Lib3hError>;
-pub type KeystoreActorParentWrapper<Context> = GhostParentWrapper<Context, RequestToParent, RequestToParentResponse, RequestToChild, RequestToChildResponse, Lib3hError>;
+pub type KeystoreActor = Box<
+    dyn GhostActor<
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Lib3hError,
+    >,
+>;
+pub type KeystoreActorParentEndpoint = GhostEndpoint<
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    Lib3hError,
+>;
+pub type KeystoreActorParentWrapper<Context> = GhostParentWrapper<
+    Context,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    Lib3hError,
+>;
 
 use keystore_protocol::*;
 
@@ -67,13 +83,21 @@ impl KeystoreStub {
         }
     }
 
-    fn handle_msg_from_parent(&mut self, mut msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>) -> Lib3hResult<()> {
+    fn handle_msg_from_parent(
+        &mut self,
+        mut msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>,
+    ) -> Lib3hResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Sign { id, payload } => self.handle_sign(msg, id, payload),
         }
     }
 
-    fn handle_sign(&mut self, msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>, _id: String, _payload: Vec<u8>) -> Lib3hResult<()> {
+    fn handle_sign(
+        &mut self,
+        msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>,
+        _id: String,
+        _payload: Vec<u8>,
+    ) -> Lib3hResult<()> {
         // THIS IS A STUB, just responding with empty signature
         msg.respond(Ok(RequestToChildResponse::Sign {
             signature: b"".to_vec(),
@@ -96,7 +120,7 @@ impl
     }
 
     fn take_parent_endpoint(
-        &mut self
+        &mut self,
     ) -> Option<
         GhostEndpoint<
             RequestToChild,

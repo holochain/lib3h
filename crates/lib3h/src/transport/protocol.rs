@@ -1,4 +1,5 @@
 use crate::transport::{error::TransportError, ConnectionId};
+use lib3h_ghost_actor::prelude::*;
 use url::Url;
 
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
@@ -57,3 +58,28 @@ pub enum RequestToParentResponse {
     Allowed,    // just for testing
     Disallowed, // just for testing
 }
+
+pub type TransportActor = Box<
+    dyn GhostActor<
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        TransportError,
+    >,
+>;
+pub type TransportActorParentEndpoint = GhostEndpoint<
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+pub type TransportActorParentWrapper<Context> = GhostParentWrapper<
+    Context,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    TransportError,
+>;
