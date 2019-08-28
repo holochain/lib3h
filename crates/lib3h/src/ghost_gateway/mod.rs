@@ -1,12 +1,12 @@
 pub mod gateway_actor;
 pub mod ghost_gateway;
 pub mod gateway_dht;
+pub mod wrapper;
 
 use crate::{
     dht::dht_trait::Dht,
     transport::protocol::*,
 };
-use lib3h_ghost_actor::prelude::*;
 use detach::prelude::*;
 
 /// Gateway Actor where:
@@ -15,7 +15,7 @@ use detach::prelude::*;
 /// Transport protocol used on all ends
 pub struct GhostGateway<D: Dht> {
     /// Used for distinguishing gateways
-    identifier: String,
+    pub identifier: String,
     /// Internal DHT
     inner_dht: D,
     /// Hold child transport actor

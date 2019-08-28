@@ -8,8 +8,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
     gateway::GatewayWrapper,
+    ghost_gateway::{
+        GhostGateway, wrapper::GhostGatewayWrapper,
+    },
     track::Tracker,
-    transport::{ConnectionId, TransportWrapper},
+    transport::{ConnectionId, GhostTransportWrapper},
     transport_wss::TlsConfig,
 };
 
@@ -74,9 +77,9 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
-    network_transport: TransportWrapper<'engine>,
+    //network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: GatewayWrapper<'engine>,
+    network_gateway: GhostGatewayWrapper<'engine, D>,
     /// Store active connections?
     network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent

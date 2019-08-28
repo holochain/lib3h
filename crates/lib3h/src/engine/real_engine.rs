@@ -16,9 +16,11 @@ use crate::{
     },
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
-    ghost_gateway::GhostGateway,
+    ghost_gateway::{
+        GhostGateway, wrapper::GhostGatewayWrapper,
+    },
     track::Tracker,
-    transport::{protocol::TransportCommand, TransportWrapper},
+    transport::{protocol::TransportCommand, GhostTransportWrapper},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -43,52 +45,53 @@ impl TransportKeys {
     }
 }
 
-impl<'engine, D: Dht> RealEngine<'engine, D> {
-    /// Constructor with TransportWss
-    pub fn new(
-        crypto: Box<dyn CryptoSystem>,
-        config: RealEngineConfig,
-        name: &str,
-        dht_factory: DhtFactory<D>,
-    ) -> Lib3hResult<Self> {
-        // Create Transport and bind
-        let network_transport =
-            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
-        let binding = network_transport.as_mut().bind(&config.bind_url)?;
-        // Generate keys
-        // TODO #209 - Check persistence first before generating
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-        // Generate DHT config and create network_gateway
-        let dht_config = DhtConfig {
-            this_peer_address: transport_keys.transport_id.clone(),
-            this_peer_uri: binding,
-            custom: config.dht_custom_config.clone(),
-            gossip_interval: config.dht_gossip_interval,
-            timeout_threshold: config.dht_timeout_threshold,
-        };
-        let network_gateway = GatewayWrapper::new(GhostGateway::new(
-            NETWORK_GATEWAY_ID,
-            network_transport.clone(),
-            dht_factory,
-            &dht_config,
-        ));
-        // Done
-        Ok(RealEngine {
-            crypto,
-            config,
-            inbox: VecDeque::new(),
-            name: name.to_string(),
-            dht_factory,
-            request_track: Tracker::new("real_engine_", 2000),
-            network_transport,
-            network_gateway,
-            network_connections: HashSet::new(),
-            space_gateway_map: HashMap::new(),
-            transport_keys,
-            process_count: 0,
-        })
-    }
-}
+// TODO: GhostTransportWss
+//impl<'engine, D: Dht> RealEngine<'engine, D> {
+//    /// Constructor with TransportWss
+//    pub fn new(
+//        crypto: Box<dyn CryptoSystem>,
+//        config: RealEngineConfig,
+//        name: &str,
+//        dht_factory: DhtFactory<D>,
+//    ) -> Lib3hResult<Self> {
+//        // Create Transport and bind
+//        let network_transport =
+//            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
+//        let binding = network_transport.as_mut().bind(&config.bind_url)?;
+//        // Generate keys
+//        // TODO #209 - Check persistence first before generating
+//        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+//        // Generate DHT config and create network_gateway
+//        let dht_config = DhtConfig {
+//            this_peer_address: transport_keys.transport_id.clone(),
+//            this_peer_uri: binding,
+//            custom: config.dht_custom_config.clone(),
+//            gossip_interval: config.dht_gossip_interval,
+//            timeout_threshold: config.dht_timeout_threshold,
+//        };
+//        let network_gateway = GhostGateway::new(
+//            NETWORK_GATEWAY_ID,
+//            network_transport.clone(),
+//            dht_factory,
+//            &dht_config,
+//        );
+//        // Done
+//        Ok(RealEngine {
+//            crypto,
+//            config,
+//            inbox: VecDeque::new(),
+//            name: name.to_string(),
+//            dht_factory,
+//            request_track: Tracker::new("real_engine_", 2000),
+//            // network_transport,
+//            network_gateway,
+//            network_connections: HashSet::new(),
+//            space_gateway_map: HashMap::new(),
+//            transport_keys,
+//            process_count: 0,
+//        })
+//    }
+//}
 
 /// Constructor
 //#[cfg(test)]
@@ -101,12 +104,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         dht_factory: DhtFactory<D>,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let network_transport = TransportWrapper::new(TransportMemory::new());
+        let network_transport = GhostTransportMemory::new();
         // Bind & create DhtConfig
-        let binding = network_transport
-            .as_mut()
-            .bind(&config.bind_url)
-            .expect("TransportMemory.bind() failed. bind-url might not be unique?");
+        // FIXME
         let dht_config = DhtConfig {
             this_peer_address: format!("{}_tId", name),
             this_peer_uri: binding,
@@ -115,9 +115,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = GatewayWrapper::new(GhostGateway::new(
+        let network_gateway = GhostGatewayWrapper::new(GhostGateway::new(
             NETWORK_GATEWAY_ID,
-            network_transport.clone(),
+            network_transport,
             dht_factory,
             &dht_config,
         ));
@@ -134,7 +134,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             name: name.to_string(),
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
-            network_transport,
+            // network_transport,
             network_gateway,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
@@ -147,7 +147,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
 impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
     fn advertise(&self) -> Url {
         self.network_gateway
-            .as_dht_ref()
+            .as_ref()
             .this_peer()
             .peer_uri
             .to_owned()
@@ -214,14 +214,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
             }
         }
-        // Done
-        self.network_gateway
-            .as_transport_mut()
-            .close_all()
-            .map_err(|e| {
-                error!("Closing of some connection failed: {:?}", e);
-                e
-            })?;
+//        // Done
+//        self.network_gateway
+//            .as_transport_mut()
+//            .close_all()
+//            .map_err(|e| {
+//                error!("Closing of some connection failed: {:?}", e);
+//                e
+//            })?;
 
         result
     }
@@ -262,9 +262,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 // TODO #168
             }
             Lib3hClientProtocol::Connect(msg) => {
-                // Convert into TransportCommand & post to network gateway
-                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
-                self.network_gateway.as_transport_mut().post(cmd)?;
+                self.network_connect(msg);
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
@@ -547,9 +545,8 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
         let this_peer_transport_id_as_uri = {
-            let gateway = self.network_gateway.as_ref();
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
+            Url::parse(format!("transportId:{}", self.network_gateway.as_ref().this_peer().peer_address).as_str())
                 .expect("can parse url")
         };
         let dht_config = DhtConfig {
@@ -562,7 +559,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
             GatewayWrapper::new(P2pGateway::new_with_space(
-                self.network_gateway.as_transport(),
+                self.network_gateway.clone(),
                 &join_msg.space_address,
                 self.dht_factory,
                 &dht_config,
@@ -582,6 +579,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             space_address,
             peer.peer_address,
         );
+        // FIXME
         self.network_gateway
             .as_transport_mut()
             .send_all(&payload)

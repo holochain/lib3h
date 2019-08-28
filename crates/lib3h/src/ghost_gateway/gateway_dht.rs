@@ -11,7 +11,7 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 
 /// Compose DHT
-impl<'gateway, D: Dht> Dht for GhostGateway<'gateway, D> {
+impl<D: Dht> Dht for GhostGateway<D> {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.inner_dht.get_peer_list()
@@ -49,6 +49,10 @@ impl<'gateway, D: Dht> Dht for GhostGateway<'gateway, D> {
                 self.handle_DhtEvent(evt)?;
             }
         }
+
+        // Process the actor
+        let did_actor_work = self.process()?;
+
         // TODO #173: Check for timeouts of own requests here?
         // Done
         Ok((did_work, dht_event_list))
@@ -56,7 +60,7 @@ impl<'gateway, D: Dht> Dht for GhostGateway<'gateway, D> {
 }
 
 /// Private internals
-impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
+impl<D: Dht> GhostGateway<D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
         trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);
@@ -72,7 +76,7 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
                     // TODO END
                     // Convert DHT Gossip to P2P Gossip
                     let p2p_gossip = P2pProtocol::Gossip(GossipData {
-                        space_address: self.identifier().into(),
+                        space_address: self.identifier.into(),
                         to_peer_address: to_peer_address.clone().into(),
                         from_peer_address: self.this_peer().peer_address.clone().into(),
                         bundle: data.bundle.clone(),
@@ -81,13 +85,8 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .expect("P2pProtocol::Gossip serialization failed");
-                    let to_conn_id = self
-                        .get_connection_id(&to_peer_address)
-                        .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
-                    self.inner_transport
-                        .as_mut()
-                        .send(&[&to_conn_id], &payload)?;
+                    self.send(&[&to_peer_address], &payload, None)?;
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

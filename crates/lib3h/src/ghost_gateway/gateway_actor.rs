@@ -3,25 +3,20 @@ use url::Url;
 use lib3h_ghost_actor::prelude::*;
 use crate::{
     dht::dht_trait::Dht,
-    transport::protocol::*,
+    transport::{
+        protocol::*,
+        error::TransportError,
+    },
     ghost_gateway::GhostGateway,
 };
 
-impl<
-    'gateway,
-    D: Dht,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    E,
-> GhostActor<
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    E,
-> for GhostGateway<'gateway, D> {
+impl< D: Dht> GhostActor<
+    TransportRequestToParent,
+    TransportRequestToParentResponse,
+    TransportRequestToChild,
+    TransportRequestToChildResponse,
+    TransportError,
+> for GhostGateway<D> {
 
     fn as_any(&mut self) -> &mut dyn Any {
         &mut *self
@@ -35,22 +30,22 @@ impl<
     fn /* priv */ process_concrete(&mut self) -> GhostResult<WorkWasDone> {
 
         // Check inbox from parent
-        let endpoint_did_some_work = detach_run!(&mut self.endpoint_self, |endpoint_self| {
-                endpoint_self.process(self.as_any())
+        let endpoint_did_some_work = detach_run!(&mut self.endpoint_self.unwrap(), |endpoint_self| {
+                endpoint_self.unwrap().process(self.as_any())
             })?;
         let mut worked_for_parent = false;
         for mut msg in self.endpoint_self.as_mut().drain_messages() {
             match msg.take_message().expect("exists") {
-                RequestToChild::Bind { spec } => {
+                TransportRequestToChild::Bind { spec } => {
                     worked_for_parent = true;
-                    self.bind(spec, msg)?;
+                    self.bind(&spec, msg)?;
                 }
-                RequestToChild::SendMessage {
+                TransportRequestToChild::SendMessage {
                     address,
                     payload,
                 } => {
                     worked_for_parent = true;
-                    self.send(&address, payload, msg)?;
+                    self.send(&address, &payload, msg)?;
                 }
             }
         }
@@ -70,7 +65,7 @@ impl<
 //--------------------------------------------------------------------------------------------------
 
 /// Private internals
-impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
+impl<'gateway, D: Dht> GhostGateway<D> {
     /// Forward Bind request to child Transport
     fn bind(
         &mut self,
@@ -99,7 +94,7 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
 
                 // check for timeout
                 if let GhostCallbackData::Timeout = response {
-                    parent_msg.respond(Err("Timeout".into()));
+                    parent_msg.respond(Err(TransportError::new("Timeout".into())));
                     return Ok(());
                 }
                 // got response
@@ -141,17 +136,21 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
         &mut self,
         dht_id: &Url,
         payload: &[u8],
-        parent_msg: &mut TransportMessage,
+        maybe_parent_msg: Option<&mut TransportMessage>,
     ) -> GhostResult<()> {
         // get connectionId from the inner dht first
         let dht_uri_list = self.dht_address_to_uri_list([dht_id])?;
         let address = dht_uri_list[0];
         trace!("({}).send() {} -> {} | {}", self.identifier, dht_id, address, payload.len());
         // Forward to the child Transport
+        let context = match maybe_parent_msg {
+            None => (),
+            Some(parent_msg) => TransportContext::SendMessage { parent_msg: parent_msg.clone() },
+        };
         self.child_transport.as_mut().request(
             std::time::Duration::from_millis(2000), // FIXME magic number
-            TransportContext::SendMessage { parent_msg: parent_msg.clone() },
-            TransportRequestToChild::SendMessage { address: address.clone(), payload: payload.clone() },
+            context,
+            TransportRequestToChild::SendMessage { address: address.clone(), payload: payload.to_vec() },
             // Might receive a response back from our message.
             // Send it back to parent
             Box::new(|me, context, response| {

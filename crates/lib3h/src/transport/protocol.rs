@@ -32,6 +32,15 @@ pub enum TransportEvent {
 // Transport protocol for GhostActors
 //--------------------------------------------------------------------------------------------------
 
+
+pub type TransportActor = GhostActor<
+    TransportRequestToChild,
+    TransportRequestToChildResponse,
+    TransportRequestToParent,
+    TransportRequestToParentResponse,
+    TransportError,
+>;
+
 pub type TransportEndpoint = GhostEndpoint<
     TransportRequestToChild,
     TransportRequestToChildResponse,

@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
-    transport::TransportWrapper,
+    ghost_gateway::wrapper::GhostGatewayWrapper,
 };
 use lib3h_protocol::Address;
 use std::collections::{HashMap, VecDeque};
@@ -18,12 +18,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        inner_transport: TransportWrapper<'gateway>,
+        network_gateway: GhostGatewayWrapper<'gateway, D>,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
-            inner_transport,
+            inner_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
             connection_map: HashMap::new(),
@@ -73,7 +73,7 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
 impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     /// Constructors
     pub fn new_with_space(
-        network_gateway: TransportWrapper<'gateway>,
+        network_gateway: GhostGatewayWrapper<'gateway, D>,
         space_address: &Address,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,

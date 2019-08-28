@@ -5,7 +5,8 @@ pub mod p2p_gateway;
 use crate::{
     dht::dht_trait::Dht,
     transport::{
-        protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
+        protocol::TransportCommand, transport_trait::Transport, ConnectionId, GhostTransportWrapper,
+        TransportWrapper,
     },
 };
 use std::{
@@ -94,7 +95,7 @@ impl<'wrap> GatewayWrapper<'wrap> {
 /// Tracks distributed data for that P2P network in a DHT.
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
 pub struct P2pGateway<'gateway, D: Dht> {
-    inner_transport: TransportWrapper<'gateway>,
+    inner_transport: GhostTransportWrapper<'gateway>,
     inner_dht: D,
     /// Used for distinguishing gateways
     identifier: String,

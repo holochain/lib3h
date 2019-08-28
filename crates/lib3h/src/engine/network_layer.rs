@@ -7,6 +7,7 @@ use crate::{
     transport::{protocol::*, ConnectionIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
+use lib3h_ghost_actor::prelude::*;
 
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -17,30 +18,31 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     pub(crate) fn process_network_gateway(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let mut outbox = Vec::new();
-        // Process the network gateway as a Transport
-        let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
+        // Process the child network_gateway actor
+        let mut parent_endpoint = self.network_gateway
+            .as_mut()
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint::<i8>("network_layer");
+
+        let (tranport_did_work, event_list) = self.network_gateway
+            .as_mut().process()?;
+        parent_endpoint.process(&mut ())?;
         debug!(
-            "{} - network_gateway Transport.process(): {} {}",
+            "{} - network_gateway.process(): {} {}",
             self.name,
-            tranport_did_work,
-            event_list.len(),
+            network_gateway_worked,
+            dht_event_list.len(),
         );
-        if tranport_did_work {
-            for evt in event_list {
-                let mut output = self.handle_netTransportEvent(&evt)?;
-                outbox.append(&mut output);
-            }
-        }
-        // Process the network gateway as a DHT
-        let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
-        if dht_did_work {
-            for evt in event_list {
+        // Handle DhtEvents
+        let mut outbox = Vec::new();
+        if network_gateway_worked {
+            for dht_evt in dht_event_list {
                 let mut output = self.handle_netDhtEvent(evt)?;
                 outbox.append(&mut output);
             }
         }
-        Ok((tranport_did_work || dht_did_work, outbox))
+        Ok((network_gateway_worked, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
@@ -61,25 +63,14 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     "{} auto-connect to peer: {} ({})",
                     self.name, peer_data.peer_address, peer_data.peer_uri,
                 );
-                let cmd = TransportCommand::Connect(peer_data.peer_uri.clone(), "".to_string());
-                self.network_gateway.as_transport_mut().post(cmd)?;
+                // Send phony SendMessage request so we connect to it
+                self.network_gateway.as_mut().publish(
+                    (),
+                    TransportRequestToChild::SendMessage { address: peer_data.peer_uri, payload: Vec::new() },
+                );
             }
             DhtEvent::PeerTimedOut(peer_address) => {
-                // Disconnect from that peer by calling a Close on it.
-                let maybe_connection_id = self
-                    .network_gateway
-                    .as_ref()
-                    .get_connection_id(&peer_address);
-                trace!(
-                    "{} -- maybe_connection_id: {:?}",
-                    self.name.clone(),
-                    maybe_connection_id,
-                );
-                if let Some(connection_id) = maybe_connection_id {
-                    self.network_gateway
-                        .as_transport_mut()
-                        .post(TransportCommand::Close(connection_id))?;
-                }
+                // TODO
             }
             // No entries in Network DHT
             DhtEvent::HoldEntryRequested(_, _) => {
@@ -213,6 +204,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 });
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
+                    // FIXME
                     self.network_gateway.as_dht_mut().post(cmd)?;
                 } else {
                     // otherwise should be for one of our space

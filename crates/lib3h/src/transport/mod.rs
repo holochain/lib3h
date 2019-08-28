@@ -8,11 +8,80 @@ pub mod protocol;
 pub mod transport_crypto;
 pub mod transport_trait;
 
+use transport_trait::Transport;
+use lib3h_ghost_actor::prelude::*;
+use self::{
+    error::TransportError,
+    protocol::*,
+};
+
+#[derive(Clone)]
+pub struct GhostTransportWrapper<'wrap> {
+    inner: Arc<RwLock<dyn GhostActor<
+        TransportRequestToChild,
+        TransportRequestToChildResponse,
+        TransportRequestToParent,
+        TransportRequestToParentResponse,
+        TransportError,
+    > + 'wrap>>,
+}
+
+impl<'wrap> GhostTransportWrapper<'wrap> {
+    /// wrap a concrete TransportActor into an Arc<RwLock<dyn GhostActor>>
+    pub fn new<T: GhostActor<
+        TransportRequestToChild,
+        TransportRequestToChildResponse,
+        TransportRequestToParent,
+        TransportRequestToParentResponse,
+        TransportError,
+    > + 'wrap>(concrete: T) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(concrete)),
+        }
+    }
+
+    /// if we already have an Arc<RwLock<dyn Transport>>,
+    /// us it directly as our inner
+    pub fn assume(inner: Arc<RwLock<dyn GhostActor<
+        TransportRequestToChild,
+        TransportRequestToChildResponse,
+        TransportRequestToParent,
+        TransportRequestToParentResponse,
+        TransportError,
+    > + 'wrap>>) -> Self {
+        Self { inner }
+    }
+
+    /// get an immutable ref to Transport trait object
+    pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn GhostActor<
+        TransportRequestToChild,
+        TransportRequestToChildResponse,
+        TransportRequestToParent,
+        TransportRequestToParentResponse,
+        TransportError,
+    > + 'wrap> {
+        self.inner.read().expect("failed to obtain read lock")
+    }
+
+    /// get a mutable ref to Transport trait object
+    pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn GhostActor<
+        TransportRequestToChild,
+        TransportRequestToChildResponse,
+        TransportRequestToParent,
+        TransportRequestToParentResponse,
+        TransportError,
+    > + 'wrap> {
+        self.inner.write().expect("failed to obtain write lock")
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+// Old Transport trait
+//--------------------------------------------------------------------------------------------------
+
 /// a connection identifier
 pub type ConnectionId = String;
 pub type ConnectionIdRef = str;
-
-use transport_trait::Transport;
 
 /// Hide complexity of Arc<RwLock<dyn Transport>>
 /// making it more ergonomic to work with
