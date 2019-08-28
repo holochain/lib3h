@@ -31,7 +31,6 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
             child_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
-            connection_map: HashMap::new(),
         }
     }
 }
@@ -54,25 +53,6 @@ impl<'gateway, D: Dht> Gateway for GhostGateway<'gateway, D> {
             return None;
         }
         let peer_uri = maybe_peer_data.unwrap().peer_uri;
-        trace!(
-            "({}) get_connection_id: {} -> {}",
-            self.identifier,
-            peer_address,
-            peer_uri,
-        );
-        // get connection_id
-        let maybe_connection_id = self.connection_map.get(&peer_uri);
-        if maybe_connection_id.is_none() {
-            return None;
-        }
-        let conn_id = maybe_connection_id.unwrap().clone();
-        trace!(
-            "({}) get_connection_id: {} -> {} -> {}",
-            self.identifier,
-            peer_address,
-            peer_uri,
-            conn_id,
-        );
-        Some(conn_id)
+        Some(peer_uri.to_string())
     }
 }

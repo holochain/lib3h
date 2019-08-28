@@ -32,30 +32,6 @@ impl<'gateway, D: Dht> Dht for GhostGateway<'gateway, D> {
 
     /// Processing
     fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        // Add to connection_map for space_gateways
-        // TODO #176 - Maybe we shouldn't have different code paths for populating
-        // the connection_map between space and network gateways.
-        if self.identifier != NETWORK_GATEWAY_ID {
-            if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
-                debug!(
-                    "({}).Dht.post(HoldPeer) - {}",
-                    self.identifier, peer_data.peer_uri,
-                );
-                // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
-                // to get the transportId
-                let maybe_previous = self.connection_map.insert(
-                    peer_data.peer_uri.clone(),
-                    String::from(peer_data.peer_uri.path()),
-                );
-                if let Some(previous_cId) = maybe_previous {
-                    debug!(
-                        "Replaced connectionId for {} ; was: {}",
-                        peer_data.peer_uri.clone(),
-                        previous_cId
-                    );
-                }
-            }
-        }
         self.inner_dht.post(cmd)
     }
     fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {

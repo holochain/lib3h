@@ -149,14 +149,7 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
         // get connectionId from the inner dht first
         let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
         trace!("({}).send() {:?} -> {:?} | {}", self.identifier, dht_id_list, dht_uri_list, payload.len());
-        // Get connectionIds for the child transport
-        let mut conn_list = Vec::new();
-        for dht_uri in dht_uri_list {
-            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri);
-            trace!("({}).send() reversed mapped dht_uri {:?} to net_uri {:?}", self.identifier, dht_uri, net_uri);
-        }
-        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
+        let ref_list: Vec<&str> = dht_uri_list;
         // Forward to the child Transport
         for address in ref_list {
             self.child_transport.as_mut().request(

@@ -14,8 +14,6 @@ use lib3h_ghost_actor::{
 pub struct GhostGateway<'gateway, D: Dht> {
     /// Used for distinguishing gateways
     identifier: String,
-    /// Map holding the reversed mapping between connection url and connectionId response
-    connection_map: HashMap<Url, ConnectionId>,
     /// Internal DHT
     inner_dht: D,
     /// Hold child transport actor
