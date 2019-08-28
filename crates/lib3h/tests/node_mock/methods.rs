@@ -842,6 +842,4 @@ impl lib3h_protocol::network_engine::NetworkEngine for NodeMock {
     fn name(&self) -> String {
         self.engine.name()
     }
-
 }
-
