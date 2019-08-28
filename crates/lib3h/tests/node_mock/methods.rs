@@ -826,3 +826,22 @@ impl NodeMock {
         }
     }
 }
+
+impl lib3h_protocol::network_engine::NetworkEngine for NodeMock {
+    fn post(&mut self, data: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
+        self.engine.post(data)
+    }
+
+    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        self.process()
+    }
+    fn advertise(&self) -> Url {
+        self.advertise()
+    }
+
+    fn name(&self) -> String {
+        self.engine.name()
+    }
+
+}
+

@@ -6,6 +6,7 @@ use lib3h_protocol::{
 use std::collections::HashMap;
 
 /// Holds Space-specific data
+#[derive(Clone)]
 pub struct ChainStore {
     space_address: Address,
     stored_entry_store: EntryStore,
