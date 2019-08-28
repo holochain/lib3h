@@ -1,6 +1,6 @@
 use crate::transport::{error::TransportError, ConnectionId};
-use url::Url;
 use lib3h_ghost_actor::prelude::*;
+use url::Url;
 
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
@@ -67,12 +67,8 @@ pub type TransportMessage = GhostMessage<
 
 #[derive(Debug)]
 enum TransportContext {
-    Bind {
-        parent_msg: TransportMessage,
-    },
-    SendMessage {
-        parent_msg: TransportMessage
-    },
+    Bind { parent_msg: TransportMessage },
+    SendMessage { parent_msg: TransportMessage },
 }
 
 /// Transport protocol enums for use with GhostActor implementation

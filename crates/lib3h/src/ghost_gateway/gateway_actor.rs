@@ -171,7 +171,6 @@ impl<'gateway, D: Dht> GhostGateway<'gateway, D> {
                             panic!("received unexpected context type");
                         }
                     };
-
                     // check for timeout
                     if let GhostCallbackData::Timeout = response {
                         parent_msg.respond(Err("Timeout".into()));
