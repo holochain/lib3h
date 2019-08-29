@@ -21,7 +21,9 @@ use lib3h_protocol::{
 };
 use lib3h_sodium::SodiumCryptoSystem;
 use url::Url;
-use utils::{constants::*, processor_harness::*};
+use utils::{constants::*};
+use utils::processor_harness::{Processor, is_connected, 
+    Lib3hServerProtocolAssert, Lib3hServerProtocolEquals, DidWorkAssert};
 
 //--------------------------------------------------------------------------------------------------
 // Test suites
@@ -157,9 +159,7 @@ fn basic_connect_test_mock() {
     // TODO should not be blank request id!
     let is_connected = Box::new(is_connected("", engine_a.advertise()));
 
-    let mut engines = vec![&mut engine_a, &mut engine_b];
-
-    assert_processed(&mut engines, &vec![is_connected]);
+    assert_one_processed!(engine_a, engine_b, is_connected);
 }
 
 #[test]
@@ -189,7 +189,6 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
     engine
         .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
-    let mut engines = vec![engine];
 
     let is_success_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::SuccessResult(GenericResultData {
@@ -218,19 +217,13 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
         handle_get_gosip_entry_list as Box<dyn Processor>,
         handle_get_author_entry_list as Box<dyn Processor>,
     ];
-    assert_processed(&mut engines, &processors);
+    assert_processed!(engine, engine, processors);
 
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 
-    // TODO better way to reuse engines
-    let mut engines2 = Vec::new();
-    for engine in engines.drain(..) {
-        engine
-            .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+    engine.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
             .unwrap();
-        engines2.push(engine);
-    }
 
     let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::FailureResult(GenericResultData {
@@ -241,7 +234,7 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
         }),
     ));
 
-    assert_processed(&mut engines2, &vec![handle_failure_result]);
+    assert_one_processed!(engine, engine, handle_failure_result);
 }
 
 #[test]
@@ -298,15 +291,13 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    let mut engines = vec![alex, billy];
-
     // TODO fix bug in request id tracking
     let request_id = "";
     //    req_connect.clone().request_id.as_str(),
 
     let is_connected = Box::new(is_connected(request_id, req_connect.clone().peer_uri));
 
-    assert_one_processed(&mut engines, is_connected);
+    assert_one_processed!(alex, billy, is_connected);
 
     // Alex joins space A
     println!("\n Alex joins space \n");
@@ -316,29 +307,22 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
         agent_id: ALEX_AGENT_ID.clone(),
     };
 
-    let mut engines2 = Vec::new();
-    for e in engines.drain(..) {
-        if e.name() == alex_engine_name {
-            track_space.agent_id = ALEX_AGENT_ID.clone();
-        } else if e.name() == billy_engine_name {
-            track_space.agent_id = BILLY_AGENT_ID.clone();
-        } else {
-            panic!("unexpected engine name: {}", e.name());
-        }
-        e.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-            .unwrap();
-        engines2.push(e);
-    }
+    track_space.agent_id = ALEX_AGENT_ID.clone();
+    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
+    track_space.agent_id = BILLY_AGENT_ID.clone();
+    billy.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
 
     // TODO check for join space response messages.
 
-    let processors: Vec<Box<dyn Processor>> = vec![
+    let processors /*: Vec<Box<dyn Processor>> = */ = vec![
         Box::new(DidWorkAssert(alex_engine_name)),
         Box::new(DidWorkAssert(billy_engine_name)),
     ];
 
-    assert_processed(&mut engines2, &processors);
-    wait_until_no_work(&mut engines2);
+    assert_processed!(alex, billy, processors);
+    wait_until_no_work!(alex, billy);
 
     println!("DONE basic_two_setup DONE \n\n\n");
 }
@@ -357,7 +341,6 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     println!("\nAlex sends DM to Billy...\n");
     alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
         .unwrap();
-    let mut engines = vec![alex, billy];
     let is_success_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::SuccessResult(GenericResultData {
             request_id: req_dm.clone().request_id,
@@ -371,10 +354,13 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         Lib3hServerProtocol::HandleSendDirectMessage(req_dm.clone()),
     ));
 
-    // Send / Receive request
-    assert_processed(
-        &mut engines,
-        &vec![is_success_result, handle_send_direct_message],
+    let processors = 
+        vec![is_success_result, handle_send_direct_message];
+     // Send / Receive request
+    assert_processed!(
+        alex,
+        billy,
+        processors
     );
 
     // Post response
@@ -387,7 +373,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
     )
     .as_bytes()
     .to_vec();
-    engines[1]
+    billy
         .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
             res_dm.clone(),
         ))
@@ -406,10 +392,13 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         Lib3hServerProtocol::SendDirectMessageResult(res_dm.clone()),
     ));
 
-    let _ = assert_processed(
-        &mut engines,
-        &vec![is_success_result, handle_send_direct_message_result],
-    );
+    let processors = vec![is_success_result, handle_send_direct_message_result];
+
+     assert_processed!(
+        alex,
+        billy,
+        processors
+   );
 }
 
 //
@@ -446,19 +435,15 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
         .unwrap();
 
     let alex_bind_url = alex.advertise();
-    let mut engines = vec![alex, billy];
 
     let is_connected = Box::new(is_connected("", alex_bind_url));
 
-    assert_one_processed(&mut engines, is_connected);
+    assert_one_processed!(alex, billy, is_connected);
 
     println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
 
-    wait_until_no_work(&mut engines);
+    wait_until_no_work!(alex, billy);
 
     // Do Send DM test
-    let mut e = engines.iter_mut();
-    let alex = e.next().expect("alex");
-    let billy = e.next().expect("billy");
     basic_two_send_message(alex, billy);
 }

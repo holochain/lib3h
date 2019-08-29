@@ -2,6 +2,7 @@ pub mod constants;
 #[macro_use]
 pub mod predicate;
 
+#[macro_use]
 pub mod processor_harness;
 
 #[allow(unused_macros)]

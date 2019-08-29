@@ -1,4 +1,4 @@
-use crate::{node_mock::NodeMock, utils::constants::*};
+use crate::{node_mock::{NodeMock}, utils::constants::*};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
@@ -23,15 +23,15 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 ///
-pub fn setup_two_nodes(alex: &mut NodeMock, mut billy: &mut NodeMock) {
+pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
     // Connect Alex to Billy
     let connect_data = alex.connect_to(&billy.advertise()).unwrap();
-    alex.wait_connect(&connect_data, &mut billy);
+    wait_connect!(alex, connect_data, billy);
 
     billy.wait_until_no_work();
     alex.wait_until_no_work();
     billy.wait_until_no_work();
-    two_join_space(alex, billy, &SPACE_ADDRESS_A);
+    two_join_space(&mut alex, &mut billy, &SPACE_ADDRESS_A);
 
     println!("DONE setup_two_nodes() DONE \n\n\n");
 }
@@ -43,17 +43,17 @@ pub fn setup_two_nodes(alex: &mut NodeMock, mut billy: &mut NodeMock) {
 /// Request ENTRY_ADDRESS_1 from the network and should get it back
 pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let enty_address_str = &entry.entry_address;
-    println!("\n{} requesting entry: {}\n", node.name, enty_address_str);
+    println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let query_data = node.request_entry(entry.entry_address.clone());
     let (did_work, _srv_msg_list) = node.process().unwrap();
     assert!(did_work);
 
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request:\n", node.name);
+    println!("\n{} reply to own request:\n", node.name());
     let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = node.process().unwrap();
-    println!("\n{} gets own response {:?}\n", node.name, srv_msg_list);
+    println!("\n{} gets own response {:?}\n", node.name(), srv_msg_list);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
@@ -70,7 +70,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
     println!(
         "\ntwo_join_space ({},{}) -> {}\n",
-        alex.name, billy.name, space_address
+        alex.name(), billy.name(), space_address
     );
     // Alex joins space
     let req_id = alex.join_space(&space_address, true).unwrap();
@@ -85,7 +85,7 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space
-    println!("\n {} joins {}\n", billy.name, space_address);
+    println!("\n {} joins {}\n", billy.name(), space_address);
     let req_id = billy.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -126,7 +126,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Send response
     let response_content = format!("echo: {}", content).as_bytes().to_vec();
-    billy.send_response(&req_id, &alex.agent_id, response_content.clone());
+    billy.send_response(&req_id, &alex.agent_id(), response_content.clone());
     assert_process_success!(billy, req_id);
     // Receive response
     let (did_work, srv_msg_list) = alex.process().unwrap();
