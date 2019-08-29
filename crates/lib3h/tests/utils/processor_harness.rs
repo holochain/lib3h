@@ -73,13 +73,17 @@ pub trait Assert<T> {
 
     fn assert_inner(&self, args: &T) -> bool;
 }
+
+/// Asserts that the actual is equal to the given expected
 #[allow(dead_code)]
 #[derive(PartialEq, Debug)]
 pub struct Lib3hServerProtocolEquals(pub Lib3hServerProtocol);
 
+/// Asserts using an arbitrary predicate over a lib3h server protocol event
 #[allow(dead_code)]
 pub struct Lib3hServerProtocolAssert(pub Box<dyn Predicate<Lib3hServerProtocol>>);
 
+/// Assserts work was done
 #[allow(dead_code)]
 #[derive(PartialEq, Debug)]
 pub struct DidWorkAssert(pub String /* engine name */);
@@ -108,6 +112,10 @@ impl Processor for DidWorkAssert {
     fn test(&self, args: &ProcessorResult) {
         assert!(args.engine_name == self.0);
         assert!(args.did_work);
+    }
+
+    fn name(&self) -> String {
+        format!("{:?}", self).to_string()
     }
 }
 
@@ -190,9 +198,9 @@ impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {
 impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 
 #[allow(unused_macros)]
-/// Convenience function that asserts only one particular predicate
+/// Convenience function that asserts only one particular equality predicate
 /// passes for a collection of engines. See assert_processed for
-/// more information.
+/// more information. equal_to is compared to the actual and aborts if not actual.
 macro_rules! assert_processed_eq {
     ($engine1:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
      $engine2:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
@@ -266,7 +274,6 @@ macro_rules! process_one {
     }};
 }
 
-// TODO Return back engines?
 /// Asserts that a collection of engines produce events
 /// matching a set of predicate functions. For the program
 /// to continue executing all processors must pass.
@@ -341,7 +348,8 @@ pub fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEqual
     }))
 }
 
-/// Waits for work to be done
+/// Waits for work to be done. Will interrupt the program if no work was done and should_abort
+/// is true
 #[allow(unused_macros)]
 macro_rules! wait_did_work {
     ($engine1:ident, //&mut Vec<&mut Box<dyn NetworkEngine>>,
