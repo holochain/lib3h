@@ -226,7 +226,7 @@ macro_rules! assert_one_processed {
 }
 
 #[allow(unused_macros)]
-macro_rules! check_one {
+macro_rules! process_one {
     ($engine: ident,
   $previous: ident,
   $errors: ident
@@ -302,12 +302,12 @@ macro_rules! assert_processed {
         for epoch in 0..20 {
             println!("[{:?}] {:?}", epoch, previous);
 
-            check_one!($engine1, previous, errors);
+            process_one!($engine1, previous, errors);
             if errors.is_empty() {
                 break;
             }
 
-            check_one!($engine2, previous, errors);
+            process_one!($engine2, previous, errors);
             if errors.is_empty() {
                 break;
             }
