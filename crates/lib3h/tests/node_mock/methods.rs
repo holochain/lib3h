@@ -646,55 +646,15 @@ impl NodeMock {
 
     /// Waits for work to be done
     pub fn wait_did_work(&mut self, should_abort: bool) -> Vec<ProcessorResult> {
-        let engine_name = self.engine.name();
-        let processor = 
-            Box::new(DidWorkAssert(engine_name));
-
         let me = self;
-        assert_one_processed!(
-            me, me,
-            processor,
-            should_abort
-        )
+        wait_did_work!(me, me, should_abort)
     }
 
     /// Continues processing the engine until no work is being done.
     pub fn wait_until_no_work(&mut self) -> Vec<ProcessorResult> {
-        loop {
-            let result = self.wait_did_work(false);
-            if result.is_empty() {
-                return result;
-            } else {
-                if result.iter().find(|x| x.did_work).is_some() {
-                    continue;
-                } else {
-                    return result;
-                }
-            }
-        }
+        let me = self;
+        wait_until_no_work!(me, me)
     }
-
-
-    /*
-    pub fn wait_connect(
-        &mut self,
-        _connect_data: &ConnectData,
-        other: &mut Box<dyn NetworkEngine>,
-    ) -> Vec<ProcessorResult> {
-        let connected_data = Lib3hServerProtocol::Connected(ConnectedData {
-            uri: other.advertise(),
-            request_id: "".to_string(), // TODO fix this bug and uncomment out! connect_data.clone().request_id
-        });
-        let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(connected_data));
-        let mut me : Box<dyn lib3h_protocol::network_engine::NetworkEngine> = Box::new(*self);
-        let other : &mut Box<dyn lib3h_protocol::network_engine::NetworkEngine> = other as
-            &mut Box<dyn lib3h_protocol::network_engine::NetworkEngine>;
-        let engines = &mut vec![&mut me, &mut other];
-        let result = assert_one_processed!(engines, predicate);
-        result
-    }
-    */
-
 
     /// Send a DirectMessage on the network.
     /// Returns the generated request_id for this send
