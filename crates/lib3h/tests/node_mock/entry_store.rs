@@ -4,6 +4,7 @@ use lib3h_protocol::{
 };
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct EntryStore {
     pub store: HashMap<Address, HashMap<Address, EntryAspectData>>,
 }

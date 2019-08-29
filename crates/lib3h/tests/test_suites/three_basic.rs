@@ -18,29 +18,24 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 ///
-pub fn setup_three_nodes(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock) {
+pub fn setup_three_nodes(
+    /*mut*/ alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    /*mut*/ camille: &mut NodeMock,
+) {
     // Connection
     // ==========
     // Connect Alex to Billy
-    alex.connect_to(&billy.advertise()).unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("[Alex] connected_msg = {:?}\n", connected_msg);
-    assert_eq!(&connected_msg.uri, &billy.advertise());
-    // More process: Have Billy process P2p::PeerAddress of alex
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let connect_data = alex.connect_to(&billy.advertise()).unwrap();
+    wait_connect!(alex, connect_data, billy);
+
+    billy.wait_until_no_work();
+    alex.wait_until_no_work();
+    billy.wait_until_no_work();
 
     // Connect Camille to Billy
-    camille.connect_to(&billy.advertise()).unwrap();
-    let (did_work, srv_msg_list) = camille.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let connected_msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::Connected);
-    println!("[Camille] connected_msg = {:?}\n", connected_msg);
-    assert_eq!(&connected_msg.uri, &billy.advertise());
+    let connect_data = camille.connect_to(&billy.advertise()).unwrap();
+    wait_connect!(camille, connect_data, billy);
     // More process: Have Billy process P2p::PeerAddress of Camille
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
@@ -136,7 +131,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
     // Send response
     println!("\nBilly responds to Alex...\n");
     let response_content = format!("echo: {}", content).as_bytes().to_vec();
-    billy.send_response(&req_id, &alex.agent_id, response_content.clone());
+    billy.send_response(&req_id, &alex.agent_id(), response_content.clone());
     assert_process_success!(billy, req_id);
     // A receives response
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -174,7 +169,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
     // Send response
     println!("\nAlex responds to Camille...\n");
     let response_content = format!("echo: {}", content).as_bytes().to_vec();
-    alex.send_response(&req_id, &camille.agent_id, response_content.clone());
+    alex.send_response(&req_id, &camille.agent_id(), response_content.clone());
     assert_process_success!(alex, req_id);
     // Receive response
     let (did_work, srv_msg_list) = camille.process().unwrap();
@@ -257,17 +252,22 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     let enty_address_str = &entry_1.entry_address;
     println!(
         "\n{} requesting entry: {}\n",
-        camille.name, enty_address_str
+        camille.name(),
+        enty_address_str
     );
     let query_data = camille.request_entry(entry_1.entry_address.clone());
     let (did_work, _srv_msg_list) = camille.process().unwrap();
     assert!(did_work);
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request:\n", camille.name);
+    println!("\n{} reply to own request:\n", camille.name());
     let _ = camille.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = camille.process().unwrap();
-    println!("\n{} gets own response {:?}\n", camille.name, srv_msg_list);
+    println!(
+        "\n{} gets own response {:?}\n",
+        camille.name(),
+        srv_msg_list
+    );
     assert!(did_work);
     assert!(srv_msg_list.len() >= 1);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
@@ -283,17 +283,22 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     let enty_address_str = &entry_2.entry_address;
     println!(
         "\n{} requesting entry: {}\n",
-        camille.name, enty_address_str
+        camille.name(),
+        enty_address_str
     );
     let query_data = camille.request_entry(entry_2.entry_address.clone());
     let (did_work, _srv_msg_list) = camille.process().unwrap();
     assert!(did_work);
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request:\n", camille.name);
+    println!("\n{} reply to own request:\n", camille.name());
     let _ = camille.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = camille.process().unwrap();
-    println!("\n{} gets own response {:?}\n", camille.name, srv_msg_list);
+    println!(
+        "\n{} gets own response {:?}\n",
+        camille.name(),
+        srv_msg_list
+    );
     assert!(did_work);
     assert!(srv_msg_list.len() >= 1);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);

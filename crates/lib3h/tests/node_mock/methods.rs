@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
+use predicates::prelude::*;
+
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
-use crate::utils::constants::*;
+use crate::utils::{constants::*, processor_harness::*};
 use holochain_persistence_api::hash::HashString;
 use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
@@ -16,14 +18,12 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use std::collections::HashMap;
 use url::Url;
-
 /// Query logs
 impl NodeMock {
     /// Return number of Lib3hServerProtocol message this node has received
     pub fn count_recv_messages(&self) -> usize {
         self.recv_msg_log.len()
     }
-
     /// Return the ith Lib3hServerProtocol message
     /// that this node has received and fullfills predicate
     pub fn find_recv_msg(
@@ -64,7 +64,7 @@ impl NodeMock {
 
     /// Try connecting to previously connected_to nodes.
     /// Return Err if all connects failed.
-    pub fn reconnect(&mut self) -> Lib3hProtocolResult<()> {
+    pub fn reconnect(&mut self) -> Lib3hProtocolResult<ConnectData> {
         // re-connect to all nodes
         let mut return_res = Err(Lib3hProtocolError::new(ErrorKind::Other(String::from(
             "Failed to reconnect to any node",
@@ -91,11 +91,11 @@ impl NodeMock {
                 warn!("Failed to rejoin space {}: {:?}", space, e);
             }
         }
-        Ok(())
+        return_res
     }
 
     /// Connect to another peer via its uri
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<()> {
+    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<ConnectData> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
             peer_uri: uri.clone(),
@@ -104,7 +104,8 @@ impl NodeMock {
         self.connected_list.insert(uri.clone());
         return self
             .engine
-            .post(Lib3hClientProtocol::Connect(req_connect.clone()));
+            .post(Lib3hClientProtocol::Connect(req_connect.clone()))
+            .map(|_| req_connect);
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
@@ -445,47 +446,7 @@ impl NodeMock {
 }
 
 /// Direct Messaging
-impl NodeMock {
-    /// Send a DirectMessage on the network.
-    /// Returns the generated request_id for this send
-    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
-        let current_space = self.current_space.clone().expect("Current Space not set");
-        let request_id = self.generate_request_id();
-        debug!("current_space: {:?}", self.current_space);
-        let msg_data = DirectMessageData {
-            space_address: current_space.clone(),
-            request_id: request_id.clone(),
-            to_agent_id: to_agent_id.clone(),
-            from_agent_id: self.agent_id.clone(),
-            content,
-        };
-        let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
-        self.engine
-            .post(p)
-            .expect("Posting SendDirectMessage failed");
-        request_id
-    }
-
-    /// Send a DirectMessage response on the network.
-    pub fn send_response(
-        &mut self,
-        request_id: &str,
-        to_agent_id: &Address,
-        response_content: Vec<u8>,
-    ) {
-        let current_space = self.current_space.clone().expect("Current Space not set");
-        let response = DirectMessageData {
-            space_address: current_space.clone(),
-            request_id: request_id.to_owned(),
-            to_agent_id: to_agent_id.clone(),
-            from_agent_id: self.agent_id.clone(),
-            content: response_content,
-        };
-        self.engine
-            .post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
-            .expect("Posting HandleSendMessageResult failed");
-    }
-}
+impl NodeMock {}
 
 /// Reply to get*List
 impl NodeMock {
@@ -622,6 +583,17 @@ impl NodeMock {
             .expect("Reply to HandleFetchEntry should work");
         true
     }
+}
+
+impl NodeMock {
+    /// Wait for receiving a message corresponding to predicate
+    /// hard coded timeout
+    pub fn wait(
+        &mut self,
+        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
+    ) -> Option<Lib3hServerProtocol> {
+        self.wait_with_timeout(predicate, TIMEOUT_MS)
+    }
 
     /// Call process() in a loop until receiving a message corresponding to predicate
     /// or until timeout is reached
@@ -645,6 +617,7 @@ impl NodeMock {
             }
 
             std::thread::sleep(std::time::Duration::from_millis(100));
+            // TODO actually compute elapsed time
             time_ms += 100;
             if time_ms > timeout_ms {
                 info!("({:?})::wait() has TIMEOUT", self.agent_id);
@@ -653,15 +626,79 @@ impl NodeMock {
         }
     }
 
-    /// Wait for receiving a message corresponding to predicate
-    /// hard coded timeout
-    pub fn wait(
+    /// Asserts that some event passes an arbitrary predicate
+    pub fn wait_assert(
         &mut self,
-        predicate: Box<dyn Fn(&Lib3hServerProtocol) -> bool>,
-    ) -> Option<Lib3hServerProtocol> {
-        self.wait_with_timeout(predicate, TIMEOUT_MS)
+        predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
+    ) -> Vec<ProcessorResult> {
+        let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolAssert(predicate));
+        assert_one_processed!(self, self, predicate)
     }
 
+    /// Asserts some event produced by produce equals actual
+    pub fn wait_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
+        let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(actual.clone()));
+        assert_one_processed!(self, self, predicate)
+    }
+
+    /// Waits for work to be done
+    pub fn wait_did_work(&mut self, should_abort: bool) -> Vec<ProcessorResult> {
+        let me = self;
+        wait_did_work!(me, me, should_abort)
+    }
+
+    /// Continues processing the engine until no work is being done.
+    pub fn wait_until_no_work(&mut self) -> Vec<ProcessorResult> {
+        let me = self;
+        wait_until_no_work!(me, me)
+    }
+
+    /// Send a DirectMessage on the network.
+    /// Returns the generated request_id for this send
+    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let request_id = self.generate_request_id();
+        debug!("current_space: {:?}", self.current_space);
+        let msg_data = DirectMessageData {
+            space_address: current_space.clone(),
+            request_id: request_id.clone(),
+            to_agent_id: to_agent_id.clone(),
+            from_agent_id: self.agent_id.clone(),
+            content,
+        };
+        let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
+        self.engine
+            .post(p)
+            .expect("Posting SendDirectMessage failed");
+        request_id
+    }
+
+    /// Send a DirectMessage response on the network.
+    pub fn send_response(
+        &mut self,
+        request_id: &str,
+        to_agent_id: &Address,
+        response_content: Vec<u8>,
+    ) {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let response = DirectMessageData {
+            space_address: current_space.clone(),
+            request_id: request_id.to_owned(),
+            to_agent_id: to_agent_id.clone(),
+            from_agent_id: self.agent_id.clone(),
+            content: response_content,
+        };
+        self.engine
+            .post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
+            .expect("Posting HandleSendMessageResult failed");
+    }
+
+    pub fn agent_id(&self) -> Address {
+        self.agent_id.clone()
+    }
+}
+
+impl NodeMock {
     /// Call process until timeout is reached
     /// returns the number of messages it received during listening period
     /// timeout is reset after a message is received
@@ -767,5 +804,26 @@ impl NodeMock {
                 // no-op
             }
         }
+    }
+
+    pub fn name(&self) -> String {
+        self.engine.name()
+    }
+}
+
+impl lib3h_protocol::network_engine::NetworkEngine for NodeMock {
+    fn post(&mut self, data: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
+        self.engine.post(data)
+    }
+
+    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        self.process()
+    }
+    fn advertise(&self) -> Url {
+        self.advertise()
+    }
+
+    fn name(&self) -> String {
+        self.name()
     }
 }

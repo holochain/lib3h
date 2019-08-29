@@ -88,16 +88,16 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
 
     // Billy asks for unpublished data.
-    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name);
+    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name());
     let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
     let (did_work, _srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
 
     // #fullsync
     // Alex sends back a failureResult response to the network
-    println!("\n{} looking for HandleQueryEntry\n", billy.name);
+    println!("\n{} looking for HandleQueryEntry\n", billy.name());
     let res = billy.reply_to_HandleQueryEntry(&query_data);
-    println!("\n{} found: {:?}\n", billy.name, res);
+    println!("\n{} found: {:?}\n", billy.name(), res);
     assert!(res.is_err());
     let result_data = res.err().unwrap();
     let info = std::string::String::from_utf8_lossy(&result_data.result_info).to_string();
@@ -187,14 +187,14 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Billy asks for the entry
     // ========================
-    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name);
+    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name());
     let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
     let (did_work, _srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
 
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request:\n", billy.name);
+    println!("\n{} reply to own request:\n", billy.name());
     let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);

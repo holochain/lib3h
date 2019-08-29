@@ -15,4 +15,7 @@ pub trait NetworkEngine {
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)>;
     /// Get qualified transport address
     fn advertise(&self) -> Url;
+
+    /// User supplied engine identifier
+    fn name(&self) -> String;
 }

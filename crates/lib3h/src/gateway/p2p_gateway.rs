@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
-    transport::TransportWrapper,
+    transport::{protocol::*, TransportWrapper},
 };
 use lib3h_protocol::Address;
 use std::collections::{HashMap, VecDeque};
@@ -28,6 +28,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             identifier: identifier.to_owned(),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
+            transport_inject_events: Vec::new(),
         }
     }
 }
@@ -36,6 +37,10 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
     /// This Gateway's identifier
     fn identifier(&self) -> &str {
         self.identifier.as_str()
+    }
+
+    fn transport_inject_event(&mut self, evt: TransportEvent) {
+        self.transport_inject_events.push(evt);
     }
 
     /// Helper for getting a connectionId from a peer_address
@@ -85,6 +90,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             identifier,
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
+            transport_inject_events: Vec::new(),
         }
     }
 }
