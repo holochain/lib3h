@@ -3,6 +3,7 @@ use std::any::Any;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
+#[derive(Debug)]
 enum GhostEndpointMessage<Request, Response, Error> {
     Request {
         request_id: Option<RequestId>,
@@ -29,7 +30,7 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error> std::fmt::Debu
     for GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "GhostMessage {{ .. }}")
+        write!(f, "GhostMessage {{request_id: {:?}, ..}}", self.request_id)
     }
 }
 
@@ -48,6 +49,29 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
             message: Some(message),
             sender,
         }
+    }
+
+    /// create a request message
+    #[allow(dead_code)]
+    fn new_request(
+        request_id: RequestId,
+        message: RequestToSelf,
+        sender: crossbeam_channel::Sender<
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
+        >,
+    ) -> Self {
+        GhostMessage::new(Some(request_id), message, sender)
+    }
+
+    /// create an event message
+    #[allow(dead_code)]
+    fn new_event(
+        message: RequestToSelf,
+        sender: crossbeam_channel::Sender<
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
+        >,
+    ) -> Self {
+        GhostMessage::new(None, message, sender)
     }
 
     /// most often you will want to consume the contents of the request
@@ -303,4 +327,76 @@ pub fn create_ghost_channel<
     let child_side = GhostEndpoint::new(child_send, child_recv);
 
     (parent_side, child_side)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestMsgOut(String);
+    //    #[derive(Debug)]
+    //    struct TestMsgOutResponse(String);
+    #[derive(Debug)]
+    struct TestMsgIn(String);
+    #[derive(Debug)]
+    struct TestMsgInResponse(String);
+    type TestError = String;
+
+    #[test]
+    fn test_ghost_channel_message_event() {
+        let (child_send, child_as_parent_recv) = crossbeam_channel::unbounded::<
+            GhostEndpointMessage<TestMsgOut, TestMsgInResponse, TestError>,
+        >();
+
+        let mut msg: GhostMessage<TestMsgIn, TestMsgOut, TestMsgInResponse, TestError> =
+            GhostMessage::new_event(
+                TestMsgIn("this is an event message from an internal child".into()),
+                child_send,
+            );
+        assert_eq!("GhostMessage {request_id: None, ..}", format!("{:?}", msg));
+        let payload = msg.take_message().unwrap();
+        assert_eq!(
+            "TestMsgIn(\"this message from an internal child\")",
+            format!("{:?}", payload)
+        );
+
+        msg.respond(Ok(TestMsgInResponse(
+            "response back to child which should fail because no request id".into(),
+        )));
+        // check to see if the message was sent
+        let response = child_as_parent_recv.recv();
+        assert_eq!("Err(RecvError)", format!("{:?}", response));
+    }
+
+    #[test]
+    fn test_ghost_channel_message_request() {
+        let (child_send, child_as_parent_recv) = crossbeam_channel::unbounded::<
+            GhostEndpointMessage<TestMsgOut, TestMsgInResponse, TestError>,
+        >();
+        let request_id = RequestId::new();
+        let msg: GhostMessage<TestMsgIn, TestMsgOut, TestMsgInResponse, TestError> =
+            GhostMessage::new_request(
+                request_id.clone(),
+                TestMsgIn("this is a request message from an internal child".into()),
+                child_send,
+            );
+        msg.respond(Ok(TestMsgInResponse("response back to child".into())));
+
+        // check to see if the response was sent
+        let response = child_as_parent_recv.recv();
+        match response {
+            Ok(GhostEndpointMessage::Response {
+                request_id,
+                payload,
+            }) => {
+                assert_eq!(request_id, request_id);
+                assert_eq!(
+                    "Ok(TestMsgInResponse(\"response back to child\"))",
+                    format!("{:?}", payload)
+                );
+            }
+            _ => assert!(false),
+        }
+    }
 }
