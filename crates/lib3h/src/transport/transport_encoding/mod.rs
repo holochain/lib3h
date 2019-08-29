@@ -148,6 +148,7 @@ impl TransportEncoding {
 
     /// private handler for inner transport ReceivedData events
     fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+        trace!("got {:?} {}", &address, &String::from_utf8_lossy(&payload));
         match self.connections_no_id_to_id.get(&address) {
             Some(remote_addr) => {
                 // if we've seen this connection before, just forward it
@@ -341,7 +342,7 @@ impl TransportEncoding {
 
                 // first make a low-level address by removing the ?a=Hcyada
                 let mut sub_address = address.clone();
-                sub_address.query_pairs_mut().clear();
+                sub_address.set_query(None);
 
                 // send along a handshake message
                 self.send_handshake(&sub_address);
@@ -410,18 +411,25 @@ mod tests {
                 TransportError,
             >,
         >,
+        bound_url: Url,
         mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
+        mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
     }
 
     impl TransportMock {
-        pub fn new(mock_sender: crossbeam_channel::Sender<Vec<u8>>) -> Self {
+        pub fn new(
+            mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
+            mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+        ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
             let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
             Self {
                 endpoint_parent,
                 endpoint_self,
+                bound_url: Url::parse("none:").expect("can parse url"),
                 mock_sender,
+                mock_receiver,
             }
         }
     }
@@ -449,17 +457,30 @@ mod tests {
                 match msg.take_message().expect("exists") {
                     RequestToChild::Bind { mut spec } => {
                         spec.set_path("bound");
+                        self.bound_url = spec.clone();
                         msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                             bound_url: spec,
                         })));
                     }
-                    RequestToChild::SendMessage {
-                        address: _,
-                        payload: _,
-                    } => {
-
+                    RequestToChild::SendMessage { address, payload } => {
+                        self.mock_sender.send((address, payload)).unwrap();
                         msg.respond(Ok(RequestToChildResponse::SendMessage));
                     }
+                }
+            }
+            loop {
+                match self.mock_receiver.try_recv() {
+                    Ok((address, payload)) => {
+                        // bit of a hack, just always send an incoming connection
+                        // in front of all received data messages
+                        self.endpoint_self
+                            .publish(RequestToParent::IncomingConnection {
+                                address: address.clone(),
+                            });
+                        self.endpoint_self
+                            .publish(RequestToParent::ReceivedData { address, payload });
+                    }
+                    Err(_) => break,
                 }
             }
             Ok(false.into())
@@ -471,18 +492,30 @@ mod tests {
         let crypto: Box<dyn CryptoSystem> =
             Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
 
-        let (s1out, r1out) = crossbeam_channel::unbounded();
+        // set up some reference values
+        let addr1 = Url::parse("test://1/bound").unwrap();
+        let addr2 = Url::parse("test://2/bound").unwrap();
+        let mut addr1full = addr1.clone();
+        addr1full.query_pairs_mut().append_pair("a", ID_1);
+        let mut addr2full = addr2.clone();
+        addr2full.query_pairs_mut().append_pair("a", ID_2);
 
+        // we need some channels into our mock inner_transports
+        let (s1out, r1out) = crossbeam_channel::unbounded();
+        let (s1in, r1in) = crossbeam_channel::unbounded();
+
+        // create the first encoding transport
         let mut t1: TransportActorParentWrapper<()> = GhostParentWrapper::new(
             Box::new(TransportEncoding::new(
                 crypto.box_clone(),
                 ID_1.to_string(),
                 Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new(s1out)),
+                Box::new(TransportMock::new(s1out, r1in)),
             )),
             "test1",
         );
 
+        // give it a bind point
         t1.request(
             std::time::Duration::from_millis(2000),
             (),
@@ -498,20 +531,25 @@ mod tests {
             })
         );
 
+        // allow process
         t1.process(&mut ()).unwrap();
 
-        let (s2out, _r2out) = crossbeam_channel::unbounded();
+        // we need some channels into our mock inner_transports
+        let (s2out, r2out) = crossbeam_channel::unbounded();
+        let (s2in, r2in) = crossbeam_channel::unbounded();
 
+        // create the second encoding transport
         let mut t2: TransportActorParentWrapper<()> = GhostParentWrapper::new(
             Box::new(TransportEncoding::new(
                 crypto.box_clone(),
                 ID_2.to_string(),
                 Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new(s2out)),
+                Box::new(TransportMock::new(s2out, r2in)),
             )),
             "test2",
         );
 
+        // give it a bind point
         t2.request(
             std::time::Duration::from_millis(2000),
             (),
@@ -527,28 +565,77 @@ mod tests {
             })
         );
 
+        // allow process
         t2.process(&mut ()).unwrap();
 
+        let mut t1_got_success_resp = false;
+
+        // now we're going to send a message to our sibling #2
         t1.request(
             std::time::Duration::from_millis(2000),
             (),
             RequestToChild::SendMessage {
-                address: Url::parse("test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r").expect("can parse url"),
+                address: addr2full.clone(),
                 payload: b"hello".to_vec(),
             },
-            Box::new(|_, _, response| {
-                println!("got: {:?}", response);
+            Box::new(|m, _, response| {
+                match m.downcast_mut::<bool>() {
+                    None => panic!("bad downcast"),
+                    Some(b) => *b = true,
+                }
+                // make sure we get a success response
+                assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
                 Ok(())
-            })
+            }),
         );
 
         t1.process(&mut ()).unwrap();
+
+        // we get a handshake that needs to be forwarded to #2
+        let (address, payload) = r1out.recv().unwrap();
+        assert_eq!(&addr2, &address);
+        assert_eq!(ID_1, &String::from_utf8_lossy(&payload));
+        s2in.send((addr1.clone(), payload)).unwrap();
+
         t2.process(&mut ()).unwrap();
         t1.process(&mut ()).unwrap();
         t2.process(&mut ()).unwrap();
+
+        // we get a handshake that needs to be forwarded to #1
+        let (address, payload) = r2out.recv().unwrap();
+        assert_eq!(&addr1, &address);
+        assert_eq!(ID_2, &String::from_utf8_lossy(&payload));
+        s1in.send((addr2.clone(), payload)).unwrap();
+
         t1.process(&mut ()).unwrap();
         t2.process(&mut ()).unwrap();
-        t1.process(&mut ()).unwrap();
+
+        // this is the process where we get the Send Success
+        assert!(!t1_got_success_resp);
+        t1.process(&mut t1_got_success_resp).unwrap();
+        assert!(t1_got_success_resp);
+
+        // this is another handshake due to our mock kludge
+        r1out.recv().unwrap();
+
         t2.process(&mut ()).unwrap();
+
+        // we get the actual payload that needs to be forwarded to #2
+        let (address, payload) = r1out.recv().unwrap();
+        assert_eq!(&addr2, &address);
+        assert_eq!(&b"hello".to_vec(), &payload);
+        s2in.send((addr1.clone(), payload)).unwrap();
+
+        t2.process(&mut ()).unwrap();
+
+        // #2 now gets the payload!
+        let mut msg_list = t2.drain_messages();
+        let msg = msg_list.get_mut(2).unwrap().take_message();
+        if let Some(RequestToParent::ReceivedData { address, payload }) = msg {
+            assert_eq!(&address, &addr1full);
+            assert_eq!(&b"hello".to_vec(), &payload);
+        } else {
+            panic!("bad type {:?}", msg);
+        }
     }
 }
