@@ -98,6 +98,66 @@ impl<
     }
 }
 
+impl<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor: GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    > std::convert::AsRef<Actor>
+    for GhostParentWrapper<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor,
+    >
+{
+    fn as_ref(&self) -> &Actor {
+        &self.actor
+    }
+}
+
+impl<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor: GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    > std::convert::AsMut<Actor>
+    for GhostParentWrapper<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor,
+    >
+{
+    fn as_mut(&mut self) -> &mut Actor {
+        &mut self.actor
+    }
+}
+
 pub trait GhostActor<
     RequestToParent,
     RequestToParentResponse,
