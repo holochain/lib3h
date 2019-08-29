@@ -3,9 +3,7 @@
 /// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
 
-use lib3h_protocol::{
-    data_types::*, protocol_server::Lib3hServerProtocol,
-};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
 
 /// Represents all useful state after a single call to an engine's process function
 #[derive(Clone, Debug)]
@@ -187,16 +185,14 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 /// Convenience function that asserts only one particular predicate
 /// passes for a collection of engines. See assert_processed for
 /// more information.
-macro_rules! assert_processed_eq{
+macro_rules! assert_processed_eq {
     ($engine1:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
      $engine2:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
      $equal_to:ident,// Box<dyn Processor>,
-    ) => {
-        {
-            let p = Box::new(Lib3hServerProtocolEquals($equal_to));
-            assert_one_processed!($engine1, $engine2, p)
-        }
-    }
+    ) => {{
+        let p = Box::new(Lib3hServerProtocolEquals($equal_to));
+        assert_one_processed!($engine1, $engine2, p)
+    }};
 }
 
 #[allow(unused_macros)]
@@ -208,35 +204,31 @@ macro_rules! assert_one_processed {
      $engine2:ident,
      $processor:ident,
     $should_abort:expr
-    ) => {
-        {
-            let processors = vec![$processor];
-            let result = assert_processed!($engine1, $engine2, 
-                                           processors, $should_abort);
-            result
-        }
-    };
+    ) => {{
+        let processors = vec![$processor];
+        let result = assert_processed!($engine1, $engine2, processors, $should_abort);
+        result
+    }};
     ($engine1:ident,
      $engine2:ident,
      $processor:ident
-     ) => { assert_one_processed!($engine1, $engine2, $processor, true) }
+     ) => {
+        assert_one_processed!($engine1, $engine2, $processor, true)
+    };
 }
 
 #[allow(unused_macros)]
 macro_rules! check_one {
- ($engine: ident,
+    ($engine: ident,
   $previous: ident,
   $errors: ident
-  ) => 
- {
-     {          
-         let (did_work, events) = 
-             $engine.process()
-                .map_err(|err| dbg!(err))
-                .unwrap_or((false, vec![]));
-            if events.is_empty() {
-            } else {
-
+  ) => {{
+        let (did_work, events) = $engine
+            .process()
+            .map_err(|err| dbg!(err))
+            .unwrap_or((false, vec![]));
+        if events.is_empty() {
+        } else {
             let events = dbg!(events);
             let processor_result = $crate::utils::processor_harness::ProcessorResult {
                 did_work,
@@ -262,12 +254,9 @@ macro_rules! check_one {
             if !processor_result.events.is_empty() {
                 $previous.push(processor_result.clone());
             }
-            }
-
+        }
+    }};
 }
-}
-}
-
 
 // TODO Return back engines?
 /// Asserts that a collection of engines produce events
@@ -281,31 +270,29 @@ macro_rules! check_one {
 /// Returns all observed processor results for use by
 /// subsequent tests.
 #[allow(unused_macros)]
-macro_rules! assert_processed{
- ($engine1:ident,
+macro_rules! assert_processed {
+    ($engine1:ident,
   $engine2:ident,
   $processors:ident
- ) => { 
-  assert_processed!($engine1, $engine2,
-                     $processors, true) };
+ ) => {
+        assert_processed!($engine1, $engine2, $processors, true)
+    };
     ($engine1:ident,
      $engine2:ident,
      $processors:ident, 
-     $should_abort:expr) 
- =>
-    {
-    {
+     $should_abort:expr) => {{
         let mut previous = Vec::new();
-        let mut errors : 
-            Vec<(Box<dyn $crate::utils::processor_harness::Processor>, 
-                 Option<$crate::utils::processor_harness::ProcessorResult>)>= Vec::new();
+        let mut errors: Vec<(
+            Box<dyn $crate::utils::processor_harness::Processor>,
+            Option<$crate::utils::processor_harness::ProcessorResult>,
+        )> = Vec::new();
 
-    for p in $processors {
-        errors.push((p, None))
-    }
+        for p in $processors {
+            errors.push((p, None))
+        }
 
-    for epoch in 0..20 {
-        println!("[{:?}] {:?}", epoch, previous);
+        for epoch in 0..20 {
+            println!("[{:?}] {:?}", epoch, previous);
 
             check_one!($engine1, previous, errors);
             if errors.is_empty() {
@@ -316,27 +303,26 @@ macro_rules! assert_processed{
             if errors.is_empty() {
                 break;
             }
+        }
 
-    }
-
-    if $should_abort {
-        for (p, args) in errors {
-            if let Some(args) = args {
-                p.test(&args)
-            } else {
-                // Make degenerate result which should fail
-                p.test(&$crate::utils::processor_harness::ProcessorResult {
-                    engine_name: "none".into(),
-                    previous: vec![],
-                    events: vec![],
-                    did_work: false,
-                })
+        if $should_abort {
+            for (p, args) in errors {
+                if let Some(args) = args {
+                    p.test(&args)
+                } else {
+                    // Make degenerate result which should fail
+                    p.test(&$crate::utils::processor_harness::ProcessorResult {
+                        engine_name: "none".into(),
+                        previous: vec![],
+                        events: vec![],
+                        did_work: false,
+                    })
+                }
             }
         }
-    }
-    previous
+        previous
+    }};
 }
-}}
 /// Creates a processor that verifies a connected data response is produced
 /// by an engine
 #[allow(dead_code)]
@@ -353,40 +339,36 @@ macro_rules! wait_did_work {
     ($engine1:ident, //&mut Vec<&mut Box<dyn NetworkEngine>>,
      $engine2:ident,
      $should_abort: expr
-    ) => { 
-        {
-            let p1: Box<dyn Processor> = 
-                Box::new(DidWorkAssert($engine1.name()));
-            let p2: Box<dyn Processor> = 
-                Box::new(DidWorkAssert($engine2.name()));
-            let processors : Vec<Box<dyn Processor>> = vec![p1, p2];
-            assert_processed!($engine1, $engine2, processors, $should_abort)
-        }
+    ) => {{
+        let p1: Box<dyn Processor> = Box::new(DidWorkAssert($engine1.name()));
+        let p2: Box<dyn Processor> = Box::new(DidWorkAssert($engine2.name()));
+        let processors: Vec<Box<dyn Processor>> = vec![p1, p2];
+        assert_processed!($engine1, $engine2, processors, $should_abort)
+    }};
+    ($engine1:ident, $engine2:ident) => {
+        wait_did_work!($engine1, $engine2, true)
     };
-    ($engine1:ident, $engine2:ident) => { wait_did_work!($engine1, $engine2, true) }
 }
 
 /// Continues processing the engine until no work is being done.
 #[allow(unused_macros)]
 macro_rules! wait_until_no_work {
-    ($engine1: ident, $engine2:ident) => {
-    {
+    ($engine1: ident, $engine2:ident) => {{
         let mut result;
-    loop {
-        result = wait_did_work!($engine1, $engine2, false);
-        if result.is_empty() {
-            break;
-        } else {
-            if result.iter().find(|x| x.did_work).is_some() {
-                continue;
-            } else {
+        loop {
+            result = wait_did_work!($engine1, $engine2, false);
+            if result.is_empty() {
                 break;
+            } else {
+                if result.iter().find(|x| x.did_work).is_some() {
+                    continue;
+                } else {
+                    break;
+                }
             }
         }
-    }
-    result
-}
-}
+        result
+    }};
 }
 
 #[allow(unused_macros)]
@@ -395,7 +377,7 @@ macro_rules! wait_connect {
         $me:ident,
         $connect_data: ident,
         $other: ident
-    )  => { 
+    )  => {
         {
             let _connect_data = $connect_data;
             let connected_data = Lib3hServerProtocol::Connected(
@@ -403,7 +385,7 @@ macro_rules! wait_connect {
                 uri: $other.advertise(),
                 request_id: "".to_string(), // TODO fix this bug and uncomment out! connect_data.clone().request_id
             });
-            let predicate: Box<dyn $crate::utils::processor_harness::Processor> = 
+            let predicate: Box<dyn $crate::utils::processor_harness::Processor> =
                 Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals(connected_data));
             let result = assert_one_processed!($me, $other, predicate);
             result

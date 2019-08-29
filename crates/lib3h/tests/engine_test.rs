@@ -21,9 +21,13 @@ use lib3h_protocol::{
 };
 use lib3h_sodium::SodiumCryptoSystem;
 use url::Url;
-use utils::{constants::*};
-use utils::processor_harness::{Processor, is_connected, 
-    Lib3hServerProtocolAssert, Lib3hServerProtocolEquals, DidWorkAssert};
+use utils::{
+    constants::*,
+    processor_harness::{
+        is_connected, DidWorkAssert, Lib3hServerProtocolAssert, Lib3hServerProtocolEquals,
+        Processor,
+    },
+};
 
 //--------------------------------------------------------------------------------------------------
 // Test suites
@@ -222,8 +226,9 @@ fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 
-    engine.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-            .unwrap();
+    engine
+        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+        .unwrap();
 
     let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::FailureResult(GenericResultData {
@@ -311,7 +316,8 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
     alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
     track_space.agent_id = BILLY_AGENT_ID.clone();
-    billy.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+    billy
+        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
         .unwrap();
 
     // TODO check for join space response messages.
@@ -354,14 +360,9 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         Lib3hServerProtocol::HandleSendDirectMessage(req_dm.clone()),
     ));
 
-    let processors = 
-        vec![is_success_result, handle_send_direct_message];
-     // Send / Receive request
-    assert_processed!(
-        alex,
-        billy,
-        processors
-    );
+    let processors = vec![is_success_result, handle_send_direct_message];
+    // Send / Receive request
+    assert_processed!(alex, billy, processors);
 
     // Post response
     let mut res_dm = req_dm.clone();
@@ -394,11 +395,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
 
     let processors = vec![is_success_result, handle_send_direct_message_result];
 
-     assert_processed!(
-        alex,
-        billy,
-        processors
-   );
+    assert_processed!(alex, billy, processors);
 }
 
 //

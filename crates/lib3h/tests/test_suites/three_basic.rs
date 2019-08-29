@@ -1,6 +1,5 @@
-use crate::{node_mock::{NodeMock}, utils::constants::*};
-use lib3h_protocol::{
-    data_types::*, protocol_server::Lib3hServerProtocol};
+use crate::{node_mock::NodeMock, utils::constants::*};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
@@ -19,7 +18,11 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 ///
-pub fn setup_three_nodes(/*mut*/ alex: &mut NodeMock, billy: &mut NodeMock, /*mut*/ camille: &mut NodeMock) {
+pub fn setup_three_nodes(
+    /*mut*/ alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    /*mut*/ camille: &mut NodeMock,
+) {
     // Connection
     // ==========
     // Connect Alex to Billy
@@ -249,7 +252,8 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     let enty_address_str = &entry_1.entry_address;
     println!(
         "\n{} requesting entry: {}\n",
-        camille.name(), enty_address_str
+        camille.name(),
+        enty_address_str
     );
     let query_data = camille.request_entry(entry_1.entry_address.clone());
     let (did_work, _srv_msg_list) = camille.process().unwrap();
@@ -259,7 +263,11 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     println!("\n{} reply to own request:\n", camille.name());
     let _ = camille.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = camille.process().unwrap();
-    println!("\n{} gets own response {:?}\n", camille.name(), srv_msg_list);
+    println!(
+        "\n{} gets own response {:?}\n",
+        camille.name(),
+        srv_msg_list
+    );
     assert!(did_work);
     assert!(srv_msg_list.len() >= 1);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
@@ -275,7 +283,8 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     let enty_address_str = &entry_2.entry_address;
     println!(
         "\n{} requesting entry: {}\n",
-        camille.name(), enty_address_str
+        camille.name(),
+        enty_address_str
     );
     let query_data = camille.request_entry(entry_2.entry_address.clone());
     let (did_work, _srv_msg_list) = camille.process().unwrap();
@@ -285,7 +294,11 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     println!("\n{} reply to own request:\n", camille.name());
     let _ = camille.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = camille.process().unwrap();
-    println!("\n{} gets own response {:?}\n", camille.name(), srv_msg_list);
+    println!(
+        "\n{} gets own response {:?}\n",
+        camille.name(),
+        srv_msg_list
+    );
     assert!(did_work);
     assert!(srv_msg_list.len() >= 1);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);

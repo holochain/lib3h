@@ -3,8 +3,7 @@
 use predicates::prelude::*;
 
 use super::{chain_store::ChainStore, NodeMock, TIMEOUT_MS};
-use crate::utils::{constants::*};
-use crate::utils::processor_harness::*;
+use crate::utils::{constants::*, processor_harness::*};
 use holochain_persistence_api::hash::HashString;
 use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
@@ -447,8 +446,7 @@ impl NodeMock {
 }
 
 /// Direct Messaging
-impl NodeMock {
-}
+impl NodeMock {}
 
 /// Reply to get*List
 impl NodeMock {
@@ -597,7 +595,6 @@ impl NodeMock {
         self.wait_with_timeout(predicate, TIMEOUT_MS)
     }
 
-
     /// Call process() in a loop until receiving a message corresponding to predicate
     /// or until timeout is reached
     pub fn wait_with_timeout(
@@ -696,7 +693,9 @@ impl NodeMock {
             .expect("Posting HandleSendMessageResult failed");
     }
 
-    pub fn agent_id(&self) -> Address { self.agent_id.clone() }
+    pub fn agent_id(&self) -> Address {
+        self.agent_id.clone()
+    }
 }
 
 impl NodeMock {

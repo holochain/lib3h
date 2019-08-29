@@ -1,4 +1,4 @@
-use crate::{node_mock::{NodeMock}, utils::constants::*};
+use crate::{node_mock::NodeMock, utils::constants::*};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
@@ -70,7 +70,9 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
     println!(
         "\ntwo_join_space ({},{}) -> {}\n",
-        alex.name(), billy.name(), space_address
+        alex.name(),
+        billy.name(),
+        space_address
     );
     // Alex joins space
     let req_id = alex.join_space(&space_address, true).unwrap();

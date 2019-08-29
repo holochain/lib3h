@@ -67,9 +67,7 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
 
 /// Wait for peer timeout
 #[allow(dead_code)]
-fn test_two_peer_timeout(
-    alex: &mut NodeMock,
-    billy: & mut NodeMock) {
+fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait before peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(1000));
     // Billy should NOT send a PeerTimedOut message
@@ -90,7 +88,9 @@ fn test_two_peer_timeout(
 /// Wait for peer timeout than reconnect
 #[allow(dead_code)]
 fn test_two_peer_timeout_reconnect(
-    /*mut*/ alex: &mut NodeMock, /*mut */ billy: &mut NodeMock) {
+    /*mut*/ alex: &mut NodeMock,
+    /*mut */ billy: &mut NodeMock,
+) {
     // Wait past peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(3100));
     let disconnect1 = Box::new(Lib3hServerProtocolEquals(

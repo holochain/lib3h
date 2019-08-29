@@ -22,7 +22,7 @@ use lib3h::{
     transport_wss::TlsConfig,
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address};
-use node_mock::{NodeMock};
+use node_mock::NodeMock;
 use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
@@ -197,10 +197,8 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     println!("========================");
 
     // Setup
-    let mut alex =
-        setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut billy =
-        setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     if can_setup {
         setup_two_nodes(&mut alex, &mut billy);
     }
@@ -224,10 +222,8 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
     println!("==========================");
 
     // Setup
-    let mut alex =
-        setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut billy =
-        setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     let mut camille = setup_memory_node("camille", CAMILLE_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     if can_setup {
         setup_three_nodes(&mut alex, &mut billy, &mut camille);
