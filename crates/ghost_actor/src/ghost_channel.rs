@@ -342,8 +342,6 @@ mod tests {
     #[derive(Debug)]
     struct TestMsgInResponse(String);
     type TestError = String;
-    //#[derive(Debug)]
-    //struct TestCallbackData(String);
     #[derive(Debug)]
     struct TestContext(String);
 
