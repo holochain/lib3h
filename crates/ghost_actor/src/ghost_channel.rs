@@ -335,13 +335,17 @@ mod tests {
 
     #[derive(Debug)]
     struct TestMsgOut(String);
-    //    #[derive(Debug)]
-    //    struct TestMsgOutResponse(String);
+    #[derive(Debug)]
+    struct TestMsgOutResponse(String);
     #[derive(Debug)]
     struct TestMsgIn(String);
     #[derive(Debug)]
     struct TestMsgInResponse(String);
     type TestError = String;
+    //#[derive(Debug)]
+    //struct TestCallbackData(String);
+    #[derive(Debug)]
+    struct TestContext(String);
 
     #[test]
     fn test_ghost_channel_message_event() {
@@ -357,7 +361,7 @@ mod tests {
         assert_eq!("GhostMessage {request_id: None, ..}", format!("{:?}", msg));
         let payload = msg.take_message().unwrap();
         assert_eq!(
-            "TestMsgIn(\"this message from an internal child\")",
+            "TestMsgIn(\"this is an event message from an internal child\")",
             format!("{:?}", payload)
         );
 
@@ -387,10 +391,10 @@ mod tests {
         let response = child_as_parent_recv.recv();
         match response {
             Ok(GhostEndpointMessage::Response {
-                request_id,
+                request_id: req_id,
                 payload,
             }) => {
-                assert_eq!(request_id, request_id);
+                assert_eq!(req_id, request_id);
                 assert_eq!(
                     "Ok(TestMsgInResponse(\"response back to child\"))",
                     format!("{:?}", payload)
@@ -398,5 +402,86 @@ mod tests {
             }
             _ => assert!(false),
         }
+    }
+
+    #[test]
+    fn test_ghost_channel_endpoint() {
+        let fake_dyn_actor = &mut ();
+
+        // build the channel which returns two endpoints with cross-connected crossbeam channels
+        let (parent_side, child_side) = create_ghost_channel::<
+            TestMsgOut,
+            TestMsgOutResponse,
+            TestMsgIn,
+            TestMsgInResponse,
+            TestError,
+        >();
+
+        // in this test the endpoint will be the child end
+        let mut endpoint = child_side.as_context_endpoint("req_id_prefix");
+
+        endpoint.publish(TestMsgOut("event to my parent".into()));
+        // check to see if the event was sent to the parent
+        let msg = parent_side.receiver.recv();
+        match msg {
+            Ok(GhostEndpointMessage::Request {
+                request_id,
+                payload,
+            }) => {
+                assert_eq!(request_id, None);
+                assert_eq!(
+                    "TestMsgOut(\"event to my parent\")",
+                    format!("{:?}", payload)
+                );
+            }
+            _ => assert!(false),
+        }
+
+        let cb: GhostCallback<TestContext, TestMsgOutResponse, TestError> =
+            Box::new(|_dyn_me, _context, _callback_data| {
+                // empty callback because that's tested in ghost_tracker...
+                Ok(())
+            });
+        endpoint.request(
+            std::time::Duration::from_millis(1),
+            TestContext("context data".into()),
+            TestMsgOut("request to my parent".into()),
+            cb,
+        );
+        // check to see if the request was sent to the parent
+        let msg = parent_side.receiver.recv();
+        match msg {
+            Ok(GhostEndpointMessage::Request {
+                request_id,
+                payload,
+            }) => {
+                assert!(request_id.is_some());
+                assert_eq!(
+                    "TestMsgOut(\"request to my parent\")",
+                    format!("{:?}", payload)
+                );
+            }
+            _ => assert!(false),
+        }
+
+        // now lets simulate sending an event from the parent
+        parent_side
+            .sender
+            .send(GhostEndpointMessage::Request {
+                request_id: None,
+                payload: TestMsgIn("event from a parent".into()),
+            })
+            .expect("should send");
+
+        assert_eq!(endpoint.drain_messages().len(), 0);
+        // calling process should then cause this message to be added the endpoint's inbox
+        // which we get access to by calling drain_messages()
+        assert!(endpoint.process(fake_dyn_actor).is_ok());
+        let mut messages = endpoint.drain_messages();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(
+            "Some(TestMsgIn(\"event from a parent\"))",
+            format!("{:?}", messages[0].take_message())
+        );
     }
 }
