@@ -83,7 +83,7 @@ pub struct Lib3hServerProtocolEquals(pub Lib3hServerProtocol);
 #[allow(dead_code)]
 pub struct Lib3hServerProtocolAssert(pub Box<dyn Predicate<Lib3hServerProtocol>>);
 
-/// Assserts work was done
+/// Asserts work was done
 #[allow(dead_code)]
 #[derive(PartialEq, Debug)]
 pub struct DidWorkAssert(pub String /* engine name */);
