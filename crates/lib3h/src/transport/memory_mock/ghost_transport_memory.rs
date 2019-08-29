@@ -4,13 +4,11 @@ use std::{any::Any, collections::HashSet};
 use url::Url;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 enum RequestToParentContext {
     Source { address: Url },
 }
 
-#[allow(dead_code)]
-struct GhostTransportMemory {
+pub struct GhostTransportMemory {
     endpoint_parent: Option<TransportEndpoint>,
     endpoint_self: Option<TransportEndpointWithContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -20,7 +18,6 @@ struct GhostTransportMemory {
 }
 
 impl GhostTransportMemory {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {

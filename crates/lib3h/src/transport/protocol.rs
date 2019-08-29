@@ -32,8 +32,7 @@ pub enum TransportEvent {
 // Transport protocol for GhostActors
 //--------------------------------------------------------------------------------------------------
 
-
-pub type TransportActor = GhostActor<
+pub type TransportActor = dyn GhostActor<
     TransportRequestToChild,
     TransportRequestToChildResponse,
     TransportRequestToParent,
@@ -76,8 +75,12 @@ pub type TransportMessage = GhostMessage<
 
 #[derive(Debug)]
 pub enum TransportContext {
-    Bind { maybe_parent_msg: Option<TransportMessage> },
-    SendMessage { maybe_parent_msg: Option<TransportMessage> },
+    Bind {
+        maybe_parent_msg: Option<TransportMessage>,
+    },
+    SendMessage {
+        maybe_parent_msg: Option<TransportMessage>,
+    },
 }
 
 /// Transport protocol enums for use with GhostActor implementation

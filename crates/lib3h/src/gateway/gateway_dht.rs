@@ -5,13 +5,15 @@ use crate::{
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
     gateway::{Gateway, P2pGateway},
+    transport::protocol::*,
 };
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
 use serde::Serialize;
+use url::Url;
 
 /// Compose DHT
-impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
+impl<D: Dht> Dht for P2pGateway<D> {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.inner_dht.get_peer_list()
@@ -80,7 +82,7 @@ impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
 }
 
 /// Private internals
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Handle a DhtEvent sent to us by our internal DHT.
     pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
         trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);
@@ -109,9 +111,11 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .get_connection_id(&to_peer_address)
                         .expect("Should gossip to a known peer");
                     // Forward gossip to the inner_transport
-                    self.inner_transport
-                        .as_mut()
-                        .send(&[&to_conn_id], &payload)?;
+                    self.child_transport
+                        .publish(TransportRequestToChild::SendMessage {
+                            address: Url::parse(&to_conn_id).unwrap(),
+                            payload: payload.to_vec(),
+                        });
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

@@ -12,7 +12,6 @@ extern crate lib3h_sodium;
 use lib3h::{
     dht::{dht_trait::Dht, mirror_dht::MirrorDht},
     engine::{RealEngine, RealEngineConfig},
-    transport_wss::TlsConfig,
 };
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
@@ -59,7 +58,7 @@ fn enable_logging_for_test(enable: bool) {
 
 fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
     let config = RealEngineConfig {
-        tls_config: TlsConfig::Unencrypted,
+        //tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
@@ -86,7 +85,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
 
 fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     let config = RealEngineConfig {
-        tls_config: TlsConfig::Unencrypted,
+        //tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),

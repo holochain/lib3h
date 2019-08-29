@@ -7,15 +7,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
-    gateway::GatewayWrapper,
-    ghost_gateway::{
-        GhostGateway, wrapper::GhostGatewayWrapper,
-    },
+    gateway::wrapper::GatewayWrapper,
     track::Tracker,
-    transport::{ConnectionId, GhostTransportWrapper},
-    transport_wss::TlsConfig,
+    transport::protocol::TransportParentWrapper,
 };
-
+use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
 use url::Url;
@@ -41,7 +37,7 @@ enum RealEngineTrackerData {
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {
-    pub tls_config: TlsConfig,
+    //pub tls_config: TlsConfig,
     pub socket_type: String,
     pub bootstrap_nodes: Vec<String>,
     pub work_dir: String,
@@ -79,7 +75,7 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// Transport used by the network gateway
     //network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: GhostGatewayWrapper<D>,
+    network_gateway: Detach<TransportParentWrapper>, //GhostGatewayWrapper<D>,
     /// Store active connections?
     network_connections: HashSet<Url>,
     /// Map of P2p gateway per Space+Agent
@@ -92,4 +88,5 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
+    this_peer_address: Url, // binding result on the network_gateway
 }

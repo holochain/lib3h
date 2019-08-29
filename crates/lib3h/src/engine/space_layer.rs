@@ -4,7 +4,7 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
-    gateway::GatewayWrapper,
+    gateway::wrapper::GatewayWrapper,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,

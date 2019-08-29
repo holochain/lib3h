@@ -1,12 +1,9 @@
 pub mod gateway_actor;
-pub mod ghost_gateway;
 pub mod gateway_dht;
+pub mod ghost_gateway;
 pub mod wrapper;
 
-use crate::{
-    dht::dht_trait::Dht,
-    transport::protocol::*,
-};
+use crate::{dht::dht_trait::Dht, transport::protocol::*};
 use detach::prelude::*;
 
 /// Gateway Actor where:
@@ -25,16 +22,18 @@ pub struct GhostGateway<D: Dht> {
     endpoint_self: Option<TransportEndpointWithContext>,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use url::Url;
     use crate::{
-        dht::mirror_dht::MirrorDht,
-        dht::dht_trait::{Dht, DhtConfig, DhtFactory},
+        dht::{
+            dht_trait::{Dht, DhtConfig, DhtFactory},
+            mirror_dht::MirrorDht,
+        },
         engine::NETWORK_GATEWAY_ID,
+        transport::memory_mock::ghost_transport_memory::GhostTransportMemory,
     };
+    use url::Url;
 
     fn create_ghost_gateway(peer_address: &str) -> GhostGateway<MirrorDht> {
         // Create memory Transport and bind
@@ -53,8 +52,9 @@ mod tests {
             Box::new(|_, _, r| {
                 binding = r;
                 Ok(())
-            }),);
-        memory_transport.process();
+            }),
+        );
+        let _res = memory_transport.process();
         let _ = parent_endpoint.process(&mut ());
         // Wait for bind response
         let mut timeout = 0;
@@ -74,21 +74,20 @@ mod tests {
     }
     #[test]
     fn test_gateway_as_transport() {
-
         let mut gateway_a = create_ghost_gateway("peer_a");
         let mut gateway_b = create_ghost_gateway("peer_b");
 
         let expected_address_a = Url::parse("mem://addr_1").unwrap();
         let expected_address_b = Url::parse("mem://addr_2").unwrap();
 
-//        assert_eq!(
-//            gateway_a.maybe_my_address,
-//            Some(expected_transport1_address)
-//        );
-//        assert_eq!(
-//            gateway_b.maybe_my_address,
-//            Some(expected_transport2_address)
-//        );
+        //        assert_eq!(
+        //            gateway_a.maybe_my_address,
+        //            Some(expected_transport1_address)
+        //        );
+        //        assert_eq!(
+        //            gateway_b.maybe_my_address,
+        //            Some(expected_transport2_address)
+        //        );
 
         let mut endpoint_a = gateway_a
             .take_parent_endpoint()
@@ -128,7 +127,6 @@ mod tests {
         assert_eq!("Some(ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
     }
 }
-
 
 //
 //#[cfg(test)]

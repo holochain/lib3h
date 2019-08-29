@@ -1,18 +1,13 @@
-use lib3h_ghost_actor::prelude::*;
 use crate::{
     dht::{
         dht_protocol::PeerData,
-        dht_trait::{Dht, DhtConfig, DhtFactory}
+        dht_trait::{Dht, DhtConfig, DhtFactory},
     },
-    transport::{
-        GhostTransportWrapper,
-        protocol::*,
-        error::{TransportError, TransportResult},
-    },
-    gateway::Gateway,
     ghost_gateway::GhostGateway,
+    transport::{error::TransportError, protocol::*},
 };
 use detach::prelude::*;
+use lib3h_ghost_actor::prelude::*;
 
 impl<'gateway, D: Dht> GhostGateway<D> {
     #[allow(dead_code)]

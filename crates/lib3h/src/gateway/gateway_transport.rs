@@ -4,26 +4,33 @@ use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
     gateway::{Gateway, P2pGateway},
+    ghost_gateway::GhostGateway,
     transport::{
         error::{TransportError, TransportResult},
-        protocol::{TransportCommand, TransportEvent},
+        protocol::*,
         transport_trait::Transport,
         ConnectionId, ConnectionIdRef,
     },
 };
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::DidWork;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
+impl<D: Dht> Transport for P2pGateway<D> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
-        // Connect
-        let connection_id = self.inner_transport.as_mut().connect(&uri)?;
+        // Send phony SendMessage request so we connect to it
+        self.child_transport
+            .publish(TransportRequestToChild::SendMessage {
+                address: uri.clone(),
+                payload: Vec::new(),
+            });
         // Store result in connection map
+        let connection_id = uri.to_string();
         self.connection_map
             .insert(uri.clone(), connection_id.clone());
         // Done
@@ -32,12 +39,12 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 
     // TODO #176 - remove conn id conn_map??
     fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        self.inner_transport.as_mut().close(id)
+        Ok(())
     }
 
     // TODO #176
     fn close_all(&mut self) -> TransportResult<()> {
-        self.inner_transport.as_mut().close_all()
+        Ok(())
     }
 
     /// id_list =
@@ -54,21 +61,14 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             dht_uri_list,
             payload.len(),
         );
-        // Get connectionIds for the inner Transport.
-        let mut conn_list = Vec::new();
         for dht_uri in dht_uri_list {
-            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri);
-            trace!(
-                "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
-                self.identifier,
-                dht_uri,
-                net_uri,
-            )
+            self.child_transport
+                .publish(TransportRequestToChild::SendMessage {
+                    address: dht_uri,
+                    payload: payload.to_vec(),
+                });
         }
-        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
-        // Send on the inner Transport
-        self.inner_transport.as_mut().send(&ref_list, payload)
+        Ok(())
     }
 
     ///
@@ -80,9 +80,58 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
     }
 
     ///
-    fn bind(&mut self, url: &Url) -> TransportResult<Url> {
-        trace!("({}) bind() {}", self.identifier, url);
-        self.inner_transport.as_mut().bind(url)
+    fn bind(&mut self, uri: &Url) -> TransportResult<Url> {
+        trace!("({}) bind() {}", self.identifier, uri);
+        let mut binding = Url::parse("").unwrap();
+        self.child_transport.request(
+            std::time::Duration::from_millis(2000), // FIXME magic number
+            TransportContext::Bind {
+                maybe_parent_msg: None,
+            },
+            TransportRequestToChild::Bind { spec: uri.clone() },
+            Box::new(|me, context, response| {
+                let me = match me.downcast_mut::<GhostGateway<D>>() {
+                    None => panic!("received unexpected actor"),
+                    Some(me) => me,
+                };
+                // check for timeout
+                if let GhostCallbackData::Timeout = response {
+                    return Ok(());
+                }
+                // got response
+                let response = {
+                    if let GhostCallbackData::Response(response) = response {
+                        response
+                    } else {
+                        unimplemented!();
+                    }
+                };
+                // Check if response is an error
+                if let Err(e) = response {
+                    return Ok(());
+                };
+                // Must be a Bind response
+                let bind_response = if let TransportRequestToChildResponse::Bind(bind_response) =
+                    response.unwrap()
+                {
+                    bind_response
+                } else {
+                    panic!("received unexpected response type");
+                };
+                // Act on response
+                binding = bind_response.bound_url;
+                // Done
+                Ok(())
+            }),
+        );
+        // Wait for bind response
+        let mut timeout = 0;
+        while binding == Url::parse("").unwrap() && timeout < 200 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            timeout += 10;
+        }
+        assert!(timeout < 200);
+        Ok(binding)
     }
 
     ///
@@ -113,26 +162,19 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             did_work,
             outbox.len(),
         );
-        // Process inner transport
-        // Its okay to process inner transport as long as NetworkEngine only calls
-        // Transport::process() on the network gateway,
-        // otherwise remove this code and have RealEngine explicitly call the process of the
-        // Network transport.
-        let (inner_did_work, mut event_list) = self.inner_transport.as_mut().process()?;
-        trace!(
-            "({}).Transport.inner_process() - output: {} {}",
-            self.identifier,
-            inner_did_work,
-            event_list.len()
-        );
-        if inner_did_work {
-            did_work = true;
-            outbox.append(&mut event_list);
-        }
-        // Handle TransportEvents
-        for evt in outbox.clone().iter() {
-            self.handle_TransportEvent(&evt)?;
-        }
+        // Process child network_gateway actor
+        let netgate_worked = detach_run!(&mut self.child_transport, |child_transport| {
+            child_transport.process(&mut ())
+        })
+        .expect("FIXME");
+        //        if netgate_worked {
+        //            did_work = true;
+        //            outbox.append(&mut event_list);
+        //        }
+        //        // Handle TransportEvents
+        //        for evt in outbox.clone().iter() {
+        //            self.handle_TransportEvent(&evt)?;
+        //        }
         Ok((did_work, outbox))
     }
 
@@ -148,14 +190,13 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 
     /// TODO: return a higher-level uri instead
     fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-        self.inner_transport.as_ref().get_uri(id)
-        //let maybe_peer_data = self.inner_dht.get_peer(id);
-        //maybe_peer_data.map(|pd| pd.peer_address)
+        // FIXME
+        None
     }
 }
 
 /// Private internals
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
         &self,
@@ -198,9 +239,9 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             this_peer.peer_address,
             this_peer.timestamp,
         );
-        let mut buf = Vec::new();
+        let mut payload = Vec::new();
         our_peer_address
-            .serialize(&mut Serializer::new(&mut buf))
+            .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
         trace!(
             "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
@@ -208,7 +249,13 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             our_peer_address,
             id,
         );
-        return self.inner_transport.as_mut().send(&[&id], &buf);
+
+        self.child_transport
+            .publish(TransportRequestToChild::SendMessage {
+                address: uri,
+                payload,
+            });
+        Ok(())
     }
 
     /// Process a transportEvent received from our internal connection.
@@ -224,7 +271,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                     "({}) Connection Error for {}: {}\n Closing connection.",
                     self.identifier, id, e,
                 );
-                self.inner_transport.as_mut().close(id)?;
+                //FIXME self.child_transport.as_mut().close(id)?;
             }
             TransportEvent::ConnectResult(id, _) => {
                 info!("({}) Outgoing connection opened: {}", self.identifier, id);
@@ -252,7 +299,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                             peer_address, gateway_id, self.identifier
                         );
                         let peer_uri = self
-                            .inner_transport
+                            .child_transport
                             .as_mut()
                             .get_uri(connection_id)
                             .expect("FIXME"); // TODO #58

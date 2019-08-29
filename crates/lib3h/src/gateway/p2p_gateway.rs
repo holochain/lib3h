@@ -4,7 +4,9 @@ use crate::{
     dht::dht_trait::{Dht, DhtConfig, DhtFactory},
     gateway::{Gateway, P2pGateway},
     ghost_gateway::wrapper::GhostGatewayWrapper,
+    transport::protocol::TransportParentWrapper,
 };
+use detach::prelude::*;
 use lib3h_protocol::Address;
 use std::collections::{HashMap, VecDeque};
 
@@ -13,17 +15,17 @@ use std::collections::{HashMap, VecDeque};
 //--------------------------------------------------------------------------------------------------
 
 /// any Transport Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        network_gateway: GhostGatewayWrapper<'gateway, D>,
+        network_gateway: Detach<TransportParentWrapper>,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
-            inner_transport: network_gateway,
+            child_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
             connection_map: HashMap::new(),
@@ -32,7 +34,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     }
 }
 
-impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
+impl<D: Dht> Gateway for P2pGateway<D> {
     /// This Gateway's identifier
     fn identifier(&self) -> &str {
         self.identifier.as_str()
@@ -70,17 +72,17 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
 }
 
 /// P2pGateway Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<D: Dht> P2pGateway<D> {
     /// Constructors
     pub fn new_with_space(
-        network_gateway: GhostGatewayWrapper<'gateway, D>,
+        network_gateway: Detach<TransportParentWrapper>,
         space_address: &Address,
         dht_factory: DhtFactory<D>,
         dht_config: &DhtConfig,
     ) -> Self {
         let identifier: String = space_address.clone().into();
         P2pGateway {
-            inner_transport: network_gateway,
+            child_transport: network_gateway,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier,
             connection_map: HashMap::new(),

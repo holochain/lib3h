@@ -8,33 +8,38 @@ pub mod protocol;
 pub mod transport_crypto;
 pub mod transport_trait;
 
-use transport_trait::Transport;
+use self::{error::TransportError, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use self::{
-    error::TransportError,
-    protocol::*,
-};
+use transport_trait::Transport;
 
 #[derive(Clone)]
 pub struct GhostTransportWrapper<'wrap> {
-    inner: Arc<RwLock<dyn GhostActor<
-        TransportRequestToChild,
-        TransportRequestToChildResponse,
-        TransportRequestToParent,
-        TransportRequestToParentResponse,
-        TransportError,
-    > + 'wrap>>,
+    inner: Arc<
+        RwLock<
+            dyn GhostActor<
+                    TransportRequestToChild,
+                    TransportRequestToChildResponse,
+                    TransportRequestToParent,
+                    TransportRequestToParentResponse,
+                    TransportError,
+                > + 'wrap,
+        >,
+    >,
 }
 
 impl<'wrap> GhostTransportWrapper<'wrap> {
     /// wrap a concrete TransportActor into an Arc<RwLock<dyn GhostActor>>
-    pub fn new<T: GhostActor<
-        TransportRequestToChild,
-        TransportRequestToChildResponse,
-        TransportRequestToParent,
-        TransportRequestToParentResponse,
-        TransportError,
-    > + 'wrap>(concrete: T) -> Self {
+    pub fn new<
+        T: GhostActor<
+                TransportRequestToChild,
+                TransportRequestToChildResponse,
+                TransportRequestToParent,
+                TransportRequestToParentResponse,
+                TransportError,
+            > + 'wrap,
+    >(
+        concrete: T,
+    ) -> Self {
         Self {
             inner: Arc::new(RwLock::new(concrete)),
         }
@@ -42,35 +47,51 @@ impl<'wrap> GhostTransportWrapper<'wrap> {
 
     /// if we already have an Arc<RwLock<dyn Transport>>,
     /// us it directly as our inner
-    pub fn assume(inner: Arc<RwLock<dyn GhostActor<
-        TransportRequestToChild,
-        TransportRequestToChildResponse,
-        TransportRequestToParent,
-        TransportRequestToParentResponse,
-        TransportError,
-    > + 'wrap>>) -> Self {
+    pub fn assume(
+        inner: Arc<
+            RwLock<
+                dyn GhostActor<
+                        TransportRequestToChild,
+                        TransportRequestToChildResponse,
+                        TransportRequestToParent,
+                        TransportRequestToParentResponse,
+                        TransportError,
+                    > + 'wrap,
+            >,
+        >,
+    ) -> Self {
         Self { inner }
     }
 
     /// get an immutable ref to Transport trait object
-    pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn GhostActor<
-        TransportRequestToChild,
-        TransportRequestToChildResponse,
-        TransportRequestToParent,
-        TransportRequestToParentResponse,
-        TransportError,
-    > + 'wrap> {
+    pub fn as_ref(
+        &self,
+    ) -> RwLockReadGuard<
+        '_,
+        dyn GhostActor<
+                TransportRequestToChild,
+                TransportRequestToChildResponse,
+                TransportRequestToParent,
+                TransportRequestToParentResponse,
+                TransportError,
+            > + 'wrap,
+    > {
         self.inner.read().expect("failed to obtain read lock")
     }
 
     /// get a mutable ref to Transport trait object
-    pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn GhostActor<
-        TransportRequestToChild,
-        TransportRequestToChildResponse,
-        TransportRequestToParent,
-        TransportRequestToParentResponse,
-        TransportError,
-    > + 'wrap> {
+    pub fn as_mut(
+        &self,
+    ) -> RwLockWriteGuard<
+        '_,
+        dyn GhostActor<
+                TransportRequestToChild,
+                TransportRequestToChildResponse,
+                TransportRequestToParent,
+                TransportRequestToParentResponse,
+                TransportError,
+            > + 'wrap,
+    > {
         self.inner.write().expect("failed to obtain write lock")
     }
 }
@@ -119,11 +140,8 @@ impl<'wrap> TransportWrapper<'wrap> {
 pub mod tests {
     #![allow(non_snake_case)]
 
-    use crate::{
-        transport::{
-            memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
-        },
-        transport_wss::{TlsConfig, TransportWss},
+    use crate::transport::{
+        memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
     };
 
     use crate::tests::enable_logging_for_test;
