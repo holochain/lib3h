@@ -76,8 +76,8 @@ pub type TransportMessage = GhostMessage<
 
 #[derive(Debug)]
 pub enum TransportContext {
-    Bind { parent_msg: TransportMessage },
-    SendMessage { parent_msg: TransportMessage },
+    Bind { maybe_parent_msg: Option<TransportMessage> },
+    SendMessage { maybe_parent_msg: Option<TransportMessage> },
 }
 
 /// Transport protocol enums for use with GhostActor implementation
@@ -97,7 +97,7 @@ pub enum TransportRequestToChildResponse {
 pub enum TransportRequestToParent {
     IncomingConnection { address: Url },
     ReceivedData { address: Url, payload: Vec<u8> },
-    TransportError { error: TransportError },
+    ErrorOccured { address: Url, error: TransportError },
 }
 
 #[derive(Debug)]

@@ -79,9 +79,9 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// Transport used by the network gateway
     //network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: GhostGatewayWrapper<'engine, D>,
+    network_gateway: GhostGatewayWrapper<D>,
     /// Store active connections?
-    network_connections: HashSet<ConnectionId>,
+    network_connections: HashSet<Url>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
     #[allow(dead_code)]

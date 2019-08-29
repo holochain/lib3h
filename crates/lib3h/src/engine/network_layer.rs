@@ -8,7 +8,7 @@ use crate::{
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use lib3h_ghost_actor::prelude::*;
-
+use url::Url;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -19,170 +19,93 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         // Process the child network_gateway actor
-        let mut parent_endpoint = self.network_gateway
-            .as_mut()
-            .take_parent_endpoint()
-            .expect("exists")
-            .as_context_endpoint::<i8>("network_layer");
-
-        let (tranport_did_work, event_list) = self.network_gateway
-            .as_mut().process()?;
-        parent_endpoint.process(&mut ())?;
-        debug!(
-            "{} - network_gateway.process(): {} {}",
-            self.name,
-            network_gateway_worked,
-            dht_event_list.len(),
-        );
-        // Handle DhtEvents
-        let mut outbox = Vec::new();
+        let network_gateway_worked = detach_run!(&mut self.network_gateway, |network_gateway| {
+            network_gateway.process(self.as_any())
+        })?;
+        debug!("{} - network_gateway.process() - {}", self.name, network_gateway_worked);
+        // Act on child's requests
         if network_gateway_worked {
-            for dht_evt in dht_event_list {
-                let mut output = self.handle_netDhtEvent(evt)?;
-                outbox.append(&mut output);
+            for mut msg in self.network_gateway.drain_messages() {
+                match msg.take_message().expect("msg doesn't exist") {
+                    TransportRequestToParent::IncomingConnection { address } => {
+                        // TODO
+                        let mut output = self.handle_new_connection(&address, "".to_string())?;
+                        outbox.append(&mut output);
+                    },
+                    TransportRequestToParent::ReceivedData { address, payload } => {
+                        // TODO
+                        debug!("Received message from: {} | {}", address, payload.len());
+                        let mut de = Deserializer::new(&payload[..]);
+                        let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                            Deserialize::deserialize(&mut de);
+                        if let Err(e) = maybe_msg {
+                            error!("Failed deserializing msg: {:?}", e);
+                            return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                        }
+                        let p2p_msg = maybe_msg.unwrap();
+                        let mut output = self.serve_P2pProtocol(&address, &p2p_msg)?;
+                        outbox.append(&mut output);
+                    },
+                    TransportRequestToParent::ErrorOccured { address, error } => {
+                        self.network_connections.remove(&address);
+                        error!("{} Network error from {} : {:?}", self.name, address, e);
+                        // Output a Lib3hServerProtocol::Disconnected if it was the last connection
+                        if self.network_connections.is_empty() {
+                            let data = DisconnectedData {
+                                network_id: "FIXME".to_string(), // TODO #172
+                            };
+                            outbox.push(Lib3hServerProtocol::Disconnected(data));
+                        }
+                    }
+                };
             }
         }
+        // Done
         Ok((network_gateway_worked, outbox))
     }
 
-    /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
-        let outbox = Vec::new();
-        match cmd {
-            DhtEvent::GossipTo(_data) => {
-                // no-op
-            }
-            DhtEvent::GossipUnreliablyTo(_data) => {
-                // no-op
-            }
-            DhtEvent::HoldPeerRequested(peer_data) => {
-                // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
-                // Connect to every peer we are requested to hold.
-                info!(
-                    "{} auto-connect to peer: {} ({})",
-                    self.name, peer_data.peer_address, peer_data.peer_uri,
-                );
-                // Send phony SendMessage request so we connect to it
-                self.network_gateway.as_mut().publish(
-                    (),
-                    TransportRequestToChild::SendMessage { address: peer_data.peer_uri, payload: Vec::new() },
-                );
-            }
-            DhtEvent::PeerTimedOut(peer_address) => {
-                // TODO
-            }
-            // No entries in Network DHT
-            DhtEvent::HoldEntryRequested(_, _) => {
-                unreachable!();
-            }
-            DhtEvent::FetchEntryResponse(_) => {
-                unreachable!();
-            }
-            DhtEvent::EntryPruned(_) => {
-                unreachable!();
-            }
-            DhtEvent::EntryDataRequested(_) => {
-                unreachable!();
-            }
-        }
-        Ok(outbox)
-    }
 
+    /// On new connection, send all joined spaces to other node
     fn handle_new_connection(
         &mut self,
-        id: &ConnectionIdRef,
+        uri: &Url,
         request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();
         let mut network_gateway = self.network_gateway.as_mut();
-        if let Some(uri) = network_gateway.get_uri(id) {
-            info!("Network Connection opened: {} ({})", id, uri);
-            // TODO #150 - Should do this in next process instead
-            // Send to other node our Joined Spaces
-            let space_list = self.get_all_spaces();
-            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-            let mut buf = Vec::new();
-            our_joined_space_list
-                .serialize(&mut Serializer::new(&mut buf))
-                .unwrap();
-            trace!(
-                "AllJoinedSpaceList: {:?} to {:?}",
-                our_joined_space_list,
-                id
-            );
-            // id is connectionId but we need a transportId, so search for it in the DHT
-            let peer_list = network_gateway.get_peer_list();
-            trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
-            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
-            if let Some(peer_data) = maybe_peer_data {
-                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                network_gateway.send(&[&peer_data.peer_address], &buf)?;
-            }
-            // TODO END
+        //if let Some(uri) = network_gateway.get_uri(uri) {
+        info!("Network Connection opened to: {}", uri);
+        // TODO #150 - Should do this in next process instead
+        // Send to other node our Joined Spaces
+        let space_list = self.get_all_spaces();
+        let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+        let mut payload = Vec::new();
+        our_joined_space_list
+            .serialize(&mut Serializer::new(&mut payload))
+            .unwrap();
+        trace!(
+            "AllJoinedSpaceList: {:?} to {:?}",
+            our_joined_space_list,
+            uri
+        );
+        // We need a transportId, so search for it in the DHT
+//        let peer_list = network_gateway.get_peer_list();
+//        trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
+//        let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
+//        if let Some(peer_data) = maybe_peer_data {
+//            trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+//            network_gateway.send(&[&peer_data.peer_address], &payload)?;
+//        }
+        network_gateway.publish(TransportRequestToChild::SendMessage {address:  uri.clone(), payload});
+        // TODO END
 
-            // Output a Lib3hServerProtocol::Connected if its the first connection
-            if self.network_connections.is_empty() {
-                let data = ConnectedData { request_id, uri };
-                outbox.push(Lib3hServerProtocol::Connected(data));
-            }
-            let _ = self.network_connections.insert(id.to_owned());
+        // Output a Lib3hServerProtocol::Connected if its the first connection
+        if self.network_connections.is_empty() {
+            let data = ConnectedData { request_id, uri: uri.clone() };
+            outbox.push(Lib3hServerProtocol::Connected(data));
         }
-        Ok(outbox)
-    }
-
-    /// Handle a TransportEvent sent to us by our network gateway
-    fn handle_netTransportEvent(
-        &mut self,
-        evt: &TransportEvent,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netTransportEvent: {:?}", self.name, evt);
-        let mut outbox = Vec::new();
-        // Note: use same order as the enum
-        match evt {
-            TransportEvent::ErrorOccured(id, e) => {
-                self.network_connections.remove(id);
-                error!("{} Network error from {} : {:?}", self.name, id, e);
-                // Output a Lib3hServerProtocol::Disconnected if it was the connection
-                if self.network_connections.is_empty() {
-                    let data = DisconnectedData {
-                        network_id: "FIXME".to_string(), // TODO #172
-                    };
-                    outbox.push(Lib3hServerProtocol::Disconnected(data));
-                }
-            }
-            TransportEvent::ConnectResult(id, request_id) => {
-                let mut output = self.handle_new_connection(id, request_id.clone())?;
-                outbox.append(&mut output);
-            }
-            TransportEvent::IncomingConnectionEstablished(id) => {
-                let mut output = self.handle_new_connection(id, "".to_string())?;
-                outbox.append(&mut output);
-            }
-            TransportEvent::ConnectionClosed(id) => {
-                self.network_connections.remove(id);
-                // Output a Lib3hServerProtocol::Disconnected if it was the last connection
-                if self.network_connections.is_empty() {
-                    let data = DisconnectedData {
-                        network_id: "FIXME".to_string(), // TODO #172
-                    };
-                    outbox.push(Lib3hServerProtocol::Disconnected(data));
-                }
-            }
-            TransportEvent::ReceivedData(id, payload) => {
-                debug!("Received message from: {} | {}", id, payload.len());
-                let mut de = Deserializer::new(&payload[..]);
-                let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                if let Err(e) = maybe_msg {
-                    error!("Failed deserializing msg: {:?}", e);
-                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
-                }
-                let p2p_msg = maybe_msg.unwrap();
-                let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
-                outbox.append(&mut output);
-            }
-        };
+        let _ = self.network_connections.insert(uri.to_owned());
+        //}
         Ok(outbox)
     }
 
@@ -191,7 +114,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     /// TODO #150
     fn serve_P2pProtocol(
         &mut self,
-        _from_id: &ConnectionIdRef,
+        _from_uri: &Url,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         let mut outbox = Vec::new();

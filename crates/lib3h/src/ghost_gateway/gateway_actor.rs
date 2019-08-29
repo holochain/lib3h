@@ -2,7 +2,7 @@ use std::any::Any;
 use url::Url;
 use lib3h_ghost_actor::prelude::*;
 use crate::{
-    dht::dht_trait::Dht,
+    dht::{dht_protocol::*, dht_trait::Dht},
     transport::{
         protocol::*,
         error::TransportError,
@@ -10,7 +10,7 @@ use crate::{
     ghost_gateway::GhostGateway,
 };
 
-impl< D: Dht> GhostActor<
+impl<D: Dht> GhostActor<
     TransportRequestToParent,
     TransportRequestToParentResponse,
     TransportRequestToChild,
@@ -26,13 +26,11 @@ impl< D: Dht> GhostActor<
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
-    /// Process
     fn /* priv */ process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-
         // Check inbox from parent
         let endpoint_did_some_work = detach_run!(&mut self.endpoint_self.unwrap(), |endpoint_self| {
-                endpoint_self.unwrap().process(self.as_any())
-            })?;
+            endpoint_self.unwrap().process(self.as_any())
+        })?;
         let mut worked_for_parent = false;
         for mut msg in self.endpoint_self.as_mut().drain_messages() {
             match msg.take_message().expect("exists") {
@@ -53,8 +51,34 @@ impl< D: Dht> GhostActor<
         let child_did_some_work = detach_run!(&mut self.child_transport, |child_transport| {
             child_transport.process(self.as_any())
         })?;
+        // Act on child's requests
+        if child_did_some_work {
+            for mut msg in self.child_transport.drain_messages() {
+                match msg.take_message().expect("msg doesn't exist") {
+                    TransportRequestToParent::IncomingConnection { _address } => {
+                        // TODO
+                    }
+                    TransportRequestToParent::ReceivedData { _address, _payload } => {
+                        // TODO
+                    }
+                    TransportRequestToParent::ErrorOccured { _address, _error } => {
+                        // TODO
+                    }
+                };
+                // bubble up to parent
+                let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+                endpoint_self.as_mut().expect("exists").publish(msg);
+                std::mem::replace(&mut self.endpoint_self, endpoint_self);
+            }
+        }
         // Process internal dht
         let (dht_did_some_work, event_list) = self.inner_dht.process()?;
+        // Handle DhtEvents
+        if dht_did_some_work {
+            for dht_evt in event_list {
+                self.handle_netDhtEvent(evt);
+            }
+        }
         // Done
         Ok(WorkWasDone::from(endpoint_did_some_work || dht_did_some_work || worked_for_parent || child_did_some_work))
     }
@@ -66,19 +90,62 @@ impl< D: Dht> GhostActor<
 
 /// Private internals
 impl<'gateway, D: Dht> GhostGateway<D> {
+    /// Handle a DhtEvent sent to us by our network gateway
+    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) {
+        debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
+        match cmd {
+            DhtEvent::GossipTo(_data) => {
+                // no-op
+            }
+            DhtEvent::GossipUnreliablyTo(_data) => {
+                // no-op
+            }
+            DhtEvent::HoldPeerRequested(peer_data) => {
+                // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
+                // Connect to every peer we are requested to hold.
+                info!(
+                    "{} auto-connect to peer: {} ({})",
+                    self.name, peer_data.peer_address, peer_data.peer_uri,
+                );
+                // Send phony SendMessage request so we connect to it
+                self.network_gateway.as_mut().publish(
+                    (),
+                    TransportRequestToChild::SendMessage { address: peer_data.peer_uri, payload: Vec::new() },
+                );
+            }
+            DhtEvent::PeerTimedOut(peer_address) => {
+                // TODO
+            }
+            // No entries in Network DHT
+            DhtEvent::HoldEntryRequested(_, _) => {
+                unreachable!();
+            }
+            DhtEvent::FetchEntryResponse(_) => {
+                unreachable!();
+            }
+            DhtEvent::EntryPruned(_) => {
+                unreachable!();
+            }
+            DhtEvent::EntryDataRequested(_) => {
+                unreachable!();
+            }
+        }
+    }
+
+
     /// Forward Bind request to child Transport
     fn bind(
         &mut self,
         spec: &Url,
-        parent_msg: &mut TransportMessage,
+        maybe_parent_msg: Option<TransportMessage>,
     ) -> GhostResult<()> {
         self.child_transport.as_mut().request(
-            std::time::Duration::from_millis(2000), // FIXME magic number
-            TransportContext::Bind { parent_msg: parent_msg.clone() },
-            TransportRequestToChild::Bind { spec: spec.clone() },
-            // Should receive a response back from our message.
-            // Forward it back to parent
-            Box::new(|me, context, response| {
+    std::time::Duration::from_millis(2000), // FIXME magic number
+    TransportContext::Bind { maybe_parent_msg },
+    TransportRequestToChild::Bind { spec: spec.clone() },
+        // Should receive a response back from our message.
+        // Forward it back to parent
+        Box::new(|me, context, response| {
                 let me = match me.downcast_mut::<GhostGateway<D>>() {
                     None => panic!("received unexpected actor"),
                     Some(me) => me,
@@ -136,21 +203,17 @@ impl<'gateway, D: Dht> GhostGateway<D> {
         &mut self,
         dht_id: &Url,
         payload: &[u8],
-        maybe_parent_msg: Option<&mut TransportMessage>,
+        maybe_parent_msg: Option<TransportMessage>,
     ) -> GhostResult<()> {
         // get connectionId from the inner dht first
         let dht_uri_list = self.dht_address_to_uri_list([dht_id])?;
         let address = dht_uri_list[0];
         trace!("({}).send() {} -> {} | {}", self.identifier, dht_id, address, payload.len());
         // Forward to the child Transport
-        let context = match maybe_parent_msg {
-            None => (),
-            Some(parent_msg) => TransportContext::SendMessage { parent_msg: parent_msg.clone() },
-        };
         self.child_transport.as_mut().request(
-            std::time::Duration::from_millis(2000), // FIXME magic number
-            context,
-            TransportRequestToChild::SendMessage { address: address.clone(), payload: payload.to_vec() },
+        std::time::Duration::from_millis(2000), // FIXME magic number
+        TransportContext::SendMessage { maybe_parent_msg },
+        TransportRequestToChild::SendMessage { address: address.clone(), payload: payload.to_vec() },
             // Might receive a response back from our message.
             // Send it back to parent
             Box::new(|me, context, response| {
