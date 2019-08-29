@@ -1,6 +1,6 @@
 use std::{any::Any, collections::HashMap};
 
-use crate::{GhostResult, RequestId};
+use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
 
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure
@@ -91,18 +91,136 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
     }
 
     /// handle a response
+    /// "owner" is meant to be the GhostActor (or other dynamic trait object) that is
+    /// tracking for the call back, to get itself back in the callback and to an upcast
     pub fn handle(
         &mut self,
         request_id: RequestId,
-        ga: &mut dyn Any,
+        owner: &mut dyn Any,
         data: Result<CbData, E>,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
-            None => {
-                println!("request_id {:?} not found", request_id);
-                Ok(())
-            }
-            Some(entry) => (entry.cb)(ga, entry.context, GhostCallbackData::Response(data)),
+            None => Err(GhostError::new(ErrorKind::RequestIdNotFound)),
+            Some(entry) => (entry.cb)(owner, entry.context, GhostCallbackData::Response(data)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use detach::prelude::*;
+
+    use super::*;
+    #[derive(Debug)]
+    struct TestCallbackData(String);
+    #[derive(Debug)]
+    struct TestContext(String);
+    type TestError = String;
+    struct TestTrackingActor {
+        state: String,
+        tracker: Detach<GhostTracker<TestContext, TestCallbackData, TestError>>,
+    }
+
+    use std::any::Any;
+
+    impl TestTrackingActor {
+        fn new(request_id_prefix: &str) -> Self {
+            Self {
+                state: "".into(),
+                tracker: Detach::new(GhostTracker::new(request_id_prefix)),
+            }
+        }
+        fn as_any(&mut self) -> &mut dyn Any {
+            &mut *self
+        }
+    }
+
+    #[test]
+    fn test_ghost_tracker_should_bookmark_and_handle() {
+        let mut actor = TestTrackingActor::new("test_request_id_prefix");
+        let context = TestContext("some_context_data".into());
+
+        let cb: GhostCallback<TestContext, TestCallbackData, TestError> =
+            Box::new(|dyn_me, context, callback_data| {
+                let mutable_me = dyn_me
+                    .downcast_mut::<TestTrackingActor>()
+                    .expect("should be a TestTrakingActor");
+
+                // and we'll check that we got our context back too because we
+                // might have used it to determine what to do here.
+                assert_eq!(context.0, "some_context_data");
+                if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
+                    mutable_me.state = payload;
+                }
+                Ok(())
+            });
+
+        // lets bookmark a callback that should set our actors state to the value
+        // of the callback response
+        let req_id = actor
+            .tracker
+            .bookmark(std::time::Duration::from_millis(2000), context, cb);
+
+        let entry = actor.tracker.pending.get(&req_id).unwrap();
+        assert_eq!(entry.context.0, "some_context_data");
+
+        // the state should be empty from the new
+        assert_eq!(actor.state, "");
+        // after handling
+        detach_run!(&mut actor.tracker, |tracker| {
+            let result = tracker.handle(
+                req_id.clone(),
+                actor.as_any(),
+                Ok(TestCallbackData("here's the data!".into())),
+            );
+            assert_eq!("Ok(())", format!("{:?}", result))
+        });
+        assert_eq!(actor.state, "here's the data!");
+
+        // try again and this time we should get that the request ID wasn't found
+        detach_run!(&mut actor.tracker, |tracker| {
+            let result = tracker.handle(
+                req_id,
+                actor.as_any(),
+                Ok(TestCallbackData("here's the data again!".into())),
+            );
+            assert_eq!(
+                "Err(GhostError(RequestIdNotFound))",
+                format!("{:?}", result)
+            )
+        });
+    }
+
+    #[test]
+    fn test_ghost_tracker_should_timeout() {
+        let mut actor = TestTrackingActor::new("test_request_id_prefix");
+        let context = TestContext("foo".into());
+        let cb: GhostCallback<TestContext, TestCallbackData, TestError> =
+            Box::new(|dyn_me, _context, callback_data| {
+                let mutable_me = dyn_me
+                    .downcast_mut::<TestTrackingActor>()
+                    .expect("should be a TestTrakingActor");
+
+                // when the timeout happens the callback should get
+                // the timeout enum in the callback_data
+                match callback_data {
+                    GhostCallbackData::Timeout => mutable_me.state = "timed_out".into(),
+                    _ => assert!(false),
+                }
+                Ok(())
+            });
+        let _req_id = actor
+            .tracker
+            .bookmark(std::time::Duration::from_millis(1), context, cb);
+        assert_eq!(actor.tracker.pending.len(), 1);
+
+        // wait 1 ms for the callback to have expired
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        detach_run!(&mut actor.tracker, |tracker| {
+            let result = tracker.process(actor.as_any());
+            assert_eq!("Ok(())", format!("{:?}", result));
+        });
+        assert_eq!(actor.state, "timed_out");
+        assert_eq!(actor.tracker.pending.len(), 0);
     }
 }

@@ -16,3 +16,6 @@ crossbeam-channel = "=0.3.8"
 detach = { version = "=0.0.10", path = "../detach" }
 nanoid = "=0.2.0"
 shrinkwraprs = "=0.2.1"
+
+[dev-dependencies]
+env_logger = "=0.6.1"
