@@ -13,6 +13,7 @@ pub enum CryptoError {
     BadParentSize,
     BadContextSize,
     BadSeedSize,
+    BadKeySize,
     BadPublicKeySize,
     BadSecretKeySize,
     BadSignatureSize,
