@@ -54,7 +54,7 @@ impl NodeMock {
     pub fn disconnect(&mut self) {
         let mut dummy_config = self.config.clone();
         dummy_config.bind_url =
-            Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).expect("can parse url");
+            Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
         self.engine = (self.engine_factory)(&dummy_config, "__dummy")
             .expect("Failed to create dummy RealEngine");
         self.engine = (self.engine_factory)(&self.config, &self.name)

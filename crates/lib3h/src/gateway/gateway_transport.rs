@@ -3,7 +3,6 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::p2p_protocol::P2pProtocol,
-    error::Lib3hResult,
     gateway::{Gateway, P2pGateway},
     transport::{
         error::{TransportError, TransportResult},
@@ -13,8 +12,8 @@ use crate::{
     },
 };
 use lib3h_protocol::DidWork;
-use rmp_serde::Serializer;
-use serde::Serialize;
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
@@ -241,8 +240,9 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             TransportEvent::ReceivedData(connection_id, payload) => {
                 debug!("Received message from: {}", connection_id);
                 // trace!("Deserialize msg: {:?}", payload);
-                let maybe_p2p_msg: Lib3hResult<P2pProtocol> =
-                    crate::lib3h_rmp_deserialize(&payload[..]);
+                let mut de = Deserializer::new(&payload[..]);
+                let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                    Deserialize::deserialize(&mut de);
                 if let Ok(p2p_msg) = maybe_p2p_msg {
                     if let P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) =
                         p2p_msg

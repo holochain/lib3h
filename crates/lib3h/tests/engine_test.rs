@@ -64,7 +64,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
         bootstrap_nodes: vec![],
         work_dir: String::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}", name).as_str()).expect("can parse url"),
+        bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
         dht_gossip_interval: 100,
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],

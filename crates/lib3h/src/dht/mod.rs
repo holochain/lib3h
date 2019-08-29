@@ -45,7 +45,7 @@ pub mod tests {
     static mut FETCH_COUNT: u32 = 0;
 
     fn create_test_uri(peer_address: &PeerAddressRef) -> Url {
-        Url::parse(format!("test://{}", peer_address).as_str()).expect("can parse url")
+        Url::parse(format!("test://{}", peer_address).as_str()).unwrap()
     }
 
     #[allow(non_snake_case)]

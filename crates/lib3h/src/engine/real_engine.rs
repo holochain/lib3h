@@ -25,8 +25,8 @@ use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
-use rmp_serde::Serializer;
-use serde::Serialize;
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 impl TransportKeys {
     pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
@@ -385,8 +385,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     &msg.request_id,
                     None,
                 );
-                let maybe_entry: Lib3hResult<EntryData> =
-                    crate::lib3h_rmp_deserialize(&msg.query_result[..]);
+                let mut de = Deserializer::new(&msg.query_result[..]);
+                let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
+                    Deserialize::deserialize(&mut de);
                 let entry = maybe_entry.expect("Deserialization should always work");
                 match maybe_space {
                     Err(res) => outbox.push(res),

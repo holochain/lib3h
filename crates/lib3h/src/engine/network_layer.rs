@@ -3,13 +3,13 @@
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
-    error::Lib3hResult,
+    error::{ErrorKind, Lib3hError, Lib3hResult},
     transport::{protocol::*, ConnectionIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 
-use rmp_serde::Serializer;
-use serde::Serialize;
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// Network layer related private methods
 impl<'engine, D: Dht> RealEngine<'engine, D> {
@@ -180,10 +180,12 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             }
             TransportEvent::ReceivedData(id, payload) => {
                 debug!("Received message from: {} | {}", id, payload.len());
-                let maybe_msg: Lib3hResult<P2pProtocol> =
-                    crate::lib3h_rmp_deserialize(&payload[..]);
+                let mut de = Deserializer::new(&payload[..]);
+                let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                    Deserialize::deserialize(&mut de);
                 if let Err(e) = maybe_msg {
-                    return Err(e);
+                    error!("Failed deserializing msg: {:?}", e);
+                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                 }
                 let p2p_msg = maybe_msg.unwrap();
                 let mut output = self.serve_P2pProtocol(id, &p2p_msg)?;
