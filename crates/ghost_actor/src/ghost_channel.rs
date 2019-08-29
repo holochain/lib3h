@@ -91,6 +91,10 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
                 .expect("should send");
         }
     }
+
+    pub fn is_request(&self) -> bool {
+        self.request_id.is_some()
+    }
 }
 
 /// `create_ghost_channel` outputs two endpoints,
