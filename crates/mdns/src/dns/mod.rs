@@ -15,9 +15,6 @@ pub mod question;
 pub use answer::{AnswerSection, Target};
 pub use question::QuerySection;
 
-// pub use answer::{Answer, AnswerSection, Target};
-// pub use question::{Question, QuerySection};
-
 /// Structure matching a DNS message format.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DnsMessage {

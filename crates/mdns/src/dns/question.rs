@@ -19,7 +19,7 @@ pub struct QuerySection {
     pub(crate) domain_name: String,
     /// Not used at the moment
     pub(crate) query_type: u16,
-    /// Not used at the moment
+    /// IN(1) fro the Internet.
     pub(crate) query_class: u16,
 }
 
@@ -29,7 +29,7 @@ impl QuerySection {
             dn_len: name.len() as u16,
             domain_name: name.to_owned(),
             query_type: 0,
-            query_class: 0,
+            query_class: 1,
         }
     }
     pub fn from_raw(dn_len: u16, cursor: &mut Cursor<&Vec<u8>>) -> MulticastDnsResult<Self> {

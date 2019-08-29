@@ -29,13 +29,14 @@
 use log::{debug, error, trace, warn};
 use rand::Rng;
 use regex;
-use std::net;
+// Used to clean ouf buffer to avoid mixing messages together.
+use zeroize::Zeroize;
 
 #[cfg(not(target_os = "windows"))]
 use net2::unix::UnixUdpBuilderExt;
 
 use std::{
-    net::{SocketAddr, ToSocketAddrs},
+    net::{self, SocketAddr, ToSocketAddrs},
     thread,
     time::{Duration, Instant},
 };
@@ -347,15 +348,13 @@ impl MulticastDns {
         Ok(None)
     }
 
-    /// Clean our buffer.
+    /// Clean our buffer of bytes from previous messages.
     pub fn clear_buffer(&mut self) {
-        for i in 0..self.buffer.len() {
-            self.buffer[i] = 0;
-        }
+        self.buffer.zeroize();
     }
 
     /// Clean our cache by removing the out of live records.
-    pub fn clean_cache(&mut self) {
+    pub fn prune_cache(&mut self) {
         // Get the entry of the dead records to remove them safely afterward
         let mut dead_entry_list: Vec<String> = Vec::with_capacity(self.map_record.len());
         for (k, v) in self.map_record.iter() {
@@ -503,7 +502,7 @@ impl MulticastDns {
     /// potential answers.  Only conflicting Multicast DNS responses received
     /// "live" from the network are considered valid for the purposes of
     /// determining whether probing has succeeded or failed.
-    fn probe(&mut self) -> MulticastDnsResult<()> {
+    pub fn probe(&mut self) -> MulticastDnsResult<()> {
         // Making sure our cache is empty before probing
         self.map_record.clear();
 
@@ -657,7 +656,7 @@ impl Discovery for MulticastDns {
             }
         }
 
-        self.clean_cache();
+        self.prune_cache();
 
         Ok(())
     }
@@ -854,7 +853,8 @@ mod tests {
             .spawn(move || {
                 let mut mdns = MulticastDnsBuilder::new()
                     .own_record("holonaute", &["0.0.0.0"])
-                    .bind_port(8596)
+                    .bind_port(0)
+                    // .bind_port(8596)
                     .multicast_address("224.0.0.252")
                     .build()
                     .expect("Fail to build mDNS.");
@@ -868,7 +868,7 @@ mod tests {
                     .expect("Fail to send mDNS service through channel.");
 
                 // Listen to the network for a few moment, just the time to defend our name
-                mdns.responder()
+                mdns.responder_service_loop()
                     .expect("Fail to fire up the mDNS responder service.");
 
                 // eprintln!("Exit defending thread.");
@@ -883,10 +883,12 @@ mod tests {
 
         let mut mdns_with_resolved_conflict = MulticastDnsBuilder::new()
             .own_record("holonaute", &["0.0.0.0"])
-            .bind_port(8596)
+            .bind_port(0)
             .multicast_address("224.0.0.252")
             .build()
             .expect("Fail to build mDNS.");
+
+        thread::sleep(Duration::from_millis(1_000));
 
         mdns_with_resolved_conflict
             .advertise()

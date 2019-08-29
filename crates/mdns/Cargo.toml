@@ -21,6 +21,7 @@ get_if_addrs = "0.5.3"
 regex = "1.1.2"
 log = "0.4.8"
 lib3h_discovery = { version = "=0.0.10", path = "../discovery" }
+zeroize = "0.10.0"
 
 [dev-dependencies]
 lib3h = { version = "=0.0.10", path = "../lib3h" }
