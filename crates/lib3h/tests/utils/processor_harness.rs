@@ -98,6 +98,10 @@ impl Processor for Lib3hServerProtocolAssert {
             assert!(actual.is_some());
         }
     }
+
+    fn name(&self) -> String {
+        "Lib3hServerProtocolAssert".to_string()
+    }
 }
 
 impl Processor for DidWorkAssert {
@@ -147,6 +151,10 @@ impl Processor for Lib3hServerProtocolEquals {
         let extracted = self.extracted(args);
         let actual = extracted.iter().find(|actual| **actual == self.expected());
         assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
+    }
+
+    fn name(&self) -> String {
+        format!("{:?}", self).to_string()
     }
 }
 
@@ -200,7 +208,7 @@ macro_rules! assert_processed_eq {
 /// passes for a collection of engines. See assert_processed for
 /// more information.
 macro_rules! assert_one_processed {
-    ($engine1:ident, 
+    ($engine1:ident,
      $engine2:ident,
      $processor:ident,
     $should_abort:expr
@@ -279,7 +287,7 @@ macro_rules! assert_processed {
     };
     ($engine1:ident,
      $engine2:ident,
-     $processors:ident, 
+     $processors:ident,
      $should_abort:expr) => {{
         let mut previous = Vec::new();
         let mut errors: Vec<(

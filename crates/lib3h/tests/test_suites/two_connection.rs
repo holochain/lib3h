@@ -92,6 +92,7 @@ fn test_two_peer_timeout_reconnect(
     /*mut */ billy: &mut NodeMock,
 ) {
     // Wait past peer Timeout threshold
+    // TODO make this timeout much faster or mock time
     std::thread::sleep(std::time::Duration::from_millis(3100));
     let disconnect1 = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::Disconnected(lib3h_protocol::data_types::DisconnectedData {
