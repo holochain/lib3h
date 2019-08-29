@@ -410,16 +410,18 @@ mod tests {
                 TransportError,
             >,
         >,
+        mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
     }
 
     impl TransportMock {
-        pub fn new() -> Self {
+        pub fn new(mock_sender: crossbeam_channel::Sender<Vec<u8>>) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
             let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
             Self {
                 endpoint_parent,
                 endpoint_self,
+                mock_sender,
             }
         }
     }
@@ -455,6 +457,7 @@ mod tests {
                         address: _,
                         payload: _,
                     } => {
+
                         msg.respond(Ok(RequestToChildResponse::SendMessage));
                     }
                 }
@@ -468,12 +471,14 @@ mod tests {
         let crypto: Box<dyn CryptoSystem> =
             Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
 
+        let (s1out, r1out) = crossbeam_channel::unbounded();
+
         let mut t1: TransportActorParentWrapper<()> = GhostParentWrapper::new(
             Box::new(TransportEncoding::new(
                 crypto.box_clone(),
                 ID_1.to_string(),
                 Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new()),
+                Box::new(TransportMock::new(s1out)),
             )),
             "test1",
         );
@@ -495,12 +500,14 @@ mod tests {
 
         t1.process(&mut ()).unwrap();
 
+        let (s2out, _r2out) = crossbeam_channel::unbounded();
+
         let mut t2: TransportActorParentWrapper<()> = GhostParentWrapper::new(
             Box::new(TransportEncoding::new(
                 crypto.box_clone(),
                 ID_2.to_string(),
                 Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new()),
+                Box::new(TransportMock::new(s2out)),
             )),
             "test2",
         );
@@ -520,6 +527,28 @@ mod tests {
             })
         );
 
+        t2.process(&mut ()).unwrap();
+
+        t1.request(
+            std::time::Duration::from_millis(2000),
+            (),
+            RequestToChild::SendMessage {
+                address: Url::parse("test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r").expect("can parse url"),
+                payload: b"hello".to_vec(),
+            },
+            Box::new(|_, _, response| {
+                println!("got: {:?}", response);
+                Ok(())
+            })
+        );
+
+        t1.process(&mut ()).unwrap();
+        t2.process(&mut ()).unwrap();
+        t1.process(&mut ()).unwrap();
+        t2.process(&mut ()).unwrap();
+        t1.process(&mut ()).unwrap();
+        t2.process(&mut ()).unwrap();
+        t1.process(&mut ()).unwrap();
         t2.process(&mut ()).unwrap();
     }
 }
