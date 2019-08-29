@@ -91,17 +91,17 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
     }
 
     /// handle a response
-    /// "this" is meant to be the GhostActor (or other dynamic trait object) that is
+    /// "owner" is meant to be the GhostActor (or other dynamic trait object) that is
     /// tracking for the call back, to get itself back in the callback and to an upcast
     pub fn handle(
         &mut self,
         request_id: RequestId,
-        this: &mut dyn Any,
+        owner: &mut dyn Any,
         data: Result<CbData, E>,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
             None => Err(GhostError::new(ErrorKind::RequestIdNotFound)),
-            Some(entry) => (entry.cb)(this, entry.context, GhostCallbackData::Response(data)),
+            Some(entry) => (entry.cb)(owner, entry.context, GhostCallbackData::Response(data)),
         }
     }
 }
