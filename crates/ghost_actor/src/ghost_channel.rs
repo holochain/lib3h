@@ -406,7 +406,9 @@ mod tests {
 
     #[test]
     fn test_ghost_channel_endpoint() {
-        let fake_dyn_actor = &mut ();
+        #[derive(Debug)]
+        struct FakeActor(String);
+        let fake_dyn_actor = &mut FakeActor("".to_string());
 
         // build the channel which returns two endpoints with cross-connected crossbeam channels
         let (parent_side, child_side) = create_ghost_channel::<
@@ -443,12 +445,13 @@ mod tests {
                 Ok(())
             });
         endpoint.request(
-            std::time::Duration::from_millis(1),
+            std::time::Duration::from_millis(1000),
             TestContext("context data".into()),
             TestMsgOut("request to my parent".into()),
             cb,
         );
-        // check to see if the request was sent to the parent
+        // simulate receiving this on the parent-side and check that the
+        // correct message went into the channel
         let msg = parent_side.receiver.recv();
         match msg {
             Ok(GhostEndpointMessage::Request {
@@ -463,6 +466,27 @@ mod tests {
             }
             _ => assert!(false),
         }
+
+        let cb: GhostCallback<TestContext, TestMsgOutResponse, TestError> =
+            Box::new(|dyn_me, _context, callback_data| {
+                let mutable_me = dyn_me
+                    .downcast_mut::<FakeActor>()
+                    .expect("should be a our fake actor which is just a String");
+                mutable_me.0 = format!("{:?}", callback_data);
+                Ok(())
+            });
+        // Now we'll send a request that should timeout
+        endpoint.request(
+            std::time::Duration::from_millis(1),
+            TestContext("context data".into()),
+            TestMsgOut("another request to my parent".into()),
+            cb,
+        );
+
+        // wait 1 ms for the callback to have expired
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        assert!(endpoint.process(fake_dyn_actor).is_ok());
+        assert_eq!("Timeout", fake_dyn_actor.0);
 
         // now lets simulate sending an event from the parent
         parent_side
