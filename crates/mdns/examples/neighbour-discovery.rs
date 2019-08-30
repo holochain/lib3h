@@ -1,10 +1,29 @@
 use lib3h_discovery::Discovery;
 use lib3h_mdns as mdns;
-
+use get_if_addrs;
 use std::{thread, time::Duration};
 
+fn list_ip_v4() -> Vec<String> {
+
+       let mut addrs = vec![];
+       for iface in get_if_addrs::get_if_addrs().unwrap() {
+            if iface.name != "lo" {
+                println!("{:?}", iface.addr);
+                match iface.addr {
+                    get_if_addrs::IfAddr::V4(addrv4) => addrs.push(addrv4.ip.to_string()),
+                    _ => (),
+                }
+            }
+       }
+       addrs
+}
+
 fn discover_neighbourhood() {
+    let urls = list_ip_v4();
+    let urls: Vec<&str> = urls.iter().map(|url| url.as_str()).collect();
+
     let mut mdns = mdns::MulticastDnsBuilder::new()
+        .own_record("holonaute.holo.host", &urls)
         .bind_port(8585)
         .build()
         .expect("Fail to build mDNS.");
