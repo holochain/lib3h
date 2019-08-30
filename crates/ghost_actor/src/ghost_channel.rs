@@ -91,6 +91,10 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
                 .expect("should send");
         }
     }
+
+    pub fn is_request(&self) -> bool {
+        self.request_id.is_some()
+    }
 }
 
 /// `create_ghost_channel` outputs two endpoints,
@@ -342,8 +346,6 @@ mod tests {
     #[derive(Debug)]
     struct TestMsgInResponse(String);
     type TestError = String;
-    //#[derive(Debug)]
-    //struct TestCallbackData(String);
     #[derive(Debug)]
     struct TestContext(String);
 
