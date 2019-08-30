@@ -144,7 +144,7 @@ pub trait GhostActor<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ghost_channel::create_ghost_channel;
+    use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
     use std::any::Any;
 
@@ -235,8 +235,14 @@ mod tests {
     #[test]
     fn test_ghost_actor() {
         // The body of this test simulates being the parent actor
+        struct FakeParent {
+            state: String,
+        }
+        let mut fake_parent = FakeParent {
+            state: "".to_string(),
+        };
 
-        // so first create the child actor
+        // then we create the child actor
         let mut child_actor = TestActor::new();
         // get the endpoint from the child actor that we as parent will interact with
         let mut parent_endpoint: GhostContextEndpoint<
@@ -251,26 +257,26 @@ mod tests {
             .unwrap()
             .as_context_endpoint("parent");
 
+        // now lets post an event from the parent
         parent_endpoint.publish(TestMsgIn("event from parent".into()));
 
+        // now process the events on the child and watch that internal state has chaned
         assert!(child_actor.process().is_ok());
         assert_eq!(
             "\"event from parent\"",
             format!("{:?}", child_actor.internal_state[0])
         );
 
+        // now lets try posting a request with a callback which just saves the response
+        // value to the parent's statee
         let cb: GhostCallback<TestContext, TestMsgInResponse, TestError> =
-            Box::new(|_dyn_me, _context, _callback_data| {
-                /*                let mutable_me = dyn_me
-                    .downcast_mut::<TestTrackingActor>()
-                    .expect("should be a TestTrakingActor");
-
-                // and we'll check that we got our context back too because we
-                // might have used it to determine what to do here.
-                assert_eq!(context.0, "some_context_data");
-                if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
-                    mutable_me.state = payload;
-                }*/
+            Box::new(|dyn_parent, _context, callback_data| {
+                let mutable_parent = dyn_parent
+                    .downcast_mut::<FakeParent>()
+                    .expect("should be a FakeParent");
+                if let GhostCallbackData::Response(Ok(TestMsgInResponse(payload))) = callback_data {
+                    mutable_parent.state = payload;
+                }
                 Ok(())
             });
 
@@ -280,15 +286,9 @@ mod tests {
             TestMsgIn("event from parent".into()),
             cb,
         );
-
         assert!(child_actor.process().is_ok());
-        assert!(parent_endpoint.process(&mut ()).is_ok());
-        assert!(child_actor.process().is_ok());
-
-        assert_eq!(
-            "\"fish msg from parent\"",
-            format!("{:?}", parent_endpoint.drain_messages())
-        );
+        assert!(parent_endpoint.process(&mut fake_parent).is_ok());
+        assert_eq!("we got: event from parent", fake_parent.state);
     }
 
     #[test]
