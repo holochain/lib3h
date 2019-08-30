@@ -8,7 +8,6 @@ fn list_ip_v4() -> Vec<String> {
        let mut addrs = vec![];
        for iface in get_if_addrs::get_if_addrs().unwrap() {
             if iface.name != "lo" {
-                println!("{:?}", iface.addr);
                 match iface.addr {
                     get_if_addrs::IfAddr::V4(addrv4) => addrs.push(addrv4.ip.to_string()),
                     _ => (),
