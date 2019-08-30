@@ -5,10 +5,12 @@ use crate::{
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
     ghost_gateway::GhostGateway,
+    transport::protocol::*,
 };
 use lib3h_protocol::{Address, DidWork};
 use rmp_serde::Serializer;
 use serde::Serialize;
+use url::Url;
 
 /// Compose DHT
 impl<D: Dht> Dht for GhostGateway<D> {
@@ -85,8 +87,12 @@ impl<D: Dht> GhostGateway<D> {
                     p2p_gossip
                         .serialize(&mut Serializer::new(&mut payload))
                         .expect("P2pProtocol::Gossip serialization failed");
-                    // Forward gossip to the inner_transport
-                    self.send(&[&to_peer_address], &payload, None)?;
+                    // Forward gossip to the child_transport
+                    self.child_transport
+                        .publish(TransportRequestToChild::SendMessage {
+                            address: Url::parse(&to_peer_address).unwrap(),
+                            payload: payload.to_vec(),
+                        });
                 }
             }
             DhtEvent::GossipUnreliablyTo(_data) => {

@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<D: Dht> Transport for P2pGateway<D> {
+impl<'gateway, D: Dht + 'gateway> Transport for P2pGateway<D> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
@@ -298,11 +298,7 @@ impl<D: Dht> P2pGateway<D> {
                             "Received PeerAddress: {} | {} ({})",
                             peer_address, gateway_id, self.identifier
                         );
-                        let peer_uri = self
-                            .child_transport
-                            .as_mut()
-                            .get_uri(connection_id)
-                            .expect("FIXME"); // TODO #58
+                        let peer_uri = Url::parse("").unwrap(); // FIXME
                         debug!("peer_uri of: {} = {}", connection_id, peer_uri);
                         if self.identifier == gateway_id {
                             let peer = PeerData {

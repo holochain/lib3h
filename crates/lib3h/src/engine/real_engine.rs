@@ -10,8 +10,7 @@ use crate::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
-    gateway::{wrapper::GatewayWrapper, P2pGateway},
-    ghost_gateway::GhostGateway,
+    ghost_gateway::{wrapper::GhostGatewayWrapper, GhostGateway},
     track::Tracker,
     transport::{memory_mock::ghost_transport_memory::GhostTransportMemory, protocol::*},
 };
@@ -91,7 +90,7 @@ impl TransportKeys {
 
 /// Constructor
 //#[cfg(test)]
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<D: Dht> RealEngine<D> {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
@@ -191,7 +190,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     }
 }
 
-impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
+impl<D: Dht> NetworkEngine for RealEngine<D> {
     fn advertise(&self) -> Url {
         self.this_peer_address.clone()
     }
@@ -233,7 +232,7 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
 }
 
 /// Drop
-impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
+impl<D: Dht> Drop for RealEngine<D> {
     fn drop(&mut self) {
         self.shutdown().unwrap_or_else(|e| {
             warn!("Graceful shutdown failed: {}", e);
@@ -242,7 +241,7 @@ impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
 }
 
 /// Private
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine, D: Dht> RealEngine<D> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
@@ -607,19 +606,18 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway: GatewayWrapper<'engine> =
-            GatewayWrapper::new(P2pGateway::new_with_space(
-                self.network_gateway,
-                &join_msg.space_address,
-                self.dht_factory,
-                &dht_config,
-            ));
+        let new_space_gateway = GhostGatewayWrapper::new(GhostGateway::new_with_space(
+            self.network_gateway,
+            &join_msg.space_address,
+            self.dht_factory,
+            &dht_config,
+        ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
-        let peer = new_space_gateway.as_ref().this_peer().to_owned();
+        let this_peer = new_space_gateway.this_peer().to_owned();
         let mut payload = Vec::new();
-        let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
+        let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), this_peer.clone());
         p2p_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
@@ -627,7 +625,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             "{} - Broadcasting JoinSpace: {}, {}",
             self.name,
             space_address,
-            peer.peer_address,
+            this_peer.peer_address,
         );
         for address in self.network_connections {
             self.network_gateway
@@ -636,11 +634,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         // TODO END
 
         // Add it to space map
+        let new_space_gateway = Detach::new(GhostParentWrapper::new(new_space_gateway, "space"));
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        let this_peer = { space_gateway.as_ref().this_peer().clone() };
         space_gateway
             .as_dht_mut()
             .post(DhtCommand::HoldPeer(this_peer))?;
@@ -711,9 +709,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             .unwrap();
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
-        let res = space_gateway
-            .as_transport_mut()
-            .send(&[peer_address.as_str()], &payload);
+        let res = space_gateway.publish(TransportRequestToChild::SendMessage {
+            address: Url::parse(&peer_address).unwrap(),
+            payload: payload.to_vec(),
+        });
         if let Err(e) = res {
             response.result_info = e.to_string().as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
@@ -752,7 +751,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<GatewayWrapper<'engine>, Lib3hServerProtocol> {
+    ) -> Result<GhostGatewayWrapper<D>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));

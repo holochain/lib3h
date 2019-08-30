@@ -52,25 +52,27 @@ impl<D: Dht>
         })?;
         // Act on child's requests
         for mut msg in self.child_transport.drain_messages() {
+            let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
             match msg.take_message().expect("msg doesn't exist") {
                 TransportRequestToParent::IncomingConnection { address } => {
                     // TODO
+                    // bubble up to parent
+                    endpoint_self.as_mut().expect("exists").publish(msg);
                 }
                 TransportRequestToParent::ReceivedData { address, payload } => {
                     // TODO
+                    endpoint_self.as_mut().expect("exists").publish(msg);
                 }
                 TransportRequestToParent::ErrorOccured { address, error } => {
                     // TODO
+                    endpoint_self.as_mut().expect("exists").publish(msg);
                 }
             };
-            // bubble up to parent
-            let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-            endpoint_self.as_mut().expect("exists").publish(msg);
             std::mem::replace(&mut self.endpoint_self, endpoint_self);
         }
         // Process internal dht
-        let (dht_did_some_work, event_list) = self.inner_dht.process()?;
-        // Handle DhtEvents
+        let (dht_did_some_work, event_list) = self.inner_dht.process().unwrap(); // fixme
+                                                                                 // Handle DhtEvents
         if dht_did_some_work {
             for dht_evt in event_list {
                 self.handle_netDhtEvent(dht_evt);
@@ -175,17 +177,19 @@ impl<'gateway, D: Dht> GhostGateway<D> {
                     return Ok(());
                 };
                 // Must be a Bind response
-                let bind_response = if let TransportRequestToChildResponse::Bind(bind_response) =
-                    response.unwrap()
-                {
-                    bind_response
-                } else {
-                    panic!("received unexpected response type");
-                };
-                println!("yay? {:?}", bind_response);
+                let bind_response_data =
+                    if let TransportRequestToChildResponse::Bind(bind_response_data) =
+                        response.unwrap()
+                    {
+                        bind_response_data
+                    } else {
+                        panic!("received unexpected response type");
+                    };
+                println!("yay? {:?}", bind_response_data);
                 // Act on response: forward to parent
                 if let Some(parent_msg) = maybe_parent_msg {
-                    parent_msg.respond(TransportRequestToParentResponse::Bind(bind_response));
+                    //parent_msg.respond(response);
+                    parent_msg.respond(TransportRequestToChildResponse::Bind(bind_response_data));
                 }
                 // Done
                 Ok(())
@@ -205,12 +209,10 @@ impl<'gateway, D: Dht> GhostGateway<D> {
         maybe_parent_msg: Option<TransportMessage>,
     ) -> GhostResult<()> {
         // get connectionId from the inner dht first
-        let dht_uri_list = self.dht_address_to_uri_list([dht_id])?;
-        let address = dht_uri_list[0];
+        let address = dht_id;
         trace!(
-            "({}).send() {} -> {} | {}",
+            "({}).send() {} | {}",
             self.identifier,
-            dht_id,
             address,
             payload.len()
         );
@@ -259,6 +261,7 @@ impl<'gateway, D: Dht> GhostGateway<D> {
                     }
                     return Ok(());
                 };
+                let response = response.unwrap();
                 // Must be a SendMessage response
                 let _ = match response {
                     TransportRequestToChildResponse::SendMessage => (),

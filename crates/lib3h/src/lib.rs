@@ -25,7 +25,7 @@ extern crate detach;
 pub mod dht;
 pub mod engine;
 pub mod error;
-pub mod gateway;
+//pub mod gateway;
 pub mod ghost_gateway;
 pub mod time;
 pub mod track;

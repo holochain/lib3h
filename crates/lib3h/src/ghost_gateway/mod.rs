@@ -6,6 +6,12 @@ pub mod wrapper;
 use crate::{dht::dht_trait::Dht, transport::protocol::*};
 use detach::prelude::*;
 
+///// describes a super construct of a Transport and a Dht allowing
+///// Transport access via peer discovery handled by the Dht
+//pub trait GhostGatewayTrait: Dht {
+//    fn identifier(&self) -> &str;
+//}
+
 /// Gateway Actor where:
 ///   - child: some Transport
 ///   - parent: RealEngine or Multiplexer

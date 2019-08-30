@@ -4,7 +4,7 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
-    gateway::wrapper::GatewayWrapper,
+    ghost_gateway::wrapper::GhostGatewayWrapper,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -15,19 +15,19 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<D: Dht> RealEngine<D> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
         for (chainId, space_gateway) in self.space_gateway_map.iter() {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, space_gateway.as_ref().this_peer().clone()));
+            result.push((space_address, space_gateway.this_peer().clone()));
         }
         result
     }
 
     /// Return first space gateway for a specified space_address
-    pub fn get_first_space_mut(&mut self, space_address: &str) -> Option<GatewayWrapper<'engine>> {
+    pub fn get_first_space_mut(&mut self, space_address: &str) -> Option<GhostGatewayWrapper<D>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {

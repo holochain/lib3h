@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Network layer related private methods
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<D: Dht> RealEngine<D> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,

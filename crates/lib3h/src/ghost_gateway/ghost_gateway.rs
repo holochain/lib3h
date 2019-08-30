@@ -8,9 +8,9 @@ use crate::{
 };
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::Address;
 
 impl<'gateway, D: Dht> GhostGateway<D> {
-    #[allow(dead_code)]
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
@@ -36,6 +36,24 @@ impl<'gateway, D: Dht> GhostGateway<D> {
             child_transport,
             inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
             identifier: identifier.to_owned(),
+        }
+    }
+
+    ///
+    pub fn new_with_space(
+        network_gateway: Detach<TransportParentWrapper>,
+        space_address: &Address,
+        dht_factory: DhtFactory<D>,
+        dht_config: &DhtConfig,
+    ) -> Self {
+        let identifier: String = space_address.clone().into();
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        GhostGateway {
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self: Some(endpoint_self.as_context_endpoint("from_gateway_parent")),
+            child_transport: network_gateway,
+            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
+            identifier,
         }
     }
 

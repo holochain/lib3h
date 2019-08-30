@@ -110,7 +110,7 @@ impl<D: Dht> P2pGateway<D> {
                     let to_conn_id = self
                         .get_connection_id(&to_peer_address)
                         .expect("Should gossip to a known peer");
-                    // Forward gossip to the inner_transport
+                    // Forward gossip to the child_transport
                     self.child_transport
                         .publish(TransportRequestToChild::SendMessage {
                             address: Url::parse(&to_conn_id).unwrap(),

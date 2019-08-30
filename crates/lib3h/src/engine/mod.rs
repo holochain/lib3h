@@ -7,7 +7,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
-    gateway::wrapper::GatewayWrapper,
     track::Tracker,
     transport::protocol::TransportParentWrapper,
 };
@@ -59,7 +58,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'engine, D: Dht + 'engine> {
+pub struct RealEngine<D: Dht> {
     /// Identifier
     name: String,
     /// Config settings
@@ -75,11 +74,11 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// Transport used by the network gateway
     //network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: Detach<TransportParentWrapper>, //GhostGatewayWrapper<D>,
+    network_gateway: Detach<TransportParentWrapper>,
     /// Store active connections?
     network_connections: HashSet<Url>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
+    space_gateway_map: HashMap<ChainId, TransportParentWrapper>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

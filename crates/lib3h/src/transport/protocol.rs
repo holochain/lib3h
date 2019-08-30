@@ -3,6 +3,7 @@ use lib3h_ghost_actor::prelude::*;
 use url::Url;
 
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
+/// Used for MemoryServer only
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportCommand {
     Connect(Url, /*request_id*/ String),
