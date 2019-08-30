@@ -6,8 +6,54 @@ extern crate lazy_static;
 use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashSet, sync::RwLock};
+use std::{any::Any, collections::HashMap, sync::RwLock};
 use url::Url;
+
+// we need an "internet" that a transport can bind to that will
+// deliver messages to bound transports, we'll call it the Mockernet
+pub struct Mockernet {
+    bindings: HashMap<Url, Tube>,
+}
+
+// The Mockernet is a series of tubes, which is technical term for the
+// sets of crossbeam channels in the bindings that mocker connects shuttles
+// between
+pub struct Tube {
+    sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
+    #[allow(dead_code)]
+    receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+}
+impl Tube {
+    pub fn new() -> Self {
+        let (sender, receiver) = crossbeam_channel::unbounded::<(Url, Vec<u8>)>();
+        Tube { sender, receiver }
+    }
+}
+impl Mockernet {
+    pub fn new() -> Self {
+        Mockernet {
+            bindings: HashMap::new(),
+        }
+    }
+    pub fn bind(&mut self, url: Url) -> bool {
+        if self.bindings.contains_key(&url) {
+            false
+        } else {
+            self.bindings.insert(url, Tube::new());
+            true
+        }
+    }
+    pub fn send(&mut self, to: Url, from: Url, payload: Vec<u8>) -> Result<(), String> {
+        let dst = self.bindings.get(&to).ok_or(format!("{} not bound", to))?;
+        dst.sender
+            .send((from, payload))
+            .map_err(|e| format!("{}", e))
+    }
+}
+
+lazy_static! {
+    pub static ref MOCKERNET: RwLock<Mockernet> = RwLock::new(Mockernet::new());
+}
 
 enum ToParentContext {}
 struct TestTransport {
@@ -109,29 +155,6 @@ impl TestTransportOwner {
     fn new() -> Self {
         TestTransportOwner { log: Vec::new() }
     }
-}
-
-// we need an "internet" that a transport can bind to that will
-// deliver messages to bound transports
-pub struct Mockernet {
-    bindings: HashSet<Url>,
-}
-impl Mockernet {
-    pub fn new() -> Self {
-        Mockernet {
-            bindings: HashSet::new(),
-        }
-    }
-    pub fn bind(&mut self, url: Url) -> bool {
-        if self.bindings.contains(&url) {
-            return false;
-        }
-        self.bindings.insert(url)
-    }
-}
-
-lazy_static! {
-    pub static ref MOCKERNET: RwLock<Mockernet> = RwLock::new(Mockernet::new());
 }
 
 #[test]
