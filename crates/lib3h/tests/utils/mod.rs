@@ -2,6 +2,9 @@ pub mod constants;
 #[macro_use]
 pub mod predicate;
 
+#[macro_use]
+pub mod processor_harness;
+
 #[allow(unused_macros)]
 macro_rules! assert_process_success {
     ($node: ident, $req: ident) => {

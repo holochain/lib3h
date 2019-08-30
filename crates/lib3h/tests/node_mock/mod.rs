@@ -22,7 +22,7 @@ pub struct NodeMock {
     /// Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
     //_maybe_temp_dir: Option<tempfile::TempDir>,
     /// The Node's networking engine
-    engine: Box<dyn NetworkEngine>,
+    pub engine: Box<dyn NetworkEngine>,
     /// Config used by the engine
     pub config: RealEngineConfig,
     /// Factory used to create the engine
