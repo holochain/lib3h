@@ -2,7 +2,7 @@
 
 use crate::{
     dht::{dht_protocol::*, dht_trait::Dht},
-    engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
+    engine::p2p_protocol::*,
     error::Lib3hResult,
     ghost_gateway::GhostGateway,
     transport::protocol::*,
