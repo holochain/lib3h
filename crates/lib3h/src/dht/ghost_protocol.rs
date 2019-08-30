@@ -1,15 +1,24 @@
+use crate::error::Lib3hError;
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
-use crate::error::Lib3hError;
 
-pub type DhtActor = Box<dyn GhostActor<
-    DhtRequestToChild,
-    DhtRequestToChildResponse,
+pub type DhtActor = Box<
+    dyn GhostActor<
+        DhtRequestToChild,
+        DhtRequestToChildResponse,
+        DhtRequestToParent,
+        DhtRequestToParentResponse,
+        Lib3hError,
+    >,
+>;
+pub type DhtEndpointWithContext = GhostContextEndpoint<
+    DhtContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
+    DhtRequestToChild,
+    DhtRequestToChildResponse,
     Lib3hError,
->>;
-
+>;
 pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToChild,
     DhtRequestToChildResponse,
@@ -26,13 +35,11 @@ pub type DhtParentWrapper<Context> = GhostParentWrapper<
     Lib3hError,
 >;
 
-pub type DhtMessage = GhostMessage<
-    DhtRequestToParent,
-    DhtRequestToChild,
-    DhtRequestToChildResponse,
-    Lib3hError,
->;
+pub type DhtMessage =
+    GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToChildResponse, Lib3hError>;
 
+#[derive(Debug)]
+pub enum DhtContext {}
 
 #[derive(Debug)]
 pub enum DhtRequestToChild {
@@ -89,7 +96,10 @@ pub enum DhtRequestToParent {
     /// Notify owner that we believe a peer has dropped
     PeerTimedOut(PeerAddress),
     /// Notify owner that gossip is requesting we hold an entry.
-    HoldEntryRequested { from_peer: Address, entry: EntryData},
+    HoldEntryRequested {
+        from_peer: Address,
+        entry: EntryData,
+    },
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),
