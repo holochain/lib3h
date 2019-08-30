@@ -245,8 +245,12 @@ impl TransportEncoding {
     fn handle_bind(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        spec: Url,
+        mut spec: Url,
     ) -> TransportResult<()> {
+        // remove any agent id from the spec
+        // i.e. wss://1.2.3.4:55888?a=HcMyada -> wss://1.2.3.4:55888
+        spec.set_query(None);
+
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
             std::time::Duration::from_millis(2000),

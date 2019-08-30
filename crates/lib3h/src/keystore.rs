@@ -23,6 +23,8 @@ pub mod keystore_protocol {
     pub enum RequestToParentResponse {}
 }
 
+use keystore_protocol::*;
+
 pub type DynKeystoreActor = Box<
     dyn GhostActor<
         RequestToParent,
@@ -32,6 +34,7 @@ pub type DynKeystoreActor = Box<
         Lib3hError,
     >,
 >;
+
 pub type KeystoreActorParentEndpoint = GhostEndpoint<
     RequestToChild,
     RequestToChildResponse,
@@ -39,6 +42,7 @@ pub type KeystoreActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     Lib3hError,
 >;
+
 pub type KeystoreActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
     Context,
     RequestToParent,
@@ -48,28 +52,29 @@ pub type KeystoreActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
     Lib3hError,
 >;
 
-use keystore_protocol::*;
+type KeystoreParentEndpoint = GhostEndpoint<
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    Lib3hError,
+>;
+
+type KeystoreSelfEndpoint = GhostContextEndpoint<
+    (),
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    Lib3hError,
+>;
+
+type KeystoreMessageFromParent =
+    GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>;
 
 pub struct KeystoreStub {
-    endpoint_parent: Option<
-        GhostEndpoint<
-            RequestToChild,
-            RequestToChildResponse,
-            RequestToParent,
-            RequestToParentResponse,
-            Lib3hError,
-        >,
-    >,
-    endpoint_self: Detach<
-        GhostContextEndpoint<
-            (),
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChild,
-            RequestToChildResponse,
-            Lib3hError,
-        >,
-    >,
+    endpoint_parent: Option<KeystoreParentEndpoint>,
+    endpoint_self: Detach<KeystoreSelfEndpoint>,
 }
 
 impl KeystoreStub {
@@ -83,10 +88,7 @@ impl KeystoreStub {
         }
     }
 
-    fn handle_msg_from_parent(
-        &mut self,
-        mut msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>,
-    ) -> Lib3hResult<()> {
+    fn handle_msg_from_parent(&mut self, mut msg: KeystoreMessageFromParent) -> Lib3hResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Sign { id, payload } => self.handle_sign(msg, id, payload),
         }
@@ -94,7 +96,7 @@ impl KeystoreStub {
 
     fn handle_sign(
         &mut self,
-        msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>,
+        msg: KeystoreMessageFromParent,
         _id: String,
         _payload: Vec<u8>,
     ) -> Lib3hResult<()> {
@@ -119,17 +121,7 @@ impl
         &mut *self
     }
 
-    fn take_parent_endpoint(
-        &mut self,
-    ) -> Option<
-        GhostEndpoint<
-            RequestToChild,
-            RequestToChildResponse,
-            RequestToParent,
-            RequestToParentResponse,
-            Lib3hError,
-        >,
-    > {
+    fn take_parent_endpoint(&mut self) -> Option<KeystoreParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
