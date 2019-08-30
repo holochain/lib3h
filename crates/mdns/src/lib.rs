@@ -29,9 +29,9 @@
 #![feature(drain_filter)]
 
 use log::{debug, error, trace};
-use rand::Rng;
 // Used to clean our buffer to avoid mixing messages together.
 use zeroize::Zeroize;
+use url::Url;
 
 use std::{
     net::{self, SocketAddr, ToSocketAddrs},
@@ -144,6 +144,19 @@ impl MulticastDns {
         self.own_map_record
             .iter()
             .flat_map(|(_, v)| v.iter().map(|r| r.url.clone()).collect::<Vec<String>>())
+            .collect()
+    }
+
+    /// Returns all the urls for every NetworkId.
+    pub fn urls(&self) -> Vec<Url> {
+        self.map_record
+            .iter()
+            .flat_map(|(_, v)| v.iter().filter_map(|r| {
+                match Url::parse(&r.url) {
+                    Ok(url) => Some(url),
+                    Err(_) => None,
+                }
+            }).collect::<Vec<Url>>())
             .collect()
     }
 
@@ -363,7 +376,7 @@ impl Discovery for MulticastDns {
     }
 
     /// Read the UDP stack and update our cache accordingly.
-    fn discover(&mut self) -> DiscoveryResult<()> {
+    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
         self.responder()?;
 
         // We should query (and announce in the same time because we will anser to our query in the
@@ -376,7 +389,7 @@ impl Discovery for MulticastDns {
         self.update_ttl();
         self.prune_cache();
 
-        Ok(())
+        Ok(self.urls())
     }
 
     /// Release itself from the available participants in a network.
@@ -402,14 +415,6 @@ impl Discovery for MulticastDns {
         self.map_record.clear();
         Ok(())
     }
-}
-
-/// Wrapper around randomized range generation.
-pub fn rand_delay<T>(low: T, high: T) -> T
-where
-    T: rand::distributions::uniform::SampleUniform,
-{
-    rand::thread_rng().gen_range(low, high)
 }
 
 pub fn get_available_port(addr: &str) -> MulticastDnsResult<u16> {
