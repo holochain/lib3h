@@ -113,25 +113,11 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
             did_work,
             outbox.len(),
         );
-        // Process inner transport
-        // Its okay to process inner transport as long as NetworkEngine only calls
-        // Transport::process() on the network gateway,
-        // otherwise remove this code and have RealEngine explicitly call the process of the
-        // Network transport.
-        let (inner_did_work, mut event_list) = self.inner_transport.as_mut().process()?;
-        trace!(
-            "({}).Transport.inner_process() - output: {} {}",
-            self.identifier,
-            inner_did_work,
-            event_list.len()
-        );
-        if inner_did_work {
+        for evt in self.transport_inject_events.drain(..).collect::<Vec<_>>() {
+            info!("#$#$# GW {:?}", &evt);
             did_work = true;
-            outbox.append(&mut event_list);
-        }
-        // Handle TransportEvents
-        for evt in outbox.clone().iter() {
             self.handle_TransportEvent(&evt)?;
+            outbox.push(evt);
         }
         Ok((did_work, outbox))
     }

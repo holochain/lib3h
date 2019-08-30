@@ -17,9 +17,10 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     pub(crate) fn process_network_gateway(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        let mut did_work = false;
         let mut outbox = Vec::new();
         // Process the network gateway as a Transport
-        let (tranport_did_work, event_list) = self.network_gateway.as_transport_mut().process()?;
+        let (tranport_did_work, event_list) = self.network_transport.as_mut().process()?;
         debug!(
             "{} - network_gateway Transport.process(): {} {}",
             self.name,
@@ -27,20 +28,34 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             event_list.len(),
         );
         if tranport_did_work {
-            for evt in event_list {
-                let mut output = self.handle_netTransportEvent(&evt)?;
-                outbox.append(&mut output);
+            did_work = true;
+        }
+        for evt in &event_list {
+            self.network_gateway
+                .as_mut()
+                .transport_inject_event(evt.clone());
+        }
+        {
+            let (gateway_did_work, _event_list) =
+                self.network_gateway.as_transport_mut().process()?;
+            if gateway_did_work {
+                did_work = true;
             }
+        }
+        for evt in event_list {
+            let mut output = self.handle_netTransportEvent(&evt)?;
+            outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
         let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
         if dht_did_work {
-            for evt in event_list {
-                let mut output = self.handle_netDhtEvent(evt)?;
-                outbox.append(&mut output);
-            }
+            did_work = true;
         }
-        Ok((tranport_did_work || dht_did_work, outbox))
+        for evt in event_list {
+            let mut output = self.handle_netDhtEvent(evt)?;
+            outbox.append(&mut output);
+        }
+        Ok((did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
