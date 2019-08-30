@@ -32,13 +32,13 @@ impl std::error::Error for TransportError {
         None
     }
 }
-/*
-impl From<std::io::Error> for TransportError {
-    fn from(error: std::io::Error) -> Self {
+
+impl From<lib3h_ghost_actor::GhostError> for TransportError {
+    fn from(error: lib3h_ghost_actor::GhostError) -> Self {
         Self(format!("{:?}", error))
     }
 }
-*/
+
 impl From<Vec<TransportError>> for TransportError {
     fn from(errors: Vec<TransportError>) -> Self {
         Self(format!("{:?}", errors))
