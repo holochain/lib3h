@@ -3,8 +3,8 @@ pub mod gateway_transport;
 pub mod p2p_gateway;
 
 use crate::{
-    dht::dht_trait::Dht,
     transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
+    dht::ghost_protocol::*,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -15,7 +15,7 @@ use url::Url;
 
 /// describes a super construct of a Transport and a Dht allowing
 /// Transport access via peer discovery handled by the Dht
-pub trait Gateway: Transport + Dht {
+pub trait Gateway: Transport {
     fn identifier(&self) -> &str;
     fn transport_inject_event(&mut self, evt: TransportEvent);
     fn get_connection_id(&self, peer_address: &str) -> Option<String>;
@@ -27,7 +27,7 @@ pub trait Gateway: Transport + Dht {
 pub struct GatewayWrapper<'wrap> {
     gateway: Arc<RwLock<dyn Gateway + 'wrap>>,
     transport: TransportWrapper<'wrap>,
-    dht: Arc<RwLock<dyn Dht + 'wrap>>,
+    dht: Arc<RwLock<DhtActor>>,
 }
 
 impl<'wrap> GatewayWrapper<'wrap> {
@@ -58,17 +58,17 @@ impl<'wrap> GatewayWrapper<'wrap> {
     }
 
     /// clone a pointer to the internal dyn Dht
-    pub fn as_dht(&self) -> Arc<RwLock<dyn Dht + 'wrap>> {
+    pub fn as_dht(&self) -> Arc<RwLock<DhtActor>> {
         self.dht.clone()
     }
 
     /// immutable ref to the dyn Dht
-    pub fn as_dht_ref(&self) -> RwLockReadGuard<'_, dyn Dht + 'wrap> {
+    pub fn as_dht_ref(&self) -> RwLockReadGuard<'_, DhtActor> {
         self.dht.read().expect("failed to obtain read lock")
     }
 
     /// mutable ref to the dyn Dht
-    pub fn as_dht_mut(&self) -> RwLockWriteGuard<'_, dyn Dht + 'wrap> {
+    pub fn as_dht_mut(&self) -> RwLockWriteGuard<'_, DhtActor> {
         self.dht.write().expect("failed to obtain write lock")
     }
 
@@ -92,14 +92,15 @@ impl<'wrap> GatewayWrapper<'wrap> {
 /// Combines a transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 /// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
-pub struct P2pGateway<'gateway, D: Dht> {
-    inner_transport: TransportWrapper<'gateway>,
-    inner_dht: D,
+pub struct P2pGateway<'gateway> {
     /// Used for distinguishing gateways
     identifier: String,
     /// Map holding the reversed mapping between connection url and connectionId response
     connection_map: HashMap<Url, ConnectionId>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
+    inner_transport: TransportWrapper<'gateway>,
     transport_inbox: VecDeque<TransportCommand>,
     transport_inject_events: Vec<TransportEvent>,
+    /// DHT
+    inner_dht: DhtActor,
 }

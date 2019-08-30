@@ -1,13 +1,22 @@
-use crate::error::Lib3hError;
+use crate::{
+    error::*,
+    dht::{
+        PeerAddress,
+        dht_trait::*, dht_protocol::*,
+    },
+};
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
+use lib3h_protocol::{data_types::EntryData, Address};
+
+pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<DhtActor>;
 
 pub type DhtActor = Box<
     dyn GhostActor<
-        DhtRequestToChild,
-        DhtRequestToChildResponse,
         DhtRequestToParent,
         DhtRequestToParentResponse,
+        DhtRequestToChild,
+        DhtRequestToChildResponse,
         Lib3hError,
     >,
 >;
@@ -26,13 +35,20 @@ pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToParentResponse,
     Lib3hError,
 >;
-pub type DhtParentWrapper<Context> = GhostParentWrapper<
-    Context,
+pub type DhtParentWrapper = GhostParentWrapper<
+    DhtContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
     DhtRequestToChildResponse,
     Lib3hError,
+    dyn GhostActor<
+        DhtRequestToParent,
+        DhtRequestToParentResponse,
+        DhtRequestToChild,
+        DhtRequestToChildResponse,
+        Lib3hError,
+    >,
 >;
 
 pub type DhtMessage =

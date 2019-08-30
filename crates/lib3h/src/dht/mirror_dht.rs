@@ -1,16 +1,20 @@
 use crate::{
     dht::{
         dht_protocol::*,
-        dht_trait::{Dht, DhtConfig},
+        dht_trait::DhtConfig,
         PeerAddress, PeerAddressRef,
+        ghost_protocol::*,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     time,
 };
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
-use std::collections::{HashMap, HashSet, VecDeque};
-
+use lib3h_ghost_actor::prelude::*;
 use detach::prelude::*;
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    any::Any,
+};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -118,24 +122,10 @@ impl MirrorDht {
     // -- Processing -- //
 
     /// Serve each item in inbox
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
+    fn internal_process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtRequestToParent>)> {
         let now = time::since_epoch_ms();
         let mut outbox = Vec::new();
-        // Process inbox
-        let mut did_work = false;
-        loop {
-            let cmd = match self.inbox.pop_front() {
-                None => break,
-                Some(msg) => msg,
-            };
-            let res = self.serve_DhtCommand(&cmd);
-            if let Ok(mut output) = res {
-                did_work = true;
-                outbox.append(&mut output);
-            } else {
-                error!("serve_DhtCommand() failed: {:?}", res);
-            }
-        }
+        let mut did_work= false;
         // Check if others timed-out
         // TODO: Might need to optimize performance as walking a map is expensive
         // see comment: https://github.com/holochain/lib3h/pull/210/#discussion_r304518608
@@ -156,7 +146,7 @@ impl MirrorDht {
             // Check if timed-out
             if now - peer.timestamp > self.config.timeout_threshold {
                 debug!("@MirrorDht@ peer {} timed-out", peer_address);
-                outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
+                outbox.push(DhtRequestToParent::PeerTimedOut(peer_address.clone()));
                 timed_out_list.push(peer_address.clone());
                 did_work = true;
             }
@@ -176,7 +166,7 @@ impl MirrorDht {
             self.last_gossip_of_self = now;
             let gossip_data = self.gossip_self(self.get_other_peer_list());
             if gossip_data.peer_address_list.len() > 0 {
-                outbox.push(DhtEvent::GossipTo(gossip_data));
+                outbox.push(DhtRequestToParent::GossipTo(gossip_data));
                 did_work = true;
             }
         }
@@ -291,7 +281,7 @@ impl MirrorDht {
     }
 
     /// Create GossipTo event for entry to all known peers
-    fn gossip_entry(&self, entry: &EntryData) -> DhtEvent {
+    fn gossip_entry(&self, entry: &EntryData) -> DhtRequestToParent {
         let entry_gossip = MirrorGossip::Entry(entry.clone());
         let mut buf = Vec::new();
         entry_gossip
@@ -301,17 +291,17 @@ impl MirrorDht {
             peer_address_list: self.get_other_peer_list(),
             bundle: buf,
         };
-        DhtEvent::GossipTo(gossip_evt)
+        DhtRequestToParent::GossipTo(gossip_evt)
     }
 }
 
 /// Impl DhtActor interface
 impl
     GhostActor<
-        DhtRequestToChild,
-        DhtRequestToChildResponse,
         DhtRequestToParent,
         DhtRequestToParentResponse,
+        DhtRequestToChild,
+        DhtRequestToChildResponse,
         Lib3hError,
     > for MirrorDht
 {
@@ -325,9 +315,13 @@ impl
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
-        for msg in self.endpoint_self.as_mut().drain_messages() {
+        for request in self.endpoint_self.as_mut().drain_messages() {
             debug!("@MirrorDht@ serving request: {:?}", request);
             // self.handle_msg_from_parent(msg).expect("no ghost errors");
+        }
+        let (did_work, command_list) = self.internal_process().unwrap(); // FIXME
+        for command in command_list {
+            self.endpoint_parent.unwrap().publish(command);
         }
         Ok(false.into())
     }

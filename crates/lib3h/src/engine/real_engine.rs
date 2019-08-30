@@ -10,6 +10,7 @@ use crate::{
     dht::{
         dht_protocol::{self, *},
         dht_trait::*,
+        ghost_protocol::*,
     },
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
@@ -42,13 +43,13 @@ impl TransportKeys {
     }
 }
 
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine> RealEngine<'engine> {
     /// Constructor with TransportWss
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         name: &str,
-        dht_factory: DhtFactory<D>,
+        dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create Transport and bind
         let network_transport =
@@ -91,13 +92,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
 
 /// Constructor
 //#[cfg(test)]
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine> RealEngine<'engine> {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         name: &str,
-        dht_factory: DhtFactory<D>,
+        dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
         let network_transport = TransportWrapper::new(TransportMemory::new());
@@ -143,18 +144,19 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     }
 }
 
-impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
+impl<'engine> NetworkEngine for RealEngine<'engine> {
     /// User provided identifier for this engine
     fn name(&self) -> String {
         self.name.clone()
     }
 
     fn advertise(&self) -> Url {
-        self.network_gateway
-            .as_dht_ref()
-            .this_peer()
-            .peer_uri
-            .to_owned()
+        Url::parse("").unwrap()
+        // FIXME request this peer, process, block
+//        self.network_gateway
+//            .this_peer()
+//            .peer_uri
+//            .to_owned()
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -194,7 +196,7 @@ impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
 }
 
 /// Drop
-impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
+impl<'engine> Drop for RealEngine<'engine> {
     fn drop(&mut self) {
         self.shutdown().unwrap_or_else(|e| {
             warn!("Graceful shutdown failed: {}", e);
@@ -203,7 +205,7 @@ impl<'engine, D: Dht> Drop for RealEngine<'engine, D> {
 }
 
 /// Private
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine> RealEngine<'engine> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
@@ -315,15 +317,17 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
-                            let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                            space_gateway.as_dht_mut().post(cmd)?;
+                            space_gateway
+                                .as_dht_mut()
+                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry))?;
                         } else {
                             let response = FetchDhtEntryResponseData {
                                 msg_id: msg.request_id.clone(),
                                 entry: msg.entry.clone(),
                             };
-                            let cmd = DhtCommand::EntryDataResponse(response);
-                            space_gateway.as_dht_mut().post(cmd)?;
+                            space_gateway
+                                .as_dht_mut()
+                                .respond(DhtRequestToParentResponse::RequestEntry(msg.entry))?;
                         }
                     }
                 }
@@ -339,8 +343,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                        space_gateway.as_dht_mut().post(cmd)?;
+                        space_gateway
+                            .as_dht_mut()
+                            .publish(DhtRequestToChild::BroadcastEntry(msg.entry))?;
                     }
                 }
             }
@@ -355,8 +360,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
-                        space_gateway.as_dht_mut().post(cmd)?;
+                        space_gateway
+                            .as_dht_mut()
+                            .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry))?;
                     }
                 }
             }
@@ -372,12 +378,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let msg = dht_protocol::FetchDhtEntryData {
-                            msg_id: msg.request_id,
-                            entry_address: msg.entry_address,
-                        };
-                        let cmd = DhtCommand::FetchEntry(msg);
-                        space_gateway.as_dht_mut().post(cmd)?;
+                        // TODO request & handle response
+//                        let msg = dht_protocol::FetchDhtEntryData {
+//                            msg_id: msg.request_id,
+//                            entry_address: msg.entry_address,
+//                        };
+                        // let cmd = DhtCommand::FetchEntry(msg);
+                        // space_gateway.as_dht_mut().post(cmd)?;
                     }
                 }
             }
@@ -397,12 +404,9 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let msg = dht_protocol::FetchDhtEntryResponseData {
-                            msg_id: msg.request_id,
-                            entry,
-                        };
-                        let cmd = DhtCommand::EntryDataResponse(msg);
-                        space_gateway.as_dht_mut().post(cmd)?;
+                        space_gateway
+                            .as_dht_mut()
+                            .respond(DhtRequestToParentResponse::RequestEntry(entry))?;
                     }
                 }
             }
@@ -523,7 +527,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     };
                     space_gateway
                         .as_dht_mut()
-                        .post(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
+                        .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry))?;
                 }
             }
         }
@@ -600,7 +604,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         let this_peer = { space_gateway.as_ref().this_peer().clone() };
         space_gateway
             .as_dht_mut()
-            .post(DhtCommand::HoldPeer(this_peer))?;
+            .publish(DhtRequestToChild::HoldPeer(this_peer))?;
         // Send Get*Lists requests
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),

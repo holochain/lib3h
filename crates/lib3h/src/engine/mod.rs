@@ -6,7 +6,9 @@ mod space_layer;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
-    dht::dht_trait::{Dht, DhtFactory},
+    dht::{
+        ghost_protocol::*,
+    },
     gateway::GatewayWrapper,
     track::Tracker,
     transport::{ConnectionId, TransportWrapper},
@@ -60,7 +62,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'engine, D: Dht + 'engine> {
+pub struct RealEngine<'engine> {
     /// Identifier
     name: String,
     /// Config settings
@@ -68,7 +70,7 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
-    dht_factory: DhtFactory<D>,
+    dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
     // TODO #176: Remove this if we resolve #176 without it.

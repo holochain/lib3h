@@ -1,6 +1,6 @@
 use crate::{
     dht::{
-        dht_protocol::{DhtCommand, DhtEvent, PeerData},
+        dht_protocol::PeerData,
         PeerAddress, PeerAddressRef,
     },
     error::Lib3hResult,
@@ -32,7 +32,6 @@ impl DhtConfig {
         }
     }
 }
-pub type DhtFactory<D> = fn(config: &DhtConfig) -> Lib3hResult<D>;
 
 ///// Allow storage and retrieval of peer & entry data.
 ///// Trait API is for querying local dht data

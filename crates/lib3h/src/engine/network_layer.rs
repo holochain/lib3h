@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::{dht_protocol::*, ghost_protocol::*},
     engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     transport::{protocol::*, ConnectionIdRef},
@@ -12,7 +12,7 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer related private methods
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine> RealEngine<'engine> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
@@ -47,7 +47,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
-        let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
+        let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process().unwrap(); // FIXME
         if dht_did_work {
             did_work = true;
         }
@@ -59,17 +59,17 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_netDhtEvent(&mut self, cmd: DhtRequestToParent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
         let outbox = Vec::new();
         match cmd {
-            DhtEvent::GossipTo(_data) => {
+            DhtRequestToParent::GossipTo(_data) => {
                 // no-op
             }
-            DhtEvent::GossipUnreliablyTo(_data) => {
+            DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
             }
-            DhtEvent::HoldPeerRequested(peer_data) => {
+            DhtRequestToParent::HoldPeerRequested(peer_data) => {
                 // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
                 // Connect to every peer we are requested to hold.
                 info!(
@@ -79,7 +79,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone(), "".to_string());
                 self.network_gateway.as_transport_mut().post(cmd)?;
             }
-            DhtEvent::PeerTimedOut(peer_address) => {
+            DhtRequestToParent::PeerTimedOut(peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
                 let maybe_connection_id = self
                     .network_gateway
@@ -97,16 +97,13 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
             }
             // No entries in Network DHT
-            DhtEvent::HoldEntryRequested(_, _) => {
+            DhtRequestToParent::HoldEntryRequested {_, _} => {
                 unreachable!();
             }
-            DhtEvent::FetchEntryResponse(_) => {
+            DhtRequestToParent::EntryPruned(_) => {
                 unreachable!();
             }
-            DhtEvent::EntryPruned(_) => {
-                unreachable!();
-            }
-            DhtEvent::EntryDataRequested(_) => {
+            DhtRequestToParent::RequestEntry(_) => {
                 unreachable!();
             }
         }
@@ -222,20 +219,24 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
-                let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
+                let gossip = RemoteGossipBundleData {
                     from_peer_address: msg.from_peer_address.clone().into(),
                     bundle: msg.bundle.clone(),
-                });
+                };
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    self.network_gateway.as_dht_mut().post(cmd)?;
+                    self.network_gateway
+                        .as_dht_mut()
+                        .publish(DhtRequestToChild::HandleGossip(gossip))?;
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        space_gateway.as_dht_mut().post(cmd)?;
+                        space_gateway
+                            .as_dht_mut()
+                            .publish(DhtRequestToChild::HandleGossip(gossip))?;
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -280,7 +281,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway
                         .as_dht_mut()
-                        .post(DhtCommand::HoldPeer(peer_data.clone()))?;
+                        .publish(DhtRequestToChild::HoldPeer(peer_data.clone()))?;
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -290,7 +291,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     if let Some(space_gateway) = maybe_space_gateway {
                         space_gateway
                             .as_dht_mut()
-                            .post(DhtCommand::HoldPeer(peer_data.clone()))?;
+                            .publish(DhtRequestToChild::HoldPeer(peer_data.clone()))?;
                     }
                 }
             }

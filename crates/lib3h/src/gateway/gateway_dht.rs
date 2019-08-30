@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::{
+        dht_protocol::*, ghost_protocol::*,
+    },
     engine::{p2p_protocol::*, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
     gateway::{Gateway, P2pGateway},
@@ -11,7 +13,7 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 
 /// Compose DHT
-impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
+impl<'gateway>  P2pGateway<'gateway> {
     /// Peer info
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.inner_dht.get_peer_list()
@@ -31,12 +33,12 @@ impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
     }
 
     /// Processing
-    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
+    fn post(&mut self, cmd: DhtRequestToChild) -> Lib3hResult<()> {
         // Add to connection_map for space_gateways
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         if self.identifier != NETWORK_GATEWAY_ID {
-            if let DhtCommand::HoldPeer(peer_data) = cmd.clone() {
+            if let DhtRequestToChild::HoldPeer(peer_data) = cmd.clone() {
                 debug!(
                     "({}).Dht.post(HoldPeer) - {}",
                     self.identifier, peer_data.peer_uri,
@@ -56,36 +58,36 @@ impl<'gateway, D: Dht> Dht for P2pGateway<'gateway, D> {
                 }
             }
         }
-        self.inner_dht.post(cmd)
+        self.inner_dht.publish(cmd)
     }
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
-        // Process the dht
-        let (did_work, dht_event_list) = self.inner_dht.process()?;
-        trace!(
-            "({}).Dht.process() - output: {} {}",
-            self.identifier,
-            did_work,
-            dht_event_list.len(),
-        );
-        // Handle events directly
-        if did_work {
-            for evt in dht_event_list.clone() {
-                self.handle_DhtEvent(evt)?;
-            }
-        }
-        // TODO #173: Check for timeouts of own requests here?
-        // Done
-        Ok((did_work, dht_event_list))
-    }
+//    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
+//        // Process the dht
+//        let (did_work, dht_event_list) = self.inner_dht.process()?;
+//        trace!(
+//            "({}).Dht.process() - output: {} {}",
+//            self.identifier,
+//            did_work,
+//            dht_event_list.len(),
+//        );
+//        // Handle events directly
+//        if did_work {
+//            for evt in dht_event_list.clone() {
+//                self.handle_DhtEvent(evt)?;
+//            }
+//        }
+//        // TODO #173: Check for timeouts of own requests here?
+//        // Done
+//        Ok((did_work, dht_event_list))
+//    }
 }
 
 /// Private internals
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<'gateway> P2pGateway<'gateway> {
     /// Handle a DhtEvent sent to us by our internal DHT.
-    pub(crate) fn handle_DhtEvent(&mut self, evt: DhtEvent) -> Lib3hResult<()> {
+    pub(crate) fn handle_DhtEvent(&mut self, evt: DhtRequestToParent) -> Lib3hResult<()> {
         trace!("({}).handle_DhtEvent() {:?}", self.identifier, evt);
         match evt {
-            DhtEvent::GossipTo(data) => {
+            DhtRequestToParent::GossipTo(data) => {
                 // DHT should give us the peer_transport
                 for to_peer_address in data.peer_address_list {
                     // TODO #150 - should not gossip to self in the first place
@@ -114,25 +116,22 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                         .send(&[&to_conn_id], &payload)?;
                 }
             }
-            DhtEvent::GossipUnreliablyTo(_data) => {
+            DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // TODO #171
             }
-            DhtEvent::HoldPeerRequested(_peer_data) => {
+            DhtRequestToParent::HoldPeerRequested(_peer_data) => {
                 // no-op
             }
-            DhtEvent::PeerTimedOut(_peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // no-op
             }
-            DhtEvent::HoldEntryRequested(_from, _data) => {
+            DhtRequestToParent::HoldEntryRequested(_from, _data) => {
                 // no-op
             }
-            DhtEvent::FetchEntryResponse(_data) => {
+            DhtRequestToParent::EntryPruned(_address) => {
                 // no-op
             }
-            DhtEvent::EntryPruned(_address) => {
-                // no-op
-            }
-            DhtEvent::EntryDataRequested(_) => {
+            DhtRequestToParent::EntryDataRequested(_) => {
                 // no-op
             }
         }

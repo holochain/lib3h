@@ -12,7 +12,7 @@ pub type PeerAddressRef = str;
 pub mod tests {
     use crate::{
         dht::{
-            dht_protocol::*, dht_trait::Dht, mirror_dht::MirrorDht, rrdht::RrDht, PeerAddressRef,
+            dht_protocol::*, mirror_dht::MirrorDht, rrdht::RrDht, PeerAddressRef,
         },
         tests::enable_logging_for_test,
     };
@@ -251,9 +251,9 @@ pub mod tests {
         assert!(did_work);
         // Should receive a HoldRequested
         assert_eq!(event_list.len(), 1);
-        if let DhtEvent::HoldEntryRequested(from, hold_entry) = event_list[0].clone() {
-            assert_eq!(from, PEER_B.clone());
-            assert_eq!(hold_entry, entry_data.clone());
+        if let DhtEvent::HoldEntryRequested {from_peer, entry} = event_list[0].clone() {
+            assert_eq!(from_peer, PEER_B.clone());
+            assert_eq!(entry, entry_data.clone());
         } else {
             panic!("Should be of variant type HoldEntryRequested");
         }

@@ -1,5 +1,5 @@
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht, PeerAddressRef},
+    dht::{dht_protocol::*, dht_trait, PeerAddressRef},
     error::Lib3hResult,
 };
 use lib3h_protocol::{Address, DidWork};

@@ -1,7 +1,9 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::{
+        dht_protocol::*, ghost_protocol::*,
+    },
     engine::p2p_protocol::P2pProtocol,
     gateway::{Gateway, P2pGateway},
     transport::{
@@ -17,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
+impl<'gateway> Transport for P2pGateway<'gateway> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
@@ -141,7 +143,7 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 }
 
 /// Private internals
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<'gateway> P2pGateway<'gateway> {
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
         &self,
@@ -249,9 +251,12 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                                 peer_uri,
                                 timestamp: peer_timestamp,
                             };
-                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
-                                                                                         // TODO #150 - Should not call process manually
-                            Dht::process(self).expect("HACK");
+                            // HACK
+                            self.as_dht_mut()
+                                .publish(DhtRequestToChild::HoldPeer(peer));
+                            // TODO #58
+                            // TODO #150 - Should not call process manually
+                            self.process().expect("HACK");
                         }
                     }
                 }

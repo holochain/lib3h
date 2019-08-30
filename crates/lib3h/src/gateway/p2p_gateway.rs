@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::dht_trait::{Dht, DhtConfig, DhtFactory},
+    dht::{dht_trait::DhtConfig, ghost_protocol::DhtFactory},
+
     gateway::{Gateway, P2pGateway},
     transport::{protocol::*, TransportWrapper},
 };
@@ -13,13 +14,13 @@ use std::collections::{HashMap, VecDeque};
 //--------------------------------------------------------------------------------------------------
 
 /// any Transport Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<'gateway> P2pGateway<'gateway> {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
         inner_transport: TransportWrapper<'gateway>,
-        dht_factory: DhtFactory<D>,
+        dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
         P2pGateway {
@@ -33,7 +34,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
     }
 }
 
-impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
+impl<'gateway> Gateway for P2pGateway<'gateway> {
     /// This Gateway's identifier
     fn identifier(&self) -> &str {
         self.identifier.as_str()
@@ -75,12 +76,12 @@ impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
 }
 
 /// P2pGateway Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<'gateway> P2pGateway<'gateway> {
     /// Constructors
     pub fn new_with_space(
         network_gateway: TransportWrapper<'gateway>,
         space_address: &Address,
-        dht_factory: DhtFactory<D>,
+        dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
         let identifier: String = space_address.clone().into();
