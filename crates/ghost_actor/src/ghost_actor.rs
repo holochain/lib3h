@@ -288,12 +288,13 @@ mod tests {
         }
     }
 
+    struct FakeParent {
+        state: String,
+    }
+
     #[test]
     fn test_ghost_actor() {
         // The body of this test simulates being the parent actor
-        struct FakeParent {
-            state: String,
-        }
         let mut fake_parent = FakeParent {
             state: "".to_string(),
         };
@@ -349,22 +350,35 @@ mod tests {
 
     #[test]
     fn test_ghost_actor_parent_wrapper() {
-        /*
-        type FakeParent = ();  // this test body is this parent type
-        // The body of this test simulates being the parent actor
-        // but this time we use a parent wrapper to make things easier
+        // much of the previous test is the parent creating instances of the actor
+        // and taking control of the parent endpoint.  Parent wrapper implements
+        // much of this work as a convenience
 
-        // so first create the wrapper
-        let mut wrapped_child = GhostParentWrapper::new(Box::new(TestActor::new()),"parent");
-        wrapped_child.publish(TestMsgIn("msg from parent".into()));
+        let mut fake_parent = FakeParent {
+            state: "".to_string(),
+        };
 
-        let mut this : FakeParent = ();
-        assert!(wrapped_child.process(&mut this).is_ok());
+        // create the wrapper
+        let mut wrapped_child: GhostParentWrapper<
+            TestContext,
+            TestMsgOut,
+            TestMsgOutResponse,
+            TestMsgIn,
+            TestMsgInResponse,
+            TestError,
+            TestActor,
+        > = GhostParentWrapper::new(TestActor::new(), "parent");
+
+        // use it to publish an event via the wrapper
+        wrapped_child.publish(TestMsgIn("event from parent".into()));
+
+        // process via the wrapper
+        assert!(wrapped_child.process(&mut fake_parent).is_ok());
 
         assert_eq!(
-            "\"msg from parent\"",
-            format!("{:?}",wrapped_child)
-        )*/
+            "\"event from parent\"",
+            format!("{:?}", wrapped_child.as_ref().internal_state[0])
+        )
     }
 
 }
