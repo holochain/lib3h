@@ -129,7 +129,7 @@ fn dns_message_question_test() {
 
 #[test]
 fn dns_message_answer_test() {
-    let targets = vec![Target::new("wss://192.168.0.88")];
+    let targets = Target::new("wss://192.168.0.88");
     let answer = AnswerSection::new("holonaute.local.", &targets);
 
     let dmesg = DnsMessage {
@@ -159,10 +159,10 @@ fn dns_message_multiple_question_and_answer_test() {
     ];
 
     let answers = vec![
-        AnswerSection::new("holonaute.local.", &[Target::new("wss://192.168.0.88")]),
-        AnswerSection::new("holonaute.local.", &[Target::new("wss://192.168.0.89")]),
-        AnswerSection::new("mistral.local.", &[Target::new("wss://192.168.0.77")]),
-        AnswerSection::new("mistral.local.", &[Target::new("wss://192.168.0.78")]),
+        AnswerSection::new("holonaute.local.", &Target::new("wss://192.168.0.88")),
+        AnswerSection::new("holonaute.local.", &Target::new("wss://192.168.0.89")),
+        AnswerSection::new("mistral.local.", &Target::new("wss://192.168.0.77")),
+        AnswerSection::new("mistral.local.", &Target::new("wss://192.168.0.78")),
     ];
 
     let dmesg = DnsMessage {

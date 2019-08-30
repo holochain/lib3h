@@ -1,13 +1,10 @@
 //! MulticastDns builder definition.
 
 use crate::{
-    READ_BUF_SIZE,
-    DEFAULT_BIND_ADRESS,
-    SERVICE_LISTENER_PORT,
-    MDNS_MULCAST_IPV4_ADRESS,
-    MulticastDns,
     error::MulticastDnsError,
-    record::{Record, MapRecord, HashMapRecord},
+    record::{HashMapRecord, MapRecord, Record},
+    Instant, MulticastDns, DEFAULT_BIND_ADRESS, DEFAULT_EVERY_MS, DEFAULT_TTL,
+    MDNS_MULCAST_IPV4_ADRESS, READ_BUF_SIZE, SERVICE_LISTENER_PORT,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -20,13 +17,21 @@ pub struct MulticastDnsBuilder {
     pub(crate) multicast_loop: bool,
     pub(crate) multicast_ttl: u32,
     pub(crate) multicast_address: String,
-    pub(crate) own_record: Record,
+    pub(crate) every: u128,
+    pub(crate) own_map_record: MapRecord,
 }
 
 impl MulticastDnsBuilder {
     /// create a new mdns builder
     pub fn new() -> Self {
         MulticastDnsBuilder::default()
+    }
+
+    pub fn with_own_record(networkid: &str, rec: &Record) -> Self {
+        Self {
+            own_map_record: MapRecord::new(networkid, &[rec.clone()]),
+            ..Default::default()
+        }
     }
 
     /// specify the network interface to bind to
@@ -59,11 +64,19 @@ impl MulticastDnsBuilder {
         self
     }
 
+    /// Sets the amount of time between two queries originating from ourself.
+    pub fn every(&mut self, every_ms: u128) -> &mut Self {
+        self.every = every_ms;
+        self
+    }
+
     /// Set the host's record.
-    pub fn own_record(&mut self, hostname: &str, addrs: &[&str]) -> &mut Self {
-        let addrs: Vec<String> = addrs.iter().map(|a| a.to_string()).collect();
-        let hostname = hostname.split_terminator(".local.").collect::<Vec<&str>>()[0];
-        self.own_record = Record::new(hostname, &addrs, 255);
+    pub fn own_record(&mut self, networkid: &str, urls: &[&str]) -> &mut Self {
+        let records: Vec<Record> = urls
+            .iter()
+            .map(|url| Record::new(networkid, url, DEFAULT_TTL))
+            .collect();
+        self.own_map_record = MapRecord::new(networkid, &records);
         self
     }
 
@@ -78,10 +91,7 @@ impl MulticastDnsBuilder {
             &self.bind_address.parse()?,
         )?;
 
-        let send_socket = create_socket(
-            &self.bind_address,
-            self.bind_port,
-        )?;
+        let send_socket = create_socket(&self.bind_address, self.bind_port)?;
         send_socket.set_nonblocking(true)?;
 
         Ok(MulticastDns {
@@ -90,13 +100,13 @@ impl MulticastDnsBuilder {
             multicast_loop: self.multicast_loop,
             multicast_ttl: self.multicast_ttl,
             multicast_address: self.multicast_address.to_owned(),
+            timestamp: Instant::now(),
+            every: self.every,
             send_socket,
             recv_socket,
             buffer: [0; READ_BUF_SIZE],
-            own_record: self.own_record.clone(),
-            map_record: MapRecord {
-                value: HashMapRecord::with_capacity(32),
-            },
+            own_map_record: self.own_map_record.clone(),
+            map_record: MapRecord(HashMapRecord::with_capacity(32)),
         })
     }
 }
@@ -104,17 +114,24 @@ impl MulticastDnsBuilder {
 use std::default::Default;
 impl Default for MulticastDnsBuilder {
     fn default() -> Self {
+        let networkid = format!(
+            "{}.holo.host",
+            &hostname::get_hostname().unwrap_or_else(|| String::from("Anonymous-host"))
+        );
+        let record = Record::new(&networkid, DEFAULT_BIND_ADRESS, DEFAULT_TTL);
+        let map_record = MapRecord::new(&networkid, &[record]);
+
         MulticastDnsBuilder {
             bind_address: String::from(DEFAULT_BIND_ADRESS),
             bind_port: SERVICE_LISTENER_PORT,
             multicast_loop: true,
-            multicast_ttl: 255,
+            multicast_ttl: DEFAULT_TTL,
             multicast_address: String::from(MDNS_MULCAST_IPV4_ADRESS),
-            own_record: Record::new_own(),
+            every: DEFAULT_EVERY_MS,
+            own_map_record: map_record,
         }
     }
 }
-
 
 /// non-windows udp socket bind.
 #[cfg(not(target_os = "windows"))]

@@ -4,6 +4,7 @@
 //! ```rust
 //! use lib3h_mdns as mdns;
 //! use lib3h_discovery::Discovery;
+//! use std::{thread, time::Duration};
 //!
 //! let mut mdns = mdns::MulticastDnsBuilder::new()
 //!     .bind_port(8585)
@@ -19,24 +20,22 @@
 //!     mdns.discover();
 //!     println!("mDNS neighbourhood : {:#?}", &mdns.records());
 //!
-//!     mdns::sleep_ms(100);
+//!     thread::sleep(Duration::from_millis(100));
 //! }
 //! ```
 
 #![feature(try_trait)]
 #![feature(never_type)]
+#![feature(drain_filter)]
 
-use log::{debug, error, trace, warn};
+use log::{debug, error, trace};
 use rand::Rng;
-use regex;
-// Used to clean ouf buffer to avoid mixing messages together.
+// Used to clean our buffer to avoid mixing messages together.
 use zeroize::Zeroize;
-
 
 use std::{
     net::{self, SocketAddr, ToSocketAddrs},
-    thread,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use lib3h_discovery::{error::DiscoveryResult, Discovery};
@@ -60,17 +59,14 @@ use record::{MapRecord, Record};
 const READ_BUF_SIZE: usize = 4_096;
 
 /// Delay between probe query, 250ms by default.
-const PROBE_QUERY_DELAY_MS: u64 = 250;
+const _PROBE_QUERY_DELAY_MS: u64 = 250;
 
 /// Listening port of this mDNS service.
 const SERVICE_LISTENER_PORT: u16 = 8585;
 
-/// Amount of time to wait between two actions.
-const TIME_TO_SLEEP_MS: u64  = 1_000;
-
 /// Threshold value used to getting ourselves out of a potential
 /// infinite loop during probe
-const FAIL_SAFE_TRESHOLD: u16 = 1_000;
+const _FAIL_SAFE_TRESHOLD: u16 = 1_000;
 
 /// mDNS multicast IPv4 address.
 const MDNS_MULCAST_IPV4_ADRESS: &str = "224.0.0.251";
@@ -78,7 +74,11 @@ const MDNS_MULCAST_IPV4_ADRESS: &str = "224.0.0.251";
 /// Default bind adress.
 const DEFAULT_BIND_ADRESS: &str = "0.0.0.0";
 
+/// Default "time to live" value for a new record.
+const DEFAULT_TTL: u32 = 255;
 
+/// Default amount of time between two queries.
+const DEFAULT_EVERY_MS: u128 = 30_000;
 
 /// an mdns instance that can send and receive dns packets on LAN UDP multicast
 pub struct MulticastDns {
@@ -92,6 +92,10 @@ pub struct MulticastDns {
     pub(crate) multicast_ttl: u32,
     /// Multicast address used by the mDNS protocol: `224.0.0.251`
     pub(crate) multicast_address: String,
+    /// Determine if we need to query / announce.
+    pub(crate) timestamp: Instant,
+    /// The amount of time we should wait between two queries.
+    pub(crate) every: u128,
     /// The socket used by the mDNS service protocol to send packets
     pub(crate) send_socket: net::UdpSocket,
     /// The socket used to receive mDNS packets
@@ -99,7 +103,7 @@ pub struct MulticastDns {
     /// The buffer used to store the packet to send/receive messages
     buffer: [u8; READ_BUF_SIZE],
     /// Reference the host's record
-    pub(crate) own_record: Record,
+    pub(crate) own_map_record: MapRecord,
     /// The lookup table where the neighbors are stored
     pub(crate) map_record: MapRecord,
 }
@@ -135,19 +139,33 @@ impl MulticastDns {
         &self.map_record
     }
 
+    /// Returns a vector of all the url we own through every NetworkId.
+    pub fn own_urls(&self) -> Vec<String> {
+        self.own_map_record
+            .iter()
+            .flat_map(|(_, v)| v.iter().map(|r| r.url.clone()).collect::<Vec<String>>())
+            .collect()
+    }
+
+    /// Returns all the NetworkIds we are currently in.
+    pub fn own_networkids(&self) -> Vec<&str> {
+        self.own_map_record.keys().map(|k| k.as_str()).collect()
+    }
+
+    /// Returns the amount of time we wait between two queries.
+    pub fn every(&self) -> u128 {
+        self.every
+    }
+
     /// Insert a new record to our cache.
-    pub fn push_record(&mut self, hostname: &str, record: &Record) {
-        self.map_record.insert(hostname.to_string(), record.clone());
+    pub fn insert_record(&mut self, hostname: &str, records: &[Record]) {
+        self.map_record
+            .insert(hostname.to_string(), records.to_vec());
     }
 
     /// Update our cache of resource records.
     pub fn update_cache(&mut self, other_map_record: &MapRecord) {
-        for (other_name, other_record) in other_map_record.iter() {
-            if self.own_record.hostname != *other_name {
-                self.map_record
-                    .insert(other_name.clone(), other_record.clone());
-            }
-        }
+        self.map_record.update(other_map_record);
     }
 
     /// Broadcasts a DNS message.
@@ -195,49 +213,6 @@ impl MulticastDns {
         }
     }
 
-    /// Try to receive a DNS packet and set timeout and wait time doing so.
-    pub fn recv_probe_response(
-        &mut self,
-        timeout: u64,
-        every: u64,
-    ) -> Result<Option<(AnswerSection, SocketAddr)>, MulticastDnsError> {
-        self.clear_buffer();
-        let start = Instant::now();
-
-        while start.elapsed().as_millis() < u128::from(timeout) {
-            match self.recv_socket.recv_from(&mut self.buffer) {
-                Ok((num_bytes, sender_socket_addr)) => {
-                    let packet = self.buffer[..num_bytes].to_vec();
-                    trace!("I received '{}' bytes: {:?}", num_bytes, &packet);
-
-                    if let Ok(dmesg) = DnsMessage::from_raw(&packet) {
-                        // We discard non authoritative answers
-                        if dmesg.nb_authority < 1 {
-                            continue;
-                        } else {
-                            for answer in dmesg.answers.iter() {
-                                if self.own_record.hostname() == answer.domain_name {
-                                    return Ok(Some((answer.clone(), sender_socket_addr)));
-                                }
-                            }
-                        }
-                    } else {
-                        warn!("Fail to cast DnsMessage from : {:?}", &packet);
-                    }
-                }
-                Err(err) => {
-                    if err.kind() != std::io::ErrorKind::WouldBlock {
-                        error!("Something went wrong: {}", err);
-                        return Err(err.into());
-                    } else {
-                    }
-                }
-            }
-            sleep_ms(every);
-        }
-        Ok(None)
-    }
-
     /// Clean our buffer of bytes from previous messages.
     pub fn clear_buffer(&mut self) {
         self.buffer.zeroize();
@@ -246,37 +221,33 @@ impl MulticastDns {
     /// Clean our cache by removing the out of live records.
     pub fn prune_cache(&mut self) {
         // Get the entry of the dead records to remove them safely afterward
-        let mut dead_entry_list: Vec<String> = Vec::with_capacity(self.map_record.len());
-        for (k, v) in self.map_record.iter() {
-            if v.ttl == 0 {
-                dead_entry_list.push(k.clone());
-            }
-        }
-
-        // Safely clean our cache from dead entry
-        for dead_entry in dead_entry_list {
-            self.map_record.remove(&dead_entry);
+        // let mut dead_entry_list: Vec<String> = Vec::with_capacity(self.map_record.len());
+        for (_, records) in self.map_record.iter_mut() {
+            let _: Vec<Record> = records.drain_filter(|r| r.ttl == 0).collect();
         }
     }
 
-    /// Run the mDNS service.
-    /// This will run an infinite loop responding to mDNS solicitations.
-    pub fn run_service(&mut self) -> MulticastDnsResult<!> {
-        debug!("Starting.");
-        self.advertise()?;
-
-        debug!("Responder service started.");
-        self.responder_service_loop()?;
-
+    /// Update the `time to live` of every cached record.
+    pub fn update_ttl(&mut self) {
+        let own_urls = self.own_urls();
+        for (_netid, records) in self.map_record.iter_mut() {
+            for record in records {
+                if !own_urls.contains(&record.url) {
+                    if record.ttl > 0 {
+                        record.ttl -= 1;
+                    }
+                }
+            }
+        }
     }
 
     /// mDNS Querier
     /// One-Shot Multicast DNS Queries
     /// Not used in our actual mDNS implementation use case.
-    pub fn _query(&mut self) -> MulticastDnsResult<()> {
-        // if let Some(query_message) = self.build_query_message() {
-        //     self.broadcast(&query_message)?;
-        // }
+    pub fn query(&mut self) -> MulticastDnsResult<()> {
+        if let Some(query_message) = self.build_query_message() {
+            self.broadcast_message(&query_message)?;
+        }
 
         Ok(())
     }
@@ -285,228 +256,13 @@ impl MulticastDns {
     /// queries
     /// Not used in our actual mDNS implementation use case.
     fn responder(&mut self) -> MulticastDnsResult<()> {
-        let defend_message = self.build_defensive_message();
-
-        match self.recv() {
-            Ok(Some((packet, sender_addr))) => {
-                let dmesg = DnsMessage::from_raw(&packet)?;
-                if dmesg.nb_answers > 0 {
-                    // Skipping for now...
-                }
-                // We send response only for record we have authority on.
-                if dmesg.nb_questions > 0 {
-                    for question in dmesg.questions.iter() {
-                        if question.domain_name == self.own_record.hostname {
-                            // We send the response directly to the sender instead of broadcasting it to
-                            // avoid any unnecessary burden on the network.
-                            // But apparently this fail on a local network, so we broadcast it
-                            // as well
-                            self.send_socket
-                                .send_to(&defend_message.to_raw()?, sender_addr)?;
-                            self.broadcast_message(&defend_message)?;
-                        }
-                    }
-                }
-            }
-            Ok(None) => {
-                debug!(">> Nothing on the UDP stack");
-            }
-            Err(e) => {
-                error!(
-                    "Something went wrong while processing the UDP stack during update: '{}'",
-                    e
-                );
-                return Err(e);
-            }
-        }
-        Ok(())
-    }
-
-    /// Runs the mDNS infinite service loop.
-    fn responder_service_loop(&mut self) -> MulticastDnsResult<!> {
-        loop {
-            self.responder()?;
-            thread::sleep(Duration::from_millis(TIME_TO_SLEEP_MS));
-        }
-    }
-
-    /// Builds mDNS probe packet with the proper bit set up in order to check if a host record is
-    /// available.
-    fn build_probe_packet(&self) -> DnsMessage {
-        let questions = vec![QuerySection::new(&self.own_record.hostname)];
-        DnsMessage {
-            nb_questions: 1,
-            questions,
-            ..Default::default()
-        }
-    }
-
-    /// Builds an mDNS reponse packet containing all the registered ressource records of the host
-    /// in the "Answer Section".
-    pub fn build_response_packet(&self, record: &Record) -> DnsMessage {
-        let resp_record = self
-            .map_record
-            .get(record.hostname())
-            .expect("Missing record.");
-        let mr = MapRecord::new(&resp_record.hostname, &resp_record);
-        mr.to_dns_reponse_message()
-    }
-
-    /// Build a packet to defend our name.
-    pub fn build_defensive_message(&self) -> DnsMessage {
-        let mut def_mesg =
-            MapRecord::new(&self.own_record.hostname, &self.own_record).to_dns_reponse_message();
-        def_mesg.nb_authority = 1;
-        def_mesg
-    }
-
-    pub fn build_release_message(&self) -> DnsMessage {
-        let mut release_record = self.own_record.clone();
-        // We make sure our "time to live" is zero to send a meaningfull message about our release
-        // to other participants on the network
-        release_record.ttl = 0;
-        MapRecord::new(&self.own_record.hostname, &release_record).to_dns_reponse_message()
-    }
-
-    /// Builds an announcing packet corresponding to an unsolicited mDNS response containing all of
-    /// the node's cache.
-    fn build_announcing_message(&self) -> DnsMessage {
-        self.map_record.to_dns_reponse_message()
-    }
-
-    /// Builds a query packet to be used by one-shot mDNS implementation.
-    pub fn build_query_message(&self, hostname: &str) -> Option<DnsMessage> {
-        if let Some(record) = self.map_record.get(hostname) {
-            let questions = vec![QuerySection::new(&record.hostname)];
-            Some(DnsMessage {
-                nb_questions: 1,
-                questions,
-                ..Default::default()
-            })
-        } else {
-            None
-        }
-    }
-
-    /// When sending probe queries, a host MUST NOT consult its cache for
-    /// potential answers.  Only conflicting Multicast DNS responses received
-    /// "live" from the network are considered valid for the purposes of
-    /// determining whether probing has succeeded or failed.
-    pub fn probe(&mut self) -> MulticastDnsResult<()> {
-        // Making sure our cache is empty before probing
-        self.map_record.clear();
-
-        // Let's wait a moment to give time to other nodes to initialize their network
-        let delay_probe_by: u64 = rand_delay(0, PROBE_QUERY_DELAY_MS);
-        sleep_ms(delay_probe_by);
-
-        // Abitrary value to prevent any infinite loop if there is some mischief happening on the
-        // network
-        let mut fail_safe = 0;
-        let mut retry = 0;
-        while retry < 3 && fail_safe < FAIL_SAFE_TRESHOLD {
-            let probe_packet = self.build_probe_packet();
-            fail_safe += 1;
-            retry += 1;
-            self.broadcast_message(&probe_packet)?;
-
-            // If this function returns, it means that a conflict has been detected
-            if let Some((_answer, _sender_socket_addr)) = self.recv_probe_response(3_000, 10)? {
-                self.resolve_conflict()?;
-                retry = 0;
-            }
-        }
-
-        if retry == 3 && self.map_record.is_empty() {
-            // Nobody complained on the network about our hostname,
-            // so let's take authority on our hostname and update our cache accordingly
-            self.map_record
-                .insert(self.own_record.hostname.clone(), self.own_record.clone());
-        } else if fail_safe == FAIL_SAFE_TRESHOLD {
-            panic!("Fail safe triggered during probe step. Something is wrong in the network Sir.");
-        }
-
-        // Set back the read time of the receiving socket
-        self.recv_socket
-            .set_read_timeout(Some(Duration::from_millis(5_000)))?;
-        self.recv_socket.set_nonblocking(true)?;
-        Ok(())
-    }
-
-    /// Sends unsolicited mDNS responses containing our node's resource records in the "Answer
-    /// Section" of a DNS packet.
-    fn announcing(&mut self) -> MulticastDnsResult<()> {
-        let dmesg = self.build_announcing_message();
-
-        // Sends at least 2 time an unsolicited response, up to 8 times maximum
-        for _ in 0..rand_delay(2_usize, 9_usize) {
-            // Sends mDNS responses containing all of its resource records in the "Answer Section"
-            self.broadcast_message(&dmesg)?;
-            sleep_ms(TIME_TO_SLEEP_MS);
-        }
-        Ok(())
-    }
-
-    /// Detects confict: check if a record already exist in the cache.
-    pub fn detect_conflict_during_probe(&self, other_record: &Record) -> bool {
-        if self.map_record.is_empty() {
-            false
-        } else {
-            self.map_record.get(&other_record.hostname).is_some()
-        }
-    }
-
-    /// Resolve a conflict by renaming our own record in the case of conflict.
-    pub fn resolve_conflict(&mut self) -> MulticastDnsResult<String> {
-        let hostname = self.own_record.hostname();
-        // Take only what we want
-        let base_hostname = hostname.split_terminator(".local.").collect::<Vec<&str>>()[0];
-
-        let re = regex::Regex::new(r"(\.)(\d$)")?;
-        let confict_free_hostname = match re.captures(&base_hostname) {
-            Some(cap) => {
-                let nb = cap.get(2)?.as_str().parse::<i32>().unwrap_or(0) + 1;
-                let suffix = cap.get(0)?.as_str();
-
-                let base_hostname = base_hostname
-                    .split_terminator(suffix)
-                    .collect::<Vec<&str>>()[0];
-                format!("{}.{}.local.", &base_hostname, nb)
-            }
-            None => format!("{}.{}.local.", &base_hostname, 1),
-        };
-
-        self.own_record.hostname = confict_free_hostname.clone();
-        Ok(confict_free_hostname)
-    }
-}
-
-impl Discovery for MulticastDns {
-    /// Make yourself known on the network.
-    fn advertise(&mut self) -> DiscoveryResult<()> {
-        for _retry in 0..15 {
-            match self.probe() {
-                Ok(_) => break,
-                Err(ref err) => match err.kind() {
-                    error::ErrorKind::ProbeError => {
-                        sleep_ms(TIME_TO_SLEEP_MS);
-                    }
-                    _ => panic!("Unrecoverable error encountered during probe step."),
-                },
-            }
-        }
-
-        self.announcing().expect("Fail to announce during startup.");
-        Ok(())
-    }
-
-    /// Read the UDP stack and update our cache accordingly.
-    fn discover(&mut self) -> DiscoveryResult<()> {
-        // Process all element of the UDP socket stack
+        // Process all elements of the UDP socket stack
         loop {
             match self.recv() {
                 Ok(Some((packet, sender_addr))) => {
                     let dmesg = DnsMessage::from_raw(&packet)?;
+
+                    // Here we update our cache with the responses gathered from the network
                     if dmesg.nb_answers > 0 {
                         if let Some(new_map_record) = MapRecord::from_dns_message(&dmesg) {
                             self.update_cache(&new_map_record);
@@ -516,16 +272,21 @@ impl Discovery for MulticastDns {
                     // We send the response directly to the sender instead of broadcasting it to
                     // avoid any unnecessary burden on the network.
                     if dmesg.nb_questions > 0 {
-                        for question in dmesg.questions.iter() {
-                            if question.domain_name == self.own_record.hostname {
-                                let response = self.build_defensive_message();
-                                self.send_socket.send_to(&response.to_raw()?, sender_addr)?;
-                            }
+                        let question_list: Vec<&str> = dmesg
+                            .questions
+                            .iter()
+                            .map(|q| q.domain_name.as_str())
+                            .collect();
+                        if let Some(response) =
+                            self.own_map_record.to_dns_response_message(&question_list)
+                        {
+                            self.broadcast_message(&response)?;
+                            self.send_socket.send_to(&response.to_raw()?, sender_addr)?;
                         }
                     }
                 }
                 Ok(None) => {
-                    debug!(">> Nothing on the UDP stack");
+                    trace!(">> Nothing on the UDP stack");
                     break;
                 }
                 Err(e) => {
@@ -537,15 +298,82 @@ impl Discovery for MulticastDns {
                 }
             }
         }
+        Ok(())
+    }
 
-        self.announcing()?;
+    /// Builds mDNS probe packet with the proper bit set up in order to check if a host record is
+    /// available.
+    /// Not used çin our implementation because we don't need to be fully standart compliant.
+    fn _build_probe_packet(&self) -> DnsMessage {
+        let questions: Vec<QuerySection> = self
+            .own_map_record
+            .keys()
+            .map(|k| QuerySection::new(k))
+            .collect();
+        DnsMessage {
+            nb_questions: questions.len() as u16,
+            questions,
+            ..Default::default()
+        }
+    }
 
-        for (name, record) in self.map_record.iter_mut() {
-            if record.ttl > 1 && name != self.own_record.hostname() {
-                record.ttl -= 1;
+    /// Builds a query DNS message to be used by one-shot mDNS implementation.
+    pub fn build_query_message(&self) -> Option<DnsMessage> {
+        if self.own_map_record.is_empty() {
+            None
+        } else {
+            let mut questions = Vec::new();
+            for (_netid, records) in self.own_map_record.iter() {
+                for rec in records {
+                    questions.push(rec.to_question_section());
+                }
             }
+
+            Some(DnsMessage {
+                nb_questions: questions.len() as u16,
+                questions,
+                ..Default::default()
+            })
+        }
+    }
+
+    /// Sends unsolicited mDNS responses containing our node's resource records in the "Answer
+    /// Section" of a DNS packet.
+    fn announcing(&mut self) -> MulticastDnsResult<()> {
+        let own_net_id_list = self.own_networkids();
+
+        if let Some(dmesg) = self
+            .own_map_record
+            .to_dns_response_message(&own_net_id_list)
+        {
+            // Sends at least 2 time an unsolicited response, up to 8 times maximum
+            self.broadcast_message(&dmesg)?;
+            self.broadcast_message(&dmesg)?;
+        }
+        Ok(())
+    }
+}
+
+impl Discovery for MulticastDns {
+    /// Make yourself known on the network.
+    fn advertise(&mut self) -> DiscoveryResult<()> {
+        self.query()?;
+        self.announcing()?;
+        Ok(())
+    }
+
+    /// Read the UDP stack and update our cache accordingly.
+    fn discover(&mut self) -> DiscoveryResult<()> {
+        self.responder()?;
+
+        // We should query (and announce in the same time because we will anser to our query in the
+        // next iteration) "every amount of time"
+        if self.timestamp.elapsed().as_millis() > self.every {
+            self.query()?;
+            self.timestamp = Instant::now();
         }
 
+        self.update_ttl();
         self.prune_cache();
 
         Ok(())
@@ -553,13 +381,18 @@ impl Discovery for MulticastDns {
 
     /// Release itself from the available participants in a network.
     fn release(&mut self) -> DiscoveryResult<()> {
-        // Since we want to leave the network space, we set our "time to live" to zero and let
-        // other know about it
-        self.own_record.ttl = 0;
-        self.map_record
-            .insert(self.own_record.hostname.clone(), self.own_record.clone());
-        self.broadcast_message(&self.build_release_message())
-            .expect("Fail to broadcast release message.");
+        for (_netid, records) in self.own_map_record.iter_mut() {
+            for rec in records.iter_mut() {
+                // Since we want to leave the network space, we set our "time to live" to zero and let
+                // other know about it
+                rec.ttl = 0;
+            }
+        }
+
+        let net_ids = self.own_networkids();
+        if let Some(release_dmesg) = self.own_map_record.to_dns_response_message(&net_ids) {
+            self.broadcast_message(&release_dmesg)?;
+        }
 
         Ok(())
     }
@@ -571,14 +404,8 @@ impl Discovery for MulticastDns {
     }
 }
 
-
-
-pub fn sleep_ms(duration: u64) {
-    thread::sleep(Duration::from_millis(duration));
-}
-
 /// Wrapper around randomized range generation.
-fn rand_delay<T>(low: T, high: T) -> T
+pub fn rand_delay<T>(low: T, high: T) -> T
 where
     T: rand::distributions::uniform::SampleUniform,
 {
@@ -645,8 +472,8 @@ mod tests {
 
         let mut dmesg = DnsMessage::new();
         let answers = vec![
-            AnswerSection::new("holonaute.local.", &[Target::new("wss://192.168.0.88")]),
-            AnswerSection::new("mistral.local.", &[Target::new("wss://192.168.0.77")]),
+            AnswerSection::new("holonaute.local.", &Target::new("wss://192.168.0.88")),
+            AnswerSection::new("mistral.local.", &Target::new("wss://192.168.0.77")),
         ];
         dmesg.nb_answers = answers.len() as u16;
         dmesg.answers = answers;
@@ -659,7 +486,6 @@ mod tests {
         mdns.broadcast_message(&dmesg)
             .expect("Fail to broadcast DNS Message.");
 
-        // std::thread::sleep(std::time::Duration::from_millis(100));
         if let Some((resp, _addr)) = mdns.recv().expect("Fail to receive from the UDP socket.") {
             let dmesg_from_resp = DnsMessage::from_raw(&resp).unwrap();
             println!("dmesg = {:#?}", &dmesg);
@@ -670,134 +496,18 @@ mod tests {
     }
 
     #[test]
-    fn probe_message_test() {
-        let mdns = MulticastDnsBuilder::new()
-            .bind_address("0.0.0.0")
-            .bind_port(56056)
-            .multicast_loop(true)
-            .multicast_ttl(255)
-            .multicast_address("224.0.0.246")
-            .build()
-            .expect("build fail");
-
-        let probe_message = mdns.build_probe_packet();
-
-        let probe_message_from_raw = DnsMessage::from_raw(
-            &probe_message
-                .to_raw()
-                .expect("Fail to convert probe message to bytes."),
-        )
-        .expect("Fail to convert back probe message from bytes.");
-
-        assert_eq!(probe_message, probe_message_from_raw);
-        assert_ne!(probe_message.nb_questions, 0);
-    }
-
-    #[test]
-    fn resolve_conflict_test() {
-        let resolve_conflict_name = {
-            let mut mdns = MulticastDnsBuilder::new()
-                .multicast_address("224.0.0.249")
-                .build()
-                .expect("Fail to build mDNS.");
-
-            let own_record = Record::new_own();
-            let resolve_conflict_name = mdns.resolve_conflict().expect("Fail to resolve confict.");
-            assert_ne!(own_record.hostname(), resolve_conflict_name);
-            resolve_conflict_name
-        };
-
-        let mut mdns = MulticastDnsBuilder::new()
-            .own_record(&resolve_conflict_name, &["0.0.0.0"])
-            .multicast_address("224.0.0.249")
-            .build()
-            .expect("Fail to build mDNS.");
-
-        let own_record = Record::new_own();
-        let resolve_confict_name = mdns.resolve_conflict().expect("Fail to resolve confict.");
-        assert_ne!(own_record.hostname(), resolve_confict_name);
-
-        let mut mdns = MulticastDnsBuilder::new()
-            .own_record("asgard.1.2", &["0.0.0.0"])
-            .multicast_address("224.0.0.249")
-            .build()
-            .expect("Fail to build mDNS.");
-
-        let own_record = Record::new_own();
-        let resolve_confict_name = mdns.resolve_conflict().expect("Fail to resolve confict.");
-        assert_ne!(own_record.hostname(), resolve_confict_name);
-    }
-
-    #[test]
-    fn responder_and_conflict_resolver_test() {
-        use std::sync::mpsc::channel;
-
-        let (sx, rx) = channel();
-
-        let _handle = thread::Builder::new()
-            .name(String::from("mDNS Responder"))
-            .spawn(move || {
-                let mut mdns = MulticastDnsBuilder::new()
-                    .own_record("holonaute", &["0.0.0.0"])
-                    .bind_port(0)
-                    // .bind_port(8596)
-                    .multicast_address("224.0.0.252")
-                    .build()
-                    .expect("Fail to build mDNS.");
-
-                // Skip the advertising step
-                let own_record = Record::new("holonaute.local.", &["0.0.0.0".to_string()], 255);
-                mdns.map_record
-                    .insert("holonaute.local.".to_string(), own_record);
-
-                sx.send(mdns.own_record.clone())
-                    .expect("Fail to send mDNS service through channel.");
-
-                // Listen to the network for a few moment, just the time to defend our name
-                mdns.responder_service_loop()
-                    .expect("Fail to fire up the mDNS responder service.");
-
-                // eprintln!("Exit defending thread.");
-            });
-
-        let mdns_own_record = rx
-            .recv()
-            .expect("Fail to receive mDNS server through channel.");
-
-        drop(_handle);
-        drop(rx);
-
-        let mut mdns_with_resolved_conflict = MulticastDnsBuilder::new()
-            .own_record("holonaute", &["0.0.0.0"])
-            .bind_port(0)
-            .multicast_address("224.0.0.252")
-            .build()
-            .expect("Fail to build mDNS.");
-
-        thread::sleep(Duration::from_millis(1_000));
-
-        mdns_with_resolved_conflict
-            .advertise()
-            .expect("Fail to advertise the conflictual mDNS server.");
-
-        assert_ne!(mdns_own_record, mdns_with_resolved_conflict.own_record);
-    }
-
-    #[test]
     fn release_test() {
-        let own_record = Record::new("holonaute.local.", &["0.0.0.0".to_string()], 255);
+        let networkid = "holonaute-release.holo.host";
+
         // This is the one from which we want to see another node disapearing from its cache
         let mut mdns = MulticastDnsBuilder::new()
             .multicast_address("224.0.0.251")
-            .own_record("holonaute", &["0.0.0.0"])
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=to-keep"])
             .build()
             .expect("Fail to build mDNS.");
 
-        mdns.map_record
-            .insert("holonaute.local.".to_string(), own_record);
-
         let mut mdns_releaser = MulticastDnsBuilder::new()
-            .own_record("holonaute-to-release", &["0.0.0.0"])
+            .own_record(networkid, &["wss://192.168.0.87:88088?a=to-release"])
             .multicast_address("224.0.0.251")
             .build()
             .expect("Fail to build mDNS.");
@@ -810,6 +520,16 @@ mod tests {
         // Discovering the soon leaving participant
         mdns.discover().expect("Fail to discover.");
 
+        println!("mdns = {:#?}", &mdns.map_record);
+        // Let's check that we discovered the soon-to-be-released record
+        {
+            let records = mdns
+                .map_record
+                .get(networkid)
+                .expect("Fail to get records from the networkid");
+            assert_eq!(records.len(), 2);
+        }
+
         // Leaving the party
         mdns_releaser
             .release()
@@ -818,6 +538,83 @@ mod tests {
         // Updating the cache
         mdns.discover().expect("Fail to discover.");
 
-        assert_eq!(mdns.map_record.get("holonaute-to-release.local."), None);
+        println!("mdns = {:#?}", &mdns.map_record);
+        {
+            let records = mdns
+                .map_record
+                .get(networkid)
+                .expect("Fail to get records from the networkid");
+            assert_eq!(records.len(), 1);
+        }
+    }
+
+    #[test]
+    fn query_test() {
+        let networkid = "holonaute-query.holo.host";
+
+        let mut mdns = MulticastDnsBuilder::new()
+            .multicast_address("224.0.0.253")
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+            .build()
+            .expect("Fail to build mDNS.");
+
+        eprintln!("bind addr = {}", mdns.multicast_address());
+
+        let mut mdns_other = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
+            .multicast_address("224.0.0.253")
+            .build()
+            .expect("Fail to build mDNS.");
+
+        mdns.query().expect("Fail to advertise during Query test.");
+        mdns_other
+            .discover()
+            .expect("Fail to run discovery during Query test.");
+        mdns.discover()
+            .expect("Fail to run discovery during Query test.");
+
+        eprintln!("mdns = {:#?}", &mdns.map_record);
+
+        let records = mdns
+            .map_record
+            .get(networkid)
+            .expect("Fail to get records from the networkid");
+        assert_eq!(records.len(), 2);
+    }
+
+    #[test]
+    fn advertise_test() {
+        let networkid = "holonaute-advertise.holo.host";
+
+        // This is the one from which we want to see another node disapearing from its cache
+        let mut mdns = MulticastDnsBuilder::new()
+            .multicast_address("224.0.0.252")
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+            .build()
+            .expect("Fail to build mDNS.");
+
+        eprintln!("bind addr = {}", mdns.multicast_address());
+
+        let mut mdns_other = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
+            .multicast_address("224.0.0.252")
+            .build()
+            .expect("Fail to build mDNS.");
+
+        // Make itself known on the network
+        mdns_other
+            .advertise()
+            .expect("Fail to advertise my existence during release test.");
+
+        // Discovering the soon leaving participant
+        mdns.discover().expect("Fail to discover.");
+        eprintln!("mdns = {:#?}", &mdns.map_record);
+
+        // Let's check that we discovered the soon to release record
+        let records = mdns
+            .map_record
+            .get(networkid)
+            .expect("Fail to get records from the networkid");
+        assert_eq!(records.len(), 2);
     }
 }

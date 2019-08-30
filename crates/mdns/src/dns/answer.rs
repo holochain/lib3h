@@ -1,6 +1,6 @@
 //! DNS Answer part.
 
-use crate::error::MulticastDnsResult;
+use crate::{error::MulticastDnsResult, DEFAULT_TTL};
 #[allow(unused_imports)]
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 use std::{default::Default, io::Cursor};
@@ -17,13 +17,13 @@ pub enum Answer {
 pub struct AnswerSection {
     pub(crate) dn_len: u16,
     pub(crate) domain_name: String,
-    // Should be CNAME = 5
+    // CNAME = 5
     pub(crate) answer_type: u16,
-    // = 1 ?
+    // NET = 1
     pub(crate) answer_class: u16,
     pub(crate) ttl: u32,
     pub(crate) data_len: u16,
-    pub(crate) data: Vec<Target>,
+    pub(crate) data: Target,
 }
 
 impl Default for AnswerSection {
@@ -33,33 +33,33 @@ impl Default for AnswerSection {
             domain_name: String::default(),
             answer_type: 5,
             answer_class: 1,
-            ttl: 255,
+            ttl: DEFAULT_TTL,
             data_len: 0,
-            data: Vec::new(),
+            data: Target::new(""),
         }
     }
 }
 
 impl AnswerSection {
     /// New with default values for ttl(255), type(5) and class(1).
-    pub fn new(name: &str, targets: &[Target]) -> Self {
+    pub fn new(name: &str, target: &Target) -> Self {
         Self {
             dn_len: name.len() as u16,
             domain_name: name.to_owned(),
-            data_len: targets.len() as u16,
-            data: targets.to_vec(),
+            data_len: target.target.len() as u16,
+            data: target.to_owned(),
             ..Default::default()
         }
     }
 
     /// New with Time To Live value specified.
-    pub fn new_with_ttl(name: &str, targets: &[Target], ttl: u32) -> Self {
+    pub fn new_with_ttl(name: &str, target: &Target, ttl: u32) -> Self {
         Self {
             dn_len: name.len() as u16,
             domain_name: name.to_owned(),
             ttl,
-            data_len: targets.len() as u16,
-            data: targets.to_vec(),
+            data_len: target.target.len() as u16,
+            data: target.clone(),
             ..Default::default()
         }
     }
@@ -75,11 +75,7 @@ impl AnswerSection {
         let answer_class = cursor.read_u16::<BigEndian>()?;
         let ttl = cursor.read_u32::<BigEndian>()?;
         let data_len = cursor.read_u16::<BigEndian>()?;
-        let mut data = Vec::with_capacity(data_len as usize);
-
-        for _ in 0..data_len {
-            data.push(Target::from_raw(&mut cursor)?);
-        }
+        let data = Target::from_raw(&mut cursor)?;
 
         Ok(Self {
             dn_len,
@@ -104,9 +100,7 @@ impl AnswerSection {
         packet.write_u32::<BigEndian>(self.ttl)?;
         packet.write_u16::<BigEndian>(self.data_len)?;
 
-        for target in self.data.iter() {
-            target.write(&mut packet)?;
-        }
+        self.data.write(&mut packet)?;
 
         Ok(())
     }
@@ -169,7 +163,7 @@ fn target_io_test() {
 #[test]
 fn answer_with_target_test() {
     let name = "holonaute.local.";
-    let targets = vec![Target::new("wss:/192.168.0.88")];
+    let targets = Target::new("wss:/192.168.0.88");
     let answer = AnswerSection::new(name, &targets);
 
     let mut buffer = vec![];

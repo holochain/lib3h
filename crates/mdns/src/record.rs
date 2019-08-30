@@ -1,60 +1,57 @@
 //! mDNS resource record definition.
 
-use crate::dns::{AnswerSection, DnsMessage, QuerySection, Target};
-use get_if_addrs;
+use crate::{
+    dns::{AnswerSection, DnsMessage, QuerySection, Target},
+    DEFAULT_BIND_ADRESS, DEFAULT_TTL,
+};
 use hostname;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     ops::{Deref, DerefMut},
 };
 
-/// Helper type.
-pub type HashMapRecord = HashMap<String, Record>;
+/// Helper type corresponding to a HashMap<NetworkId, Vec<Url>>
+pub type HashMapRecord = HashMap<String, Vec<Record>>;
 
 /// Type helper corresponding to the resource record of a host.
 #[derive(Debug, Clone)]
-pub struct MapRecord {
-    pub(crate) value: HashMapRecord,
-}
+pub struct MapRecord(pub(crate) HashMapRecord);
 
 impl Deref for MapRecord {
     type Target = HashMapRecord;
 
     fn deref(&self) -> &Self::Target {
-        &self.value
+        &self.0
     }
 }
 
 impl DerefMut for MapRecord {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
+        &mut self.0
     }
 }
 
 impl MapRecord {
-    pub fn new(hostname: &str, record: &Record) -> Self {
+    pub fn new(networkid: &str, record: &[Record]) -> Self {
         let mut hmr = HashMapRecord::new();
-        hmr.insert(hostname.to_string(), record.clone());
+        hmr.insert(networkid.to_string(), record.to_vec());
 
-        Self { value: hmr }
+        Self(hmr)
     }
 
     /// Update the [`MapRecord`]'s vectors of addresses.
-    pub fn update(&mut self, new_map_record: &MapRecord) {
-        for (_name, new_record) in new_map_record.iter() {
-            if let Some(rec) = self.value.get(&new_record.hostname) {
-                let new_addr = new_record.addrs.first().expect("Empty list of address.");
-                let mut record_to_update = rec.clone();
-
-                if !record_to_update.addrs.contains(new_addr) {
-                    record_to_update.addrs.push(new_addr.clone());
+    pub fn update(&mut self, other_map_record: &MapRecord) {
+        for (other_nid, other_records) in other_map_record.iter() {
+            // Update an existing one
+            if let Some(cached_records) = self.0.get_mut(other_nid) {
+                for other_rec in other_records.iter() {
+                    cached_records.push(other_rec.clone());
                 }
-
-                self.value
-                    .insert(new_record.hostname.clone(), record_to_update.clone());
+                cached_records.sort();
+                cached_records.dedup_by(|a, b| a.url() == b.url());
             } else {
-                self.value
-                    .insert(new_record.hostname.clone(), new_record.clone());
+                self.0.insert(other_nid.to_string(), other_records.to_vec());
             }
         }
     }
@@ -62,31 +59,19 @@ impl MapRecord {
     /// Builds a [`MapRecord`] from a [`DnsMessage`].
     pub fn from_dns_message(dmesg: &DnsMessage) -> Option<MapRecord> {
         if !dmesg.answers.is_empty() {
-            let records: Vec<Record> = dmesg
+            let mut records: Vec<Record> = dmesg
                 .answers
                 .iter()
-                .map(|a_sec| {
-                    let targets: Vec<String> =
-                        a_sec.data.iter().map(|t| t.target.clone()).collect();
-                    Record::new(&a_sec.domain_name, &targets, a_sec.ttl)
-                })
+                .map(|a_sec| Record::new(&a_sec.domain_name, &a_sec.data.target, a_sec.ttl))
                 .collect();
 
-            let mut map_record = MapRecord {
-                value: HashMapRecord::with_capacity(records.len()),
-            };
-            for new_record in records.iter() {
-                if let Some(rec) = map_record.get(&new_record.hostname) {
-                    let new_addr = new_record.addrs.first().expect("Empty list of address.");
-                    let mut record_to_update = rec.clone();
+            records.sort();
+            records.dedup_by(|a, b| a.url() == b.url());
 
-                    if !record_to_update.addrs.contains(new_addr) {
-                        record_to_update.addrs.push(new_addr.clone());
-                    }
-                    map_record.insert(new_record.hostname.clone(), record_to_update.clone());
-                } else {
-                    map_record.insert(new_record.hostname.clone(), new_record.clone());
-                }
+            let mut map_record = MapRecord(HashMapRecord::with_capacity(records.len()));
+            for new_record in records.iter() {
+                let fake_map_record = MapRecord::new(&new_record.networkid, &[new_record.clone()]);
+                map_record.update(&fake_map_record);
             }
 
             Some(map_record)
@@ -96,27 +81,61 @@ impl MapRecord {
     }
 
     /// Builds a [`DnsMessage`] from a [`MapRecord`].
-    pub fn to_dns_reponse_message(&self) -> DnsMessage {
-        let answers: Vec<AnswerSection> = self
-            .value
-            .values()
-            .map(|record| record.to_answers_section())
-            .collect();
+    pub fn to_dns_response_message(&self, networkids: &[&str]) -> Option<DnsMessage> {
+        // Let's make sure we have at least one networkid in our keys
+        let mut answers = Vec::new();
 
-        DnsMessage {
-            nb_answers: answers.len() as u16,
-            answers,
-            ..DnsMessage::default()
+        for &netid in networkids.iter() {
+            if let Some(records) = self.0.get(netid) {
+                for rec in records {
+                    answers.push(rec.to_answers_section());
+                }
+            }
+        }
+
+        if answers.is_empty() {
+            None
+        } else {
+            Some(DnsMessage {
+                nb_answers: answers.len() as u16,
+                nb_authority: answers.len() as u16,
+                answers,
+                ..DnsMessage::default()
+            })
+        }
+    }
+
+    /// Builds a [`DnsMessage`] from a [`MapRecord`].
+    pub fn to_dns_message_query(&self, networkids: &[&str]) -> Option<DnsMessage> {
+        // Let's make sure we have at least one networkid in our keys
+        let mut questions = Vec::new();
+
+        for &netid in networkids.iter() {
+            if let Some(records) = self.0.get(netid) {
+                for rec in records {
+                    questions.push(rec.to_question_section());
+                }
+            }
+        }
+
+        if questions.is_empty() {
+            None
+        } else {
+            Some(DnsMessage {
+                nb_questions: questions.len() as u16,
+                questions,
+                ..DnsMessage::default()
+            })
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     /// Hostname of our neighbor
-    pub(crate) hostname: String,
+    pub(crate) networkid: String,
     /// IP address in the lan
-    pub(crate) addrs: Vec<String>,
+    pub(crate) url: String,
     /// Time to live
     pub(crate) ttl: u32,
 }
@@ -125,24 +144,22 @@ impl Record {
     /// Create a new record respecting the mDNS
     /// [naming convention](https://tools.ietf.org/html/rfc6762#section-3)
     /// of the form "single-dns-label.local." with value ending with `.local.`
-    pub fn new(name: &str, addr: &[String], ttl: u32) -> Self {
-        let hostname = convert_to_mdns_hostname(&name);
-
+    pub fn new(name: &str, url: &str, ttl: u32) -> Self {
         Record {
-            hostname,
-            addrs: addr.to_vec(),
+            networkid: name.to_owned(),
+            url: url.to_owned(),
             ttl,
         }
     }
 
     /// Returns a reference to the IP address of a neighbor in the LAN.
-    pub fn addr(&self) -> &[String] {
-        &self.addrs
+    pub fn url(&self) -> &str {
+        &self.url
     }
 
     /// Returns a reference to the hostname of a neighbor in the LAN.
-    pub fn hostname(&self) -> &str {
-        &self.hostname
+    pub fn networkid(&self) -> &str {
+        &self.networkid
     }
 
     /// Returns the time to leave value oif a [`Record`].
@@ -157,53 +174,83 @@ impl Record {
             &hostname::get_hostname().unwrap_or_else(|| String::from("Anonymous-host")),
         );
 
-        let mut addrs: Vec<String> = get_if_addrs::get_if_addrs()
-            .expect("Fail to retrieve host network interfaces.")
-            .iter()
-            .filter_map(|iface| {
-                if !iface.is_loopback() {
-                    match &iface.addr {
-                        get_if_addrs::IfAddr::V4(ipv4) => Some(ipv4.ip.to_string()),
-                        _ => None,
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        if addrs.is_empty() {
-            addrs = vec!["0.0.0.0"
-                .parse()
-                .expect("Fail to parse default IPv4 address.")]
-        }
-
         Record {
-            hostname,
-            addrs,
-            ttl: 255,
+            networkid: hostname,
+            url: String::from(DEFAULT_BIND_ADRESS),
+            ttl: DEFAULT_TTL,
         }
     }
 
     /// Convert a [`Record`] to an [`Answer Reponse`](crate::dns::AnswerSection).
     pub fn to_answers_section(&self) -> AnswerSection {
-        AnswerSection::new_with_ttl(&self.hostname, &self.to_targets(), self.ttl)
+        AnswerSection::new_with_ttl(&self.networkid, &self.to_target(), self.ttl)
     }
 
     /// Convert a record to a question packet.
-    pub fn to_query_question(&self) -> QuerySection {
-        QuerySection::new(&self.hostname)
+    pub fn to_question_section(&self) -> QuerySection {
+        QuerySection::new(&self.networkid)
     }
 
-    pub fn to_targets(&self) -> Vec<Target> {
-        self.addrs.iter().map(|addr| Target::new(addr)).collect()
+    pub fn to_target(&self) -> Target {
+        Target::new(&self.url)
+    }
+
+    /// Builds a [`DnsMessage`] from a [`MapRecord`].
+    pub fn to_dns_response_message(&self) -> DnsMessage {
+        DnsMessage {
+            nb_answers: 1,
+            nb_authority: 1,
+            answers: vec![self.to_answers_section()],
+            ..DnsMessage::default()
+        }
     }
 }
 
+impl Ord for Record {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.networkid.cmp(&other.networkid) {
+            Ordering::Equal => self.ttl.cmp(&other.ttl),
+            other_ordering => other_ordering,
+        }
+    }
+}
+
+impl PartialOrd for Record {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// This function is usefull if we want to be fully mDNS compliant, but it's not the case at the
+/// moment, so it's not used in our current implementaition.
 fn convert_to_mdns_hostname(hostname: &str) -> String {
     if hostname.ends_with(".local.") {
         hostname.to_string()
     } else {
         format!("{}.local.", hostname)
+    }
+}
+
+#[test]
+fn map_record_update_test() {
+    let networkid = "hcnmynetworkid.hc-mdns-discovery.holo.host";
+    let url = "wss://1.2.3.4:12345?a=HcMmymachineid";
+    let record_to_prune1 = Record::new(networkid, url, 255);
+    let record_to_prune2 = Record::new(networkid, url, 200);
+    // Because this record has the smallest ttl, it's the one that supposed to be kept during the dedup
+    // process
+    let record_to_keep = Record::new(networkid, url, 100);
+    let mut map_record = MapRecord::new(
+        networkid,
+        &[record_to_prune1, record_to_prune2, record_to_keep.clone()],
+    );
+
+    for (_, records) in map_record.iter_mut() {
+        records.sort();
+        records.dedup_by(|a, b| a.url() == b.url());
+    }
+
+    if let Some(dedup_records) = map_record.get(networkid) {
+        assert_eq!(dedup_records, &[record_to_keep])
     }
 }

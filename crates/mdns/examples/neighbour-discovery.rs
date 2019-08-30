@@ -1,6 +1,8 @@
 use lib3h_discovery::Discovery;
 use lib3h_mdns as mdns;
 
+use std::{thread, time::Duration};
+
 fn discover_neighbourhood() {
     let mut mdns = mdns::MulticastDnsBuilder::new()
         .bind_port(8585)
@@ -20,7 +22,7 @@ fn discover_neighbourhood() {
         println!(">> mDNS neighbourhood : {:#?}", &mdns.records());
 
         // Let's wait a few moments before checking if new participants arrived on the network
-        mdns::sleep_ms(listen_every_ms);
+        thread::sleep(Duration::from_millis(listen_every_ms));
 
         if listen_every_ms < 30_000 {
             listen_every_ms += 1_000;
