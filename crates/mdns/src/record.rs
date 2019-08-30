@@ -209,7 +209,10 @@ impl Record {
 impl Ord for Record {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.networkid.cmp(&other.networkid) {
-            Ordering::Equal => self.ttl.cmp(&other.ttl),
+            Ordering::Equal => match self.url.cmp(&other.url) {
+                Ordering::Equal => self.ttl.cmp(&other.ttl),
+                other_ordering => other_ordering,
+            },
             other_ordering => other_ordering,
         }
     }
