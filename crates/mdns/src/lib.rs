@@ -470,7 +470,7 @@ mod tests {
     fn it_should_loop_answer() {
         let mut mdns = MulticastDnsBuilder::new()
             .bind_address("0.0.0.0")
-            .bind_port(55055)
+            .bind_port(56056)
             .multicast_loop(true)
             .multicast_ttl(255)
             .multicast_address("224.0.0.248")
