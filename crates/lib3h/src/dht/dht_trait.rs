@@ -34,18 +34,18 @@ impl DhtConfig {
 }
 pub type DhtFactory<D> = fn(config: &DhtConfig) -> Lib3hResult<D>;
 
-/// Allow storage and retrieval of peer & entry data.
-/// Trait API is for querying local dht data
-/// DhtCommand is for mutating storage or network/async queries
-pub trait Dht {
-    /// Peer info
-    fn get_peer_list(&self) -> Vec<PeerData>;
-    fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData>;
-    fn this_peer(&self) -> &PeerData;
-    /// Entry
-    fn get_entry_address_list(&self) -> Vec<&Address>;
-    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>>;
-    /// Processing
-    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()>;
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)>;
-}
+///// Allow storage and retrieval of peer & entry data.
+///// Trait API is for querying local dht data
+///// DhtCommand is for mutating storage or network/async queries
+//pub trait Dht {
+//    /// Peer info
+//    fn get_peer_list(&self) -> Vec<PeerData>;
+//    fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData>;
+//    fn this_peer(&self) -> &PeerData;
+//    /// Entry
+//    fn get_entry_address_list(&self) -> Vec<&Address>;
+//    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>>;
+//    /// Processing
+//    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()>;
+//    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)>;
+//}

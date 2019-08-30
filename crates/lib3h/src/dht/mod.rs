@@ -1,7 +1,9 @@
 pub mod dht_protocol;
 pub mod dht_trait;
 pub mod mirror_dht;
-pub mod rrdht;
+//pub mod rrdht;
+pub mod ghost_dht;
+pub mod ghost_protocol;
 
 /// a Peer identifier
 pub type PeerAddress = String;
