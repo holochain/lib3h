@@ -42,7 +42,6 @@ impl MapRecord {
 
     /// Update the [`MapRecord`]'s vectors of addresses.
     pub fn update(&mut self, other_map_record: &MapRecord) {
-
         // TODO: find a better way to do it.
         for (other_nid, other_records) in other_map_record.iter() {
             if let Some(cached_records) = self.0.get_mut(other_nid) {
@@ -50,19 +49,19 @@ impl MapRecord {
                     cached_records.push(other_rec.clone());
                 }
 
-
                 cached_records.sort();
 
-                let mut uniq_urls: Vec<String> = cached_records.iter()
-                    .map(|rec| rec.url.clone())
-                    .collect();
+                let mut uniq_urls: Vec<String> =
+                    cached_records.iter().map(|rec| rec.url.clone()).collect();
 
                 uniq_urls.dedup();
 
                 let mut final_records: Vec<Record> = Vec::new();
 
                 for url in uniq_urls {
-                    let drain_record_with_url: Vec<Record> = cached_records.drain_filter(|rec| *rec.url == *url).collect();
+                    let drain_record_with_url: Vec<Record> = cached_records
+                        .drain_filter(|rec| *rec.url == *url)
+                        .collect();
                     if drain_record_with_url.len() == 1 {
                         final_records.push(drain_record_with_url[0].clone());
                     } else {
@@ -80,11 +79,9 @@ impl MapRecord {
                 }
 
                 *cached_records = final_records.clone();
-
             } else {
                 self.0.insert(other_nid.to_string(), other_records.to_vec());
             }
-
         }
     }
 

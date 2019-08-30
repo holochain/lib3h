@@ -1,20 +1,19 @@
+use get_if_addrs;
 use lib3h_discovery::Discovery;
 use lib3h_mdns as mdns;
-use get_if_addrs;
 use std::{thread, time::Duration};
 
 fn list_ip_v4() -> Vec<String> {
-
-       let mut addrs = vec![];
-       for iface in get_if_addrs::get_if_addrs().unwrap() {
-            if iface.name != "lo" {
-                match iface.addr {
-                    get_if_addrs::IfAddr::V4(addrv4) => addrs.push(addrv4.ip.to_string()),
-                    _ => (),
-                }
+    let mut addrs = vec![];
+    for iface in get_if_addrs::get_if_addrs().unwrap() {
+        if iface.name != "lo" {
+            match iface.addr {
+                get_if_addrs::IfAddr::V4(addrv4) => addrs.push(addrv4.ip.to_string()),
+                _ => (),
             }
-       }
-       addrs
+        }
+    }
+    addrs
 }
 
 fn discover_neighbourhood() {
