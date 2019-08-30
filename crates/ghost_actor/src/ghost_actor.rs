@@ -14,16 +14,15 @@ pub struct GhostParentWrapper<
     RequestToChild,
     RequestToChildResponse,
     Error,
-> {
-    actor: Box<
-        dyn GhostActor<
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChild,
-            RequestToChildResponse,
-            Error,
-        >,
+    Actor: GhostActor<
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
     >,
+> {
+    actor: Actor,
     endpoint: GhostContextEndpoint<
         Context,
         RequestToChild,
@@ -41,6 +40,13 @@ impl<
         RequestToChild,
         RequestToChildResponse,
         Error,
+        Actor: GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
     >
     GhostParentWrapper<
         Context,
@@ -49,21 +55,11 @@ impl<
         RequestToChild,
         RequestToChildResponse,
         Error,
+        Actor,
     >
 {
     /// wrap a GhostActor instance and it's parent channel endpoint.
-    pub fn new(
-        mut actor: Box<
-            dyn GhostActor<
-                RequestToParent,
-                RequestToParentResponse,
-                RequestToChild,
-                RequestToChildResponse,
-                Error,
-            >,
-        >,
-        request_id_prefix: &str,
-    ) -> Self {
+    pub fn new(mut actor: Actor, request_id_prefix: &str) -> Self {
         let endpoint = actor
             .take_parent_endpoint()
             .expect("exists")
@@ -99,6 +95,66 @@ impl<
         self.actor.process()?;
         self.endpoint.process(actor)?;
         Ok(())
+    }
+}
+
+impl<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor: GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    > std::convert::AsRef<Actor>
+    for GhostParentWrapper<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor,
+    >
+{
+    fn as_ref(&self) -> &Actor {
+        &self.actor
+    }
+}
+
+impl<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor: GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    > std::convert::AsMut<Actor>
+    for GhostParentWrapper<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor,
+    >
+{
+    fn as_mut(&mut self) -> &mut Actor {
+        &mut self.actor
     }
 }
 
