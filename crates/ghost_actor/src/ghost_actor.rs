@@ -197,6 +197,102 @@ pub trait GhostActor<
     }
 }
 
+/// same as above, but takes a trait object child
+pub struct GhostParentWrapperDyn<
+    Context,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    Error,
+> {
+    actor: Box<
+        dyn GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    >,
+    endpoint: GhostContextEndpoint<
+        Context,
+        RequestToChild,
+        RequestToChildResponse,
+        RequestToParent,
+        RequestToParentResponse,
+        Error,
+    >,
+}
+
+impl<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+    >
+    GhostParentWrapperDyn<
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+    >
+{
+    /// wrap a GhostActor instance and it's parent channel endpoint.
+    pub fn new(
+        mut actor: Box<
+            dyn GhostActor<
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChild,
+                RequestToChildResponse,
+                Error,
+            >,
+        >,
+        request_id_prefix: &str,
+    ) -> Self {
+        let endpoint = actor
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint(request_id_prefix);
+        Self { actor, endpoint }
+    }
+
+    /// see GhostContextEndpoint::publish
+    pub fn publish(&mut self, payload: RequestToChild) {
+        self.endpoint.publish(payload)
+    }
+
+    /// see GhostContextEndpoint::request
+    pub fn request(
+        &mut self,
+        timeout: std::time::Duration,
+        context: Context,
+        payload: RequestToChild,
+        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+    ) {
+        self.endpoint.request(timeout, context, payload, cb)
+    }
+
+    /// see GhostContextEndpoint::drain_messages
+    pub fn drain_messages(
+        &mut self,
+    ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
+        self.endpoint.drain_messages()
+    }
+
+    /// see GhostContextEndpoint::process and GhostActor::process
+    pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
+        self.actor.process()?;
+        self.endpoint.process(actor)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

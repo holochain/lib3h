@@ -23,7 +23,7 @@ pub mod keystore_protocol {
     pub enum RequestToParentResponse {}
 }
 
-pub type KeystoreActor = Box<
+pub type DynKeystoreActor = Box<
     dyn GhostActor<
         RequestToParent,
         RequestToParentResponse,
@@ -39,7 +39,7 @@ pub type KeystoreActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     Lib3hError,
 >;
-pub type KeystoreActorParentWrapper<Context> = GhostParentWrapper<
+pub type KeystoreActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
     Context,
     RequestToParent,
     RequestToParentResponse,

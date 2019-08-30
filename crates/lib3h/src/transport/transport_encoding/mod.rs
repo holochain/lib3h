@@ -30,7 +30,7 @@ pub struct TransportEncoding {
     // the machine_id or agent_id of this encoding instance
     this_id: String,
     // the keystore to use for getting signatures for `this_id`
-    keystore: Detach<KeystoreActorParentWrapper<ToKeystoreContext>>,
+    keystore: Detach<KeystoreActorParentWrapperDyn<ToKeystoreContext>>,
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
@@ -45,7 +45,7 @@ pub struct TransportEncoding {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapper<ToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<ToInnerContext>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes
@@ -74,15 +74,15 @@ impl TransportEncoding {
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         this_id: String,
-        keystore: KeystoreActor,
-        inner_transport: TransportActor,
+        keystore: DynKeystoreActor,
+        inner_transport: DynTransportActor,
     ) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("enc_to_parent_"));
-        let keystore = Detach::new(GhostParentWrapper::new(keystore, "enc_to_keystore"));
+        let keystore = Detach::new(GhostParentWrapperDyn::new(keystore, "enc_to_keystore"));
         let inner_transport =
-            Detach::new(GhostParentWrapper::new(inner_transport, "enc_to_inner_"));
+            Detach::new(GhostParentWrapperDyn::new(inner_transport, "enc_to_inner_"));
         Self {
             crypto,
             this_id,
@@ -505,13 +505,13 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<()> = GhostParentWrapper::new(
-            Box::new(TransportEncoding::new(
+        let mut t1: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
+            TransportEncoding::new(
                 crypto.box_clone(),
                 ID_1.to_string(),
                 Box::new(KeystoreStub::new()),
                 Box::new(TransportMock::new(s1out, r1in)),
-            )),
+            ),
             "test1",
         );
 
@@ -539,13 +539,13 @@ mod tests {
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<()> = GhostParentWrapper::new(
-            Box::new(TransportEncoding::new(
+        let mut t2: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
+            TransportEncoding::new(
                 crypto.box_clone(),
                 ID_2.to_string(),
                 Box::new(KeystoreStub::new()),
                 Box::new(TransportMock::new(s2out, r2in)),
-            )),
+            ),
             "test2",
         );
 
