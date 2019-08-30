@@ -774,4 +774,77 @@ mod test {
             Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
         crypto_system_test::full_suite(crypto);
     }
+
+    #[test]
+    fn sodium_should_kdf_derive_as_expected() {
+        let crypto: Box<dyn CryptoSystem> =
+            Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
+
+        let ctx1: Box<dyn Buffer> = Box::new(vec![1; crypto.kdf_context_bytes()]);
+        let ctx2: Box<dyn Buffer> = Box::new(vec![2; crypto.kdf_context_bytes()]);
+
+        let root: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut a_1_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut a_2_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut a_1_2: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut b_1_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut b_2_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut b_1_2: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+
+        crypto.kdf(&mut a_1_1, 1, &ctx1, &root).unwrap();
+        crypto.kdf(&mut a_2_1, 2, &ctx1, &root).unwrap();
+        crypto.kdf(&mut a_1_2, 1, &ctx2, &root).unwrap();
+
+        crypto.kdf(&mut b_1_1, 1, &ctx1, &root).unwrap();
+        crypto.kdf(&mut b_2_1, 2, &ctx1, &root).unwrap();
+        crypto.kdf(&mut b_1_2, 1, &ctx2, &root).unwrap();
+
+        assert_eq!(
+            "[83, 122, 246, 52, 224, 115, 205, 114, 19, 135, 153, 145, 83, 70, 124, 32]",
+            format!("{:?}", &*a_1_1.read_lock()),
+            "a_1_1 exact"
+        );
+        assert_eq!(
+            "[38, 205, 209, 192, 32, 141, 217, 236, 159, 173, 133, 27, 185, 207, 103, 187]",
+            format!("{:?}", &*a_2_1.read_lock()),
+            "a_2_1 exact"
+        );
+        assert_eq!(
+            "[124, 146, 236, 50, 123, 87, 25, 191, 124, 253, 19, 78, 87, 49, 179, 23]",
+            format!("{:?}", &*a_1_2.read_lock()),
+            "a_1_2 exact"
+        );
+
+        assert_eq!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", b_1_1),
+            "a_1_1 == b_1_1"
+        );
+        assert_eq!(
+            &format!("{:?}", a_2_1),
+            &format!("{:?}", b_2_1),
+            "a_2_1 == b_2_1"
+        );
+        assert_eq!(
+            &format!("{:?}", a_1_2),
+            &format!("{:?}", b_1_2),
+            "a_1_2 == b_1_2"
+        );
+
+        assert_ne!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", a_2_1),
+            "a_1_1 != a_2_1"
+        );
+        assert_ne!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", a_1_2),
+            "a_1_1 != a_1_2"
+        );
+        assert_ne!(
+            &format!("{:?}", a_2_1),
+            &format!("{:?}", a_1_2),
+            "a_2_1 != a_1_2"
+        );
+    }
 }
