@@ -30,8 +30,8 @@
 
 use log::{debug, error, trace};
 // Used to clean our buffer to avoid mixing messages together.
-use zeroize::Zeroize;
 use url::Url;
+use zeroize::Zeroize;
 
 use std::{
     net::{self, SocketAddr, ToSocketAddrs},
@@ -151,12 +151,14 @@ impl MulticastDns {
     pub fn urls(&self) -> Vec<Url> {
         self.map_record
             .iter()
-            .flat_map(|(_, v)| v.iter().filter_map(|r| {
-                match Url::parse(&r.url) {
-                    Ok(url) => Some(url),
-                    Err(_) => None,
-                }
-            }).collect::<Vec<Url>>())
+            .flat_map(|(_, v)| {
+                v.iter()
+                    .filter_map(|r| match Url::parse(&r.url) {
+                        Ok(url) => Some(url),
+                        Err(_) => None,
+                    })
+                    .collect::<Vec<Url>>()
+            })
             .collect()
     }
 
