@@ -103,13 +103,15 @@ impl FullSuite {
         let ctx1: Box<dyn Buffer> = Box::new(vec![1; self.crypto.kdf_context_bytes()]);
         let ctx2: Box<dyn Buffer> = Box::new(vec![2; self.crypto.kdf_context_bytes()]);
 
-        let root: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let mut root: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut a_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut a_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut a_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut b_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut b_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut b_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+
+        self.crypto.randombytes_buf(&mut root).unwrap();
 
         self.crypto.kdf(&mut a_1_1, 1, &ctx1, &root).unwrap();
         self.crypto.kdf(&mut a_2_1, 2, &ctx1, &root).unwrap();
@@ -119,13 +121,37 @@ impl FullSuite {
         self.crypto.kdf(&mut b_2_1, 2, &ctx1, &root).unwrap();
         self.crypto.kdf(&mut b_1_2, 1, &ctx2, &root).unwrap();
 
-        assert_eq!(&format!("{:?}", a_1_1), &format!("{:?}", b_1_1));
-        assert_eq!(&format!("{:?}", a_2_1), &format!("{:?}", b_2_1));
-        assert_eq!(&format!("{:?}", a_1_2), &format!("{:?}", b_1_2));
+        assert_eq!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", b_1_1),
+            "a_1_1 == b_1_1"
+        );
+        assert_eq!(
+            &format!("{:?}", a_2_1),
+            &format!("{:?}", b_2_1),
+            "a_2_1 == b_2_1"
+        );
+        assert_eq!(
+            &format!("{:?}", a_1_2),
+            &format!("{:?}", b_1_2),
+            "a_1_2 == b_1_2"
+        );
 
-        assert_ne!(&format!("{:?}", a_1_1), &format!("{:?}", a_2_1));
-        assert_ne!(&format!("{:?}", a_1_1), &format!("{:?}", a_1_2));
-        assert_ne!(&format!("{:?}", a_2_1), &format!("{:?}", a_1_2));
+        assert_ne!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", a_2_1),
+            "a_1_1 != a_2_1"
+        );
+        assert_ne!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", a_1_2),
+            "a_1_1 != a_1_2"
+        );
+        assert_ne!(
+            &format!("{:?}", a_2_1),
+            &format!("{:?}", a_1_2),
+            "a_2_1 != a_1_2"
+        );
     }
 
     fn test_sign_keypair_sizes(&self) {

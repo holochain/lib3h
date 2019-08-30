@@ -144,6 +144,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
 }
 
 impl<'engine, D: Dht> NetworkEngine for RealEngine<'engine, D> {
+    /// User provided identifier for this engine
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
     fn advertise(&self) -> Url {
         self.network_gateway
             .as_dht_ref()

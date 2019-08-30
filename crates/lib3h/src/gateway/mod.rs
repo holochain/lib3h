@@ -4,9 +4,7 @@ pub mod p2p_gateway;
 
 use crate::{
     dht::dht_trait::Dht,
-    transport::{
-        protocol::TransportCommand, transport_trait::Transport, ConnectionId, TransportWrapper,
-    },
+    transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -19,6 +17,7 @@ use url::Url;
 /// Transport access via peer discovery handled by the Dht
 pub trait Gateway: Transport + Dht {
     fn identifier(&self) -> &str;
+    fn transport_inject_event(&mut self, evt: TransportEvent);
     fn get_connection_id(&self, peer_address: &str) -> Option<String>;
 }
 
@@ -102,4 +101,5 @@ pub struct P2pGateway<'gateway, D: Dht> {
     connection_map: HashMap<Url, ConnectionId>,
     /// Own inbox for TransportCommands which is processed during Transport::process()
     transport_inbox: VecDeque<TransportCommand>,
+    transport_inject_events: Vec<TransportEvent>,
 }
