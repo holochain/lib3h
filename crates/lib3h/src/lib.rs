@@ -1,4 +1,6 @@
 extern crate backtrace;
+#[macro_use]
+extern crate detach;
 extern crate hcid;
 extern crate lib3h_crypto_api;
 extern crate lib3h_protocol;
@@ -24,6 +26,7 @@ pub mod dht;
 pub mod engine;
 pub mod error;
 pub mod gateway;
+pub mod keystore;
 pub mod time;
 pub mod track;
 pub mod transport;

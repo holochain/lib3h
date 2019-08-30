@@ -5,8 +5,10 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
-pub mod transport_crypto;
 pub mod transport_trait;
+
+mod transport_encoding;
+pub use transport_encoding::TransportEncoding;
 
 /// a connection identifier
 pub type ConnectionId = String;
