@@ -160,9 +160,12 @@ mod tests {
 
         // lets bookmark a callback that should set our actors state to the value
         // of the callback response
-        let req_id = actor
-            .tracker
-            .bookmark(std::time::Duration::from_millis(2000), context, cb);
+        let req_id = actor.tracker.bookmark(
+            // arbitrary timeout, we never call process in this test
+            std::time::Duration::from_millis(2000),
+            context,
+            cb,
+        );
 
         let entry = actor.tracker.pending.get(&req_id).unwrap();
         assert_eq!(entry.context.0, "some_context_data");
