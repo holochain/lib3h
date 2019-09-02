@@ -58,13 +58,13 @@ mod ghost_channel;
 pub use ghost_channel::{create_ghost_channel, GhostContextEndpoint, GhostEndpoint, GhostMessage};
 
 mod ghost_actor;
-pub use ghost_actor::{GhostActor, GhostParentWrapper};
+pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostContextEndpoint,
-        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostResult, GhostTracker,
-        WorkWasDone,
+        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostParentWrapperDyn,
+        GhostResult, GhostTracker, WorkWasDone,
     };
 }
 
