@@ -17,7 +17,7 @@ pub enum GhostCallbackData<CbData, E> {
 /// if you want to mutate the state of a struct instance, pass it in
 /// with the `handle` or `process` call.
 /// (see detach crate for help with self refs)
-pub type GhostCallback<Context, CbData, E, A /*: Any*/> =
+pub type GhostCallback<A, Context, CbData, E> =
     Box<dyn Fn(&mut A, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
 
 /// this internal struct helps us keep track of the context and timeout
@@ -25,7 +25,7 @@ pub type GhostCallback<Context, CbData, E, A /*: Any*/> =
 struct GhostTrackerEntry<Context, CbData, E> {
     expires: std::time::SystemTime,
     context: Context,
-    cb: GhostCallback<Context, CbData, E, dyn Any>,
+    cb: GhostCallback<dyn Any, Context, CbData, E>,
 }
 
 /// GhostTracker registers callbacks associated with request_ids
@@ -74,12 +74,11 @@ impl<Context: 'static, CbData: 'static, E: 'static> GhostTracker<Context, CbData
         &mut self,
         timeout: std::time::Duration,
         context: Context,
-        cb: GhostCallback<Context, CbData, E, A>,
+        cb: GhostCallback<A, Context, CbData, E>,
     ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
 
-        let cb: GhostCallback<_, _, _, dyn Any> = Box::new(move |a, ctx, data| {
-            let a = dbg!(a);
+        let cb: GhostCallback<dyn Any, _, _, _> = Box::new(move |a, ctx, data| {
             let a = a
                 .downcast_mut::<A>()
                 .expect("downcast Any to specific actor A");
@@ -148,7 +147,7 @@ mod tests {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("some_context_data".into());
 
-        let cb: GhostCallback<TestContext, TestCallbackData, TestError, TestTrackingActor> =
+        let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
             Box::new(|dyn_me, context, callback_data| {
                 // and we'll check that we got our context back too because we
                 // might have used it to determine what to do here.
@@ -199,7 +198,7 @@ mod tests {
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("foo".into());
-        let cb: GhostCallback<TestContext, TestCallbackData, TestError, TestTrackingActor> =
+        let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
             Box::new(|dyn_me, _context, callback_data| {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data

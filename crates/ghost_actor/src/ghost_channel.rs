@@ -211,7 +211,7 @@ impl<
         timeout: std::time::Duration,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<Context, RequestToOtherResponse, Error, A>,
+        cb: GhostCallback<A, Context, RequestToOtherResponse, Error>,
     ) {
         let request_id = self
             .pending_responses_tracker

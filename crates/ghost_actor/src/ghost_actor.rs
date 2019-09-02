@@ -82,7 +82,7 @@ impl<
         timeout: std::time::Duration,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<Context, RequestToChildResponse, Error, A>,
+        cb: GhostCallback<A, Context, RequestToChildResponse, Error>,
     ) {
         self.endpoint.request(timeout, context, payload, cb)
     }
