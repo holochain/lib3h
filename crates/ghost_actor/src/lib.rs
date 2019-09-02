@@ -316,7 +316,7 @@ mod tests {
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
-                Box::new(|_m, c, r| {
+                Box::new(|_m: &mut GatewayTransport, c, r| {
                     println!(
                         "response from parent to IncomingConnection got: {:?} with context {:?}",
                         r, c
@@ -349,12 +349,7 @@ mod tests {
                             std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
-                            Box::new(|m, context, response| {
-                                let _m = match m.downcast_mut::<GatewayTransport>() {
-                                    None => panic!("wrong type"),
-                                    Some(m) => m,
-                                };
-
+                            Box::new(|_m:&mut GatewayTransport, context, response| {
                                 let msg = {
                                     if let GwDht::ResolveAddressForId { msg } = context {
                                         msg
@@ -459,7 +454,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: "address_to_bind_to".to_string(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 println!("in callback 1, got: {:?}", r);
                 Ok(())
             }),
@@ -475,7 +470,7 @@ mod tests {
                 address: "agent_id_1".to_string(),
                 payload: b"some content".to_vec(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 println!("in callback 2, got: {:?}", r);
                 Ok(())
             }),

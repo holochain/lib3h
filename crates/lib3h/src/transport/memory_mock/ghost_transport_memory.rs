@@ -26,6 +26,15 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
     TransportError,
 >;
 
+pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
+    (),
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
 #[allow(dead_code)]
 struct GhostTransportMemory {
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
@@ -265,7 +274,7 @@ mod tests {
              */
 
         let mut transport1 = GhostTransportMemory::new();
-        let mut t1_endpoint = transport1
+        let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint::<()>("tmem_to_child1");
@@ -287,7 +296,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 // parent should see the bind event
                 assert_eq!(
                     "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
@@ -303,7 +312,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 // parent should see the bind event
                 assert_eq!(
                     "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
@@ -336,7 +345,7 @@ mod tests {
                 address: Url::parse("mem://addr_2").unwrap(),
                 payload: b"test message".to_vec(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 // parent should see that the send request was OK
                 assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
                 Ok(())

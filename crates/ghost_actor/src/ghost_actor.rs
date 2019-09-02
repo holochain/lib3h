@@ -35,12 +35,12 @@ pub struct GhostParentWrapper<
 }
 
 impl<
-        Context,
+        Context: 'static,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
-        RequestToChildResponse,
-        Error,
+        RequestToChildResponse: 'static,
+        Error: 'static,
     >
     GhostParentWrapper<
         Context,
@@ -77,12 +77,12 @@ impl<
     }
 
     /// see GhostContextEndpoint::request
-    pub fn request(
+    pub fn request<A: Any>(
         &mut self,
         timeout: std::time::Duration,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<Context, RequestToChildResponse, Error, A>,
     ) {
         self.endpoint.request(timeout, context, payload, cb)
     }

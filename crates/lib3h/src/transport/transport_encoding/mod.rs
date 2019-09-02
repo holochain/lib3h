@@ -252,11 +252,7 @@ impl TransportEncoding {
             std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitBind(msg),
             RequestToChild::Bind { spec },
-            Box::new(|m, context, response| {
-                let m = match m.downcast_mut::<TransportEncoding>() {
-                    None => panic!("wrong type"),
-                    Some(m) => m,
-                };
+            Box::new(|m: &mut TransportEncoding, context, response| {
                 let msg = {
                     match context {
                         ToInnerContext::AwaitBind(msg) => msg,
@@ -302,7 +298,7 @@ impl TransportEncoding {
             std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitSend(msg),
             RequestToChild::SendMessage { address, payload },
-            Box::new(|_, context, response| {
+            Box::new(|_: &mut TransportEncoding, context, response| {
                 let msg = {
                     match context {
                         ToInnerContext::AwaitSend(msg) => msg,
@@ -522,7 +518,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
-            Box::new(|_, _, response| {
+            Box::new(|_: &mut (), _, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
@@ -556,7 +552,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
             },
-            Box::new(|_, _, response| {
+            Box::new(|_:&mut (), _, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\" })))"
@@ -578,11 +574,8 @@ mod tests {
                 address: addr2full.clone(),
                 payload: b"hello".to_vec(),
             },
-            Box::new(|m, _, response| {
-                match m.downcast_mut::<bool>() {
-                    None => panic!("bad downcast"),
-                    Some(b) => *b = true,
-                }
+            Box::new(|b: &mut bool, _, response| {
+                *b = true;
                 // make sure we get a success response
                 assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
                 Ok(())

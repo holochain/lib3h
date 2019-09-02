@@ -17,15 +17,15 @@ pub enum GhostCallbackData<CbData, E> {
 /// if you want to mutate the state of a struct instance, pass it in
 /// with the `handle` or `process` call.
 /// (see detach crate for help with self refs)
-pub type GhostCallback<Context, CbData, E> =
-    Box<dyn Fn(&mut dyn Any, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
+pub type GhostCallback<Context, CbData, E, A /*: Any*/> =
+    Box<dyn Fn(&mut A, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<Context, CbData, E> {
     expires: std::time::SystemTime,
     context: Context,
-    cb: GhostCallback<Context, CbData, E>,
+    cb: GhostCallback<Context, CbData, E, dyn Any>,
 }
 
 /// GhostTracker registers callbacks associated with request_ids
@@ -35,7 +35,7 @@ pub struct GhostTracker<Context, CbData, E> {
     pending: HashMap<RequestId, GhostTrackerEntry<Context, CbData, E>>,
 }
 
-impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
+impl<Context: 'static, CbData: 'static, E: 'static> GhostTracker<Context, CbData, E> {
     /// create a new tracker instance (with request_id prefix)
     pub fn new(request_id_prefix: &str) -> Self {
         Self {
@@ -70,13 +70,21 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
     }
 
     /// register a callback
-    pub fn bookmark(
+    pub fn bookmark<A: Any>(
         &mut self,
         timeout: std::time::Duration,
         context: Context,
-        cb: GhostCallback<Context, CbData, E>,
+        cb: GhostCallback<Context, CbData, E, A>,
     ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
+
+        let cb: GhostCallback<_, _, _, dyn Any> = Box::new(move |a, ctx, data| {
+            let a = dbg!(a);
+            let a = a
+                .downcast_mut::<A>()
+                .expect("downcast Any to specific actor A");
+            (cb)(a, ctx, data)
+        });
         self.pending.insert(
             request_id.clone(),
             GhostTrackerEntry {
@@ -140,17 +148,13 @@ mod tests {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("some_context_data".into());
 
-        let cb: GhostCallback<TestContext, TestCallbackData, TestError> =
+        let cb: GhostCallback<TestContext, TestCallbackData, TestError, TestTrackingActor> =
             Box::new(|dyn_me, context, callback_data| {
-                let mutable_me = dyn_me
-                    .downcast_mut::<TestTrackingActor>()
-                    .expect("should be a TestTrakingActor");
-
                 // and we'll check that we got our context back too because we
                 // might have used it to determine what to do here.
                 assert_eq!(context.0, "some_context_data");
                 if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
-                    mutable_me.state = payload;
+                    dyn_me.state = payload;
                 }
                 Ok(())
             });
@@ -195,16 +199,12 @@ mod tests {
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("foo".into());
-        let cb: GhostCallback<TestContext, TestCallbackData, TestError> =
+        let cb: GhostCallback<TestContext, TestCallbackData, TestError, TestTrackingActor> =
             Box::new(|dyn_me, _context, callback_data| {
-                let mutable_me = dyn_me
-                    .downcast_mut::<TestTrackingActor>()
-                    .expect("should be a TestTrakingActor");
-
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {
-                    GhostCallbackData::Timeout => mutable_me.state = "timed_out".into(),
+                    GhostCallbackData::Timeout => dyn_me.state = "timed_out".into(),
                     _ => assert!(false),
                 }
                 Ok(())

@@ -25,7 +25,7 @@ pub struct GhostMessage<MessageToSelf, MessageToOther, MessageToSelfResponse, Er
     >,
 }
 
-impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error> std::fmt::Debug
+impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static> std::fmt::Debug
     for GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -33,7 +33,7 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error> std::fmt::Debu
     }
 }
 
-impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
+impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static>
     GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
@@ -89,7 +89,13 @@ pub struct GhostEndpoint<
     >,
 }
 
-impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfResponse, Error>
+impl<
+        RequestToOther,
+        RequestToOtherResponse: 'static,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error: 'static,
+    >
     GhostEndpoint<
         RequestToOther,
         RequestToOtherResponse,
@@ -117,7 +123,7 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
     /// don't need any context.
     /// request_id_prefix is a debugging hint... the request_ids generated
     /// for tracking request/response pairs will be prepended with this prefix.
-    pub fn as_context_endpoint<Context>(
+    pub fn as_context_endpoint<Context: 'static>(
         self,
         request_id_prefix: &str,
     ) -> GhostContextEndpoint<
@@ -154,12 +160,12 @@ pub struct GhostContextEndpoint<
 }
 
 impl<
-        Context,
+        Context: 'static,
         RequestToOther,
-        RequestToOtherResponse,
+        RequestToOtherResponse: 'static,
         RequestToSelf,
         RequestToSelfResponse,
-        Error,
+        Error: 'static,
     >
     GhostContextEndpoint<
         Context,
@@ -200,12 +206,12 @@ impl<
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
-    pub fn request(
+    pub fn request<A: Any>(
         &mut self,
         timeout: std::time::Duration,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<Context, RequestToOtherResponse, Error, A>,
     ) {
         let request_id = self
             .pending_responses_tracker
@@ -273,10 +279,10 @@ impl<
 #[allow(clippy::complexity)]
 pub fn create_ghost_channel<
     RequestToParent,
-    RequestToParentResponse,
+    RequestToParentResponse: 'static,
     RequestToChild,
-    RequestToChildResponse,
-    Error,
+    RequestToChildResponse: 'static,
+    Error: 'static,
 >() -> (
     GhostEndpoint<
         RequestToChild,
