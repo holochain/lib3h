@@ -10,7 +10,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-
+use detach::prelude::*;
 use url::Url;
 
 /// describes a super construct of a Transport and a Dht allowing
@@ -27,7 +27,7 @@ pub trait Gateway: Transport {
 pub struct GatewayWrapper<'wrap> {
     gateway: Arc<RwLock<dyn Gateway + 'wrap>>,
     transport: TransportWrapper<'wrap>,
-    dht: Arc<RwLock<DhtActor>>,
+    dht: Arc<RwLock<Detach<DhtParentWrapper>>>,
 }
 
 impl<'wrap> GatewayWrapper<'wrap> {
@@ -58,17 +58,17 @@ impl<'wrap> GatewayWrapper<'wrap> {
     }
 
     /// clone a pointer to the internal dyn Dht
-    pub fn as_dht(&self) -> Arc<RwLock<DhtActor>> {
+    pub fn as_dht(&self) -> Arc<RwLock<Detach<DhtParentWrapper>>> {
         self.dht.clone()
     }
 
     /// immutable ref to the dyn Dht
-    pub fn as_dht_ref(&self) -> RwLockReadGuard<'_, DhtActor> {
+    pub fn as_dht_ref(&self) -> RwLockReadGuard<'_, Detach<DhtParentWrapper>> {
         self.dht.read().expect("failed to obtain read lock")
     }
 
     /// mutable ref to the dyn Dht
-    pub fn as_dht_mut(&self) -> RwLockWriteGuard<'_, DhtActor> {
+    pub fn as_dht_mut(&self) -> RwLockWriteGuard<'_, Detach<DhtParentWrapper>> {
         self.dht.write().expect("failed to obtain write lock")
     }
 
@@ -102,5 +102,5 @@ pub struct P2pGateway<'gateway> {
     transport_inbox: VecDeque<TransportCommand>,
     transport_inject_events: Vec<TransportEvent>,
     /// DHT
-    inner_dht: DhtActor,
+    inner_dht: Detach<DhtParentWrapper>,
 }

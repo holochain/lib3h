@@ -321,7 +321,7 @@ impl
         }
         let (did_work, command_list) = self.internal_process().unwrap(); // FIXME
         for command in command_list {
-            self.endpoint_parent.unwrap().publish(command);
+            self.endpoint_self.publish(command);
         }
         Ok(false.into())
     }

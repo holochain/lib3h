@@ -125,7 +125,7 @@ impl<'gateway> P2pGateway<'gateway> {
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // no-op
             }
-            DhtRequestToParent::HoldEntryRequested(_from, _data) => {
+            DhtRequestToParent::HoldEntryRequested{from_peer, entry} => {
                 // no-op
             }
             DhtRequestToParent::EntryPruned(_address) => {

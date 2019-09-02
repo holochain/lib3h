@@ -7,7 +7,7 @@ use crate::{
     transport::{protocol::*, ConnectionIdRef},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
-
+use lib3h_ghost_actor::prelude::*;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -47,19 +47,18 @@ impl<'engine> RealEngine<'engine> {
             outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
-        let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process().unwrap(); // FIXME
-        if dht_did_work {
-            did_work = true;
+        let dht_did_work = self.network_gateway.as_dht_mut().process().unwrap(); // FIXME
+        for request in self.network_gateway.as_dht_mut().drain_messages() {
+            self.handle_netDhtRequest(request)?;
         }
-        for evt in event_list {
-            let mut output = self.handle_netDhtEvent(evt)?;
-            outbox.append(&mut output);
+        if bool::from(dht_did_work) {
+            did_work = true;
         }
         Ok((did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtEvent(&mut self, cmd: DhtRequestToParent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_netDhtRequest(&mut self, cmd: DhtRequestToParent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
         let outbox = Vec::new();
         match cmd {
@@ -97,7 +96,7 @@ impl<'engine> RealEngine<'engine> {
                 }
             }
             // No entries in Network DHT
-            DhtRequestToParent::HoldEntryRequested {_, _} => {
+            DhtRequestToParent::HoldEntryRequested {from_peer, entry} => {
                 unreachable!();
             }
             DhtRequestToParent::EntryPruned(_) => {
@@ -110,45 +109,86 @@ impl<'engine> RealEngine<'engine> {
         Ok(outbox)
     }
 
+    fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
+        let mut peer_list = Vec::new();
+        self.network_gateway.as_dht_mut().request(
+            std::time::Duration::from_millis(2000),
+            (),
+            DhtRequestToChild::GetPeerList,
+            Box::new(|me, context, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let DhtRequestToChildResponse::GetPeerList(peer_list_response) = response {
+                    peer_list = peer_list_response;
+                } else {
+                    panic!("bad response to bind: {:?}", response);
+                }
+                Ok(())
+            }),
+        );
+        let _res = self.network_gateway.as_dht_mut().process().unwrap(); // FIXME
+        //let _ = parent_endpoint.process(&mut ());
+        // Wait for bind response
+        let mut timeout = 0;
+        while peer_list == Vec::new() && timeout < 200 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            timeout += 10;
+        }
+        assert!(timeout < 200);
+        peer_list
+    }
+
     fn handle_new_connection(
         &mut self,
         id: &ConnectionIdRef,
         request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let mut outbox = Vec::new();
-        let mut network_gateway = self.network_gateway.as_mut();
-        if let Some(uri) = network_gateway.get_uri(id) {
-            info!("Network Connection opened: {} ({})", id, uri);
-            // TODO #150 - Should do this in next process instead
-            // Send to other node our Joined Spaces
-            let space_list = self.get_all_spaces();
-            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-            let mut buf = Vec::new();
-            our_joined_space_list
-                .serialize(&mut Serializer::new(&mut buf))
-                .unwrap();
-            trace!(
-                "AllJoinedSpaceList: {:?} to {:?}",
-                our_joined_space_list,
-                id
-            );
-            // id is connectionId but we need a transportId, so search for it in the DHT
-            let peer_list = network_gateway.get_peer_list();
-            trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
-            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
-            if let Some(peer_data) = maybe_peer_data {
-                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                network_gateway.send(&[&peer_data.peer_address], &buf)?;
-            }
-            // TODO END
-
-            // Output a Lib3hServerProtocol::Connected if its the first connection
-            if self.network_connections.is_empty() {
-                let data = ConnectedData { request_id, uri };
-                outbox.push(Lib3hServerProtocol::Connected(data));
-            }
-            let _ = self.network_connections.insert(id.to_owned());
+        // get uri from id
+        let network_transport = self.network_gateway.as_transport_ref().as_mut();
+        let maybe_uri = network_transport.get_uri(id);
+        if maybe_uri.is_none() {
+            return Ok(Vec::new());
         }
+        let uri = maybe_uri.unwrap();
+        info!("Network Connection opened: {} ({})", id, uri);
+        // TODO #150 - Should do this in next process instead
+        // Send to other node our Joined Spaces
+        let space_list = self.get_all_spaces();
+        let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+        let mut payload = Vec::new();
+        our_joined_space_list
+            .serialize(&mut Serializer::new(&mut payload))
+            .unwrap();
+        trace!(
+            "AllJoinedSpaceList: {:?} to {:?}",
+            our_joined_space_list,
+            id
+        );
+        // id is connectionId but we need a transportId, so search for it in the DHT
+
+        let peer_list = self.get_peer_list_sync();
+        trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
+        let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
+        if let Some(peer_data) = maybe_peer_data {
+            trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+            network_transport.send(&[&peer_data.peer_address], &payload)?;
+        }
+        // TODO END
+
+        // Output a Lib3hServerProtocol::Connected if its the first connection
+        let mut outbox = Vec::new();
+        if self.network_connections.is_empty() {
+            let data = ConnectedData { request_id, uri };
+            outbox.push(Lib3hServerProtocol::Connected(data));
+        }
+        let _ = self.network_connections.insert(id.to_owned());
         Ok(outbox)
     }
 
@@ -227,6 +267,9 @@ impl<'engine> RealEngine<'engine> {
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
                     self.network_gateway
                         .as_dht_mut()
+                        .take_parent_channel()
+                        .unwrap()
+                        .as_context_channel()
                         .publish(DhtRequestToChild::HandleGossip(gossip))?;
                 } else {
                     // otherwise should be for one of our space

@@ -555,7 +555,7 @@ impl<'engine> RealEngine<'engine> {
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
         let this_peer_transport_id_as_uri = {
-            let gateway = self.network_gateway.as_ref();
+            let gateway = self.network_gateway.as_dht_ref();
             // TODO #175 - encapsulate this conversion logic
             Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
                 .expect("can parse url")

@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use lib3h_ghost_actor::prelude::*;
+use detach::prelude::*;
 use url::Url;
 use lib3h_protocol::{data_types::EntryData, Address};
 

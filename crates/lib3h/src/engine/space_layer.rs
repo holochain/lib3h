@@ -106,7 +106,7 @@ impl<'engine> RealEngine<'engine> {
                     let lib3h_msg = StoreEntryAspectData {
                         request_id: self.request_track.reserve(),
                         space_address: chain_id.0.clone(),
-                        provider_agent_id: from.clone().into(),
+                        provider_agent_id: from_peer.clone().into(),
                         entry_address: entry.entry_address.clone(),
                         entry_aspect: aspect,
                     };
@@ -146,7 +146,7 @@ impl<'engine> RealEngine<'engine> {
                 let msg_data = FetchEntryData {
                     space_address: chain_id.0.clone(),
                     entry_address: entry_address.clone(),
-                    request_id: "FIXME",
+                    request_id: "FIXME".to_string(),
                     provider_agent_id: chain_id.1.clone(),
                     aspect_address_list: None,
                 };

@@ -1,13 +1,14 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_trait::DhtConfig, ghost_protocol::DhtFactory},
+    dht::{dht_trait::DhtConfig, ghost_protocol::*},
 
     gateway::{Gateway, P2pGateway},
     transport::{protocol::*, TransportWrapper},
 };
 use lib3h_protocol::Address;
 use std::collections::{HashMap, VecDeque};
+use detach::prelude::*;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -23,9 +24,10 @@ impl<'gateway> P2pGateway<'gateway> {
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
+        let dht = dht_factory(dht_config).expect("Failed to construct DHT");
         P2pGateway {
             inner_transport,
-            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
+            inner_dht: Detach::new(DhtParentWrapper::new(dht)),
             identifier: identifier.to_owned(),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
