@@ -10,16 +10,16 @@ use detach::prelude::*;
 use url::Url;
 use lib3h_protocol::{data_types::EntryData, Address};
 
-pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<DhtActor>;
+pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>>;
 
-pub type DhtActor = Box<
+pub type DhtActor = // Box<
     dyn GhostActor<
         DhtRequestToParent,
         DhtRequestToParentResponse,
         DhtRequestToChild,
         DhtRequestToChildResponse,
         Lib3hError,
-    >,
+    // >,
 >;
 pub type DhtEndpointWithContext = GhostContextEndpoint<
     DhtContext,
@@ -36,27 +36,25 @@ pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToParentResponse,
     Lib3hError,
 >;
-pub type DhtParentWrapper = GhostParentWrapper<
+pub type ChildDhtWrapperDyn = GhostParentWrapperDyn<
     DhtContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
     DhtRequestToChildResponse,
     Lib3hError,
-    dyn GhostActor<
-        DhtRequestToParent,
-        DhtRequestToParentResponse,
-        DhtRequestToChild,
-        DhtRequestToChildResponse,
-        Lib3hError,
-    >,
 >;
 
-pub type DhtMessage =
-    GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToChildResponse, Lib3hError>;
+pub type DhtToChildMessage =
+    GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
+
+pub type DhtToParentMessage =
+GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
 
 #[derive(Debug)]
-pub enum DhtContext {}
+pub enum DhtContext {
+    NoOp,
+}
 
 #[derive(Debug)]
 pub enum DhtRequestToChild {
@@ -90,7 +88,7 @@ pub enum DhtRequestToChild {
 
 #[derive(Debug)]
 pub enum DhtRequestToChildResponse {
-    RequestPeer(PeerData),
+    RequestPeer(Option<PeerData>),
     RequestPeerList(Vec<PeerData>),
     RequestThisPeer(PeerData),
     RequestEntryAddressList(Vec<Address>),

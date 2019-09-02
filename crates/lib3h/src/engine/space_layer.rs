@@ -4,7 +4,7 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, ghost_protocol::*},
     engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
-    gateway::GatewayWrapper,
+    gateway::wrapper::GatewayWrapper,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -21,7 +21,7 @@ impl<'engine> RealEngine<'engine> {
         let mut result = Vec::new();
         for (chainId, space_gateway) in self.space_gateway_map.iter() {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, space_gateway.as_ref().this_peer().clone()));
+            result.push((space_address, space_gateway.as_mut().get_this_peer_sync().clone()));
         }
         result
     }
@@ -43,21 +43,23 @@ impl<'engine> RealEngine<'engine> {
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
         // Process all gateways' DHT
         let mut outbox = Vec::new();
-        let mut dht_outbox = HashMap::new();
+        //let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            let (did_work, event_list) = space_gateway.process()?;
-            if did_work {
-                // TODO: perf optim, don't copy chain_id
-                dht_outbox.insert(chain_id.clone(), event_list);
-            }
+            //let (did_work, event_list) =
+                space_gateway.as_dht_mut().process(&mut ()).unwrap(); // FIXME
+//            if did_work {
+//                // TODO: perf optim, don't copy chain_id
+//                dht_outbox.insert(chain_id.clone(), event_list);
+//            }
+//        }
+//        // Process all gateway DHT events
+//        for (chain_id, evt_list) in dht_outbox {
+//            for evt in evt_list {
+//                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
+//                outbox.append(&mut output);
+//            }
         }
-        // Process all gateway DHT events
-        for (chain_id, evt_list) in dht_outbox {
-            for evt in evt_list {
-                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
-                outbox.append(&mut output);
-            }
-        }
+        // FIXME
         Ok(outbox)
     }
 
@@ -94,7 +96,7 @@ impl<'engine> RealEngine<'engine> {
                 // For now accept all request
                 space_gateway
                     .as_dht_mut()
-                    .publish(DhtRequestToChild::HoldPeer(peer_data))?;
+                    .publish(DhtRequestToChild::HoldPeer(peer_data));
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // no-op

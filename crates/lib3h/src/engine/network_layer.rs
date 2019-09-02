@@ -47,21 +47,21 @@ impl<'engine> RealEngine<'engine> {
             outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
-        let dht_did_work = self.network_gateway.as_dht_mut().process().unwrap(); // FIXME
+        let dht_did_work = self.network_gateway.as_dht_mut().process(&mut ()).unwrap(); // FIXME
         for request in self.network_gateway.as_dht_mut().drain_messages() {
             self.handle_netDhtRequest(request)?;
         }
-        if bool::from(dht_did_work) {
-            did_work = true;
-        }
+//        if bool::from(dht_did_work) {
+//            did_work = true;
+//        }
         Ok((did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtRequest(&mut self, cmd: DhtRequestToParent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
+    fn handle_netDhtRequest(&mut self, mut msg: DhtToParentMessage) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        debug!("{} << handle_netDhtEvent: {:?}", self.name, msg);
         let outbox = Vec::new();
-        match cmd {
+        match msg.take_message().expect("exists") {
             DhtRequestToParent::GossipTo(_data) => {
                 // no-op
             }
@@ -96,7 +96,7 @@ impl<'engine> RealEngine<'engine> {
                 }
             }
             // No entries in Network DHT
-            DhtRequestToParent::HoldEntryRequested {from_peer, entry} => {
+            DhtRequestToParent::HoldEntryRequested {from_peer: _, entry: _} => {
                 unreachable!();
             }
             DhtRequestToParent::EntryPruned(_) => {
@@ -109,49 +109,13 @@ impl<'engine> RealEngine<'engine> {
         Ok(outbox)
     }
 
-    fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
-        let mut peer_list = Vec::new();
-        self.network_gateway.as_dht_mut().request(
-            std::time::Duration::from_millis(2000),
-            (),
-            DhtRequestToChild::GetPeerList,
-            Box::new(|me, context, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
-                    }
-                };
-                if let DhtRequestToChildResponse::GetPeerList(peer_list_response) = response {
-                    peer_list = peer_list_response;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
-        let _res = self.network_gateway.as_dht_mut().process().unwrap(); // FIXME
-        //let _ = parent_endpoint.process(&mut ());
-        // Wait for bind response
-        let mut timeout = 0;
-        while peer_list == Vec::new() && timeout < 200 {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            timeout += 10;
-        }
-        assert!(timeout < 200);
-        peer_list
-    }
-
     fn handle_new_connection(
         &mut self,
         id: &ConnectionIdRef,
         request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // get uri from id
-        let network_transport = self.network_gateway.as_transport_ref().as_mut();
+        let mut network_transport = self.network_gateway.as_transport_mut();
         let maybe_uri = network_transport.get_uri(id);
         if maybe_uri.is_none() {
             return Ok(Vec::new());
@@ -173,7 +137,7 @@ impl<'engine> RealEngine<'engine> {
         );
         // id is connectionId but we need a transportId, so search for it in the DHT
 
-        let peer_list = self.get_peer_list_sync();
+        let peer_list = self.network_gateway.as_mut().get_peer_list_sync();
         trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
         let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
         if let Some(peer_data) = maybe_peer_data {
@@ -267,10 +231,7 @@ impl<'engine> RealEngine<'engine> {
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
                     self.network_gateway
                         .as_dht_mut()
-                        .take_parent_channel()
-                        .unwrap()
-                        .as_context_channel()
-                        .publish(DhtRequestToChild::HandleGossip(gossip))?;
+                        .publish(DhtRequestToChild::HandleGossip(gossip));
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
@@ -279,7 +240,7 @@ impl<'engine> RealEngine<'engine> {
                     if let Some(space_gateway) = maybe_space_gateway {
                         space_gateway
                             .as_dht_mut()
-                            .publish(DhtRequestToChild::HandleGossip(gossip))?;
+                            .publish(DhtRequestToChild::HandleGossip(gossip));
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -324,7 +285,7 @@ impl<'engine> RealEngine<'engine> {
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway
                         .as_dht_mut()
-                        .publish(DhtRequestToChild::HoldPeer(peer_data.clone()))?;
+                        .publish(DhtRequestToChild::HoldPeer(peer_data.clone()));
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -334,7 +295,7 @@ impl<'engine> RealEngine<'engine> {
                     if let Some(space_gateway) = maybe_space_gateway {
                         space_gateway
                             .as_dht_mut()
-                            .publish(DhtRequestToChild::HoldPeer(peer_data.clone()))?;
+                            .publish(DhtRequestToChild::HoldPeer(peer_data.clone()));
                     }
                 }
             }

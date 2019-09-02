@@ -19,8 +19,6 @@ extern crate serde_derive;
 extern crate rmp_serde;
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate detach;
 
 // -- mod -- //
 

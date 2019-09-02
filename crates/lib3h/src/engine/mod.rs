@@ -9,7 +9,7 @@ use crate::{
     dht::{
         ghost_protocol::*,
     },
-    gateway::GatewayWrapper,
+    gateway::wrapper::GatewayWrapper,
     track::Tracker,
     transport::{ConnectionId, TransportWrapper},
     transport_wss::TlsConfig,

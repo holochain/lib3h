@@ -16,11 +16,12 @@ use crate::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
-    gateway::{GatewayWrapper, P2pGateway},
+    gateway::{P2pGateway, wrapper::*},
     track::Tracker,
     transport::{protocol::TransportCommand, TransportWrapper},
     transport_wss::TransportWss,
 };
+use lib3h_ghost_actor::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
@@ -121,11 +122,11 @@ impl<'engine> RealEngine<'engine> {
             dht_factory,
             &dht_config,
         ));
-        debug!(
-            "New MOCK RealEngine {} -> {:?}",
-            name,
-            network_gateway.as_ref().this_peer()
-        );
+//        debug!(
+//            "New MOCK RealEngine {} -> {:?}",
+//            name,
+//            network_gateway.as_ref().this_peer()
+//        );
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         Ok(RealEngine {
             crypto,
@@ -319,15 +320,11 @@ impl<'engine> RealEngine<'engine> {
                         if is_data_for_author_list {
                             space_gateway
                                 .as_dht_mut()
-                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry))?;
+                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
                         } else {
-                            let response = FetchDhtEntryResponseData {
-                                msg_id: msg.request_id.clone(),
-                                entry: msg.entry.clone(),
-                            };
                             space_gateway
                                 .as_dht_mut()
-                                .respond(DhtRequestToParentResponse::RequestEntry(msg.entry))?;
+                                .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
                         }
                     }
                 }
@@ -345,7 +342,7 @@ impl<'engine> RealEngine<'engine> {
                     Ok(space_gateway) => {
                         space_gateway
                             .as_dht_mut()
-                            .publish(DhtRequestToChild::BroadcastEntry(msg.entry))?;
+                            .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
                     }
                 }
             }
@@ -362,7 +359,7 @@ impl<'engine> RealEngine<'engine> {
                     Ok(space_gateway) => {
                         space_gateway
                             .as_dht_mut()
-                            .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry))?;
+                            .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
                     }
                 }
             }
@@ -406,23 +403,23 @@ impl<'engine> RealEngine<'engine> {
                     Ok(space_gateway) => {
                         space_gateway
                             .as_dht_mut()
-                            .respond(DhtRequestToParentResponse::RequestEntry(entry))?;
+                            .publish(DhtRequestToChild::BroadcastEntry(entry));
                     }
                 }
             }
             // Our request for the publish_list has returned
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(msg) => {
-                self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(&mut outbox, msg)?;
+                self.serve_HandleGetAuthoringEntryListResult(&mut outbox, msg)?;
             }
             // Our request for the hold_list has returned
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(msg) => {
-                self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(&mut outbox, msg)?;
+                self.serve_HandleGetGossipingEntryListResult(&mut outbox, msg)?;
             }
         }
         Ok(outbox)
     }
 
-    fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
+    fn serve_HandleGetAuthoringEntryListResult(
         &mut self,
         outbox: &mut Vec<Lib3hServerProtocol>,
         msg: EntryListData,
@@ -445,33 +442,52 @@ impl<'engine> RealEngine<'engine> {
             &msg.request_id,
             None,
         );
-        match maybe_space {
-            Err(res) => outbox.push(res),
-            Ok(space_gateway) => {
-                let mut msg_data = FetchEntryData {
-                    space_address: msg.space_address.clone(),
-                    entry_address: "".into(),
-                    request_id: "".into(),
-                    provider_agent_id: msg.provider_agent_id.clone(),
-                    aspect_address_list: None,
-                };
-                // Request every Entry from Core
-                let mut count = 0;
-                for (entry_address, aspect_address_list) in msg.address_map {
-                    // Check aspects and only request entry with new aspects
-                    let maybe_known_aspects = space_gateway.as_ref().get_aspects_of(&entry_address);
-                    if let Some(known_aspects) = maybe_known_aspects {
-                        if includes(&known_aspects, &aspect_address_list) {
-                            continue;
-                        }
-                    }
-                    count += 1;
-                    msg_data.entry_address = entry_address.clone();
-                    request_list.push(msg_data.clone());
-                }
-                debug!("HandleGetAuthoringEntryListResult: {}", count);
-            }
+        if let Err(res) = maybe_space {
+            outbox.push(res);
+            return Ok(());
         }
+        let space_gateway = maybe_space.unwrap();
+        let mut msg_data = FetchEntryData {
+            space_address: msg.space_address.clone(),
+            entry_address: "".into(),
+            request_id: "".into(),
+            provider_agent_id: msg.provider_agent_id.clone(),
+            aspect_address_list: None,
+        };
+        // Request every 'new' Entry from Core
+        let mut count = 0;
+        for (entry_address, aspect_address_list) in msg.address_map {
+            // Check aspects and only request entry with new aspects
+            space_gateway
+                .as_dht_mut()
+                .request(
+                    std::time::Duration::from_millis(2000),
+                    DhtContext::NoOp,
+                    DhtRequestToChild::RequestAspectsOf(entry_address),
+                    Box::new(move |_me, _context, response| {
+                        let response = {
+                            match response {
+                                GhostCallbackData::Timeout => panic!("timeout"),
+                                GhostCallbackData::Response(response) => match response {
+                                    Err(e) => panic!("{:?}", e),
+                                    Ok(response) => response,
+                                },
+                            }
+                        };
+                        if let DhtRequestToChildResponse::RequestAspectsOf(known_aspects) = response {
+                            if !includes(&known_aspects, &aspect_address_list) {
+                                count += 1;
+                                msg_data.entry_address = entry_address.clone();
+                                request_list.push(msg_data.clone());
+                            }
+                        } else {
+                            panic!("bad response to bind: {:?}", response);
+                        }
+                        Ok(())
+                    }),
+                );
+        }
+        debug!("HandleGetAuthoringEntryListResult: {}", count);
         for mut msg_data in request_list {
             msg_data.request_id = self.request_track.reserve();
             self.request_track.set(
@@ -483,7 +499,7 @@ impl<'engine> RealEngine<'engine> {
         Ok(())
     }
 
-    fn serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(
+    fn serve_HandleGetGossipingEntryListResult(
         &mut self,
         outbox: &mut Vec<Lib3hServerProtocol>,
         msg: EntryListData,
@@ -527,7 +543,7 @@ impl<'engine> RealEngine<'engine> {
                     };
                     space_gateway
                         .as_dht_mut()
-                        .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry))?;
+                        .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry));
                 }
             }
         }
@@ -555,9 +571,9 @@ impl<'engine> RealEngine<'engine> {
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
         let this_peer_transport_id_as_uri = {
-            let gateway = self.network_gateway.as_dht_ref();
+            let peer = self.network_gateway.as_mut().get_this_peer_sync();
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
+            Url::parse(format!("transportId:{}", peer.peer_address).as_str())
                 .expect("can parse url")
         };
         let dht_config = DhtConfig {
@@ -570,15 +586,15 @@ impl<'engine> RealEngine<'engine> {
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
             GatewayWrapper::new(P2pGateway::new_with_space(
-                self.network_gateway.as_transport(),
                 &join_msg.space_address,
+                self.network_gateway.as_transport(),
                 self.dht_factory,
                 &dht_config,
             ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
-        let peer = new_space_gateway.as_ref().this_peer().to_owned();
+        let peer = new_space_gateway.as_mut().get_this_peer_sync().to_owned();
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
         p2p_msg
@@ -601,10 +617,10 @@ impl<'engine> RealEngine<'engine> {
             .insert(chain_id.clone(), new_space_gateway);
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        let this_peer = { space_gateway.as_ref().this_peer().clone() };
+        let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
         space_gateway
             .as_dht_mut()
-            .publish(DhtRequestToChild::HoldPeer(this_peer))?;
+            .publish(DhtRequestToChild::HoldPeer(this_peer));
         // Send Get*Lists requests
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),
@@ -653,7 +669,7 @@ impl<'engine> RealEngine<'engine> {
             result_info: vec![],
         };
         // Check if messaging self
-        let peer_address = &space_gateway.as_ref().this_peer().peer_address.clone();
+        let peer_address = &space_gateway.as_mut().get_this_peer_sync().peer_address.clone();
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == &to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();

@@ -126,7 +126,7 @@ impl<'gateway> Transport for P2pGateway<'gateway> {
 
     /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
     fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
-        let peer_data_list = self.inner_dht.get_peer_list();
+        let peer_data_list = self.get_peer_list_sync();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
             id_list.push(peer_data.peer_address);
@@ -151,7 +151,7 @@ impl<'gateway> P2pGateway<'gateway> {
     ) -> TransportResult<Vec<Url>> {
         let mut uri_list = Vec::with_capacity(address_list.len());
         for address in address_list {
-            let maybe_peer = self.inner_dht.get_peer(address);
+            let maybe_peer = self.get_peer_sync(address);
             match maybe_peer {
                 None => {
                     return Err(TransportError::new(format!(
@@ -180,7 +180,7 @@ impl<'gateway> P2pGateway<'gateway> {
         }
 
         // Send to other node our PeerAddress
-        let this_peer = self.this_peer().clone();
+        let this_peer = self.get_this_peer_sync().clone();
         let our_peer_address = P2pProtocol::PeerAddress(
             self.identifier().to_string(),
             this_peer.peer_address,
@@ -252,7 +252,7 @@ impl<'gateway> P2pGateway<'gateway> {
                                 timestamp: peer_timestamp,
                             };
                             // HACK
-                            self.as_dht_mut()
+                            self.inner_dht
                                 .publish(DhtRequestToChild::HoldPeer(peer));
                             // TODO #58
                             // TODO #150 - Should not call process manually
