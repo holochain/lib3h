@@ -6,18 +6,30 @@ extern crate lazy_static;
 use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashMap, sync::RwLock};
+use std::{
+    any::Any,
+    collections::{HashMap, HashSet},
+    sync::RwLock,
+};
 use url::Url;
 
 // we need an "internet" that a transport can bind to that will
 // deliver messages to bound transports, we'll call it the Mockernet
 pub struct Mockernet {
     bindings: HashMap<Url, Tube>,
+    connections: HashMap<Url, HashSet<Url>>,
+}
+
+pub enum MockernetEvent {
+    Connection { from: Url },
+    Message { from: Url, payload: Vec<u8> },
+    //    Error(String),
 }
 
 // The Mockernet is a Series-of-Tubes, which is the technical term for the
 // sets of crossbeam channels in the bindings that mockernet shuttles
-// data between
+// data between.
+// The Mockernet simulates a
 pub struct Tube {
     sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
     #[allow(dead_code)]
@@ -33,8 +45,11 @@ impl Mockernet {
     pub fn new() -> Self {
         Mockernet {
             bindings: HashMap::new(),
+            connections: HashMap::new(),
         }
     }
+
+    /// create a binding to the mockernet, without one you can't send or receive
     pub fn bind(&mut self, url: Url) -> bool {
         if self.bindings.contains_key(&url) {
             false
@@ -43,18 +58,58 @@ impl Mockernet {
             true
         }
     }
+
+    /// send a message to anyone on the Mockernet
     pub fn send_to(&mut self, to: Url, from: Url, payload: Vec<u8>) -> Result<(), String> {
-        let dst = self.bindings.get(&to).ok_or(format!("{} not bound", to))?;
-        dst.sender
-            .send((from, payload))
-            .map_err(|e| format!("{}", e))
+        {
+            let _src = self
+                .bindings
+                .get(&from)
+                .ok_or(format!("{} not bound", from))?;
+            let dst = self.bindings.get(&to).ok_or(format!("{} not bound", to))?;
+            dst.sender
+                .send((from.clone(), payload))
+                .map_err(|e| format!("{}", e))?;
+        }
+        self.connect(from.clone(), to.clone());
+        Ok(())
     }
-    pub fn receive_for(&mut self, to: Url) -> Result<(Url, Vec<u8>), String> {
+
+    /// check to see, for a given Url, if there are any events waiting
+    pub fn process_for(&mut self, address: Url) -> Result<Vec<MockernetEvent>, String> {
+        let mut events = Vec::new();
         let binding = self
             .bindings
-            .get(&to)
-            .ok_or("requested address not bound")?;
-        binding.receiver.try_recv().map_err(|e| format!("{:?}", e))
+            .get(&address)
+            .ok_or(format!("{} not bound", address))?;
+        let (from, payload) = binding
+            .receiver
+            .try_recv()
+            .map_err(|e| format!("{:?}", e))?;
+        if !self.are_connected(&address, &from) {
+            events.push(MockernetEvent::Connection { from: from.clone() });
+        }
+        events.push(MockernetEvent::Message { from, payload });
+        Ok(events)
+    }
+
+    /// record a connection
+    pub fn connect(&mut self, from: Url, to: Url) {
+        if let Some(cmap) = self.connections.get_mut(&from) {
+            cmap.insert(to);
+        } else {
+            let mut cmap = HashSet::new();
+            cmap.insert(to);
+            self.connections.insert(from, cmap);
+        }
+    }
+
+    /// check to see if two nodes are connected
+    pub fn are_connected(&mut self, from: &Url, to: &Url) -> bool {
+        match self.connections.get(from) {
+            None => return false,
+            Some(cmap) => cmap.contains(to),
+        }
     }
 }
 
@@ -105,16 +160,7 @@ impl
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        let mut mockernet = MOCKERNET.write().unwrap();
-        let our_url = self.bound_url.as_ref().unwrap();
-        if let Ok((from, payload)) = mockernet.receive_for(our_url.clone()) {
-            detach_run!(self.endpoint_self, |s| s.publish(
-                RequestToParent::ReceivedData {
-                    address: from,
-                    payload
-                }
-            ));
-        }
+        self.handle_events_from_mockernet();
         Ok(false.into())
     }
     // END BOILER PLATE--------------------------
@@ -166,6 +212,29 @@ impl TestTransport {
             }
         }
         Ok(())
+    }
+
+    fn handle_events_from_mockernet(&mut self) {
+        let mut mockernet = MOCKERNET.write().unwrap();
+        let our_url = self.bound_url.as_ref().unwrap();
+        if let Ok(events) = mockernet.process_for(our_url.clone()) {
+            for e in events {
+                match e {
+                    MockernetEvent::Message { from, payload } => {
+                        detach_run!(self.endpoint_self, |s| s.publish(
+                            RequestToParent::ReceivedData {
+                                address: from,
+                                payload
+                            }
+                        ));
+                    }
+                    MockernetEvent::Connection { from } => {
+                        detach_run!(self.endpoint_self, |s| s
+                            .publish(RequestToParent::IncomingConnection { address: from }));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -268,6 +337,6 @@ fn ghost_transport() {
     );
     assert_eq!(
         "ReceivedData { address: \"mocknet://t1/\", payload: [102, 111, 111] }",
-        format!("{:?}", messages[0].take_message().expect("exists"))
+        format!("{:?}", messages[1].take_message().expect("exists"))
     );
 }
