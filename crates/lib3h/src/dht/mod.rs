@@ -126,7 +126,7 @@ pub mod tests {
         peer_address: &PeerAddressRef,
     ) -> Detach<ChildDhtWrapperDyn> {
         let dht = new_dht(true, PEER_A);
-        Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent"))
+        Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
     fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn>) -> PeerData {
@@ -161,7 +161,7 @@ pub mod tests {
                 Ok(())
             }),
         );
-        println!("dht.process()...");
+        println!("dht.process(get_this_peer)...");
         dht.process(&mut this_peer).unwrap();
         this_peer
     }
@@ -194,7 +194,7 @@ pub mod tests {
                 Ok(())
             }),
         );
-        println!("dht.process()...");
+        println!("dht.process(get_peer) ...");
         dht.process(&mut maybe_peer).unwrap();
         maybe_peer
     }
@@ -227,9 +227,76 @@ pub mod tests {
                 Ok(())
             }),
         );
-        println!("dht.process()...");
+        println!("dht.process(get_peer_list)...");
         dht.process(&mut peer_list).unwrap();
         peer_list
+    }
+
+    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn>) -> Vec<Address> {
+        let mut entry_list = Vec::new();
+        dht.request(
+            std::time::Duration::from_millis(200),
+            DhtContext::NoOp,
+            DhtRequestToChild::RequestEntryAddressList,
+            Box::new(|ud, _context, response| {
+                let mut entry_list = match ud.downcast_mut::<Vec<Address>>() {
+                    None => panic!("bad downcast"),
+                    Some(e) => e,
+                };
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let DhtRequestToChildResponse::RequestEntryAddressList(entry_response) = response {
+                    *entry_list = entry_response;
+                } else {
+                    panic!("bad response to RequestEntryAddressList: {:?}", response);
+                }
+                Ok(())
+            }),
+        );
+        println!("dht.process(get_entry_address_list)...");
+        dht.process(&mut entry_list).unwrap();
+        entry_list
+    }
+
+    fn get_aspects_of(dht: &mut Detach<ChildDhtWrapperDyn>, entry_address: &Address)
+        -> Option<Vec<Address>> {
+        let mut maybe_aspect_list = None;
+        dht.request(
+            std::time::Duration::from_millis(200),
+            DhtContext::NoOp,
+            DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
+            Box::new(|ud, _context, response| {
+                let mut maybe_aspect_list = match ud.downcast_mut::<Option<Vec<Address>>>() {
+                    None => panic!("bad downcast"),
+                    Some(e) => e,
+                };
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let DhtRequestToChildResponse::RequestAspectsOf(entry_response) = response {
+                    *maybe_aspect_list = entry_response;
+                } else {
+                    panic!("bad response to RequestAspectsOf: {:?}", response);
+                }
+                Ok(())
+            }),
+        );
+        println!("dht.process(get_aspects_of)...");
+        dht.process(&mut maybe_aspect_list).unwrap();
+        maybe_aspect_list
     }
 
     #[test]
@@ -268,47 +335,73 @@ pub mod tests {
         assert_eq!(peer_list.len(), 2);
     }
 
-    //
-    //    #[test]
-    //    fn test_get_own_entry() {
-    //        enable_logging_for_test(true);
-    //        let mut dht = new_dht(true, PEER_A);
-    //        // Should be empty
-    //        let entry_address_list = dht.get_entry_address_list();
-    //        assert_eq!(entry_address_list.len(), 0);
-    //        // Add a data item
-    //        let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
-    //        dht.post(DhtCommand::HoldEntryAspectAddress(entry.clone()))
-    //            .unwrap();
-    //        let (did_work, _) = dht.process().unwrap();
-    //        assert!(did_work);
-    //        // Should have it
-    //        let entry_address_list = dht.get_entry_address_list();
-    //        assert_eq!(entry_address_list.len(), 1);
-    //        let maybe_aspects = dht.get_aspects_of(&ENTRY_ADDRESS_1);
-    //        assert!(maybe_aspects.is_some());
-    //        assert_eq!(maybe_aspects.unwrap().len(), 1);
-    //        // Fetch it
-    //        let fetch_entry = FetchDhtEntryData {
-    //            msg_id: "fetch_1".to_owned(),
-    //            entry_address: ENTRY_ADDRESS_1.clone(),
-    //        };
-    //        dht.post(DhtCommand::FetchEntry(fetch_entry)).unwrap();
-    //        let (_did_work, event_list) = dht.process().unwrap();
-    //        assert_eq!(event_list.len(), 1);
-    //        let provide_entry = unwrap_to!(event_list[0] => DhtEvent::EntryDataRequested);
-    //        // Make something up
-    //        let response = FetchDhtEntryResponseData {
-    //            msg_id: provide_entry.msg_id.clone(),
-    //            entry: entry.clone(),
-    //        };
-    //        dht.post(DhtCommand::EntryDataResponse(response)).unwrap();
-    //        let (_did_work, event_list) = dht.process().unwrap();
-    //        // Should have it
-    //        assert_eq!(event_list.len(), 1);
-    //        let entry_response = unwrap_to!(event_list[0] => DhtEvent::FetchEntryResponse);
-    //        assert_eq!(entry_response.entry, entry);
-    //    }
+
+        #[test]
+        fn test_get_own_entry() {
+            enable_logging_for_test(true);
+            let mut dht = new_dht_wrapper(true, PEER_A);
+            // Should be empty
+            let entry_address_list = get_entry_address_list(&mut dht);
+            assert_eq!(entry_address_list.len(), 0);
+            // Add a data item
+            let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
+            println!("dht.process(HoldEntryAspectAddress)...");
+            dht.publish(DhtRequestToChild::HoldEntryAspectAddress(entry.clone()));
+            dht.process(&mut ()).unwrap();
+            // Should have it
+            let entry_address_list = get_entry_address_list(&mut dht);
+            assert_eq!(entry_address_list.len(), 1);
+            let maybe_aspects = get_aspects_of(&mut dht, &*ENTRY_ADDRESS_1);
+            assert!(maybe_aspects.is_some());
+            assert_eq!(maybe_aspects.unwrap().len(), 1);
+            // Flush any pending requests from child
+            let mut request_list = dht.drain_messages();
+            println!("0. dht.drain_messages(): {}", request_list.len());
+            // Fetch it
+            // ========
+            dht.request(
+                std::time::Duration::from_millis(200),
+                DhtContext::NoOp,
+                DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
+                Box::new(|_ud, _context, response| {
+                    println!("5. In DhtRequestToChild::RequestEntry Response Closure");
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestEntry(entry_response) = response {
+                        // Should have it
+                        assert_eq!(entry_response.entry_address, *ENTRY_ADDRESS_1);
+                    } else {
+                        panic!("bad response to RequestAspectsOf: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            );
+            println!("1. dht.process(RequestEntry)...");
+            dht.process(&mut ()).unwrap();
+            // Should have received the request back
+            let mut request_list = dht.drain_messages();
+            assert_eq!(request_list.len(), 1);
+            for mut request in request_list {
+                println!("2. request = {:?}", request);
+                match request.take_message().expect("exists") {
+                    DhtRequestToParent::RequestEntry(entry_address) => {
+                        assert_eq!(entry_address, *ENTRY_ADDRESS_1);
+                    },
+                    _ => panic!("Expecting a different request type"),
+                }
+                request.respond(Ok(DhtRequestToParentResponse::RequestEntry(entry.clone())));
+            }
+            println!("3. dht.process(RequestEntry)...");
+            dht.process(&mut ()).unwrap();
+        }
+
     //
     //    #[test]
     //    fn test_update_peer() {

@@ -71,7 +71,7 @@ impl MirrorDht {
             last_gossip_of_self: timestamp,
             config: config.clone(),
             endpoint_parent: Some(endpoint_parent),
-            endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_to_parent")),
+            endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_child_")),
         };
         Ok(Box::new(this))
     }
@@ -511,6 +511,7 @@ impl MirrorDht {
                             _ => panic!("bad context"),
                         };
                         if let DhtRequestToParentResponse::RequestEntry(entry_response) = response {
+                            println!("4. In DhtRequestToChild::RequestEntry Responding...");
                             let payload =
                                 Ok(DhtRequestToChildResponse::RequestEntry(entry_response));
                             request.respond(payload);

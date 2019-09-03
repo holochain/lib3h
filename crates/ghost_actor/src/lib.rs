@@ -127,7 +127,7 @@ mod tests {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
                 endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_to_parent")),
+                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_child_")),
             }
         }
     }
