@@ -421,7 +421,7 @@ mod tests {
         // the FakeActor's state String, thus for testing we can just look in the actors's
         // state to see if the callback was run.
         fn cb_factory() -> GhostCallback<FakeActor, TestContext, TestMsgOutResponse, TestError> {
-            Box::new(|dyn_me, _context, callback_data| {
+            Box::new(|me, _context, callback_data| {
                 dyn_me.0 = format!("{:?}", callback_data);
                 Ok(())
             })
