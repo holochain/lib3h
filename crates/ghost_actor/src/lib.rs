@@ -58,13 +58,13 @@ mod ghost_channel;
 pub use ghost_channel::{create_ghost_channel, GhostContextEndpoint, GhostEndpoint, GhostMessage};
 
 mod ghost_actor;
-pub use ghost_actor::{GhostActor, GhostParentWrapper};
+pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostContextEndpoint,
-        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostResult, GhostTracker,
-        WorkWasDone,
+        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostParentWrapperDyn,
+        GhostResult, GhostTracker, WorkWasDone,
     };
 }
 
@@ -263,6 +263,7 @@ mod tests {
                 dht_protocol::RequestToChild,
                 dht_protocol::RequestToChildResponse,
                 FakeError,
+                RrDht,
             >,
         >,
     }
@@ -270,7 +271,7 @@ mod tests {
     impl GatewayTransport {
         pub fn new() -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
-            let dht = Detach::new(GhostParentWrapper::new(Box::new(RrDht::new()), "to_dht"));
+            let dht = Detach::new(GhostParentWrapper::new(RrDht::new(), "to_dht"));
             Self {
                 endpoint_parent: Some(endpoint_parent),
                 endpoint_self: Detach::new(endpoint_self.as_context_endpoint("gw_to_parent")),
