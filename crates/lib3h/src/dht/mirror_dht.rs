@@ -12,7 +12,7 @@ use lib3h_protocol::{data_types::EntryData, Address, DidWork};
 use lib3h_ghost_actor::prelude::*;
 use detach::prelude::*;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     any::Any,
 };
 use rmp_serde::{Deserializer, Serializer};
@@ -55,12 +55,14 @@ pub struct MirrorDht {
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Self {
+    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Box<DhtActor> {
         let dht_config = DhtConfig::new(this_peer_address, this_peer_uri);
-        Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht")
+        let dht = Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht");
+        // Box::new(dht)
+        dht
     }
 
-    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
+    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>> {
         let timestamp = time::since_epoch_ms();
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
 
@@ -79,7 +81,7 @@ impl MirrorDht {
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_to_parent")),
         };
-        Ok(this)
+        Ok(Box::new(this))
     }
 }
 
@@ -99,9 +101,9 @@ impl MirrorDht {
 //        None
 //    }
 //
-    fn this_peer(&self) -> &PeerData {
-        &self.this_peer
-    }
+//    fn this_peer(&self) -> &PeerData {
+//        &self.this_peer
+//    }
 //
 //    // -- Entry -- //
 //
@@ -188,15 +190,14 @@ impl MirrorDht {
 
     // Create gossipTo event of your own PeerData (but not to yourself)
     fn gossip_self(&mut self, peer_address_list: Vec<PeerAddress>) -> GossipToData {
-        let this_peer = self.this_peer();
-        let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
+        let gossip_this_peer = MirrorGossip::Peer(self.this_peer.clone());
         let mut buf = Vec::new();
         gossip_this_peer
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
         trace!(
             "@MirrorDht@ gossip_self: {:?} | to: {:?}",
-            this_peer,
+            self.this_peer,
             peer_address_list,
         );
         GossipToData {
