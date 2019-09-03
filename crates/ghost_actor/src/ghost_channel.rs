@@ -422,7 +422,7 @@ mod tests {
         // state to see if the callback was run.
         fn cb_factory() -> GhostCallback<FakeActor, TestContext, TestMsgOutResponse, TestError> {
             Box::new(|me, _context, callback_data| {
-                dyn_me.0 = format!("{:?}", callback_data);
+                me.0 = format!("{:?}", callback_data);
                 Ok(())
             })
         }
