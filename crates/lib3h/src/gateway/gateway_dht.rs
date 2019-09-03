@@ -38,7 +38,7 @@ impl<'gateway>  P2pGateway<'gateway> {
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         if self.identifier != NETWORK_GATEWAY_ID {
-            if let DhtRequestToChild::HoldPeer(peer_data) = cmd {
+            if let DhtRequestToChild::HoldPeer(peer_data) = &cmd {
                 debug!(
                     "({}).Dht.post(HoldPeer) - {}",
                     self.identifier, peer_data.peer_uri,

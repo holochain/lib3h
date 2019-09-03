@@ -125,7 +125,7 @@ impl<'gateway> Transport for P2pGateway<'gateway> {
     }
 
     /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
+    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
         let peer_data_list = self.get_peer_list_sync();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
@@ -146,7 +146,7 @@ impl<'gateway> Transport for P2pGateway<'gateway> {
 impl<'gateway> P2pGateway<'gateway> {
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
-        &self,
+        &mut self,
         address_list: &[&str],
     ) -> TransportResult<Vec<Url>> {
         let mut uri_list = Vec::with_capacity(address_list.len());

@@ -54,6 +54,7 @@ GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, 
 #[derive(Debug)]
 pub enum DhtContext {
     NoOp,
+    RequestAspectsOf { entry_address: Address, aspect_address_list: Vec<Address> },
 }
 
 #[derive(Debug)]

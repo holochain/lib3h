@@ -47,8 +47,9 @@ impl<'engine> RealEngine<'engine> {
             outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
-        let dht_did_work = self.network_gateway.as_dht_mut().process(&mut ()).unwrap(); // FIXME
-        for request in self.network_gateway.as_dht_mut().drain_messages() {
+        let dht_did_work = self.network_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME
+        let request_list = self.network_gateway.as_mut().as_dht_mut().drain_messages();
+        for request in request_list {
             self.handle_netDhtRequest(request)?;
         }
 //        if bool::from(dht_did_work) {
@@ -82,7 +83,7 @@ impl<'engine> RealEngine<'engine> {
                 // Disconnect from that peer by calling a Close on it.
                 let maybe_connection_id = self
                     .network_gateway
-                    .as_ref()
+                    .as_mut()
                     .get_connection_id(&peer_address);
                 trace!(
                     "{} -- maybe_connection_id: {:?}",
@@ -230,6 +231,7 @@ impl<'engine> RealEngine<'engine> {
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
                     self.network_gateway
+                        .as_mut()
                         .as_dht_mut()
                         .publish(DhtRequestToChild::HandleGossip(gossip));
                 } else {
@@ -239,6 +241,7 @@ impl<'engine> RealEngine<'engine> {
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         space_gateway
+                            .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::HandleGossip(gossip));
                     } else {
@@ -284,6 +287,7 @@ impl<'engine> RealEngine<'engine> {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway
+                        .as_mut()
                         .as_dht_mut()
                         .publish(DhtRequestToChild::HoldPeer(peer_data.clone()));
                 }
@@ -294,6 +298,7 @@ impl<'engine> RealEngine<'engine> {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
                         space_gateway
+                            .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::HoldPeer(peer_data.clone()));
                     }

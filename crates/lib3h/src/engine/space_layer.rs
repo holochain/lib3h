@@ -42,11 +42,11 @@ impl<'engine> RealEngine<'engine> {
         &mut self,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
         // Process all gateways' DHT
-        let mut outbox = Vec::new();
+        let /*mut*/ outbox = Vec::new();
         //let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
             //let (did_work, event_list) =
-                space_gateway.as_dht_mut().process(&mut ()).unwrap(); // FIXME
+                space_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME
 //            if did_work {
 //                // TODO: perf optim, don't copy chain_id
 //                dht_outbox.insert(chain_id.clone(), event_list);
@@ -95,6 +95,7 @@ impl<'engine> RealEngine<'engine> {
                 );
                 // For now accept all request
                 space_gateway
+                    .as_mut()
                     .as_dht_mut()
                     .publish(DhtRequestToChild::HoldPeer(peer_data));
             }

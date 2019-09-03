@@ -10,18 +10,26 @@ use crate::{
 use std::collections::{HashMap, VecDeque};
 use detach::prelude::*;
 use url::Url;
+use std::any::Any;
+use lib3h_ghost_actor::prelude::*;
 
 /// describes a super construct of a Transport and a Dht allowing
 /// Transport access via peer discovery handled by the Dht
 pub trait Gateway: Transport {
     fn identifier(&self) -> &str;
     fn transport_inject_event(&mut self, evt: TransportEvent);
-    fn get_connection_id(&self, peer_address: &str) -> Option<String>;
+    fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
 
     // sync actor requests
     fn get_peer_list_sync(&mut self) -> Vec<PeerData>;
     fn get_this_peer_sync(&mut self) -> PeerData;
     fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData>;
+
+    // fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
+
+    fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()>;
+
+//    fn take_dht_parent_endpoint(&mut self) -> Option<DhtEndpoint>;
 
     fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
 }
@@ -41,4 +49,9 @@ pub struct P2pGateway<'gateway> {
     transport_inject_events: Vec<TransportEvent>,
     /// DHT
     inner_dht: Detach<ChildDhtWrapperDyn>,
+
+    /// temp variables for ghostCallback mutation
+    maybe_peer: Option<PeerData>,
+    this_peer: PeerData,
+    peer_list: Vec<PeerData>,
 }

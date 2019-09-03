@@ -17,6 +17,7 @@ pub struct GatewayWrapper<'wrap> {
     gateway: Arc<RwLock<dyn Gateway + 'wrap>>,
     transport: TransportWrapper<'wrap>,
     //dht: Arc<RwLock<ChildDhtWrapperDyn>>,
+    //dht: Arc<RwLock<dyn Dht + 'wrap>>,
 }
 
 impl<'wrap> GatewayWrapper<'wrap> {
@@ -61,12 +62,12 @@ impl<'wrap> GatewayWrapper<'wrap> {
 //        self.dht.write().expect("failed to obtain write lock")
 //    }
 
-    /// mutable ref to the dyn Dht
-    pub fn as_dht_mut(&self) -> &mut Detach<ChildDhtWrapperDyn> {
-        self.gateway
-            .write().expect("failed to obtain write lock")
-            .as_dht_mut()
-    }
+//    /// mutable ref to the dyn Dht
+//    pub fn as_dht_mut(&self) -> &mut Detach<ChildDhtWrapperDyn> {
+//        self.gateway
+//            .write().expect("failed to obtain write lock")
+//            .as_dht_mut()
+//    }
 
     /// clone a pointer to the internal dyn Gateway
     pub fn as_gateway(&self) -> Arc<RwLock<dyn Gateway + 'wrap>> {

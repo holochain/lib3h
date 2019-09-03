@@ -87,6 +87,7 @@ impl<'engine> RealEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
+            request_list: Vec::new(),
         })
     }
 }
@@ -141,6 +142,7 @@ impl<'engine> RealEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
+            request_list: Vec::new(),
         })
     }
 }
@@ -319,10 +321,12 @@ impl<'engine> RealEngine<'engine> {
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
                             space_gateway
+                                .as_mut()
                                 .as_dht_mut()
                                 .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
                         } else {
                             space_gateway
+                                .as_mut()
                                 .as_dht_mut()
                                 .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
                         }
@@ -341,6 +345,7 @@ impl<'engine> RealEngine<'engine> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         space_gateway
+                            .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
                     }
@@ -358,6 +363,7 @@ impl<'engine> RealEngine<'engine> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         space_gateway
+                            .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
                     }
@@ -402,6 +408,7 @@ impl<'engine> RealEngine<'engine> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         space_gateway
+                            .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::BroadcastEntry(entry));
                     }
@@ -435,7 +442,6 @@ impl<'engine> RealEngine<'engine> {
                 None => error!("bad track type HandleGetAuthoringEntryListResult"),
             };
         }
-        let mut request_list = Vec::new();
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
             &msg.provider_agent_id,
@@ -447,24 +453,30 @@ impl<'engine> RealEngine<'engine> {
             return Ok(());
         }
         let space_gateway = maybe_space.unwrap();
-        let mut msg_data = FetchEntryData {
-            space_address: msg.space_address.clone(),
-            entry_address: "".into(),
-            request_id: "".into(),
-            provider_agent_id: msg.provider_agent_id.clone(),
-            aspect_address_list: None,
-        };
         // Request every 'new' Entry from Core
-        let mut count = 0;
-        for (entry_address, aspect_address_list) in msg.address_map {
+        //let mut count = 0;
+        self.request_list = Vec::new();
+        for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
             space_gateway
+                .as_mut()
                 .as_dht_mut()
                 .request(
                     std::time::Duration::from_millis(2000),
                     DhtContext::NoOp,
-                    DhtRequestToChild::RequestAspectsOf(entry_address),
-                    Box::new(move |_me, _context, response| {
+                    DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
+                    Box::new(|me, context, response| {
+                        let engine = match me.downcast_mut::<RealEngine>() {
+                            None => panic!("bad downcast"),
+                            Some(e) => e,
+                        };
+                        let (entry_address, aspect_address_list) = {
+                            if let DhtContext::RequestAspectsOf { entry_address, aspect_address_list } = context {
+                                (entry_address, aspect_address_list)
+                            } else {
+                                panic!("bad context type");
+                            }
+                        };
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => panic!("timeout"),
@@ -476,9 +488,8 @@ impl<'engine> RealEngine<'engine> {
                         };
                         if let DhtRequestToChildResponse::RequestAspectsOf(known_aspects) = response {
                             if !includes(&known_aspects, &aspect_address_list) {
-                                count += 1;
-                                msg_data.entry_address = entry_address.clone();
-                                request_list.push(msg_data.clone());
+                                //context += 1;
+                                engine.request_list.push(entry_address.clone());
                             }
                         } else {
                             panic!("bad response to bind: {:?}", response);
@@ -487,9 +498,15 @@ impl<'engine> RealEngine<'engine> {
                     }),
                 );
         }
-        debug!("HandleGetAuthoringEntryListResult: {}", count);
-        for mut msg_data in request_list {
-            msg_data.request_id = self.request_track.reserve();
+        debug!("HandleGetAuthoringEntryListResult: {}", self.request_list.len());
+        for entry_address in self.request_list.clone() {
+            let msg_data = FetchEntryData {
+                space_address: msg.space_address.clone(),
+                entry_address: entry_address.clone(),
+                request_id: self.request_track.reserve(),
+                provider_agent_id: msg.provider_agent_id.clone(),
+                aspect_address_list: None,
+            };
             self.request_track.set(
                 &msg_data.request_id,
                 Some(RealEngineTrackerData::DataForAuthorEntry),
@@ -542,6 +559,7 @@ impl<'engine> RealEngine<'engine> {
                         aspect_list,
                     };
                     space_gateway
+                        .as_mut()
                         .as_dht_mut()
                         .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry));
                 }
@@ -619,6 +637,7 @@ impl<'engine> RealEngine<'engine> {
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
         space_gateway
+            .as_mut()
             .as_dht_mut()
             .publish(DhtRequestToChild::HoldPeer(this_peer));
         // Send Get*Lists requests

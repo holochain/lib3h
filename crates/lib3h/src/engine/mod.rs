@@ -14,10 +14,11 @@ use crate::{
     transport::{ConnectionId, TransportWrapper},
     transport_wss::TlsConfig,
 };
-
+use lib3h_ghost_actor::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
 use url::Url;
+use lib3h_protocol::data_types::FetchEntryData;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
@@ -91,4 +92,7 @@ pub struct RealEngine<'engine> {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
+
+    /// temp variables for ghostCallback mutation
+    request_list: Vec<Address>,
 }
