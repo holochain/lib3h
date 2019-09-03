@@ -1,14 +1,10 @@
 use crate::{
     gateway::Gateway,
-    dht::{dht_protocol::*, ghost_protocol::*},
-    transport::{protocol::*, transport_trait::Transport, TransportWrapper},
+    transport::{transport_trait::Transport, TransportWrapper},
 };
 use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
-use detach::prelude::*;
-use url::Url;
-use lib3h_ghost_actor::prelude::*;
 
 /// since rust doesn't suport upcasting to supertraits
 /// create a super-fat-pointer in this wrapper struct
@@ -16,8 +12,6 @@ use lib3h_ghost_actor::prelude::*;
 pub struct GatewayWrapper<'wrap> {
     gateway: Arc<RwLock<dyn Gateway + 'wrap>>,
     transport: TransportWrapper<'wrap>,
-    //dht: Arc<RwLock<ChildDhtWrapperDyn>>,
-    //dht: Arc<RwLock<dyn Dht + 'wrap>>,
 }
 
 impl<'wrap> GatewayWrapper<'wrap> {
@@ -28,7 +22,6 @@ impl<'wrap> GatewayWrapper<'wrap> {
         Self {
             gateway: concrete.clone(),
             transport: TransportWrapper::assume(concrete.clone()),
-            //dht: concrete.clone(),
         }
     }
 
@@ -46,28 +39,6 @@ impl<'wrap> GatewayWrapper<'wrap> {
     pub fn as_transport_mut(&self) -> RwLockWriteGuard<'_, dyn Transport + 'wrap> {
         self.transport.as_mut()
     }
-
-//    /// clone a pointer to the internal dyn Dht
-//    pub fn as_dht(&self) -> Arc<RwLock<ChildDhtWrapperDyn>> {
-//        self.dht.clone()
-//    }
-//
-//    /// immutable ref to the dyn Dht
-//    pub fn as_dht_ref(&self) -> RwLockReadGuard<'_, ChildDhtWrapperDyn> {
-//        self.dht.read().expect("failed to obtain read lock")
-//    }
-
-//    /// mutable ref to the dyn Dht
-//    pub fn as_dht_mut(&self) -> RwLockWriteGuard<'_, ChildDhtWrapperDyn> {
-//        self.dht.write().expect("failed to obtain write lock")
-//    }
-
-//    /// mutable ref to the dyn Dht
-//    pub fn as_dht_mut(&self) -> &mut Detach<ChildDhtWrapperDyn> {
-//        self.gateway
-//            .write().expect("failed to obtain write lock")
-//            .as_dht_mut()
-//    }
 
     /// clone a pointer to the internal dyn Gateway
     pub fn as_gateway(&self) -> Arc<RwLock<dyn Gateway + 'wrap>> {

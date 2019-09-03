@@ -1,11 +1,8 @@
 use crate::{
     dht::{
-        dht_protocol::PeerData,
-        PeerAddress, PeerAddressRef,
+        PeerAddress,
     },
-    error::Lib3hResult,
 };
-use lib3h_protocol::{Address, DidWork};
 use url::Url;
 
 pub const DEFAULT_GOSSIP_INTERVAL_MS: u64 = 1000;

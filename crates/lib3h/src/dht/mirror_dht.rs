@@ -85,39 +85,39 @@ impl MirrorDht {
 
 // was Dht Interface
 impl MirrorDht {
-    // -- Peer info -- //
-
-    fn get_peer_list(&self) -> Vec<PeerData> {
-        self.peer_map.values().map(|v| v.clone()).collect()
-    }
-
-    fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData> {
-        let res = self.peer_map.get(peer_address);
-        if let Some(pd) = res {
-            return Some(pd.clone());
-        }
-        None
-    }
-
+//    // -- Peer info -- //
+//
+//    fn get_peer_list(&self) -> Vec<PeerData> {
+//        self.peer_map.values().map(|v| v.clone()).collect()
+//    }
+//
+//    fn get_peer(&self, peer_address: &PeerAddressRef) -> Option<PeerData> {
+//        let res = self.peer_map.get(peer_address);
+//        if let Some(pd) = res {
+//            return Some(pd.clone());
+//        }
+//        None
+//    }
+//
     fn this_peer(&self) -> &PeerData {
         &self.this_peer
     }
-
-    // -- Entry -- //
-
-    fn get_entry_address_list(&self) -> Vec<&Address> {
-        self.entry_list.iter().map(|kv| kv.0).collect()
-    }
-
-    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
-        match self.entry_list.get(entry_address) {
-            None => None,
-            Some(set) => {
-                let vec = set.iter().map(|addr| addr.clone()).collect();
-                Some(vec)
-            }
-        }
-    }
+//
+//    // -- Entry -- //
+//
+//    fn get_entry_address_list(&self) -> Vec<&Address> {
+//        self.entry_list.iter().map(|kv| kv.0).collect()
+//    }
+//
+//    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
+//        match self.entry_list.get(entry_address) {
+//            None => None,
+//            Some(set) => {
+//                let vec = set.iter().map(|addr| addr.clone()).collect();
+//                Some(vec)
+//            }
+//        }
+//    }
 
     // -- Processing -- //
 

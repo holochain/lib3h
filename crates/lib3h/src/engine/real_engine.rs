@@ -8,7 +8,6 @@ use url::Url;
 use super::RealEngineTrackerData;
 use crate::{
     dht::{
-        dht_protocol::{self, *},
         dht_trait::*,
         ghost_protocol::*,
     },
