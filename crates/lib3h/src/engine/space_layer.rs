@@ -21,7 +21,10 @@ impl<'engine> RealEngine<'engine> {
         let mut result = Vec::new();
         for (chainId, space_gateway) in self.space_gateway_map.iter() {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, space_gateway.as_mut().get_this_peer_sync().clone()));
+            result.push((
+                space_address,
+                space_gateway.as_mut().get_this_peer_sync().clone(),
+            ));
         }
         result
     }
@@ -46,18 +49,18 @@ impl<'engine> RealEngine<'engine> {
         //let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
             //let (did_work, event_list) =
-                space_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME
-//            if did_work {
-//                // TODO: perf optim, don't copy chain_id
-//                dht_outbox.insert(chain_id.clone(), event_list);
-//            }
-//        }
-//        // Process all gateway DHT events
-//        for (chain_id, evt_list) in dht_outbox {
-//            for evt in evt_list {
-//                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
-//                outbox.append(&mut output);
-//            }
+            space_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME
+                                                                  //            if did_work {
+                                                                  //                // TODO: perf optim, don't copy chain_id
+                                                                  //                dht_outbox.insert(chain_id.clone(), event_list);
+                                                                  //            }
+                                                                  //        }
+                                                                  //        // Process all gateway DHT events
+                                                                  //        for (chain_id, evt_list) in dht_outbox {
+                                                                  //            for evt in evt_list {
+                                                                  //                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
+                                                                  //                outbox.append(&mut output);
+                                                                  //            }
         }
         // FIXME
         Ok(outbox)
@@ -104,7 +107,7 @@ impl<'engine> RealEngine<'engine> {
             }
             // HoldEntryRequested from gossip
             // -> Send each aspect to Core for validation
-            DhtRequestToParent::HoldEntryRequested {from_peer, entry} => {
+            DhtRequestToParent::HoldEntryRequested { from_peer, entry } => {
                 for aspect in entry.aspect_list {
                     let lib3h_msg = StoreEntryAspectData {
                         request_id: self.request_track.reserve(),
@@ -122,25 +125,25 @@ impl<'engine> RealEngine<'engine> {
                     outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }
             }
-// Fixme move to request's response handler
-//            // FetchEntryResponse: Send back as a query response to Core
-//            // TODO #169 - Discern Fetch from Query
-//            DhtRequestToParent::FetchEntryResponse(response) => {
-//                let mut query_result = Vec::new();
-//                response
-//                    .entry
-//                    .serialize(&mut Serializer::new(&mut query_result))
-//                    .unwrap();
-//                let msg_data = QueryEntryResultData {
-//                    space_address: chain_id.0.clone(),
-//                    entry_address: response.entry.entry_address.clone(),
-//                    request_id: response.msg_id.clone(),
-//                    requester_agent_id: chain_id.1.clone(), // TODO #150 - get requester from channel from p2p-protocol
-//                    responder_agent_id: chain_id.1.clone(),
-//                    query_result,
-//                };
-//                outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
-//            }
+            // Fixme move to request's response handler
+            //            // FetchEntryResponse: Send back as a query response to Core
+            //            // TODO #169 - Discern Fetch from Query
+            //            DhtRequestToParent::FetchEntryResponse(response) => {
+            //                let mut query_result = Vec::new();
+            //                response
+            //                    .entry
+            //                    .serialize(&mut Serializer::new(&mut query_result))
+            //                    .unwrap();
+            //                let msg_data = QueryEntryResultData {
+            //                    space_address: chain_id.0.clone(),
+            //                    entry_address: response.entry.entry_address.clone(),
+            //                    request_id: response.msg_id.clone(),
+            //                    requester_agent_id: chain_id.1.clone(), // TODO #150 - get requester from channel from p2p-protocol
+            //                    responder_agent_id: chain_id.1.clone(),
+            //                    query_result,
+            //                };
+            //                outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
+            //            }
             DhtRequestToParent::EntryPruned(_address) => {
                 // TODO #174
             }

@@ -1,9 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{
-        dht_protocol::*, ghost_protocol::*,
-    },
+    dht::{dht_protocol::*, ghost_protocol::*},
     engine::p2p_protocol::P2pProtocol,
     gateway::{Gateway, P2pGateway},
     transport::{
@@ -252,8 +250,7 @@ impl<'gateway> P2pGateway<'gateway> {
                                 timestamp: peer_timestamp,
                             };
                             // HACK
-                            self.inner_dht
-                                .publish(DhtRequestToChild::HoldPeer(peer));
+                            self.inner_dht.publish(DhtRequestToChild::HoldPeer(peer));
                             // TODO #58
                             // TODO #150 - Should not call process manually
                             self.process().expect("HACK");

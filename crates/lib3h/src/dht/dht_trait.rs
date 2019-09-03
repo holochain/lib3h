@@ -1,8 +1,4 @@
-use crate::{
-    dht::{
-        PeerAddress,
-    },
-};
+use crate::dht::PeerAddress;
 use url::Url;
 
 pub const DEFAULT_GOSSIP_INTERVAL_MS: u64 = 1000;

@@ -1,22 +1,18 @@
 use crate::{
+    dht::{dht_protocol::*, dht_trait::*, PeerAddress},
     error::*,
-    dht::{
-        PeerAddress,
-        dht_trait::*, dht_protocol::*,
-    },
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address};
 
 pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>>;
 
-pub type DhtActor = // Box<
-    dyn GhostActor<
-        DhtRequestToParent,
-        DhtRequestToParentResponse,
-        DhtRequestToChild,
-        DhtRequestToChildResponse,
-        Lib3hError,
+pub type DhtActor = dyn GhostActor<
+    DhtRequestToParent,
+    DhtRequestToParentResponse,
+    DhtRequestToChild,
+    DhtRequestToChildResponse,
+    Lib3hError,
     // >,
 >;
 pub type DhtEndpointWithContext = GhostContextEndpoint<
@@ -47,12 +43,16 @@ pub type DhtToChildMessage =
     GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
 
 pub type DhtToParentMessage =
-GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
+    GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
 
 #[derive(Debug)]
 pub enum DhtContext {
     NoOp,
-    RequestAspectsOf { entry_address: Address, aspect_address_list: Vec<Address> },
+    RequestAspectsOf {
+        entry_address: Address,
+        aspect_address_list: Vec<Address>,
+    },
+    RequestEntry(DhtToChildMessage),
 }
 
 #[derive(Debug)]
@@ -91,7 +91,7 @@ pub enum DhtRequestToChildResponse {
     RequestPeerList(Vec<PeerData>),
     RequestThisPeer(PeerData),
     RequestEntryAddressList(Vec<Address>),
-    RequestAspectsOf(Vec<Address>),
+    RequestAspectsOf(Option<Vec<Address>>),
     RequestEntry(EntryData),
 }
 
@@ -110,10 +110,7 @@ pub enum DhtRequestToParent {
     /// Notify owner that we believe a peer has dropped
     PeerTimedOut(PeerAddress),
     /// Notify owner that gossip is requesting we hold an entry.
-    HoldEntryRequested {
-        from_peer: String,
-        entry: EntryData,
-    },
+    HoldEntryRequested { from_peer: String, entry: EntryData },
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),

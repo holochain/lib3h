@@ -6,8 +6,8 @@ use crate::{
     error::{ErrorKind, Lib3hError, Lib3hResult},
     transport::{protocol::*, ConnectionIdRef},
 };
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -52,14 +52,17 @@ impl<'engine> RealEngine<'engine> {
         for request in request_list {
             self.handle_netDhtRequest(request)?;
         }
-//        if bool::from(dht_did_work) {
-//            did_work = true;
-//        }
+        //        if bool::from(dht_did_work) {
+        //            did_work = true;
+        //        }
         Ok((did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtRequest(&mut self, mut msg: DhtToParentMessage) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_netDhtRequest(
+        &mut self,
+        mut msg: DhtToParentMessage,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} << handle_netDhtEvent: {:?}", self.name, msg);
         let outbox = Vec::new();
         match msg.take_message().expect("exists") {
@@ -97,7 +100,10 @@ impl<'engine> RealEngine<'engine> {
                 }
             }
             // No entries in Network DHT
-            DhtRequestToParent::HoldEntryRequested {from_peer: _, entry: _} => {
+            DhtRequestToParent::HoldEntryRequested {
+                from_peer: _,
+                entry: _,
+            } => {
                 unreachable!();
             }
             DhtRequestToParent::EntryPruned(_) => {

@@ -7,21 +7,18 @@ use url::Url;
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{
-        dht_trait::*,
-        ghost_protocol::*,
-    },
+    dht::{dht_trait::*, ghost_protocol::*},
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
-    gateway::{P2pGateway, wrapper::*},
+    gateway::{wrapper::*, P2pGateway},
     track::Tracker,
     transport::{protocol::TransportCommand, TransportWrapper},
     transport_wss::TransportWss,
 };
-use lib3h_ghost_actor::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
@@ -122,11 +119,11 @@ impl<'engine> RealEngine<'engine> {
             dht_factory,
             &dht_config,
         ));
-//        debug!(
-//            "New MOCK RealEngine {} -> {:?}",
-//            name,
-//            network_gateway.as_ref().this_peer()
-//        );
+        //        debug!(
+        //            "New MOCK RealEngine {} -> {:?}",
+        //            name,
+        //            network_gateway.as_ref().this_peer()
+        //        );
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         Ok(RealEngine {
             crypto,
@@ -155,10 +152,10 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
     fn advertise(&self) -> Url {
         Url::parse("dummy://default").unwrap()
         // FIXME request this peer, process, block
-//        self.network_gateway
-//            .this_peer()
-//            .peer_uri
-//            .to_owned()
+        //        self.network_gateway
+        //            .this_peer()
+        //            .peer_uri
+        //            .to_owned()
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -381,10 +378,10 @@ impl<'engine> RealEngine<'engine> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         // TODO request & handle response
-//                        let msg = dht_protocol::FetchDhtEntryData {
-//                            msg_id: msg.request_id,
-//                            entry_address: msg.entry_address,
-//                        };
+                        //                        let msg = dht_protocol::FetchDhtEntryData {
+                        //                            msg_id: msg.request_id,
+                        //                            entry_address: msg.entry_address,
+                        //                        };
                         // let cmd = DhtCommand::FetchEntry(msg);
                         // space_gateway.as_dht_mut().post(cmd)?;
                     }
@@ -453,51 +450,55 @@ impl<'engine> RealEngine<'engine> {
         }
         let space_gateway = maybe_space.unwrap();
         // Request every 'new' Entry from Core
-        //let mut count = 0;
         self.request_list = Vec::new();
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
-            space_gateway
-                .as_mut()
-                .as_dht_mut()
-                .request(
-                    std::time::Duration::from_millis(2000),
-                    DhtContext::NoOp,
-                    DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                    Box::new(|me, context, response| {
-                        let engine = match me.downcast_mut::<RealEngine>() {
-                            None => panic!("bad downcast"),
-                            Some(e) => e,
-                        };
-                        let (entry_address, aspect_address_list) = {
-                            if let DhtContext::RequestAspectsOf { entry_address, aspect_address_list } = context {
-                                (entry_address, aspect_address_list)
-                            } else {
-                                panic!("bad context type");
-                            }
-                        };
-                        let response = {
-                            match response {
-                                GhostCallbackData::Timeout => panic!("timeout"),
-                                GhostCallbackData::Response(response) => match response {
-                                    Err(e) => panic!("{:?}", e),
-                                    Ok(response) => response,
-                                },
-                            }
-                        };
-                        if let DhtRequestToChildResponse::RequestAspectsOf(known_aspects) = response {
+            space_gateway.as_mut().as_dht_mut().request(
+                std::time::Duration::from_millis(2000),
+                DhtContext::NoOp,
+                DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
+                Box::new(|me, context, response| {
+                    let engine = match me.downcast_mut::<RealEngine>() {
+                        None => panic!("bad downcast"),
+                        Some(e) => e,
+                    };
+                    let (entry_address, aspect_address_list) = {
+                        if let DhtContext::RequestAspectsOf {
+                            entry_address,
+                            aspect_address_list,
+                        } = context
+                        {
+                            (entry_address, aspect_address_list)
+                        } else {
+                            panic!("bad context type");
+                        }
+                    };
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) = response {
+                        if let Some(known_aspects) = maybe_known_aspects {
                             if !includes(&known_aspects, &aspect_address_list) {
-                                //context += 1;
                                 engine.request_list.push(entry_address.clone());
                             }
-                        } else {
-                            panic!("bad response to bind: {:?}", response);
                         }
-                        Ok(())
-                    }),
-                );
+                    } else {
+                        panic!("bad response to RequestAspectsOf: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            );
         }
-        debug!("HandleGetAuthoringEntryListResult: {}", self.request_list.len());
+        debug!(
+            "HandleGetAuthoringEntryListResult: {}",
+            self.request_list.len()
+        );
         for entry_address in self.request_list.clone() {
             let msg_data = FetchEntryData {
                 space_address: msg.space_address.clone(),
@@ -687,7 +688,11 @@ impl<'engine> RealEngine<'engine> {
             result_info: vec![],
         };
         // Check if messaging self
-        let peer_address = &space_gateway.as_mut().get_this_peer_sync().peer_address.clone();
+        let peer_address = &space_gateway
+            .as_mut()
+            .get_this_peer_sync()
+            .peer_address
+            .clone();
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == &to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();

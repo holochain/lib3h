@@ -4,14 +4,16 @@ pub mod p2p_gateway;
 pub mod wrapper;
 
 use crate::{
+    dht::{dht_protocol::*, ghost_protocol::*},
     transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
-    dht::ghost_protocol::*, dht::dht_protocol::*,
 };
-use std::collections::{HashMap, VecDeque};
 use detach::prelude::*;
-use url::Url;
-use std::any::Any;
 use lib3h_ghost_actor::prelude::*;
+use std::{
+    any::Any,
+    collections::{HashMap, VecDeque},
+};
+use url::Url;
 
 /// describes a super construct of a Transport and a Dht allowing
 /// Transport access via peer discovery handled by the Dht
@@ -29,7 +31,7 @@ pub trait Gateway: Transport {
 
     fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()>;
 
-//    fn take_dht_parent_endpoint(&mut self) -> Option<DhtEndpoint>;
+    //    fn take_dht_parent_endpoint(&mut self) -> Option<DhtEndpoint>;
 
     fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
 }

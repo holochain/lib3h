@@ -2,9 +2,7 @@ use crate::{
     gateway::Gateway,
     transport::{transport_trait::Transport, TransportWrapper},
 };
-use std::{
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// since rust doesn't suport upcasting to supertraits
 /// create a super-fat-pointer in this wrapper struct

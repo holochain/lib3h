@@ -1,17 +1,18 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_trait::DhtConfig, ghost_protocol::*, dht_protocol::*},
-
+    dht::{dht_protocol::*, dht_trait::DhtConfig, ghost_protocol::*},
     gateway::{Gateway, P2pGateway},
     transport::{protocol::*, TransportWrapper},
 };
-use lib3h_protocol::Address;
-use std::collections::{HashMap, VecDeque};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::Address;
+use std::{
+    any::Any,
+    collections::{HashMap, VecDeque},
+};
 use url::Url;
-use std::any::Any;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -101,9 +102,9 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
         self.inner_dht.process(user_data)
     }
 
-//    fn take_dht_parent_endpoint(&mut self) -> Option<DhtEndpoint> {
-//        self.inner_dht.take_parent_endpoint()
-//    }
+    //    fn take_dht_parent_endpoint(&mut self) -> Option<DhtEndpoint> {
+    //        self.inner_dht.take_parent_endpoint()
+    //    }
 
     fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn> {
         &mut self.inner_dht
@@ -138,14 +139,14 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             }),
         );
         let _res = self.inner_dht.process(&mut ()).unwrap(); // FIXME unwrap
-//        //let _ = parent_endpoint.process(&mut ());
-//        // Wait for bind response
-//        let mut timeout = 0;
-//        while peer_list == Vec::new() && timeout < 200 {
-//            std::thread::sleep(std::time::Duration::from_millis(10));
-//            timeout += 10;
-//        }
-//        assert!(timeout < 200);
+                                                             //        //let _ = parent_endpoint.process(&mut ());
+                                                             //        // Wait for bind response
+                                                             //        let mut timeout = 0;
+                                                             //        while peer_list == Vec::new() && timeout < 200 {
+                                                             //            std::thread::sleep(std::time::Duration::from_millis(10));
+                                                             //            timeout += 10;
+                                                             //        }
+                                                             //        assert!(timeout < 200);
         self.peer_list.clone()
     }
 
@@ -182,14 +183,14 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             }),
         );
         let _res = self.inner_dht.process(&mut ()).unwrap(); // FIXME unwrap
-//        //let _ = parent_endpoint.process(&mut ());
-//        // Wait for bind response
-//        let mut timeout = 0;
-//        while this_peer.peer_address == String::new() && timeout < 200 {
-//            std::thread::sleep(std::time::Duration::from_millis(10));
-//            timeout += 10;
-//        }
-//        assert!(timeout < 200);
+                                                             //        //let _ = parent_endpoint.process(&mut ());
+                                                             //        // Wait for bind response
+                                                             //        let mut timeout = 0;
+                                                             //        while this_peer.peer_address == String::new() && timeout < 200 {
+                                                             //            std::thread::sleep(std::time::Duration::from_millis(10));
+                                                             //            timeout += 10;
+                                                             //        }
+                                                             //        assert!(timeout < 200);
         self.this_peer.clone()
     }
 
@@ -222,18 +223,17 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             }),
         );
         let _res = self.inner_dht.process(&mut ()).unwrap(); // FIXME unwrap
-//        //let _ = parent_endpoint.process(&mut ());
-//        // Wait for bind response
-//        let mut timeout = 0;
-//        while maybe_peer == None && timeout < 200 {
-//            std::thread::sleep(std::time::Duration::from_millis(10));
-//            timeout += 10;
-//        }
+                                                             //        //let _ = parent_endpoint.process(&mut ());
+                                                             //        // Wait for bind response
+                                                             //        let mut timeout = 0;
+                                                             //        while maybe_peer == None && timeout < 200 {
+                                                             //            std::thread::sleep(std::time::Duration::from_millis(10));
+                                                             //            timeout += 10;
+                                                             //        }
         self.maybe_peer.clone()
     }
 
-//    fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn> {
-//        &mut self.inner_dht
-//    }
+    //    fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn> {
+    //        &mut self.inner_dht
+    //    }
 }
-
