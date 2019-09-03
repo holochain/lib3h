@@ -226,12 +226,12 @@ pub struct GhostParentWrapperDyn<
 }
 
 impl<
-        Context:'static,
+        Context: 'static,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
-        RequestToChildResponse:'static,
-        Error:'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
     >
     GhostParentWrapperDyn<
         Context,
