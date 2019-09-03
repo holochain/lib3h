@@ -18,12 +18,13 @@ use url::Url;
 pub struct Mockernet {
     bindings: HashMap<Url, Tube>,
     connections: HashMap<Url, HashSet<Url>>,
+    errors: Vec<(Url, String)>,
 }
 
 pub enum MockernetEvent {
     Connection { from: Url },
     Message { from: Url, payload: Vec<u8> },
-    //    Error(String),
+    Error(String),
 }
 
 // The Mockernet is a Series-of-Tubes, which is the technical term for the
@@ -46,6 +47,7 @@ impl Mockernet {
         Mockernet {
             bindings: HashMap::new(),
             connections: HashMap::new(),
+            errors: Vec::new(),
         }
     }
 
@@ -56,6 +58,15 @@ impl Mockernet {
         } else {
             self.bindings.insert(url, Tube::new());
             true
+        }
+    }
+
+    /// remove a binding, this is should trigger an error event
+    pub fn unbind(&mut self, url: Url) {
+        if self.bindings.contains_key(&url) {
+            self.bindings.remove(&url);
+            self.errors
+                .push((url.clone(), format!("{} has become unbound", &url)));
         }
     }
 
@@ -78,11 +89,26 @@ impl Mockernet {
     /// check to see, for a given Url, if there are any events waiting
     pub fn process_for(&mut self, address: Url) -> Result<Vec<MockernetEvent>, String> {
         let mut events = Vec::new();
-        let binding = self
-            .bindings
-            .get(&address)
-            .ok_or(format!("{} not bound", address))?;
-        let (from, payload) = binding
+
+        // push any errors for this url into the events
+        let errors: Vec<_> = self.errors.drain(0..).collect();
+        for (url, err) in &errors {
+            if url == &address {
+                events.push(MockernetEvent::Error(err.into()));
+            } else {
+                self.errors.push((url.clone(), err.clone()))
+            }
+        }
+
+        let maybe_binding = self.bindings.get(&address);
+        if maybe_binding.is_none() {
+            if errors.len() == 0 {
+                return Err(format!("{} not bound", address));
+            }
+            return Ok(events);
+        }
+        let (from, payload) = maybe_binding
+            .unwrap()
             .receiver
             .try_recv()
             .map_err(|e| format!("{:?}", e))?;
@@ -90,6 +116,7 @@ impl Mockernet {
             events.push(MockernetEvent::Connection { from: from.clone() });
         }
         events.push(MockernetEvent::Message { from, payload });
+
         Ok(events)
     }
 
@@ -242,6 +269,13 @@ impl TestTransport {
                         detach_run!(self.endpoint_self, |s| s
                             .publish(RequestToParent::IncomingConnection { address: from }));
                     }
+                    MockernetEvent::Error(err) => {
+                        detach_run!(self.endpoint_self, |s| s.publish(
+                            RequestToParent::TransportError {
+                                error: TransportError::new(err)
+                            }
+                        ));
+                    }
                 }
             }
         }
@@ -380,5 +414,17 @@ fn ghost_transport() {
     assert_eq!(
         "ReceivedData { address: \"mocknet://t1/\", payload: [102, 111, 111] }",
         format!("{:?}", messages[1].take_message().expect("exists"))
+    );
+
+    {
+        let mut mockernet = MOCKERNET.write().unwrap();
+        mockernet.unbind(Url::parse("mocknet://t1").expect("can parse url"));
+    }
+    t1.process(&mut owner).expect("should process");
+    let mut messages = t1.drain_messages();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(
+        "TransportError { error: TransportError(\"mocknet://t1/ has become unbound\") }",
+        format!("{:?}", messages[0].take_message().expect("exists"))
     );
 }
