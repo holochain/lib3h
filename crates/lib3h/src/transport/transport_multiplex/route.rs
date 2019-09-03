@@ -1,6 +1,4 @@
-use crate::{
-    transport::{error::*, protocol::*},
-};
+use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use std::any::Any;
@@ -36,20 +34,34 @@ pub struct TransportMultiplexRoute {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<GhostContextEndpoint<RouteToInnerContext, RequestToChild, RequestToChildResponse, RequestToParent, RequestToParentResponse, TransportError>>,
+    inner_transport: Detach<
+        GhostContextEndpoint<
+            RouteToInnerContext,
+            RequestToChild,
+            RequestToChildResponse,
+            RequestToParent,
+            RequestToParentResponse,
+            TransportError,
+        >,
+    >,
 }
 
 impl TransportMultiplexRoute {
     /// create a new TransportMultiplexRoute Instance
     pub(crate) fn new(
         route_spec: LocalRouteSpec,
-        inner_transport: GhostEndpoint<RequestToChild, RequestToChildResponse, RequestToParent, RequestToParentResponse, TransportError>,
+        inner_transport: GhostEndpoint<
+            RequestToChild,
+            RequestToChildResponse,
+            RequestToParent,
+            RequestToParentResponse,
+            TransportError,
+        >,
     ) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("route_to_parent_"));
-        let inner_transport = Detach::new(
-            inner_transport.as_context_endpoint("route_to_inner_"));
+        let inner_transport = Detach::new(inner_transport.as_context_endpoint("route_to_inner_"));
         Self {
             route_spec,
             endpoint_parent,
@@ -83,19 +95,15 @@ impl TransportMultiplexRoute {
     fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::IncomingConnection {
-                address,
-            });
+            .publish(RequestToParent::IncomingConnection { address });
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
     fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
         // forward
-        self.endpoint_self.publish(RequestToParent::ReceivedData {
-            address,
-            payload,
-        });
+        self.endpoint_self
+            .publish(RequestToParent::ReceivedData { address, payload });
         Ok(())
     }
 

@@ -1,6 +1,4 @@
-use crate::{
-    transport::{error::*, protocol::*},
-};
+use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use std::{any::Any, collections::HashMap};
@@ -36,28 +34,31 @@ pub struct TransportMultiplex {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapper<MplexToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<MplexToInnerContext>>,
     // our map of endpoints connecting us to our Routes
-    route_endpoints: Detach<HashMap<LocalRouteSpec, GhostContextEndpoint<
-        MplexToRouteContext,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        TransportError,
-    >>>,
+    route_endpoints: Detach<
+        HashMap<
+            LocalRouteSpec,
+            GhostContextEndpoint<
+                MplexToRouteContext,
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChild,
+                RequestToChildResponse,
+                TransportError,
+            >,
+        >,
+    >,
 }
 
 impl TransportMultiplex {
     /// create a new TransportMultiplex Instance
-    pub fn new(
-        inner_transport: TransportActor,
-    ) -> Self {
+    pub fn new(inner_transport: DynTransportActor) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mplex_to_parent_"));
         let inner_transport =
-            Detach::new(GhostParentWrapper::new(inner_transport, "mplex_to_inner_"));
+            Detach::new(GhostParentWrapperDyn::new(inner_transport, "mplex_to_inner_"));
         Self {
             endpoint_parent,
             endpoint_self,
@@ -70,7 +71,11 @@ impl TransportMultiplex {
     /// we are wrapping a network/machine-level gateway with a machine
     /// space_address and machineId... the space_address + agent_id parameters
     /// for this function are the higher-level notions for the AgentSpaceGateway
-    pub fn get_agent_space_route(&mut self, space_address: String, local_agent_id: String) -> TransportMultiplexRoute {
+    pub fn get_agent_space_route(
+        &mut self,
+        space_address: String,
+        local_agent_id: String,
+    ) -> TransportMultiplexRoute {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_self = endpoint_self.as_context_endpoint("mplex_to_route_");
 
@@ -79,7 +84,11 @@ impl TransportMultiplex {
             local_agent_id,
         };
 
-        if self.route_endpoints.insert(route_spec.clone(), endpoint_self).is_some() {
+        if self
+            .route_endpoints
+            .insert(route_spec.clone(), endpoint_self)
+            .is_some()
+        {
             panic!("get_agent_space_route can only be called ONCE!");
         }
 
@@ -90,12 +99,23 @@ impl TransportMultiplex {
     /// these at this level are intended to be forwarded up to our routes.
     /// Collect all the un-packed info that will let us pass it back up the
     /// chain.
-    pub fn received_data_for_agent_space_route(&mut self, space_address: String, local_agent_id: String, remote_agent_id: String, remote_machine_id: String, unpacked_payload: Vec<u8>) {
+    pub fn received_data_for_agent_space_route(
+        &mut self,
+        space_address: String,
+        local_agent_id: String,
+        remote_agent_id: String,
+        remote_machine_id: String,
+        unpacked_payload: Vec<u8>,
+    ) {
         let route_spec = LocalRouteSpec {
             space_address,
             local_agent_id,
         };
-        let address = Url::parse(&format!("transportId:{}?a={}", remote_machine_id, remote_agent_id)).expect("can parse url");
+        let address = Url::parse(&format!(
+            "transportId:{}?a={}",
+            remote_machine_id, remote_agent_id
+        ))
+        .expect("can parse url");
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {
@@ -132,19 +152,15 @@ impl TransportMultiplex {
     fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::IncomingConnection {
-                address,
-            });
+            .publish(RequestToParent::IncomingConnection { address });
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
     fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
         // forward
-        self.endpoint_self.publish(RequestToParent::ReceivedData {
-            address,
-            payload,
-        });
+        self.endpoint_self
+            .publish(RequestToParent::ReceivedData { address, payload });
         Ok(())
     }
 
@@ -451,10 +467,10 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<()> = GhostParentWrapper::new(
-            Box::new(TransportMultiplex::new(
-                Box::new(TransportMock::new(s1out, r1in)),
-            )),
+        let mut t1: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
+            Box::new(TransportMultiplex::new(Box::new(TransportMock::new(
+                s1out, r1in,
+            )))),
             "test1",
         );
 
@@ -482,10 +498,10 @@ mod tests {
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<()> = GhostParentWrapper::new(
-            Box::new(TransportMultiplex::new(
-                Box::new(TransportMock::new(s2out, r2in)),
-            )),
+        let mut t2: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
+            Box::new(TransportMultiplex::new(Box::new(TransportMock::new(
+                s2out, r2in,
+            )))),
             "test2",
         );
 
