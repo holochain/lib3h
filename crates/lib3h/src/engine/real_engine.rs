@@ -153,7 +153,7 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
     }
 
     fn advertise(&self) -> Url {
-        Url::parse("").unwrap()
+        Url::parse("dummy://default").unwrap()
         // FIXME request this peer, process, block
 //        self.network_gateway
 //            .this_peer()

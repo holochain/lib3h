@@ -111,7 +111,7 @@ pub enum DhtRequestToParent {
     PeerTimedOut(PeerAddress),
     /// Notify owner that gossip is requesting we hold an entry.
     HoldEntryRequested {
-        from_peer: Address,
+        from_peer: String,
         entry: EntryData,
     },
     /// Notify owner that we are no longer tracking this entry internally.

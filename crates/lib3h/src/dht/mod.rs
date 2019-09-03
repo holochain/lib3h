@@ -61,7 +61,7 @@ pub mod tests {
 //                maybe_peer: None,
 //                this_peer: PeerData {
 //                    peer_address: String::new(),
-//                    peer_uri: Url::parse("").unwrap(),
+//                    peer_uri: Url::parse("dummy://default").unwrap(),
 //                    timestamp: 0,
 //                },
 //                peer_list: Vec::new(),
@@ -138,7 +138,7 @@ pub mod tests {
         let mut dht = new_dht_wrapper(true, PEER_A);
         let mut this_peer = PeerData {
             peer_address: String::new(),
-            peer_uri: Url::parse("").unwrap(),
+            peer_uri: Url::parse("dummy://default").unwrap(),
             timestamp: 0,
         };
         dht.request(
@@ -167,41 +167,42 @@ pub mod tests {
                 Ok(())
             }),
         );
+        println!("dht.process()...");
         dht.process(&mut this_peer).unwrap();
         assert_eq!(this_peer.peer_address, PEER_A);
     }
-//
-//    #[test]
-//    fn test_own_peer_list() {
-//        enable_logging_for_test(true);
-//        let mut dht = new_dht(true, PEER_A);
-//        // Should be empty
-//        let this = dht.get_peer(PEER_A);
-//        assert!(this.is_none());
-//        let peer_list = dht.get_peer_list();
-//        assert_eq!(peer_list.len(), 0);
-//        // Add a peer
-//        dht.post(DhtCommand::HoldPeer(create_PeerData(PEER_B)))
-//            .unwrap();
-//        let (did_work, _) = dht.process().unwrap();
-//        assert!(did_work);
-//        // Should have it
-//        let peer = dht.get_peer(PEER_B).unwrap();
-//        assert_eq!(peer.peer_address, PEER_B);
-//        let peer_list = dht.get_peer_list();
-//        assert_eq!(peer_list.len(), 1);
-//        assert_eq!(peer_list[0].peer_address, PEER_B);
-//        // Add a peer again
-//        dht.post(DhtCommand::HoldPeer(create_PeerData(PEER_C)))
-//            .unwrap();
-//        let (did_work, _) = dht.process().unwrap();
-//        assert!(did_work);
-//        // Should have it
-//        let peer = dht.get_peer(PEER_B).unwrap();
-//        assert_eq!(peer.peer_address, PEER_B);
-//        let peer_list = dht.get_peer_list();
-//        assert_eq!(peer_list.len(), 2);
-//    }
+
+    #[test]
+    fn test_own_peer_list() {
+        enable_logging_for_test(true);
+        let mut dht = new_dht_wrapper(true, PEER_A);
+        // Should be empty
+        let this = dht.get_peer(PEER_A);
+        assert!(this.is_none());
+        let peer_list = dht.get_peer_list();
+        assert_eq!(peer_list.len(), 0);
+        // Add a peer
+        dht.post(DhtCommand::HoldPeer(create_PeerData(PEER_B)))
+            .unwrap();
+        let (did_work, _) = dht.process().unwrap();
+        assert!(did_work);
+        // Should have it
+        let peer = dht.get_peer(PEER_B).unwrap();
+        assert_eq!(peer.peer_address, PEER_B);
+        let peer_list = dht.get_peer_list();
+        assert_eq!(peer_list.len(), 1);
+        assert_eq!(peer_list[0].peer_address, PEER_B);
+        // Add a peer again
+        dht.post(DhtCommand::HoldPeer(create_PeerData(PEER_C)))
+            .unwrap();
+        let (did_work, _) = dht.process().unwrap();
+        assert!(did_work);
+        // Should have it
+        let peer = dht.get_peer(PEER_B).unwrap();
+        assert_eq!(peer.peer_address, PEER_B);
+        let peer_list = dht.get_peer_list();
+        assert_eq!(peer_list.len(), 2);
+    }
 //
 //    #[test]
 //    fn test_get_own_entry() {

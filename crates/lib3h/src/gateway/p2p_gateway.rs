@@ -38,7 +38,7 @@ impl<'gateway> P2pGateway<'gateway> {
             maybe_peer: None,
             this_peer: PeerData {
                 peer_address: String::new(),
-                peer_uri: Url::parse("").unwrap(),
+                peer_uri: Url::parse("dummy://default").unwrap(),
                 timestamp: 0,
             },
             peer_list: Vec::new(),
