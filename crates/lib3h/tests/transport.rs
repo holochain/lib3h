@@ -49,9 +49,12 @@ impl Mockernet {
             .send((from, payload))
             .map_err(|e| format!("{}", e))
     }
-    pub fn receive_for(&mut self, to: Url) -> Result<(Url,Vec<u8>), String> {
-        let binding = self.bindings.get(&to).ok_or("requested address not bound")?;
-        binding.receiver.try_recv().map_err(|e| format!("{:?}",e))
+    pub fn receive_for(&mut self, to: Url) -> Result<(Url, Vec<u8>), String> {
+        let binding = self
+            .bindings
+            .get(&to)
+            .ok_or("requested address not bound")?;
+        binding.receiver.try_recv().map_err(|e| format!("{:?}", e))
     }
 }
 
@@ -106,7 +109,7 @@ impl
         let our_url = self.bound_url.as_ref().unwrap();
         if let Ok((from, payload)) = mockernet.receive_for(our_url.clone()) {
             detach_run!(self.endpoint_self, |s| s.publish(
-                RequestToParent::ReceivedData{
+                RequestToParent::ReceivedData {
                     address: from,
                     payload
                 }
@@ -154,14 +157,12 @@ impl TestTransport {
                 self.bound_url = Some(spec);
                 msg.respond(response);
             }
-            RequestToChild::SendMessage {
-                address,
-                payload,
-            } =>{
+            RequestToChild::SendMessage { address, payload } => {
                 let mut mockernet = MOCKERNET.write().unwrap();
                 // return error if not bound.
-                let _ = mockernet.send_to(address,self.bound_url.as_ref().unwrap().clone(),payload);
-//                msg.respond(response);
+                let _ =
+                    mockernet.send_to(address, self.bound_url.as_ref().unwrap().clone(), payload);
+                //                msg.respond(response);
             }
         }
         Ok(())
@@ -188,11 +189,11 @@ fn ghost_transport() {
         "t1_requests", // prefix for request ids in the tracker
     );
     assert_eq!(t1.as_ref().name, "t1");
-    let mut t2: TransportActorParentWrapper<(),TestTransport> = GhostParentWrapper::new(
+    let mut t2: TransportActorParentWrapper<(), TestTransport> = GhostParentWrapper::new(
         TestTransport::new("t2"),
         "t2_requests", // prefix for request ids in the tracker
     );
-    assert_eq!(t2.as_ref().name,"t2");
+    assert_eq!(t2.as_ref().name, "t2");
 
     // bind t1 to the network
     t1.request(
@@ -217,27 +218,26 @@ fn ghost_transport() {
     );
 
     // bind t2 to the network
-        t2.request(
-            std::time::Duration::from_millis(2000),
-            (),
-            RequestToChild::Bind {
-                spec: Url::parse("mocknet://t2").expect("can parse url"),
-            },
-            // callback should simply log the response
-            Box::new(|dyn_owner, _, response| {
-                let owner = dyn_owner
-                    .downcast_mut::<TestTransportOwner>()
-                    .expect("a TestTransportOwner");
-                owner.log.push(format!("{:?}", response));
-                Ok(())
-            }),
-        );
+    t2.request(
+        std::time::Duration::from_millis(2000),
+        (),
+        RequestToChild::Bind {
+            spec: Url::parse("mocknet://t2").expect("can parse url"),
+        },
+        // callback should simply log the response
+        Box::new(|dyn_owner, _, response| {
+            let owner = dyn_owner
+                .downcast_mut::<TestTransportOwner>()
+                .expect("a TestTransportOwner");
+            owner.log.push(format!("{:?}", response));
+            Ok(())
+        }),
+    );
     t2.process(&mut owner).expect("should process");
     assert_eq!(
         "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t2/\\\" })))\"",
         format!("{:?}", owner.log[1])
     );
-
 
     t1.request(
         std::time::Duration::from_millis(2000),
@@ -258,7 +258,7 @@ fn ghost_transport() {
     t1.process(&mut owner).expect("should process");
     t2.process(&mut owner).expect("should process");
     let mut messages = t2.drain_messages();
-    assert_eq!(messages.len(),2);
+    assert_eq!(messages.len(), 2);
 
     // because this is the first incoming message, the low level
     // transport should also send an IncomingConnection event
