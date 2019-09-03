@@ -423,7 +423,7 @@ mod tests {
         // now lets try posting a request with a callback which just saves the response
         // value to the parent's statee
         let cb: GhostCallback<FakeParent, TestContext, TestMsgInResponse, TestError> =
-            Box::new(|dyn_parent, _context, callback_data| {
+            Box::new(|parent, _context, callback_data| {
                 if let GhostCallbackData::Response(Ok(TestMsgInResponse(payload))) = callback_data {
                     dyn_parent.state = payload;
                 }
