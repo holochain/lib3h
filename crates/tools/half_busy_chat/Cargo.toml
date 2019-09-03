@@ -14,6 +14,13 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 crossbeam-channel = "=0.3.8"
 linefeed = "=0.6.0"
+base64 = "=0.10.1"
+lib3h_protocol = { "path" = "../../lib3h_protocol" }
+lib3h_sodium = { "path" = "../../sodium" }
+lib3h_crypto_api = { "path" = "../../crypto_api" }
+lib3h = { "path" = "../../lib3h" }
+lib3h_ghost_actor = { "path" = "../../ghost_actor" }
+
 
 [lib]
 name = "lib3h_half_busy_chat"

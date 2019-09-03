@@ -1,6 +1,7 @@
 //! HalfBusyChat Command Line Utility / Manual Testing CLI
 
 extern crate linefeed;
+use lib3h_half_busy_chat::{ChatEvent, channel_address_from_str};
 
 fn main() {
     let rl = std::sync::Arc::new(
@@ -40,8 +41,12 @@ Half Busy Chat Commands:
                         return;
                     } else if s.starts_with("/help") {
                         help_text();
+                    } else if s.starts_with("/join ") {
+                        let channel_id = &s["/join ".len()..];
+                        let channel_addr = channel_address_from_str(channel_id).expect("failed to hash channel address");
+                        cli.send(ChatEvent::Join(channel_addr))
                     } else {
-                        cli.send(lib3h_half_busy_chat::ChatEvent::Message(
+                        cli.send(ChatEvent::Message(
                             lib3h_half_busy_chat::MessageData {
                                 from_address: "[null]".to_string(),
                                 payload: s,
