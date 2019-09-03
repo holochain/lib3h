@@ -425,7 +425,7 @@ mod tests {
         let cb: GhostCallback<FakeParent, TestContext, TestMsgInResponse, TestError> =
             Box::new(|parent, _context, callback_data| {
                 if let GhostCallbackData::Response(Ok(TestMsgInResponse(payload))) = callback_data {
-                    dyn_parent.state = payload;
+                    parent.state = payload;
                 }
                 Ok(())
             });
