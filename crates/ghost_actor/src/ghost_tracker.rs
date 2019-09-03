@@ -148,7 +148,7 @@ mod tests {
         let context = TestContext("some_context_data".into());
 
         let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
-            Box::new(|dyn_me, context, callback_data| {
+            Box::new(|me, context, callback_data| {
                 // and we'll check that we got our context back too because we
                 // might have used it to determine what to do here.
                 assert_eq!(context.0, "some_context_data");
