@@ -202,7 +202,7 @@ mod tests {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("foo".into());
         let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
-            Box::new(|dyn_me, _context, callback_data| {
+            Box::new(|me, _context, callback_data| {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {
