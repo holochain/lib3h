@@ -29,3 +29,197 @@ pub use route::TransportMultiplexRoute;
 
 mod mplex;
 pub use mplex::TransportMultiplex;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transport::{error::*, protocol::*};
+    use detach::prelude::*;
+    use lib3h_ghost_actor::prelude::*;
+    use std::any::Any;
+    use url::Url;
+
+    enum MockToParentContext {}
+
+    pub struct TransportMock {
+        endpoint_parent: Option<TransportActorParentEndpoint>,
+        endpoint_self: Detach<
+            GhostContextEndpoint<
+                MockToParentContext,
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChild,
+                RequestToChildResponse,
+                TransportError,
+            >,
+        >,
+        bound_url: Url,
+        mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
+        mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+    }
+
+    impl TransportMock {
+        pub fn new(
+            mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
+            mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+        ) -> Self {
+            let (endpoint_parent, endpoint_self) = create_ghost_channel();
+            let endpoint_parent = Some(endpoint_parent);
+            let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
+            Self {
+                endpoint_parent,
+                endpoint_self,
+                bound_url: Url::parse("none:").expect("can parse url"),
+                mock_sender,
+                mock_receiver,
+            }
+        }
+    }
+
+    impl
+        GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            TransportError,
+        > for TransportMock
+    {
+        fn as_any(&mut self) -> &mut dyn Any {
+            &mut *self
+        }
+
+        fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
+            std::mem::replace(&mut self.endpoint_parent, None)
+        }
+
+        fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+            for mut msg in self.endpoint_self.as_mut().drain_messages() {
+                match msg.take_message().expect("exists") {
+                    RequestToChild::Bind { mut spec } => {
+                        spec.set_path("bound");
+                        self.bound_url = spec.clone();
+                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                            bound_url: spec,
+                        })));
+                    }
+                    RequestToChild::SendMessage { address, payload } => {
+                        self.mock_sender.send((address, payload)).unwrap();
+                        msg.respond(Ok(RequestToChildResponse::SendMessage));
+                    }
+                }
+            }
+            loop {
+                match self.mock_receiver.try_recv() {
+                    Ok((address, payload)) => {
+                        self.endpoint_self
+                            .publish(RequestToParent::ReceivedData { address, payload });
+                    }
+                    Err(_) => break,
+                }
+            }
+            Ok(false.into())
+        }
+    }
+
+    #[test]
+    fn it_should_multiplex() {
+        let (s_out, r_out) = crossbeam_channel::unbounded();
+        let (s_in, r_in) = crossbeam_channel::unbounded();
+
+        let addr_none = Url::parse("none:").expect("can parse url");
+
+        let mut mplex: TransportActorParentWrapper<(), TransportMultiplex> =
+            GhostParentWrapper::new(
+                TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
+                "test_mplex_",
+            );
+
+        let mut route_a: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
+            Box::new(
+                mplex
+                    .as_mut()
+                    .get_agent_space_route("space_a".to_string(), "agent_a".to_string()),
+            ),
+            "test_route_a_",
+        );
+
+        let mut route_b: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
+            Box::new(
+                mplex
+                    .as_mut()
+                    .get_agent_space_route("space_b".to_string(), "agent_b".to_string()),
+            ),
+            "test_route_b_",
+        );
+
+        // send a message from route A
+        route_a.request(
+            std::time::Duration::from_millis(2000),
+            (),
+            RequestToChild::SendMessage {
+                address: addr_none.clone(),
+                payload: b"hello-from-a".to_vec(),
+            },
+            Box::new(|_, _, response| {
+                assert_eq!(&format!("{:?}", response), "");
+                Ok(())
+            }),
+        );
+
+        route_a.process(&mut ()).unwrap();
+        mplex.process(&mut ()).unwrap();
+        route_a.process(&mut ()).unwrap();
+        mplex.process(&mut ()).unwrap();
+
+        // should receive that out the bottom
+        let (address, payload) = r_out.recv().unwrap();
+        assert_eq!(&addr_none, &address);
+        assert_eq!(&b"hello-from-a".to_vec(), &payload);
+
+        // send a message up the bottom
+        s_in.send((addr_none.clone(), b"hello-to-b".to_vec()))
+            .unwrap();
+
+        // process "receive" that message
+        mplex.process(&mut ()).unwrap();
+        let mut msgs = mplex.drain_messages();
+        assert_eq!(1, msgs.len());
+
+        let msg = msgs.remove(0).take_message().unwrap();
+        if let RequestToParent::ReceivedData { address, payload } = msg {
+            assert_eq!(&addr_none, &address);
+            assert_eq!(&b"hello-to-b".to_vec(), &payload);
+        } else {
+            panic!("bad type");
+        }
+
+        // our mplex module got it, now we should have the context
+        // let's instruct it to be forwarded up the route
+        mplex.as_mut().received_data_for_agent_space_route(
+            "space_b".to_string(),
+            "agent_b".to_string(),
+            "agent_x".to_string(),
+            "machine_x".to_string(),
+            b"hello".to_vec(),
+        );
+
+        mplex.process(&mut ()).unwrap();
+        route_b.process(&mut ()).unwrap();
+
+        let mut msgs = route_b.drain_messages();
+        assert_eq!(1, msgs.len());
+
+        let msg = msgs.remove(0).take_message().unwrap();
+        if let RequestToParent::ReceivedData { address, payload } = msg {
+            assert_eq!(
+                &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
+                &address
+            );
+            assert_eq!(&b"hello".to_vec(), &payload);
+        } else {
+            panic!("bad type");
+        }
+    }
+}

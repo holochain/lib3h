@@ -6,10 +6,6 @@ use url::Url;
 
 use super::{LocalRouteSpec, TransportMultiplexRoute};
 
-enum MplexToParentContext {}
-
-enum MplexToRouteContext {}
-
 enum MplexToInnerContext {
     AwaitBind(
         GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
@@ -19,36 +15,24 @@ enum MplexToInnerContext {
     ),
 }
 
+type SelfContextEndpoint<Context> = GhostContextEndpoint<
+    Context,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    TransportError,
+>;
+
 pub struct TransportMultiplex {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<
-        GhostContextEndpoint<
-            MplexToParentContext,
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChild,
-            RequestToChildResponse,
-            TransportError,
-        >,
-    >,
+    endpoint_self: Detach<SelfContextEndpoint<()>>,
     // ref to our inner transport
     inner_transport: Detach<TransportActorParentWrapperDyn<MplexToInnerContext>>,
     // our map of endpoints connecting us to our Routes
-    route_endpoints: Detach<
-        HashMap<
-            LocalRouteSpec,
-            GhostContextEndpoint<
-                MplexToRouteContext,
-                RequestToParent,
-                RequestToParentResponse,
-                RequestToChild,
-                RequestToChildResponse,
-                TransportError,
-            >,
-        >,
-    >,
+    route_endpoints: Detach<HashMap<LocalRouteSpec, SelfContextEndpoint<()>>>,
 }
 
 impl TransportMultiplex {
@@ -57,8 +41,10 @@ impl TransportMultiplex {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mplex_to_parent_"));
-        let inner_transport =
-            Detach::new(GhostParentWrapperDyn::new(inner_transport, "mplex_to_inner_"));
+        let inner_transport = Detach::new(GhostParentWrapperDyn::new(
+            inner_transport,
+            "mplex_to_inner_",
+        ));
         Self {
             endpoint_parent,
             endpoint_self,
@@ -196,8 +182,32 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
-        // ... I have no idea what this should do : )
-        unimplemented!();
+        // forward the bind to our inner_transport
+        self.inner_transport.as_mut().request(
+            std::time::Duration::from_millis(2000),
+            MplexToInnerContext::AwaitBind(msg),
+            RequestToChild::Bind { spec },
+            Box::new(|_, context, response| {
+                let msg = {
+                    match context {
+                        MplexToInnerContext::AwaitBind(msg) => msg,
+                        _ => return Err("bad context".into()),
+                    }
+                };
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => {
+                            msg.respond(Err("timeout".into()));
+                            return Ok(());
+                        }
+                        GhostCallbackData::Response(response) => response,
+                    }
+                };
+                msg.respond(response);
+                Ok(())
+            }),
+        );
+        Ok(())
     }
 
     /// private handler for SendMessage requests from a route
@@ -216,12 +226,15 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitSend(msg) => msg,
-                        _ => panic!("bad context"),
+                        _ => return Err("bad context".into()),
                     }
                 };
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout => {
+                            msg.respond(Err("timeout".into()));
+                            return Ok(());
+                        }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
@@ -265,12 +278,15 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitBind(msg) => msg,
-                        _ => panic!("bad context"),
+                        _ => return Err("bad context".into()),
                     }
                 };
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout => {
+                            msg.respond(Err("timeout".into()));
+                            return Ok(());
+                        }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
@@ -297,12 +313,15 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitSend(msg) => msg,
-                        _ => panic!("bad context"),
+                        _ => return Err("bad context".into()),
                     }
                 };
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout => {
+                            msg.respond(Err("timeout".into()));
+                            return Ok(());
+                        }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
@@ -354,174 +373,5 @@ impl
             Ok(())
         })?;
         Ok(false.into())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
-    const ID_2: &'static str = "HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r";
-
-    pub struct TransportMock {
-        endpoint_parent: Option<TransportActorParentEndpoint>,
-        endpoint_self: Detach<
-            GhostContextEndpoint<
-                MplexToParentContext,
-                RequestToParent,
-                RequestToParentResponse,
-                RequestToChild,
-                RequestToChildResponse,
-                TransportError,
-            >,
-        >,
-        bound_url: Url,
-        mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-        mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
-    }
-
-    impl TransportMock {
-        pub fn new(
-            mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-            mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
-        ) -> Self {
-            let (endpoint_parent, endpoint_self) = create_ghost_channel();
-            let endpoint_parent = Some(endpoint_parent);
-            let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
-            Self {
-                endpoint_parent,
-                endpoint_self,
-                bound_url: Url::parse("none:").expect("can parse url"),
-                mock_sender,
-                mock_receiver,
-            }
-        }
-    }
-
-    impl
-        GhostActor<
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChild,
-            RequestToChildResponse,
-            TransportError,
-        > for TransportMock
-    {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
-        fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
-            std::mem::replace(&mut self.endpoint_parent, None)
-        }
-
-        fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
-            for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                match msg.take_message().expect("exists") {
-                    RequestToChild::Bind { mut spec } => {
-                        spec.set_path("bound");
-                        self.bound_url = spec.clone();
-                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
-                            bound_url: spec,
-                        })));
-                    }
-                    RequestToChild::SendMessage { address, payload } => {
-                        self.mock_sender.send((address, payload)).unwrap();
-                        msg.respond(Ok(RequestToChildResponse::SendMessage));
-                    }
-                }
-            }
-            loop {
-                match self.mock_receiver.try_recv() {
-                    Ok((address, payload)) => {
-                        // bit of a hack, just always send an incoming connection
-                        // in front of all received data messages
-                        self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection {
-                                address: address.clone(),
-                            });
-                        self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload });
-                    }
-                    Err(_) => break,
-                }
-            }
-            Ok(false.into())
-        }
-    }
-
-    #[test]
-    fn it_should_exchange_messages() {
-        // set up some reference values
-        let addr1 = Url::parse("test://1/bound").unwrap();
-        let addr2 = Url::parse("test://2/bound").unwrap();
-        let mut addr1full = addr1.clone();
-        addr1full.query_pairs_mut().append_pair("a", ID_1);
-        let mut addr2full = addr2.clone();
-        addr2full.query_pairs_mut().append_pair("a", ID_2);
-
-        // we need some channels into our mock inner_transports
-        let (s1out, r1out) = crossbeam_channel::unbounded();
-        let (s1in, r1in) = crossbeam_channel::unbounded();
-
-        // create the first encoding transport
-        let mut t1: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
-            Box::new(TransportMultiplex::new(Box::new(TransportMock::new(
-                s1out, r1in,
-            )))),
-            "test1",
-        );
-
-        // give it a bind point
-        t1.request(
-            std::time::Duration::from_millis(2000),
-            (),
-            RequestToChild::Bind {
-                spec: Url::parse("test://1?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz").expect("can parse url"),
-            },
-            Box::new(|_, _, response| {
-                assert_eq!(
-                    &format!("{:?}", response),
-                    "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
-                );
-                Ok(())
-            })
-        );
-
-        // allow process
-        t1.process(&mut ()).unwrap();
-
-        // we need some channels into our mock inner_transports
-        let (s2out, r2out) = crossbeam_channel::unbounded();
-        let (s2in, r2in) = crossbeam_channel::unbounded();
-
-        // create the second encoding transport
-        let mut t2: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
-            Box::new(TransportMultiplex::new(Box::new(TransportMock::new(
-                s2out, r2in,
-            )))),
-            "test2",
-        );
-
-        // give it a bind point
-        t2.request(
-            std::time::Duration::from_millis(2000),
-            (),
-            RequestToChild::Bind {
-                spec: Url::parse("test://2?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r").expect("can parse url"),
-            },
-            Box::new(|_, _, response| {
-                assert_eq!(
-                    &format!("{:?}", response),
-                    "Response(Ok(Bind(BindResultData { bound_url: \"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\" })))"
-                );
-                Ok(())
-            })
-        );
-
-        // allow process
-        t2.process(&mut ()).unwrap();
     }
 }

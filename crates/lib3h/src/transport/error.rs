@@ -33,6 +33,18 @@ impl std::error::Error for TransportError {
     }
 }
 
+impl From<String> for TransportError {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for TransportError {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
 impl From<lib3h_ghost_actor::GhostError> for TransportError {
     fn from(error: lib3h_ghost_actor::GhostError) -> Self {
         Self(format!("{:?}", error))
