@@ -206,7 +206,7 @@ mod tests {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {
-                    GhostCallbackData::Timeout => dyn_me.state = "timed_out".into(),
+                    GhostCallbackData::Timeout => me.state = "timed_out".into(),
                     _ => assert!(false),
                 }
                 Ok(())
