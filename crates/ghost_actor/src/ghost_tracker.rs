@@ -153,7 +153,7 @@ mod tests {
                 // might have used it to determine what to do here.
                 assert_eq!(context.0, "some_context_data");
                 if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
-                    dyn_me.state = payload;
+                    me.state = payload;
                 }
                 Ok(())
             });
