@@ -42,7 +42,12 @@ impl GhostTransportMemory {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {
             endpoint_parent: Some(endpoint_parent),
-            endpoint_self: Some(endpoint_self.as_context_endpoint("tmem_to_parent")),
+            endpoint_self: Some(
+                endpoint_self
+                    .as_context_builder()
+                    .request_id_prefix("tmem_to_parent")
+                    .build(),
+            ),
             connections: HashSet::new(),
             maybe_my_address: None,
         }
@@ -268,13 +273,17 @@ mod tests {
         let mut t1_endpoint = transport1
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<()>("tmem_to_child1");
+            .as_context_builder()
+            .request_id_prefix("tmem_to_child1")
+            .build::<()>();
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<()>("tmem_to_child2");
+            .as_context_builder()
+            .request_id_prefix("tmem_to_child2")
+            .build::<()>();
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
@@ -282,7 +291,6 @@ mod tests {
 
         let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
         t1_endpoint.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
@@ -298,7 +306,6 @@ mod tests {
         );
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_endpoint.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
@@ -330,7 +337,6 @@ mod tests {
 
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::SendMessage {
                 address: Url::parse("mem://addr_2").unwrap(),

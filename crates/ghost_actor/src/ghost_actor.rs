@@ -63,7 +63,9 @@ impl<
         let endpoint = actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint(request_id_prefix);
+            .as_context_builder()
+            .request_id_prefix(request_id_prefix)
+            .build();
         Self { actor, endpoint }
     }
 
@@ -75,12 +77,11 @@ impl<
     /// see GhostContextEndpoint::request
     pub fn request(
         &mut self,
-        timeout: std::time::Duration,
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<Context, RequestToChildResponse, Error>,
     ) {
-        self.endpoint.request(timeout, context, payload, cb)
+        self.endpoint.request(context, payload, cb)
     }
 
     /// see GhostContextEndpoint::drain_messages
@@ -258,7 +259,9 @@ impl<
         let endpoint = actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint(request_id_prefix);
+            .as_context_builder()
+            .request_id_prefix(request_id_prefix)
+            .build();
         Self { actor, endpoint }
     }
 
@@ -270,12 +273,21 @@ impl<
     /// see GhostContextEndpoint::request
     pub fn request(
         &mut self,
-        timeout: std::time::Duration,
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<Context, RequestToChildResponse, Error>,
     ) {
-        self.endpoint.request(timeout, context, payload, cb)
+        self.endpoint.request(context, payload, cb)
+    }
+
+    pub fn request_timeout(
+        &mut self,
+        context: Context,
+        payload: RequestToChild,
+        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+        timeout: std::time::Duration,
+    ) {
+        self.endpoint.request_timeout(context, payload, cb, timeout)
     }
 
     /// see GhostContextEndpoint::drain_messages
@@ -337,7 +349,12 @@ mod tests {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
                 endpoint_for_parent: Some(endpoint_parent),
-                endpoint_as_child: Detach::new(endpoint_self.as_context_endpoint("child")),
+                endpoint_as_child: Detach::new(
+                    endpoint_self
+                        .as_context_builder()
+                        .request_id_prefix("child")
+                        .build(),
+                ),
                 internal_state: Vec::new(),
             }
         }
@@ -408,7 +425,9 @@ mod tests {
         > = child_actor
             .take_parent_endpoint()
             .unwrap()
-            .as_context_endpoint("parent");
+            .as_context_builder()
+            .request_id_prefix("parent")
+            .build();
 
         // now lets post an event from the parent
         parent_endpoint.publish(TestMsgIn("event from parent".into()));
@@ -434,7 +453,6 @@ mod tests {
             });
 
         parent_endpoint.request(
-            std::time::Duration::from_millis(1000),
             TestContext("context data".into()),
             TestMsgIn("event from parent".into()),
             cb,
