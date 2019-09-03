@@ -15,9 +15,9 @@ pub struct Mockernet {
     bindings: HashMap<Url, Tube>,
 }
 
-// The Mockernet is a series of tubes, which is technical term for the
-// sets of crossbeam channels in the bindings that mocker connects shuttles
-// between
+// The Mockernet is a Series-of-Tubes, which is the technical term for the
+// sets of crossbeam channels in the bindings that mockernet shuttles
+// data between
 pub struct Tube {
     sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
     #[allow(dead_code)]
@@ -43,11 +43,15 @@ impl Mockernet {
             true
         }
     }
-    pub fn send(&mut self, to: Url, from: Url, payload: Vec<u8>) -> Result<(), String> {
+    pub fn send_to(&mut self, to: Url, from: Url, payload: Vec<u8>) -> Result<(), String> {
         let dst = self.bindings.get(&to).ok_or(format!("{} not bound", to))?;
         dst.sender
             .send((from, payload))
             .map_err(|e| format!("{}", e))
+    }
+    pub fn receive_for(&mut self, to: Url) -> Result<(Url,Vec<u8>), String> {
+        let binding = self.bindings.get(&to).ok_or("requested address not bound")?;
+        binding.receiver.try_recv().map_err(|e| format!("{:?}",e))
     }
 }
 
@@ -60,6 +64,7 @@ struct TestTransport {
     // instance name of this transport
     name: String,
     // our parent channel endpoint
+    bound_url: Option<Url>,
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
     endpoint_self: Detach<
@@ -97,6 +102,16 @@ impl
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
+        let mut mockernet = MOCKERNET.write().unwrap();
+        let our_url = self.bound_url.as_ref().unwrap();
+        if let Ok((from, payload)) = mockernet.receive_for(our_url.clone()) {
+            detach_run!(self.endpoint_self, |s| s.publish(
+                RequestToParent::ReceivedData{
+                    address: from,
+                    payload
+                }
+            ));
+        }
         Ok(false.into())
     }
     // END BOILER PLATE--------------------------
@@ -110,6 +125,7 @@ impl TestTransport {
             Detach::new(endpoint_self.as_context_endpoint(&format!("{}_to_parent_", name)));
         TestTransport {
             name: name.to_string(),
+            bound_url: None,
             endpoint_parent,
             endpoint_self,
         }
@@ -130,17 +146,23 @@ impl TestTransport {
                 let mut mockernet = MOCKERNET.write().unwrap();
                 let response = if mockernet.bind(spec.clone()) {
                     Ok(RequestToChildResponse::Bind(BindResultData {
-                        bound_url: spec,
+                        bound_url: spec.clone(),
                     }))
                 } else {
                     Err(TransportError::new("already bound".to_string()))
                 };
+                self.bound_url = Some(spec);
                 msg.respond(response);
             }
             RequestToChild::SendMessage {
-                address: _,
-                payload: _,
-            } => panic!("BAM"),
+                address,
+                payload,
+            } =>{
+                let mut mockernet = MOCKERNET.write().unwrap();
+                // return error if not bound.
+                let _ = mockernet.send_to(address,self.bound_url.as_ref().unwrap().clone(),payload);
+//                msg.respond(response);
+            }
         }
         Ok(())
     }
@@ -166,12 +188,11 @@ fn ghost_transport() {
         "t1_requests", // prefix for request ids in the tracker
     );
     assert_eq!(t1.as_ref().name, "t1");
-    /*    let t2: TransportActorParentWrapper<(),TestTransport> = GhostParentWrapper::new(
+    let mut t2: TransportActorParentWrapper<(),TestTransport> = GhostParentWrapper::new(
         TestTransport::new("t2"),
         "t2_requests", // prefix for request ids in the tracker
     );
-    assert_eq!(t1.as_ref().name,"t2");
-     */
+    assert_eq!(t2.as_ref().name,"t2");
 
     // bind t1 to the network
     t1.request(
@@ -193,5 +214,60 @@ fn ghost_transport() {
     assert_eq!(
         "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t1/\\\" })))\"",
         format!("{:?}", owner.log[0])
-    )
+    );
+
+    // bind t2 to the network
+        t2.request(
+            std::time::Duration::from_millis(2000),
+            (),
+            RequestToChild::Bind {
+                spec: Url::parse("mocknet://t2").expect("can parse url"),
+            },
+            // callback should simply log the response
+            Box::new(|dyn_owner, _, response| {
+                let owner = dyn_owner
+                    .downcast_mut::<TestTransportOwner>()
+                    .expect("a TestTransportOwner");
+                owner.log.push(format!("{:?}", response));
+                Ok(())
+            }),
+        );
+    t2.process(&mut owner).expect("should process");
+    assert_eq!(
+        "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t2/\\\" })))\"",
+        format!("{:?}", owner.log[1])
+    );
+
+
+    t1.request(
+        std::time::Duration::from_millis(2000),
+        (),
+        RequestToChild::SendMessage {
+            address: Url::parse("mocknet://t2").expect("can parse url"),
+            payload: b"foo".to_vec(),
+        },
+        // callback should simply log the response
+        Box::new(|dyn_owner, _, response| {
+            let owner = dyn_owner
+                .downcast_mut::<TestTransportOwner>()
+                .expect("a TestTransportOwner");
+            owner.log.push(format!("{:?}", response));
+            Ok(())
+        }),
+    );
+    t1.process(&mut owner).expect("should process");
+    t2.process(&mut owner).expect("should process");
+    let mut messages = t2.drain_messages();
+    assert_eq!(messages.len(),2);
+
+    // because this is the first incoming message, the low level
+    // transport should also send an IncomingConnection event
+    assert_eq!(
+        "IncomingConnection { address: \"mocknet://t1/\" }",
+        format!("{:?}", messages[0].take_message().expect("exists"))
+    );
+    assert_eq!(
+        "ReceivedData { address: \"mocknet://t1/\", payload: [102, 111, 111] }",
+        format!("{:?}", messages[0].take_message().expect("exists"))
+    );
 }
