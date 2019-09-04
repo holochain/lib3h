@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-//#[cfg(test)]
 use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
@@ -442,10 +441,6 @@ impl<'engine> RealEngine<'engine> {
             return Ok(());
         }
         let space_gateway = maybe_space.unwrap();
-        println!(
-            "serve_HandleGetAuthoringEntryListResult - {}",
-            msg.space_address.clone()
-        );
         // Request every 'new' Entry from Core
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
@@ -472,11 +467,6 @@ impl<'engine> RealEngine<'engine> {
                             panic!("bad context type");
                         }
                     };
-                    println!(
-                        "Maybe HandleFetchEntry for.. {} = {:?}",
-                        entry_address.clone(),
-                        aspect_address_list.clone()
-                    );
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -492,20 +482,11 @@ impl<'engine> RealEngine<'engine> {
                         let can_fetch = match maybe_known_aspects {
                             None => true,
                             Some(known_aspects) => {
-                                println!(
-                                    "Known for.. {} = {:?}",
-                                    entry_address.clone(),
-                                    known_aspects.clone()
-                                );
                                 let can = !includes(&known_aspects, &aspect_address_list);
                                 can
                             }
                         };
                         if can_fetch {
-                            println!(
-                                "Maybe HandleFetchEntry for.. {} -- YES",
-                                entry_address.clone()
-                            );
                             let msg_data = FetchEntryData {
                                 space_address: msg.space_address.clone(),
                                 entry_address: entry_address.clone(),
@@ -571,10 +552,6 @@ impl<'engine> RealEngine<'engine> {
         match maybe_space {
             Err(res) => outbox.push(res),
             Ok(_space_gateway) => {
-                println!(
-                    "serve_HandleGetGossipingEntryListResult - {}",
-                    msg.space_address.clone()
-                );
                 for (entry_address, _aspect_address_list) in msg.address_map {
                     // #fullsync hack
                     // fetch every entry from owner
@@ -665,9 +642,6 @@ impl<'engine> RealEngine<'engine> {
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
         space_gateway.as_mut().hold_peer(this_peer);
-        //            .as_mut()
-        //            .as_dht_mut()
-        //            .publish(DhtRequestToChild::HoldPeer(this_peer));
         // Send Get*Lists requests
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),

@@ -299,9 +299,6 @@ impl<'engine> RealEngine<'engine> {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.as_mut().hold_peer(peer_data.clone());
-                    //                        .as_mut()
-                    //                        .as_dht_mut()
-                    //                        .publish(DhtRequestToChild::HoldPeer(peer_data.clone()));
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -310,9 +307,6 @@ impl<'engine> RealEngine<'engine> {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
                         space_gateway.as_mut().hold_peer(peer_data.clone());
-                        //                            .as_mut()
-                        //                            .as_dht_mut()
-                        //                            .publish(DhtRequestToChild::HoldPeer(peer_data.clone()));
                     }
                 }
             }

@@ -95,9 +95,6 @@ impl<'engine> RealEngine<'engine> {
                 );
                 // For now accept all request
                 space_gateway.as_mut().hold_peer(peer_data);
-                //                    .as_mut()
-                //                    .as_dht_mut()
-                //                    .publish(DhtRequestToChild::HoldPeer(peer_data));
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // no-op
@@ -122,25 +119,6 @@ impl<'engine> RealEngine<'engine> {
                     outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }
             }
-            // Fixme move to request's response handler
-            //            // FetchEntryResponse: Send back as a query response to Core
-            //            // TODO #169 - Discern Fetch from Query
-            //            DhtRequestToParent::FetchEntryResponse(response) => {
-            //                let mut query_result = Vec::new();
-            //                response
-            //                    .entry
-            //                    .serialize(&mut Serializer::new(&mut query_result))
-            //                    .unwrap();
-            //                let msg_data = QueryEntryResultData {
-            //                    space_address: chain_id.0.clone(),
-            //                    entry_address: response.entry.entry_address.clone(),
-            //                    request_id: response.msg_id.clone(),
-            //                    requester_agent_id: chain_id.1.clone(), // TODO #150 - get requester from channel from p2p-protocol
-            //                    responder_agent_id: chain_id.1.clone(),
-            //                    query_result,
-            //                };
-            //                outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
-            //            }
             DhtRequestToParent::EntryPruned(_address) => {
                 // TODO #174
             }

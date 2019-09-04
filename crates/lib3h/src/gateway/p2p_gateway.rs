@@ -97,9 +97,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
     }
 
     fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()> {
-        //println!("process_dht() START");
         let res = self.inner_dht.process(user_data);
-        //println!("process_dht() END");
         res
     }
 

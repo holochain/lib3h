@@ -251,7 +251,6 @@ impl<'gateway> P2pGateway<'gateway> {
                             };
                             // HACK
                             self.hold_peer(peer);
-                            //self.inner_dht.publish(DhtRequestToChild::HoldPeer(peer));
                             // TODO #58
                             // TODO #150 - Should not call process manually
                             self.process().expect("HACK");
