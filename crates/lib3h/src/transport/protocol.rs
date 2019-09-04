@@ -69,8 +69,6 @@ pub type DynTransportActor = Box<
     >,
 >;
 
-//type UserData = TransportEncoding;
-
 pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToChild,
     RequestToChildResponse,
