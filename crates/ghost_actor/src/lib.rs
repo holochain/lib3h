@@ -60,7 +60,7 @@ pub use ghost_tracker::{
 mod ghost_channel;
 pub use ghost_channel::{
     create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
-    GhostTrackRequestOptions,
+    GhostTrackRequestOptions, GhostResponder
 };
 
 mod ghost_actor;
@@ -69,7 +69,7 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
+        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostResponder, GhostParentWrapper,
         GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
         GhostTrackerBookmarkOptions, WorkWasDone,
     };
@@ -172,11 +172,11 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             detach_run!(&mut self.endpoint_self, |cs| { cs.process(self) })?;
 
-            for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                match msg.take_message().expect("exists") {
+            for (payload, responder) in self.endpoint_self.as_mut().drain_messages() {
+                match payload {
                     dht_protocol::RequestToChild::ResolveAddressForId { id } => {
                         println!("dht got ResolveAddressForId {}", id);
-                        msg.respond(Ok(
+                        responder(Ok(
                             dht_protocol::RequestToChildResponse::ResolveAddressForId(
                                 dht_protocol::ResolveAddressForIdData {
                                     address: "wss://yada".to_string(),
@@ -233,10 +233,9 @@ mod tests {
 
     use transport_protocol::*;
 
-    #[derive(Debug)]
     enum GwDht {
         ResolveAddressForId {
-            msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
+            responder: GhostResponder<RequestToChildResponse, FakeError>,
         },
     }
 
@@ -342,14 +341,14 @@ mod tests {
                 endpoint_self.process(self)
             })?;
 
-            for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                match msg.take_message().expect("exists") {
+            for (payload, responder) in self.endpoint_self.as_mut().drain_messages() {
+                match payload {
                     RequestToChild::Bind { spec: _ } => {
                         // do some internal bind
                         // we get a bound_url
                         let bound_url = "bound_url".to_string();
                         // respond to our parent
-                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                        responder(Ok(RequestToChildResponse::Bind(BindResultData {
                             bound_url: bound_url,
                         })));
                     }
@@ -359,12 +358,12 @@ mod tests {
                         payload: _,
                     } => {
                         self.dht.as_mut().request(
-                            GwDht::ResolveAddressForId { msg },
+                            GwDht::ResolveAddressForId { responder },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(|_m:&mut GatewayTransport, context, response| {
-                                let msg = {
-                                    if let GwDht::ResolveAddressForId { msg } = context {
-                                        msg
+                                let responder = {
+                                    if let GwDht::ResolveAddressForId { responder } = context {
+                                        responder
                                     } else {
                                         panic!("bad context type");
                                     }
@@ -372,7 +371,7 @@ mod tests {
 
                                 // got a timeout error
                                 if let GhostCallbackData::Timeout = response {
-                                    msg.respond(Err("Timeout".into()));
+                                    responder(Err("Timeout".into()));
                                     return Ok(());
                                 }
 
@@ -386,7 +385,7 @@ mod tests {
 
                                 let response = match response {
                                     Err(e) => {
-                                        msg.respond(Err(e));
+                                        responder(Err(e));
                                         return Ok(());
                                     }
                                     Ok(response) => response,
@@ -405,7 +404,7 @@ mod tests {
 
                                 println!("yay? {:?}", response);
 
-                                msg.respond(Ok(RequestToChildResponse::SendMessage));
+                                responder(Ok(RequestToChildResponse::SendMessage));
 
                                 Ok(())
                             }),
@@ -449,13 +448,12 @@ mod tests {
         let _ = t_actor_endpoint.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)
-        for mut msg in t_actor_endpoint.drain_messages() {
-            let payload = msg.take_message();
+        for (payload, responder) in t_actor_endpoint.drain_messages() {
             println!("in drain_messages got: {:?}", payload);
 
             // we might allow or disallow connections for example
             let response = RequestToParentResponse::Allowed;
-            msg.respond(Ok(response));
+            responder(Ok(response));
         }
 
         t_actor.process().unwrap();

@@ -136,7 +136,7 @@ impl<
     /// see GhostContextEndpoint::drain_messages
     fn drain_messages(
         &mut self,
-    ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
+    ) -> Vec<(RequestToParent, GhostResponder<RequestToParentResponse, Error>)> {
         self.endpoint.drain_messages()
     }
 
@@ -317,14 +317,43 @@ impl<
             .build();
         Self { actor, endpoint }
     }
+}
 
+impl<
+        UserData,
+        Context: 'static,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
+    >
+    GhostCanTrack<
+        UserData,
+        Context,
+        RequestToChild,
+        RequestToChildResponse,
+        RequestToParent,
+        RequestToParentResponse,
+        Error,
+    >
+    for GhostParentWrapperDyn<
+        UserData,
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+    >
+{
     /// see GhostContextEndpoint::publish
-    pub fn publish(&mut self, payload: RequestToChild) {
+    fn publish(&mut self, payload: RequestToChild) {
         self.endpoint.publish(payload)
     }
 
     /// see GhostContextEndpoint::request
-    pub fn request(
+    fn request(
         &mut self,
         context: Context,
         payload: RequestToChild,
@@ -333,7 +362,7 @@ impl<
         self.endpoint.request(context, payload, cb)
     }
 
-    pub fn request_options(
+    fn request_options(
         &mut self,
         context: Context,
         payload: RequestToChild,
@@ -344,14 +373,14 @@ impl<
     }
 
     /// see GhostContextEndpoint::drain_messages
-    pub fn drain_messages(
+    fn drain_messages(
         &mut self,
-    ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
+    ) -> Vec<(RequestToParent, GhostResponder<RequestToParentResponse, Error>)> {
         self.endpoint.drain_messages()
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.actor.process()?;
         self.endpoint.process(user_data)?;
         Ok(())
@@ -436,14 +465,13 @@ mod tests {
 
             // In this test actor we simply take all the messages we get and
             // add them to our internal state.
-            for mut msg in self.endpoint_as_child.as_mut().drain_messages() {
-                let payload = match msg.take_message().expect("exists") {
+            for (payload, responder) in self.endpoint_as_child.as_mut().drain_messages() {
+                let payload = match payload {
                     TestMsgIn(payload) => payload,
                 };
                 self.internal_state.push(payload.clone());
-                if msg.is_request() {
-                    msg.respond(Ok(TestMsgInResponse(format!("we got: {}", payload))))
-                };
+                responder(
+                    Ok(TestMsgInResponse(format!("we got: {}", payload))));
             }
             Ok(false.into())
         }

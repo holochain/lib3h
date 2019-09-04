@@ -720,11 +720,11 @@ mod tests {
         // calling process should then cause this message to be added the endpoint's inbox
         // which we get access to by calling drain_messages()
         assert!(endpoint.process(fake_dyn_actor).is_ok());
-        let mut messages = endpoint.drain_messages();
+        let messages = endpoint.drain_messages();
         assert_eq!(messages.len(), 1);
         assert_eq!(
-            "Some(TestMsgIn(\"event from a parent\"))",
-            format!("{:?}", messages[0].take_message())
+            "TestMsgIn(\"event from a parent\")",
+            format!("{:?}", messages[0].0)
         );
     }
 }
