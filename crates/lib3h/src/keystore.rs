@@ -1,10 +1,12 @@
 //! This is a stub of the keystore so we can prove out the encoding transport
 
-use crate::error::{Lib3hError, Lib3hResult};
+use crate::{
+    error::{Lib3hError, Lib3hResult},
+    transport::TransportEncoding,
+};
+
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use std::any::Any;
-
 pub mod keystore_protocol {
     #[derive(Debug)]
     pub enum RequestToChild {
@@ -44,6 +46,7 @@ pub type KeystoreActorParentEndpoint = GhostEndpoint<
 >;
 
 pub type KeystoreActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
+    TransportEncoding,
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -61,6 +64,7 @@ type KeystoreParentEndpoint = GhostEndpoint<
 >;
 
 type KeystoreSelfEndpoint = GhostContextEndpoint<
+    KeystoreStub,
     (),
     RequestToParent,
     RequestToParentResponse,
@@ -81,7 +85,12 @@ impl KeystoreStub {
     pub fn new() -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("keystore_to_parent_"));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix("keystore_to_parent_")
+                .build(),
+        );
         Self {
             endpoint_parent,
             endpoint_self,
@@ -117,16 +126,12 @@ impl
         Lib3hError,
     > for KeystoreStub
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<KeystoreParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg).expect("no ghost errors");
         }
