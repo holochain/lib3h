@@ -262,7 +262,7 @@ impl<
         >,
         request_id_prefix: &str,
     ) -> Self {
-        let endpoint = actor
+        let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = actor
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint(request_id_prefix);
