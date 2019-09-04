@@ -6,7 +6,7 @@ use crate::{
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
 #[derive(Debug)]
-enum GhostEndpointMessage<Request, Response, Error> {
+enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
@@ -24,7 +24,12 @@ pub type GhostResponder<RequestToSelfResponse, Error> = Box<
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
 /// A GhostMessage contains the incoming request, as well as a hook to
 /// allow a response to automatically be returned.
-pub struct GhostMessage<MessageToSelf, MessageToOther, MessageToSelfResponse, Error> {
+pub struct GhostMessage<
+    MessageToSelf: 'static,
+    MessageToOther: 'static,
+    MessageToSelfResponse: 'static,
+    Error: 'static,
+> {
     request_id: Option<RequestId>,
     message: Option<MessageToSelf>,
     sender: crossbeam_channel::Sender<
@@ -32,7 +37,12 @@ pub struct GhostMessage<MessageToSelf, MessageToOther, MessageToSelfResponse, Er
     >,
 }
 
-impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static> std::fmt::Debug
+impl<
+        RequestToSelf: 'static,
+        RequestToOther: 'static,
+        RequestToSelfResponse: 'static,
+        Error: 'static,
+    > std::fmt::Debug
     for GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -40,8 +50,12 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static> std::
     }
 }
 
-impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static>
-    GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
+impl<
+        RequestToSelf: 'static,
+        RequestToOther: 'static,
+        RequestToSelfResponse: 'static,
+        Error: 'static,
+    > GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
         request_id: Option<RequestId>,
@@ -109,11 +123,11 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static>
 /// to the place they will be used, you probably want to call
 /// `as_context_endpoint_builder()` on them.
 pub struct GhostEndpoint<
-    RequestToOther,
-    RequestToOtherResponse,
-    RequestToSelf,
-    RequestToSelfResponse,
-    Error,
+    RequestToOther: 'static,
+    RequestToOtherResponse: 'static,
+    RequestToSelf: 'static,
+    RequestToSelfResponse: 'static,
+    Error: 'static,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -124,10 +138,10 @@ pub struct GhostEndpoint<
 }
 
 impl<
-        RequestToOther,
+        RequestToOther: 'static,
         RequestToOtherResponse: 'static,
-        RequestToSelf,
-        RequestToSelfResponse,
+        RequestToSelf: 'static,
+        RequestToSelfResponse: 'static,
         Error: 'static,
     >
     GhostEndpoint<
@@ -175,11 +189,11 @@ impl<
 }
 
 pub struct GhostContextEndpointBuilder<
-    RequestToOther,
-    RequestToOtherResponse,
-    RequestToSelf,
-    RequestToSelfResponse,
-    Error,
+    RequestToOther: 'static,
+    RequestToOtherResponse: 'static,
+    RequestToSelf: 'static,
+    RequestToSelfResponse: 'static,
+    Error: 'static,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -190,7 +204,13 @@ pub struct GhostContextEndpointBuilder<
     tracker_builder: GhostTrackerBuilder,
 }
 
-impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfResponse, Error>
+impl<
+        RequestToOther: 'static,
+        RequestToOtherResponse: 'static,
+        RequestToSelf: 'static,
+        RequestToSelfResponse: 'static,
+        Error: 'static,
+    >
     GhostContextEndpointBuilder<
         RequestToOther,
         RequestToOtherResponse,
@@ -250,12 +270,12 @@ impl GhostTrackRequestOptions {
 /// indicates this type is able to make callback requests && respond to requests
 pub trait GhostCanTrack<
     UserData,
-    Context,
-    RequestToOther,
-    RequestToOtherResponse,
-    RequestToSelf,
-    RequestToSelfResponse,
-    Error,
+    Context: 'static,
+    RequestToOther: 'static,
+    RequestToOtherResponse: 'static,
+    RequestToSelf: 'static,
+    RequestToSelfResponse: 'static,
+    Error: 'static,
 >
 {
     /// publish an event to the remote side, not expecting a response
@@ -293,12 +313,12 @@ pub trait GhostCanTrack<
 /// see `GhostEndpoint::as_context_endpoint_builder` for additional details
 pub struct GhostContextEndpoint<
     UserData,
-    Context,
-    RequestToOther,
-    RequestToOtherResponse,
-    RequestToSelf,
-    RequestToSelfResponse,
-    Error,
+    Context: 'static,
+    RequestToOther: 'static,
+    RequestToOtherResponse: 'static,
+    RequestToSelf: 'static,
+    RequestToSelfResponse: 'static,
+    Error: 'static,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -314,10 +334,10 @@ pub struct GhostContextEndpoint<
 impl<
         UserData,
         Context: 'static,
-        RequestToOther,
+        RequestToOther: 'static,
         RequestToOtherResponse: 'static,
-        RequestToSelf,
-        RequestToSelfResponse,
+        RequestToSelf: 'static,
+        RequestToSelfResponse: 'static,
         Error: 'static,
     >
     GhostContextEndpoint<
@@ -357,10 +377,10 @@ impl<
 impl<
         UserData,
         Context: 'static,
-        RequestToOther,
+        RequestToOther: 'static,
         RequestToOtherResponse: 'static,
-        RequestToSelf,
-        RequestToSelfResponse,
+        RequestToSelf: 'static,
+        RequestToSelfResponse: 'static,
         Error: 'static,
     >
     GhostCanTrack<
@@ -484,9 +504,9 @@ impl<
 /// structures, the first one is the parent side, the second is the child's.
 #[allow(clippy::complexity)]
 pub fn create_ghost_channel<
-    RequestToParent,
+    RequestToParent: 'static,
     RequestToParentResponse: 'static,
-    RequestToChild,
+    RequestToChild: 'static,
     RequestToChildResponse: 'static,
     Error: 'static,
 >() -> (
