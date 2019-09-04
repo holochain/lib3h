@@ -68,6 +68,8 @@ pub mod prelude {
     };
 }
 
+//pub type UserData = ();
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,6 +114,7 @@ mod tests {
         >,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                RrDht,
                 i8,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
@@ -160,7 +163,7 @@ mod tests {
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |cs| { cs.process(self.as_any()) })?;
+            detach_run!(&mut self.endpoint_self, |cs| { cs.process(self) })?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
@@ -247,6 +250,7 @@ mod tests {
         >,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                GatewayTransport,
                 RequestToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
@@ -257,6 +261,7 @@ mod tests {
         >,
         dht: Detach<
             GhostParentWrapper<
+                GatewayTransport,
                 GwDht,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
@@ -325,9 +330,9 @@ mod tests {
                     Ok(())
                 }),
             );
-            detach_run!(&mut self.dht, |dht| { dht.process(self.as_any()) })?;
+            detach_run!(&mut self.dht, |dht| { dht.process(self) })?;
             detach_run!(&mut self.endpoint_self, |endpoint_self| {
-                endpoint_self.process(self.as_any())
+                endpoint_self.process(self)
             })?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
@@ -421,15 +426,19 @@ mod tests {
         // the body of this test simulates an object that contains a actor, i.e. a parent.
         // it would usually just be another ghost_actor but here we test it out explicitly
         // so first instantiate the "child" actor
-        let mut t_actor: TransportActor = Box::new(GatewayTransport::new());
+
+        let gw = GatewayTransport::new();
+
+        let mut t_actor: TransportActor = Box::new(gw);
         let mut t_actor_endpoint = t_actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<i8>("test");
+            .as_context_endpoint::<(), i8>("test");
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
         t_actor.process().unwrap();
+
         let _ = t_actor_endpoint.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)

@@ -68,6 +68,9 @@ pub type DynTransportActor = Box<
         TransportError,
     >,
 >;
+
+//type UserData = TransportEncoding;
+
 pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToChild,
     RequestToChildResponse,
@@ -75,7 +78,8 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportActorParentWrapper<Context, Actor> = GhostParentWrapper<
+pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
+    UserData,
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -84,7 +88,8 @@ pub type TransportActorParentWrapper<Context, Actor> = GhostParentWrapper<
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+    UserData,
     Context,
     RequestToParent,
     RequestToParentResponse,

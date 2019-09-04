@@ -9,6 +9,8 @@ enum RequestToParentContext {
     Source { address: Url },
 }
 
+pub type UserData = GhostTransportMemory;
+
 type GhostTransportMemoryEndpoint = GhostEndpoint<
     RequestToChild,
     RequestToChildResponse,
@@ -18,6 +20,7 @@ type GhostTransportMemoryEndpoint = GhostEndpoint<
 >;
 
 type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
+    UserData,
     (),
     RequestToParent,
     RequestToParentResponse,
@@ -28,6 +31,7 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
 
 pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
     (),
+    (),
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -36,7 +40,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 >;
 
 #[allow(dead_code)]
-struct GhostTransportMemory {
+pub struct GhostTransportMemory {
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Option<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -88,10 +92,7 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // process the self endpoint
         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-        endpoint_self
-            .as_mut()
-            .expect("exists")
-            .process(self.as_any())?;
+        endpoint_self.as_mut().expect("exists").process(self)?;
         std::mem::replace(&mut self.endpoint_self, endpoint_self);
 
         for mut msg in self
@@ -277,13 +278,13 @@ mod tests {
         let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<()>("tmem_to_child1");
+            .as_context_endpoint::<(), ()>("tmem_to_child1");
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<()>("tmem_to_child2");
+            .as_context_endpoint::<(), ()>("tmem_to_child2");
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);

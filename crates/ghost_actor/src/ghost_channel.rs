@@ -1,5 +1,4 @@
 use crate::{GhostCallback, GhostResult, GhostTracker, RequestId};
-use std::any::Any;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -151,10 +150,11 @@ impl<
     /// don't need any context.
     /// request_id_prefix is a debugging hint... the request_ids generated
     /// for tracking request/response pairs will be prepended with this prefix.
-    pub fn as_context_endpoint<Context: 'static>(
+    pub fn as_context_endpoint<UserData, Context: 'static>(
         self,
         request_id_prefix: &str,
     ) -> GhostContextEndpoint<
+        UserData,
         Context,
         RequestToOther,
         RequestToOtherResponse,
@@ -169,6 +169,7 @@ impl<
 /// an expanded endpoint usable to send/receive requests/responses/events
 /// see `GhostEndpoint::as_context_endpoint` for additional details
 pub struct GhostContextEndpoint<
+    UserData,
     Context,
     RequestToOther,
     RequestToOtherResponse,
@@ -182,12 +183,13 @@ pub struct GhostContextEndpoint<
     receiver: crossbeam_channel::Receiver<
         GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
-    pending_responses_tracker: GhostTracker<Context, RequestToOtherResponse, Error>,
+    pending_responses_tracker: GhostTracker<UserData, Context, RequestToOtherResponse, Error>,
     outbox_messages_to_self:
         Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>,
 }
 
 impl<
+        UserData,
         Context: 'static,
         RequestToOther,
         RequestToOtherResponse: 'static,
@@ -196,6 +198,7 @@ impl<
         Error: 'static,
     >
     GhostContextEndpoint<
+        UserData,
         Context,
         RequestToOther,
         RequestToOtherResponse,
@@ -234,12 +237,12 @@ impl<
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
-    pub fn request<A: Any>(
+    pub fn request(
         &mut self,
         timeout: std::time::Duration,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<A, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
     ) {
         let request_id = self
             .pending_responses_tracker
@@ -260,8 +263,8 @@ impl<
     }
 
     /// check for pending responses timeouts or incoming messages
-    pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
-        self.pending_responses_tracker.process(actor)?;
+    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+        self.pending_responses_tracker.process(user_data)?;
         loop {
             let msg: Result<
                 GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
@@ -284,7 +287,7 @@ impl<
                         payload,
                     } => {
                         self.pending_responses_tracker
-                            .handle(request_id, actor, payload)?;
+                            .handle(request_id, user_data, payload)?;
                     }
                 },
                 Err(e) => match e {

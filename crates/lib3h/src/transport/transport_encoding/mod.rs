@@ -36,6 +36,7 @@ pub struct TransportEncoding {
     // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
+            Self,
             ToParentContext,
             RequestToParent,
             RequestToParentResponse,
@@ -45,7 +46,7 @@ pub struct TransportEncoding {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<ToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding, ToInnerContext>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes
@@ -378,15 +379,15 @@ impl
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        detach_run!(&mut self.inner_transport, |it| it.process(self.as_any()))?;
+        detach_run!(&mut self.inner_transport, |it| it.process(self))?;
         for msg in self.inner_transport.as_mut().drain_messages() {
             self.handle_msg_from_inner(msg)?;
         }
-        detach_run!(&mut self.keystore, |ks| ks.process(self.as_any()))?;
+        detach_run!(&mut self.keystore, |ks| ks.process(self))?;
         Ok(false.into())
     }
 }
@@ -403,6 +404,7 @@ mod tests {
         endpoint_parent: Option<TransportActorParentEndpoint>,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                TransportMock,
                 ToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
@@ -452,7 +454,7 @@ mod tests {
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+            detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
                     RequestToChild::Bind { mut spec } => {
@@ -505,15 +507,16 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
-            TransportEncoding::new(
-                crypto.box_clone(),
-                ID_1.to_string(),
-                Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new(s1out, r1in)),
-            ),
-            "test1",
-        );
+        let mut t1: TransportActorParentWrapper<bool, (), TransportEncoding> =
+            GhostParentWrapper::new(
+                TransportEncoding::new(
+                    crypto.box_clone(),
+                    ID_1.to_string(),
+                    Box::new(KeystoreStub::new()),
+                    Box::new(TransportMock::new(s1out, r1in)),
+                ),
+                "test1",
+            );
 
         // give it a bind point
         t1.request(
@@ -522,7 +525,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
-            Box::new(|_: &mut (), _, response| {
+            Box::new(|_: &mut bool, _, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
@@ -532,22 +535,23 @@ mod tests {
         );
 
         // allow process
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut false).unwrap();
 
         // we need some channels into our mock inner_transports
         let (s2out, r2out) = crossbeam_channel::unbounded();
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
-            TransportEncoding::new(
-                crypto.box_clone(),
-                ID_2.to_string(),
-                Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new(s2out, r2in)),
-            ),
-            "test2",
-        );
+        let mut t2: TransportActorParentWrapper<(), (), TransportEncoding> =
+            GhostParentWrapper::new(
+                TransportEncoding::new(
+                    crypto.box_clone(),
+                    ID_2.to_string(),
+                    Box::new(KeystoreStub::new()),
+                    Box::new(TransportMock::new(s2out, r2in)),
+                ),
+                "test2",
+            );
 
         // give it a bind point
         t2.request(
@@ -586,7 +590,7 @@ mod tests {
             }),
         );
 
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut t1_got_success_resp).unwrap();
 
         // we get a handshake that needs to be forwarded to #2
         let (address, payload) = r1out.recv().unwrap();
@@ -595,7 +599,7 @@ mod tests {
         s2in.send((addr1.clone(), payload)).unwrap();
 
         t2.process(&mut ()).unwrap();
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut t1_got_success_resp).unwrap();
         t2.process(&mut ()).unwrap();
 
         // we get a handshake that needs to be forwarded to #1
@@ -604,7 +608,7 @@ mod tests {
         assert_eq!(ID_2, &String::from_utf8_lossy(&payload));
         s1in.send((addr2.clone(), payload)).unwrap();
 
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut t1_got_success_resp).unwrap();
         t2.process(&mut ()).unwrap();
 
         // this is the process where we get the Send Success
