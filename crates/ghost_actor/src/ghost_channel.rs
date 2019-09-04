@@ -222,6 +222,48 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
     }
 }
 
+/// indicates this type is able to make callback requests && respond to requests
+pub trait GhostCanTrack<
+    UserData,
+    Context,
+    RequestToOther,
+    RequestToOtherResponse,
+    RequestToSelf,
+    RequestToSelfResponse,
+    Error,
+>
+{
+    /// publish an event to the remote side, not expecting a response
+    fn publish(&mut self, payload: RequestToOther);
+
+    /// make a request of the other side. When a response is sent back to us
+    /// the callback will be invoked.
+    fn request(
+        &mut self,
+        context: Context,
+        payload: RequestToOther,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+    );
+
+    /// make a request of the other side. When a response is sent back to us
+    /// the callback will be invoked, override the default timeout.
+    fn request_timeout(
+        &mut self,
+        context: Context,
+        payload: RequestToOther,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        timeout: std::time::Duration,
+    );
+
+    /// fetch any messages (requests or events) sent to us from the other side
+    fn drain_messages(
+        &mut self,
+    ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>;
+
+    /// check for pending responses timeouts or incoming messages
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()>;
+}
+
 /// an expanded endpoint usable to send/receive requests/responses/events
 /// see `GhostEndpoint::as_context_endpoint` for additional details
 pub struct GhostContextEndpoint<
@@ -263,16 +305,6 @@ impl<
         Error,
     >
 {
-    /// publish an event to the remote side, not expecting a response
-    pub fn publish(&mut self, payload: RequestToOther) {
-        self.sender
-            .send(GhostEndpointMessage::Request {
-                request_id: None,
-                payload,
-            })
-            .expect("should send");
-    }
-
     fn priv_request(
         &mut self,
         context: Context,
@@ -293,10 +325,49 @@ impl<
             })
             .expect("should send");
     }
+}
+
+impl<
+        UserData,
+        Context: 'static,
+        RequestToOther,
+        RequestToOtherResponse: 'static,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error: 'static,
+    >
+    GhostCanTrack<
+        UserData,
+        Context,
+        RequestToOther,
+        RequestToOtherResponse,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error,
+    >
+    for GhostContextEndpoint<
+        UserData,
+        Context,
+        RequestToOther,
+        RequestToOtherResponse,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error,
+    >
+{
+    /// publish an event to the remote side, not expecting a response
+    fn publish(&mut self, payload: RequestToOther) {
+        self.sender
+            .send(GhostEndpointMessage::Request {
+                request_id: None,
+                payload,
+            })
+            .expect("should send");
+    }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
-    pub fn request(
+    fn request(
         &mut self,
         context: Context,
         payload: RequestToOther,
@@ -307,7 +378,7 @@ impl<
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
-    pub fn request_timeout(
+    fn request_timeout(
         &mut self,
         context: Context,
         payload: RequestToOther,
@@ -318,14 +389,14 @@ impl<
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
-    pub fn drain_messages(
+    fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>> {
         self.outbox_messages_to_self.drain(..).collect()
     }
 
     /// check for pending responses timeouts or incoming messages
-    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.pending_responses_tracker.process(user_data)?;
         loop {
             let msg: Result<
