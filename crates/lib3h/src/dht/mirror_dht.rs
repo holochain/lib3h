@@ -345,16 +345,19 @@ impl MirrorDht {
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
                         let maybe_known_peer = self.get_peer(&gossiped_peer.peer_address);
-                        if maybe_known_peer.is_none() {
-                            self.endpoint_self
-                                .publish(DhtRequestToParent::HoldPeerRequested(
-                                    gossiped_peer.clone(),
-                                ));
-                        }
-                        let known_peer = maybe_known_peer.unwrap();
-                        // Update Peer timestamp
-                        if gossiped_peer.timestamp > known_peer.timestamp {
-                            let _ = self.add_peer(&gossiped_peer);
+                        match maybe_known_peer {
+                            None => {
+                                self.endpoint_self
+                                    .publish(DhtRequestToParent::HoldPeerRequested(
+                                        gossiped_peer.clone(),
+                                    ));
+                            }
+                            Some(known_peer) => {
+                                // Update Peer timestamp
+                                if gossiped_peer.timestamp > known_peer.timestamp {
+                                    let _ = self.add_peer(&gossiped_peer);
+                                }
+                            }
                         }
                     }
                 }

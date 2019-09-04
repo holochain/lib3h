@@ -482,7 +482,9 @@ impl<'engine> RealEngine<'engine> {
                             },
                         }
                     };
-                    if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) = response {
+                    if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
+                        response
+                    {
                         if let Some(known_aspects) = maybe_known_aspects {
                             if !includes(&known_aspects, &aspect_address_list) {
                                 engine.request_list.push(entry_address.clone());
