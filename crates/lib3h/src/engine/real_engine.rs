@@ -9,6 +9,7 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_config::DhtConfig, ghost_protocol::*, dht_protocol::*},
     engine::{
+        g_outbox,
         p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
@@ -181,6 +182,11 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
         outbox.append(&mut p2p_output);
+
+        // Hack
+        let (ugly_did_work, mut ugly_outbox) = self.process_ugly();
+        outbox.append(&mut ugly_outbox);
+
         trace!(
             "process() END - {} (outbox: {})\n",
             self.process_count,
@@ -192,7 +198,7 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
         }
 
         // Done
-        Ok((inbox_did_work || net_did_work, outbox))
+        Ok((inbox_did_work || net_did_work || ugly_did_work, outbox))
     }
 }
 
@@ -386,6 +392,49 @@ impl<'engine> RealEngine<'engine> {
                         //                        };
                         // let cmd = DhtCommand::FetchEntry(msg);
                         // space_gateway.as_dht_mut().post(cmd)?;
+
+                        // #fullsync hack
+                        // just send handle query back to self
+                        outbox.push(Lib3hServerProtocol::HandleQueryEntry(msg));
+
+//                        space_gateway.as_dht_mut().request(
+//                            std::time::Duration::from_millis(2000),
+//                        DhtContext::QueryEntry(msg),
+//                        DhtRequestToChild::RequestEntry(entry_address),
+//                        Box::new( |me, context, response| {
+//                            let /*mut*/ engine = match me.downcast_mut::<RealEngine>() {
+//                                None => panic!("bad downcast"),
+//                                Some(e) => e,
+//                            };
+//                            let response = {
+//                                match response {
+//                                    GhostCallbackData::Timeout => panic!("timeout"),
+//                                    GhostCallbackData::Response(response) => match response {
+//                                        Err(e) => panic!("{:?}", e),
+//                                        Ok(response) => response,
+//                                    },
+//                                }
+//                            };
+//                            let msg = match context {
+//                                DhtContext::QueryEntry(msg) => msg,
+//                                _ => panic!("bad context"),
+//                            };
+//                            if let DhtRequestToChildResponse::RequestEntry(entry_response) = response {
+//                                let srv_msg = Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
+//                                    space_address: msg.space_address.clone(),
+//                                    entry_address: msg.entry_address.clone(),
+//                                    request_id: msg.request_id.clone(),
+//                                    requester_agent_id: msg.requester_agent_id.clone(),
+//                                    responder_agent_id: msg.requester_agent_id.clone(),
+//                                    query_result,
+//                                });
+//                                engine.async_outbox.push(srv_msg);
+//                            } else {
+//                                panic!("bad response to RequestEntry: {:?}", response);
+//                            }
+//                            Ok(())
+//                        }),
+//                        );
                     }
                 }
             }
@@ -405,10 +454,13 @@ impl<'engine> RealEngine<'engine> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        space_gateway
-                            .as_mut()
-                            .as_dht_mut()
-                            .publish(DhtRequestToChild::BroadcastEntry(entry));
+                        // #fullsync hack
+                        // just send handle query back to self
+                        outbox.push(Lib3hServerProtocol::QueryEntryResult(msg));
+//                        space_gateway
+//                            .as_mut()
+//                            .as_dht_mut()
+//                            .publish(DhtRequestToChild::BroadcastEntry(entry));
                     }
                 }
             }
@@ -451,30 +503,35 @@ impl<'engine> RealEngine<'engine> {
             return Ok(());
         }
         let space_gateway = maybe_space.unwrap();
+        println!("serve_HandleGetAuthoringEntryListResult - {}", msg.space_address.clone());
         // Request every 'new' Entry from Core
         self.request_list = Vec::new();
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
                 std::time::Duration::from_millis(2000),
-                DhtContext::NoOp,
+                DhtContext::RequestAspectsOf {
+                    entry_address: entry_address.clone(),
+                    aspect_address_list,
+                    msg: msg.clone(),
+                    request_id: self.request_track.reserve(),
+                },
                 DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                Box::new(|me, context, response| {
-                    let engine = match me.downcast_mut::<RealEngine>() {
-                        None => panic!("bad downcast"),
-                        Some(e) => e,
-                    };
-                    let (entry_address, aspect_address_list) = {
+                Box::new(|_me, context, response| {
+                    let (entry_address, aspect_address_list, msg, request_id) = {
                         if let DhtContext::RequestAspectsOf {
                             entry_address,
                             aspect_address_list,
+                            msg,
+                            request_id,
                         } = context
                         {
-                            (entry_address, aspect_address_list)
+                            (entry_address, aspect_address_list, msg, request_id)
                         } else {
                             panic!("bad context type");
                         }
                     };
+                    println!("Maybe HandleFetchEntry for.. {} = {:?}", entry_address.clone(), aspect_address_list.clone());
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -487,9 +544,25 @@ impl<'engine> RealEngine<'engine> {
                     if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
                         response
                     {
-                        if let Some(known_aspects) = maybe_known_aspects {
-                            if !includes(&known_aspects, &aspect_address_list) {
-                                engine.request_list.push(entry_address.clone());
+                        let can_fetch = match maybe_known_aspects {
+                            None => true,
+                            Some(known_aspects) => {
+                                println!("Known for.. {} = {:?}", entry_address.clone(), known_aspects.clone());
+                                let can = !includes(&known_aspects, &aspect_address_list);
+                                can
+                            }
+                        };
+                        if can_fetch {
+                            println!("Maybe HandleFetchEntry for.. {} -- YES", entry_address.clone());
+                            let msg_data = FetchEntryData {
+                                space_address: msg.space_address.clone(),
+                                entry_address: entry_address.clone(),
+                                request_id,
+                                provider_agent_id: msg.provider_agent_id.clone(),
+                                aspect_address_list: None,
+                            };
+                            unsafe {
+                                g_outbox.lock().unwrap().push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
                             }
                         }
                     } else {
@@ -499,25 +572,27 @@ impl<'engine> RealEngine<'engine> {
                 }),
             );
         }
-        debug!(
-            "HandleGetAuthoringEntryListResult: {}",
-            self.request_list.len()
-        );
-        for entry_address in self.request_list.clone() {
-            let msg_data = FetchEntryData {
-                space_address: msg.space_address.clone(),
-                entry_address: entry_address.clone(),
-                request_id: self.request_track.reserve(),
-                provider_agent_id: msg.provider_agent_id.clone(),
-                aspect_address_list: None,
-            };
-            self.request_track.set(
-                &msg_data.request_id,
-                Some(RealEngineTrackerData::DataForAuthorEntry),
-            );
-            outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
-        }
         Ok(())
+    }
+
+    fn process_ugly(&mut self) -> (DidWork, Vec<Lib3hServerProtocol>) {
+        trace!("process_ugly() - {}", g_outbox.lock().unwrap().len());
+        let mut outbox = Vec::new();
+        let mut did_work = false;
+        unsafe {
+            for srv_msg in g_outbox.lock().unwrap().drain(0..) {
+                did_work = true;
+                if let Lib3hServerProtocol::HandleFetchEntry(msg) = srv_msg.clone() {
+                    self.request_track.set(
+                        &msg.request_id,
+                        Some(RealEngineTrackerData::DataForAuthorEntry),
+                    );
+                }
+                outbox.push(srv_msg);
+            }
+        }
+        trace!("process_ugly() END - {}", outbox.len());
+        (did_work, outbox)
     }
 
     fn serve_HandleGetGossipingEntryListResult(
@@ -805,10 +880,6 @@ pub fn handle_gossipTo<'engine>(
         p2p_gossip
             .serialize(&mut Serializer::new(&mut payload))
             .expect("P2pProtocol::Gossip serialization failed");
-//        let to_conn_id = gateway
-//            .as_mut()
-//            .get_connection_id(&to_peer_address)
-//            .expect("Should gossip to a known peer");
         // Forward gossip to the inner_transport
         gateway
             .as_transport_mut()

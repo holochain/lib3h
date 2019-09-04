@@ -3,7 +3,7 @@ use crate::{
     error::*,
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::EntryData, Address};
+use lib3h_protocol::{data_types::*, Address};
 
 pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>>;
 
@@ -51,8 +51,11 @@ pub enum DhtContext {
     RequestAspectsOf {
         entry_address: Address,
         aspect_address_list: Vec<Address>,
+        msg: EntryListData,
+        request_id: String,
     },
     RequestEntry(DhtToChildMessage),
+    QueryEntry(QueryEntryData)
 }
 
 #[derive(Debug)]
