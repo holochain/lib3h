@@ -263,23 +263,19 @@ impl TestTransport {
             for e in events {
                 match e {
                     MockernetEvent::Message { from, payload } => {
-                        detach_run!(self.endpoint_self, |s| s.publish(
-                            RequestToParent::ReceivedData {
-                                address: from,
-                                payload
-                            }
-                        ));
+                        self.endpoint_self.publish(RequestToParent::ReceivedData {
+                            address: from,
+                            payload,
+                        });
                     }
                     MockernetEvent::Connection { from } => {
-                        detach_run!(self.endpoint_self, |s| s
-                            .publish(RequestToParent::IncomingConnection { address: from }));
+                        self.endpoint_self
+                            .publish(RequestToParent::IncomingConnection { address: from });
                     }
                     MockernetEvent::Error(err) => {
-                        detach_run!(self.endpoint_self, |s| s.publish(
-                            RequestToParent::TransportError {
-                                error: TransportError::new(err)
-                            }
-                        ));
+                        self.endpoint_self.publish(RequestToParent::TransportError {
+                            error: TransportError::new(err),
+                        });
                     }
                 }
             }
