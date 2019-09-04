@@ -186,6 +186,7 @@ impl
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
+    // END BOILER PLATE--------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
@@ -195,7 +196,6 @@ impl
         self.handle_events_from_mockernet();
         Ok(false.into())
     }
-    // END BOILER PLATE--------------------------
 }
 
 impl TestTransport {
