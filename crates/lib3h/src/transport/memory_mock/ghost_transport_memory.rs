@@ -1,6 +1,6 @@
 use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashSet};
+use std::collections::HashSet;
 use url::Url;
 
 #[derive(Debug)]
@@ -78,10 +78,6 @@ impl
     > for GhostTransportMemory
 {
     // BOILERPLATE START----------------------------------
-
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
 
     fn take_parent_endpoint(&mut self) -> Option<GhostTransportMemoryEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)

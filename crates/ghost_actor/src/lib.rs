@@ -74,7 +74,6 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use std::any::Any;
 
     type FakeError = String;
 
@@ -144,10 +143,6 @@ mod tests {
             FakeError,
         > for RrDht
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(
             &mut self,
         ) -> Option<
@@ -294,10 +289,6 @@ mod tests {
             String,
         > for GatewayTransport
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(
             &mut self,
         ) -> Option<

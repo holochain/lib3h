@@ -7,7 +7,6 @@ use crate::{
 
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use std::any::Any;
 pub mod keystore_protocol {
     #[derive(Debug)]
     pub enum RequestToChild {
@@ -122,10 +121,6 @@ impl
         Lib3hError,
     > for KeystoreStub
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<KeystoreParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }

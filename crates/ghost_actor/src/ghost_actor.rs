@@ -1,7 +1,6 @@
 use crate::{
     GhostCallback, GhostContextEndpoint, GhostEndpoint, GhostMessage, GhostResult, WorkWasDone,
 };
-use std::any::Any;
 
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
@@ -174,10 +173,6 @@ pub trait GhostActor<
     Error,
 >
 {
-    /// get a generic reference to ourselves
-    /// will be passed into any endpoint process functions
-    fn as_any(&mut self) -> &mut dyn Any;
-
     /// our parent gets a reference to the parent side of our channel
     fn take_parent_endpoint(
         &mut self,
@@ -310,7 +305,6 @@ mod tests {
     use super::*;
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
-    use std::any::Any;
 
     // Any actor has messages that it exchanges with it's parent
     // These are the Out message, and it has messages that come internally
@@ -360,9 +354,6 @@ mod tests {
         for TestActor
     {
         // START BOILER PLATE--------------------------
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
 
         fn take_parent_endpoint(
             &mut self,

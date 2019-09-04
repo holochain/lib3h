@@ -5,7 +5,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 use url::Url;
 
 enum ToParentContext {}
@@ -370,10 +370,6 @@ impl
         TransportError,
     > for TransportEncoding
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
@@ -445,10 +441,6 @@ mod tests {
             TransportError,
         > for TransportMock
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
             std::mem::replace(&mut self.endpoint_parent, None)
         }
