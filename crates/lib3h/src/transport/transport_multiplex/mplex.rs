@@ -1,7 +1,7 @@
 use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 use url::Url;
 
 use super::{LocalRouteSpec, TransportMultiplexRoute};
@@ -16,6 +16,7 @@ enum MplexToInnerContext {
 }
 
 type SelfContextEndpoint<Context> = GhostContextEndpoint<
+    TransportMultiplex,
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -30,7 +31,8 @@ pub struct TransportMultiplex {
     // our self channel endpoint
     endpoint_self: Detach<SelfContextEndpoint<()>>,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<MplexToInnerContext>>,
+    inner_transport:
+        Detach<TransportActorParentWrapperDyn<TransportMultiplex, MplexToInnerContext>>,
     // our map of endpoints connecting us to our Routes
     route_endpoints: Detach<HashMap<LocalRouteSpec, SelfContextEndpoint<()>>>,
 }
@@ -40,7 +42,12 @@ impl TransportMultiplex {
     pub fn new(inner_transport: DynTransportActor) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mplex_to_parent_"));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix("mplex_to_parent_")
+                .build(),
+        );
         let inner_transport = Detach::new(GhostParentWrapperDyn::new(
             inner_transport,
             "mplex_to_inner_",
@@ -63,7 +70,10 @@ impl TransportMultiplex {
         local_agent_id: String,
     ) -> TransportMultiplexRoute {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
-        let endpoint_self = endpoint_self.as_context_endpoint("mplex_to_route_");
+        let endpoint_self = endpoint_self
+            .as_context_endpoint_builder()
+            .request_id_prefix("mplex_to_route_")
+            .build();
 
         let route_spec = LocalRouteSpec {
             space_address,
@@ -184,7 +194,6 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             MplexToInnerContext::AwaitBind(msg),
             RequestToChild::Bind { spec },
             Box::new(|_, context, response| {
@@ -219,7 +228,6 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             MplexToInnerContext::AwaitSend(msg),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, context, response| {
@@ -271,7 +279,6 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             MplexToInnerContext::AwaitBind(msg),
             RequestToChild::Bind { spec },
             Box::new(|_, context, response| {
@@ -306,7 +313,6 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             MplexToInnerContext::AwaitSend(msg),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, context, response| {
@@ -342,26 +348,22 @@ impl
         TransportError,
     > for TransportMultiplex
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        detach_run!(&mut self.inner_transport, |it| it.process(self.as_any()))?;
+        detach_run!(&mut self.inner_transport, |it| it.process(self))?;
         for msg in self.inner_transport.as_mut().drain_messages() {
             self.handle_msg_from_inner(msg)?;
         }
         detach_run!(&mut self.route_endpoints, |re| {
             for (_route_spec, endpoint) in re.iter_mut() {
-                if let Err(e) = endpoint.process(self.as_any()) {
+                if let Err(e) = endpoint.process(self) {
                     return Err(TransportError::from(e));
                 }
                 for msg in endpoint.drain_messages() {

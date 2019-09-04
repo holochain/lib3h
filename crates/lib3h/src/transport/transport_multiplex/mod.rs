@@ -36,7 +36,6 @@ mod tests {
     use crate::transport::{error::*, protocol::*};
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
-    use std::any::Any;
     use url::Url;
 
     enum MockToParentContext {}
@@ -45,6 +44,7 @@ mod tests {
         endpoint_parent: Option<TransportActorParentEndpoint>,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                TransportMock,
                 MockToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
@@ -65,7 +65,12 @@ mod tests {
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
-            let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
+            let endpoint_self = Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("mock_to_parent_")
+                    .build(),
+            );
             Self {
                 endpoint_parent,
                 endpoint_self,
@@ -85,16 +90,12 @@ mod tests {
             TransportError,
         > for TransportMock
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
             std::mem::replace(&mut self.endpoint_parent, None)
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+            detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
                     RequestToChild::Bind { mut spec } => {
@@ -130,13 +131,13 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: TransportActorParentWrapper<(), TransportMultiplex> =
+        let mut mplex: TransportActorParentWrapper<(), (), TransportMultiplex> =
             GhostParentWrapper::new(
                 TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
                 "test_mplex_",
             );
 
-        let mut route_a: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
+        let mut route_a: TransportActorParentWrapperDyn<(), ()> = GhostParentWrapperDyn::new(
             Box::new(
                 mplex
                     .as_mut()
@@ -145,7 +146,7 @@ mod tests {
             "test_route_a_",
         );
 
-        let mut route_b: TransportActorParentWrapperDyn<()> = GhostParentWrapperDyn::new(
+        let mut route_b: TransportActorParentWrapperDyn<(), ()> = GhostParentWrapperDyn::new(
             Box::new(
                 mplex
                     .as_mut()
@@ -156,7 +157,6 @@ mod tests {
 
         // send a message from route A
         route_a.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::SendMessage {
                 address: addr_none.clone(),

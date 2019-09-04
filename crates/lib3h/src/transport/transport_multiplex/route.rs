@@ -1,7 +1,6 @@
 use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use std::any::Any;
 use url::Url;
 
 use super::LocalRouteSpec;
@@ -26,6 +25,7 @@ pub struct TransportMultiplexRoute {
     // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
+            TransportMultiplexRoute,
             RouteToParentContext,
             RequestToParent,
             RequestToParentResponse,
@@ -37,6 +37,7 @@ pub struct TransportMultiplexRoute {
     // ref to our inner transport
     inner_transport: Detach<
         GhostContextEndpoint<
+            TransportMultiplexRoute,
             RouteToInnerContext,
             RequestToChild,
             RequestToChildResponse,
@@ -61,8 +62,18 @@ impl TransportMultiplexRoute {
     ) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("route_to_parent_"));
-        let inner_transport = Detach::new(inner_transport.as_context_endpoint("route_to_inner_"));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix("route_to_parent_")
+                .build(),
+        );
+        let inner_transport = Detach::new(
+            inner_transport
+                .as_context_endpoint_builder()
+                .request_id_prefix("route_to_inner_")
+                .build(),
+        );
         Self {
             route_spec,
             endpoint_parent,
@@ -142,7 +153,6 @@ impl TransportMultiplexRoute {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             RouteToInnerContext::AwaitBind(msg),
             RequestToChild::Bind { spec },
             Box::new(|_, context, response| {
@@ -177,7 +187,6 @@ impl TransportMultiplexRoute {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             RouteToInnerContext::AwaitSend(msg),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, context, response| {
@@ -213,20 +222,16 @@ impl
         TransportError,
     > for TransportMultiplexRoute
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        detach_run!(&mut self.inner_transport, |it| it.process(self.as_any()))?;
+        detach_run!(&mut self.inner_transport, |it| it.process(self))?;
         for msg in self.inner_transport.as_mut().drain_messages() {
             self.handle_msg_from_inner(msg)?;
         }
