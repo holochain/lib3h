@@ -49,18 +49,19 @@ impl<'engine> RealEngine<'engine> {
         //let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
             //let (did_work, event_list) =
-            space_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME
-                                                                  //            if did_work {
-                                                                  //                // TODO: perf optim, don't copy chain_id
-                                                                  //                dht_outbox.insert(chain_id.clone(), event_list);
-                                                                  //            }
-                                                                  //        }
-                                                                  //        // Process all gateway DHT events
-                                                                  //        for (chain_id, evt_list) in dht_outbox {
-                                                                  //            for evt in evt_list {
-                                                                  //                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
-                                                                  //                outbox.append(&mut output);
-                                                                  //            }
+            // FIXME unwrap
+            space_gateway.as_mut().process_dht(&mut ()).unwrap();
+            //            if did_work {
+            //                // TODO: perf optim, don't copy chain_id
+            //                dht_outbox.insert(chain_id.clone(), event_list);
+            //            }
+            //        }
+            //        // Process all gateway DHT events
+            //        for (chain_id, evt_list) in dht_outbox {
+            //            for evt in evt_list {
+            //                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
+            //                outbox.append(&mut output);
+            //            }
         }
         // FIXME
         Ok(outbox)

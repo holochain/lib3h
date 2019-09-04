@@ -1,5 +1,5 @@
 use crate::{
-    dht::{dht_protocol::*, dht_trait::*, PeerAddress},
+    dht::{dht_config::DhtConfig, dht_protocol::*, PeerAddress},
     error::*,
 };
 use lib3h_ghost_actor::prelude::*;

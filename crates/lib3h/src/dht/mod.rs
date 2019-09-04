@@ -1,5 +1,5 @@
+pub mod dht_config;
 pub mod dht_protocol;
-pub mod dht_trait;
 pub mod mirror_dht;
 //pub mod rrdht;
 pub mod ghost_protocol;
@@ -40,28 +40,6 @@ pub mod tests {
     const PEER_A: &PeerAddressRef = "alex";
     const PEER_B: &PeerAddressRef = "billy";
     const PEER_C: &PeerAddressRef = "camille";
-
-    //    pub struct DhtParent {
-    //        inner_dht: Detach<ChildDhtWrapperDyn>,
-    //        /// temp variables for ghostCallback mutation
-    //        maybe_peer: Option<PeerData>,
-    //        this_peer: PeerData,
-    //        peer_list: Vec<PeerData>,
-    //    }
-    //    impl DhtParent {
-    //        pub fn new(dht: Box<DhtActor>) -> Self {
-    //            DhtParent {
-    //                inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent")),
-    //                maybe_peer: None,
-    //                this_peer: PeerData {
-    //                    peer_address: String::new(),
-    //                    peer_uri: Url::parse("dummy://default").unwrap(),
-    //                    timestamp: 0,
-    //                },
-    //                peer_list: Vec::new(),
-    //            }
-    //        }
-    //    }
 
     // Request counters
     #[allow(dead_code)]
@@ -116,10 +94,6 @@ pub mod tests {
         //}
         //Box::new(RrDht::new())
     }
-    //
-    //    fn new_dht_parent(is_mirror: bool, peer_address: &PeerAddressRef) -> DhtParent {
-    //        DhtParent::new(new_dht(is_mirror, peer_address))
-    //    }
 
     fn new_dht_wrapper(
         _is_mirror: bool,

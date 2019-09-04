@@ -7,7 +7,7 @@ use url::Url;
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{dht_trait::*, ghost_protocol::*},
+    dht::{dht_config::DhtConfig, ghost_protocol::*},
     engine::{
         p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },

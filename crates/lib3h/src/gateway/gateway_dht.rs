@@ -14,24 +14,6 @@ use serde::Serialize;
 
 /// Compose DHT
 impl<'gateway>  P2pGateway<'gateway> {
-//    /// Peer info
-//    fn get_peer_list(&self) -> Vec<PeerData> {
-//        self.inner_dht.get_peer_list()
-//    }
-//    fn get_peer(&self, peer_address: &str) -> Option<PeerData> {
-//        self.inner_dht.get_peer(peer_address)
-//    }
-//    fn this_peer(&self) -> &PeerData {
-//        self.inner_dht.this_peer()
-//    }
-//    /// Entry
-//    fn get_entry_address_list(&self) -> Vec<&Address> {
-//        self.inner_dht.get_entry_address_list()
-//    }
-//    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
-//        self.inner_dht.get_aspects_of(entry_address)
-//    }
-
     /// Processing
     fn post(&mut self, cmd: DhtRequestToChild) -> Lib3hResult<()> {
         // Add to connection_map for space_gateways

@@ -22,18 +22,13 @@ pub trait Gateway: Transport {
     fn transport_inject_event(&mut self, evt: TransportEvent);
     fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
 
+    fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()>;
+    fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
+
     // sync actor requests
     fn get_peer_list_sync(&mut self) -> Vec<PeerData>;
     fn get_this_peer_sync(&mut self) -> PeerData;
     fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData>;
-
-    // fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
-
-    fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()>;
-
-    //    fn take_dht_parent_endpoint(&mut self) -> Option<DhtEndpoint>;
-
-    fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
 }
 
 /// Gateway to a P2P network.
