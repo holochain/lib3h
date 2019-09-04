@@ -5,7 +5,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 use url::Url;
 
 enum ToParentContext {}
@@ -36,6 +36,7 @@ pub struct TransportEncoding {
     // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
+            Self,
             ToParentContext,
             RequestToParent,
             RequestToParentResponse,
@@ -45,7 +46,7 @@ pub struct TransportEncoding {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<ToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding, ToInnerContext>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes
@@ -79,7 +80,12 @@ impl TransportEncoding {
     ) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("enc_to_parent_"));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix("enc_to_parent_")
+                .build(),
+        );
         let keystore = Detach::new(GhostParentWrapperDyn::new(keystore, "enc_to_keystore"));
         let inner_transport =
             Detach::new(GhostParentWrapperDyn::new(inner_transport, "enc_to_inner_"));
@@ -253,14 +259,9 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitBind(msg),
             RequestToChild::Bind { spec },
-            Box::new(|m, context, response| {
-                let m = match m.downcast_mut::<TransportEncoding>() {
-                    None => panic!("wrong type"),
-                    Some(m) => m,
-                };
+            Box::new(|m: &mut TransportEncoding, context, response| {
                 let msg = {
                     match context {
                         ToInnerContext::AwaitBind(msg) => msg,
@@ -303,10 +304,9 @@ impl TransportEncoding {
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitSend(msg),
             RequestToChild::SendMessage { address, payload },
-            Box::new(|_, context, response| {
+            Box::new(|_: &mut TransportEncoding, context, response| {
                 let msg = {
                     match context {
                         ToInnerContext::AwaitSend(msg) => msg,
@@ -373,24 +373,20 @@ impl
         TransportError,
     > for TransportEncoding
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        detach_run!(&mut self.inner_transport, |it| it.process(self.as_any()))?;
+        detach_run!(&mut self.inner_transport, |it| it.process(self))?;
         for msg in self.inner_transport.as_mut().drain_messages() {
             self.handle_msg_from_inner(msg)?;
         }
-        detach_run!(&mut self.keystore, |ks| ks.process(self.as_any()))?;
+        detach_run!(&mut self.keystore, |ks| ks.process(self))?;
         Ok(false.into())
     }
 }
@@ -407,6 +403,7 @@ mod tests {
         endpoint_parent: Option<TransportActorParentEndpoint>,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                TransportMock,
                 ToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
@@ -427,7 +424,12 @@ mod tests {
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
-            let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
+            let endpoint_self = Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("mock_to_parent_")
+                    .build(),
+            );
             Self {
                 endpoint_parent,
                 endpoint_self,
@@ -447,16 +449,12 @@ mod tests {
             TransportError,
         > for TransportMock
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
             std::mem::replace(&mut self.endpoint_parent, None)
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+            detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
                     RequestToChild::Bind { mut spec } => {
@@ -509,24 +507,24 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
-            TransportEncoding::new(
-                crypto.box_clone(),
-                ID_1.to_string(),
-                Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new(s1out, r1in)),
-            ),
-            "test1",
-        );
+        let mut t1: TransportActorParentWrapper<bool, (), TransportEncoding> =
+            GhostParentWrapper::new(
+                TransportEncoding::new(
+                    crypto.box_clone(),
+                    ID_1.to_string(),
+                    Box::new(KeystoreStub::new()),
+                    Box::new(TransportMock::new(s1out, r1in)),
+                ),
+                "test1",
+            );
 
         // give it a bind point
         t1.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
-            Box::new(|_, _, response| {
+            Box::new(|_: &mut bool, _, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
@@ -536,31 +534,31 @@ mod tests {
         );
 
         // allow process
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut false).unwrap();
 
         // we need some channels into our mock inner_transports
         let (s2out, r2out) = crossbeam_channel::unbounded();
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
-            TransportEncoding::new(
-                crypto.box_clone(),
-                ID_2.to_string(),
-                Box::new(KeystoreStub::new()),
-                Box::new(TransportMock::new(s2out, r2in)),
-            ),
-            "test2",
-        );
+        let mut t2: TransportActorParentWrapper<(), (), TransportEncoding> =
+            GhostParentWrapper::new(
+                TransportEncoding::new(
+                    crypto.box_clone(),
+                    ID_2.to_string(),
+                    Box::new(KeystoreStub::new()),
+                    Box::new(TransportMock::new(s2out, r2in)),
+                ),
+                "test2",
+            );
 
         // give it a bind point
         t2.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
             },
-            Box::new(|_, _, response| {
+            Box::new(|_:&mut (), _, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\" })))"
@@ -576,24 +574,20 @@ mod tests {
 
         // now we're going to send a message to our sibling #2
         t1.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::SendMessage {
                 address: addr2full.clone(),
                 payload: b"hello".to_vec(),
             },
-            Box::new(|m, _, response| {
-                match m.downcast_mut::<bool>() {
-                    None => panic!("bad downcast"),
-                    Some(b) => *b = true,
-                }
+            Box::new(|b: &mut bool, _, response| {
+                *b = true;
                 // make sure we get a success response
                 assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
                 Ok(())
             }),
         );
 
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut t1_got_success_resp).unwrap();
 
         // we get a handshake that needs to be forwarded to #2
         let (address, payload) = r1out.recv().unwrap();
@@ -602,7 +596,7 @@ mod tests {
         s2in.send((addr1.clone(), payload)).unwrap();
 
         t2.process(&mut ()).unwrap();
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut t1_got_success_resp).unwrap();
         t2.process(&mut ()).unwrap();
 
         // we get a handshake that needs to be forwarded to #1
@@ -611,7 +605,7 @@ mod tests {
         assert_eq!(ID_2, &String::from_utf8_lossy(&payload));
         s1in.send((addr2.clone(), payload)).unwrap();
 
-        t1.process(&mut ()).unwrap();
+        t1.process(&mut t1_got_success_resp).unwrap();
         t2.process(&mut ()).unwrap();
 
         // this is the process where we get the Send Success
