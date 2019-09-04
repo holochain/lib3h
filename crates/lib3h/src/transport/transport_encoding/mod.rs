@@ -80,7 +80,12 @@ impl TransportEncoding {
     ) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("enc_to_parent_"));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix("enc_to_parent_")
+                .build(),
+        );
         let keystore = Detach::new(GhostParentWrapperDyn::new(keystore, "enc_to_keystore"));
         let inner_transport =
             Detach::new(GhostParentWrapperDyn::new(inner_transport, "enc_to_inner_"));
@@ -254,7 +259,6 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitBind(msg),
             RequestToChild::Bind { spec },
             Box::new(|m: &mut TransportEncoding, context, response| {
@@ -300,7 +304,6 @@ impl TransportEncoding {
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
-            std::time::Duration::from_millis(2000),
             ToInnerContext::AwaitSend(msg),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_: &mut TransportEncoding, context, response| {
@@ -421,7 +424,12 @@ mod tests {
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
-            let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("mock_to_parent_"));
+            let endpoint_self = Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("mock_to_parent_")
+                    .build(),
+            );
             Self {
                 endpoint_parent,
                 endpoint_self,
@@ -512,7 +520,6 @@ mod tests {
 
         // give it a bind point
         t1.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
@@ -547,7 +554,6 @@ mod tests {
 
         // give it a bind point
         t2.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
@@ -568,7 +574,6 @@ mod tests {
 
         // now we're going to send a message to our sibling #2
         t1.request(
-            std::time::Duration::from_millis(2000),
             (),
             RequestToChild::SendMessage {
                 address: addr2full.clone(),

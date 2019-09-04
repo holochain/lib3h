@@ -85,7 +85,12 @@ impl KeystoreStub {
     pub fn new() -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self = Detach::new(endpoint_self.as_context_endpoint("keystore_to_parent_"));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix("keystore_to_parent_")
+                .build(),
+        );
         Self {
             endpoint_parent,
             endpoint_self,

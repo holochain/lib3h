@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
 
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
+
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure
 /// such as a timeout
@@ -28,24 +30,70 @@ struct GhostTrackerEntry<UserData, Context, CbData, E> {
     cb: GhostCallback<UserData, Context, CbData, E>,
 }
 
+#[derive(Debug, Clone)]
+pub struct GhostTrackerBuilder {
+    request_id_prefix: String,
+    default_timeout: std::time::Duration,
+}
+
+impl Default for GhostTrackerBuilder {
+    fn default() -> Self {
+        Self {
+            request_id_prefix: "".to_string(),
+            default_timeout: DEFAULT_TIMEOUT,
+        }
+    }
+}
+
+impl GhostTrackerBuilder {
+    pub fn build<UserData, Context, CbData, E>(self) -> GhostTracker<UserData, Context, CbData, E> {
+        GhostTracker {
+            request_id_prefix: self.request_id_prefix,
+            default_timeout: self.default_timeout,
+            pending: HashMap::new(),
+        }
+    }
+
+    pub fn request_id_prefix(mut self, request_id_prefix: &str) -> Self {
+        self.request_id_prefix = request_id_prefix.to_string();
+        self
+    }
+
+    pub fn default_timeout(mut self, default_timeout: std::time::Duration) -> Self {
+        self.default_timeout = default_timeout;
+        self
+    }
+}
+
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
 pub struct GhostTracker<UserData, Context, CbData, E> {
     request_id_prefix: String,
+    default_timeout: std::time::Duration,
     pending: HashMap<RequestId, GhostTrackerEntry<UserData, Context, CbData, E>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GhostTrackerBookmarkOptions {
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Default for GhostTrackerBookmarkOptions {
+    fn default() -> Self {
+        Self { timeout: None }
+    }
+}
+
+impl GhostTrackerBookmarkOptions {
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
 }
 
 impl<UserData, Context: 'static, CbData: 'static, E: 'static>
     GhostTracker<UserData, Context, CbData, E>
 {
-    /// create a new tracker instance (with request_id prefix)
-    pub fn new(request_id_prefix: &str) -> Self {
-        Self {
-            request_id_prefix: request_id_prefix.to_string(),
-            pending: HashMap::new(),
-        }
-    }
-
     /// trigger any periodic or delayed callbacks
     /// also check / cleanup any timeouts
     pub fn process(&mut self, ga: &mut UserData) -> GhostResult<()> {
@@ -74,11 +122,25 @@ impl<UserData, Context: 'static, CbData: 'static, E: 'static>
     /// register a callback
     pub fn bookmark(
         &mut self,
-        timeout: std::time::Duration,
         context: Context,
         cb: GhostCallback<UserData, Context, CbData, E>,
     ) -> RequestId {
+        self.bookmark_options(context, cb, GhostTrackerBookmarkOptions::default())
+    }
+
+    /// register a callback, using a specific timeout instead of the default
+    pub fn bookmark_options(
+        &mut self,
+        context: Context,
+        cb: GhostCallback<UserData, Context, CbData, E>,
+        options: GhostTrackerBookmarkOptions,
+    ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
+
+        let timeout = match options.timeout {
+            None => self.default_timeout,
+            Some(timeout) => timeout,
+        };
 
         self.pending.insert(
             request_id.clone(),
@@ -126,9 +188,11 @@ mod tests {
 
     impl TestTrackingActor {
         fn new(request_id_prefix: &str) -> Self {
+            let tracker_builder =
+                GhostTrackerBuilder::default().request_id_prefix(request_id_prefix);
             Self {
                 state: "".into(),
-                tracker: Detach::new(GhostTracker::new(request_id_prefix)),
+                tracker: Detach::new(tracker_builder.build()),
             }
         }
     }
@@ -151,12 +215,7 @@ mod tests {
 
         // lets bookmark a callback that should set our actors state to the value
         // of the callback response
-        let req_id = actor.tracker.bookmark(
-            // arbitrary timeout, we never call process in this test
-            std::time::Duration::from_millis(2000),
-            context,
-            cb,
-        );
+        let req_id = actor.tracker.bookmark(context, cb);
 
         let entry = actor.tracker.pending.get(&req_id).unwrap();
         assert_eq!(entry.context.0, "some_context_data");
@@ -202,9 +261,11 @@ mod tests {
                 }
                 Ok(())
             });
-        let _req_id = actor
-            .tracker
-            .bookmark(std::time::Duration::from_millis(1), context, cb);
+        let _req_id = actor.tracker.bookmark_options(
+            context,
+            cb,
+            GhostTrackerBookmarkOptions::default().timeout(std::time::Duration::from_millis(1)),
+        );
         assert_eq!(actor.tracker.pending.len(), 1);
 
         // wait 1 ms for the callback to have expired

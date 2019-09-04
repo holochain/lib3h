@@ -52,19 +52,26 @@ mod ghost_error;
 pub use ghost_error::{GhostError, GhostResult};
 
 mod ghost_tracker;
-pub use ghost_tracker::{GhostCallback, GhostCallbackData, GhostTracker};
+pub use ghost_tracker::{
+    GhostCallback, GhostCallbackData, GhostTracker, GhostTrackerBookmarkOptions,
+    GhostTrackerBuilder,
+};
 
 mod ghost_channel;
-pub use ghost_channel::{create_ghost_channel, GhostContextEndpoint, GhostEndpoint, GhostMessage};
+pub use ghost_channel::{
+    create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
+    GhostTrackRequestOptions,
+};
 
 mod ghost_actor;
 pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostContextEndpoint,
-        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostParentWrapperDyn,
-        GhostResult, GhostTracker, WorkWasDone,
+        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
+        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
+        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
+        GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -129,7 +136,12 @@ mod tests {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
                 endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_to_parent")),
+                endpoint_self: Detach::new(
+                    endpoint_self
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("dht_to_parent")
+                        .build(),
+                ),
             }
         }
     }
@@ -274,7 +286,12 @@ mod tests {
             let dht = Detach::new(GhostParentWrapper::new(RrDht::new(), "to_dht"));
             Self {
                 endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("gw_to_parent")),
+                endpoint_self: Detach::new(
+                    endpoint_self
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("gw_to_parent")
+                        .build(),
+                ),
                 dht,
             }
         }
@@ -306,7 +323,6 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.endpoint_self.as_mut().request(
-                std::time::Duration::from_millis(2000),
                 RequestToParentContext::IncomingConnection {
                     address: "test".to_string(),
                 },
@@ -343,7 +359,6 @@ mod tests {
                         payload: _,
                     } => {
                         self.dht.as_mut().request(
-                            std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(|_m:&mut GatewayTransport, context, response| {
@@ -424,7 +439,8 @@ mod tests {
         let mut t_actor_endpoint = t_actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<(), i8>("test");
+            .as_context_endpoint_builder()
+            .build::<(), i8>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
@@ -450,7 +466,6 @@ mod tests {
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
         t_actor_endpoint.request(
-            std::time::Duration::from_millis(2000),
             42_i8,
             RequestToChild::Bind {
                 spec: "address_to_bind_to".to_string(),
@@ -465,7 +480,6 @@ mod tests {
         let _ = t_actor_endpoint.process(&mut ());
 
         t_actor_endpoint.request(
-            std::time::Duration::from_millis(2000),
             42_i8,
             RequestToChild::SendMessage {
                 address: "agent_id_1".to_string(),

@@ -199,8 +199,12 @@ impl TestTransport {
     pub fn new(name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
-        let endpoint_self =
-            Detach::new(endpoint_self.as_context_endpoint(&format!("{}_to_parent_", name)));
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix(&format!("{}_to_parent_", name))
+                .build(),
+        );
         TestTransport {
             name: name.to_string(),
             bound_url: None,
@@ -311,7 +315,6 @@ fn ghost_transport() {
 
     // bind t1 to the network
     t1.request(
-        std::time::Duration::from_millis(2000),
         (),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t1").expect("can parse url"),
@@ -331,7 +334,6 @@ fn ghost_transport() {
     // lets do some things to test out returning of error messages, i.e. sending messages
     // to someone not bount to the network
     t1.request(
-        std::time::Duration::from_millis(2000),
         (),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
@@ -352,7 +354,6 @@ fn ghost_transport() {
 
     // bind t2 to the network
     t2.request(
-        std::time::Duration::from_millis(2000),
         (),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t2").expect("can parse url"),
@@ -370,7 +371,6 @@ fn ghost_transport() {
     );
 
     t1.request(
-        std::time::Duration::from_millis(2000),
         (),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),

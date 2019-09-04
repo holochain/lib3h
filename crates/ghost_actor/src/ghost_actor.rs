@@ -1,6 +1,4 @@
-use crate::{
-    GhostCallback, GhostContextEndpoint, GhostEndpoint, GhostMessage, GhostResult, WorkWasDone,
-};
+use crate::prelude::*;
 
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
@@ -66,35 +64,84 @@ impl<
         let endpoint = actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint(request_id_prefix);
+            .as_context_endpoint_builder()
+            .request_id_prefix(request_id_prefix)
+            .build();
         Self { actor, endpoint }
     }
+}
 
+impl<
+        UserData: 'static,
+        Context: 'static,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse: 'static,
+        Error: 'static,
+        Actor: GhostActor<
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            Error,
+        >,
+    >
+    GhostCanTrack<
+        UserData,
+        Context,
+        RequestToChild,
+        RequestToChildResponse,
+        RequestToParent,
+        RequestToParentResponse,
+        Error,
+    >
+    for GhostParentWrapper<
+        UserData,
+        Context,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+        Actor,
+    >
+{
     /// see GhostContextEndpoint::publish
-    pub fn publish(&mut self, payload: RequestToChild) {
+    fn publish(&mut self, payload: RequestToChild) {
         self.endpoint.publish(payload)
     }
 
     /// see GhostContextEndpoint::request
-    pub fn request(
+    fn request(
         &mut self,
-        timeout: std::time::Duration,
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
     ) {
-        self.endpoint.request(timeout, context, payload, cb)
+        self.endpoint.request(context, payload, cb)
+    }
+
+    /// see GhostContextEndpoint::request
+    fn request_options(
+        &mut self,
+        context: Context,
+        payload: RequestToChild,
+        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
+        options: GhostTrackRequestOptions,
+    ) {
+        self.endpoint.request_options(context, payload, cb, options)
     }
 
     /// see GhostContextEndpoint::drain_messages
-    pub fn drain_messages(
+    fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
         self.endpoint.drain_messages()
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.actor.process()?;
         self.endpoint.process(user_data)?;
         Ok(())
@@ -265,7 +312,9 @@ impl<
         let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint(request_id_prefix);
+            .as_context_endpoint_builder()
+            .request_id_prefix(request_id_prefix)
+            .build();
         Self { actor, endpoint }
     }
 
@@ -277,12 +326,21 @@ impl<
     /// see GhostContextEndpoint::request
     pub fn request(
         &mut self,
-        timeout: std::time::Duration,
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
     ) {
-        self.endpoint.request(timeout, context, payload, cb)
+        self.endpoint.request(context, payload, cb)
+    }
+
+    pub fn request_options(
+        &mut self,
+        context: Context,
+        payload: RequestToChild,
+        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
+        options: GhostTrackRequestOptions,
+    ) {
+        self.endpoint.request_options(context, payload, cb, options)
     }
 
     /// see GhostContextEndpoint::drain_messages
@@ -344,7 +402,12 @@ mod tests {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
                 endpoint_for_parent: Some(endpoint_parent),
-                endpoint_as_child: Detach::new(endpoint_self.as_context_endpoint("child")),
+                endpoint_as_child: Detach::new(
+                    endpoint_self
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("child")
+                        .build(),
+                ),
                 internal_state: Vec::new(),
             }
         }
@@ -411,7 +474,9 @@ mod tests {
         > = child_actor
             .take_parent_endpoint()
             .unwrap()
-            .as_context_endpoint("parent");
+            .as_context_endpoint_builder()
+            .request_id_prefix("parent")
+            .build();
 
         // now lets post an event from the parent
         parent_endpoint.publish(TestMsgIn("event from parent".into()));
@@ -434,7 +499,6 @@ mod tests {
             });
 
         parent_endpoint.request(
-            std::time::Duration::from_millis(1000),
             TestContext("context data".into()),
             TestMsgIn("event from parent".into()),
             cb,

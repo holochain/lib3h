@@ -1,4 +1,7 @@
-use crate::{GhostCallback, GhostResult, GhostTracker, RequestId};
+use crate::{
+    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
+    RequestId,
+};
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -100,7 +103,7 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static>
 /// a parent_endpoint, and a child_endpoint
 /// these raw endpoints are not very useful on their own. When you get them
 /// to the place they will be used, you probably want to call
-/// `as_context_endpoint()` on them.
+/// `as_context_endpoint_builder()` on them.
 pub struct GhostEndpoint<
     RequestToOther,
     RequestToOtherResponse,
@@ -146,13 +149,54 @@ impl<
     /// expand a raw endpoint into something usable.
     /// <Context> let's you store data with individual `request` calls
     /// that will be available again when the callback is invoked.
-    /// Feel free to use `as_context_endpoint::<()>("prefix")` if you
+    /// Feel free to use `as_context_endpoint_builder::<()>("prefix")` if you
     /// don't need any context.
     /// request_id_prefix is a debugging hint... the request_ids generated
     /// for tracking request/response pairs will be prepended with this prefix.
-    pub fn as_context_endpoint<UserData, Context: 'static>(
+    pub fn as_context_endpoint_builder(
         self,
-        request_id_prefix: &str,
+    ) -> GhostContextEndpointBuilder<
+        RequestToOther,
+        RequestToOtherResponse,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error,
+    > {
+        GhostContextEndpointBuilder {
+            sender: self.sender,
+            receiver: self.receiver,
+            tracker_builder: GhostTrackerBuilder::default(),
+        }
+    }
+}
+
+pub struct GhostContextEndpointBuilder<
+    RequestToOther,
+    RequestToOtherResponse,
+    RequestToSelf,
+    RequestToSelfResponse,
+    Error,
+> {
+    sender: crossbeam_channel::Sender<
+        GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
+    >,
+    receiver: crossbeam_channel::Receiver<
+        GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
+    >,
+    tracker_builder: GhostTrackerBuilder,
+}
+
+impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfResponse, Error>
+    GhostContextEndpointBuilder<
+        RequestToOther,
+        RequestToOtherResponse,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error,
+    >
+{
+    pub fn build<UserData, Context: 'static>(
+        self,
     ) -> GhostContextEndpoint<
         UserData,
         Context,
@@ -162,12 +206,87 @@ impl<
         RequestToSelfResponse,
         Error,
     > {
-        GhostContextEndpoint::new(request_id_prefix, self.sender, self.receiver)
+        GhostContextEndpoint {
+            sender: self.sender,
+            receiver: self.receiver,
+            pending_responses_tracker: self.tracker_builder.build(),
+            outbox_messages_to_self: Vec::new(),
+        }
+    }
+
+    pub fn request_id_prefix(mut self, request_id_prefix: &str) -> Self {
+        self.tracker_builder = self.tracker_builder.request_id_prefix(request_id_prefix);
+        self
+    }
+
+    pub fn default_timeout(mut self, default_timeout: std::time::Duration) -> Self {
+        self.tracker_builder = self.tracker_builder.default_timeout(default_timeout);
+        self
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct GhostTrackRequestOptions {
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Default for GhostTrackRequestOptions {
+    fn default() -> Self {
+        Self { timeout: None }
+    }
+}
+
+impl GhostTrackRequestOptions {
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+}
+
+/// indicates this type is able to make callback requests && respond to requests
+pub trait GhostCanTrack<
+    UserData,
+    Context,
+    RequestToOther,
+    RequestToOtherResponse,
+    RequestToSelf,
+    RequestToSelfResponse,
+    Error,
+>
+{
+    /// publish an event to the remote side, not expecting a response
+    fn publish(&mut self, payload: RequestToOther);
+
+    /// make a request of the other side. When a response is sent back to us
+    /// the callback will be invoked.
+    fn request(
+        &mut self,
+        context: Context,
+        payload: RequestToOther,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+    );
+
+    /// make a request of the other side. When a response is sent back to us
+    /// the callback will be invoked, override the default timeout.
+    fn request_options(
+        &mut self,
+        context: Context,
+        payload: RequestToOther,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        options: GhostTrackRequestOptions,
+    );
+
+    /// fetch any messages (requests or events) sent to us from the other side
+    fn drain_messages(
+        &mut self,
+    ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>;
+
+    /// check for pending responses timeouts or incoming messages
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()>;
+}
+
 /// an expanded endpoint usable to send/receive requests/responses/events
-/// see `GhostEndpoint::as_context_endpoint` for additional details
+/// see `GhostEndpoint::as_context_endpoint_builder` for additional details
 pub struct GhostContextEndpoint<
     UserData,
     Context,
@@ -207,26 +326,60 @@ impl<
         Error,
     >
 {
-    /// internal new used by `GhostEndpoint::as_context_endpoint`
-    fn new(
-        request_id_prefix: &str,
-        sender: crossbeam_channel::Sender<
-            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
-        >,
-        receiver: crossbeam_channel::Receiver<
-            GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
-        >,
-    ) -> Self {
-        Self {
-            sender,
-            receiver,
-            pending_responses_tracker: GhostTracker::new(request_id_prefix),
-            outbox_messages_to_self: Vec::new(),
-        }
+    fn priv_request(
+        &mut self,
+        context: Context,
+        payload: RequestToOther,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        options: GhostTrackRequestOptions,
+    ) {
+        let request_id = match options.timeout {
+            None => self.pending_responses_tracker.bookmark(context, cb),
+            Some(timeout) => self.pending_responses_tracker.bookmark_options(
+                context,
+                cb,
+                GhostTrackerBookmarkOptions::default().timeout(timeout),
+            ),
+        };
+        self.sender
+            .send(GhostEndpointMessage::Request {
+                request_id: Some(request_id),
+                payload,
+            })
+            .expect("should send");
     }
+}
 
+impl<
+        UserData,
+        Context: 'static,
+        RequestToOther,
+        RequestToOtherResponse: 'static,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error: 'static,
+    >
+    GhostCanTrack<
+        UserData,
+        Context,
+        RequestToOther,
+        RequestToOtherResponse,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error,
+    >
+    for GhostContextEndpoint<
+        UserData,
+        Context,
+        RequestToOther,
+        RequestToOtherResponse,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error,
+    >
+{
     /// publish an event to the remote side, not expecting a response
-    pub fn publish(&mut self, payload: RequestToOther) {
+    fn publish(&mut self, payload: RequestToOther) {
         self.sender
             .send(GhostEndpointMessage::Request {
                 request_id: None,
@@ -237,33 +390,36 @@ impl<
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
-    pub fn request(
+    fn request(
         &mut self,
-        timeout: std::time::Duration,
         context: Context,
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
     ) {
-        let request_id = self
-            .pending_responses_tracker
-            .bookmark(timeout, context, cb);
-        self.sender
-            .send(GhostEndpointMessage::Request {
-                request_id: Some(request_id),
-                payload,
-            })
-            .expect("should send");
+        self.priv_request(context, payload, cb, GhostTrackRequestOptions::default());
+    }
+
+    /// make a request of the other side. When a response is sent back to us
+    /// the callback will be invoked, override the default timeout.
+    fn request_options(
+        &mut self,
+        context: Context,
+        payload: RequestToOther,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        options: GhostTrackRequestOptions,
+    ) {
+        self.priv_request(context, payload, cb, options);
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
-    pub fn drain_messages(
+    fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>> {
         self.outbox_messages_to_self.drain(..).collect()
     }
 
     /// check for pending responses timeouts or incoming messages
-    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.pending_responses_tracker.process(user_data)?;
         loop {
             let msg: Result<
@@ -442,7 +598,7 @@ mod tests {
         >();
 
         // in this test the endpoint will be the child end
-        let mut endpoint = child_side.as_context_endpoint("req_id_prefix");
+        let mut endpoint = child_side.as_context_endpoint_builder().build();
 
         endpoint.publish(TestMsgOut("event to my parent".into()));
         // check to see if the event was sent to the parent
@@ -462,7 +618,6 @@ mod tests {
         }
 
         endpoint.request(
-            std::time::Duration::from_millis(1000),
             TestContext("context data".into()),
             TestMsgOut("request to my parent".into()),
             cb_factory(),
@@ -501,11 +656,11 @@ mod tests {
         );
 
         // Now we'll send a request that should timeout
-        endpoint.request(
-            std::time::Duration::from_millis(1),
+        endpoint.request_options(
             TestContext("context data".into()),
             TestMsgOut("another request to my parent".into()),
             cb_factory(),
+            GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),
         );
 
         // wait 1 ms for the callback to have expired
