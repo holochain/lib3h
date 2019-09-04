@@ -34,7 +34,6 @@ pub enum MockernetEvent {
 // data between.
 pub struct Tube {
     sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-    #[allow(dead_code)]
     receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
 }
 impl Tube {
@@ -101,23 +100,28 @@ impl Mockernet {
             }
         }
 
-        let maybe_binding = self.bindings.get(&address);
-        if maybe_binding.is_none() {
-            if errors.len() == 0 {
-                return Err(format!("{} not bound", address));
+        let ref mut binding = match self.bindings.get(&address) {
+            None => {
+                if errors.len() == 0 {
+                    return Err(format!("{} not bound", address));
+                }
+                return Ok(events);
             }
-            return Ok(events);
-        }
-        let (from, payload) = maybe_binding
-            .unwrap()
-            .receiver
-            .try_recv()
-            .map_err(|e| format!("{:?}", e))?;
-        if !self.are_connected(&address, &from) {
-            events.push(MockernetEvent::Connection { from: from.clone() });
-        }
-        events.push(MockernetEvent::Message { from, payload });
+            Some(binding) => binding,
+        };
 
+        loop {
+            match binding.receiver.try_recv() {
+                Ok((from, payload)) => {
+                    if !self.are_connected(&address, &from) {
+                        events.push(MockernetEvent::Connection { from: from.clone() });
+                    }
+                    events.push(MockernetEvent::Message { from, payload });
+                }
+                Err(crossbeam_channel::TryRecvError::Empty) => break,
+                Err(err) => return Err(format!("{:?}", err)),
+            }
+        }
         Ok(events)
     }
 
@@ -133,7 +137,7 @@ impl Mockernet {
     }
 
     /// check to see if two nodes are connected
-    pub fn are_connected(&mut self, from: &Url, to: &Url) -> bool {
+    pub fn are_connected(&self, from: &Url, to: &Url) -> bool {
         match self.connections.get(from) {
             None => return false,
             Some(cmap) => cmap.contains(to),
