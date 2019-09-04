@@ -23,7 +23,10 @@ pub trait Gateway: Transport {
     fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
 
     fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()>;
-    fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn>;
+    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn;
+
+    // TODO - remove this hack
+    fn hold_peer(&mut self, peer_data: PeerData);
 
     // sync actor requests
     fn get_peer_list_sync(&mut self) -> Vec<PeerData>;
@@ -45,10 +48,7 @@ pub struct P2pGateway<'gateway> {
     transport_inbox: VecDeque<TransportCommand>,
     transport_inject_events: Vec<TransportEvent>,
     /// DHT
-    inner_dht: Detach<ChildDhtWrapperDyn>,
-
-    /// temp variables for ghostCallback mutation
-    maybe_peer: Option<PeerData>,
+    inner_dht: ChildDhtWrapperDyn,
+    // Cache
     this_peer: PeerData,
-    peer_list: Vec<PeerData>,
 }

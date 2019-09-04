@@ -2,6 +2,7 @@
 
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*, ghost_protocol::*},
+    engine::NETWORK_GATEWAY_ID,
     gateway::{Gateway, P2pGateway},
     transport::{protocol::*, TransportWrapper},
 };
@@ -31,18 +32,16 @@ impl<'gateway> P2pGateway<'gateway> {
         let dht = dht_factory(dht_config).expect("Failed to construct DHT");
         P2pGateway {
             inner_transport,
-            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht")),
+            inner_dht: ChildDhtWrapperDyn::new(dht, "gateway_dht"),
             identifier: identifier.to_owned(),
             connection_map: HashMap::new(),
             transport_inbox: VecDeque::new(),
             transport_inject_events: Vec::new(),
-            maybe_peer: None,
             this_peer: PeerData {
                 peer_address: String::new(),
                 peer_uri: Url::parse("dummy://default").unwrap(),
                 timestamp: 0,
             },
-            peer_list: Vec::new(),
         }
     }
     /// Helper Ctor
@@ -99,21 +98,51 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
     }
 
     fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()> {
-        self.inner_dht.process(user_data)
+        println!("process_dht() START");
+        let res = self.inner_dht.process(user_data);
+        println!("process_dht() END");
+        res
     }
 
-    fn as_dht_mut(&mut self) -> &mut Detach<ChildDhtWrapperDyn> {
+    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn {
         &mut self.inner_dht
+    }
+
+    // TODO - remove this hack
+    fn hold_peer(&mut self, peer_data: PeerData) {
+        if self.identifier != NETWORK_GATEWAY_ID {
+            debug!(
+                "({}).Dht.post(HoldPeer) - {}",
+                self.identifier, peer_data.peer_uri,
+            );
+            // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
+            // to get the transportId
+            let maybe_previous = self.connection_map.insert(
+                peer_data.peer_uri.clone(),
+                String::from(peer_data.peer_uri.path()),
+            );
+            if let Some(previous_cId) = maybe_previous {
+                debug!(
+                    "Replaced connectionId for {} ; was: {}",
+                    peer_data.peer_uri.clone(),
+                    previous_cId
+                );
+            }
+        }
+        self.inner_dht
+            .publish(DhtRequestToChild::HoldPeer(peer_data));
     }
 
     ///
     fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
+        trace!("get_peer_list_sync() ...");
+        let mut peer_list = Vec::new();
         self.inner_dht.request(
             std::time::Duration::from_millis(2000),
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeerList,
-            Box::new(|me, _context, response| {
-                let mut gateway = match me.downcast_mut::<P2pGateway>() {
+            Box::new(|ud, _context, response| {
+                let mut peer_list = match ud.downcast_mut::<Vec<PeerData>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -127,15 +156,17 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestPeerList(peer_list_response) = response {
-                    gateway.peer_list = peer_list_response;
+                    *peer_list = peer_list_response;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
                 Ok(())
             }),
         );
-        let _res = self.inner_dht.process(&mut ()).unwrap(); // FIXME unwrap
-        self.peer_list.clone()
+        trace!("inner_dht.process() for get_peer_list_sync() ...");
+        let _res = self.inner_dht.process(&mut peer_list).unwrap(); // FIXME unwrap
+        trace!("inner_dht.process() for get_peer_list_sync() DONE");
+        peer_list
     }
 
     ///
@@ -144,12 +175,17 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
         if self.this_peer.peer_address != String::new() {
             return self.this_peer.clone();
         }
+        let mut this_peer = PeerData {
+            peer_address: String::new(),
+            peer_uri: Url::parse("dummy://default").unwrap(),
+            timestamp: 0,
+        };
         self.inner_dht.request(
             std::time::Duration::from_millis(2000),
             DhtContext::NoOp,
             DhtRequestToChild::RequestThisPeer,
-            Box::new(|me, _context, response| {
-                let mut gateway = match me.downcast_mut::<P2pGateway>() {
+            Box::new(|ud, _context, response| {
+                let mut this_peer = match ud.downcast_mut::<PeerData>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -163,25 +199,27 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
-                    gateway.this_peer = peer_response;
+                    *this_peer = peer_response;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
                 Ok(())
             }),
         );
-        let _res = self.inner_dht.process(&mut ()).unwrap(); // FIXME unwrap
+        self.inner_dht.process(&mut this_peer).unwrap(); // FIXME unwrap
+        self.this_peer = this_peer;
         self.this_peer.clone()
     }
 
     ///
     fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData> {
+        let mut maybe_peer = None;
         self.inner_dht.request(
             std::time::Duration::from_millis(2000),
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeer(peer_address.to_string()),
-            Box::new(|me, _context, response| {
-                let mut gateway = match me.downcast_mut::<P2pGateway>() {
+            Box::new(|ud, _context, response| {
+                let mut maybe_peer = match ud.downcast_mut::<Option<PeerData>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -195,14 +233,14 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestPeer(peer_response) = response {
-                    gateway.maybe_peer = peer_response;
+                    *maybe_peer = peer_response;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
                 Ok(())
             }),
         );
-        let _res = self.inner_dht.process(&mut ()).unwrap(); // FIXME unwrap
-        self.maybe_peer.clone()
+        let _res = self.inner_dht.process(&mut maybe_peer).unwrap(); // FIXME unwrap
+        maybe_peer
     }
 }

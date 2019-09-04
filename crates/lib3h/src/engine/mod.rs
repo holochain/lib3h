@@ -91,4 +91,5 @@ pub struct RealEngine<'engine> {
 
     /// temp variables for ghostCallback mutation
     request_list: Vec<Address>,
+    to_send_spaces_list: Vec<Url>,
 }

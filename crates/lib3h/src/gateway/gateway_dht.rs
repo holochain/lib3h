@@ -43,25 +43,26 @@ impl<'gateway>  P2pGateway<'gateway> {
         self.inner_dht.publish(cmd);
         Ok(())
     }
-//    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
-//        // Process the dht
-//        let (did_work, dht_event_list) = self.inner_dht.process()?;
-//        trace!(
-//            "({}).Dht.process() - output: {} {}",
-//            self.identifier,
-//            did_work,
-//            dht_event_list.len(),
-//        );
-//        // Handle events directly
-//        if did_work {
-//            for evt in dht_event_list.clone() {
-//                self.handle_DhtEvent(evt)?;
-//            }
-//        }
-//        // TODO #173: Check for timeouts of own requests here?
-//        // Done
-//        Ok((did_work, dht_event_list))
-//    }
+
+    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
+        // Process the dht
+        let (did_work, dht_event_list) = self.inner_dht.process()?;
+        trace!(
+            "({}).Dht.process() - output: {} {}",
+            self.identifier,
+            did_work,
+            dht_event_list.len(),
+        );
+        // Handle events directly
+        if did_work {
+            for evt in dht_event_list.clone() {
+                self.handle_DhtEvent(evt)?;
+            }
+        }
+        // TODO #173: Check for timeouts of own requests here?
+        // Done
+        Ok((did_work, dht_event_list))
+    }
 }
 
 /// Private internals

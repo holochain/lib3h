@@ -7,9 +7,9 @@ use url::Url;
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{dht_config::DhtConfig, ghost_protocol::*},
+    dht::{dht_config::DhtConfig, ghost_protocol::*, dht_protocol::*},
     engine::{
-        p2p_protocol::P2pProtocol, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
+        p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
     gateway::{wrapper::*, P2pGateway},
@@ -84,6 +84,7 @@ impl<'engine> RealEngine<'engine> {
             transport_keys,
             process_count: 0,
             request_list: Vec::new(),
+            to_send_spaces_list: Vec::new(),
         })
     }
 }
@@ -139,6 +140,7 @@ impl<'engine> RealEngine<'engine> {
             transport_keys,
             process_count: 0,
             request_list: Vec::new(),
+            to_send_spaces_list: Vec::new(),
         })
     }
 }
@@ -150,12 +152,12 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
     }
 
     fn advertise(&self) -> Url {
-        Url::parse("dummy://default").unwrap()
-        // FIXME request this peer, process, block
-        //        self.network_gateway
-        //            .this_peer()
-        //            .peer_uri
-        //            .to_owned()
+        // Url::parse("dummy://default").unwrap()
+        self.network_gateway
+            .as_mut()
+            .get_this_peer_sync()
+            .peer_uri
+            .to_owned()
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -638,10 +640,10 @@ impl<'engine> RealEngine<'engine> {
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
-        space_gateway
-            .as_mut()
-            .as_dht_mut()
-            .publish(DhtRequestToChild::HoldPeer(this_peer));
+        space_gateway.as_mut().hold_peer(this_peer);
+        //            .as_mut()
+        //            .as_dht_mut()
+        //            .publish(DhtRequestToChild::HoldPeer(this_peer));
         // Send Get*Lists requests
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),
@@ -775,6 +777,44 @@ impl<'engine> RealEngine<'engine> {
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }
+}
+
+pub fn handle_gossipTo<'engine>(
+    gateway: &mut GatewayWrapper<'engine>,
+    gossip_data: GossipToData,
+) -> Lib3hResult<()> {
+    debug!(
+        "({}) handle_gossipTo: {:?}",
+        gateway.as_mut().identifier(), gossip_data
+    );
+    for to_peer_address in gossip_data.peer_address_list {
+        // TODO #150 - should not gossip to self in the first place
+        let me = &gateway.as_mut().get_this_peer_sync().peer_address;
+        if &to_peer_address == me {
+            continue;
+        }
+        // TODO END
+        // Convert DHT Gossip to P2P Gossip
+        let p2p_gossip = P2pProtocol::Gossip(GossipData {
+            space_address: gateway.as_mut().identifier().into(),
+            to_peer_address: to_peer_address.clone().into(),
+            from_peer_address: me.clone().into(),
+            bundle: gossip_data.bundle.clone(),
+        });
+        let mut payload = Vec::new();
+        p2p_gossip
+            .serialize(&mut Serializer::new(&mut payload))
+            .expect("P2pProtocol::Gossip serialization failed");
+//        let to_conn_id = gateway
+//            .as_mut()
+//            .get_connection_id(&to_peer_address)
+//            .expect("Should gossip to a known peer");
+        // Forward gossip to the inner_transport
+        gateway
+            .as_transport_mut()
+            .send(&[&to_peer_address], &payload)?;
+    }
+    Ok(())
 }
 
 /// Return true if all elements of list_b are found in list_a

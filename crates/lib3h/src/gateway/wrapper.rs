@@ -45,11 +45,15 @@ impl<'wrap> GatewayWrapper<'wrap> {
 
     /// immutable ref to the dyn Gateway
     pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn Gateway + 'wrap> {
+        //println!("GatewayWrapper.as_ref()...");
         self.gateway.read().expect("failed to obtain read lock")
     }
 
     /// mutable ref to the dyn Gateway
     pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn Gateway + 'wrap> {
-        self.gateway.write().expect("failed to obtain write lock")
+        //println!("GatewayWrapper.as_mut()...");
+        let res = self.gateway.write().expect("failed to obtain write lock");
+        //println!("GatewayWrapper.as_mut() LOCKED ");
+        res
     }
 }

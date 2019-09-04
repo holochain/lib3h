@@ -309,7 +309,7 @@ impl
             self.handle_request_from_parent(request)
                 .expect("no ghost errors");
         }
-        let (did_work, command_list) = self.internal_process().unwrap(); // FIXME
+        let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
         for command in command_list {
             self.endpoint_self.publish(command);
         }

@@ -3,7 +3,9 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, ghost_protocol::*},
-    engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
+    engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine,
+             real_engine::handle_gossipTo,
+    },
     gateway::wrapper::GatewayWrapper,
 };
 use lib3h_protocol::{
@@ -44,47 +46,44 @@ impl<'engine> RealEngine<'engine> {
     pub(crate) fn process_space_gateways(
         &mut self,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
-        // Process all gateways' DHT
-        let /*mut*/ outbox = Vec::new();
-        //let mut dht_outbox = HashMap::new();
+        // Process all space gateways' DHT and collect requests
+        let mut outbox = Vec::new();
+        let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            //let (did_work, event_list) =
-            // FIXME unwrap
-            space_gateway.as_mut().process_dht(&mut ()).unwrap();
-            //            if did_work {
-            //                // TODO: perf optim, don't copy chain_id
-            //                dht_outbox.insert(chain_id.clone(), event_list);
-            //            }
-            //        }
-            //        // Process all gateway DHT events
-            //        for (chain_id, evt_list) in dht_outbox {
-            //            for evt in evt_list {
-            //                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
-            //                outbox.append(&mut output);
-            //            }
+            space_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME unwrap
+            let request_list = space_gateway.as_mut().as_dht_mut().drain_messages();
+            dht_outbox.insert(chain_id.clone(), request_list);
         }
-        // FIXME
+        // Process all space gateway DHT requests
+        for (chain_id, request_list) in dht_outbox {
+            for mut request in request_list {
+                let dhtMessage = request.take_message().expect("exists");
+                let mut output = self.handle_spaceDhtRequest(&chain_id, dhtMessage)?;
+                outbox.append(&mut output);
+            }
+        }
+        // Done
         Ok(outbox)
     }
 
     /// Handle a DhtEvent sent to us by a space gateway
-    fn handle_spaceDhtEvent(
+    fn handle_spaceDhtRequest(
         &mut self,
         chain_id: &ChainId,
-        evt: DhtRequestToParent,
+        request: DhtRequestToParent,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
         debug!(
             "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
-            self.name, chain_id, evt,
+            self.name, chain_id, request,
         );
         let mut outbox = Vec::new();
         let space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
-        match evt {
-            DhtRequestToParent::GossipTo(_gossip_data) => {
-                // n/a - should have been handled by gateway
+        match request {
+            DhtRequestToParent::GossipTo(gossip_data) => {
+                handle_gossipTo(space_gateway, gossip_data).expect("Failed to gossip with space_gateway");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // n/a - should have been handled by gateway
@@ -98,10 +97,10 @@ impl<'engine> RealEngine<'engine> {
                     peer_data,
                 );
                 // For now accept all request
-                space_gateway
-                    .as_mut()
-                    .as_dht_mut()
-                    .publish(DhtRequestToChild::HoldPeer(peer_data));
+                space_gateway.as_mut().hold_peer(peer_data);
+                //                    .as_mut()
+                //                    .as_dht_mut()
+                //                    .publish(DhtRequestToChild::HoldPeer(peer_data));
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // no-op

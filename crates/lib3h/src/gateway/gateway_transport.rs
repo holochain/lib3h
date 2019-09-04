@@ -169,7 +169,7 @@ impl<'gateway> P2pGateway<'gateway> {
             return Ok(());
         }
         let uri = maybe_uri.unwrap();
-        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id,);
+        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id);
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         let maybe_previous = self.connection_map.insert(uri.clone(), id.to_string());
@@ -250,7 +250,8 @@ impl<'gateway> P2pGateway<'gateway> {
                                 timestamp: peer_timestamp,
                             };
                             // HACK
-                            self.inner_dht.publish(DhtRequestToChild::HoldPeer(peer));
+                            self.hold_peer(peer);
+                            //self.inner_dht.publish(DhtRequestToChild::HoldPeer(peer));
                             // TODO #58
                             // TODO #150 - Should not call process manually
                             self.process().expect("HACK");
