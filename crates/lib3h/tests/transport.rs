@@ -7,7 +7,6 @@ use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
 use std::{
-    any::Any,
     collections::{HashMap, HashSet},
     sync::RwLock,
 };
@@ -159,6 +158,7 @@ struct TestTransport {
     // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
+            TestTransport,
             ToParentContext,
             RequestToParent,
             RequestToParentResponse,
@@ -179,9 +179,6 @@ impl
     > for TestTransport
 {
     // START BOILER PLATE--------------------------
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
 
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
@@ -189,7 +186,7 @@ impl
     // END BOILER PLATE--------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
@@ -299,15 +296,17 @@ fn ghost_transport() {
     // create an object that can be used to hold state data in callbacks to the transports
     let mut owner = TestTransportOwner::new();
 
-    let mut t1: TransportActorParentWrapper<(), TestTransport> = GhostParentWrapper::new(
-        TestTransport::new("t1"),
-        "t1_requests", // prefix for request ids in the tracker
-    );
+    let mut t1: TransportActorParentWrapper<TestTransportOwner, (), TestTransport> =
+        GhostParentWrapper::new(
+            TestTransport::new("t1"),
+            "t1_requests", // prefix for request ids in the tracker
+        );
     assert_eq!(t1.as_ref().name, "t1");
-    let mut t2: TransportActorParentWrapper<(), TestTransport> = GhostParentWrapper::new(
-        TestTransport::new("t2"),
-        "t2_requests", // prefix for request ids in the tracker
-    );
+    let mut t2: TransportActorParentWrapper<TestTransportOwner, (), TestTransport> =
+        GhostParentWrapper::new(
+            TestTransport::new("t2"),
+            "t2_requests", // prefix for request ids in the tracker
+        );
     assert_eq!(t2.as_ref().name, "t2");
 
     // bind t1 to the network
@@ -318,10 +317,7 @@ fn ghost_transport() {
             spec: Url::parse("mocknet://t1").expect("can parse url"),
         },
         // callback should simply log the response
-        Box::new(|dyn_owner, _, response| {
-            let owner = dyn_owner
-                .downcast_mut::<TestTransportOwner>()
-                .expect("a TestTransportOwner");
+        Box::new(|owner, _, response| {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
@@ -342,10 +338,7 @@ fn ghost_transport() {
             payload: b"won't be received!".to_vec(),
         },
         // callback should simply log the response
-        Box::new(|dyn_owner, _, response| {
-            let owner = dyn_owner
-                .downcast_mut::<TestTransportOwner>()
-                .expect("a TestTransportOwner");
+        Box::new(|owner, _, response| {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
@@ -365,10 +358,7 @@ fn ghost_transport() {
             spec: Url::parse("mocknet://t2").expect("can parse url"),
         },
         // callback should simply log the response
-        Box::new(|dyn_owner, _, response| {
-            let owner = dyn_owner
-                .downcast_mut::<TestTransportOwner>()
-                .expect("a TestTransportOwner");
+        Box::new(|owner, _, response| {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
@@ -387,10 +377,7 @@ fn ghost_transport() {
             payload: b"foo".to_vec(),
         },
         // callback should simply log the response
-        Box::new(|dyn_owner, _, response| {
-            let owner = dyn_owner
-                .downcast_mut::<TestTransportOwner>()
-                .expect("a TestTransportOwner");
+        Box::new(|owner, _, response| {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
