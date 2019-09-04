@@ -57,7 +57,7 @@ impl GhostTransportMemory {
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Some(
                 endpoint_self
-                    .as_context_builder()
+                    .as_context_endpoint_builder()
                     .request_id_prefix("tmem_to_parent")
                     .build(),
             ),
@@ -279,7 +279,7 @@ mod tests {
         let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_builder()
+            .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child1")
             .build::<(), ()>();
 
@@ -287,7 +287,7 @@ mod tests {
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_builder()
+            .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child2")
             .build::<(), ()>();
 

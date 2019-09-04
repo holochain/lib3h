@@ -103,7 +103,7 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static>
 /// a parent_endpoint, and a child_endpoint
 /// these raw endpoints are not very useful on their own. When you get them
 /// to the place they will be used, you probably want to call
-/// `as_context_endpoint()` on them.
+/// `as_context_endpoint_builder()` on them.
 pub struct GhostEndpoint<
     RequestToOther,
     RequestToOtherResponse,
@@ -149,11 +149,11 @@ impl<
     /// expand a raw endpoint into something usable.
     /// <Context> let's you store data with individual `request` calls
     /// that will be available again when the callback is invoked.
-    /// Feel free to use `as_context_endpoint::<()>("prefix")` if you
+    /// Feel free to use `as_context_endpoint_builder::<()>("prefix")` if you
     /// don't need any context.
     /// request_id_prefix is a debugging hint... the request_ids generated
     /// for tracking request/response pairs will be prepended with this prefix.
-    pub fn as_context_builder(
+    pub fn as_context_endpoint_builder(
         self,
     ) -> GhostContextEndpointBuilder<
         RequestToOther,
@@ -286,7 +286,7 @@ pub trait GhostCanTrack<
 }
 
 /// an expanded endpoint usable to send/receive requests/responses/events
-/// see `GhostEndpoint::as_context_endpoint` for additional details
+/// see `GhostEndpoint::as_context_endpoint_builder` for additional details
 pub struct GhostContextEndpoint<
     UserData,
     Context,
@@ -598,7 +598,7 @@ mod tests {
         >();
 
         // in this test the endpoint will be the child end
-        let mut endpoint = child_side.as_context_builder().build();
+        let mut endpoint = child_side.as_context_endpoint_builder().build();
 
         endpoint.publish(TestMsgOut("event to my parent".into()));
         // check to see if the event was sent to the parent

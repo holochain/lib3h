@@ -138,7 +138,7 @@ mod tests {
                 endpoint_parent: Some(endpoint_parent),
                 endpoint_self: Detach::new(
                     endpoint_self
-                        .as_context_builder()
+                        .as_context_endpoint_builder()
                         .request_id_prefix("dht_to_parent")
                         .build(),
                 ),
@@ -288,7 +288,7 @@ mod tests {
                 endpoint_parent: Some(endpoint_parent),
                 endpoint_self: Detach::new(
                     endpoint_self
-                        .as_context_builder()
+                        .as_context_endpoint_builder()
                         .request_id_prefix("gw_to_parent")
                         .build(),
                 ),
@@ -439,7 +439,7 @@ mod tests {
         let mut t_actor_endpoint = t_actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_builder()
+            .as_context_endpoint_builder()
             .build::<(), i8>();
 
         // allow the actor to run this actor always creates a simulated incoming

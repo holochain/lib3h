@@ -87,7 +87,7 @@ impl KeystoreStub {
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(
             endpoint_self
-                .as_context_builder()
+                .as_context_endpoint_builder()
                 .request_id_prefix("keystore_to_parent_")
                 .build(),
         );

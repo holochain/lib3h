@@ -64,7 +64,7 @@ impl<
         let endpoint = actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_builder()
+            .as_context_endpoint_builder()
             .request_id_prefix(request_id_prefix)
             .build();
         Self { actor, endpoint }
@@ -312,7 +312,7 @@ impl<
         let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_builder()
+            .as_context_endpoint_builder()
             .request_id_prefix(request_id_prefix)
             .build();
         Self { actor, endpoint }
@@ -404,7 +404,7 @@ mod tests {
                 endpoint_for_parent: Some(endpoint_parent),
                 endpoint_as_child: Detach::new(
                     endpoint_self
-                        .as_context_builder()
+                        .as_context_endpoint_builder()
                         .request_id_prefix("child")
                         .build(),
                 ),
@@ -474,7 +474,7 @@ mod tests {
         > = child_actor
             .take_parent_endpoint()
             .unwrap()
-            .as_context_builder()
+            .as_context_endpoint_builder()
             .request_id_prefix("parent")
             .build();
 
