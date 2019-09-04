@@ -13,7 +13,7 @@ use std::{
 };
 use url::Url;
 
-// we need an "internet" that a transport can bind to that will
+// We need an "internet" that a transport can bind to that will
 // deliver messages to bound transports, we'll call it the Mockernet
 pub struct Mockernet {
     bindings: HashMap<Url, Tube>,
@@ -21,6 +21,8 @@ pub struct Mockernet {
     errors: Vec<(Url, String)>,
 }
 
+// These are the events that the mockernet can generate that must by handled
+// by any mockernet client.
 pub enum MockernetEvent {
     Connection { from: Url },
     Message { from: Url, payload: Vec<u8> },
@@ -30,7 +32,6 @@ pub enum MockernetEvent {
 // The Mockernet is a Series-of-Tubes, which is the technical term for the
 // sets of crossbeam channels in the bindings that mockernet shuttles
 // data between.
-// The Mockernet simulates a
 pub struct Tube {
     sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
     #[allow(dead_code)]
