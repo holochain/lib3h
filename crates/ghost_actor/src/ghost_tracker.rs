@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
 
@@ -17,25 +17,27 @@ pub enum GhostCallbackData<CbData, E> {
 /// if you want to mutate the state of a struct instance, pass it in
 /// with the `handle` or `process` call.
 /// (see detach crate for help with self refs)
-pub type GhostCallback<Context, CbData, E> =
-    Box<dyn Fn(&mut dyn Any, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
+pub type GhostCallback<UserData, Context, CbData, E> =
+    Box<dyn Fn(&mut UserData, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
-struct GhostTrackerEntry<Context, CbData, E> {
+struct GhostTrackerEntry<UserData, Context, CbData, E> {
     expires: std::time::SystemTime,
     context: Context,
-    cb: GhostCallback<Context, CbData, E>,
+    cb: GhostCallback<UserData, Context, CbData, E>,
 }
 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<Context, CbData, E> {
+pub struct GhostTracker<UserData, Context, CbData, E> {
     request_id_prefix: String,
-    pending: HashMap<RequestId, GhostTrackerEntry<Context, CbData, E>>,
+    pending: HashMap<RequestId, GhostTrackerEntry<UserData, Context, CbData, E>>,
 }
 
-impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
+impl<UserData, Context: 'static, CbData: 'static, E: 'static>
+    GhostTracker<UserData, Context, CbData, E>
+{
     /// create a new tracker instance (with request_id prefix)
     pub fn new(request_id_prefix: &str) -> Self {
         Self {
@@ -46,7 +48,7 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
 
     /// trigger any periodic or delayed callbacks
     /// also check / cleanup any timeouts
-    pub fn process(&mut self, ga: &mut dyn Any) -> GhostResult<()> {
+    pub fn process(&mut self, ga: &mut UserData) -> GhostResult<()> {
         let mut expired = Vec::new();
 
         let now = std::time::SystemTime::now();
@@ -74,9 +76,10 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
         &mut self,
         timeout: std::time::Duration,
         context: Context,
-        cb: GhostCallback<Context, CbData, E>,
+        cb: GhostCallback<UserData, Context, CbData, E>,
     ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
+
         self.pending.insert(
             request_id.clone(),
             GhostTrackerEntry {
@@ -96,7 +99,7 @@ impl<Context, CbData, E> GhostTracker<Context, CbData, E> {
     pub fn handle(
         &mut self,
         request_id: RequestId,
-        owner: &mut dyn Any,
+        owner: &mut UserData,
         data: Result<CbData, E>,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
@@ -118,10 +121,8 @@ mod tests {
     type TestError = String;
     struct TestTrackingActor {
         state: String,
-        tracker: Detach<GhostTracker<TestContext, TestCallbackData, TestError>>,
+        tracker: Detach<GhostTracker<TestTrackingActor, TestContext, TestCallbackData, TestError>>,
     }
-
-    use std::any::Any;
 
     impl TestTrackingActor {
         fn new(request_id_prefix: &str) -> Self {
@@ -130,9 +131,6 @@ mod tests {
                 tracker: Detach::new(GhostTracker::new(request_id_prefix)),
             }
         }
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
     }
 
     #[test]
@@ -140,17 +138,13 @@ mod tests {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("some_context_data".into());
 
-        let cb: GhostCallback<TestContext, TestCallbackData, TestError> =
-            Box::new(|dyn_me, context, callback_data| {
-                let mutable_me = dyn_me
-                    .downcast_mut::<TestTrackingActor>()
-                    .expect("should be a TestTrakingActor");
-
+        let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
+            Box::new(|me, context, callback_data| {
                 // and we'll check that we got our context back too because we
                 // might have used it to determine what to do here.
                 assert_eq!(context.0, "some_context_data");
                 if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
-                    mutable_me.state = payload;
+                    me.state = payload;
                 }
                 Ok(())
             });
@@ -173,7 +167,7 @@ mod tests {
         detach_run!(&mut actor.tracker, |tracker| {
             let result = tracker.handle(
                 req_id.clone(),
-                actor.as_any(),
+                &mut actor,
                 Ok(TestCallbackData("here's the data!".into())),
             );
             assert_eq!("Ok(())", format!("{:?}", result))
@@ -184,7 +178,7 @@ mod tests {
         detach_run!(&mut actor.tracker, |tracker| {
             let result = tracker.handle(
                 req_id,
-                actor.as_any(),
+                &mut actor,
                 Ok(TestCallbackData("here's the data again!".into())),
             );
             assert_eq!(
@@ -198,16 +192,12 @@ mod tests {
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("foo".into());
-        let cb: GhostCallback<TestContext, TestCallbackData, TestError> =
-            Box::new(|dyn_me, _context, callback_data| {
-                let mutable_me = dyn_me
-                    .downcast_mut::<TestTrackingActor>()
-                    .expect("should be a TestTrakingActor");
-
+        let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
+            Box::new(|me, _context, callback_data| {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {
-                    GhostCallbackData::Timeout => mutable_me.state = "timed_out".into(),
+                    GhostCallbackData::Timeout => me.state = "timed_out".into(),
                     _ => assert!(false),
                 }
                 Ok(())
@@ -220,7 +210,7 @@ mod tests {
         // wait 1 ms for the callback to have expired
         std::thread::sleep(std::time::Duration::from_millis(1));
         detach_run!(&mut actor.tracker, |tracker| {
-            let result = tracker.process(actor.as_any());
+            let result = tracker.process(&mut actor);
             assert_eq!("Ok(())", format!("{:?}", result));
         });
         assert_eq!(actor.state, "timed_out");
