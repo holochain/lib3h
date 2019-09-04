@@ -17,6 +17,10 @@ enum GhostEndpointMessage<Request, Response, Error> {
     },
 }
 
+pub type GhostResponder<RequestToSelfResponse, Error> = Box<
+    dyn FnOnce(Result<RequestToSelfResponse, Error>)
+>;
+
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
 /// A GhostMessage contains the incoming request, as well as a hook to
 /// allow a response to automatically be returned.
@@ -279,7 +283,7 @@ pub trait GhostCanTrack<
     /// fetch any messages (requests or events) sent to us from the other side
     fn drain_messages(
         &mut self,
-    ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>;
+    ) -> Vec<(RequestToSelf, GhostResponder<RequestToSelfResponse, Error>)>;
 
     /// check for pending responses timeouts or incoming messages
     fn process(&mut self, user_data: &mut UserData) -> GhostResult<()>;
@@ -304,7 +308,7 @@ pub struct GhostContextEndpoint<
     >,
     pending_responses_tracker: GhostTracker<UserData, Context, RequestToOtherResponse, Error>,
     outbox_messages_to_self:
-        Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>,
+        Vec<(RequestToSelf, GhostResponder<RequestToSelfResponse, Error>)>,
 }
 
 impl<
@@ -414,7 +418,7 @@ impl<
     /// fetch any messages (requests or events) sent to us from the other side
     fn drain_messages(
         &mut self,
-    ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>> {
+    ) -> Vec<(RequestToSelf, GhostResponder<RequestToSelfResponse, Error>)> {
         self.outbox_messages_to_self.drain(..).collect()
     }
 
@@ -432,11 +436,26 @@ impl<
                         request_id,
                         payload,
                     } => {
+                        let responder: GhostResponder<RequestToSelfResponse, Error> = match request_id {
+                            Some(request_id) => {
+                                let sender = self.sender.clone();
+                                Box::new(move |payload| {
+                                    sender.send(GhostEndpointMessage::Response {
+                                        request_id,
+                                        payload,
+                                    }).expect("should send");
+                                })
+                            }
+                            None => Box::new(|_|{}),
+                        };
+                        self.outbox_messages_to_self.push((payload, responder));
+                        /*
                         self.outbox_messages_to_self.push(GhostMessage::new(
                             request_id,
                             payload,
                             self.sender.clone(),
                         ));
+                        */
                     }
                     GhostEndpointMessage::Response {
                         request_id,
