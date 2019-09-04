@@ -2,13 +2,13 @@
 
 use crate::{
     dht::{dht_protocol::*, ghost_protocol::*},
-    engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID,
-    real_engine::handle_gossipTo,
+    engine::{
+        p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     transport::{protocol::*, ConnectionIdRef},
 };
-use lib3h_ghost_actor::prelude::*;
+
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -69,7 +69,8 @@ impl<'engine> RealEngine<'engine> {
         let outbox = Vec::new();
         match msg.take_message().expect("exists") {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(&mut self.network_gateway, gossip_data).expect("Failed to gossip with network_gateway");
+                handle_gossipTo(&mut self.network_gateway, gossip_data)
+                    .expect("Failed to gossip with network_gateway");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
@@ -157,8 +158,6 @@ impl<'engine> RealEngine<'engine> {
             }
             // TODO END
         }
-
-        // self.to_send_spaces_list.push(uri.clone());
 
         // Output a Lib3hServerProtocol::Connected if its the first connection
         let mut outbox = Vec::new();

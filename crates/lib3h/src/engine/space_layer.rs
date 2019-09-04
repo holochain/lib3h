@@ -3,16 +3,12 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_protocol::*, ghost_protocol::*},
-    engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine,
-             real_engine::handle_gossipTo,
-    },
+    engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
     gateway::wrapper::GatewayWrapper,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
-use rmp_serde::Serializer;
-use serde::Serialize;
 use std::collections::HashMap;
 
 /// Space layer related private methods
@@ -83,7 +79,8 @@ impl<'engine> RealEngine<'engine> {
             .expect("Should have the space gateway we receive an event from.");
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(space_gateway, gossip_data).expect("Failed to gossip with space_gateway");
+                handle_gossipTo(space_gateway, gossip_data)
+                    .expect("Failed to gossip with space_gateway");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // n/a - should have been handled by gateway

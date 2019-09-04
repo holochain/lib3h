@@ -6,7 +6,6 @@ use crate::{
     gateway::{Gateway, P2pGateway},
     transport::{protocol::*, TransportWrapper},
 };
-use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
 use std::{
@@ -142,7 +141,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeerList,
             Box::new(|ud, _context, response| {
-                let mut peer_list = match ud.downcast_mut::<Vec<PeerData>>() {
+                let peer_list = match ud.downcast_mut::<Vec<PeerData>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -185,7 +184,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             DhtContext::NoOp,
             DhtRequestToChild::RequestThisPeer,
             Box::new(|ud, _context, response| {
-                let mut this_peer = match ud.downcast_mut::<PeerData>() {
+                let this_peer = match ud.downcast_mut::<PeerData>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -219,7 +218,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeer(peer_address.to_string()),
             Box::new(|ud, _context, response| {
-                let mut maybe_peer = match ud.downcast_mut::<Option<PeerData>>() {
+                let maybe_peer = match ud.downcast_mut::<Option<PeerData>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };

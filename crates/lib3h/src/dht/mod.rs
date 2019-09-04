@@ -114,7 +114,7 @@ pub mod tests {
             DhtContext::NoOp,
             DhtRequestToChild::RequestThisPeer,
             Box::new(|ud, _context, response| {
-                let mut this_peer = match ud.downcast_mut::<PeerData>() {
+                let this_peer = match ud.downcast_mut::<PeerData>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -147,7 +147,7 @@ pub mod tests {
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeer(address.to_string()),
             Box::new(|ud, _context, response| {
-                let mut maybe_peer = match ud.downcast_mut::<Option<PeerData>>() {
+                let maybe_peer = match ud.downcast_mut::<Option<PeerData>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -180,7 +180,7 @@ pub mod tests {
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeerList,
             Box::new(|ud, _context, response| {
-                let mut peer_list = match ud.downcast_mut::<Vec<PeerData>>() {
+                let peer_list = match ud.downcast_mut::<Vec<PeerData>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -213,7 +213,7 @@ pub mod tests {
             DhtContext::NoOp,
             DhtRequestToChild::RequestEntryAddressList,
             Box::new(|ud, _context, response| {
-                let mut entry_list = match ud.downcast_mut::<Vec<Address>>() {
+                let entry_list = match ud.downcast_mut::<Vec<Address>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -250,7 +250,7 @@ pub mod tests {
             DhtContext::NoOp,
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
             Box::new(|ud, _context, response| {
-                let mut maybe_aspect_list = match ud.downcast_mut::<Option<Vec<Address>>>() {
+                let maybe_aspect_list = match ud.downcast_mut::<Option<Vec<Address>>>() {
                     None => panic!("bad downcast"),
                     Some(e) => e,
                 };
@@ -362,7 +362,7 @@ pub mod tests {
         println!("1. dht.process(RequestEntry)...");
         dht.process(&mut ()).unwrap();
         // Should have received the request back
-        let mut request_list = dht.drain_messages();
+        let request_list = dht.drain_messages();
         assert_eq!(request_list.len(), 1);
         for mut request in request_list {
             println!("2. request = {:?}", request);

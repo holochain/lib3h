@@ -7,7 +7,6 @@ use crate::{
     dht::{dht_protocol::*, ghost_protocol::*},
     transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
 };
-use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use std::{
     any::Any,

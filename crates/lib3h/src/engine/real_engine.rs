@@ -7,10 +7,9 @@ use url::Url;
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{dht_config::DhtConfig, ghost_protocol::*, dht_protocol::*},
+    dht::{dht_config::DhtConfig, dht_protocol::*, ghost_protocol::*},
     engine::{
-        g_outbox,
-        p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
+        p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, G_OUTBOX, NETWORK_GATEWAY_ID,
     },
     error::Lib3hResult,
     gateway::{wrapper::*, P2pGateway},
@@ -24,8 +23,8 @@ use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Serializer;
+use serde::Serialize;
 
 impl TransportKeys {
     pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
@@ -84,8 +83,6 @@ impl<'engine> RealEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
-            request_list: Vec::new(),
-            to_send_spaces_list: Vec::new(),
         })
     }
 }
@@ -121,11 +118,11 @@ impl<'engine> RealEngine<'engine> {
             dht_factory,
             &dht_config,
         ));
-        //        debug!(
-        //            "New MOCK RealEngine {} -> {:?}",
-        //            name,
-        //            network_gateway.as_ref().this_peer()
-        //        );
+        debug!(
+            "New MOCK RealEngine {} -> {:?}",
+            name,
+            network_gateway.as_mut().get_this_peer_sync(),
+        );
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         Ok(RealEngine {
             crypto,
@@ -140,8 +137,6 @@ impl<'engine> RealEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
-            request_list: Vec::new(),
-            to_send_spaces_list: Vec::new(),
         })
     }
 }
@@ -153,7 +148,6 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
     }
 
     fn advertise(&self) -> Url {
-        // Url::parse("dummy://default").unwrap()
         self.network_gateway
             .as_mut()
             .get_this_peer_sync()
@@ -384,57 +378,10 @@ impl<'engine> RealEngine<'engine> {
                 );
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
-                        // TODO request & handle response
-                        //                        let msg = dht_protocol::FetchDhtEntryData {
-                        //                            msg_id: msg.request_id,
-                        //                            entry_address: msg.entry_address,
-                        //                        };
-                        // let cmd = DhtCommand::FetchEntry(msg);
-                        // space_gateway.as_dht_mut().post(cmd)?;
-
+                    Ok(_space_gateway) => {
                         // #fullsync hack
                         // just send handle query back to self
                         outbox.push(Lib3hServerProtocol::HandleQueryEntry(msg));
-
-//                        space_gateway.as_dht_mut().request(
-//                            std::time::Duration::from_millis(2000),
-//                        DhtContext::QueryEntry(msg),
-//                        DhtRequestToChild::RequestEntry(entry_address),
-//                        Box::new( |me, context, response| {
-//                            let /*mut*/ engine = match me.downcast_mut::<RealEngine>() {
-//                                None => panic!("bad downcast"),
-//                                Some(e) => e,
-//                            };
-//                            let response = {
-//                                match response {
-//                                    GhostCallbackData::Timeout => panic!("timeout"),
-//                                    GhostCallbackData::Response(response) => match response {
-//                                        Err(e) => panic!("{:?}", e),
-//                                        Ok(response) => response,
-//                                    },
-//                                }
-//                            };
-//                            let msg = match context {
-//                                DhtContext::QueryEntry(msg) => msg,
-//                                _ => panic!("bad context"),
-//                            };
-//                            if let DhtRequestToChildResponse::RequestEntry(entry_response) = response {
-//                                let srv_msg = Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData {
-//                                    space_address: msg.space_address.clone(),
-//                                    entry_address: msg.entry_address.clone(),
-//                                    request_id: msg.request_id.clone(),
-//                                    requester_agent_id: msg.requester_agent_id.clone(),
-//                                    responder_agent_id: msg.requester_agent_id.clone(),
-//                                    query_result,
-//                                });
-//                                engine.async_outbox.push(srv_msg);
-//                            } else {
-//                                panic!("bad response to RequestEntry: {:?}", response);
-//                            }
-//                            Ok(())
-//                        }),
-//                        );
                     }
                 }
             }
@@ -447,20 +394,12 @@ impl<'engine> RealEngine<'engine> {
                     &msg.request_id,
                     None,
                 );
-                let mut de = Deserializer::new(&msg.query_result[..]);
-                let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                let entry = maybe_entry.expect("Deserialization should always work");
                 match maybe_space {
                     Err(res) => outbox.push(res),
-                    Ok(space_gateway) => {
+                    Ok(_space_gateway) => {
                         // #fullsync hack
                         // just send handle query back to self
                         outbox.push(Lib3hServerProtocol::QueryEntryResult(msg));
-//                        space_gateway
-//                            .as_mut()
-//                            .as_dht_mut()
-//                            .publish(DhtRequestToChild::BroadcastEntry(entry));
                     }
                 }
             }
@@ -503,9 +442,11 @@ impl<'engine> RealEngine<'engine> {
             return Ok(());
         }
         let space_gateway = maybe_space.unwrap();
-        println!("serve_HandleGetAuthoringEntryListResult - {}", msg.space_address.clone());
+        println!(
+            "serve_HandleGetAuthoringEntryListResult - {}",
+            msg.space_address.clone()
+        );
         // Request every 'new' Entry from Core
-        self.request_list = Vec::new();
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
@@ -531,7 +472,11 @@ impl<'engine> RealEngine<'engine> {
                             panic!("bad context type");
                         }
                     };
-                    println!("Maybe HandleFetchEntry for.. {} = {:?}", entry_address.clone(), aspect_address_list.clone());
+                    println!(
+                        "Maybe HandleFetchEntry for.. {} = {:?}",
+                        entry_address.clone(),
+                        aspect_address_list.clone()
+                    );
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -547,13 +492,20 @@ impl<'engine> RealEngine<'engine> {
                         let can_fetch = match maybe_known_aspects {
                             None => true,
                             Some(known_aspects) => {
-                                println!("Known for.. {} = {:?}", entry_address.clone(), known_aspects.clone());
+                                println!(
+                                    "Known for.. {} = {:?}",
+                                    entry_address.clone(),
+                                    known_aspects.clone()
+                                );
                                 let can = !includes(&known_aspects, &aspect_address_list);
                                 can
                             }
                         };
                         if can_fetch {
-                            println!("Maybe HandleFetchEntry for.. {} -- YES", entry_address.clone());
+                            println!(
+                                "Maybe HandleFetchEntry for.. {} -- YES",
+                                entry_address.clone()
+                            );
                             let msg_data = FetchEntryData {
                                 space_address: msg.space_address.clone(),
                                 entry_address: entry_address.clone(),
@@ -561,9 +513,10 @@ impl<'engine> RealEngine<'engine> {
                                 provider_agent_id: msg.provider_agent_id.clone(),
                                 aspect_address_list: None,
                             };
-                            unsafe {
-                                g_outbox.lock().unwrap().push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
-                            }
+                            G_OUTBOX
+                                .lock()
+                                .unwrap()
+                                .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
                         }
                     } else {
                         panic!("bad response to RequestAspectsOf: {:?}", response);
@@ -576,20 +529,18 @@ impl<'engine> RealEngine<'engine> {
     }
 
     fn process_ugly(&mut self) -> (DidWork, Vec<Lib3hServerProtocol>) {
-        trace!("process_ugly() - {}", g_outbox.lock().unwrap().len());
+        trace!("process_ugly() - {}", G_OUTBOX.lock().unwrap().len());
         let mut outbox = Vec::new();
         let mut did_work = false;
-        unsafe {
-            for srv_msg in g_outbox.lock().unwrap().drain(0..) {
-                did_work = true;
-                if let Lib3hServerProtocol::HandleFetchEntry(msg) = srv_msg.clone() {
-                    self.request_track.set(
-                        &msg.request_id,
-                        Some(RealEngineTrackerData::DataForAuthorEntry),
-                    );
-                }
-                outbox.push(srv_msg);
+        for srv_msg in G_OUTBOX.lock().unwrap().drain(0..) {
+            did_work = true;
+            if let Lib3hServerProtocol::HandleFetchEntry(msg) = srv_msg.clone() {
+                self.request_track.set(
+                    &msg.request_id,
+                    Some(RealEngineTrackerData::DataForAuthorEntry),
+                );
             }
+            outbox.push(srv_msg);
         }
         trace!("process_ugly() END - {}", outbox.len());
         (did_work, outbox)
@@ -619,9 +570,12 @@ impl<'engine> RealEngine<'engine> {
         );
         match maybe_space {
             Err(res) => outbox.push(res),
-            Ok(space_gateway) => {
-                println!("serve_HandleGetGossipingEntryListResult - {}", msg.space_address.clone());
-                for (entry_address, aspect_address_list) in msg.address_map {
+            Ok(_space_gateway) => {
+                println!(
+                    "serve_HandleGetGossipingEntryListResult - {}",
+                    msg.space_address.clone()
+                );
+                for (entry_address, _aspect_address_list) in msg.address_map {
                     // #fullsync hack
                     // fetch every entry from owner
                     self.request_track.set(
@@ -636,27 +590,6 @@ impl<'engine> RealEngine<'engine> {
                         aspect_address_list: None,
                     };
                     outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
-
-//                    let mut aspect_list = Vec::new();
-//                    for aspect_address in aspect_address_list {
-//                        let fake_aspect = EntryAspectData {
-//                            aspect_address: aspect_address.clone(),
-//                            type_hint: String::new(),
-//                            aspect: vec![],
-//                            publish_ts: 0,
-//                        };
-//                        aspect_list.push(fake_aspect);
-//                    }
-//                    // Create "fake" entry, in the sense an entry with no actual content,
-//                    // but valid addresses.
-//                    let fake_entry = EntryData {
-//                        entry_address: entry_address.clone(),
-//                        aspect_list,
-//                    };
-//                    space_gateway
-//                        .as_mut()
-//                        .as_dht_mut()
-//                        .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry));
                 }
             }
         }
@@ -876,7 +809,8 @@ pub fn handle_gossipTo<'engine>(
 ) -> Lib3hResult<()> {
     debug!(
         "({}) handle_gossipTo: {:?}",
-        gateway.as_mut().identifier(), gossip_data
+        gateway.as_mut().identifier(),
+        gossip_data
     );
     for to_peer_address in gossip_data.peer_address_list {
         // TODO #150 - should not gossip to self in the first place

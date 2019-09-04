@@ -207,19 +207,9 @@ fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
     let entry = alex
         .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
+    let (did_work, _srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
 
-    // #fullsync
-    // mirrorDht wants the entry to broadcast it
-//    assert_eq!(srv_msg_list.len(), 1);
-//    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleFetchEntry);
-//    assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
-//    alex.reply_to_HandleFetchEntry(msg).unwrap();
-//    let (did_work, srv_msg_list) = alex.process().unwrap();
-//    assert!(did_work);
-//    //assert_eq!(srv_msg_list.len(), 0);
-//    println!("\n srv_msg_list: {:?}", srv_msg_list);
     // Process the HoldEntry generated from receiving HandleStoreEntryAspect
     println!("\nBilly should receive entry from gossip and asks owner to validate it:\n");
     let (did_work, srv_msg_list) = billy.process().unwrap();

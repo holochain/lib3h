@@ -55,7 +55,7 @@ pub enum DhtContext {
         request_id: String,
     },
     RequestEntry(DhtToChildMessage),
-    QueryEntry(QueryEntryData)
+    QueryEntry(QueryEntryData),
 }
 
 #[derive(Debug)]

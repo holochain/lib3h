@@ -313,11 +313,12 @@ impl
         for command in command_list {
             self.endpoint_self.publish(command);
         }
-        Ok(false.into())
+        Ok(did_work.into())
     }
 }
 
 impl MirrorDht {
+    #[allow(irrefutable_let_patterns)]
     fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
         debug!("@MirrorDht@ serving request: {:?}", request);
         match request.take_message().expect("exists") {
@@ -417,34 +418,6 @@ impl MirrorDht {
                 // broadcast it by gossiping it to every known peer
                 let gossip_evt = self.gossip_entry(&entry);
                 self.endpoint_self.publish(gossip_evt);
-//                self.endpoint_self.request(
-//                    std::time::Duration::from_millis(2000),
-//                    DhtContext::NoOp,
-//                    DhtRequestToParent::RequestEntry(entry.entry_address.to_owned()),
-//                    Box::new(|me, context, response| {
-//                        let /*mut*/ this_dht = match me.downcast_mut::<MirrorDht>() {
-//                            None => panic!("bad downcast"),
-//                            Some(e) => e,
-//                        };
-//                        let response = {
-//                            match response {
-//                                GhostCallbackData::Timeout => panic!("timeout"),
-//                                GhostCallbackData::Response(response) => match response {
-//                                    Err(e) => panic!("{:?}", e),
-//                                    Ok(response) => response,
-//                                },
-//                            }
-//                        };
-//                        if let DhtRequestToParentResponse::RequestEntry(entry_response) = response {
-//                            this_dht.add_entry_aspects(&entry_response);
-//                            let gossip_evt = this_dht.gossip_entry(&entry_response);
-//                            this_dht.endpoint_self.publish(gossip_evt);
-//                        } else {
-//                            panic!("bad response to RequestEntry: {:?}", response);
-//                        }
-//                        Ok(())
-//                    }),
-//                );
             }
 
             // Owner has some entry and wants it stored on the network
@@ -500,11 +473,7 @@ impl MirrorDht {
                     std::time::Duration::from_millis(2000),
                     DhtContext::RequestEntry(request),
                     DhtRequestToParent::RequestEntry(entry_address),
-                    Box::new(|me, context, response| {
-                        let /*mut*/ this_dht = match me.downcast_mut::<MirrorDht>() {
-                            None => panic!("bad downcast"),
-                            Some(e) => e,
-                        };
+                    Box::new(|_me, context, response| {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => panic!("timeout"),
