@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
 
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
+
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure
 /// such as a timeout
@@ -38,7 +40,7 @@ impl Default for GhostTrackerBuilder {
     fn default() -> Self {
         Self {
             request_id_prefix: "".to_string(),
-            default_timeout: std::time::Duration::from_millis(2000),
+            default_timeout: DEFAULT_TIMEOUT,
         }
     }
 }
