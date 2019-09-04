@@ -620,27 +620,43 @@ impl<'engine> RealEngine<'engine> {
         match maybe_space {
             Err(res) => outbox.push(res),
             Ok(space_gateway) => {
+                println!("serve_HandleGetGossipingEntryListResult - {}", msg.space_address.clone());
                 for (entry_address, aspect_address_list) in msg.address_map {
-                    let mut aspect_list = Vec::new();
-                    for aspect_address in aspect_address_list {
-                        let fake_aspect = EntryAspectData {
-                            aspect_address: aspect_address.clone(),
-                            type_hint: String::new(),
-                            aspect: vec![],
-                            publish_ts: 0,
-                        };
-                        aspect_list.push(fake_aspect);
-                    }
-                    // Create "fake" entry, in the sense an entry with no actual content,
-                    // but valid addresses.
-                    let fake_entry = EntryData {
+                    // #fullsync hack
+                    // fetch every entry from owner
+                    self.request_track.set(
+                        &msg.request_id,
+                        Some(RealEngineTrackerData::DataForAuthorEntry),
+                    );
+                    let msg_data = FetchEntryData {
+                        space_address: msg.space_address.clone(),
                         entry_address: entry_address.clone(),
-                        aspect_list,
+                        request_id: self.request_track.reserve(),
+                        provider_agent_id: msg.provider_agent_id.clone(),
+                        aspect_address_list: None,
                     };
-                    space_gateway
-                        .as_mut()
-                        .as_dht_mut()
-                        .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry));
+                    outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
+
+//                    let mut aspect_list = Vec::new();
+//                    for aspect_address in aspect_address_list {
+//                        let fake_aspect = EntryAspectData {
+//                            aspect_address: aspect_address.clone(),
+//                            type_hint: String::new(),
+//                            aspect: vec![],
+//                            publish_ts: 0,
+//                        };
+//                        aspect_list.push(fake_aspect);
+//                    }
+//                    // Create "fake" entry, in the sense an entry with no actual content,
+//                    // but valid addresses.
+//                    let fake_entry = EntryData {
+//                        entry_address: entry_address.clone(),
+//                        aspect_list,
+//                    };
+//                    space_gateway
+//                        .as_mut()
+//                        .as_dht_mut()
+//                        .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry));
                 }
             }
         }

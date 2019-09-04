@@ -10,10 +10,10 @@ use serde::Deserialize;
 lazy_static! {
     pub static ref TWO_NODES_GET_LISTS_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
         // (author_list_test, true),
-        (hold_list_test, true),
+//        (hold_list_test, true),
 //        (empty_author_list_test, true),
 //        (author_list_known_entry_test, true),
-//        (many_aspects_test, true),
+        (many_aspects_test, true),
     ];
 }
 
