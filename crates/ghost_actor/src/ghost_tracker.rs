@@ -71,6 +71,24 @@ pub struct GhostTracker<UserData, Context, CbData, E> {
     pending: HashMap<RequestId, GhostTrackerEntry<UserData, Context, CbData, E>>,
 }
 
+#[derive(Debug, Clone)]
+pub struct GhostTrackerBookmarkOptions {
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Default for GhostTrackerBookmarkOptions {
+    fn default() -> Self {
+        Self { timeout: None }
+    }
+}
+
+impl GhostTrackerBookmarkOptions {
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+}
+
 impl<UserData, Context: 'static, CbData: 'static, E: 'static>
     GhostTracker<UserData, Context, CbData, E>
 {
@@ -105,17 +123,22 @@ impl<UserData, Context: 'static, CbData: 'static, E: 'static>
         context: Context,
         cb: GhostCallback<UserData, Context, CbData, E>,
     ) -> RequestId {
-        self.bookmark_timeout(context, cb, self.default_timeout)
+        self.bookmark_options(context, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
-    pub fn bookmark_timeout(
+    pub fn bookmark_options(
         &mut self,
         context: Context,
         cb: GhostCallback<UserData, Context, CbData, E>,
-        timeout: std::time::Duration,
+        options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
+
+        let timeout = match options.timeout {
+            None => self.default_timeout,
+            Some(timeout) => timeout,
+        };
 
         self.pending.insert(
             request_id.clone(),
@@ -236,10 +259,11 @@ mod tests {
                 }
                 Ok(())
             });
-        let _req_id =
-            actor
-                .tracker
-                .bookmark_timeout(context, cb, std::time::Duration::from_millis(1));
+        let _req_id = actor.tracker.bookmark_options(
+            context,
+            cb,
+            GhostTrackerBookmarkOptions::default().timeout(std::time::Duration::from_millis(1)),
+        );
         assert_eq!(actor.tracker.pending.len(), 1);
 
         // wait 1 ms for the callback to have expired

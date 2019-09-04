@@ -123,14 +123,14 @@ impl<
     }
 
     /// see GhostContextEndpoint::request
-    fn request_timeout(
+    fn request_options(
         &mut self,
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
-        timeout: std::time::Duration,
+        options: GhostTrackRequestOptions,
     ) {
-        self.endpoint.request_timeout(context, payload, cb, timeout)
+        self.endpoint.request_options(context, payload, cb, options)
     }
 
     /// see GhostContextEndpoint::drain_messages
@@ -333,14 +333,14 @@ impl<
         self.endpoint.request(context, payload, cb)
     }
 
-    pub fn request_timeout(
+    pub fn request_options(
         &mut self,
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
-        timeout: std::time::Duration,
+        options: GhostTrackRequestOptions,
     ) {
-        self.endpoint.request_timeout(context, payload, cb, timeout)
+        self.endpoint.request_options(context, payload, cb, options)
     }
 
     /// see GhostContextEndpoint::drain_messages

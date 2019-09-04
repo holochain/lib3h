@@ -1,4 +1,7 @@
-use crate::{GhostCallback, GhostResult, GhostTracker, GhostTrackerBuilder, RequestId};
+use crate::{
+    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
+    RequestId,
+};
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -222,6 +225,24 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct GhostTrackRequestOptions {
+    pub timeout: Option<std::time::Duration>,
+}
+
+impl Default for GhostTrackRequestOptions {
+    fn default() -> Self {
+        Self { timeout: None }
+    }
+}
+
+impl GhostTrackRequestOptions {
+    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+}
+
 /// indicates this type is able to make callback requests && respond to requests
 pub trait GhostCanTrack<
     UserData,
@@ -247,12 +268,12 @@ pub trait GhostCanTrack<
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
-    fn request_timeout(
+    fn request_options(
         &mut self,
         context: Context,
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
-        timeout: std::time::Duration,
+        options: GhostTrackRequestOptions,
     );
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -310,13 +331,15 @@ impl<
         context: Context,
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
-        timeout: Option<std::time::Duration>,
+        options: GhostTrackRequestOptions,
     ) {
-        let request_id = match timeout {
+        let request_id = match options.timeout {
             None => self.pending_responses_tracker.bookmark(context, cb),
-            Some(timeout) => self
-                .pending_responses_tracker
-                .bookmark_timeout(context, cb, timeout),
+            Some(timeout) => self.pending_responses_tracker.bookmark_options(
+                context,
+                cb,
+                GhostTrackerBookmarkOptions::default().timeout(timeout),
+            ),
         };
         self.sender
             .send(GhostEndpointMessage::Request {
@@ -373,19 +396,19 @@ impl<
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
     ) {
-        self.priv_request(context, payload, cb, None);
+        self.priv_request(context, payload, cb, GhostTrackRequestOptions::default());
     }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
-    fn request_timeout(
+    fn request_options(
         &mut self,
         context: Context,
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
-        timeout: std::time::Duration,
+        options: GhostTrackRequestOptions,
     ) {
-        self.priv_request(context, payload, cb, Some(timeout));
+        self.priv_request(context, payload, cb, options);
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -633,11 +656,11 @@ mod tests {
         );
 
         // Now we'll send a request that should timeout
-        endpoint.request_timeout(
+        endpoint.request_options(
             TestContext("context data".into()),
             TestMsgOut("another request to my parent".into()),
             cb_factory(),
-            std::time::Duration::from_millis(1),
+            GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),
         );
 
         // wait 1 ms for the callback to have expired
