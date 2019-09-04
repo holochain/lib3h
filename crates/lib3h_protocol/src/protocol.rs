@@ -208,6 +208,108 @@ impl From<Lib3hServerProtocol> for ToChildResponse {
         }
     }
 }
+///////////////////////////////////////////
+impl From<ToChild> for Lib3hClientProtocol {
+    fn from(c: ToChild) -> Self {
+        match c {
+            ToChild::Connect(connect_data) => Lib3hClientProtocol::Connect(connect_data),
+            ToChild::JoinSpace(space_data) => Lib3hClientProtocol::JoinSpace(space_data),
+            ToChild::LeaveSpace(space_data) => Lib3hClientProtocol::LeaveSpace(space_data),
+            ToChild::SendDirectMessage(direct_message_data) => {
+                Lib3hClientProtocol::SendDirectMessage(direct_message_data)
+            }
+            ToChild::FetchEntry(fetch_entry_data) => {
+                Lib3hClientProtocol::FetchEntry(fetch_entry_data)
+            }
+            ToChild::PublishEntry(provided_entry_data) => {
+                Lib3hClientProtocol::PublishEntry(provided_entry_data)
+            }
+            ToChild::HoldEntry(provided_entry_data) => {
+                Lib3hClientProtocol::HoldEntry(provided_entry_data)
+            }
+            ToChild::QueryEntry(query_entry_data) => {
+                Lib3hClientProtocol::QueryEntry(query_entry_data)
+            }
+        }
+    }
+}
+
+impl From<ToParentResponse> for Lib3hClientProtocol {
+    fn from(c: ToParentResponse) -> Self {
+        match c {
+            ToParentResponse::SuccessResult(r) => Lib3hClientProtocol::SuccessResult(r),
+            ToParentResponse::FailureResult(r) => Lib3hClientProtocol::FailureResult(r),
+            ToParentResponse::HandleSendDirectMessageResult(direct_message_data) => {
+                Lib3hClientProtocol::HandleSendDirectMessageResult(direct_message_data)
+            }
+            ToParentResponse::HandleFetchEntryResult(fetch_entry_result_data) => {
+                Lib3hClientProtocol::HandleFetchEntryResult(fetch_entry_result_data)
+            }
+            ToParentResponse::HandleQueryEntryResult(query_entry_result_data) => {
+                Lib3hClientProtocol::HandleQueryEntryResult(query_entry_result_data)
+            }
+            ToParentResponse::HandleGetAuthoringEntryListResult(entry_list_data) => {
+                Lib3hClientProtocol::HandleGetAuthoringEntryListResult(entry_list_data)
+            }
+            ToParentResponse::HandleGetGossipingEntryListResult(entry_list_data) => {
+                Lib3hClientProtocol::HandleGetGossipingEntryListResult(entry_list_data)
+            }
+        }
+    }
+}
+
+impl From<ToParent> for Lib3hServerProtocol {
+    fn from(c: ToParent) -> Self {
+        match c {
+            ToParent::Disconnected(disconnected_data) => {
+                Lib3hServerProtocol::Disconnected(disconnected_data)
+            }
+            ToParent::HandleSendDirectMessage(direct_message_data) => {
+                Lib3hServerProtocol::HandleSendDirectMessage(direct_message_data)
+            }
+            ToParent::HandleFetchEntry(fetch_entry_data) => {
+                Lib3hServerProtocol::HandleFetchEntry(fetch_entry_data)
+            }
+            ToParent::HandleStoreEntryAspect(store_entry_aspect_data) => {
+                Lib3hServerProtocol::HandleStoreEntryAspect(store_entry_aspect_data)
+            }
+            ToParent::HandleDropEntry(drop_entry_data) => {
+                Lib3hServerProtocol::HandleDropEntry(drop_entry_data)
+            }
+            ToParent::HandleQueryEntry(query_entry_data) => {
+                Lib3hServerProtocol::HandleQueryEntry(query_entry_data)
+            }
+            ToParent::HandleGetAuthoringEntryList(get_list_data) => {
+                Lib3hServerProtocol::HandleGetAuthoringEntryList(get_list_data)
+            }
+            ToParent::HandleGetGossipingEntryList(get_list_data) => {
+                Lib3hServerProtocol::HandleGetGossipingEntryList(get_list_data)
+            }
+        }
+    }
+}
+
+impl From<ToChildResponse> for Lib3hServerProtocol {
+    fn from(c: ToChildResponse) -> Self {
+        match c {
+            ToChildResponse::SuccessResult(r) => Lib3hServerProtocol::SuccessResult(r),
+            ToChildResponse::FailureResult(r) => Lib3hServerProtocol::FailureResult(r),
+            ToChildResponse::SendDirectMessageResult(direct_message_data) => {
+                Lib3hServerProtocol::SendDirectMessageResult(direct_message_data)
+            }
+            ToChildResponse::FetchEntryResult(fetch_entry_result_data) => {
+                Lib3hServerProtocol::FetchEntryResult(fetch_entry_result_data)
+            }
+
+            ToChildResponse::QueryEntryResult(query_entry_result_data) => {
+                Lib3hServerProtocol::QueryEntryResult(query_entry_result_data)
+            }
+            ToChildResponse::Connected(connected_data) => {
+                Lib3hServerProtocol::Connected(connected_data)
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -225,11 +327,16 @@ mod tests {
     #[test]
     fn test_translate_protocol() {
         let gr = generic_result();
-        let c = Lib3hServerProtocol::SuccessResult(gr.clone());
-        let to_c: ToChildResponse = c.into();
+        let s = Lib3hServerProtocol::SuccessResult(gr.clone());
+        let to_c: ToChildResponse = s.clone().into();
         assert_eq!(to_c, ToChildResponse::SuccessResult(gr.clone()));
+
+        let to_s: Lib3hServerProtocol = to_c.into();
+        assert_eq!(to_s,s);
+
         let c = Lib3hServerProtocol::FailureResult(gr.clone());
         let _to_c: ToChildResponse = c.into();
-        //assert_eq!(to_c,ToChild::FailureResult(gr.clone()));
+        //assert_eq!(to_c,ToChildResponse::FailureResult(gr.clone()));
+
     }
 }
