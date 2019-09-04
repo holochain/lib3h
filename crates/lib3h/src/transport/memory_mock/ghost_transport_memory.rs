@@ -1,6 +1,6 @@
 use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use std::{any::Any, collections::HashSet};
+use std::collections::HashSet;
 use url::Url;
 
 #[derive(Debug)]
@@ -8,6 +8,8 @@ use url::Url;
 enum RequestToParentContext {
     Source { address: Url },
 }
+
+pub type UserData = GhostTransportMemory;
 
 type GhostTransportMemoryEndpoint = GhostEndpoint<
     RequestToChild,
@@ -18,6 +20,7 @@ type GhostTransportMemoryEndpoint = GhostEndpoint<
 >;
 
 type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
+    UserData,
     (),
     RequestToParent,
     RequestToParentResponse,
@@ -26,8 +29,18 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
     TransportError,
 >;
 
+pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
+    (),
+    (),
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
 #[allow(dead_code)]
-struct GhostTransportMemory {
+pub struct GhostTransportMemory {
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Option<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -71,10 +84,6 @@ impl
 {
     // BOILERPLATE START----------------------------------
 
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<GhostTransportMemoryEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
@@ -84,10 +93,7 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // process the self endpoint
         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-        endpoint_self
-            .as_mut()
-            .expect("exists")
-            .process(self.as_any())?;
+        endpoint_self.as_mut().expect("exists").process(self)?;
         std::mem::replace(&mut self.endpoint_self, endpoint_self);
 
         for mut msg in self
@@ -270,12 +276,12 @@ mod tests {
              */
 
         let mut transport1 = GhostTransportMemory::new();
-        let mut t1_endpoint = transport1
+        let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
             .as_context_builder()
             .request_id_prefix("tmem_to_child1")
-            .build::<()>();
+            .build::<(), ()>();
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_endpoint = transport2
@@ -283,7 +289,7 @@ mod tests {
             .expect("exists")
             .as_context_builder()
             .request_id_prefix("tmem_to_child2")
-            .build::<()>();
+            .build::<(), ()>();
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
@@ -295,7 +301,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 // parent should see the bind event
                 assert_eq!(
                     "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
@@ -310,7 +316,7 @@ mod tests {
             RequestToChild::Bind {
                 spec: Url::parse("mem://_").unwrap(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 // parent should see the bind event
                 assert_eq!(
                     "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
@@ -342,7 +348,7 @@ mod tests {
                 address: Url::parse("mem://addr_2").unwrap(),
                 payload: b"test message".to_vec(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 // parent should see that the send request was OK
                 assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
                 Ok(())

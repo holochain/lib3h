@@ -1,5 +1,4 @@
 use crate::{GhostCallback, GhostResult, GhostTracker, GhostTrackerBuilder, RequestId};
-use std::any::Any;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -26,7 +25,7 @@ pub struct GhostMessage<MessageToSelf, MessageToOther, MessageToSelfResponse, Er
     >,
 }
 
-impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error> std::fmt::Debug
+impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static> std::fmt::Debug
     for GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -34,7 +33,7 @@ impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error> std::fmt::Debu
     }
 }
 
-impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
+impl<RequestToSelf, RequestToOther, RequestToSelfResponse, Error: 'static>
     GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
@@ -117,7 +116,13 @@ pub struct GhostEndpoint<
     >,
 }
 
-impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfResponse, Error>
+impl<
+        RequestToOther,
+        RequestToOtherResponse: 'static,
+        RequestToSelf,
+        RequestToSelfResponse,
+        Error: 'static,
+    >
     GhostEndpoint<
         RequestToOther,
         RequestToOtherResponse,
@@ -187,9 +192,10 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
         Error,
     >
 {
-    pub fn build<Context>(
+    pub fn build<UserData, Context: 'static>(
         self,
     ) -> GhostContextEndpoint<
+        UserData,
         Context,
         RequestToOther,
         RequestToOtherResponse,
@@ -219,6 +225,7 @@ impl<RequestToOther, RequestToOtherResponse, RequestToSelf, RequestToSelfRespons
 /// an expanded endpoint usable to send/receive requests/responses/events
 /// see `GhostEndpoint::as_context_endpoint` for additional details
 pub struct GhostContextEndpoint<
+    UserData,
     Context,
     RequestToOther,
     RequestToOtherResponse,
@@ -232,20 +239,22 @@ pub struct GhostContextEndpoint<
     receiver: crossbeam_channel::Receiver<
         GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
-    pending_responses_tracker: GhostTracker<Context, RequestToOtherResponse, Error>,
+    pending_responses_tracker: GhostTracker<UserData, Context, RequestToOtherResponse, Error>,
     outbox_messages_to_self:
         Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>,
 }
 
 impl<
-        Context,
+        UserData,
+        Context: 'static,
         RequestToOther,
-        RequestToOtherResponse,
+        RequestToOtherResponse: 'static,
         RequestToSelf,
         RequestToSelfResponse,
-        Error,
+        Error: 'static,
     >
     GhostContextEndpoint<
+        UserData,
         Context,
         RequestToOther,
         RequestToOtherResponse,
@@ -268,7 +277,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
         timeout: Option<std::time::Duration>,
     ) {
         let request_id = match timeout {
@@ -291,7 +300,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
     ) {
         self.priv_request(context, payload, cb, None);
     }
@@ -302,7 +311,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
         timeout: std::time::Duration,
     ) {
         self.priv_request(context, payload, cb, Some(timeout));
@@ -316,8 +325,8 @@ impl<
     }
 
     /// check for pending responses timeouts or incoming messages
-    pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
-        self.pending_responses_tracker.process(actor)?;
+    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+        self.pending_responses_tracker.process(user_data)?;
         loop {
             let msg: Result<
                 GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
@@ -340,7 +349,7 @@ impl<
                         payload,
                     } => {
                         self.pending_responses_tracker
-                            .handle(request_id, actor, payload)?;
+                            .handle(request_id, user_data, payload)?;
                     }
                 },
                 Err(e) => match e {
@@ -363,10 +372,10 @@ impl<
 #[allow(clippy::complexity)]
 pub fn create_ghost_channel<
     RequestToParent,
-    RequestToParentResponse,
+    RequestToParentResponse: 'static,
     RequestToChild,
-    RequestToChildResponse,
-    Error,
+    RequestToChildResponse: 'static,
+    Error: 'static,
 >() -> (
     GhostEndpoint<
         RequestToChild,
@@ -476,12 +485,9 @@ mod tests {
         // this genrates a callback for requests that simply puts the callbackdata  into
         // the FakeActor's state String, thus for testing we can just look in the actors's
         // state to see if the callback was run.
-        fn cb_factory() -> GhostCallback<TestContext, TestMsgOutResponse, TestError> {
-            Box::new(|dyn_me, _context, callback_data| {
-                let mutable_me = dyn_me
-                    .downcast_mut::<FakeActor>()
-                    .expect("should be a our fake actor which is just a String");
-                mutable_me.0 = format!("{:?}", callback_data);
+        fn cb_factory() -> GhostCallback<FakeActor, TestContext, TestMsgOutResponse, TestError> {
+            Box::new(|me, _context, callback_data| {
+                me.0 = format!("{:?}", callback_data);
                 Ok(())
             })
         }

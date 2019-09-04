@@ -1,13 +1,13 @@
 use crate::{
     GhostCallback, GhostContextEndpoint, GhostEndpoint, GhostMessage, GhostResult, WorkWasDone,
 };
-use std::any::Any;
 
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
 /// You only have to call process() on this one struct, and it provides
 /// all the request / drain_messages etc functions from GhostEndpoint.
 pub struct GhostParentWrapper<
+    UserData,
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -24,6 +24,7 @@ pub struct GhostParentWrapper<
 > {
     actor: Actor,
     endpoint: GhostContextEndpoint<
+        UserData,
         Context,
         RequestToChild,
         RequestToChildResponse,
@@ -34,12 +35,13 @@ pub struct GhostParentWrapper<
 }
 
 impl<
-        Context,
+        UserData: 'static,
+        Context: 'static,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
-        RequestToChildResponse,
-        Error,
+        RequestToChildResponse: 'static,
+        Error: 'static,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -49,6 +51,7 @@ impl<
         >,
     >
     GhostParentWrapper<
+        UserData,
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -79,7 +82,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
     ) {
         self.endpoint.request(context, payload, cb)
     }
@@ -92,14 +95,15 @@ impl<
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
+    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.actor.process()?;
-        self.endpoint.process(actor)?;
+        self.endpoint.process(user_data)?;
         Ok(())
     }
 }
 
 impl<
+        UserData,
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -115,6 +119,7 @@ impl<
         >,
     > std::convert::AsRef<Actor>
     for GhostParentWrapper<
+        UserData,
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -130,6 +135,7 @@ impl<
 }
 
 impl<
+        UserData,
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -145,6 +151,7 @@ impl<
         >,
     > std::convert::AsMut<Actor>
     for GhostParentWrapper<
+        UserData,
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -167,10 +174,6 @@ pub trait GhostActor<
     Error,
 >
 {
-    /// get a generic reference to ourselves
-    /// will be passed into any endpoint process functions
-    fn as_any(&mut self) -> &mut dyn Any;
-
     /// our parent gets a reference to the parent side of our channel
     fn take_parent_endpoint(
         &mut self,
@@ -200,6 +203,7 @@ pub trait GhostActor<
 
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
+    UserData,
     Context,
     RequestToParent,
     RequestToParentResponse,
@@ -217,6 +221,7 @@ pub struct GhostParentWrapperDyn<
         >,
     >,
     endpoint: GhostContextEndpoint<
+        UserData,
         Context,
         RequestToChild,
         RequestToChildResponse,
@@ -227,14 +232,16 @@ pub struct GhostParentWrapperDyn<
 }
 
 impl<
-        Context,
+        UserData,
+        Context: 'static,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
-        RequestToChildResponse,
-        Error,
+        RequestToChildResponse: 'static,
+        Error: 'static,
     >
     GhostParentWrapperDyn<
+        UserData,
         Context,
         RequestToParent,
         RequestToParentResponse,
@@ -256,7 +263,7 @@ impl<
         >,
         request_id_prefix: &str,
     ) -> Self {
-        let endpoint = actor
+        let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = actor
             .take_parent_endpoint()
             .expect("exists")
             .as_context_builder()
@@ -275,7 +282,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
     ) {
         self.endpoint.request(context, payload, cb)
     }
@@ -284,7 +291,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
         timeout: std::time::Duration,
     ) {
         self.endpoint.request_timeout(context, payload, cb, timeout)
@@ -298,9 +305,9 @@ impl<
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    pub fn process(&mut self, actor: &mut dyn Any) -> GhostResult<()> {
+    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.actor.process()?;
-        self.endpoint.process(actor)?;
+        self.endpoint.process(user_data)?;
         Ok(())
     }
 }
@@ -310,7 +317,6 @@ mod tests {
     use super::*;
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
-    use std::any::Any;
 
     // Any actor has messages that it exchanges with it's parent
     // These are the Out message, and it has messages that come internally
@@ -333,6 +339,7 @@ mod tests {
         >,
         endpoint_as_child: Detach<
             GhostContextEndpoint<
+                TestActor,
                 String,
                 TestMsgOut,
                 TestMsgOutResponse,
@@ -364,9 +371,6 @@ mod tests {
         for TestActor
     {
         // START BOILER PLATE--------------------------
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
 
         fn take_parent_endpoint(
             &mut self,
@@ -381,9 +385,7 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
-            detach_run!(&mut self.endpoint_as_child, |cs| {
-                cs.process(self.as_any())
-            })?;
+            detach_run!(&mut self.endpoint_as_child, |cs| { cs.process(self) })?;
             // END BOILER PLATE--------------------------
 
             // In this test actor we simply take all the messages we get and
@@ -416,6 +418,7 @@ mod tests {
         let mut child_actor = TestActor::new();
         // get the endpoint from the child actor that we as parent will interact with
         let mut parent_endpoint: GhostContextEndpoint<
+            FakeParent,
             TestContext,
             TestMsgIn,
             TestMsgInResponse,
@@ -441,13 +444,10 @@ mod tests {
 
         // now lets try posting a request with a callback which just saves the response
         // value to the parent's statee
-        let cb: GhostCallback<TestContext, TestMsgInResponse, TestError> =
-            Box::new(|dyn_parent, _context, callback_data| {
-                let mutable_parent = dyn_parent
-                    .downcast_mut::<FakeParent>()
-                    .expect("should be a FakeParent");
+        let cb: GhostCallback<FakeParent, TestContext, TestMsgInResponse, TestError> =
+            Box::new(|parent, _context, callback_data| {
                 if let GhostCallbackData::Response(Ok(TestMsgInResponse(payload))) = callback_data {
-                    mutable_parent.state = payload;
+                    parent.state = payload;
                 }
                 Ok(())
             });
@@ -474,6 +474,7 @@ mod tests {
 
         // create the wrapper
         let mut wrapped_child: GhostParentWrapper<
+            FakeParent,
             TestContext,
             TestMsgOut,
             TestMsgOutResponse,
