@@ -1,4 +1,5 @@
-use lib3h_ghost_actor::GhostParentWrapper;
+use detach::Detach;
+use lib3h_ghost_actor::*;
 use lib3h_protocol::protocol::*;
 /// the context when making a request from core
 /// this is always the request_id
@@ -24,3 +25,128 @@ pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrappe
     EngineError,
     Engine,
 >;
+
+// FIXME
+type EngineError = String;
+
+pub struct GhostEngine {
+    client_endpoint: Option<
+        GhostEndpoint<
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            EngineError,
+        >,
+    >,
+    lib3h_endpoint: Detach<
+        GhostContextEndpoint<
+            GhostEngine,
+            String,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            EngineError,
+        >,
+    >,
+}
+
+impl GhostEngine {
+    pub fn new(name: &str) -> Self {
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        Self {
+            client_endpoint: Some(endpoint_parent),
+            lib3h_endpoint: Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix(name)
+                    .build(),
+            ),
+        }
+    }
+}
+
+impl
+    GhostActor<
+        Lib3hToClient,
+        Lib3hToClientResponse,
+        ClientToLib3h,
+        ClientToLib3hResponse,
+        EngineError,
+    > for GhostEngine
+{
+    // START BOILER PLATE--------------------------
+    fn take_parent_endpoint(
+        &mut self,
+    ) -> Option<
+        GhostEndpoint<
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            EngineError,
+        >,
+    > {
+        std::mem::replace(&mut self.client_endpoint, None)
+    }
+    // END BOILER PLATE--------------------------
+
+    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // START BOILER PLATE--------------------------
+        // always run the endpoint process loop
+        detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
+        // END BOILER PLATE--------------------------
+
+        for msg in self.lib3h_endpoint.as_mut().drain_messages() {
+            self.handle_msg_from_client(msg)?;
+        }
+
+        Ok(true.into())
+    }
+}
+
+impl GhostEngine {
+    fn handle_msg_from_client(
+        &mut self,
+        mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
+    ) -> Result<(), EngineError> {
+        match msg.take_message().expect("exists") {
+            ClientToLib3h::Connect(_data) => {
+                // pretend the connection request failed
+                msg.respond(Err("connection failed!".to_string()));
+            }
+            ClientToLib3h::JoinSpace(_data) => {
+                // pretend the request succeeded
+                msg.respond(Ok(ClientToLib3hResponse::JoinSpaceResult));
+            }
+            _ => panic!("{:?} not implemented", msg),
+        }
+        Ok(())
+    }
+
+    /// create a fake lib3h event
+    pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
+        self.lib3h_endpoint.publish(msg);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    //    use lib3h_protocol::data_types::*;
+    struct MockCore {
+        //    state: String,
+    }
+    //  use url::Url;
+
+    #[test]
+    fn test_ghost_engine() {
+        let mut _core = MockCore {
+            //        state: "".to_string(),
+        };
+        let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, EngineError> =
+            GhostParentWrapper::new(GhostEngine::new("test_engine"), "test_engine");
+        assert!(true);
+    }
+}
