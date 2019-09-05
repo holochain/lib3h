@@ -140,7 +140,10 @@ impl SimChat {
                             chat_event
                                 .try_into()
                                 .and_then(|lib3h_message: ClientToLib3h| {
-                                    parent_endpoint.publish(lib3h_message);
+                                    parent_endpoint.request(String::from("ctx"), lib3h_message, Box::new(|_, _, callback_data| {
+                                        println!("chat received response from engine: {:?}", callback_data);
+                                        Ok(())
+                                    }));
                                     Ok(())
                                 })
                                 .ok();
