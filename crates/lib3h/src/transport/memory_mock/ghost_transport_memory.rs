@@ -96,6 +96,7 @@ impl
         endpoint_self.as_mut().expect("exists").process(self)?;
         std::mem::replace(&mut self.endpoint_self, endpoint_self);
 
+        let mut server_ref;
         for mut msg in self
             .endpoint_self
             .as_mut()
@@ -106,7 +107,10 @@ impl
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
                     let bound_url = memory_server::new_url();
-                    memory_server::set_server(&bound_url).unwrap(); //set_server always returns Ok
+                    server_ref = memory_server::ensure_server(&bound_url); //set_server always returns Ok
+                    if server_ref.is_err() {
+                        panic!("not good")
+                    }
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
@@ -126,18 +130,20 @@ impl
                             )));
                         }
                         Some(my_addr) => {
+                            let maybe_server = memory_server::read_ref(my_addr);
                             // get destinations server
-                            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                            let maybe_server = server_map.get(&address);
-                            if let None = maybe_server {
+                            // TODO propagate error
+                            if let Err(e) = maybe_server {
+                                println!("server error: {:?}", e);
                                 msg.respond(Err(TransportError::new(format!(
                                     "No Memory server at this address: {}",
                                     my_addr
                                 ))));
                                 continue;
                             }
-                            let mut server = maybe_server.unwrap().lock().unwrap();
 
+                            let server_ref = maybe_server.unwrap();
+                            let mut server = server_ref.get();
                             // if not already connected, request a connections
                             if self.connections.get(&address).is_none() {
                                 match server.request_connect(&my_addr) {
@@ -176,12 +182,14 @@ impl
         println!("Processing for: {}", my_addr);
 
         // get our own server
-        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-        let maybe_server = server_map.get(&my_addr);
-        if let None = maybe_server {
+        let maybe_server = memory_server::read_ref(&my_addr);
+        if let Err(e) = maybe_server {
+            println!("error: {}", e);
             return Err(format!("No Memory server at this address: {}", my_addr).into());
         }
-        let mut server = maybe_server.unwrap().lock().unwrap();
+        let server_ref = maybe_server.unwrap();
+        let mut server = server_ref.get();
+
         let (success, event_list) = server.process()?;
         if success {
             let mut to_connect_list: Vec<(Url)> = Vec::new();
@@ -229,7 +237,7 @@ impl
                         endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::ReceivedData {
                                 address: Url::parse(&from_addr).unwrap(),
-                                payload,
+                                payload
                             },
                         );
                         std::mem::replace(&mut self.endpoint_self, endpoint_self);
@@ -346,7 +354,7 @@ mod tests {
             (),
             RequestToChild::SendMessage {
                 address: Url::parse("mem://addr_2").unwrap(),
-                payload: b"test message".to_vec(),
+                payload: "test message".into(),
             },
             Box::new(|_: &mut (), _, r| {
                 // parent should see that the send request was OK

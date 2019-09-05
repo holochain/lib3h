@@ -15,12 +15,38 @@ use crate::{
 
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
+use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
 pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
+
+fn vec_url_de<'de, D>(deserializer: D) -> Result<Vec<Url>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Wrapper(#[serde(with = "url_serde")] Url);
+
+    let v = Vec::deserialize(deserializer)?;
+    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
+}
+
+fn vec_url_se<S>(v: &[Url], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    #[derive(Serialize)]
+    struct Wrapper(#[serde(with = "url_serde")] Url);
+
+    let mut seq = serializer.serialize_seq(Some(v.len()))?;
+    for u in v {
+        seq.serialize_element(&Wrapper(u.clone()))?;
+    }
+    seq.end()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RealEngineTrackerData {
@@ -40,7 +66,8 @@ enum RealEngineTrackerData {
 pub struct RealEngineConfig {
     pub tls_config: TlsConfig,
     pub socket_type: String,
-    pub bootstrap_nodes: Vec<String>,
+    #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
+    pub bootstrap_nodes: Vec<Url>,
     pub work_dir: String,
     pub log_level: char,
     #[serde(with = "url_serde")]

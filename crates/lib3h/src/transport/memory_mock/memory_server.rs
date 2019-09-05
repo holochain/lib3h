@@ -13,8 +13,10 @@ use url::Url;
 // Memory Server MAP
 //--------------------------------------------------------------------------------------------------
 
+pub type ServerInst = std::sync::Arc<Mutex<MemoryServer>>;
+
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
+type MemoryServerMap = HashMap<Url, std::sync::Weak<Mutex<MemoryServer>>>;
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
@@ -29,30 +31,44 @@ pub fn new_url() -> Url {
     *tc += 1;
     Url::parse(&format!("mem://addr_{}", *tc).as_str()).unwrap()
 }
-
 /// Add new MemoryServer to the global server map
-pub fn set_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::set_server: {}", uri);
-    // Create server with that name if it doesn't already exist
+pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
+    println!("MemoryServer::ensure_server: {}", uri);
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if server_map.contains_key(uri) {
-        return Ok(());
-    }
-    let server = MemoryServer::new(uri);
-    server_map.insert(uri.clone(), Mutex::new(server));
-    Ok(())
+
+    // make sure we keep a STRONG reference around for the first one,
+    // or it'll get cleaned up before we even send it out.
+    let mut out = None;
+
+    let tmp = server_map.entry(uri.clone()).or_insert_with(|| {
+        let s = std::sync::Arc::new(Mutex::new(MemoryServer::new(uri)));
+        let r = std::sync::Arc::downgrade(&s);
+        out = Some(s);
+        r
+    });
+
+    Ok(match out {
+        Some(s) => s,
+        None => std::sync::Weak::upgrade(tmp).unwrap(),
+    })
 }
 
-/// Remove a MemoryServer from the global server map
-pub fn unset_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::unset_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if !server_map.contains_key(uri) {
-        return Err(TransportError::new("Server doesn't exist".to_string()));
+pub struct ServerRef(std::sync::Arc<Mutex<MemoryServer>>);
+impl ServerRef {
+    pub fn get(&self) -> std::sync::MutexGuard<'_, MemoryServer> {
+        self.0.lock().expect("can read MemoryServer")
     }
-    server_map.remove(uri);
-    Ok(())
+}
+
+pub fn read_ref(uri: &Url) -> TransportResult<ServerRef> {
+    let server_map = MEMORY_SERVER_MAP.read().expect("map exists");
+    let maybe_server = server_map.get(uri);
+    if maybe_server.is_none() {
+        return Err(TransportError::new(format!("No Memory server at {}", uri)));
+    }
+    Ok(ServerRef(
+        std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists"),
+    ))
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -73,7 +89,12 @@ pub struct MemoryServer {
 
 impl Drop for MemoryServer {
     fn drop(&mut self) {
-        trace!("(MemoryServer) dropped: {:?}", self.this_uri);
+        println!("(MemoryServer) dropped: {:?}", self.this_uri);
+        let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
+        if !server_map.contains_key(&self.this_uri) {
+            panic!("Server doesn't exist");
+        }
+        server_map.remove(&self.this_uri);
     }
 }
 
@@ -178,7 +199,7 @@ impl MemoryServer {
         self.connection_inbox.clear();
         // Process msg inboxes
         for (uri, inbox) in self.inbox_map.iter_mut() {
-            loop {
+             loop {
                 let payload = match inbox.pop_front() {
                     None => break,
                     Some(msg) => msg,
@@ -190,7 +211,7 @@ impl MemoryServer {
                     payload.len(),
                     uri
                 );
-                let evt = TransportEvent::ReceivedData(uri.to_string(), payload);
+                let evt = TransportEvent::ReceivedData(uri.to_string(), payload.into());
                 outbox.push(evt);
             }
         }

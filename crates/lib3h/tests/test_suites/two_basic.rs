@@ -137,7 +137,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
-    assert_eq!(msg.content, response_content);
+    assert_eq!(msg.content, response_content.into());
 }
 
 /// Test SendDirectMessage and response
@@ -173,7 +173,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -268,7 +268,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 2);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -294,7 +294,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -314,7 +314,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request

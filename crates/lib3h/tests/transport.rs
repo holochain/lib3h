@@ -5,6 +5,7 @@ extern crate lazy_static;
 
 use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};
+use lib3h_protocol::data_types::Opaque;
 use lib3h_ghost_actor::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
@@ -24,7 +25,7 @@ pub struct Mockernet {
 // by any mockernet client.
 pub enum MockernetEvent {
     Connection { from: Url },
-    Message { from: Url, payload: Vec<u8> },
+    Message { from: Url, payload: Opaque },
     Error(String),
 }
 
@@ -32,12 +33,12 @@ pub enum MockernetEvent {
 // sets of crossbeam channels in the bindings that mockernet shuttles
 // data between.
 pub struct Tube {
-    sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-    receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+    sender: crossbeam_channel::Sender<(Url, Opaque)>,
+    receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
 }
 impl Tube {
     pub fn new() -> Self {
-        let (sender, receiver) = crossbeam_channel::unbounded::<(Url, Vec<u8>)>();
+        let (sender, receiver) = crossbeam_channel::unbounded::<(Url, Opaque)>();
         Tube { sender, receiver }
     }
 }
@@ -70,7 +71,7 @@ impl Mockernet {
     }
 
     /// send a message to anyone on the Mockernet
-    pub fn send_to(&mut self, to: Url, from: Url, payload: Vec<u8>) -> Result<(), String> {
+    pub fn send_to(&mut self, to: Url, from: Url, payload: Opaque) -> Result<(), String> {
         {
             let _src = self
                 .bindings
@@ -337,7 +338,7 @@ fn ghost_transport() {
         (),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
-            payload: b"won't be received!".to_vec(),
+            payload: "won't be received!".into(),
         },
         // callback should simply log the response
         Box::new(|owner, _, response| {
@@ -374,7 +375,7 @@ fn ghost_transport() {
         (),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
-            payload: b"foo".to_vec(),
+            payload: "foo".into(),
         },
         // callback should simply log the response
         Box::new(|owner, _, response| {

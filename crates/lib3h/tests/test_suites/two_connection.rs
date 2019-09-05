@@ -7,11 +7,13 @@ use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 lazy_static! {
     pub static ref TWO_NODES_CONNECTION_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        (test_two_disconnect, true),
+        // TODO Issue #236
+        //       (test_two_disconnect, true),
         (test_two_gossip_self, true),
         (test_two_peer_timeout, true),
-        (test_two_peer_timeout_reconnect, true),
-        (test_two_reconnect, true),
+        // TODO Issue #236
+        //        (test_two_peer_timeout_reconnect, true),
+        //        (test_two_reconnect, true),
     ];
 }
 
@@ -19,8 +21,8 @@ lazy_static! {
 // Tests
 //--------------------------------------------------------------------------------------------------
 
-/// Have Alex disconnect and reconnect
-fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
+/// Have Alex disconnect and reconnect TODO Issue #236
+fn _test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.disconnect();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 0);

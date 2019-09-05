@@ -111,7 +111,7 @@ pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     alex.reply_to_first_HandleGetAuthoringEntryList();
     let (did_work, _srv_msg_list) = alex.process().unwrap();
@@ -136,7 +136,7 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     println!("\nAlex authored and stored Aspects \n");
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
     println!("\nBilly should receive first aspect \n");

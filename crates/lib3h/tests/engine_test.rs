@@ -64,11 +64,15 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
+fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine<MirrorDht> {
+    let bootstrap_nodes = match bs {
+        Some(s) => s,
+        None => vec![],
+    };
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
-        bootstrap_nodes: vec![],
+        bootstrap_nodes,
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
@@ -89,6 +93,10 @@ fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
         name, p2p_binding
     );
     engine
+}
+
+fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
+    basic_setup_mock_bootstrap(name, None)
 }
 
 fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
@@ -164,6 +172,25 @@ fn basic_connect_test_mock() {
     let is_connected = Box::new(is_connected("", engine_a.advertise()));
 
     assert_one_processed!(engine_a, engine_b, is_connected);
+}
+
+#[test]
+fn basic_connect_bootstrap_test_mock() {
+    enable_logging_for_test(true);
+    // Setup
+    let engine_b = basic_setup_mock("basic_connect_bootstrap_test_node_b");
+    // Get URL
+    let url_b = engine_b.advertise();
+    println!("url_b: {}", url_b);
+
+    // Create a with b as a bootstrap
+    let mut engine_a =
+        basic_setup_mock_bootstrap("basic_connect_bootstrap_test_node_a", Some(vec![url_b]));
+
+    println!("\nengine_a.process()...");
+    let (did_work, srv_msg_list) = engine_a.process().unwrap();
+    println!("engine_a: {:?}", srv_msg_list);
+    assert!(did_work);
 }
 
 #[test]
@@ -341,7 +368,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         request_id: "dm_1".to_string(),
         to_agent_id: BILLY_AGENT_ID.clone(),
         from_agent_id: ALEX_AGENT_ID.clone(),
-        content: "wah".as_bytes().to_vec(),
+        content: "wah".as_bytes().into(),
     };
     // Send
     println!("\nAlex sends DM to Billy...\n");
@@ -366,14 +393,9 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
 
     // Post response
     let mut res_dm = req_dm.clone();
-    res_dm.to_agent_id = req_dm.clone().from_agent_id.clone();
-    res_dm.from_agent_id = req_dm.clone().to_agent_id.clone();
-    res_dm.content = format!(
-        "echo: {}",
-        String::from_utf8(req_dm.clone().content).unwrap()
-    )
-    .as_bytes()
-    .to_vec();
+    res_dm.to_agent_id = req_dm.from_agent_id.clone();
+    res_dm.from_agent_id = req_dm.to_agent_id.clone();
+    res_dm.content = format!("echo: {}", req_dm.content).as_bytes().into();
     billy
         .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
             res_dm.clone(),
