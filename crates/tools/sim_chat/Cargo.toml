@@ -1,5 +1,5 @@
 [package]
-name = "lib3h_half_busy_chat"
+name = "lib3h_sim_chat"
 version = "0.0.10"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
@@ -8,13 +8,14 @@ keywords = ["holochain", "holo"]
 categories = ["development-tools::testing"]
 license = "Apache-2.0"
 readme = "README.md"
-documentation = "https://docs.rs/lib3h_half_busy_chat"
+documentation = "https://docs.rs/lib3h_sim_chat"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 crossbeam-channel = "=0.3.8"
 linefeed = "=0.6.0"
 base64 = "=0.10.1"
+regex = "=1.1.2"
 lib3h_protocol = { "path" = "../../lib3h_protocol" }
 lib3h_sodium = { "path" = "../../sodium" }
 lib3h_crypto_api = { "path" = "../../crypto_api" }
@@ -23,7 +24,7 @@ lib3h_ghost_actor = { "path" = "../../ghost_actor" }
 
 
 [lib]
-name = "lib3h_half_busy_chat"
+name = "lib3h_sim_chat"
 path = "src/lib.rs"
 
 [[bin]]

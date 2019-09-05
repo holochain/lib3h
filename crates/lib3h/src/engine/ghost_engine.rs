@@ -96,7 +96,13 @@ impl GhostEngine {
             ClientToLib3h::Connect(_data) => {
                 // pretend the connection request failed
                 msg.respond(Err("connection failed!".to_string()));
-            }
+            },
+            ClientToLib3h::JoinSpace(_space_data) => {
+                msg.respond(Err("Joining space failed!".to_string()));
+            },
+            ClientToLib3h::LeaveSpace(_space_data) => {
+                msg.respond(Err("Leaving space failed!".to_string()));
+            },
             _ => panic!("{:?} not implemented", msg),
         }
         Ok(())

@@ -1,4 +1,3 @@
-pub mod ghost_engine;
 mod network_layer;
 pub mod p2p_protocol;
 pub mod real_engine;
