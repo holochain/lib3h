@@ -6,12 +6,12 @@ use crate::prelude::*;
 /// all the request / drain_messages etc functions from GhostEndpoint.
 pub struct GhostParentWrapper<
     UserData,
-    Context,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    Error,
+    Context: 'static,
+    RequestToParent: 'static,
+    RequestToParentResponse: 'static,
+    RequestToChild: 'static,
+    RequestToChildResponse: 'static,
+    Error: 'static,
     Actor: GhostActor<
         RequestToParent,
         RequestToParentResponse,
@@ -33,11 +33,11 @@ pub struct GhostParentWrapper<
 }
 
 impl<
-        UserData: 'static,
+        UserData,
         Context: 'static,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
         RequestToChildResponse: 'static,
         Error: 'static,
         Actor: GhostActor<
@@ -72,11 +72,11 @@ impl<
 }
 
 impl<
-        UserData: 'static,
+        UserData,
         Context: 'static,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
         RequestToChildResponse: 'static,
         Error: 'static,
         Actor: GhostActor<
@@ -150,12 +150,12 @@ impl<
 
 impl<
         UserData,
-        Context,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        Error,
+        Context: 'static,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -182,12 +182,12 @@ impl<
 
 impl<
         UserData,
-        Context,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        Error,
+        Context: 'static,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -213,11 +213,11 @@ impl<
 }
 
 pub trait GhostActor<
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    Error,
+    RequestToParent: 'static,
+    RequestToParentResponse: 'static,
+    RequestToChild: 'static,
+    RequestToChildResponse: 'static,
+    Error: 'static,
 >
 {
     /// our parent gets a reference to the parent side of our channel
@@ -250,12 +250,12 @@ pub trait GhostActor<
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
     UserData,
-    Context,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    Error,
+    Context: 'static,
+    RequestToParent: 'static,
+    RequestToParentResponse: 'static,
+    RequestToChild: 'static,
+    RequestToChildResponse: 'static,
+    Error: 'static,
 > {
     actor: Box<
         dyn GhostActor<
@@ -280,9 +280,9 @@ pub struct GhostParentWrapperDyn<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
         RequestToChildResponse: 'static,
         Error: 'static,
     >
