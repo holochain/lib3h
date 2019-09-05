@@ -1,7 +1,7 @@
+pub mod ghost_engine;
 mod network_layer;
 pub mod p2p_protocol;
 pub mod real_engine;
-pub mod ghost_engine;
 mod space_layer;
 
 use std::collections::{HashMap, HashSet, VecDeque};

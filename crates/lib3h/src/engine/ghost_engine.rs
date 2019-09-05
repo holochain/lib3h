@@ -92,17 +92,18 @@ impl GhostEngine {
         &mut self,
         mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
     ) -> Result<(), EngineError> {
+        println!("ghost engine received message: {:?}", msg);
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(_data) => {
                 // pretend the connection request failed
                 msg.respond(Err("connection failed!".to_string()));
-            },
+            }
             ClientToLib3h::JoinSpace(_space_data) => {
                 msg.respond(Err("Joining space failed!".to_string()));
-            },
+            }
             ClientToLib3h::LeaveSpace(_space_data) => {
                 msg.respond(Err("Leaving space failed!".to_string()));
-            },
+            }
             _ => panic!("{:?} not implemented", msg),
         }
         Ok(())
