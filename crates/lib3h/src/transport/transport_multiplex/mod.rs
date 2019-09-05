@@ -103,7 +103,7 @@ mod tests {
                         })));
                     }
                     RequestToChild::SendMessage { address, payload } => {
-                        self.mock_sender.send((address, payload)).unwrap();
+                        self.mock_sender.send((address, payload))?;
                         msg.respond(Ok(RequestToChildResponse::SendMessage));
                     }
                 }

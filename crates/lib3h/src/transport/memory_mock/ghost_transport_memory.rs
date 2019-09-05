@@ -112,7 +112,7 @@ impl
                     // respond to our parent
                     msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                         bound_url: bound_url,
-                    })));
+                    })))?;
                 }
                 RequestToChild::SendMessage { address, payload } => {
                     // make sure we have bound and get our address if so
@@ -123,7 +123,7 @@ impl
                         None => {
                             msg.respond(Err(TransportError::new(
                                 "Transport must be bound before sending".to_string(),
-                            )));
+                            )))?;
                         }
                         Some(my_addr) => {
                             // get destinations server
@@ -133,7 +133,7 @@ impl
                                 msg.respond(Err(TransportError::new(format!(
                                     "No Memory server at this address: {}",
                                     my_addr
-                                ))));
+                                ))))?;
                                 continue;
                             }
                             let mut server = maybe_server.unwrap().lock().unwrap();
@@ -142,7 +142,7 @@ impl
                             if self.connections.get(&address).is_none() {
                                 match server.request_connect(&my_addr) {
                                     Err(err) => {
-                                        msg.respond(Err(err));
+                                        msg.respond(Err(err))?;
                                         continue;
                                     }
                                     Ok(()) => self.connections.insert(address.clone()),
@@ -160,7 +160,7 @@ impl
                                 .post(&my_addr, &payload)
                                 .expect("Post on memory server should work");
 
-                            msg.respond(Ok(RequestToChildResponse::SendMessage));
+                            msg.respond(Ok(RequestToChildResponse::SendMessage))?;
                         }
                     };
                 }
@@ -199,7 +199,7 @@ impl
                             RequestToParent::IncomingConnection {
                                 address: to_connect_uri.clone(),
                             },
-                        );
+                        )?;
                         std::mem::replace(&mut self.endpoint_self, endpoint_self);
                     }
                     _ => non_connect_events.push(event),
@@ -231,7 +231,7 @@ impl
                                 address: Url::parse(&from_addr).unwrap(),
                                 payload,
                             },
-                        );
+                        )?;
                         std::mem::replace(&mut self.endpoint_self, endpoint_self);
                     }
                     _ => panic!(format!("WHAT: {:?}", event)),
