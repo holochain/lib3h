@@ -120,7 +120,7 @@ struct LegacyLib3h {
     lib3h: Detach<GhostEngineParentWapper<LegacyLib3h>>,
     #[allow(dead_code)]
     name: String,
-    client_responses: Vec<Lib3hServerProtocol>,
+    client_request_responses: Vec<Lib3hServerProtocol>,
 }
 
 #[allow(dead_code)]
@@ -129,8 +129,18 @@ impl LegacyLib3h {
         LegacyLib3h {
             lib3h: Detach::new(GhostParentWrapper::new(GhostEngine::new(), name)),
             name: name.into(),
-            client_responses: Vec::new(),
+            client_request_responses: Vec::new(),
         }
+    }
+
+    fn server_failure(err: EngineError, context: CoreContext) -> Lib3hServerProtocol {
+        let failure_data = GenericResultData {
+            request_id: context.0,
+            space_address: "space_addr".into(),
+            to_agent_id: "to_agent_id".into(),
+            result_info: err.as_bytes().to_vec(),
+        };
+        Lib3hServerProtocol::FailureResult(failure_data)
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -141,21 +151,13 @@ impl LegacyLib3h {
                  Box::new(|me:&mut LegacyLib3h, context: CoreContext, response:GhostCallbackData<ClientToLib3hResponse,EngineError>| {
                     match response {
                         GhostCallbackData::Response(Ok(rsp)) => {
-                            me.client_responses.push(rsp.into());
+                            me.client_request_responses.push(rsp.into());
                         },
                         GhostCallbackData::Response(Err(e)) => {
-                            let failure_data = GenericResultData {
-                                request_id: context.0,
-                                space_address: "space_addr".into(),
-                                to_agent_id: "to_agent_id".into(),
-                                result_info: e.as_bytes().to_vec(),
-                            };
-                            let rsp = Lib3hServerProtocol::FailureResult(failure_data);
-
-                            me.client_responses.push(rsp);
+                            me.client_request_responses.push(LegacyLib3h::server_failure(e,context));
                         },
                         GhostCallbackData::Timeout => {
-                            panic!("timeout");
+                            me.client_request_responses.push(LegacyLib3h::server_failure("Request timed out".into(),context));
                         }
                     };
                     Ok(())
@@ -171,7 +173,8 @@ impl LegacyLib3h {
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let _ = detach_run!(&mut self.lib3h, |lib3h| lib3h.process(self));
-        Ok((false, Vec::new()))
+        let responses: Vec<_> = self.client_request_responses.drain(0..).collect();
+        Ok((responses.len() > 0, responses))
     }
 }
 
@@ -201,8 +204,11 @@ mod tests {
 
         assert!(lib3h.post(Lib3hClientProtocol::Connect(data)).is_ok());
         // process via the wrapper
-        let _resul = lib3h.process();
+        let result = lib3h.process();
 
-        println!("POST RESULT:{:?}", lib3h.client_responses);
+        assert_eq!(
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: [99, 111, 110, 110, 101, 99, 116, 105, 111, 110, 32, 102, 97, 105, 108, 101, 100, 33] })]))",
+            format!("{:?}", result)
+        );
     }
 }
