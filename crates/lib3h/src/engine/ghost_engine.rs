@@ -101,6 +101,11 @@ impl GhostEngine {
         }
         Ok(())
     }
+
+    /// create a fake lib3h event
+    pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
+        self.endpoint_as_child.publish(msg);
+    }
 }
 
 type GhostEngineParentWapper<Core> = GhostParentWrapper<
@@ -190,7 +195,15 @@ impl LegacyLib3h {
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let _ = detach_run!(&mut self.lib3h, |lib3h| lib3h.process(self));
-        let responses: Vec<_> = self.client_request_responses.drain(0..).collect();
+
+        // get any "server" messages that came as responses to the client requests
+        let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
+
+        for mut msg in self.lib3h.as_mut().drain_messages() {
+            let server_msg = msg.take_message().expect("exists");
+            responses.push(server_msg.into());
+        }
+
         Ok((responses.len() > 0, responses))
     }
 }
@@ -211,7 +224,7 @@ mod tests {
         };
 
         // create the legacy lib3h engine wrapper
-        let mut lib3h: LegacyLib3h = LegacyLib3h::new("core");
+        let mut legacy: LegacyLib3h = LegacyLib3h::new("core");
 
         let data = ConnectData {
             request_id: "foo_request_id".into(),
@@ -219,12 +232,25 @@ mod tests {
             network_id: "fake_id".to_string(),
         };
 
-        assert!(lib3h.post(Lib3hClientProtocol::Connect(data)).is_ok());
+        assert!(legacy.post(Lib3hClientProtocol::Connect(data)).is_ok());
         // process via the wrapper
-        let result = lib3h.process();
+        let result = legacy.process();
 
         assert_eq!(
             "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: [99, 111, 110, 110, 101, 99, 116, 105, 111, 110, 32, 102, 97, 105, 108, 101, 100, 33] })]))",
+            format!("{:?}", result)
+        );
+
+        detach_run!(&mut legacy.lib3h, |l| l.as_mut().inject_lib3h_event(
+            Lib3hToClient::Disconnected(DisconnectedData {
+                network_id: "some_network_id".into()
+            })
+        ));
+
+        let result = legacy.process();
+
+        assert_eq!(
+            "Ok((true, [Disconnected(DisconnectedData { network_id: \"some_network_id\" })]))",
             format!("{:?}", result)
         );
     }
