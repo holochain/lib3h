@@ -1,6 +1,8 @@
 use detach::Detach;
-use lib3h_ghost_actor::*;
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::protocol::*;
+use crate::error::Lib3hError;
+
 /// the context when making a request from core
 /// this is always the request_id
 pub struct CoreRequestContext(String);
@@ -26,8 +28,11 @@ pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrappe
     Engine,
 >;
 
-// FIXME
-type EngineError = String;
+pub type ClientToLib3hMessage =
+    GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>;
+
+pub type DhtToParentMessage =
+    GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>;
 
 pub struct GhostEngine {
     client_endpoint: Option<
@@ -36,7 +41,7 @@ pub struct GhostEngine {
             ClientToLib3hResponse,
             Lib3hToClient,
             Lib3hToClientResponse,
-            EngineError,
+            Lib3hError,
         >,
     >,
     lib3h_endpoint: Detach<
@@ -47,7 +52,7 @@ pub struct GhostEngine {
             Lib3hToClientResponse,
             ClientToLib3h,
             ClientToLib3hResponse,
-            EngineError,
+            Lib3hError,
         >,
     >,
 }
@@ -73,7 +78,7 @@ impl
         Lib3hToClientResponse,
         ClientToLib3h,
         ClientToLib3hResponse,
-        EngineError,
+        Lib3hError,
     > for GhostEngine
 {
     // START BOILER PLATE--------------------------
@@ -85,7 +90,7 @@ impl
             ClientToLib3hResponse,
             Lib3hToClient,
             Lib3hToClientResponse,
-            EngineError,
+            Lib3hError,
         >,
     > {
         std::mem::replace(&mut self.client_endpoint, None)
@@ -109,12 +114,12 @@ impl
 impl GhostEngine {
     fn handle_msg_from_client(
         &mut self,
-        mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
-    ) -> Result<(), EngineError> {
+        mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>,
+    ) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(_data) => {
                 // pretend the connection request failed
-                msg.respond(Err("connection failed!".to_string()));
+                msg.respond(Err(Lib3hError::new_other("connection failed!".into())));
             }
             ClientToLib3h::JoinSpace(_data) => {
                 // pretend the request succeeded
@@ -145,7 +150,7 @@ mod tests {
         let mut _core = MockCore {
             //        state: "".to_string(),
         };
-        let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, EngineError> =
+        let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(GhostEngine::new("test_engine"), "test_engine");
         assert!(true);
     }
