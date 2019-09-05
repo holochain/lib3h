@@ -1,3 +1,6 @@
+extern crate xoroshiro128;
+extern crate rand;
+
 pub mod constants;
 #[macro_use]
 pub mod predicate;

@@ -3,7 +3,11 @@
 /// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
 
+use xoroshiro128::{Rng, SeedableRng, Xoroshiro128Rng};
+
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
+
+pub const MAX_PROCESSING_LOOPS: usize = 100;
 
 /// Represents all useful state after a single call to an engine's process function
 #[derive(Clone, Debug)]
@@ -197,6 +201,47 @@ impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {}
 impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 
+pub struct SeededUnitPrng {
+    pub seed: [u64; 2],
+    prng: Xoroshiro128Rng,
+}
+
+impl From<[u64; 2]> for SeededUnitPrng {
+    fn from(seed: [u64; 2]) -> Self {
+        Self{
+            seed,
+            prng: Xoroshiro128Rng::from_seed(seed),
+        }
+    }
+}
+
+impl Iterator for SeededUnitPrng {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // http://xoroshiro.di.unimi.it/
+        // A standard double (64-bit) floating-point number in IEEE floating point
+        // format has 52 bits of mantissa, plus an implicit one at the left of the
+        // mantissa. Thus, even if there are 52 bits of mantissa, the representation can
+        // actually store numbers with 53 significant binary digits.
+        //
+        // Because of this fact, in C99 a 64-bit unsigned integer x should be converted
+        // to a 64-bit double using the expression
+        //
+        //   #include <stdint.h>
+        //   (x >> 11) * (1. / (UINT64_C(1) << 53))])
+        //
+        // In Java, the same result can be obtained with
+        //
+        //   (x >>> 11) * 0x1.0p-53)
+        //
+        // This conversion guarantees that all dyadic rationals of the form k / 2−53
+        // will be equally likely. Note that this conversion prefers the high bits of x,
+        // but you can alternatively use the lowest bits.)
+        Some((self.prng.gen::<u64>() >> 11) as f64 * hexf64!("0x1.0p-53"))
+    }
+}
+
 #[allow(unused_macros)]
 /// Convenience function that asserts only one particular equality predicate
 /// passes for a collection of engines. See assert_processed for
@@ -306,15 +351,20 @@ macro_rules! assert_processed {
             errors.push((p, None))
         }
 
-        for epoch in 0..20 {
-            println!("[{:?}] {:?}", epoch, previous);
+        let seed = [rand::random::<u64>(), rand::random::<u64>()];
+        println!("seed is: {:?}", &seed);
+        let mut seeded_unit_prng = $crate::utils::processor_harness::SeededUnitPrng::from(seed);
 
-            process_one!($engine1, previous, errors);
-            if errors.is_empty() {
-                break;
+        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+            let n = seeded_unit_prng.next().expect("could not generate a new seeded prng value");
+            println!("seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}", seed, epoc, n, previous);
+
+            if n > 0.5 {
+                process_one!($engine1, previous, errors);
             }
-
-            process_one!($engine2, previous, errors);
+            else {
+                process_one!($engine2, previous, errors);
+            }
             if errors.is_empty() {
                 break;
             }

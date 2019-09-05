@@ -1,4 +1,7 @@
 #[macro_use]
+extern crate hexf;
+
+#[macro_use]
 mod utils;
 #[macro_use]
 extern crate lazy_static;
