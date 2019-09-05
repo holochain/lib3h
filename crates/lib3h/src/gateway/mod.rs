@@ -7,9 +7,9 @@ use crate::{
     transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 use std::collections::{HashMap, VecDeque};
 use url::Url;
-
 /// describes a super construct of a Transport and a Dht allowing
 /// Transport access via peer discovery handled by the Dht
 pub trait Gateway: Transport {
@@ -19,6 +19,9 @@ pub trait Gateway: Transport {
 
     fn process_dht(&mut self) -> GhostResult<()>;
     fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData>;
+
+    /// temp HACK. Waiting for gateway actor
+    fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol>;
 
     // TODO - remove this hack
     fn hold_peer(&mut self, peer_data: PeerData);
@@ -55,6 +58,7 @@ pub struct GatewayUserData {
     this_peer: PeerData,
     maybe_peer: Option<PeerData>,
     peer_list: Vec<PeerData>,
+    pub lib3h_outbox: Vec<Lib3hServerProtocol>,
 }
 
 impl GatewayUserData {
@@ -67,6 +71,7 @@ impl GatewayUserData {
             },
             maybe_peer: None,
             peer_list: Vec::new(),
+            lib3h_outbox: Vec::new(),
         }
     }
 }

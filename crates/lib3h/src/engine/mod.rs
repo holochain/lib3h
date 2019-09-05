@@ -16,19 +16,12 @@ use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
 };
-use std::sync::Mutex;
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
 pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
-
-// temp solution as long as Engine is not an actor and has non 'static lifetime
-// which means we can't pass it around in  ghostActor closures...
-lazy_static! {
-    pub static ref G_OUTBOX: Mutex<Vec<Lib3hServerProtocol>> = Mutex::new(Vec::new());
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RealEngineTrackerData {
@@ -97,4 +90,7 @@ pub struct RealEngine<'engine> {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
+    /// dht ghost user_data
+    /// temp HACK. Waiting for gateway actor
+    temp_outbox: Vec<Lib3hServerProtocol>,
 }

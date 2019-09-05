@@ -7,7 +7,7 @@ use crate::{
     transport::{protocol::*, TransportWrapper},
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::Address;
+use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
 use std::collections::{HashMap, VecDeque};
 use url::Url;
 
@@ -101,6 +101,10 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
 
     fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData> {
         &mut self.inner_dht
+    }
+
+    fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
+        self.user_data.lib3h_outbox.drain(0..).collect()
     }
 
     // TODO - remove this hack

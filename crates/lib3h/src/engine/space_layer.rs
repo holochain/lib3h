@@ -49,6 +49,8 @@ impl<'engine> RealEngine<'engine> {
             space_gateway.as_mut().process_dht().unwrap(); // FIXME unwrap
             let request_list = space_gateway.as_mut().as_dht_mut().drain_messages();
             dht_outbox.insert(chain_id.clone(), request_list);
+            let mut temp = space_gateway.as_mut().drain_dht_outbox();
+            self.temp_outbox.append(&mut temp);
         }
         // Process all space gateway DHT requests
         for (chain_id, request_list) in dht_outbox {

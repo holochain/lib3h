@@ -7,9 +7,7 @@ use url::Url;
 use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    engine::{
-        p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, G_OUTBOX, NETWORK_GATEWAY_ID,
-    },
+    engine::{p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
     gateway::{wrapper::*, P2pGateway},
     track::Tracker,
@@ -82,6 +80,7 @@ impl<'engine> RealEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
+            temp_outbox: Vec::new(),
         })
     }
 }
@@ -136,6 +135,7 @@ impl<'engine> RealEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
+            temp_outbox: Vec::new(),
         })
     }
 }
@@ -452,7 +452,7 @@ impl<'engine> RealEngine<'engine> {
                     request_id: self.request_track.reserve(),
                 },
                 DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                Box::new(|_me, context, response| {
+                Box::new(|ud, context, response| {
                     let (entry_address, aspect_address_list, msg, request_id) = {
                         if let DhtContext::RequestAspectsOf {
                             entry_address,
@@ -493,9 +493,7 @@ impl<'engine> RealEngine<'engine> {
                                 provider_agent_id: msg.provider_agent_id.clone(),
                                 aspect_address_list: None,
                             };
-                            G_OUTBOX
-                                .lock()
-                                .unwrap()
+                            ud.lib3h_outbox
                                 .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
                         }
                     } else {
@@ -509,10 +507,10 @@ impl<'engine> RealEngine<'engine> {
     }
 
     fn process_ugly(&mut self) -> (DidWork, Vec<Lib3hServerProtocol>) {
-        trace!("process_ugly() - {}", G_OUTBOX.lock().unwrap().len());
+        trace!("process_ugly() - {}", self.temp_outbox.len());
         let mut outbox = Vec::new();
         let mut did_work = false;
-        for srv_msg in G_OUTBOX.lock().unwrap().drain(0..) {
+        for srv_msg in self.temp_outbox.drain(0..) {
             did_work = true;
             if let Lib3hServerProtocol::HandleFetchEntry(msg) = srv_msg.clone() {
                 self.request_track.set(
