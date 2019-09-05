@@ -43,7 +43,7 @@ lib3h simchat Commands:
         match res {
             Ok(line) => match line {
                 linefeed::reader::ReadResult::Input(s) => {
-                    if s.starts_with("/") {
+                    if s.starts_with('/') {
                         let caps = command_matcher.captures(&s).expect("capture failed");
                         let command = caps.get(1).map(|s| s.as_str());
                         let args = caps.get(2).map(|s| s.as_str());
@@ -66,7 +66,7 @@ lib3h simchat Commands:
                                 cli.send(ChatEvent::Part(channel_addr))
                             }
                             (Some("msg"), Some(rest)) => {
-                                let mut words = rest.split(" ");
+                                let mut words = rest.split(' ');
                                 let to_address: String = words.next().unwrap().to_string();
                                 let payload: String = words.collect();
                                 cli.send(ChatEvent::SendDirectMessage {
