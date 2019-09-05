@@ -3,7 +3,7 @@ pub mod p2p_gateway;
 pub mod wrapper;
 
 use crate::{
-    dht::{dht_protocol::*, ghost_protocol::*},
+    dht::dht_protocol::*,
     transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
 };
 use lib3h_ghost_actor::prelude::*;

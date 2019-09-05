@@ -2,7 +2,7 @@
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{dht_protocol::*, ghost_protocol::*},
+    dht::dht_protocol::*,
     engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
     gateway::wrapper::GatewayWrapper,
 };

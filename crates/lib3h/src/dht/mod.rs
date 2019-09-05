@@ -2,7 +2,6 @@ pub mod dht_config;
 pub mod dht_protocol;
 pub mod mirror_dht;
 //pub mod rrdht;
-pub mod ghost_protocol;
 
 /// a Peer identifier
 pub type PeerAddress = String;
@@ -11,7 +10,7 @@ pub type PeerAddressRef = str;
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        dht::{dht_protocol::*, ghost_protocol::*, mirror_dht::MirrorDht, PeerAddressRef},
+        dht::{dht_protocol::*, mirror_dht::MirrorDht, PeerAddressRef},
         tests::enable_logging_for_test,
     };
     use detach::prelude::*;

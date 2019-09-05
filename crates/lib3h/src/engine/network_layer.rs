@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, ghost_protocol::*},
+    dht::dht_protocol::*,
     engine::{
         p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
     },

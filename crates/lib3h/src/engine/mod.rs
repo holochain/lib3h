@@ -6,7 +6,7 @@ mod space_layer;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
-    dht::ghost_protocol::*,
+    dht::dht_protocol::*,
     gateway::wrapper::GatewayWrapper,
     track::Tracker,
     transport::{ConnectionId, TransportWrapper},

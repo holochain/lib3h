@@ -1,5 +1,5 @@
 use crate::{
-    dht::{dht_config::DhtConfig, dht_protocol::*, ghost_protocol::*, PeerAddress, PeerAddressRef},
+    dht::{dht_config::DhtConfig, dht_protocol::*, PeerAddress, PeerAddressRef},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     time,
 };
