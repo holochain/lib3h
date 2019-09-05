@@ -1,27 +1,10 @@
+use crate::engine::ghost_engine::{CoreRequestContext, GhostEngineParentWapper};
 use detach::Detach;
+use lib3h_ghost_actor::*;
 use lib3h_protocol::{
     data_types::GenericResultData, error::Lib3hProtocolResult, protocol::*, protocol_client::*,
     protocol_server::*, DidWork,
 };
-
-use lib3h_ghost_actor::*;
-
-/// the context when making a request from core
-/// this is always the request_id
-struct CoreContext(String);
-
-/// this is a generic parent wrapper for a GhostEngine.  This allows us to have
-/// a mock GhostEngine for proving out the LegacyLib3h wrapper
-type GhostEngineParentWapper<Core, Engine, EngineError> = GhostParentWrapper<
-    Core,
-    CoreContext,
-    Lib3hToClient,
-    Lib3hToClientResponse,
-    ClientToLib3h,
-    ClientToLib3hResponse,
-    EngineError,
-    Engine,
->;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -41,9 +24,9 @@ where
     client_request_responses: Vec<Lib3hServerProtocol>,
 }
 
-fn server_failure(err: String, context: CoreContext) -> Lib3hServerProtocol {
+fn server_failure(err: String, context: CoreRequestContext) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
-        request_id: context.0,
+        request_id: context.get_request_id(),
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
         result_info: err.as_bytes().to_vec(),
@@ -51,9 +34,9 @@ fn server_failure(err: String, context: CoreContext) -> Lib3hServerProtocol {
     Lib3hServerProtocol::FailureResult(failure_data)
 }
 
-fn server_success(context: CoreContext) -> Lib3hServerProtocol {
+fn server_success(context: CoreRequestContext) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
-        request_id: context.0,
+        request_id: context.get_request_id(),
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
         result_info: Vec::new(),
@@ -83,13 +66,13 @@ where
 
     fn make_callback() -> GhostCallback<
         LegacyLib3h<Engine, EngineError>,
-        CoreContext,
+        CoreRequestContext,
         ClientToLib3hResponse,
         EngineError,
     > {
         Box::new(
             |me: &mut LegacyLib3h<Engine, EngineError>,
-             context: CoreContext,
+             context: CoreRequestContext,
              response: GhostCallbackData<ClientToLib3hResponse, EngineError>| {
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
@@ -117,32 +100,34 @@ where
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         let ctx = match &client_msg {
-            Lib3hClientProtocol::Connect(data) => CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::JoinSpace(data) => CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::LeaveSpace(data) => CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::SendDirectMessage(data) => CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::FetchEntry(data) => CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::QueryEntry(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::Connect(data) => CoreRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::JoinSpace(data) => CoreRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::LeaveSpace(data) => CoreRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::SendDirectMessage(data) => {
+                CoreRequestContext::new(&data.request_id)
+            }
+            Lib3hClientProtocol::FetchEntry(data) => CoreRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::QueryEntry(data) => CoreRequestContext::new(&data.request_id),
             Lib3hClientProtocol::HandleSendDirectMessageResult(data) => {
-                CoreContext(data.request_id.clone())
+                CoreRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleFetchEntryResult(data) => {
-                CoreContext(data.request_id.clone())
+                CoreRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleQueryEntryResult(data) => {
-                CoreContext(data.request_id.clone())
+                CoreRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => {
-                CoreContext(data.request_id.clone())
+                CoreRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => {
-                CoreContext(data.request_id.clone())
+                CoreRequestContext::new(&data.request_id)
             }
-            Lib3hClientProtocol::PublishEntry(_) => CoreContext("".to_string()),
-            Lib3hClientProtocol::HoldEntry(_) => CoreContext("".to_string()),
+            Lib3hClientProtocol::PublishEntry(_) => CoreRequestContext::new(""),
+            Lib3hClientProtocol::HoldEntry(_) => CoreRequestContext::new(""),
             _ => panic!("unimplemented"),
         };
-        if &ctx.0 == "" {
+        if &ctx.get_request_id() == "" {
             self.lib3h.publish(client_msg.into());
         } else {
             self.lib3h
