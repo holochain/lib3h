@@ -1,7 +1,7 @@
+use crate::error::Lib3hError;
 use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::protocol::*;
-use crate::error::Lib3hError;
 
 /// the context when making a request from core
 /// this is always the request_id
