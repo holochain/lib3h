@@ -143,42 +143,46 @@ impl LegacyLib3h {
         Lib3hServerProtocol::FailureResult(failure_data)
     }
 
-    fn make_callback() ->  GhostCallback<LegacyLib3h, CoreContext, ClientToLib3hResponse, EngineError> {
-        Box::new(|me:&mut LegacyLib3h, context: CoreContext, response:GhostCallbackData<ClientToLib3hResponse,EngineError>| {
-            match response {
-                GhostCallbackData::Response(Ok(rsp)) => {
-                    me.client_request_responses.push(rsp.into());
-                },
-                GhostCallbackData::Response(Err(e)) => {
-                    me.client_request_responses.push(LegacyLib3h::server_failure(e,context));
-                },
-                GhostCallbackData::Timeout => {
-                    me.client_request_responses.push(LegacyLib3h::server_failure("Request timed out".into(),context));
-                }
-            };
-            Ok(())
-        })
+    fn make_callback() -> GhostCallback<LegacyLib3h, CoreContext, ClientToLib3hResponse, EngineError>
+    {
+        Box::new(
+            |me: &mut LegacyLib3h,
+             context: CoreContext,
+             response: GhostCallbackData<ClientToLib3hResponse, EngineError>| {
+                match response {
+                    GhostCallbackData::Response(Ok(rsp)) => {
+                        me.client_request_responses.push(rsp.into());
+                    }
+                    GhostCallbackData::Response(Err(e)) => {
+                        me.client_request_responses
+                            .push(LegacyLib3h::server_failure(e, context));
+                    }
+                    GhostCallbackData::Timeout => {
+                        me.client_request_responses
+                            .push(LegacyLib3h::server_failure(
+                                "Request timed out".into(),
+                                context,
+                            ));
+                    }
+                };
+                Ok(())
+            },
+        )
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         let ctx = match &client_msg {
-            Lib3hClientProtocol::Connect(data) =>
-                CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::JoinSpace(data) =>
-                CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::LeaveSpace(data) =>
-                CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::SendDirectMessage(data) =>
-                CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::FetchEntry(data) =>
-                CoreContext(data.request_id.clone()),
-            Lib3hClientProtocol::QueryEntry(data) =>
-                CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::Connect(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::JoinSpace(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::LeaveSpace(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::SendDirectMessage(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::FetchEntry(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::QueryEntry(data) => CoreContext(data.request_id.clone()),
             _ => panic!("unimplemented"),
-
         };
-        self.lib3h.request(ctx, client_msg.into(), LegacyLib3h::make_callback());
+        self.lib3h
+            .request(ctx, client_msg.into(), LegacyLib3h::make_callback());
         Ok(())
     }
 
