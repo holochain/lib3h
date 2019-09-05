@@ -8,7 +8,7 @@ use lib3h_protocol::{
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
-struct LegacyLib3h<Engine, EngineError>
+struct LegacyLib3h<Engine, EngineError: 'static>
 where
     Engine: GhostActor<
         Lib3hToClient,
