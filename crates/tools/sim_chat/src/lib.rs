@@ -2,23 +2,22 @@
 //! - See the integration tests for automated usage
 //! - See half_busy_chat_cli for manual simulation
 
-extern crate crossbeam_channel;
 extern crate base64;
+extern crate crossbeam_channel;
 
 use core::convert::{TryFrom, TryInto};
-use lib3h_ghost_actor::{GhostActor, GhostContextEndpoint, GhostCanTrack};
+use lib3h::engine::ghost_engine::GhostEngine;
+use lib3h_crypto_api::CryptoError;
+use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
+use lib3h_protocol::{
+    data_types::SpaceData,
+    protocol::{ClientToLib3h, Lib3hToClient},
+    Address,
+};
+use lib3h_sodium::{hash, secbuf::SecBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
-};
-use lib3h_protocol::Address;
-use lib3h_sodium::{hash, secbuf::SecBuf};
-use lib3h_crypto_api::{CryptoError};
-use lib3h::engine::ghost_engine::{GhostEngine};
-use lib3h_protocol::{
-    data_types::SpaceData,
-    protocol::Lib3hToClient,
-    protocol::ClientToLib3h,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,16 +39,12 @@ impl TryFrom<Lib3hToClient> for ChatEvent {
     fn try_from(lib3h_message: Lib3hToClient) -> Result<ChatEvent, Self::Error> {
         match lib3h_message {
             Lib3hToClient::HandleSendDirectMessage(message_data) => {
-                Ok(
-                    ChatEvent::ReceiveDirectMessage{
-                        from_address: message_data.from_agent_id.to_string(),
-                        payload: "message from engine".to_string()
-                    }
-                )
-            },
-            _ => {
-                Err("Nope".to_string())
+                Ok(ChatEvent::ReceiveDirectMessage {
+                    from_address: message_data.from_agent_id.to_string(),
+                    payload: "message from engine".to_string(),
+                })
             }
+            _ => Err("Nope".to_string()),
         }
     }
 }
@@ -65,7 +60,7 @@ impl TryInto<ClientToLib3h> for ChatEvent {
                     space_address: addr.to_owned(),
                 };
                 Ok(ClientToLib3h::JoinSpace(space_data))
-            },
+            }
             ChatEvent::Part(ref addr) => {
                 let space_data = SpaceData {
                     agent_id: Address::new(),
@@ -73,10 +68,8 @@ impl TryInto<ClientToLib3h> for ChatEvent {
                     space_address: addr.to_owned(),
                 };
                 Ok(ClientToLib3h::LeaveSpace(space_data))
-            },
-            _ => {
-                Err("Not implemented".to_string())
-            },
+            }
+            _ => Err("Not implemented".to_string()),
         }
     }
 }
@@ -103,7 +96,10 @@ impl SimChat {
     pub fn new(mut handler: HandleEvent) -> Self {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
-        let (out_send, out_recv): (crossbeam_channel::Sender<_>, crossbeam_channel::Receiver<ChatEvent>) = crossbeam_channel::unbounded();
+        let (out_send, out_recv): (
+            crossbeam_channel::Sender<_>,
+            crossbeam_channel::Receiver<ChatEvent>,
+        ) = crossbeam_channel::unbounded();
 
         let thread_continue_inner = thread_continue.clone();
         Self {
@@ -112,12 +108,13 @@ impl SimChat {
                 // and is responsible for calling process
                 // and handling messages
                 let mut lib3h_engine = GhostEngine::new();
-                let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> = lib3h_engine
-                    .take_parent_endpoint()
-                    .unwrap()
-                    .as_context_endpoint_builder()
-                    .request_id_prefix("parent")
-                    .build();
+                let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> =
+                    lib3h_engine
+                        .take_parent_endpoint()
+                        .unwrap()
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("parent")
+                        .build();
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -128,23 +125,26 @@ impl SimChat {
                     // Receive directly from the crossbeam channel
                     // and convert relevent N3H protocol messages to chat events
                     let direct_chat_events = out_recv.try_iter();
-                    let n3h_chat_events = parent_endpoint.drain_messages()
-                        .into_iter()
-                        .filter_map(|mut n3h_message| { 
+                    let n3h_chat_events = parent_endpoint.drain_messages().into_iter().filter_map(
+                        |mut n3h_message| {
                             ChatEvent::try_from(n3h_message.take_message().unwrap()).ok()
-                        });
+                        },
+                    );
 
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
                     direct_chat_events
-                    .chain(n3h_chat_events)
-                    .for_each(|chat_event| {
-                        handler(&chat_event);
-                        chat_event.try_into().and_then(|lib3h_message: ClientToLib3h| {
-                            parent_endpoint.publish(lib3h_message);
-                            Ok(())
-                        }).ok();
-                    });
+                        .chain(n3h_chat_events)
+                        .for_each(|chat_event| {
+                            handler(&chat_event);
+                            chat_event
+                                .try_into()
+                                .and_then(|lib3h_message: ClientToLib3h| {
+                                    parent_endpoint.publish(lib3h_message);
+                                    Ok(())
+                                })
+                                .ok();
+                        });
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
@@ -179,7 +179,7 @@ mod tests {
             s.send(event.to_owned()).expect("send fail");
         }));
 
-        let msg = ChatEvent::SendDirectMessage{
+        let msg = ChatEvent::SendDirectMessage {
             to_address: "addr".to_string(),
             payload: "yo".to_string(),
         };
@@ -192,6 +192,9 @@ mod tests {
     #[test]
     fn can_convert_strings_to_channel_address() {
         let addr = channel_address_from_str("test channel id").expect("failed to hash string");
-        assert_eq!(addr, Address::from("mgb/+MzdPWAYRs4ERGlj3WCg53AddXsg1HjXH7pk7pE=".to_string()))
+        assert_eq!(
+            addr,
+            Address::from("mgb/+MzdPWAYRs4ERGlj3WCg53AddXsg1HjXH7pk7pE=".to_string())
+        )
     }
 }
