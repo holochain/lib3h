@@ -1,4 +1,4 @@
-use crate::engine::ghost_engine::{CoreRequestContext, GhostEngineParentWapper};
+use crate::engine::ghost_engine::{CoreRequestContext, GhostEngineParentWrapper};
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -18,7 +18,7 @@ where
         EngineError,
     >,
 {
-    lib3h: Detach<GhostEngineParentWapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
+    lib3h: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,

@@ -14,7 +14,7 @@ impl CoreRequestContext {
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
-pub type GhostEngineParentWapper<Core, Engine, EngineError> = GhostParentWrapper<
+pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
     Core,
     CoreRequestContext,
     Lib3hToClient,
