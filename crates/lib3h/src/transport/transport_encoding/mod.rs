@@ -622,7 +622,7 @@ mod tests {
         // we get the actual payload that needs to be forwarded to #2
         let (address, payload) = r1out.recv().unwrap();
         assert_eq!(&addr2, &address);
-        let expected : Opaque = "hello".into();
+        let expected: Opaque = "hello".into();
         assert_eq!(&expected, &payload);
         s2in.send((addr1.clone(), payload)).unwrap();
 

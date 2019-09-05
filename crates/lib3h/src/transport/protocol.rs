@@ -1,8 +1,8 @@
-use lib3h_ghost_actor::prelude::*;
 use crate::{
     lib3h_protocol::data_types::Opaque,
     transport::{error::TransportError, ConnectionId},
 };
+use lib3h_ghost_actor::prelude::*;
 use url::Url;
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]

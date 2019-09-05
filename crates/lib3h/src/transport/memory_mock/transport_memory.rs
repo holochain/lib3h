@@ -20,10 +20,10 @@ pub struct TransportMemory {
     cmd_inbox: VecDeque<TransportCommand>,
     /// Addresses (url-ish) of all our servers
     my_servers: HashSet<Url>,
-//    /// Mapping of connectionId -> serverUrl
+    //    /// Mapping of connectionId -> serverUrl
     outbound_connection_map: HashMap<ConnectionId, Url>,
     /// Mapping of in:connectionId -> out:connectionId
-//    inbound_connection_map: HashMap<ConnectionId, ConnectionId>,
+    //    inbound_connection_map: HashMap<ConnectionId, ConnectionId>,
     /// Counter for generating new connectionIds
     n_id: u32,
     own_id: u32,
@@ -72,8 +72,9 @@ impl TransportMemory {
                             .expect("server still exists")
                             .lock()
                             .unwrap()
-                            .is_connected_to(&Url::parse(uri_as_connection_id)
-                                .expect("uri as connection id"))
+                            .is_connected_to(
+                                &Url::parse(uri_as_connection_id).expect("uri as connection id"),
+                            )
                     })
                     .unwrap_or(false)
             }
@@ -276,8 +277,8 @@ impl Transport for TransportMemory {
         for uri in to_connect_list {
             trace!("(TransportMemory) {} <- {:?}", uri, self.maybe_my_uri);
             let out_cid = self.connect(&uri)?;
-//            self.inbound_connection_map
- //               .insert(in_cid.clone(), out_cid.clone());
+            //            self.inbound_connection_map
+            //               .insert(in_cid.clone(), out_cid.clone());
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
             outbox.insert(0, TransportEvent::IncomingConnectionEstablished(out_cid));
@@ -294,10 +295,10 @@ impl Transport for TransportMemory {
                 }
                 TransportEvent::ReceivedData(in_cid, data) => {
                     // convert inbound connectionId to outbound connectionId.
-//                    let out_cid = self
-  //                      .inbound_connection_map
-    //                    .get(&in_cid)
-      //                  .expect("Should have outbound at this stage");
+                    //                    let out_cid = self
+                    //                      .inbound_connection_map
+                    //                    .get(&in_cid)
+                    //                  .expect("Should have outbound at this stage");
                     outbox.push(TransportEvent::ReceivedData(
                         in_cid.to_string(),
                         data.clone(),

@@ -237,7 +237,7 @@ impl
                         endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::ReceivedData {
                                 address: Url::parse(&from_addr).unwrap(),
-                                payload
+                                payload,
                             },
                         );
                         std::mem::replace(&mut self.endpoint_self, endpoint_self);

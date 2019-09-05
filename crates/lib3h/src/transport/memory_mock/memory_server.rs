@@ -199,7 +199,7 @@ impl MemoryServer {
         self.connection_inbox.clear();
         // Process msg inboxes
         for (uri, inbox) in self.inbox_map.iter_mut() {
-             loop {
+            loop {
                 let payload = match inbox.pop_front() {
                     None => break,
                     Some(msg) => msg,

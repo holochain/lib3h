@@ -48,7 +48,6 @@ impl From<&str> for Opaque {
     }
 }
 
-
 impl std::ops::Deref for Opaque {
     type Target = Vec<u8>;
 
@@ -148,11 +147,9 @@ impl std::fmt::Debug for Opaque {
 }
 
 impl std::fmt::Display for Opaque {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self)
     }
-    
 }
 
 //--------------------------------------------------------------------------------------------------
