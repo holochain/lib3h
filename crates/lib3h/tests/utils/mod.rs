@@ -5,6 +5,8 @@ pub mod constants;
 #[macro_use]
 pub mod predicate;
 
+pub mod seeded_prng;
+
 #[macro_use]
 pub mod processor_harness;
 
