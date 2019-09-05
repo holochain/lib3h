@@ -184,10 +184,32 @@ impl LegacyLib3h {
             Lib3hClientProtocol::SendDirectMessage(data) => CoreContext(data.request_id.clone()),
             Lib3hClientProtocol::FetchEntry(data) => CoreContext(data.request_id.clone()),
             Lib3hClientProtocol::QueryEntry(data) => CoreContext(data.request_id.clone()),
+            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => {
+                CoreContext(data.request_id.clone())
+            }
+            Lib3hClientProtocol::HandleFetchEntryResult(data) => {
+                CoreContext(data.request_id.clone())
+            }
+            Lib3hClientProtocol::HandleQueryEntryResult(data) => {
+                CoreContext(data.request_id.clone())
+            }
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => {
+                CoreContext(data.request_id.clone())
+            }
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => {
+                CoreContext(data.request_id.clone())
+            }
+            Lib3hClientProtocol::PublishEntry(_) => CoreContext("".to_string()),
+            Lib3hClientProtocol::HoldEntry(_) => CoreContext("".to_string()),
+
             _ => panic!("unimplemented"),
         };
-        self.lib3h
-            .request(ctx, client_msg.into(), LegacyLib3h::make_callback());
+        if &ctx.0 == "" {
+            self.lib3h.publish(client_msg.into());
+        } else {
+            self.lib3h
+                .request(ctx, client_msg.into(), LegacyLib3h::make_callback());
+        }
         Ok(())
     }
 
