@@ -4,8 +4,9 @@ use lib3h_ghost_actor::prelude::*;
 use std::collections::HashMap;
 use url::Url;
 
-use super::{LocalRouteSpec, TransportMultiplexRoute};
+use super::LocalRouteSpec;
 
+#[derive(Debug)]
 enum MplexToInnerContext {
     AwaitBind(
         GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
@@ -15,26 +16,17 @@ enum MplexToInnerContext {
     ),
 }
 
-type SelfContextEndpoint<Context> = GhostContextEndpoint<
-    TransportMultiplex,
-    Context,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    TransportError,
->;
-
 pub struct TransportMultiplex {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<SelfContextEndpoint<()>>,
+    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, ()>>,
     // ref to our inner transport
     inner_transport:
         Detach<TransportActorParentWrapperDyn<TransportMultiplex, MplexToInnerContext>>,
     // our map of endpoints connecting us to our Routes
-    route_endpoints: Detach<HashMap<LocalRouteSpec, SelfContextEndpoint<()>>>,
+    route_endpoints:
+        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, ()>>>,
 }
 
 impl TransportMultiplex {
@@ -64,11 +56,11 @@ impl TransportMultiplex {
     /// we are wrapping a network/machine-level gateway with a machine
     /// space_address and machineId... the space_address + agent_id parameters
     /// for this function are the higher-level notions for the AgentSpaceGateway
-    pub fn get_agent_space_route(
+    pub fn create_agent_space_route(
         &mut self,
         space_address: String,
         local_agent_id: String,
-    ) -> TransportMultiplexRoute {
+    ) -> TransportActorParentEndpoint {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_self = endpoint_self
             .as_context_endpoint_builder()
@@ -85,16 +77,16 @@ impl TransportMultiplex {
             .insert(route_spec.clone(), endpoint_self)
             .is_some()
         {
-            panic!("get_agent_space_route can only be called ONCE!");
+            panic!("create_agent_space_route can only be called ONCE!");
         }
 
-        TransportMultiplexRoute::new(route_spec, endpoint_parent)
+        endpoint_parent
     }
 
     /// The owner of this multiplex (real_engine) has received a DirectMessage
     /// these at this level are intended to be forwarded up to our routes.
     /// Collect all the un-packed info that will let us pass it back up the
-    /// chain.
+    /// tree.
     pub fn received_data_for_agent_space_route(
         &mut self,
         space_address: String,
@@ -200,7 +192,11 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitBind(msg) => msg,
-                        _ => return Err("bad context".into()),
+                        _ => {
+                            return Err(
+                                format!("wanted context AwaitBind, got {:?}", context).into()
+                            )
+                        }
                     }
                 };
                 let response = {
@@ -234,7 +230,11 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitSend(msg) => msg,
-                        _ => return Err("bad context".into()),
+                        _ => {
+                            return Err(
+                                format!("wanted context AwaitSend, got {:?}", context).into()
+                            )
+                        }
                     }
                 };
                 let response = {
@@ -285,7 +285,11 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitBind(msg) => msg,
-                        _ => return Err("bad context".into()),
+                        _ => {
+                            return Err(
+                                format!("wanted context AwaitBind, got {:?}", context).into()
+                            )
+                        }
                     }
                 };
                 let response = {
@@ -319,7 +323,11 @@ impl TransportMultiplex {
                 let msg = {
                     match context {
                         MplexToInnerContext::AwaitSend(msg) => msg,
-                        _ => return Err("bad context".into()),
+                        _ => {
+                            return Err(
+                                format!("wanted context AwaitSend, got {:?}", context).into()
+                            )
+                        }
                     }
                 };
                 let response = {

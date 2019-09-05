@@ -16,16 +16,13 @@
 //! When the multiplexer receives data (at the network/machine gateway),
 //! if it is any other p2p_proto message, it will be forwarded to
 //! the engine or network gateway. If it is a direct message, it will be
-//! send to the appropriate Route / AgentSpaceGateway
+//! sent to the appropriate Route / AgentSpaceGateway
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct LocalRouteSpec {
     pub space_address: String,
     pub local_agent_id: String,
 }
-
-mod route;
-pub use route::TransportMultiplexRoute;
 
 mod mplex;
 pub use mplex::TransportMultiplex;
@@ -137,23 +134,17 @@ mod tests {
                 "test_mplex_",
             );
 
-        let mut route_a: TransportActorParentWrapperDyn<(), ()> = GhostParentWrapperDyn::new(
-            Box::new(
-                mplex
-                    .as_mut()
-                    .get_agent_space_route("space_a".to_string(), "agent_a".to_string()),
-            ),
-            "test_route_a_",
-        );
+        let mut route_a = mplex
+            .as_mut()
+            .create_agent_space_route("space_a".to_string(), "agent_a".to_string())
+            .as_context_endpoint_builder()
+            .build::<(), ()>();
 
-        let mut route_b: TransportActorParentWrapperDyn<(), ()> = GhostParentWrapperDyn::new(
-            Box::new(
-                mplex
-                    .as_mut()
-                    .get_agent_space_route("space_b".to_string(), "agent_b".to_string()),
-            ),
-            "test_route_b_",
-        );
+        let mut route_b = mplex
+            .as_mut()
+            .create_agent_space_route("space_b".to_string(), "agent_b".to_string())
+            .as_context_endpoint_builder()
+            .build::<(), ()>();
 
         // send a message from route A
         route_a.request(

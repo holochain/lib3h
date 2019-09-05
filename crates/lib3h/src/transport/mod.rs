@@ -10,7 +10,7 @@ pub mod transport_trait;
 mod transport_encoding;
 pub use transport_encoding::TransportEncoding;
 mod transport_multiplex;
-pub use transport_multiplex::{TransportMultiplex, TransportMultiplexRoute};
+pub use transport_multiplex::TransportMultiplex;
 
 /// a connection identifier
 pub type ConnectionId = String;
