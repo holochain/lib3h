@@ -13,7 +13,7 @@ use std::sync::{
 use lib3h_protocol::Address;
 use lib3h_sodium::{hash, secbuf::SecBuf};
 use lib3h_crypto_api::{CryptoError};
-use lib3h::engine::ghost_engine::{GhostEngine, EngineRequestToChild};
+use lib3h::engine::ghost_engine::{GhostEngine, EngineRequestToChild, EngineRequestToParent};
 use lib3h_protocol::data_types::SpaceData;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,9 +72,10 @@ impl HalfBusyChat {
 
                     // N3HProtocol => ChatEvent
                     parent_endpoint.drain_messages().iter_mut().for_each(|message| {
-                        let chat_event = match message.take_message() {
-                            // placeholder for now, everything is a chat message!
-                            _ => ChatEvent::Message(MessageData{from_address: "".to_string(), payload: "message from engine".to_string()})
+                        let chat_event = match message.take_message().unwrap() {
+                            EngineRequestToParent::HandleSendDirectMessage(_) => {
+                                ChatEvent::Message(MessageData{from_address: "".to_string(), payload: "message from engine".to_string()})
+                            }
                         };
                         // also call the handler
                         handler(chat_event);
