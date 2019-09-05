@@ -52,27 +52,35 @@ mod ghost_error;
 pub use ghost_error::{GhostError, GhostResult};
 
 mod ghost_tracker;
-pub use ghost_tracker::{GhostCallback, GhostCallbackData, GhostTracker};
+pub use ghost_tracker::{
+    GhostCallback, GhostCallbackData, GhostTracker, GhostTrackerBookmarkOptions,
+    GhostTrackerBuilder,
+};
 
 mod ghost_channel;
-pub use ghost_channel::{create_ghost_channel, GhostContextEndpoint, GhostEndpoint, GhostMessage};
+pub use ghost_channel::{
+    create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
+    GhostTrackRequestOptions,
+};
 
 mod ghost_actor;
 pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostContextEndpoint,
-        GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper, GhostParentWrapperDyn,
-        GhostResult, GhostTracker, WorkWasDone,
+        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
+        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
+        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
+        GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
+
+//pub type UserData = ();
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use std::any::Any;
 
     type FakeError = String;
 
@@ -112,6 +120,7 @@ mod tests {
         >,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                RrDht,
                 i8,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
@@ -127,7 +136,12 @@ mod tests {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
                 endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_to_parent")),
+                endpoint_self: Detach::new(
+                    endpoint_self
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("dht_to_parent")
+                        .build(),
+                ),
             }
         }
     }
@@ -141,10 +155,6 @@ mod tests {
             FakeError,
         > for RrDht
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(
             &mut self,
         ) -> Option<
@@ -160,7 +170,7 @@ mod tests {
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |cs| { cs.process(self.as_any()) })?;
+            detach_run!(&mut self.endpoint_self, |cs| { cs.process(self) })?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
@@ -247,6 +257,7 @@ mod tests {
         >,
         endpoint_self: Detach<
             GhostContextEndpoint<
+                GatewayTransport,
                 RequestToParentContext,
                 RequestToParent,
                 RequestToParentResponse,
@@ -257,6 +268,7 @@ mod tests {
         >,
         dht: Detach<
             GhostParentWrapper<
+                GatewayTransport,
                 GwDht,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
@@ -274,7 +286,12 @@ mod tests {
             let dht = Detach::new(GhostParentWrapper::new(RrDht::new(), "to_dht"));
             Self {
                 endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(endpoint_self.as_context_endpoint("gw_to_parent")),
+                endpoint_self: Detach::new(
+                    endpoint_self
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("gw_to_parent")
+                        .build(),
+                ),
                 dht,
             }
         }
@@ -289,10 +306,6 @@ mod tests {
             String,
         > for GatewayTransport
     {
-        fn as_any(&mut self) -> &mut dyn Any {
-            &mut *self
-        }
-
         fn take_parent_endpoint(
             &mut self,
         ) -> Option<
@@ -310,14 +323,13 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.endpoint_self.as_mut().request(
-                std::time::Duration::from_millis(2000),
                 RequestToParentContext::IncomingConnection {
                     address: "test".to_string(),
                 },
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
-                Box::new(|_m, c, r| {
+                Box::new(|_m: &mut GatewayTransport, c, r| {
                     println!(
                         "response from parent to IncomingConnection got: {:?} with context {:?}",
                         r, c
@@ -325,9 +337,9 @@ mod tests {
                     Ok(())
                 }),
             );
-            detach_run!(&mut self.dht, |dht| { dht.process(self.as_any()) })?;
+            detach_run!(&mut self.dht, |dht| { dht.process(self) })?;
             detach_run!(&mut self.endpoint_self, |endpoint_self| {
-                endpoint_self.process(self.as_any())
+                endpoint_self.process(self)
             })?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
@@ -347,15 +359,9 @@ mod tests {
                         payload: _,
                     } => {
                         self.dht.as_mut().request(
-                            std::time::Duration::from_millis(2000),
                             GwDht::ResolveAddressForId { msg },
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
-                            Box::new(|m, context, response| {
-                                let _m = match m.downcast_mut::<GatewayTransport>() {
-                                    None => panic!("wrong type"),
-                                    Some(m) => m,
-                                };
-
+                            Box::new(|_m:&mut GatewayTransport, context, response| {
                                 let msg = {
                                     if let GwDht::ResolveAddressForId { msg } = context {
                                         msg
@@ -426,15 +432,20 @@ mod tests {
         // the body of this test simulates an object that contains a actor, i.e. a parent.
         // it would usually just be another ghost_actor but here we test it out explicitly
         // so first instantiate the "child" actor
-        let mut t_actor: TransportActor = Box::new(GatewayTransport::new());
+
+        let gw = GatewayTransport::new();
+
+        let mut t_actor: TransportActor = Box::new(gw);
         let mut t_actor_endpoint = t_actor
             .take_parent_endpoint()
             .expect("exists")
-            .as_context_endpoint::<i8>("test");
+            .as_context_endpoint_builder()
+            .build::<(), i8>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
         t_actor.process().unwrap();
+
         let _ = t_actor_endpoint.process(&mut ());
 
         // now process any requests the actor may have made of us (as parent)
@@ -455,12 +466,11 @@ mod tests {
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
         t_actor_endpoint.request(
-            std::time::Duration::from_millis(2000),
             42_i8,
             RequestToChild::Bind {
                 spec: "address_to_bind_to".to_string(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 println!("in callback 1, got: {:?}", r);
                 Ok(())
             }),
@@ -470,13 +480,12 @@ mod tests {
         let _ = t_actor_endpoint.process(&mut ());
 
         t_actor_endpoint.request(
-            std::time::Duration::from_millis(2000),
             42_i8,
             RequestToChild::SendMessage {
                 address: "agent_id_1".to_string(),
                 payload: b"some content".to_vec(),
             },
-            Box::new(|_, _, r| {
+            Box::new(|_: &mut (), _, r| {
                 println!("in callback 2, got: {:?}", r);
                 Ok(())
             }),
