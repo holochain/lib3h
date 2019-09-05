@@ -158,7 +158,7 @@ mod tests {
     type EngineError = String;
 
     pub struct MockGhostEngine {
-        endpoint_for_parent: Option<
+        client_endpoint: Option<
             GhostEndpoint<
                 ClientToLib3h,
                 ClientToLib3hResponse,
@@ -167,7 +167,7 @@ mod tests {
                 EngineError,
             >,
         >,
-        endpoint_as_child: Detach<
+        lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
                 String,
@@ -184,8 +184,8 @@ mod tests {
         pub fn new() -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
-                endpoint_for_parent: Some(endpoint_parent),
-                endpoint_as_child: Detach::new(
+                client_endpoint: Some(endpoint_parent),
+                lib3h_endpoint: Detach::new(
                     endpoint_self
                         .as_context_endpoint_builder()
                         .request_id_prefix("engine")
@@ -216,18 +216,18 @@ mod tests {
                 EngineError,
             >,
         > {
-            std::mem::replace(&mut self.endpoint_for_parent, None)
+            std::mem::replace(&mut self.client_endpoint, None)
         }
         // END BOILER PLATE--------------------------
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
-            detach_run!(&mut self.endpoint_as_child, |cs| { cs.process(self) })?;
+            detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
             // END BOILER PLATE--------------------------
 
-            for msg in self.endpoint_as_child.as_mut().drain_messages() {
-                self.handle_msg_from_node(msg)?;
+            for msg in self.lib3h_endpoint.as_mut().drain_messages() {
+                self.handle_msg_from_client(msg)?;
             }
 
             Ok(true.into())
@@ -235,7 +235,7 @@ mod tests {
     }
 
     impl MockGhostEngine {
-        fn handle_msg_from_node(
+        fn handle_msg_from_client(
             &mut self,
             mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
         ) -> Result<(), EngineError> {
@@ -255,7 +255,7 @@ mod tests {
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            self.endpoint_as_child.publish(msg);
+            self.lib3h_endpoint.publish(msg);
         }
     }
 
