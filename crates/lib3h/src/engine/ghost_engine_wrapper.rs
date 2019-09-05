@@ -6,8 +6,12 @@ use lib3h_protocol::{
 
 use lib3h_ghost_actor::*;
 
+/// the context when making a request from core
+/// this is always the request_id
 struct CoreContext(String);
 
+/// this is a generic parent wrapper for a GhostEngine.  This allows us to have
+/// a mock GhostEngine for proving out the LegacyLib3h wrapper
 type GhostEngineParentWapper<Core, Engine, EngineError> = GhostParentWrapper<
     Core,
     CoreContext,
