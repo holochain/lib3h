@@ -13,10 +13,10 @@ type EngineError = String;
 pub struct GhostEngine {
     endpoint_for_parent: Option<
         GhostEndpoint<
-            NodeToLib3h,
-            NodeToLib3hResponse,
-            Lib3hToNode,
-            Lib3hToNodeResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
             EngineError,
         >,
     >,
@@ -24,10 +24,10 @@ pub struct GhostEngine {
         GhostContextEndpoint<
             GhostEngine,
             String,
-            Lib3hToNode,
-            Lib3hToNodeResponse,
-            NodeToLib3h,
-            NodeToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
             EngineError,
         >,
     >,
@@ -48,18 +48,24 @@ impl GhostEngine {
     }
 }
 
-impl GhostActor<Lib3hToNode, Lib3hToNodeResponse, NodeToLib3h, NodeToLib3hResponse, EngineError>
-    for GhostEngine
+impl
+    GhostActor<
+        Lib3hToClient,
+        Lib3hToClientResponse,
+        ClientToLib3h,
+        ClientToLib3hResponse,
+        EngineError,
+    > for GhostEngine
 {
     // START BOILER PLATE--------------------------
     fn take_parent_endpoint(
         &mut self,
     ) -> Option<
         GhostEndpoint<
-            NodeToLib3h,
-            NodeToLib3hResponse,
-            Lib3hToNode,
-            Lib3hToNodeResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
             EngineError,
         >,
     > {
@@ -84,18 +90,12 @@ impl GhostActor<Lib3hToNode, Lib3hToNodeResponse, NodeToLib3h, NodeToLib3hRespon
 impl GhostEngine {
     fn handle_msg_from_node(
         &mut self,
-        mut msg: GhostMessage<NodeToLib3h, Lib3hToNode, NodeToLib3hResponse, EngineError>,
+        mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
     ) -> Result<(), EngineError> {
         match msg.take_message().expect("exists") {
-            NodeToLib3h::Connect(data) => {
-                // request the actual connection
-                let mock_result_data = GenericResultData {
-                    request_id: data.request_id.clone(),
-                    space_address: "space_addr".into(),
-                    to_agent_id: "to_agent_id".into(),
-                    result_info: b"fake_result".to_vec(),
-                };
-                msg.respond(Ok(NodeToLib3hResponse::SuccessResult(mock_result_data)));
+            ClientToLib3h::Connect(_data) => {
+                // pretend the connection request failed
+                msg.respond(Err("connection failed!".to_string()));
             }
             _ => panic!("{:?} not implemented", msg),
         }
@@ -106,10 +106,10 @@ impl GhostEngine {
 type GhostEngineParentWapper<Core> = GhostParentWrapper<
     Core,
     CoreContext,
-    Lib3hToNode,
-    Lib3hToNodeResponse,
-    NodeToLib3h,
-    NodeToLib3hResponse,
+    Lib3hToClient,
+    Lib3hToClientResponse,
+    ClientToLib3h,
+    ClientToLib3hResponse,
     EngineError,
     GhostEngine,
 >;
@@ -138,13 +138,21 @@ impl LegacyLib3h {
         let (ctx, cb) = match &client_msg {
             Lib3hClientProtocol::Connect(data) =>
                 (CoreContext(data.request_id.clone()),
-                 Box::new(|me:&mut LegacyLib3h, _ctx, response:GhostCallbackData<NodeToLib3hResponse,EngineError>| {
+                 Box::new(|me:&mut LegacyLib3h, context: CoreContext, response:GhostCallbackData<ClientToLib3hResponse,EngineError>| {
                     match response {
                         GhostCallbackData::Response(Ok(rsp)) => {
                             me.client_responses.push(rsp.into());
                         },
                         GhostCallbackData::Response(Err(e)) => {
-                            panic!(e);
+                            let failure_data = GenericResultData {
+                                request_id: context.0,
+                                space_address: "space_addr".into(),
+                                to_agent_id: "to_agent_id".into(),
+                                result_info: e.as_bytes().to_vec(),
+                            };
+                            let rsp = Lib3hServerProtocol::FailureResult(failure_data);
+
+                            me.client_responses.push(rsp);
                         },
                         GhostCallbackData::Timeout => {
                             panic!("timeout");
