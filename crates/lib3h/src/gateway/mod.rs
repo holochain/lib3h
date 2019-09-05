@@ -7,10 +7,7 @@ use crate::{
     transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
 };
 use lib3h_ghost_actor::prelude::*;
-use std::{
-    any::Any,
-    collections::{HashMap, VecDeque},
-};
+use std::collections::{HashMap, VecDeque};
 use url::Url;
 
 /// describes a super construct of a Transport and a Dht allowing
@@ -20,8 +17,8 @@ pub trait Gateway: Transport {
     fn transport_inject_event(&mut self, evt: TransportEvent);
     fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
 
-    fn process_dht(&mut self, user_data: &mut dyn Any) -> GhostResult<()>;
-    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn;
+    fn process_dht(&mut self) -> GhostResult<()>;
+    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData>;
 
     // TODO - remove this hack
     fn hold_peer(&mut self, peer_data: PeerData);
@@ -46,7 +43,30 @@ pub struct P2pGateway<'gateway> {
     transport_inbox: VecDeque<TransportCommand>,
     transport_inject_events: Vec<TransportEvent>,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn,
+    inner_dht: ChildDhtWrapperDyn<GatewayUserData>,
     // Cache
     this_peer: PeerData,
+    // user data for ghost callback
+    user_data: GatewayUserData,
+}
+
+// user data for ghost callback
+pub struct GatewayUserData {
+    this_peer: PeerData,
+    maybe_peer: Option<PeerData>,
+    peer_list: Vec<PeerData>,
+}
+
+impl GatewayUserData {
+    pub fn new() -> Self {
+        GatewayUserData {
+            this_peer: PeerData {
+                peer_address: "FIXME".to_string(),
+                peer_uri: Url::parse("fixme://host:123").unwrap(),
+                timestamp: 0,
+            },
+            maybe_peer: None,
+            peer_list: Vec::new(),
+        }
+    }
 }

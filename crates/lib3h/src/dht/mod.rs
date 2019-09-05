@@ -45,6 +45,30 @@ pub mod tests {
     #[allow(dead_code)]
     static mut FETCH_COUNT: u32 = 0;
 
+    pub struct DhtData {
+        this_peer: PeerData,
+        maybe_peer: Option<PeerData>,
+        peer_list: Vec<PeerData>,
+        entry_list: Vec<Address>,
+        maybe_aspect_list: Option<Vec<Address>>,
+    }
+
+    impl DhtData {
+        pub fn new() -> Self {
+            DhtData {
+                this_peer: PeerData {
+                    peer_address: "FIXME".to_string(),
+                    peer_uri: Url::parse("fixme://host:123").unwrap(),
+                    timestamp: 0,
+                },
+                maybe_peer: None,
+                peer_list: Vec::new(),
+                entry_list: Vec::new(),
+                maybe_aspect_list: None,
+            }
+        }
+    }
+
     fn create_test_uri(peer_address: &PeerAddressRef) -> Url {
         Url::parse(format!("test://{}", peer_address).as_str()).unwrap()
     }
@@ -98,26 +122,17 @@ pub mod tests {
     fn new_dht_wrapper(
         _is_mirror: bool,
         peer_address: &PeerAddressRef,
-    ) -> Detach<ChildDhtWrapperDyn> {
+    ) -> Detach<ChildDhtWrapperDyn<DhtData>> {
         let dht = new_dht(true, peer_address);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
-    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn>) -> PeerData {
-        let mut this_peer = PeerData {
-            peer_address: String::new(),
-            peer_uri: Url::parse("dummy://default").unwrap(),
-            timestamp: 0,
-        };
+    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> PeerData {
+        let mut ud = DhtData::new();
         dht.request(
-            std::time::Duration::from_millis(200),
             DhtContext::NoOp,
             DhtRequestToChild::RequestThisPeer,
-            Box::new(|ud, _context, response| {
-                let this_peer = match ud.downcast_mut::<PeerData>() {
-                    None => panic!("bad downcast"),
-                    Some(e) => e,
-                };
+            Box::new(|mut ud, _context, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -128,7 +143,7 @@ pub mod tests {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
-                    *this_peer = peer_response;
+                    ud.this_peer = peer_response;
                 } else {
                     panic!("bad response to RequestThisPeer: {:?}", response);
                 }
@@ -136,21 +151,16 @@ pub mod tests {
             }),
         );
         println!("dht.process(get_this_peer)...");
-        dht.process(&mut this_peer).unwrap();
-        this_peer
+        dht.process(&mut ud).unwrap();
+        ud.this_peer
     }
 
-    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn>, address: &str) -> Option<PeerData> {
-        let mut maybe_peer = None;
+    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>, address: &str) -> Option<PeerData> {
+        let mut ud = DhtData::new();
         dht.request(
-            std::time::Duration::from_millis(200),
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeer(address.to_string()),
-            Box::new(|ud, _context, response| {
-                let maybe_peer = match ud.downcast_mut::<Option<PeerData>>() {
-                    None => panic!("bad downcast"),
-                    Some(e) => e,
-                };
+            Box::new(|mut ud, _context, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -161,7 +171,7 @@ pub mod tests {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestPeer(peer_response) = response {
-                    *maybe_peer = peer_response;
+                    ud.maybe_peer = peer_response;
                 } else {
                     panic!("bad response to RequestPeer: {:?}", response);
                 }
@@ -169,21 +179,16 @@ pub mod tests {
             }),
         );
         println!("dht.process(get_peer) ...");
-        dht.process(&mut maybe_peer).unwrap();
-        maybe_peer
+        dht.process(&mut ud).unwrap();
+        ud.maybe_peer
     }
 
-    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn>) -> Vec<PeerData> {
-        let mut peer_list = Vec::new();
+    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<PeerData> {
+        let mut ud = DhtData::new();
         dht.request(
-            std::time::Duration::from_millis(200),
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeerList,
-            Box::new(|ud, _context, response| {
-                let peer_list = match ud.downcast_mut::<Vec<PeerData>>() {
-                    None => panic!("bad downcast"),
-                    Some(e) => e,
-                };
+            Box::new(|mut ud, _context, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -194,7 +199,7 @@ pub mod tests {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestPeerList(peer_response) = response {
-                    *peer_list = peer_response;
+                    ud.peer_list = peer_response;
                 } else {
                     panic!("bad response to RequestPeerList: {:?}", response);
                 }
@@ -202,21 +207,16 @@ pub mod tests {
             }),
         );
         println!("dht.process(get_peer_list)...");
-        dht.process(&mut peer_list).unwrap();
-        peer_list
+        dht.process(&mut ud).unwrap();
+        ud.peer_list
     }
 
-    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn>) -> Vec<Address> {
-        let mut entry_list = Vec::new();
+    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<Address> {
+        let mut ud = DhtData::new();
         dht.request(
-            std::time::Duration::from_millis(200),
             DhtContext::NoOp,
             DhtRequestToChild::RequestEntryAddressList,
-            Box::new(|ud, _context, response| {
-                let entry_list = match ud.downcast_mut::<Vec<Address>>() {
-                    None => panic!("bad downcast"),
-                    Some(e) => e,
-                };
+            Box::new(|mut ud, _context, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -228,7 +228,7 @@ pub mod tests {
                 };
                 if let DhtRequestToChildResponse::RequestEntryAddressList(entry_response) = response
                 {
-                    *entry_list = entry_response;
+                    ud.entry_list = entry_response;
                 } else {
                     panic!("bad response to RequestEntryAddressList: {:?}", response);
                 }
@@ -236,24 +236,19 @@ pub mod tests {
             }),
         );
         println!("dht.process(get_entry_address_list)...");
-        dht.process(&mut entry_list).unwrap();
-        entry_list
+        dht.process(&mut ud).unwrap();
+        ud.entry_list
     }
 
     fn get_aspects_of(
-        dht: &mut Detach<ChildDhtWrapperDyn>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
         entry_address: &Address,
     ) -> Option<Vec<Address>> {
-        let mut maybe_aspect_list = None;
+        let mut ud = DhtData::new();
         dht.request(
-            std::time::Duration::from_millis(200),
             DhtContext::NoOp,
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-            Box::new(|ud, _context, response| {
-                let maybe_aspect_list = match ud.downcast_mut::<Option<Vec<Address>>>() {
-                    None => panic!("bad downcast"),
-                    Some(e) => e,
-                };
+            Box::new(|mut ud, _context, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -264,7 +259,7 @@ pub mod tests {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestAspectsOf(entry_response) = response {
-                    *maybe_aspect_list = entry_response;
+                    ud.maybe_aspect_list = entry_response;
                 } else {
                     panic!("bad response to RequestAspectsOf: {:?}", response);
                 }
@@ -272,8 +267,8 @@ pub mod tests {
             }),
         );
         println!("dht.process(get_aspects_of)...");
-        dht.process(&mut maybe_aspect_list).unwrap();
-        maybe_aspect_list
+        dht.process(&mut ud).unwrap();
+        ud.maybe_aspect_list
     }
 
     #[test]
@@ -288,6 +283,7 @@ pub mod tests {
     fn test_own_peer_list() {
         enable_logging_for_test(true);
         let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut ud = DhtData::new();
         // Should be empty
         let maybe_peer = get_peer(&mut dht, PEER_A);
         assert!(maybe_peer.is_none());
@@ -295,7 +291,7 @@ pub mod tests {
         assert_eq!(peer_list.len(), 0);
         // Add a peer
         dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)));
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
         assert_eq!(peer.peer_address, PEER_B);
@@ -304,7 +300,7 @@ pub mod tests {
         assert_eq!(peer_list[0].peer_address, PEER_B);
         // Add a peer again
         dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_C)));
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
         assert_eq!(peer.peer_address, PEER_B);
@@ -316,6 +312,7 @@ pub mod tests {
     fn test_get_own_entry() {
         enable_logging_for_test(true);
         let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut ud = DhtData::new();
         // Should be empty
         let entry_address_list = get_entry_address_list(&mut dht);
         assert_eq!(entry_address_list.len(), 0);
@@ -323,7 +320,7 @@ pub mod tests {
         let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         println!("dht.process(HoldEntryAspectAddress)...");
         dht.publish(DhtRequestToChild::HoldEntryAspectAddress(entry.clone()));
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have it
         let entry_address_list = get_entry_address_list(&mut dht);
         assert_eq!(entry_address_list.len(), 1);
@@ -336,7 +333,6 @@ pub mod tests {
         // Fetch it
         // ========
         dht.request(
-            std::time::Duration::from_millis(200),
             DhtContext::NoOp,
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
             Box::new(|_ud, _context, response| {
@@ -360,7 +356,7 @@ pub mod tests {
             }),
         );
         println!("1. dht.process(RequestEntry)...");
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have received the request back
         let request_list = dht.drain_messages();
         assert_eq!(request_list.len(), 1);
@@ -375,13 +371,14 @@ pub mod tests {
             request.respond(Ok(DhtRequestToParentResponse::RequestEntry(entry.clone())));
         }
         println!("3. dht.process(RequestEntry)...");
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
     }
 
     #[test]
     fn test_update_peer() {
         enable_logging_for_test(true);
         let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut ud = DhtData::new();
         // Should be empty
         let this = get_peer(&mut dht, PEER_A);
         assert!(this.is_none());
@@ -393,7 +390,7 @@ pub mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         let mut peer_b_data = create_PeerData(PEER_B);
         dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()));
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
         assert_eq!(peer.peer_address, PEER_B);
@@ -401,7 +398,7 @@ pub mod tests {
         let ref_time = peer_b_data.timestamp;
         peer_b_data.timestamp -= 1;
         dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()));
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
         let peer = get_peer(&mut dht, PEER_B).unwrap();
         assert_eq!(peer.timestamp, ref_time);
@@ -411,7 +408,7 @@ pub mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         peer_b_data.timestamp = ref_time + 1;
         dht.publish(DhtRequestToChild::HoldPeer(peer_b_data));
-        dht.process(&mut ()).unwrap();
+        dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
         let peer = get_peer(&mut dht, PEER_B).unwrap();
         assert!(peer.timestamp > ref_time);
@@ -422,16 +419,17 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut dht_a = new_dht_wrapper(true, PEER_A);
         let mut dht_b = new_dht_wrapper(true, PEER_B);
+        let mut ud = DhtData::new();
         // Add a peer
         dht_a.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)));
-        dht_a.process(&mut ()).unwrap();
+        dht_a.process(&mut ud).unwrap();
         // Flush any pending requests from child
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
         // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a.publish(DhtRequestToChild::BroadcastEntry(entry_data.clone()));
-        dht_a.process(&mut ()).unwrap();
+        dht_a.process(&mut ud).unwrap();
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 1);
@@ -456,7 +454,7 @@ pub mod tests {
             bundle,
         };
         dht_b.publish(DhtRequestToChild::HandleGossip(remote_gossip));
-        dht_b.process(&mut ()).unwrap();
+        dht_b.process(&mut ud).unwrap();
         // Should receive a HoldRequested
         let request_list = dht_b.drain_messages();
         assert_eq!(request_list.len(), 1);
@@ -471,7 +469,7 @@ pub mod tests {
         }
         // Tell DHT B to hold it
         dht_b.publish(DhtRequestToChild::HoldEntryAspectAddress(entry_data));
-        dht_b.process(&mut ()).unwrap();
+        dht_b.process(&mut ud).unwrap();
         // DHT B should have the entry
         let entry_list = get_entry_address_list(&mut dht_b);
         assert_eq!(entry_list.len(), 1);
@@ -482,18 +480,19 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut dht_a = new_dht_wrapper(true, PEER_A);
         let mut dht_b = new_dht_wrapper(true, PEER_B);
+        let mut ud = DhtData::new();
         // Tell A to hold B
         let peer_b_data = get_this_peer(&mut dht_b);
         assert_eq!(peer_b_data.peer_address, PEER_B);
         dht_a.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()));
-        dht_a.process(&mut ()).unwrap();
+        dht_a.process(&mut ud).unwrap();
         // Flush any pending requests from child
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
         // Tell A to hold C
         let peer_c_data = create_PeerData(PEER_C);
         dht_a.publish(DhtRequestToChild::HoldPeer(peer_c_data.clone()));
-        dht_a.process(&mut ()).unwrap();
+        dht_a.process(&mut ud).unwrap();
         // Should return gossipTos of C to B
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 2);
@@ -523,7 +522,7 @@ pub mod tests {
             bundle,
         };
         dht_b.publish(DhtRequestToChild::HandleGossip(remote_gossip));
-        dht_b.process(&mut ()).unwrap();
+        dht_b.process(&mut ud).unwrap();
         // Should return gossipTos
         let request_list = dht_b.drain_messages();
         assert_eq!(request_list.len(), 1);
@@ -543,7 +542,7 @@ pub mod tests {
         }
         // Accept HoldPeerRequested
         dht_b.publish(DhtRequestToChild::HoldPeer(peer_to_hold.clone()));
-        dht_b.process(&mut ()).unwrap();
+        dht_b.process(&mut ud).unwrap();
         // B should have C
         let peer_info = get_peer(&mut dht_b, PEER_C).unwrap();
         assert_eq!(peer_info, peer_c_data);

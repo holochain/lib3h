@@ -8,10 +8,7 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use std::{
-    any::Any,
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 type HasTimedOut = bool;
@@ -43,7 +40,7 @@ pub struct MirrorDht {
 
     /// ghost stuff
     endpoint_parent: Option<DhtEndpoint>,
-    endpoint_self: Detach<DhtEndpointWithContext>,
+    endpoint_self: Detach<DhtEndpointWithContext<()>>,
 }
 
 /// Constructors
@@ -71,7 +68,12 @@ impl MirrorDht {
             last_gossip_of_self: timestamp,
             config: config.clone(),
             endpoint_parent: Some(endpoint_parent),
-            endpoint_self: Detach::new(endpoint_self.as_context_endpoint("dht_child_")),
+            endpoint_self: Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("dht_to_parent_")
+                    .build(),
+            ),
         };
         Ok(Box::new(this))
     }
@@ -294,16 +296,12 @@ impl
         Lib3hError,
     > for MirrorDht
 {
-    fn as_any(&mut self) -> &mut dyn Any {
-        &mut *self
-    }
-
     fn take_parent_endpoint(&mut self) -> Option<DhtEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self.as_any()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(&mut ()))?;
         for request in self.endpoint_self.as_mut().drain_messages() {
             //debug!("@MirrorDht@ serving request: {:?}", request);
             self.handle_request_from_parent(request)
@@ -470,7 +468,6 @@ impl MirrorDht {
             // Ask owner to respond to self
             DhtRequestToChild::RequestEntry(entry_address) => {
                 self.endpoint_self.request(
-                    std::time::Duration::from_millis(2000),
                     DhtContext::RequestEntry(request),
                     DhtRequestToParent::RequestEntry(entry_address),
                     Box::new(|_me, context, response| {

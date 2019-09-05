@@ -46,7 +46,7 @@ impl<'engine> RealEngine<'engine> {
         let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            space_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME unwrap
+            space_gateway.as_mut().process_dht().unwrap(); // FIXME unwrap
             let request_list = space_gateway.as_mut().as_dht_mut().drain_messages();
             dht_outbox.insert(chain_id.clone(), request_list);
         }

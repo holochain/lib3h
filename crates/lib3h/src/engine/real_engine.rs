@@ -445,7 +445,6 @@ impl<'engine> RealEngine<'engine> {
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
-                std::time::Duration::from_millis(2000),
                 DhtContext::RequestAspectsOf {
                     entry_address: entry_address.clone(),
                     aspect_address_list,

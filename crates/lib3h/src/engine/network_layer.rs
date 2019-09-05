@@ -50,7 +50,7 @@ impl<'engine> RealEngine<'engine> {
         }
         // Process the network gateway as a DHT
         debug!("{} - network_gateway DHT.process() ...", self.name);
-        self.network_gateway.as_mut().process_dht(&mut ()).unwrap(); // FIXME
+        self.network_gateway.as_mut().process_dht().unwrap(); // FIXME
         let request_list = self.network_gateway.as_mut().as_dht_mut().drain_messages();
         for request in request_list {
             did_work = true;
