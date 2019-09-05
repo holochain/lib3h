@@ -52,7 +52,7 @@ fn server_success(context: CoreContext) -> Lib3hServerProtocol {
         request_id: context.0,
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: Vec::new()
+        result_info: Vec::new(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
@@ -92,7 +92,7 @@ where
                         let response = match rsp {
                             ClientToLib3hResponse::JoinSpaceResult => server_success(context),
                             ClientToLib3hResponse::LeaveSpaceResult => server_success(context),
-                            _ => rsp.into()
+                            _ => rsp.into(),
                         };
                         me.client_request_responses.push(response)
                     }
