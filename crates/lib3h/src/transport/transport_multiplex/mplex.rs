@@ -94,7 +94,7 @@ impl TransportMultiplex {
         remote_agent_id: String,
         remote_machine_id: String,
         unpacked_payload: Vec<u8>,
-    ) {
+    ) -> TransportResult<()> {
         let route_spec = LocalRouteSpec {
             space_address,
             local_agent_id,
@@ -110,9 +110,10 @@ impl TransportMultiplex {
                 ep.publish(RequestToParent::ReceivedData {
                     address,
                     payload: unpacked_payload,
-                });
+                })?;
             }
         }
+        Ok(())
     }
 
     /// private dispatcher for messages from our inner transport
@@ -140,7 +141,7 @@ impl TransportMultiplex {
     fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::IncomingConnection { address });
+            .publish(RequestToParent::IncomingConnection { address })?;
         Ok(())
     }
 
@@ -148,7 +149,7 @@ impl TransportMultiplex {
     fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::ReceivedData { address, payload });
+            .publish(RequestToParent::ReceivedData { address, payload })?;
         Ok(())
     }
 
@@ -156,7 +157,7 @@ impl TransportMultiplex {
     fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::TransportError { error });
+            .publish(RequestToParent::TransportError { error })?;
         Ok(())
     }
 
@@ -202,16 +203,16 @@ impl TransportMultiplex {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()));
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response);
+                msg.respond(response)?;
                 Ok(())
             }),
-        );
+        )?;
         Ok(())
     }
 
@@ -240,16 +241,16 @@ impl TransportMultiplex {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()));
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response);
+                msg.respond(response)?;
                 Ok(())
             }),
-        );
+        )?;
         Ok(())
     }
 
@@ -295,16 +296,16 @@ impl TransportMultiplex {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()));
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response);
+                msg.respond(response)?;
                 Ok(())
             }),
-        );
+        )?;
         Ok(())
     }
 
@@ -333,16 +334,16 @@ impl TransportMultiplex {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()));
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response);
+                msg.respond(response)?;
                 Ok(())
             }),
-        );
+        )?;
         Ok(())
     }
 }

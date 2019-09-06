@@ -100,11 +100,11 @@ mod tests {
                         self.bound_url = spec.clone();
                         msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                             bound_url: spec,
-                        })));
+                        })))?;
                     }
                     RequestToChild::SendMessage { address, payload } => {
                         self.mock_sender.send((address, payload))?;
-                        msg.respond(Ok(RequestToChildResponse::SendMessage));
+                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
                     }
                 }
             }
@@ -112,7 +112,7 @@ mod tests {
                 match self.mock_receiver.try_recv() {
                     Ok((address, payload)) => {
                         self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload });
+                            .publish(RequestToParent::ReceivedData { address, payload })?;
                     }
                     Err(_) => break,
                 }
@@ -147,17 +147,19 @@ mod tests {
             .build::<(), ()>();
 
         // send a message from route A
-        route_a.request(
-            (),
-            RequestToChild::SendMessage {
-                address: addr_none.clone(),
-                payload: b"hello-from-a".to_vec(),
-            },
-            Box::new(|_, _, response| {
-                assert_eq!(&format!("{:?}", response), "");
-                Ok(())
-            }),
-        );
+        route_a
+            .request(
+                (),
+                RequestToChild::SendMessage {
+                    address: addr_none.clone(),
+                    payload: b"hello-from-a".to_vec(),
+                },
+                Box::new(|_, _, response| {
+                    assert_eq!(&format!("{:?}", response), "");
+                    Ok(())
+                }),
+            )
+            .unwrap();
 
         route_a.process(&mut ()).unwrap();
         mplex.process(&mut ()).unwrap();
@@ -188,13 +190,16 @@ mod tests {
 
         // our mplex module got it, now we should have the context
         // let's instruct it to be forwarded up the route
-        mplex.as_mut().received_data_for_agent_space_route(
-            "space_b".to_string(),
-            "agent_b".to_string(),
-            "agent_x".to_string(),
-            "machine_x".to_string(),
-            b"hello".to_vec(),
-        );
+        mplex
+            .as_mut()
+            .received_data_for_agent_space_route(
+                "space_b".to_string(),
+                "agent_b".to_string(),
+                "agent_x".to_string(),
+                "machine_x".to_string(),
+                b"hello".to_vec(),
+            )
+            .unwrap();
 
         mplex.process(&mut ()).unwrap();
         route_b.process(&mut ()).unwrap();

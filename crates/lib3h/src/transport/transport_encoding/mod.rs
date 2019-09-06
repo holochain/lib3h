@@ -462,11 +462,11 @@ mod tests {
                         self.bound_url = spec.clone();
                         msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                             bound_url: spec,
-                        })));
+                        })))?;
                     }
                     RequestToChild::SendMessage { address, payload } => {
                         self.mock_sender.send((address, payload)).unwrap();
-                        msg.respond(Ok(RequestToChildResponse::SendMessage));
+                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
                     }
                 }
             }
@@ -478,9 +478,9 @@ mod tests {
                         self.endpoint_self
                             .publish(RequestToParent::IncomingConnection {
                                 address: address.clone(),
-                            });
+                            })?;
                         self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload });
+                            .publish(RequestToParent::ReceivedData { address, payload })?;
                     }
                     Err(_) => break,
                 }
@@ -531,7 +531,7 @@ mod tests {
                 );
                 Ok(())
             })
-        );
+        ).unwrap();
 
         // allow process
         t1.process(&mut false).unwrap();
@@ -565,7 +565,7 @@ mod tests {
                 );
                 Ok(())
             })
-        );
+        ).unwrap();
 
         // allow process
         t2.process(&mut ()).unwrap();
@@ -585,7 +585,8 @@ mod tests {
                 assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
 
         t1.process(&mut t1_got_success_resp).unwrap();
 

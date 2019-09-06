@@ -296,35 +296,39 @@ mod tests {
         assert_eq!(transport2.maybe_my_address, None);
 
         let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
-        t1_endpoint.request(
-            (),
-            RequestToChild::Bind {
-                spec: Url::parse("mem://_").unwrap(),
-            },
-            Box::new(|_: &mut (), _, r| {
-                // parent should see the bind event
-                assert_eq!(
-                    "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
-                    &format!("{:?}", r)
-                );
-                Ok(())
-            }),
-        );
+        t1_endpoint
+            .request(
+                (),
+                RequestToChild::Bind {
+                    spec: Url::parse("mem://_").unwrap(),
+                },
+                Box::new(|_: &mut (), _, r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
+                        &format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
-        t2_endpoint.request(
-            (),
-            RequestToChild::Bind {
-                spec: Url::parse("mem://_").unwrap(),
-            },
-            Box::new(|_: &mut (), _, r| {
-                // parent should see the bind event
-                assert_eq!(
-                    "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
-                    &format!("{:?}", r)
-                );
-                Ok(())
-            }),
-        );
+        t2_endpoint
+            .request(
+                (),
+                RequestToChild::Bind {
+                    spec: Url::parse("mem://_").unwrap(),
+                },
+                Box::new(|_: &mut (), _, r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
+                        &format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
 
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut ());
@@ -342,18 +346,20 @@ mod tests {
         );
 
         // now send a message from transport1 to transport2 over the bound addresses
-        t1_endpoint.request(
-            (),
-            RequestToChild::SendMessage {
-                address: Url::parse("mem://addr_2").unwrap(),
-                payload: b"test message".to_vec(),
-            },
-            Box::new(|_: &mut (), _, r| {
-                // parent should see that the send request was OK
-                assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
-                Ok(())
-            }),
-        );
+        t1_endpoint
+            .request(
+                (),
+                RequestToChild::SendMessage {
+                    address: Url::parse("mem://addr_2").unwrap(),
+                    payload: b"test message".to_vec(),
+                },
+                Box::new(|_: &mut (), _, r| {
+                    // parent should see that the send request was OK
+                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                    Ok(())
+                }),
+            )
+            .unwrap();
 
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut ());
