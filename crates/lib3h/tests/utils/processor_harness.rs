@@ -317,14 +317,18 @@ macro_rules! assert_processed {
 
         // each epoc represents on "random" engine processing once
         for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
-            let b = seeded_boolean_prng.next().expect("could not generate a new seeded prng value");
-            println!("seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}", seed, epoc, b, previous);
+            let b = seeded_boolean_prng
+                .next()
+                .expect("could not generate a new seeded prng value");
+            println!(
+                "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
+                seed, epoc, b, previous
+            );
 
             // pick either engine1 or engine2 with equal probability
             if b {
                 process_one!($engine1, previous, errors);
-            }
-            else {
+            } else {
                 process_one!($engine2, previous, errors);
             }
             if errors.is_empty() {

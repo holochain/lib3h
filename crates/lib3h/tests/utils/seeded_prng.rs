@@ -10,7 +10,7 @@ pub struct SeededUnitPrng {
 
 impl From<[u64; 2]> for SeededUnitPrng {
     fn from(seed: [u64; 2]) -> Self {
-        Self{
+        Self {
             seed,
             prng: Xoroshiro128Rng::from_seed(seed),
         }
@@ -51,7 +51,7 @@ pub struct SeededBooleanPrng {
 
 impl From<[u64; 2]> for SeededBooleanPrng {
     fn from(seed: [u64; 2]) -> Self {
-        Self{
+        Self {
             seed,
             prng: Xoroshiro128Rng::from_seed(seed),
         }

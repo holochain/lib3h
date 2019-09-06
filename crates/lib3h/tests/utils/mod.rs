@@ -1,5 +1,5 @@
-extern crate xoroshiro128;
 extern crate rand;
+extern crate xoroshiro128;
 
 pub mod constants;
 #[macro_use]
