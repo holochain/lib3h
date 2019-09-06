@@ -104,7 +104,7 @@ impl TransportMultiplex {
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
         };
-        let address = Url::parse(&format!(
+        let path = Url::parse(&format!(
             "transportId:{}?a={}",
             remote_machine_id, remote_agent_id
         ))
@@ -113,7 +113,7 @@ impl TransportMultiplex {
             None => panic!("no such route"),
             Some(ep) => {
                 ep.publish(RequestToParent::ReceivedData {
-                    address,
+                    address: path,
                     payload: unpacked_payload,
                 })?;
             }
