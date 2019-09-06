@@ -5,7 +5,32 @@ use predicates::prelude::*;
 
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
 
+use crate::utils::seeded_prng::SeededBooleanPrng;
+
+use std::sync::Mutex;
+
 pub const MAX_PROCESSING_LOOPS: usize = 100;
+
+lazy_static! {
+
+    pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
+
+        // generate a random seed here
+        // if you see an error "sometimes" manually paste the seed from the logs in here and
+        // hardcode it for debugging
+        // e.g. something like
+        // let seed = [12290055440097485507, 11402434335878553749];
+
+        let seed = [rand::random::<u64>(), rand::random::<u64>()];
+
+        println!("seed is: {:?}", &seed);
+        let seeded_boolean_prng = SeededBooleanPrng::from(seed);
+
+        Mutex::new(seeded_boolean_prng)
+
+    };
+
+}
 
 /// Represents all useful state after a single call to an engine's process function
 #[derive(Clone, Debug)]
@@ -308,23 +333,16 @@ macro_rules! assert_processed {
             errors.push((p, None))
         }
 
-        // generate a random seed here
-        // if you see an error "sometime" manually paste the seed from the logs in here and
-        // hardcode it for debugging
-        // let seed = [12290055440097485507, 11402434335878553749];
-
-        let seed = [rand::random::<u64>(), rand::random::<u64>()];
-        println!("seed is: {:?}", &seed);
-        let mut seeded_boolean_prng = $crate::utils::seeded_prng::SeededBooleanPrng::from(seed);
-
-        // each epoc represents on "random" engine processing once
+        // each epoc represents one "random" engine processing once
         for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
-            let b = seeded_boolean_prng
+            let b = $crate::utils::processor_harness::BOOLEAN_PRNG
+                .lock()
+                .expect("could not acquire lock on boolean prng")
                 .next()
                 .expect("could not generate a new seeded prng value");
             println!(
                 "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
-                seed, epoc, b, previous
+                $crate::utils::processor_harness::BOOLEAN_PRNG.lock().expect("could not acquire lock on boolean prng").seed, epoc, b, previous
             );
 
             // pick either engine1 or engine2 with equal probability
