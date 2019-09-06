@@ -359,7 +359,7 @@ mod tests {
                 (),
                 RequestToChild::SendMessage {
                     address: Url::parse("mem://addr_2").unwrap(),
-                    payload: b"test message".to_vec(),
+                    payload: "test message".into()
                 },
                 Box::new(|_: &mut (), _, r| {
                     // parent should see that the send request was OK

@@ -27,6 +27,7 @@ mod tests {
     use crate::transport::{error::*, protocol::*};
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
+    use lib3h_protocol::data_types::Opaque;
     use url::Url;
 
     enum MockToParentContext {}
@@ -45,14 +46,14 @@ mod tests {
             >,
         >,
         bound_url: Url,
-        mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-        mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+        mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
+        mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
     }
 
     impl TransportMock {
         pub fn new(
-            mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-            mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+            mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
+            mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
@@ -146,7 +147,7 @@ mod tests {
                 (),
                 RequestToChild::SendMessage {
                     address: addr_none.clone(),
-                    payload: b"hello-from-a".to_vec(),
+                    payload: "hello-from-a".into(),
                 },
                 Box::new(|_, _, response| {
                     assert_eq!(&format!("{:?}", response), "");
@@ -163,10 +164,11 @@ mod tests {
         // should receive that out the bottom
         let (address, payload) = r_out.recv().unwrap();
         assert_eq!(&addr_none, &address);
-        assert_eq!(&b"hello-from-a".to_vec(), &payload);
+        let expected : Opaque = "hello-from-a".into();
+        assert_eq!(&expected, &payload);
 
         // send a message up the bottom
-        s_in.send((addr_none.clone(), b"hello-to-b".to_vec()))
+        s_in.send((addr_none.clone(), "hello-to-b".into()))
             .unwrap();
 
         // process "receive" that message
@@ -177,7 +179,8 @@ mod tests {
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { address, payload } = msg {
             assert_eq!(&addr_none, &address);
-            assert_eq!(&b"hello-to-b".to_vec(), &payload);
+            let expected : Opaque = "hello-to-b".into();
+            assert_eq!(&expected, &payload);
         } else {
             panic!("bad type");
         }
@@ -191,7 +194,7 @@ mod tests {
                 &"agent_b".into(),
                 &"agent_x".into(),
                 &"machine_x".into(),
-                b"hello".to_vec(),
+                "hello".into(),
             )
             .unwrap();
 
@@ -207,7 +210,8 @@ mod tests {
                 &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
                 &address
             );
-            assert_eq!(&b"hello".to_vec(), &payload);
+            let expected : Opaque = "hello".into();
+            assert_eq!(&expected, &payload);
         } else {
             panic!("bad type");
         }
