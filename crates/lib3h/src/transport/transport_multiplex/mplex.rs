@@ -21,22 +21,22 @@ enum MplexToInnerContext {
     ),
 }
 
-pub struct TransportMultiplex {
+pub struct TransportMultiplex<'lt> {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, ()>>,
+    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex<'lt>, ()>>,
     // ref to our inner transport
     inner_transport:
-        Detach<TransportActorParentWrapperDyn<TransportMultiplex, MplexToInnerContext>>,
+        Detach<TransportActorParentWrapperDyn<'lt, TransportMultiplex<'lt>, MplexToInnerContext>>,
     // our map of endpoints connecting us to our Routes
     route_endpoints:
-        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, ()>>>,
+        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex<'lt>, ()>>>,
 }
 
-impl TransportMultiplex {
+impl<'lt> TransportMultiplex<'lt> {
     /// create a new TransportMultiplex Instance
-    pub fn new(inner_transport: DynTransportActor) -> Self {
+    pub fn new(inner_transport: DynTransportActor<'lt>) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(
@@ -353,14 +353,14 @@ impl TransportMultiplex {
     }
 }
 
-impl
+impl<'lt>
     GhostActor<
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
         RequestToChildResponse,
         TransportError,
-    > for TransportMultiplex
+    > for TransportMultiplex<'lt>
 {
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)

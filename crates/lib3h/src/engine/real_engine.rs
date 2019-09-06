@@ -17,7 +17,7 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::TransportCommand, TransportWrapper},
+    transport::{protocol::TransportCommand, TransportWrapper, TransportGhostAsLegacy, TransportLegacyAsGhost},
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -563,10 +563,20 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             gossip_interval: self.config.dht_gossip_interval,
             timeout_threshold: self.config.dht_timeout_threshold,
         };
+
+        // --- begin hack legacy->ghost->legacy --- //
+        let sgit_ghost: TransportLegacyAsGhost<'engine> =
+            TransportLegacyAsGhost::new(
+                self.network_gateway.as_transport()
+            );
+        let sgit_legacy = TransportGhostAsLegacy::new(Box::new(sgit_ghost));
+        let space_gateway_inner_transport = TransportWrapper::new(sgit_legacy);
+        // ---  end hack legacy->ghost->legacy  --- //
+
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
             GatewayWrapper::new(P2pGateway::new_with_space(
-                self.network_gateway.as_transport(),
+                space_gateway_inner_transport,
                 &join_msg.space_address,
                 self.dht_factory,
                 &dht_config,

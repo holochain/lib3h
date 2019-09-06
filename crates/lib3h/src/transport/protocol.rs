@@ -59,14 +59,14 @@ pub enum RequestToParentResponse {
     Disallowed, // just for testing
 }
 
-pub type DynTransportActor = Box<
+pub type DynTransportActor<'lt> = Box<
     dyn GhostActor<
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
         RequestToChildResponse,
         TransportError,
-    >,
+    > + 'lt,
 >;
 
 pub type TransportActorParentEndpoint = GhostEndpoint<
@@ -95,7 +95,8 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<'lt, UserData, Context> = GhostParentWrapperDyn<
+    'lt,
     UserData,
     Context,
     RequestToParent,

@@ -24,13 +24,13 @@ enum ToKeystoreContext {}
 /// Wraps a lower-level transport in either Open or Encrypted communication
 /// Also adds a concept of MachineId and AgentId
 /// This is currently a stub, only the Id concept is in place.
-pub struct TransportEncoding {
+pub struct TransportEncoding<'lt> {
     #[allow(dead_code)]
     crypto: Box<dyn CryptoSystem>,
     // the machine_id or agent_id of this encoding instance
     this_id: String,
     // the keystore to use for getting signatures for `this_id`
-    keystore: Detach<KeystoreActorParentWrapperDyn<ToKeystoreContext>>,
+    keystore: Detach<KeystoreActorParentWrapperDyn<'lt, ToKeystoreContext>>,
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
@@ -46,7 +46,7 @@ pub struct TransportEncoding {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding, ToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<'lt, TransportEncoding<'lt>, ToInnerContext>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes
@@ -70,13 +70,13 @@ pub struct TransportEncoding {
     connections_id_to_no_id: HashMap<Url, Url>,
 }
 
-impl TransportEncoding {
+impl<'lt> TransportEncoding<'lt> {
     /// create a new TransportEncoding Instance
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         this_id: String,
         keystore: DynKeystoreActor,
-        inner_transport: DynTransportActor,
+        inner_transport: DynTransportActor<'lt>,
     ) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
@@ -364,14 +364,14 @@ impl TransportEncoding {
     }
 }
 
-impl
+impl<'lt>
     GhostActor<
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
         RequestToChildResponse,
         TransportError,
-    > for TransportEncoding
+    > for TransportEncoding<'lt>
 {
     fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)

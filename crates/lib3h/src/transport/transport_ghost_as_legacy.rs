@@ -9,17 +9,17 @@ enum ToInnerContext {
     None,
 }
 
-pub struct TransportGhostAsLegacy {
+pub struct TransportGhostAsLegacy<'lt> {
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<TransportGhostAsLegacy, ToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<'lt, TransportGhostAsLegacy<'lt>, ToInnerContext>>,
     outbox: Vec<TransportEvent>,
     sync_ready: bool,
     bound_url: Url,
 }
 
-impl TransportGhostAsLegacy {
+impl<'lt> TransportGhostAsLegacy<'lt> {
     /// create a new TransportGhostAsLegacy Instance
-    pub fn new(inner_transport: DynTransportActor) -> Self {
+    pub fn new(inner_transport: DynTransportActor<'lt>) -> Self {
         let inner_transport = Detach::new(GhostParentWrapperDyn::new(
             inner_transport,
             "mplex_to_inner_",
@@ -147,7 +147,7 @@ impl TransportGhostAsLegacy {
     }
 }
 
-impl Transport for TransportGhostAsLegacy {
+impl<'lt> Transport for TransportGhostAsLegacy<'lt> {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         // psyche!
         Ok(uri.to_string())

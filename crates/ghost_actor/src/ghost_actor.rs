@@ -249,6 +249,7 @@ pub trait GhostActor<
 
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
+    'lt,
     UserData,
     Context: 'static,
     RequestToParent: 'static,
@@ -264,7 +265,7 @@ pub struct GhostParentWrapperDyn<
             RequestToChild,
             RequestToChildResponse,
             Error,
-        >,
+        > + 'lt,
     >,
     endpoint: GhostContextEndpoint<
         UserData,
@@ -278,6 +279,7 @@ pub struct GhostParentWrapperDyn<
 }
 
 impl<
+        'lt,
         UserData,
         Context: 'static,
         RequestToParent: 'static,
@@ -287,6 +289,7 @@ impl<
         Error: 'static,
     >
     GhostParentWrapperDyn<
+        'lt,
         UserData,
         Context,
         RequestToParent,
@@ -305,7 +308,7 @@ impl<
                 RequestToChild,
                 RequestToChildResponse,
                 Error,
-            >,
+            > + 'lt,
         >,
         request_id_prefix: &str,
     ) -> Self {
