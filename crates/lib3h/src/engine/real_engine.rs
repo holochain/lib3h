@@ -60,7 +60,7 @@ impl<'engine> RealEngine<'engine> {
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
         };
-        let network_gateway = GatewayWrapper::new(P2pGateway::new(
+        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -110,7 +110,7 @@ impl<'engine> RealEngine<'engine> {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = GatewayWrapper::new(P2pGateway::new(
+        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
             dht_factory,
@@ -604,10 +604,10 @@ impl<'engine> RealEngine<'engine> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway: GatewayWrapper<'engine> =
-            GatewayWrapper::new(P2pGateway::new_with_space(
+        let new_space_gateway =
+            GatewayParentWrapperDyn::new(P2pGateway::new_with_space(
                 &join_msg.space_address,
-                self.network_gateway.as_transport(),
+                self.network_transport,
                 self.dht_factory,
                 &dht_config,
             ));
@@ -635,10 +635,12 @@ impl<'engine> RealEngine<'engine> {
         // Add it to space map
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
+
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
-        space_gateway.as_mut().hold_peer(this_peer);
+        let this_peer = { space_gateway.get_this_peer_sync().clone() };
+        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)));
+
         // Send Get*Lists requests
         let mut list_data = GetListData {
             space_address: join_msg.space_address.clone(),
@@ -751,7 +753,7 @@ impl<'engine> RealEngine<'engine> {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<GatewayWrapper<'engine>, Lib3hServerProtocol> {
+    ) -> Result<GatewayParentWrapperDyn<(), ()>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
@@ -774,25 +776,25 @@ impl<'engine> RealEngine<'engine> {
     }
 }
 
-pub fn handle_gossipTo<'engine>(
-    gateway: &mut GatewayWrapper<'engine>,
+pub fn handle_gossipTo(
+    gateway: &mut GatewayParentWrapperDyn<(), ()>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
         "({}) handle_gossipTo: {:?}",
-        gateway.as_mut().identifier(),
+        gateway.identifier(),
         gossip_data
     );
     for to_peer_address in gossip_data.peer_address_list {
         // TODO #150 - should not gossip to self in the first place
-        let me = &gateway.as_mut().get_this_peer_sync().peer_address;
+        let me = &gateway.get_this_peer_sync().peer_address;
         if &to_peer_address == me {
             continue;
         }
         // TODO END
         // Convert DHT Gossip to P2P Gossip
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
-            space_address: gateway.as_mut().identifier().into(),
+            space_address: gateway.identifier().into(),
             to_peer_address: to_peer_address.clone().into(),
             from_peer_address: me.clone().into(),
             bundle: gossip_data.bundle.clone(),
@@ -802,9 +804,9 @@ pub fn handle_gossipTo<'engine>(
             .serialize(&mut Serializer::new(&mut payload))
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
-        gateway
-            .as_transport_mut()
-            .send(&[&to_peer_address], &payload)?;
+        // FIXME peer_address to Url convert
+        let msg = transport::protocol::SendMessage { address: "address:" + to_peer_address, payload };
+        gateway.publish(GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }

@@ -1,25 +1,34 @@
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
+use crate::dht::dht_protocol::*;
 
 /// Gateway protocol enums for use with GhostActor implementation
 #[derive(Debug)]
 pub enum GatewayRequestToChild {
     // FIXME
+    Transport(transport::protocol::RequestToChild),
+    Dht(DhtRequestToChild),
 }
 
 #[derive(Debug)]
 pub enum GatewayRequestToChildResponse {
     // FIXME
+    Transport(transport::protocol::RequestToChildResponse),
+    Dht(DhtRequestToChildResponse),
 }
 
 #[derive(Debug)]
 pub enum GatewayRequestToParent {
     // FIXME
+    Transport(transport::protocol::RequestToParent),
+    Dht(DhtRequestToParent),
 }
 
 #[derive(Debug)]
 pub enum GatewayRequestToParentResponse {
     // FIXME
+    Transport(transport::protocol::RequestToParentResponse),
+    Dht(DhtRequestToParentResponse),
 }
 
 pub type GatewayToChildMessage =

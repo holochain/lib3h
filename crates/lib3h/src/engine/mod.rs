@@ -7,9 +7,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_protocol::*,
-    gateway::wrapper::GatewayWrapper,
     track::Tracker,
-    transport::{ConnectionId, TransportWrapper},
     transport_wss::TlsConfig,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -72,16 +70,20 @@ pub struct RealEngine {
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
+
+    // Should be owned by multiplexer
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
     network_transport: ChildTransportWrapperDyn<(), ()>,
     /// P2p gateway for the network layer
-    network_gateway: P2pGateway,
+    network_gateway: GatewayParentWrapperDyn<(), ()>,
+
 //    /// Store active connections?
 //    network_connections: HashSet<ConnectionId>,
+
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, P2pGateway>,
+    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<(), ()>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

@@ -6,7 +6,7 @@ use crate::{
         p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    transport::{protocol::*, ConnectionIdRef},
+    transport::{protocol::*},
 };
 
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};

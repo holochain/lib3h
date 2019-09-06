@@ -94,44 +94,44 @@ impl P2pGateway {
 //        Some(conn_id)
 //    }
 
-    pub fn process_dht(&mut self) -> GhostResult<()> {
-        let res = self.inner_dht.process(&mut self.user_data);
-        res
-    }
+//    pub fn process_dht(&mut self) -> GhostResult<()> {
+//        let res = self.inner_dht.process(&mut self.user_data);
+//        res
+//    }
+//
+//    pub fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData> {
+//        &mut self.inner_dht
+//    }
+//
+//    pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
+//        self.user_data.lib3h_outbox.drain(0..).collect()
+//    }
 
-    pub fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData> {
-        &mut self.inner_dht
-    }
-
-    pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
-        self.user_data.lib3h_outbox.drain(0..).collect()
-    }
-
-    // TODO - remove this hack
-    pub fn hold_peer(&mut self, peer_data: PeerData) {
-        if self.identifier != NETWORK_GATEWAY_ID {
-            debug!(
-                "({}).Dht.post(HoldPeer) - {}",
-                self.identifier, peer_data.peer_uri,
-            );
-            // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
-            // to get the transportId
-            let maybe_previous = self.connection_map.insert(
-                peer_data.peer_uri.clone(),
-                String::from(peer_data.peer_uri.path()),
-            );
-            if let Some(previous_cId) = maybe_previous {
-                debug!(
-                    "Replaced connectionId for {} ; was: {}",
-                    peer_data.peer_uri.clone(),
-                    previous_cId
-                );
-            }
-        }
-        let _ = self
-            .inner_dht
-            .publish(DhtRequestToChild::HoldPeer(peer_data));
-    }
+//    // TODO - remove this hack
+//    pub fn hold_peer(&mut self, peer_data: PeerData) {
+//        if self.identifier != NETWORK_GATEWAY_ID {
+//            debug!(
+//                "({}).Dht.post(HoldPeer) - {}",
+//                self.identifier, peer_data.peer_uri,
+//            );
+//            // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
+//            // to get the transportId
+//            let maybe_previous = self.connection_map.insert(
+//                peer_data.peer_uri.clone(),
+//                String::from(peer_data.peer_uri.path()),
+//            );
+//            if let Some(previous_cId) = maybe_previous {
+//                debug!(
+//                    "Replaced connectionId for {} ; was: {}",
+//                    peer_data.peer_uri.clone(),
+//                    previous_cId
+//                );
+//            }
+//        }
+//        let _ = self
+//            .inner_dht
+//            .publish(DhtRequestToChild::HoldPeer(peer_data));
+//    }
 
     ///
     pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {

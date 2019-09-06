@@ -13,94 +13,98 @@ impl GatewayActor for P2pGateway
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        // process inbox from parent
+        // process inbox from parent & handle requests
         detach_run!(&mut self.endpoint_self, |es| es.process(&mut ()))?;
-        // handle requests from parent
         for request in self.endpoint_self.as_mut().drain_messages() {
-            //debug!("@MirrorDht@ serving request: {:?}", request);
             self.handle_request_from_parent(request)
                 .expect("no ghost errors");
         }
 
-
-        let mut worked_for_parent = false;
-        for mut msg in self.endpoint_self.as_mut().unwrap().drain_messages() {
-            match msg.take_message().expect("exists") {
-                TransportRequestToChild::Bind { spec } => {
-                    worked_for_parent = true;
-                    // FIXME self.bind(&spec, Some(msg))?;
-                }
-                TransportRequestToChild::SendMessage { address, payload } => {
-                    worked_for_parent = true;
-                    // FIXME self.send(&address, &payload, Some(msg))?;
-                }
-            }
-        }
-        // Process child
-        detach_run!(&mut self.child_transport, |child_transport| {
-            child_transport.process(self.as_any())
+        // Process inbox from child transport & handle requests
+        detach_run!(&mut self.child_transport_endpoint, |child_transport_endpoint| {
+            child_transport_endpoint.process(self.as_any())
         })?;
-        // Act on child's requests
-        for mut msg in self.child_transport.drain_messages() {
-            let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-            match msg.take_message().expect("msg doesn't exist") {
-                TransportRequestToParent::IncomingConnection { address } => {
-                    // TODO
-                    // bubble up to parent
-                    endpoint_self.as_mut().expect("exists").publish(msg);
-                }
-                TransportRequestToParent::ReceivedData { address, payload } => {
-                    // TODO
-                    endpoint_self.as_mut().expect("exists").publish(msg);
-                }
-                TransportRequestToParent::ErrorOccured { address, error } => {
-                    // TODO
-                    endpoint_self.as_mut().expect("exists").publish(msg);
-                }
-            };
-            std::mem::replace(&mut self.endpoint_self, endpoint_self);
+        for request in self.child_transport_endpoint.as_mut().drain_messages() {
+            self.handle_request_from_child_transport(request)
+                .expect("no ghost errors");
         }
-        // Process internal dht
-        let (dht_did_some_work, event_list) = self.inner_dht.process().unwrap(); // fixme
-                                                                                 // Handle DhtEvents
-        if dht_did_some_work {
-            for dht_evt in event_list {
-                self.handle_netDhtEvent(dht_evt);
-            }
+
+        // Process internal dht & handle requests
+        let _res = self.inner_dht.process(&mut self.user_data);
+        for request in self.inner_dht.drain_messages() {
+            self.handle_request_from_child_dht(request)
+                .expect("no ghost errors");
         }
+
         // Done
-        Ok(WorkWasDone::from(dht_did_some_work || worked_for_parent))
+        Ok(WorkWasDone::from(true)) // FIXME
     }
 }
-
 //--------------------------------------------------------------------------------------------------
 // Private internals
 //--------------------------------------------------------------------------------------------------
 
 impl P2pGateway {
-    #[allow(irrefutable_let_patterns)]
-    fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
-        debug!("@P2pGateway@ serving request: {:?}", request);
+    fn handle_request_from_parent(&mut self, mut request: GatewayToChildMessage) -> Lib3hResult<()> {
+        debug!("({}) Serving request from parent: {:?}", self.identifier, request);
         match request.take_message().expect("exists") {
-            _ => (),
+            Transport(transport_request) => {
+                // Forward to child ???
+                let _ = self.child_transport_endpoint.request(/* FIXME */);
+
+//                match transport_request {
+//                    transport::protocol::RequestToChild::Bind { spec } => {
+//                        // FIXME
+//                        self.bind(&spec, Some(msg))?;
+//                    }
+//                    transport::protocol::RequestToChild::SendMessage { address, payload } => {
+//                        // FIXME
+//                        self.send(&address, &payload, Some(msg))?;
+//                    }
+//                }
+            },
+            Dht(dht_request) => {
+                let _ = self.inner_dht.request(/* FIXME */);
+            }
+            _ => (), // FIXME
         }
         // Done
         Ok(())
     }
+
+    fn handle_request_from_child_transport(&mut self, mut request: TransportToParentMessage) -> Lib3hResult<()> {
+        debug!("({}) Serving request from child transport: {:?}", self.identifier, request);
+        match msg.take_message().expect("msg doesn't exist") {
+                    transport::protocol::RequestToParent::IncomingConnection { address } => {
+                        // TODO
+                        // bubble up to parent
+                        self.endpoint_self.as_mut().expect("exists").publish(msg);
+                    }
+                    transport::protocol::RequestToParent::ReceivedData { address, payload } => {
+                        // TODO
+                        self.endpoint_self.as_mut().expect("exists").publish(msg);
+                    }
+                    transport::protocol::RequestToParent::ErrorOccured { address, error } => {
+                        // TODO
+                        self.endpoint_self.as_mut().expect("exists").publish(msg);
+                    }
+                }
+    }
 }
+
 /// Private internals
 impl<'gateway, D: Dht> GhostGateway<D> {
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) {
-        debug!("{} << handle_netDhtEvent: {:?}", self.identifier, cmd);
-        match cmd {
-            DhtEvent::GossipTo(_data) => {
+    fn handle_request_from_child_dht(&mut self, mut request: DhtToParentMessage) {
+        debug!("({}) Serving request from child dht: {:?}", self.identifier, request);
+        match request.take_message().expect("exists") {
+            DhtRequestToParent::GossipTo(_data) => {
                 // no-op
             }
-            DhtEvent::GossipUnreliablyTo(_data) => {
+            DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
             }
-            DhtEvent::HoldPeerRequested(peer_data) => {
+            DhtRequestToParent::HoldPeerRequested(peer_data) => {
                 // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
                 // Connect to every peer we are requested to hold.
                 info!(
@@ -108,26 +112,23 @@ impl<'gateway, D: Dht> GhostGateway<D> {
                     self.identifier, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
-                self.child_transport
+                self.child_transport_endpoint
                     .publish(TransportRequestToChild::SendMessage {
                         address: peer_data.peer_uri,
                         payload: Vec::new(),
                     });
             }
-            DhtEvent::PeerTimedOut(peer_address) => {
+            DhtRequestToParent::PeerTimedOut(peer_address) => {
                 // TODO
             }
             // No entries in Network DHT
-            DhtEvent::HoldEntryRequested(_, _) => {
+            DhtRequestToParent::HoldEntryRequested(_, _) => {
                 unreachable!();
             }
-            DhtEvent::FetchEntryResponse(_) => {
+            DhtRequestToParent::EntryPruned(_) => {
                 unreachable!();
             }
-            DhtEvent::EntryPruned(_) => {
-                unreachable!();
-            }
-            DhtEvent::EntryDataRequested(_) => {
+            DhtRequestToParent::RequestEntry(_) => {
                 unreachable!();
             }
         }

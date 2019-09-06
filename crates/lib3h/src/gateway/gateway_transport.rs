@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<'gateway> P2pGateway<'gateway> {
+impl P2pGateway {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
