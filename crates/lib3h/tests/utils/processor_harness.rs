@@ -311,9 +311,9 @@ macro_rules! assert_processed {
         // generate a random seed here
         // if you see an error "sometime" manually paste the seed from the logs in here and
         // hardcode it for debugging
-        let seed = [12290055440097485507, 11402434335878553749];
+        // let seed = [12290055440097485507, 11402434335878553749];
 
-        // let seed = [rand::random::<u64>(), rand::random::<u64>()];
+        let seed = [rand::random::<u64>(), rand::random::<u64>()];
         println!("seed is: {:?}", &seed);
         let mut seeded_boolean_prng = $crate::utils::seeded_prng::SeededBooleanPrng::from(seed);
 
