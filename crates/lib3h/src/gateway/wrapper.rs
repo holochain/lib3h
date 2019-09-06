@@ -1,6 +1,6 @@
 use crate::{
     gateway::Gateway,
-    transport::{transport_trait::Transport, TransportWrapper},
+    transport::TransportWrapper,
 };
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 

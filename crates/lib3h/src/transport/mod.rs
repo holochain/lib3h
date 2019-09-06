@@ -5,50 +5,51 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
-pub mod transport_trait;
+
+// pub mod transport_trait;
 
 mod transport_encoding;
 pub use transport_encoding::TransportEncoding;
 mod transport_multiplex;
 pub use transport_multiplex::TransportMultiplex;
 
-/// a connection identifier
-pub type ConnectionId = String;
-pub type ConnectionIdRef = str;
+///// a connection identifier
+//pub type ConnectionId = String;
+//pub type ConnectionIdRef = str;
 
-use transport_trait::Transport;
-
-/// Hide complexity of Arc<RwLock<dyn Transport>>
-/// making it more ergonomic to work with
-#[derive(Clone)]
-pub struct TransportWrapper<'wrap> {
-    inner: Arc<RwLock<dyn Transport + 'wrap>>,
-}
-
-impl<'wrap> TransportWrapper<'wrap> {
-    /// wrap a concrete Transport into an Arc<RwLock<dyn Transport>>
-    pub fn new<T: Transport + 'wrap>(concrete: T) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(concrete)),
-        }
-    }
-
-    /// if we already have an Arc<RwLock<dyn Transport>>,
-    /// us it directly as our inner
-    pub fn assume(inner: Arc<RwLock<dyn Transport + 'wrap>>) -> Self {
-        Self { inner }
-    }
-
-    /// get an immutable ref to Transport trait object
-    pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn Transport + 'wrap> {
-        self.inner.read().expect("failed to obtain read lock")
-    }
-
-    /// get a mutable ref to Transport trait object
-    pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn Transport + 'wrap> {
-        self.inner.write().expect("failed to obtain write lock")
-    }
-}
+// use transport_trait::Transport;
+//
+///// Hide complexity of Arc<RwLock<dyn Transport>>
+///// making it more ergonomic to work with
+//#[derive(Clone)]
+//pub struct TransportWrapper<'wrap> {
+//    inner: Arc<RwLock<dyn Transport + 'wrap>>,
+//}
+//
+//impl<'wrap> TransportWrapper<'wrap> {
+//    /// wrap a concrete Transport into an Arc<RwLock<dyn Transport>>
+//    pub fn new<T: Transport + 'wrap>(concrete: T) -> Self {
+//        Self {
+//            inner: Arc::new(RwLock::new(concrete)),
+//        }
+//    }
+//
+//    /// if we already have an Arc<RwLock<dyn Transport>>,
+//    /// us it directly as our inner
+//    pub fn assume(inner: Arc<RwLock<dyn Transport + 'wrap>>) -> Self {
+//        Self { inner }
+//    }
+//
+//    /// get an immutable ref to Transport trait object
+//    pub fn as_ref(&self) -> RwLockReadGuard<'_, dyn Transport + 'wrap> {
+//        self.inner.read().expect("failed to obtain read lock")
+//    }
+//
+//    /// get a mutable ref to Transport trait object
+//    pub fn as_mut(&self) -> RwLockWriteGuard<'_, dyn Transport + 'wrap> {
+//        self.inner.write().expect("failed to obtain write lock")
+//    }
+//}
 
 #[cfg(test)]
 pub mod tests {
@@ -56,7 +57,7 @@ pub mod tests {
 
     use crate::{
         transport::{
-            memory_mock::transport_memory, protocol::TransportEvent, transport_trait::Transport,
+            memory_mock::transport_memory, protocol::TransportEvent,// transport_trait::Transport,
         },
         transport_wss::{TlsConfig, TransportWss},
     };

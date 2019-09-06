@@ -6,9 +6,6 @@ use crate::{
     gateway::{Gateway, P2pGateway},
     transport::{
         error::{TransportError, TransportResult},
-        protocol::{TransportCommand, TransportEvent},
-        transport_trait::Transport,
-        ConnectionId, ConnectionIdRef,
     },
 };
 use lib3h_protocol::DidWork;
@@ -17,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<'gateway> Transport for P2pGateway<'gateway> {
+impl<'gateway> P2pGateway<'gateway> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);

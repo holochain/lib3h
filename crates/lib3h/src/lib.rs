@@ -27,7 +27,7 @@ pub mod keystore;
 pub mod time;
 pub mod track;
 pub mod transport;
-pub mod transport_wss;
+// pub mod transport_wss;
 
 #[cfg(test)]
 pub mod tests {

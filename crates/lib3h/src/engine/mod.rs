@@ -61,27 +61,27 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'engine> {
+pub struct RealEngine {
     /// Identifier
     name: String,
     /// Config settings
     config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
-    /// Factory for building DHT's of type D
+    /// Factory for building the DHTs used by the gateways
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
-    network_transport: TransportWrapper<'engine>,
+    network_transport: ChildTransportWrapperDyn<(), ()>,
     /// P2p gateway for the network layer
-    network_gateway: GatewayWrapper<'engine>,
-    /// Store active connections?
-    network_connections: HashSet<ConnectionId>,
+    network_gateway: P2pGateway,
+//    /// Store active connections?
+//    network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
+    space_gateway_map: HashMap<ChainId, P2pGateway>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

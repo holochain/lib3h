@@ -1,31 +1,36 @@
-use crate::transport::{error::TransportError, ConnectionId};
+use crate::transport::{error::TransportError};
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
+//
+///// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
+//#[derive(Debug, PartialEq, Clone)]
+//pub enum TransportCommand {
+//    Connect(Url, /*request_id*/ String),
+//    Send(Vec<ConnectionId>, Vec<u8>),
+//    SendAll(Vec<u8>),
+//    Close(ConnectionId),
+//    CloseAll,
+//    Bind(Url),
+//}
+//
+///// Events that can be generated during a `process()`
+//#[derive(Debug, PartialEq, Clone)]
+//pub enum TransportEvent {
+//    /// Notify that some TransportError occured
+//    ErrorOccured(ConnectionId, TransportError),
+//    /// an outgoing connection has been established
+//    ConnectResult(ConnectionId, /*request_id*/ String),
+//    /// we have received an incoming connection
+//    IncomingConnectionEstablished(ConnectionId),
+//    /// We have received data from a connection
+//    ReceivedData(ConnectionId, Vec<u8>),
+//    /// A connection closed for whatever reason
+//    ConnectionClosed(ConnectionId),
+//}
 
-/// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
-#[derive(Debug, PartialEq, Clone)]
-pub enum TransportCommand {
-    Connect(Url, /*request_id*/ String),
-    Send(Vec<ConnectionId>, Vec<u8>),
-    SendAll(Vec<u8>),
-    Close(ConnectionId),
-    CloseAll,
-    Bind(Url),
-}
-
-/// Events that can be generated during a `process()`
-#[derive(Debug, PartialEq, Clone)]
-pub enum TransportEvent {
-    /// Notify that some TransportError occured
-    ErrorOccured(ConnectionId, TransportError),
-    /// an outgoing connection has been established
-    ConnectResult(ConnectionId, /*request_id*/ String),
-    /// we have received an incoming connection
-    IncomingConnectionEstablished(ConnectionId),
-    /// We have received data from a connection
-    ReceivedData(ConnectionId, Vec<u8>),
-    /// A connection closed for whatever reason
-    ConnectionClosed(ConnectionId),
+#[derive(Debug)]
+pub struct BindResultData {
+    pub bound_url: Url,
 }
 
 /// Transport protocol enums for use with GhostActor implementation
@@ -33,11 +38,6 @@ pub enum TransportEvent {
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
     SendMessage { address: Url, payload: Vec<u8> },
-}
-
-#[derive(Debug)]
-pub struct BindResultData {
-    pub bound_url: Url,
 }
 
 #[derive(Debug)]
@@ -55,8 +55,8 @@ pub enum RequestToParent {
 
 #[derive(Debug)]
 pub enum RequestToParentResponse {
-    Allowed,    // just for testing
-    Disallowed, // just for testing
+//    Allowed,    // just for testing
+//    Disallowed, // just for testing
 }
 
 pub type DynTransportActor = Box<
@@ -76,6 +76,7 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
+pub type TransportEndpointWithContext<UserData, Context> = TransportActorSelfEndpoint<UserData, Context>;
 pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
     UserData,
     Context,
@@ -95,6 +96,7 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
+pub type ChildTransportWrapperDyn<UserData, Context> = TransportActorParentWrapperDyn<UserData, Context>;
 pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
     UserData,
     Context,
