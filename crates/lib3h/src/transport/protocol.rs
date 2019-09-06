@@ -61,12 +61,12 @@ pub enum RequestToParentResponse {
 
 pub type DynTransportActor<'lt> = Box<
     dyn GhostActor<
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        TransportError,
-    > + 'lt,
+            RequestToParent,
+            RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
+            TransportError,
+        > + 'lt,
 >;
 
 pub type TransportActorParentEndpoint = GhostEndpoint<

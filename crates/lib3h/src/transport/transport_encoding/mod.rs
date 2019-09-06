@@ -46,7 +46,8 @@ pub struct TransportEncoding<'lt> {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<'lt, TransportEncoding<'lt>, ToInnerContext>>,
+    inner_transport:
+        Detach<TransportActorParentWrapperDyn<'lt, TransportEncoding<'lt>, ToInnerContext>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes

@@ -17,7 +17,10 @@ use crate::{
     error::Lib3hResult,
     gateway::{GatewayWrapper, P2pGateway},
     track::Tracker,
-    transport::{protocol::TransportCommand, TransportWrapper, TransportGhostAsLegacy, TransportLegacyAsGhost},
+    transport::{
+        protocol::TransportCommand, TransportGhostAsLegacy, TransportLegacyAsGhost,
+        TransportWrapper,
+    },
     transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -565,12 +568,16 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         };
 
         // --- begin hack legacy->ghost->legacy --- //
-        let sgit_ghost: TransportLegacyAsGhost<'engine> =
-            TransportLegacyAsGhost::new(
+        let space_gateway_inner_transport = {
+            if true {
+                let sgit_ghost: TransportLegacyAsGhost<'engine> =
+                    TransportLegacyAsGhost::new(self.network_gateway.as_transport());
+                let sgit_legacy = TransportGhostAsLegacy::new(Box::new(sgit_ghost));
+                TransportWrapper::new(sgit_legacy)
+            } else {
                 self.network_gateway.as_transport()
-            );
-        let sgit_legacy = TransportGhostAsLegacy::new(Box::new(sgit_ghost));
-        let space_gateway_inner_transport = TransportWrapper::new(sgit_legacy);
+            }
+        };
         // ---  end hack legacy->ghost->legacy  --- //
 
         // Create new space gateway for this ChainId

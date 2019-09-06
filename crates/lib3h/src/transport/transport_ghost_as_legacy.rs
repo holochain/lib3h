@@ -11,7 +11,8 @@ enum ToInnerContext {
 
 pub struct TransportGhostAsLegacy<'lt> {
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<'lt, TransportGhostAsLegacy<'lt>, ToInnerContext>>,
+    inner_transport:
+        Detach<TransportActorParentWrapperDyn<'lt, TransportGhostAsLegacy<'lt>, ToInnerContext>>,
     outbox: Vec<TransportEvent>,
     sync_ready: bool,
     bound_url: Url,

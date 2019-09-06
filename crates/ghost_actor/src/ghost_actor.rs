@@ -260,12 +260,12 @@ pub struct GhostParentWrapperDyn<
 > {
     actor: Box<
         dyn GhostActor<
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChild,
-            RequestToChildResponse,
-            Error,
-        > + 'lt,
+                RequestToParent,
+                RequestToParentResponse,
+                RequestToChild,
+                RequestToChildResponse,
+                Error,
+            > + 'lt,
     >,
     endpoint: GhostContextEndpoint<
         UserData,
@@ -303,12 +303,12 @@ impl<
     pub fn new(
         mut actor: Box<
             dyn GhostActor<
-                RequestToParent,
-                RequestToParentResponse,
-                RequestToChild,
-                RequestToChildResponse,
-                Error,
-            > + 'lt,
+                    RequestToParent,
+                    RequestToParentResponse,
+                    RequestToChild,
+                    RequestToChildResponse,
+                    Error,
+                > + 'lt,
         >,
         request_id_prefix: &str,
     ) -> Self {
