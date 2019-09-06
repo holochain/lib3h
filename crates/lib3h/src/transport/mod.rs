@@ -13,6 +13,8 @@ mod transport_multiplex;
 pub use transport_multiplex::TransportMultiplex;
 mod transport_legacy_as_ghost;
 pub use transport_legacy_as_ghost::TransportLegacyAsGhost;
+mod transport_ghost_as_legacy;
+pub use transport_ghost_as_legacy::TransportGhostAsLegacy;
 
 /// a connection identifier
 pub type ConnectionId = String;
