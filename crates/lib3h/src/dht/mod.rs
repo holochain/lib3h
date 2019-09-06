@@ -148,7 +148,8 @@ pub mod tests {
                 }
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
         println!("dht.process(get_this_peer)...");
         dht.process(&mut ud).unwrap();
         ud.this_peer
@@ -176,7 +177,8 @@ pub mod tests {
                 }
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
         println!("dht.process(get_peer) ...");
         dht.process(&mut ud).unwrap();
         ud.maybe_peer
@@ -204,7 +206,8 @@ pub mod tests {
                 }
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
         println!("dht.process(get_peer_list)...");
         dht.process(&mut ud).unwrap();
         ud.peer_list
@@ -233,7 +236,8 @@ pub mod tests {
                 }
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
         println!("dht.process(get_entry_address_list)...");
         dht.process(&mut ud).unwrap();
         ud.entry_list
@@ -264,7 +268,8 @@ pub mod tests {
                 }
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
         println!("dht.process(get_aspects_of)...");
         dht.process(&mut ud).unwrap();
         ud.maybe_aspect_list
@@ -289,7 +294,8 @@ pub mod tests {
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 0);
         // Add a peer
-        dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)));
+        dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)))
+            .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -298,7 +304,8 @@ pub mod tests {
         assert_eq!(peer_list.len(), 1);
         assert_eq!(peer_list[0].peer_address, PEER_B);
         // Add a peer again
-        dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_C)));
+        dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_C)))
+            .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -318,7 +325,8 @@ pub mod tests {
         // Add a data item
         let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         println!("dht.process(HoldEntryAspectAddress)...");
-        dht.publish(DhtRequestToChild::HoldEntryAspectAddress(entry.clone()));
+        dht.publish(DhtRequestToChild::HoldEntryAspectAddress(entry.clone()))
+            .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let entry_address_list = get_entry_address_list(&mut dht);
@@ -353,7 +361,8 @@ pub mod tests {
                 }
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
         println!("1. dht.process(RequestEntry)...");
         dht.process(&mut ud).unwrap();
         // Should have received the request back
@@ -367,7 +376,9 @@ pub mod tests {
                 }
                 _ => panic!("Expecting a different request type"),
             }
-            request.respond(Ok(DhtRequestToParentResponse::RequestEntry(entry.clone())));
+            request
+                .respond(Ok(DhtRequestToParentResponse::RequestEntry(entry.clone())))
+                .unwrap();
         }
         println!("3. dht.process(RequestEntry)...");
         dht.process(&mut ud).unwrap();
@@ -388,7 +399,8 @@ pub mod tests {
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
         let mut peer_b_data = create_PeerData(PEER_B);
-        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()));
+        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()))
+            .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -396,7 +408,8 @@ pub mod tests {
         // Add older peer info
         let ref_time = peer_b_data.timestamp;
         peer_b_data.timestamp -= 1;
-        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()));
+        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()))
+            .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -406,7 +419,8 @@ pub mod tests {
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
         peer_b_data.timestamp = ref_time + 1;
-        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data));
+        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data))
+            .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -420,14 +434,18 @@ pub mod tests {
         let mut dht_b = new_dht_wrapper(true, PEER_B);
         let mut ud = DhtData::new();
         // Add a peer
-        dht_a.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)));
+        dht_a
+            .publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)))
+            .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Flush any pending requests from child
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
         // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
-        dht_a.publish(DhtRequestToChild::BroadcastEntry(entry_data.clone()));
+        dht_a
+            .publish(DhtRequestToChild::BroadcastEntry(entry_data.clone()))
+            .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
@@ -452,7 +470,9 @@ pub mod tests {
             from_peer_address: PEER_A.to_owned(),
             bundle,
         };
-        dht_b.publish(DhtRequestToChild::HandleGossip(remote_gossip));
+        dht_b
+            .publish(DhtRequestToChild::HandleGossip(remote_gossip))
+            .unwrap();
         dht_b.process(&mut ud).unwrap();
         // Should receive a HoldRequested
         let request_list = dht_b.drain_messages();
@@ -467,7 +487,9 @@ pub mod tests {
             }
         }
         // Tell DHT B to hold it
-        dht_b.publish(DhtRequestToChild::HoldEntryAspectAddress(entry_data));
+        dht_b
+            .publish(DhtRequestToChild::HoldEntryAspectAddress(entry_data))
+            .unwrap();
         dht_b.process(&mut ud).unwrap();
         // DHT B should have the entry
         let entry_list = get_entry_address_list(&mut dht_b);
@@ -483,14 +505,18 @@ pub mod tests {
         // Tell A to hold B
         let peer_b_data = get_this_peer(&mut dht_b);
         assert_eq!(peer_b_data.peer_address, PEER_B);
-        dht_a.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()));
+        dht_a
+            .publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()))
+            .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Flush any pending requests from child
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
         // Tell A to hold C
         let peer_c_data = create_PeerData(PEER_C);
-        dht_a.publish(DhtRequestToChild::HoldPeer(peer_c_data.clone()));
+        dht_a
+            .publish(DhtRequestToChild::HoldPeer(peer_c_data.clone()))
+            .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Should return gossipTos of C to B
         let request_list = dht_a.drain_messages();
@@ -520,7 +546,9 @@ pub mod tests {
             from_peer_address: PEER_A.to_owned(),
             bundle,
         };
-        dht_b.publish(DhtRequestToChild::HandleGossip(remote_gossip));
+        dht_b
+            .publish(DhtRequestToChild::HandleGossip(remote_gossip))
+            .unwrap();
         dht_b.process(&mut ud).unwrap();
         // Should return gossipTos
         let request_list = dht_b.drain_messages();
@@ -540,7 +568,9 @@ pub mod tests {
             }
         }
         // Accept HoldPeerRequested
-        dht_b.publish(DhtRequestToChild::HoldPeer(peer_to_hold.clone()));
+        dht_b
+            .publish(DhtRequestToChild::HoldPeer(peer_to_hold.clone()))
+            .unwrap();
         dht_b.process(&mut ud).unwrap();
         // B should have C
         let peer_info = get_peer(&mut dht_b, PEER_C).unwrap();

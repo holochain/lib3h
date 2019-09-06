@@ -317,12 +317,12 @@ impl<'engine> RealEngine<'engine> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
-                            space_gateway
+                            let _ = space_gateway
                                 .as_mut()
                                 .as_dht_mut()
                                 .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
                         } else {
-                            space_gateway
+                            let _ = space_gateway
                                 .as_mut()
                                 .as_dht_mut()
                                 .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
@@ -341,7 +341,7 @@ impl<'engine> RealEngine<'engine> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        space_gateway
+                        let _ = space_gateway
                             .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
@@ -359,7 +359,7 @@ impl<'engine> RealEngine<'engine> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        space_gateway
+                        let _ = space_gateway
                             .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
@@ -501,7 +501,7 @@ impl<'engine> RealEngine<'engine> {
                     }
                     Ok(())
                 }),
-            );
+            )?;
         }
         Ok(())
     }

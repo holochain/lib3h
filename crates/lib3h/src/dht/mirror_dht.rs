@@ -309,7 +309,7 @@ impl
         }
         let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
         for command in command_list {
-            self.endpoint_self.publish(command);
+            self.endpoint_self.publish(command)?;
         }
         Ok(did_work.into())
     }
@@ -339,17 +339,16 @@ impl MirrorDht {
                                 .publish(DhtRequestToParent::HoldEntryRequested {
                                     from_peer: self.this_peer.peer_address.clone(),
                                     entry,
-                                });
+                                })?;
                         }
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
                         let maybe_known_peer = self.get_peer(&gossiped_peer.peer_address);
                         match maybe_known_peer {
                             None => {
-                                self.endpoint_self
-                                    .publish(DhtRequestToParent::HoldPeerRequested(
-                                        gossiped_peer.clone(),
-                                    ));
+                                self.endpoint_self.publish(
+                                    DhtRequestToParent::HoldPeerRequested(gossiped_peer.clone()),
+                                )?;
                             }
                             Some(known_peer) => {
                                 // Update Peer timestamp
@@ -392,14 +391,14 @@ impl MirrorDht {
                     bundle: buf,
                 };
                 self.endpoint_self
-                    .publish(DhtRequestToParent::GossipTo(gossip_evt));
+                    .publish(DhtRequestToParent::GossipTo(gossip_evt))?;
 
                 // Gossip back your own PeerData (but not to yourself)
                 if new_peer_data.peer_address != self.this_peer.peer_address {
                     let gossip_data = self.gossip_self(vec![new_peer_data.peer_address.clone()]);
                     if gossip_data.peer_address_list.len() > 0 {
                         self.endpoint_self
-                            .publish(DhtRequestToParent::GossipTo(gossip_data));
+                            .publish(DhtRequestToParent::GossipTo(gossip_data))?;
                     }
                 }
             }
@@ -415,7 +414,7 @@ impl MirrorDht {
                 }
                 // broadcast it by gossiping it to every known peer
                 let gossip_evt = self.gossip_entry(&entry);
-                self.endpoint_self.publish(gossip_evt);
+                self.endpoint_self.publish(gossip_evt)?;
             }
 
             // Owner has some entry and wants it stored on the network
@@ -428,7 +427,7 @@ impl MirrorDht {
                     return Ok(());
                 }
                 let gossip_evt = self.gossip_entry(&entry);
-                self.endpoint_self.publish(gossip_evt);
+                self.endpoint_self.publish(gossip_evt)?;
             }
 
             // N/A. Do nothing since this is a monotonic fullsync dht
@@ -437,32 +436,32 @@ impl MirrorDht {
             DhtRequestToChild::RequestPeer(peer_address) => {
                 let maybe_peer = self.get_peer(&peer_address);
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
-                request.respond(payload);
+                request.respond(payload)?;
             }
 
             DhtRequestToChild::RequestPeerList => {
                 let list = self.get_peer_list();
                 let payload = Ok(DhtRequestToChildResponse::RequestPeerList(list));
-                request.respond(payload);
+                request.respond(payload)?;
             }
 
             DhtRequestToChild::RequestThisPeer => {
                 let payload = Ok(DhtRequestToChildResponse::RequestThisPeer(
                     self.this_peer.clone(),
                 ));
-                request.respond(payload);
+                request.respond(payload)?;
             }
 
             DhtRequestToChild::RequestEntryAddressList => {
                 let list = self.get_entry_address_list();
                 let payload = Ok(DhtRequestToChildResponse::RequestEntryAddressList(list));
-                request.respond(payload);
+                request.respond(payload)?;
             }
 
             DhtRequestToChild::RequestAspectsOf(address) => {
                 let maybe_list = self.get_aspects_of(&address);
                 let payload = Ok(DhtRequestToChildResponse::RequestAspectsOf(maybe_list));
-                request.respond(payload);
+                request.respond(payload)?;
             }
 
             // Ask owner to respond to self
@@ -488,13 +487,13 @@ impl MirrorDht {
                             println!("4. In DhtRequestToChild::RequestEntry Responding...");
                             let payload =
                                 Ok(DhtRequestToChildResponse::RequestEntry(entry_response));
-                            request.respond(payload);
+                            request.respond(payload)?;
                         } else {
                             panic!("bad response to RequestEntry: {:?}", response);
                         }
                         Ok(())
                     }),
-                );
+                )?;
             }
         };
         Ok(())

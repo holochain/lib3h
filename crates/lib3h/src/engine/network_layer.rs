@@ -242,7 +242,8 @@ impl<'engine> RealEngine<'engine> {
                 };
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    self.network_gateway
+                    let _ = self
+                        .network_gateway
                         .as_mut()
                         .as_dht_mut()
                         .publish(DhtRequestToChild::HandleGossip(gossip));
@@ -252,7 +253,7 @@ impl<'engine> RealEngine<'engine> {
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        space_gateway
+                        let _ = space_gateway
                             .as_mut()
                             .as_dht_mut()
                             .publish(DhtRequestToChild::HandleGossip(gossip));

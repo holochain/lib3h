@@ -128,34 +128,38 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
                 );
             }
         }
-        self.inner_dht
+        let _ = self
+            .inner_dht
             .publish(DhtRequestToChild::HoldPeer(peer_data));
     }
 
     ///
     fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
         trace!("get_peer_list_sync() ...");
-        self.inner_dht.request(
-            DhtContext::NoOp,
-            DhtRequestToChild::RequestPeerList,
-            Box::new(|mut ud, _context, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
+        self.inner_dht
+            .request(
+                DhtContext::NoOp,
+                DhtRequestToChild::RequestPeerList,
+                Box::new(|mut ud, _context, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestPeerList(peer_list_response) = response
+                    {
+                        ud.peer_list = peer_list_response;
+                    } else {
+                        panic!("bad response to bind: {:?}", response);
                     }
-                };
-                if let DhtRequestToChildResponse::RequestPeerList(peer_list_response) = response {
-                    ud.peer_list = peer_list_response;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
         self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
         self.user_data.peer_list.clone()
     }
@@ -166,27 +170,29 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
         if self.this_peer.peer_address != String::new() {
             return self.this_peer.clone();
         }
-        self.inner_dht.request(
-            DhtContext::NoOp,
-            DhtRequestToChild::RequestThisPeer,
-            Box::new(|mut ud, _context, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
+        self.inner_dht
+            .request(
+                DhtContext::NoOp,
+                DhtRequestToChild::RequestThisPeer,
+                Box::new(|mut ud, _context, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
+                        ud.this_peer = peer_response;
+                    } else {
+                        panic!("bad response to bind: {:?}", response);
                     }
-                };
-                if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
-                    ud.this_peer = peer_response;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
         self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
         self.this_peer = self.user_data.this_peer.clone();
         self.this_peer.clone()
@@ -194,27 +200,29 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
 
     ///
     fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData> {
-        self.inner_dht.request(
-            DhtContext::NoOp,
-            DhtRequestToChild::RequestPeer(peer_address.to_string()),
-            Box::new(|mut ud, _context, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
+        self.inner_dht
+            .request(
+                DhtContext::NoOp,
+                DhtRequestToChild::RequestPeer(peer_address.to_string()),
+                Box::new(|mut ud, _context, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestPeer(peer_response) = response {
+                        ud.maybe_peer = peer_response;
+                    } else {
+                        panic!("bad response to bind: {:?}", response);
                     }
-                };
-                if let DhtRequestToChildResponse::RequestPeer(peer_response) = response {
-                    ud.maybe_peer = peer_response;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
         let _res = self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
         self.user_data.maybe_peer.clone()
     }
