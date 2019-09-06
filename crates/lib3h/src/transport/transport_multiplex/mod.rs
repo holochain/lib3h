@@ -18,12 +18,6 @@
 //! the engine or network gateway. If it is a direct message, it will be
 //! sent to the appropriate Route / AgentSpaceGateway
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) struct LocalRouteSpec {
-    pub space_address: String,
-    pub local_agent_id: String,
-}
-
 mod mplex;
 pub use mplex::TransportMultiplex;
 
@@ -136,13 +130,13 @@ mod tests {
 
         let mut route_a = mplex
             .as_mut()
-            .create_agent_space_route("space_a".to_string(), "agent_a".to_string())
+            .create_agent_space_route(&"space_a".into(), &"agent_a".into())
             .as_context_endpoint_builder()
             .build::<(), ()>();
 
         let mut route_b = mplex
             .as_mut()
-            .create_agent_space_route("space_b".to_string(), "agent_b".to_string())
+            .create_agent_space_route(&"space_b".into(), &"agent_b".into())
             .as_context_endpoint_builder()
             .build::<(), ()>();
 
@@ -193,10 +187,10 @@ mod tests {
         mplex
             .as_mut()
             .received_data_for_agent_space_route(
-                "space_b".to_string(),
-                "agent_b".to_string(),
-                "agent_x".to_string(),
-                "machine_x".to_string(),
+                &"space_b".into(),
+                &"agent_b".into(),
+                &"agent_x".into(),
+                &"machine_x".into(),
                 b"hello".to_vec(),
             )
             .unwrap();

@@ -1,10 +1,15 @@
 use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::Address;
 use std::collections::HashMap;
 use url::Url;
 
-use super::LocalRouteSpec;
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct LocalRouteSpec {
+    pub space_address: Address,
+    pub local_agent_id: Address,
+}
 
 #[derive(Debug)]
 enum MplexToInnerContext {
@@ -58,8 +63,8 @@ impl TransportMultiplex {
     /// for this function are the higher-level notions for the AgentSpaceGateway
     pub fn create_agent_space_route(
         &mut self,
-        space_address: String,
-        local_agent_id: String,
+        space_address: &Address,
+        local_agent_id: &Address,
     ) -> TransportActorParentEndpoint {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_self = endpoint_self
@@ -68,8 +73,8 @@ impl TransportMultiplex {
             .build();
 
         let route_spec = LocalRouteSpec {
-            space_address,
-            local_agent_id,
+            space_address: space_address.clone(),
+            local_agent_id: local_agent_id.clone(),
         };
 
         if self
@@ -89,15 +94,15 @@ impl TransportMultiplex {
     /// tree.
     pub fn received_data_for_agent_space_route(
         &mut self,
-        space_address: String,
-        local_agent_id: String,
-        remote_agent_id: String,
-        remote_machine_id: String,
+        space_address: &Address,
+        local_agent_id: &Address,
+        remote_agent_id: &Address,
+        remote_machine_id: &Address,
         unpacked_payload: Vec<u8>,
     ) -> TransportResult<()> {
         let route_spec = LocalRouteSpec {
-            space_address,
-            local_agent_id,
+            space_address: space_address.clone(),
+            local_agent_id: local_agent_id.clone(),
         };
         let address = Url::parse(&format!(
             "transportId:{}?a={}",
