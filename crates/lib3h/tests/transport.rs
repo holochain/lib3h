@@ -191,7 +191,7 @@ impl
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        self.handle_events_from_mockernet();
+        self.handle_events_from_mockernet()?;
         Ok(false.into())
     }
 }
@@ -235,11 +235,11 @@ impl TestTransport {
                     Err(TransportError::new("already bound".to_string()))
                 };
                 self.bound_url = Some(spec);
-                msg.respond(response);
+                msg.respond(response)?;
             }
             RequestToChild::SendMessage { address, payload } => {
                 if self.bound_url.is_none() {
-                    msg.respond(Err(TransportError::new(format!("{} not bound", self.name))));
+                    msg.respond(Err(TransportError::new(format!("{} not bound", self.name))))?;
                 } else {
                     let mut mockernet = MOCKERNET.write().unwrap();
                     // return error if not bound.
@@ -251,14 +251,14 @@ impl TestTransport {
                         Err(err) => Err(TransportError::new(err)),
                         Ok(()) => Ok(RequestToChildResponse::SendMessage),
                     };
-                    msg.respond(response);
+                    msg.respond(response)?;
                 }
             }
         }
         Ok(())
     }
 
-    fn handle_events_from_mockernet(&mut self) {
+    fn handle_events_from_mockernet(&mut self) -> GhostResult<()> {
         let mut mockernet = MOCKERNET.write().unwrap();
         let our_url = self.bound_url.as_ref().unwrap();
         if let Ok(events) = mockernet.process_for(our_url.clone()) {
@@ -268,20 +268,22 @@ impl TestTransport {
                         self.endpoint_self.publish(RequestToParent::ReceivedData {
                             address: from,
                             payload,
-                        });
+                        })?;
                     }
                     MockernetEvent::Connection { from } => {
                         self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection { address: from });
+                            .publish(RequestToParent::IncomingConnection { address: from })?;
                     }
                     MockernetEvent::Error(err) => {
-                        self.endpoint_self.publish(RequestToParent::TransportError {
-                            error: TransportError::new(err),
-                        });
+                        self.endpoint_self
+                            .publish(RequestToParent::TransportError {
+                                error: TransportError::new(err),
+                            })?;
                     }
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -325,7 +327,8 @@ fn ghost_transport() {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
-    );
+    )
+    .unwrap();
     t1.process(&mut owner).expect("should process");
     assert_eq!(
         "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t1/\\\" })))\"",
@@ -345,7 +348,8 @@ fn ghost_transport() {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
-    );
+    )
+    .unwrap();
 
     t1.process(&mut owner).expect("should process");
     assert_eq!(
@@ -364,7 +368,8 @@ fn ghost_transport() {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
-    );
+    )
+    .unwrap();
     t2.process(&mut owner).expect("should process");
     assert_eq!(
         "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t2/\\\" })))\"",
@@ -382,7 +387,8 @@ fn ghost_transport() {
             owner.log.push(format!("{:?}", response));
             Ok(())
         }),
-    );
+    )
+    .unwrap();
 
     // we should get back an Ok on having sent the message when t1 gets processed
     t1.process(&mut owner).expect("should process");

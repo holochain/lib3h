@@ -126,11 +126,11 @@ impl TransportEncoding {
     }
 
     /// private send a handshake to a remote address
-    fn send_handshake(&mut self, address: &Url) {
+    fn send_handshake(&mut self, address: &Url) -> GhostResult<()> {
         self.inner_transport.publish(RequestToChild::SendMessage {
             address: address.clone(),
             payload: self.this_id.clone().into(),
-        });
+        })
     }
 
     /// private handler for inner transport IncomingConnection events
@@ -141,13 +141,13 @@ impl TransportEncoding {
                 self.endpoint_self
                     .publish(RequestToParent::IncomingConnection {
                         address: remote_addr.clone(),
-                    });
+                    })?;
             }
             None => {
                 // we've never seen this connection, handshake before
                 // forwarding the IncomingConnection msg
                 // (see handle_recveived_data for where it's actually sent)
-                self.send_handshake(&address);
+                self.send_handshake(&address)?;
             }
         }
         Ok(())
@@ -162,7 +162,7 @@ impl TransportEncoding {
                 self.endpoint_self.publish(RequestToParent::ReceivedData {
                     address: remote_addr.clone(),
                     payload,
-                });
+                })?;
             }
             None => {
                 // never seen this connection before
@@ -187,7 +187,7 @@ impl TransportEncoding {
                     self.endpoint_self
                         .publish(RequestToParent::IncomingConnection {
                             address: remote_url.clone(),
-                        });
+                        })?;
 
                     // if we have any pending received data, send it up
                     if let Some(items) = self.pending_received_data.remove(&address) {
@@ -195,7 +195,7 @@ impl TransportEncoding {
                             self.endpoint_self.publish(RequestToParent::ReceivedData {
                                 address: remote_url.clone(),
                                 payload,
-                            });
+                            })?;
                         }
                     }
 
@@ -208,7 +208,7 @@ impl TransportEncoding {
                 } else {
                     // for some reason, the remote is sending us data
                     // without handshaking, let's try to handshake back?
-                    self.send_handshake(&address);
+                    self.send_handshake(&address)?;
 
                     // store this msg to forward after we handshake
                     let e = self
@@ -226,7 +226,7 @@ impl TransportEncoding {
     fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
         // just forward this
         self.endpoint_self
-            .publish(RequestToParent::TransportError { error });
+            .publish(RequestToParent::TransportError { error })?;
         Ok(())
     }
 
@@ -285,13 +285,13 @@ impl TransportEncoding {
                         .query_pairs_mut()
                         .append_pair("a", &m.this_id);
                     info!("got bind response: {:?}", data.bound_url);
-                    msg.respond(Ok(RequestToChildResponse::Bind(data)));
+                    msg.respond(Ok(RequestToChildResponse::Bind(data)))?;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
                 Ok(())
             }),
-        );
+        )?;
         Ok(())
     }
 
@@ -320,10 +320,10 @@ impl TransportEncoding {
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response);
+                msg.respond(response)?;
                 Ok(())
             }),
-        );
+        )?;
         Ok(())
     }
 
@@ -350,7 +350,7 @@ impl TransportEncoding {
                 sub_address.set_query(None);
 
                 // send along a handshake message
-                self.send_handshake(&sub_address);
+                self.send_handshake(&sub_address)?;
 
                 // store this send_data so we can forward it after handshake
                 // (see handle_received_data for where this is done)
@@ -463,11 +463,11 @@ mod tests {
                         self.bound_url = spec.clone();
                         msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                             bound_url: spec,
-                        })));
+                        })))?;
                     }
                     RequestToChild::SendMessage { address, payload } => {
                         self.mock_sender.send((address, payload)).unwrap();
-                        msg.respond(Ok(RequestToChildResponse::SendMessage));
+                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
                     }
                 }
             }
@@ -479,9 +479,9 @@ mod tests {
                         self.endpoint_self
                             .publish(RequestToParent::IncomingConnection {
                                 address: address.clone(),
-                            });
+                            })?;
                         self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload });
+                            .publish(RequestToParent::ReceivedData { address, payload })?;
                     }
                     Err(_) => break,
                 }
@@ -532,7 +532,7 @@ mod tests {
                 );
                 Ok(())
             })
-        );
+        ).unwrap();
 
         // allow process
         t1.process(&mut false).unwrap();
@@ -566,7 +566,7 @@ mod tests {
                 );
                 Ok(())
             })
-        );
+        ).unwrap();
 
         // allow process
         t2.process(&mut ()).unwrap();
@@ -586,7 +586,8 @@ mod tests {
                 assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
                 Ok(())
             }),
-        );
+        )
+        .unwrap();
 
         t1.process(&mut t1_got_success_resp).unwrap();
 

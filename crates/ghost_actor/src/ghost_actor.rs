@@ -6,12 +6,12 @@ use crate::prelude::*;
 /// all the request / drain_messages etc functions from GhostEndpoint.
 pub struct GhostParentWrapper<
     UserData,
-    Context,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    Error,
+    Context: 'static,
+    RequestToParent: 'static,
+    RequestToParentResponse: 'static,
+    RequestToChild: 'static,
+    RequestToChildResponse: 'static,
+    Error: 'static,
     Actor: GhostActor<
         RequestToParent,
         RequestToParentResponse,
@@ -33,11 +33,11 @@ pub struct GhostParentWrapper<
 }
 
 impl<
-        UserData: 'static,
+        UserData,
         Context: 'static,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
         RequestToChildResponse: 'static,
         Error: 'static,
         Actor: GhostActor<
@@ -72,11 +72,11 @@ impl<
 }
 
 impl<
-        UserData: 'static,
+        UserData,
         Context: 'static,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
         RequestToChildResponse: 'static,
         Error: 'static,
         Actor: GhostActor<
@@ -108,7 +108,7 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, payload: RequestToChild) {
+    fn publish(&mut self, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(payload)
     }
 
@@ -118,7 +118,7 @@ impl<
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
-    ) {
+    ) -> GhostResult<()> {
         self.endpoint.request(context, payload, cb)
     }
 
@@ -129,7 +129,7 @@ impl<
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
-    ) {
+    ) -> GhostResult<()> {
         self.endpoint.request_options(context, payload, cb, options)
     }
 
@@ -150,12 +150,12 @@ impl<
 
 impl<
         UserData,
-        Context,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        Error,
+        Context: 'static,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -182,12 +182,12 @@ impl<
 
 impl<
         UserData,
-        Context,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        Error,
+        Context: 'static,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -213,11 +213,11 @@ impl<
 }
 
 pub trait GhostActor<
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    Error,
+    RequestToParent: 'static,
+    RequestToParentResponse: 'static,
+    RequestToChild: 'static,
+    RequestToChildResponse: 'static,
+    Error: 'static,
 >
 {
     /// our parent gets a reference to the parent side of our channel
@@ -250,12 +250,12 @@ pub trait GhostActor<
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
     UserData,
-    Context,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    Error,
+    Context: 'static,
+    RequestToParent: 'static,
+    RequestToParentResponse: 'static,
+    RequestToChild: 'static,
+    RequestToChildResponse: 'static,
+    Error: 'static,
 > {
     actor: Box<
         dyn GhostActor<
@@ -280,9 +280,9 @@ pub struct GhostParentWrapperDyn<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
         RequestToChildResponse: 'static,
         Error: 'static,
     >
@@ -319,7 +319,7 @@ impl<
     }
 
     /// see GhostContextEndpoint::publish
-    pub fn publish(&mut self, payload: RequestToChild) {
+    pub fn publish(&mut self, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(payload)
     }
 
@@ -329,7 +329,7 @@ impl<
         context: Context,
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
-    ) {
+    ) -> GhostResult<()> {
         self.endpoint.request(context, payload, cb)
     }
 
@@ -339,7 +339,7 @@ impl<
         payload: RequestToChild,
         cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
-    ) {
+    ) -> GhostResult<()> {
         self.endpoint.request_options(context, payload, cb, options)
     }
 
@@ -442,7 +442,7 @@ mod tests {
                 };
                 self.internal_state.push(payload.clone());
                 if msg.is_request() {
-                    msg.respond(Ok(TestMsgInResponse(format!("we got: {}", payload))))
+                    msg.respond(Ok(TestMsgInResponse(format!("we got: {}", payload))))?;
                 };
             }
             Ok(false.into())
@@ -479,7 +479,9 @@ mod tests {
             .build();
 
         // now lets post an event from the parent
-        parent_endpoint.publish(TestMsgIn("event from parent".into()));
+        parent_endpoint
+            .publish(TestMsgIn("event from parent".into()))
+            .unwrap();
 
         // now process the events on the child and watch that internal state has chaned
         assert!(child_actor.process().is_ok());
@@ -498,11 +500,13 @@ mod tests {
                 Ok(())
             });
 
-        parent_endpoint.request(
-            TestContext("context data".into()),
-            TestMsgIn("event from parent".into()),
-            cb,
-        );
+        parent_endpoint
+            .request(
+                TestContext("context data".into()),
+                TestMsgIn("event from parent".into()),
+                cb,
+            )
+            .unwrap();
         assert!(child_actor.process().is_ok());
         assert!(parent_endpoint.process(&mut fake_parent).is_ok());
         assert_eq!("we got: event from parent", fake_parent.state);
@@ -531,7 +535,9 @@ mod tests {
         > = GhostParentWrapper::new(TestActor::new(), "parent");
 
         // use it to publish an event via the wrapper
-        wrapped_child.publish(TestMsgIn("event from parent".into()));
+        wrapped_child
+            .publish(TestMsgIn("event from parent".into()))
+            .unwrap();
 
         // process via the wrapper
         assert!(wrapped_child.process(&mut fake_parent).is_ok());
