@@ -286,7 +286,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
             return Err(Lib3hError::new_other("Already joined space"));
         }
 
-        /*
+        /* TODO
 
                    // First create DhtConfig for space gateway
             let agent_id: String = join_msg.agent_id.clone().into();
@@ -337,6 +337,98 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         // TODO END
     }
 
+    fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
+        &mut self,
+        msg: EntryListData,
+    ) -> Lib3hResult<()> {
+        let mut request_list = Vec::new();
+        let space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+
+        let mut msg_data = FetchEntryData {
+            space_address: msg.space_address.clone(),
+            entry_address: "".into(),
+            request_id: "".into(),
+            provider_agent_id: msg.provider_agent_id.clone(),
+            aspect_address_list: None,
+        };
+        // Request every Entry from Core
+        let mut count = 0;
+        for (entry_address, aspect_address_list) in msg.address_map {
+            // Check aspects and only request entry with new aspects
+            /* TODO: add back in for real Gateway
+            let maybe_known_aspects = space_gateway.as_ref().get_aspects_of(&entry_address);
+            if let Some(known_aspects) = maybe_known_aspects {
+                if includes(&known_aspects, &aspect_address_list) {
+                    continue;
+                }
+            }*/
+            count += 1;
+            msg_data.entry_address = entry_address.clone();
+            request_list.push(msg_data.clone());
+        }
+        debug!("HandleGetAuthoringEntryListResult: {}", count);
+
+        for mut msg_data in request_list {
+            msg_data.request_id = self.request_track.reserve();
+
+            let context = "".to_string();
+            self.lib3h_endpoint.request(
+                context,
+                Lib3hToClient::HandleFetchEntry(msg_data),
+                Box::new(|_me, _ctx, response| {
+                    match response {
+                        GhostCallbackData::Response(Ok(
+                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
+                        )) => {
+//                            self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg)
+                        }
+                        GhostCallbackData::Response(Err(e)) => {
+                            error!("Got error on HandleFetchEntryResult: {:?} ", e);
+                        }
+                        GhostCallbackData::Timeout => {
+                            error!("Got timeout on HandleFetchEntryResult stResult");
+                        }
+                        _ => panic!("bad response type"),
+                    }
+                    Ok(())
+                }),
+            );
+        }
+        Ok(())
+    }
+
+    fn serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(
+        &mut self,
+        msg: EntryListData,
+    ) -> Lib3hResult<()> {
+        let space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+
+        for (entry_address, aspect_address_list) in msg.address_map {
+            let mut aspect_list = Vec::new();
+            for aspect_address in aspect_address_list {
+                let fake_aspect = EntryAspectData {
+                    aspect_address: aspect_address.clone(),
+                    type_hint: String::new(),
+                    aspect: vec![],
+                    publish_ts: 0,
+                };
+                aspect_list.push(fake_aspect);
+            }
+            // Create "fake" entry, in the sense an entry with no actual content,
+            // but valid addresses.
+            let _fake_entry = EntryData {
+                entry_address: entry_address.clone(),
+                aspect_list,
+            };
+            /* TODO: add back for real gateway
+            space_gateway
+                .as_dht_mut()
+                .post(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
+*/
+        }
+        Ok(())
+    }
+
     /// Create a gateway for this agent in this space, if not already part of it.
     /// Must not already be part of this space.
     fn handle_join(&mut self, join_msg: &SpaceData) -> Lib3hResult<()> {
@@ -369,13 +461,13 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                     )) => {
-                        panic!(msg);
+                        self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error on HandleGetGossipingEntryListResult: {:?} ", e);
                     }
                     GhostCallbackData::Timeout => {
-                        error!("Got timeout on HandleGetGossipingEntryLi stResult");
+                        error!("Got timeout on HandleGetGossipingEntryListResult");
                     }
                     _ => panic!("bad response type"),
                 }
@@ -393,13 +485,13 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => {
-                        panic!(msg);
+                       self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg);
                     }
                     GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error on HandleGetGossipingEntryListResult: {:?} ", e);
+                        error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
                     }
                     GhostCallbackData::Timeout => {
-                        error!("Got timeout on HandleGetGossipingEntryLi stResult");
+                        error!("Got timeout on HandleGetAuthoringEntryListResult");
                     }
                     _ => panic!("bad response type"),
                 }
@@ -408,6 +500,19 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         );
         // Done
         Ok(())
+    }
+
+    /// Get a space_gateway for the specified space+agent.
+    /// If agent did not join that space, construct error
+    fn get_space(
+        &mut self,
+        space_address: &Address,
+        agent_id: &Address,
+    ) -> Lib3hResult<&mut MockGateway>{
+       self
+            .space_gateway_map
+            .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
+            .ok_or(Lib3hError::new_other(&format!("Not in space: {:?},{:?}", space_address,agent_id)))
     }
 }
 
