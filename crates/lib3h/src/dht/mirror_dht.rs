@@ -353,7 +353,7 @@ impl MirrorDht {
                             Some(known_peer) => {
                                 // Update Peer timestamp
                                 if gossiped_peer.timestamp > known_peer.timestamp {
-                                    let _ = self.add_peer(&gossiped_peer);
+                                    let _is_new_content = self.add_peer(&gossiped_peer);
                                 }
                             }
                         }
