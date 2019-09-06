@@ -342,7 +342,13 @@ macro_rules! assert_processed {
                 .expect("could not generate a new seeded prng value");
             println!(
                 "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
-                $crate::utils::processor_harness::BOOLEAN_PRNG.lock().expect("could not acquire lock on boolean prng").seed, epoc, b, previous
+                $crate::utils::processor_harness::BOOLEAN_PRNG
+                    .lock()
+                    .expect("could not acquire lock on boolean prng")
+                    .seed,
+                epoc,
+                b,
+                previous
             );
 
             // pick either engine1 or engine2 with equal probability
