@@ -456,12 +456,12 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         self.lib3h_endpoint.request(
             context,
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
-            Box::new(|_me, _ctx, response| {
+            Box::new(|me, _ctx, response| {
                 match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                     )) => {
-                        self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
+                        me.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error on HandleGetGossipingEntryListResult: {:?} ", e);
@@ -480,12 +480,12 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         self.lib3h_endpoint.request(
             context,
             Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-            Box::new(|_me, _ctx, response| {
+            Box::new(|me, _ctx, response| {
                 match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => {
-                       self.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg);
+                       me.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg);
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
