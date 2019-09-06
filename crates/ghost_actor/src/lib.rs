@@ -182,7 +182,7 @@ mod tests {
                                     address: "wss://yada".to_string(),
                                 },
                             ),
-                        ));
+                        ))?;
                     }
                 }
             }
@@ -336,7 +336,7 @@ mod tests {
                     );
                     Ok(())
                 }),
-            );
+            )?;
             detach_run!(&mut self.dht, |dht| { dht.process(self) })?;
             detach_run!(&mut self.endpoint_self, |endpoint_self| {
                 endpoint_self.process(self)
@@ -351,7 +351,7 @@ mod tests {
                         // respond to our parent
                         msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                             bound_url: bound_url,
-                        })));
+                        })))?;
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
                     RequestToChild::SendMessage {
@@ -372,7 +372,7 @@ mod tests {
 
                                 // got a timeout error
                                 if let GhostCallbackData::Timeout = response {
-                                    msg.respond(Err("Timeout".into()));
+                                    msg.respond(Err("Timeout".into()))?;
                                     return Ok(());
                                 }
 
@@ -386,7 +386,7 @@ mod tests {
 
                                 let response = match response {
                                     Err(e) => {
-                                        msg.respond(Err(e));
+                                        msg.respond(Err(e))?;
                                         return Ok(());
                                     }
                                     Ok(response) => response,
@@ -405,11 +405,11 @@ mod tests {
 
                                 println!("yay? {:?}", response);
 
-                                msg.respond(Ok(RequestToChildResponse::SendMessage));
+                                msg.respond(Ok(RequestToChildResponse::SendMessage))?;
 
                                 Ok(())
                             }),
-                        );
+                        )?;
                     }
                 }
             }
@@ -455,7 +455,7 @@ mod tests {
 
             // we might allow or disallow connections for example
             let response = RequestToParentResponse::Allowed;
-            msg.respond(Ok(response));
+            msg.respond(Ok(response)).unwrap();
         }
 
         t_actor.process().unwrap();
@@ -465,31 +465,35 @@ mod tests {
         // to make such a request the parent would normally will also instantiate trackers so that it can
         // handle responses when they come back as callbacks.
         // here we simply watch that we got a response back as expected
-        t_actor_endpoint.request(
-            42_i8,
-            RequestToChild::Bind {
-                spec: "address_to_bind_to".to_string(),
-            },
-            Box::new(|_: &mut (), _, r| {
-                println!("in callback 1, got: {:?}", r);
-                Ok(())
-            }),
-        );
+        t_actor_endpoint
+            .request(
+                42_i8,
+                RequestToChild::Bind {
+                    spec: "address_to_bind_to".to_string(),
+                },
+                Box::new(|_: &mut (), _, r| {
+                    println!("in callback 1, got: {:?}", r);
+                    Ok(())
+                }),
+            )
+            .unwrap();
 
         t_actor.process().unwrap();
         let _ = t_actor_endpoint.process(&mut ());
 
-        t_actor_endpoint.request(
-            42_i8,
-            RequestToChild::SendMessage {
-                address: "agent_id_1".to_string(),
-                payload: b"some content".to_vec(),
-            },
-            Box::new(|_: &mut (), _, r| {
-                println!("in callback 2, got: {:?}", r);
-                Ok(())
-            }),
-        );
+        t_actor_endpoint
+            .request(
+                42_i8,
+                RequestToChild::SendMessage {
+                    address: "agent_id_1".to_string(),
+                    payload: b"some content".to_vec(),
+                },
+                Box::new(|_: &mut (), _, r| {
+                    println!("in callback 2, got: {:?}", r);
+                    Ok(())
+                }),
+            )
+            .unwrap();
 
         for _x in 0..10 {
             t_actor.process().unwrap();

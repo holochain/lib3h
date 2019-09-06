@@ -97,15 +97,14 @@ impl<
     }
 
     /// send a response back to the origin of this request
-    pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) {
+    pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
-            self.sender
-                .send(GhostEndpointMessage::Response {
-                    request_id: request_id.clone(),
-                    payload,
-                })
-                .expect("should send");
+            self.sender.send(GhostEndpointMessage::Response {
+                request_id: request_id.clone(),
+                payload,
+            })?;
         }
+        Ok(())
     }
 
     pub fn is_request(&self) -> bool {
@@ -275,7 +274,7 @@ pub trait GhostCanTrack<
 >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, payload: RequestToOther);
+    fn publish(&mut self, payload: RequestToOther) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
@@ -284,7 +283,7 @@ pub trait GhostCanTrack<
         context: Context,
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
-    );
+    ) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
@@ -294,7 +293,7 @@ pub trait GhostCanTrack<
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
-    );
+    ) -> GhostResult<()>;
 
     /// fetch any messages (requests or events) sent to us from the other side
     fn drain_messages(
@@ -352,7 +351,7 @@ impl<
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
-    ) {
+    ) -> GhostResult<()> {
         let request_id = match options.timeout {
             None => self.pending_responses_tracker.bookmark(context, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
@@ -361,12 +360,11 @@ impl<
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
-        self.sender
-            .send(GhostEndpointMessage::Request {
-                request_id: Some(request_id),
-                payload,
-            })
-            .expect("should send");
+        self.sender.send(GhostEndpointMessage::Request {
+            request_id: Some(request_id),
+            payload,
+        })?;
+        Ok(())
     }
 }
 
@@ -399,13 +397,12 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, payload: RequestToOther) {
-        self.sender
-            .send(GhostEndpointMessage::Request {
-                request_id: None,
-                payload,
-            })
-            .expect("should send");
+    fn publish(&mut self, payload: RequestToOther) -> GhostResult<()> {
+        self.sender.send(GhostEndpointMessage::Request {
+            request_id: None,
+            payload,
+        })?;
+        Ok(())
     }
 
     /// make a request of the other side. When a response is sent back to us
@@ -415,8 +412,8 @@ impl<
         context: Context,
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
-    ) {
-        self.priv_request(context, payload, cb, GhostTrackRequestOptions::default());
+    ) -> GhostResult<()> {
+        self.priv_request(context, payload, cb, GhostTrackRequestOptions::default())
     }
 
     /// make a request of the other side. When a response is sent back to us
@@ -427,8 +424,8 @@ impl<
         payload: RequestToOther,
         cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
-    ) {
-        self.priv_request(context, payload, cb, options);
+    ) -> GhostResult<()> {
+        self.priv_request(context, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -554,7 +551,8 @@ mod tests {
 
         msg.respond(Ok(TestMsgInResponse(
             "response back to child which should fail because no request id".into(),
-        )));
+        )))
+        .unwrap();
         // check to see if the message was sent
         let response = child_as_parent_recv.recv();
         assert_eq!("Err(RecvError)", format!("{:?}", response));
@@ -572,7 +570,8 @@ mod tests {
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
             );
-        msg.respond(Ok(TestMsgInResponse("response back to child".into())));
+        msg.respond(Ok(TestMsgInResponse("response back to child".into())))
+            .unwrap();
 
         // check to see if the response was sent
         let response = child_as_parent_recv.recv();
@@ -620,7 +619,9 @@ mod tests {
         // in this test the endpoint will be the child end
         let mut endpoint = child_side.as_context_endpoint_builder().build();
 
-        endpoint.publish(TestMsgOut("event to my parent".into()));
+        endpoint
+            .publish(TestMsgOut("event to my parent".into()))
+            .unwrap();
         // check to see if the event was sent to the parent
         let msg = parent_side.receiver.recv();
         match msg {
@@ -637,11 +638,13 @@ mod tests {
             _ => assert!(false),
         }
 
-        endpoint.request(
-            TestContext("context data".into()),
-            TestMsgOut("request to my parent".into()),
-            cb_factory(),
-        );
+        endpoint
+            .request(
+                TestContext("context data".into()),
+                TestMsgOut("request to my parent".into()),
+                cb_factory(),
+            )
+            .unwrap();
         // simulate receiving this on the parent-side and check that the
         // correct message went into the channel
         let msg = parent_side.receiver.recv();
@@ -676,12 +679,14 @@ mod tests {
         );
 
         // Now we'll send a request that should timeout
-        endpoint.request_options(
-            TestContext("context data".into()),
-            TestMsgOut("another request to my parent".into()),
-            cb_factory(),
-            GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),
-        );
+        endpoint
+            .request_options(
+                TestContext("context data".into()),
+                TestMsgOut("another request to my parent".into()),
+                cb_factory(),
+                GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),
+            )
+            .unwrap();
 
         // wait 1 ms for the callback to have expired
         std::thread::sleep(std::time::Duration::from_millis(1));
