@@ -20,7 +20,6 @@ lazy_static! {
         // hardcode it for debugging
         // e.g. something like
         // let seed = [12290055440097485507, 11402434335878553749];
-
         // let seed = [rand::random::<u64>(), rand::random::<u64>()];
         let seed = [1840432774656682167, 15353179927896983378];
 
