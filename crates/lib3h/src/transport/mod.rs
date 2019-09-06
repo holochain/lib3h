@@ -11,6 +11,8 @@ mod transport_encoding;
 pub use transport_encoding::TransportEncoding;
 mod transport_multiplex;
 pub use transport_multiplex::TransportMultiplex;
+mod transport_legacy_as_ghost;
+pub use transport_legacy_as_ghost::TransportLegacyAsGhost;
 
 /// a connection identifier
 pub type ConnectionId = String;
