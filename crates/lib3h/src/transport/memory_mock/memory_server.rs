@@ -31,6 +31,7 @@ pub fn new_url() -> Url {
     *tc += 1;
     Url::parse(&format!("mem://addr_{}", *tc).as_str()).unwrap()
 }
+
 /// Add new MemoryServer to the global server map
 pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
     println!("MemoryServer::ensure_server: {}", uri);
