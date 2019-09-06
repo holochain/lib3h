@@ -31,7 +31,7 @@ pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrappe
 pub type ClientToLib3hMessage =
     GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>;
 
-pub type DhtToParentMessage =
+pub type Lib3hToClientMessage =
     GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>;
 
 pub struct GhostEngine {
@@ -114,7 +114,7 @@ impl
 impl GhostEngine {
     fn handle_msg_from_client(
         &mut self,
-        mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>,
+        mut msg: ClientToLib3hMessage,
     ) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(_data) => {
