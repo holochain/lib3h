@@ -167,11 +167,11 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("\nBilly srv_msg_list = {:?}\n", srv_msg_list);
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 4);
+    assert_eq!(srv_msg_list.len(), 3);
     //let _ = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleFetchEntry); // #fullsync
+    let _ = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleStoreEntryAspect);
     let _ = unwrap_to!(srv_msg_list[1] => Lib3hServerProtocol::HandleStoreEntryAspect);
     let _ = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::HandleStoreEntryAspect);
-    let _ = unwrap_to!(srv_msg_list[3] => Lib3hServerProtocol::HandleStoreEntryAspect);
 
     // Send GossipingList
     // ==================
