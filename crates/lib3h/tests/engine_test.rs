@@ -350,7 +350,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         request_id: "dm_1".to_string(),
         to_agent_id: BILLY_AGENT_ID.clone(),
         from_agent_id: ALEX_AGENT_ID.clone(),
-        content: "wah".as_bytes().into(),
+        content: "wah".into(),
     };
     // Send
     println!("\nAlex sends DM to Billy...\n");
@@ -434,10 +434,6 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
     println!("\n Alex connects to Billy \n");
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-
-    //let alex_bind_url = alex.advertise();
-
-    //let is_connected = Box::new(is_connected("", alex_bind_url));
 
     wait_connect!(alex, req_connect, billy);
 
