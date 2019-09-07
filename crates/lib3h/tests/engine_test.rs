@@ -23,10 +23,7 @@ use lib3h_sodium::SodiumCryptoSystem;
 use url::Url;
 use utils::{
     constants::*,
-    processor_harness::{
-        Lib3hServerProtocolAssert, Lib3hServerProtocolEquals,
-        Processor,
-    },
+    processor_harness::{Lib3hServerProtocolAssert, Lib3hServerProtocolEquals, Processor},
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -315,10 +312,10 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
-    
+
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    
+
     wait_connect!(alex, req_connect, billy);
 
     // Alex joins space A
