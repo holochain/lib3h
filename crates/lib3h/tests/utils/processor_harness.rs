@@ -356,8 +356,8 @@ macro_rules! wait_did_work {
      $engine2:ident,
      $should_abort: expr
     ) => {{
-        let p1: Box<dyn Processor> = Box::new(DidWorkAssert($engine1.name()));
-        let p2: Box<dyn Processor> = Box::new(DidWorkAssert($engine2.name()));
+        let p1: Box<dyn Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert($engine1.name()));
+        let p2: Box<dyn Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert($engine2.name()));
         let processors: Vec<Box<dyn Processor>> = vec![p1, p2];
         assert_processed!($engine1, $engine2, processors, $should_abort)
     }};
@@ -395,11 +395,10 @@ macro_rules! wait_connect {
         $other: ident
     )  => {
         {
-            let _connect_data = $connect_data;
             let connected_data = Lib3hServerProtocol::Connected(
                 lib3h_protocol::data_types::ConnectedData {
                 uri: $other.advertise(),
-                request_id: "".to_string(), // TODO fix this bug and uncomment out! connect_data.clone().request_id
+                request_id: $connect_data.clone().request_id
             });
             let predicate: Box<dyn $crate::utils::processor_harness::Processor> =
                 Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals(connected_data));

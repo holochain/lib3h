@@ -24,7 +24,7 @@ use url::Url;
 use utils::{
     constants::*,
     processor_harness::{
-        is_connected, DidWorkAssert, Lib3hServerProtocolAssert, Lib3hServerProtocolEquals,
+        Lib3hServerProtocolAssert, Lib3hServerProtocolEquals,
         Processor,
     },
 };
@@ -168,10 +168,7 @@ fn basic_connect_test_mock() {
         .unwrap();
     println!("\nengine_a.process()...");
 
-    // TODO should not be blank request id!
-    let is_connected = Box::new(is_connected("", engine_a.advertise()));
-
-    assert_one_processed!(engine_a, engine_b, is_connected);
+    wait_connect!(engine_a, connect_msg, engine_b);
 }
 
 #[test]
@@ -318,18 +315,11 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
-    let alex_engine_name = alex.name();
-    let billy_engine_name = billy.name();
-
+    
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    // TODO fix bug in request id tracking
-    let request_id = "";
-    //    req_connect.clone().request_id.as_str(),
-
-    let is_connected = Box::new(is_connected(request_id, req_connect.clone().peer_uri));
-
-    assert_one_processed!(alex, billy, is_connected);
+    
+    wait_connect!(alex, req_connect, billy);
 
     // Alex joins space A
     println!("\n Alex joins space \n");
@@ -349,12 +339,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     // TODO check for join space response messages.
 
-    let processors /*: Vec<Box<dyn Processor>> = */ = vec![
-        Box::new(DidWorkAssert(alex_engine_name)),
-        Box::new(DidWorkAssert(billy_engine_name)),
-    ];
-
-    assert_processed!(alex, billy, processors);
+    wait_did_work!(alex, billy);
     wait_until_no_work!(alex, billy);
 
     println!("DONE basic_two_setup DONE \n\n\n");
@@ -453,11 +438,11 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
 
-    let alex_bind_url = alex.advertise();
+    //let alex_bind_url = alex.advertise();
 
-    let is_connected = Box::new(is_connected("", alex_bind_url));
+    //let is_connected = Box::new(is_connected("", alex_bind_url));
 
-    assert_one_processed!(alex, billy, is_connected);
+    wait_connect!(alex, req_connect, billy);
 
     println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
 
