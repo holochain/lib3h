@@ -34,7 +34,7 @@ pub fn new_url() -> Url {
 
 /// Add new MemoryServer to the global server map
 pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
-    println!("MemoryServer::ensure_server: {}", uri);
+    trace!("MemoryServer::ensure_server: {}", uri);
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
 
     // make sure we keep a STRONG reference around for the first one,
@@ -57,12 +57,15 @@ pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
 pub struct ServerRef(std::sync::Arc<Mutex<MemoryServer>>);
 impl ServerRef {
     pub fn get(&self) -> std::sync::MutexGuard<'_, MemoryServer> {
+        trace!("(MemoryServer) server_ref.get()");
         self.0.lock().expect("can read MemoryServer")
     }
 }
 
 pub fn read_ref(uri: &Url) -> TransportResult<ServerRef> {
+    trace!("read_server_map: {:?}", uri);
     let server_map = MEMORY_SERVER_MAP.read().expect("map exists");
+    trace!("read_ref: {:?}", uri);
     let maybe_server = server_map.get(uri);
     if maybe_server.is_none() {
         return Err(TransportError::new(format!("No Memory server at {}", uri)));
@@ -95,6 +98,7 @@ impl Drop for MemoryServer {
         if !server_map.contains_key(&self.this_uri) {
             panic!("Server doesn't exist");
         }
+
         server_map.remove(&self.this_uri);
     }
 }
@@ -181,14 +185,14 @@ impl MemoryServer {
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connection inbox
-        for (in_uri, is_new) in self.connection_inbox.iter() {
+        for (in_uri, is_new) in self.connection_inbox.drain(..) {
             trace!(
                 "(MemoryServer {}). connection_inbox: {} | {}",
                 self.this_uri,
                 in_uri,
                 is_new,
             );
-            let event = if *is_new {
+            let event = if is_new {
                 TransportEvent::IncomingConnectionEstablished(in_uri.to_string())
             } else {
                 TransportEvent::ConnectionClosed(in_uri.to_string())
@@ -197,7 +201,7 @@ impl MemoryServer {
             outbox.push(event);
             did_work = true;
         }
-        self.connection_inbox.clear();
+        trace!("(MemoryServer) process inbox map");
         // Process msg inboxes
         for (uri, inbox) in self.inbox_map.iter_mut() {
             loop {
@@ -216,6 +220,11 @@ impl MemoryServer {
                 outbox.push(evt);
             }
         }
+        trace!(
+            "(MemoryServer) process complete (did_work={:?}, outbox={:?})",
+            did_work,
+            outbox
+        );
         Ok((did_work, outbox))
     }
 }

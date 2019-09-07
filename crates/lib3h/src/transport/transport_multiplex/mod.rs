@@ -164,12 +164,11 @@ mod tests {
         // should receive that out the bottom
         let (address, payload) = r_out.recv().unwrap();
         assert_eq!(&addr_none, &address);
-        let expected : Opaque = "hello-from-a".into();
+        let expected: Opaque = "hello-from-a".into();
         assert_eq!(&expected, &payload);
 
         // send a message up the bottom
-        s_in.send((addr_none.clone(), "hello-to-b".into()))
-            .unwrap();
+        s_in.send((addr_none.clone(), "hello-to-b".into())).unwrap();
 
         // process "receive" that message
         mplex.process(&mut ()).unwrap();
@@ -179,7 +178,7 @@ mod tests {
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { address, payload } = msg {
             assert_eq!(&addr_none, &address);
-            let expected : Opaque = "hello-to-b".into();
+            let expected: Opaque = "hello-to-b".into();
             assert_eq!(&expected, &payload);
         } else {
             panic!("bad type");
@@ -210,7 +209,7 @@ mod tests {
                 &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
                 &address
             );
-            let expected : Opaque = "hello".into();
+            let expected: Opaque = "hello".into();
             assert_eq!(&expected, &payload);
         } else {
             panic!("bad type");

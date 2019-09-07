@@ -44,7 +44,7 @@ impl From<&String> for Opaque {
 
 impl From<&str> for Opaque {
     fn from(str: &str) -> Self {
-        str.clone().into()
+        str.clone().as_bytes().into()
     }
 }
 
@@ -148,7 +148,7 @@ impl std::fmt::Debug for Opaque {
 
 impl std::fmt::Display for Opaque {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{:?}", self)
     }
 }
 

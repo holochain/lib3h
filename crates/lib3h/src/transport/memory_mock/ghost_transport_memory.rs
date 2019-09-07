@@ -47,6 +47,7 @@ pub struct GhostTransportMemory {
     maybe_my_address: Option<Url>,
     /// Addresses of connections to remotes
     connections: HashSet<Url>,
+    server_refs: std::collections::HashMap<Url, memory_server::ServerInst>,
 }
 
 impl GhostTransportMemory {
@@ -63,6 +64,7 @@ impl GhostTransportMemory {
             ),
             connections: HashSet::new(),
             maybe_my_address: None,
+            server_refs: std::collections::HashMap::new(),
         }
     }
 }
@@ -91,26 +93,32 @@ impl
     // BOILERPLATE END----------------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        trace!("process concrete");
         // process the self endpoint
         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
         endpoint_self.as_mut().expect("exists").process(self)?;
         std::mem::replace(&mut self.endpoint_self, endpoint_self);
 
-        let mut server_ref;
         for mut msg in self
             .endpoint_self
             .as_mut()
             .expect("exists")
             .drain_messages()
         {
+            trace!("msg take");
+
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
+                    trace!("Bind");
                     // get a new bound url from the memory server (we ignore the spec here)
                     let bound_url = memory_server::new_url();
-                    server_ref = memory_server::ensure_server(&bound_url); //set_server always returns Ok
-                    if server_ref.is_err() {
-                        panic!("not good")
-                    }
+                    // memory_server::ensure_server(&bound_url.clone()).expect("bound server"); //set_server always returns Ok
+
+                    self.server_refs.insert(
+                        bound_url.clone(),
+                        memory_server::ensure_server(&bound_url.clone()).expect("bound server"),
+                    ); //set_server always returns Ok
+
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
@@ -119,6 +127,7 @@ impl
                     })))?;
                 }
                 RequestToChild::SendMessage { address, payload } => {
+                    trace!("SendMessage");
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
 
@@ -130,20 +139,24 @@ impl
                             )))?;
                         }
                         Some(my_addr) => {
-                            let maybe_server = memory_server::read_ref(my_addr);
-                            // get destinations server
-                            // TODO propagate error
-                            if let Err(e) = maybe_server {
-                                println!("server error: {:?}", e);
-                                msg.respond(Err(TransportError::new(format!(
-                                    "No Memory server at this address: {}",
-                                    my_addr
-                                ))))?;
-                                continue;
-                            }
+                            let expected = format!("server for address {:?}", address);
+                            let maybe_server =
+                                memory_server::read_ref(&address).expect(expected.as_str());
+                            let mut server = maybe_server.get();
+                            /*                            // get destinations server
+                                                        // TODO propagate error
+                                                        if let Err(e) = maybe_server {
+                                                            println!("server error: {:?}", e);
+                                                            msg.respond(Err(TransportError::new(format!(
+                                                                "No Memory server at this address: {}",
+                                                                my_addr
+                                                            ))))?;
+                                                            continue;
+                                                        }
 
-                            let server_ref = maybe_server.unwrap();
-                            let mut server = server_ref.get();
+                                                        let server_ref = maybe_server.unwrap();
+                                                        let mut server = server_ref.get();
+                            */
                             // if not already connected, request a connections
                             if self.connections.get(&address).is_none() {
                                 match server.request_connect(&my_addr) {
@@ -179,7 +192,7 @@ impl
             None => return Ok(false.into()),
         };
 
-        println!("Processing for: {}", my_addr);
+        trace!("Processing for: {}", my_addr);
 
         // get our own server
         let maybe_server = memory_server::read_ref(&my_addr);
@@ -190,7 +203,9 @@ impl
         let server_ref = maybe_server.unwrap();
         let mut server = server_ref.get();
 
+        trace!("Invoking process");
         let (success, event_list) = server.process()?;
+        trace!("Invoked process");
         if success {
             let mut to_connect_list: Vec<(Url)> = Vec::new();
             let mut non_connect_events = Vec::new();
@@ -232,7 +247,7 @@ impl
             for event in non_connect_events {
                 match event {
                     TransportEvent::ReceivedData(from_addr, payload) => {
-                        println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
+                        trace!("ReceivedData--- from:{:?} payload:{:?}", from_addr, payload);
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::ReceivedData {
@@ -258,9 +273,25 @@ mod tests {
     use super::*;
     //use protocol::RequestToChildResponse;
     //    use lib3h_ghost_actor::GhostCallbackData;
+    #[allow(dead_code)]
+    fn enable_logging_for_test(enable: bool) {
+        // wait a bit because of non monotonic clock,
+        // otherwise we could get negative substraction panics
+        // TODO #211
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "debug");
+        }
+        let _ = env_logger::builder()
+            .default_format_timestamp(false)
+            .default_format_module_path(false)
+            .is_test(enable)
+            .try_init();
+    }
 
     #[test]
     fn test_gmem_transport() {
+        enable_logging_for_test(true);
         /* Possible other ways we might think of setting up
                constructors for actor/parent_context_endpoint pairs:
 
@@ -320,6 +351,7 @@ mod tests {
                 }),
             )
             .unwrap();
+        trace!("t1 endpoint requested bind");
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_endpoint
             .request(
@@ -337,13 +369,14 @@ mod tests {
                 }),
             )
             .unwrap();
-
+        trace!("t2 endpoint requested bind");
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut ());
 
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut ());
 
+        trace!("assert_eq1");
         assert_eq!(
             transport1.maybe_my_address,
             Some(expected_transport1_address)
@@ -352,26 +385,35 @@ mod tests {
             transport2.maybe_my_address,
             Some(expected_transport2_address)
         );
+        trace!("send message");
 
+        let cb = Box::new(|_: &mut (), _, r| {
+            println!("HERE!");
+            // parent should see that the send request was OK
+            assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+            Ok(())
+        });
+
+        trace!("send message2");
+
+        let send_message = RequestToChild::SendMessage {
+            address: Url::parse("mem://addr_2").unwrap(),
+            payload: "test message".into(),
+        };
+
+        println!("send message3");
         // now send a message from transport1 to transport2 over the bound addresses
-        t1_endpoint
-            .request(
-                (),
-                RequestToChild::SendMessage {
-                    address: Url::parse("mem://addr_2").unwrap(),
-                    payload: "test message".into()
-                },
-                Box::new(|_: &mut (), _, r| {
-                    // parent should see that the send request was OK
-                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
-                    Ok(())
-                }),
-            )
-            .unwrap();
+        let result = t1_endpoint.request((), send_message, cb);
+        trace!("send message3");
 
+        assert!(result.is_ok());
+        trace!("sent message");
+
+        trace!("transport1.process");
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut ());
 
+        trace!("transport2.process");
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut ());
 
@@ -381,6 +423,9 @@ mod tests {
             "Some(IncomingConnection { address: \"mem://addr_1/\" })",
             format!("{:?}", requests[0].take_message())
         );
-        assert_eq!("Some(ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
+        assert_eq!(
+            "Some(ReceivedData { address: \"mem://addr_1/\", payload: \"test message\" })",
+            format!("{:?}", requests[1].take_message())
+        );
     }
 }
