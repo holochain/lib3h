@@ -63,6 +63,7 @@ impl<'gt> TransportLegacyAsGhost<'gt> {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         let bound_url = self.inner_transport.as_mut().bind(&spec)?;
+        warn!("@@@ - LAG:BIND({})->{}", &spec, &bound_url);
         msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
             bound_url,
         })))?;
@@ -82,7 +83,8 @@ impl<'gt> TransportLegacyAsGhost<'gt> {
             self.url_to_con_id.insert(address.clone(), con_id.clone());
             self.con_id_to_url.insert(con_id.clone(), address.clone());
         }
-        let con_id = self.url_to_con_id.get(&address).unwrap().clone();
+        let con_id = self.url_to_con_id.get(&address).ok_or(TransportError::from(format!("error connecting to {:?}", address)))?.clone();
+        warn!("@@@ - LAG:SEND({}->{})", &address, &con_id);
         // forward the request to our inner_transport
         self.inner_transport.as_mut().send(&[&con_id], &payload)?;
         msg.respond(Ok(RequestToChildResponse::SendMessage))?;
@@ -104,6 +106,7 @@ impl<'gt>
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        warn!("@@@ - LAG:process concrete");
         detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
@@ -124,7 +127,8 @@ impl<'gt>
                     // ??
                 }
                 TransportEvent::IncomingConnectionEstablished(id) => {
-                    let address = self.inner_transport.as_ref().get_uri(&id).unwrap();
+                    let address = self.inner_transport.as_ref().get_uri(&id).ok_or(TransportError::from(format!("no address for con id {:?}", &id)))?;
+                    warn!("@@@ - LAG:IN({}->{})", &id, &address);
                     self.con_id_to_url.insert(id.clone(), address.clone());
                     self.url_to_con_id.insert(address.clone(), id.clone());
                     self.endpoint_self
@@ -132,7 +136,8 @@ impl<'gt>
                 }
                 TransportEvent::ConnectionClosed(_id) => {}
                 TransportEvent::ReceivedData(id, payload) => {
-                    let address = self.inner_transport.as_ref().get_uri(&id).unwrap();
+                    let address = self.inner_transport.as_ref().get_uri(&id).ok_or(TransportError::from(format!("no address for con id {:?}", &id)))?;
+                    warn!("@@@ - LAG:RECV({}->{})", &id, &address);
                     self.con_id_to_url.insert(id.clone(), address.clone());
                     self.url_to_con_id.insert(address.clone(), id.clone());
                     self.endpoint_self

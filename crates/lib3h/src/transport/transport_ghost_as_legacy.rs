@@ -74,7 +74,8 @@ impl<'lt> TransportGhostAsLegacy<'lt> {
 
     /// private handler for inner transport TransportError events
     fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
-        panic!("cannot handle transport errors here: {:?}", error);
+        error!("cannot handle transport errors here: {:?}", error);
+        Ok(())
     }
 
     fn priv_process(&mut self) -> TransportResult<()> {
@@ -150,6 +151,7 @@ impl<'lt> TransportGhostAsLegacy<'lt> {
 
 impl<'lt> Transport for TransportGhostAsLegacy<'lt> {
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
+        warn!("@@@ - GAL:connect({})", &uri);
         // psyche!
         Ok(uri.to_string())
     }
@@ -166,13 +168,16 @@ impl<'lt> Transport for TransportGhostAsLegacy<'lt> {
 
     fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
         for id in id_list {
-            self.priv_send_message(Url::parse(id).expect("can parse url"), payload.to_vec())?;
+            warn!("@@@ - GAL:send({})", &id);
+            let fake_uri = Url::parse(&format!("fake:{}", id)).expect("can parse url");
+            self.priv_send_message(fake_uri, payload.to_vec())?;
         }
         Ok(())
     }
 
     fn send_all(&mut self, _payload: &[u8]) -> TransportResult<()> {
-        unimplemented!();
+        error!("cannot send_all");
+        Ok(())
     }
 
     fn bind(&mut self, url: &url::Url) -> TransportResult<Url> {
@@ -212,11 +217,14 @@ impl<'lt> Transport for TransportGhostAsLegacy<'lt> {
     }
 
     fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
-        unimplemented!();
+        Ok(Vec::new())
     }
 
     fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
         // psyche!
-        Some(Url::parse(id).expect("can parse url"))
+        match Url::parse(id) {
+            Err(_) => None,
+            Ok(address) => Some(address),
+        }
     }
 }
