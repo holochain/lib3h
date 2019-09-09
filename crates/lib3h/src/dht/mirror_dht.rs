@@ -467,9 +467,9 @@ impl MirrorDht {
             // Ask owner to respond to self
             DhtRequestToChild::RequestEntry(entry_address) => {
                 self.endpoint_self.request(
-                    DhtContext::RequestEntry(request),
+                    DhtContext::RequestEntry(GhostMessageData::with_message(&request)),
                     DhtRequestToParent::RequestEntry(entry_address),
-                    Box::new(|_me, context, response| {
+                    Box::new(|_me, response| {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => panic!("timeout"),
@@ -478,10 +478,6 @@ impl MirrorDht {
                                     Ok(response) => response,
                                 },
                             }
-                        };
-                        let request = match context {
-                            DhtContext::RequestEntry(request) => request,
-                            _ => panic!("bad context"),
                         };
                         if let DhtRequestToParentResponse::RequestEntry(entry_response) = response {
                             println!("4. In DhtRequestToChild::RequestEntry Responding...");

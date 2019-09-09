@@ -24,6 +24,12 @@ impl GhostContext for DefaultContext {
     fn get_span(&self) {}
 }
 
+impl From<()> for DefaultContext {
+    fn from(_: ()) -> DefaultContext {
+        DefaultContext
+    }
+}
+
 /// the context when making a request from core
 /// this is always the request_id
 pub struct ClientRequestContext(String);
@@ -124,13 +130,8 @@ pub struct GhostEngine<'engine> {
     >,
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
-<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
             GhostEngine<'engine>,
-            String,
-=======
-            GhostEngine<'engine, D>,
             DefaultContext,
->>>>>>> Remove context param from callback, add type constraint
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,
@@ -293,7 +294,9 @@ impl<'engine> GhostEngine<'engine> {
                     .map(|data| ClientToLib3hResponse::SendDirectMessageResult(data));
                 msg.respond(result)
             }
-            /*            FetchEntry(FetchEntryData)  => {} Not being used, probably deprecated*/
+            /*
+            FetchEntry(FetchEntryData)  => {} Not being used, probably deprecated
+            */
             ClientToLib3h::PublishEntry(data) => self
                 .handle_publish_entry(&data)
                 .map_err(|e| GhostError::from(e.to_string())),
@@ -306,14 +309,13 @@ impl<'engine> GhostEngine<'engine> {
                     .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
                 msg.respond(result)
             }
-<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
-=======
-            /*            SendDirectMessage(DirectMessageData) => {}
+            /*
+            SendDirectMessage(DirectMessageData) => {}
             FetchEntry(FetchEntryData)  => {}
             PublishEntry(ProvidedEntryData) => {}
             HoldEntry(ProvidedEntryData)  => {}
-            QueryEntry(QueryEntryData) => {}*/
->>>>>>> Remove context param from callback, add type constraint
+            QueryEntry(QueryEntryData) => {}
+            */
             _ => panic!("{:?} not implemented", msg),
         }
     }
@@ -415,13 +417,8 @@ impl<'engine> GhostEngine<'engine> {
         for mut msg_data in request_list {
             msg_data.request_id = self.request_track.reserve();
 
-<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
-            let context = "".to_string();
-            let _ = self.lib3h_endpoint.request(
-=======
             let context = DefaultContext;
-            self.lib3h_endpoint.request(
->>>>>>> Remove context param from callback, add type constraint
+            let _ = self.lib3h_endpoint.request(
                 context,
                 Lib3hToClient::HandleFetchEntry(msg_data),
                 Box::new(|_me, response| {
@@ -532,30 +529,17 @@ impl<'engine> GhostEngine<'engine> {
         )?;
 
         list_data.request_id = self.request_track.reserve();
-<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
         self.lib3h_endpoint
             .request(
-                context,
+                DefaultContext,
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-                Box::new(|me, _ctx, response| {
+                Box::new(|me, response| {
                     match response {
                         GhostCallbackData::Response(Ok(
                             Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                         )) => {
                             if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
                                 error!(
-=======
-        self.lib3h_endpoint.request(
-            DefaultContext,
-            Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-            Box::new(|me, response| {
-                match response {
-                    GhostCallbackData::Response(Ok(
-                        Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
-                    )) => {
-                        if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
-                            error!(
->>>>>>> Remove context param from callback, add type constraint
                                 "Got error when handling HandleGetAuthoringEntryListResult: {:?} ",
                                 err
                             );

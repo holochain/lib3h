@@ -305,7 +305,7 @@ mod tests {
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
-                Box::new(|_: &mut (), _, r| {
+                Box::new(|_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
                         "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
@@ -322,7 +322,7 @@ mod tests {
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
-                Box::new(|_: &mut (), _, r| {
+                Box::new(|_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
                         "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
@@ -356,7 +356,7 @@ mod tests {
                     address: Url::parse("mem://addr_2").unwrap(),
                     payload: b"test message".to_vec(),
                 },
-                Box::new(|_: &mut (), _, r| {
+                Box::new(|_: &mut (), r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
                     Ok(())

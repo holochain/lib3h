@@ -24,12 +24,15 @@ pub use mplex::TransportMultiplex;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::{error::*, protocol::*};
+    use crate::{
+        engine::ghost_engine::DefaultContext,
+        transport::{error::*, protocol::*},
+    };
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
     use url::Url;
 
-    enum MockToParentContext {}
+    type MockToParentContext = DefaultContext;
 
     pub struct TransportMock {
         endpoint_parent: Option<TransportActorParentEndpoint>,
@@ -122,7 +125,7 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: TransportActorParentWrapper<(), (), TransportMultiplex> =
+        let mut mplex: TransportActorParentWrapper<(), DefaultContext, TransportMultiplex> =
             GhostParentWrapper::new(
                 TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
                 "test_mplex_",
@@ -132,23 +135,23 @@ mod tests {
             .as_mut()
             .create_agent_space_route(&"space_a".into(), &"agent_a".into())
             .as_context_endpoint_builder()
-            .build::<(), ()>();
+            .build::<(), DefaultContext>();
 
         let mut route_b = mplex
             .as_mut()
             .create_agent_space_route(&"space_b".into(), &"agent_b".into())
             .as_context_endpoint_builder()
-            .build::<(), ()>();
+            .build::<(), DefaultContext>();
 
         // send a message from route A
         route_a
             .request(
-                (),
+                DefaultContext,
                 RequestToChild::SendMessage {
                     address: addr_none.clone(),
                     payload: b"hello-from-a".to_vec(),
                 },
-                Box::new(|_, _, response| {
+                Box::new(|_, response| {
                     assert_eq!(&format!("{:?}", response), "");
                     Ok(())
                 }),

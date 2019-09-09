@@ -133,14 +133,14 @@ where
         };
         let request_id = ctx.get_request_id();
         let result = if &request_id == "" {
-            self.engine.publish(client_msg.into());
+            self.engine.publish(client_msg.into())
         } else {
             self.engine.request(
                 ctx,
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id),
-            );
-        }
+            )
+        };
         result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
     }
 

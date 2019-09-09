@@ -45,11 +45,13 @@ pub type ChildDhtWrapperDyn<UserData> = GhostParentWrapperDyn<
 
 pub type DhtToChildMessage =
     GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
+pub type DhtToChildMessageData = GhostMessageData<DhtRequestToChild>;
 
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
+pub type DhtToParentMessageData = GhostMessageData<DhtRequestToParent>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtContext {
     NoOp,
     RequestAspectsOf {
@@ -58,11 +60,14 @@ pub enum DhtContext {
         msg: EntryListData,
         request_id: String,
     },
-    RequestEntry(DhtToChildMessage),
+    RequestEntry(DhtToChildMessageData),
     QueryEntry(QueryEntryData),
 }
+impl GhostContext for DhtContext {
+    fn get_span(&self) {}
+}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.
@@ -92,7 +97,7 @@ pub enum DhtRequestToChild {
     RequestEntry(Address),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChildResponse {
     RequestPeer(Option<PeerData>),
     RequestPeerList(Vec<PeerData>),
@@ -102,7 +107,7 @@ pub enum DhtRequestToChildResponse {
     RequestEntry(EntryData),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToParent {
     /// Commands & Events
     /// Ask owner to send this binary gossip bundle
@@ -127,7 +132,7 @@ pub enum DhtRequestToParent {
     RequestEntry(Address),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToParentResponse {
     RequestEntry(EntryData),
 }

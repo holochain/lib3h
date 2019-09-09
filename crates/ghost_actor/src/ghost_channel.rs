@@ -5,7 +5,7 @@ use crate::{
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
@@ -17,10 +17,26 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     },
 }
 
+/// A GhostMessage with only the data, i.e. minus the Sender
+/// This is so that it is more easily cloneable
+#[derive(Debug, Clone)]
+pub struct GhostMessageData<T: 'static + Clone> {
+    pub request_id: Option<RequestId>,
+    pub message: Option<T>,
+}
+
+impl<T: 'static + Clone> GhostMessageData<T> {
+    pub fn with_message<A, B, C>(msg: &GhostMessage<T, A, B, C>) -> Self {
+        GhostMessageData {
+            request_id: msg.request_id.clone(),
+            message: msg.message.clone(),
+        }
+    }
+}
+
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
 /// A GhostMessage contains the incoming request, as well as a hook to
 /// allow a response to automatically be returned.
-#[derive(Clone)]
 pub struct GhostMessage<
     MessageToSelf: 'static,
     MessageToOther: 'static,
@@ -519,7 +535,8 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::{TestContext, TestError};
+    use crate::test_types::TestContext;
+    type TestError = String;
 
     #[derive(Debug)]
     struct TestMsgOut(String);

@@ -366,11 +366,12 @@ impl<
 mod tests {
     use super::*;
     use crate::{
-        ghost_channel::create_ghost_channel,
-        ghost_tracker::GhostCallbackData,
-        test_types::{TestContext, TestError},
+        ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData,
+        test_types::TestContext,
     };
     use detach::prelude::*;
+
+    type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
     // These are the Out message, and it has messages that come internally

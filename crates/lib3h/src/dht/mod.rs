@@ -131,7 +131,7 @@ pub mod tests {
         dht.request(
             DhtContext::NoOp,
             DhtRequestToChild::RequestThisPeer,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -160,7 +160,7 @@ pub mod tests {
         dht.request(
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeer(address.to_string()),
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -189,7 +189,7 @@ pub mod tests {
         dht.request(
             DhtContext::NoOp,
             DhtRequestToChild::RequestPeerList,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -218,7 +218,7 @@ pub mod tests {
         dht.request(
             DhtContext::NoOp,
             DhtRequestToChild::RequestEntryAddressList,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -251,7 +251,7 @@ pub mod tests {
         dht.request(
             DhtContext::NoOp,
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -342,7 +342,7 @@ pub mod tests {
         dht.request(
             DhtContext::NoOp,
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
-            Box::new(|_ud, _context, response| {
+            Box::new(|_ud, response| {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");
                 let response = {
                     match response {

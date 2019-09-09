@@ -140,7 +140,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             .request(
                 DhtContext::NoOp,
                 DhtRequestToChild::RequestPeerList,
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -174,7 +174,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             .request(
                 DhtContext::NoOp,
                 DhtRequestToChild::RequestThisPeer,
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -204,7 +204,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
             .request(
                 DhtContext::NoOp,
                 DhtRequestToChild::RequestPeer(peer_address.to_string()),
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),

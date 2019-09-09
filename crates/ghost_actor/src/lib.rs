@@ -60,7 +60,7 @@ pub use ghost_tracker::{
 mod ghost_channel;
 pub use ghost_channel::{
     create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
-    GhostTrackRequestOptions,
+    GhostMessageData, GhostTrackRequestOptions,
 };
 
 mod ghost_actor;
@@ -73,8 +73,8 @@ pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
         GhostContext, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
-        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
-        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
+        GhostMessageData, GhostParentWrapper, GhostParentWrapperDyn, GhostResult,
+        GhostTrackRequestOptions, GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 

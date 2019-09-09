@@ -27,7 +27,7 @@ pub type GhostCallback<UserData, CbData, E> =
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static> {
     expires: std::time::SystemTime,
-    context: Context,
+    _context: Context,
     cb: GhostCallback<UserData, CbData, E>,
 }
 
@@ -151,7 +151,7 @@ impl<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
-                context,
+                _context: context,
                 cb,
             },
         );
@@ -176,10 +176,14 @@ impl<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>
 
 #[cfg(test)]
 mod tests {
-    use crate::test_types::{TestCallbackData, TestContext, TestError};
+    use super::*;
+    use crate::test_types::TestContext;
     use detach::prelude::*;
 
-    use super::*;
+    type TestError = String;
+
+    #[derive(Debug)]
+    pub struct TestCallbackData(pub String);
 
     struct TestTrackingActor {
         state: String,
@@ -215,7 +219,7 @@ mod tests {
         let req_id = actor.tracker.bookmark(context, cb);
 
         let entry = actor.tracker.pending.get(&req_id).unwrap();
-        assert_eq!(entry.context.0, "some_context_data");
+        assert_eq!(entry._context.0, "some_context_data");
 
         // the state should be empty from the new
         assert_eq!(actor.state, "");

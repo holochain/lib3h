@@ -443,23 +443,24 @@ impl<'engine> RealEngine<'engine> {
         let space_gateway = maybe_space.unwrap();
         // Request every 'new' Entry from Core
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
+            let ctx = DhtContext::RequestAspectsOf {
+                entry_address: entry_address.clone(),
+                aspect_address_list,
+                msg: msg.clone(),
+                request_id: self.request_track.reserve(),
+            };
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
-                DhtContext::RequestAspectsOf {
-                    entry_address: entry_address.clone(),
-                    aspect_address_list,
-                    msg: msg.clone(),
-                    request_id: self.request_track.reserve(),
-                },
+                ctx.clone(),
                 DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                Box::new(|ud, context, response| {
+                Box::new(|ud, response| {
                     let (entry_address, aspect_address_list, msg, request_id) = {
                         if let DhtContext::RequestAspectsOf {
                             entry_address,
                             aspect_address_list,
                             msg,
                             request_id,
-                        } = context
+                        } = ctx
                         {
                             (entry_address, aspect_address_list, msg, request_id)
                         } else {

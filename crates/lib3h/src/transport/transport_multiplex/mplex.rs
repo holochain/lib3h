@@ -1,4 +1,7 @@
-use crate::transport::{error::*, protocol::*};
+use crate::{
+    engine::ghost_engine::DefaultContext,
+    transport::{error::*, protocol::*},
+};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
@@ -13,25 +16,25 @@ struct LocalRouteSpec {
 
 #[derive(Debug)]
 enum MplexToInnerContext {
-    AwaitBind(
-        GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-    ),
-    AwaitSend(
-        GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-    ),
+    AwaitBind(GhostMessageData<RequestToChild>),
+    AwaitSend(GhostMessageData<RequestToChild>),
+}
+impl GhostContext for MplexToInnerContext {
+    fn get_span(&self) {}
 }
 
 pub struct TransportMultiplex {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, ()>>,
+    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, DefaultContext>>,
     // ref to our inner transport
     inner_transport:
         Detach<TransportActorParentWrapperDyn<TransportMultiplex, MplexToInnerContext>>,
     // our map of endpoints connecting us to our Routes
-    route_endpoints:
-        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, ()>>>,
+    route_endpoints: Detach<
+        HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, DefaultContext>>,
+    >,
 }
 
 impl TransportMultiplex {
@@ -192,19 +195,9 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitBind(msg),
+            MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg)),
             RequestToChild::Bind { spec },
-            Box::new(|_, context, response| {
-                let msg = {
-                    match context {
-                        MplexToInnerContext::AwaitBind(msg) => msg,
-                        _ => {
-                            return Err(
-                                format!("wanted context AwaitBind, got {:?}", context).into()
-                            )
-                        }
-                    }
-                };
+            Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
@@ -230,19 +223,9 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitSend(msg),
+            MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg)),
             RequestToChild::SendMessage { address, payload },
-            Box::new(|_, context, response| {
-                let msg = {
-                    match context {
-                        MplexToInnerContext::AwaitSend(msg) => msg,
-                        _ => {
-                            return Err(
-                                format!("wanted context AwaitSend, got {:?}", context).into()
-                            )
-                        }
-                    }
-                };
+            Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
@@ -285,19 +268,9 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitBind(msg),
+            MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg)),
             RequestToChild::Bind { spec },
-            Box::new(|_, context, response| {
-                let msg = {
-                    match context {
-                        MplexToInnerContext::AwaitBind(msg) => msg,
-                        _ => {
-                            return Err(
-                                format!("wanted context AwaitBind, got {:?}", context).into()
-                            )
-                        }
-                    }
-                };
+            Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
@@ -323,19 +296,9 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitSend(msg),
+            MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg)),
             RequestToChild::SendMessage { address, payload },
-            Box::new(|_, context, response| {
-                let msg = {
-                    match context {
-                        MplexToInnerContext::AwaitSend(msg) => msg,
-                        _ => {
-                            return Err(
-                                format!("wanted context AwaitSend, got {:?}", context).into()
-                            )
-                        }
-                    }
-                };
+            Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
