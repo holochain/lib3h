@@ -1,4 +1,4 @@
-use crate::engine::ghost_engine::{CoreRequestContext, GhostEngineParentWrapper};
+use crate::engine::ghost_engine::{ClientRequestContext, GhostEngineParentWrapper};
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -18,13 +18,13 @@ where
         EngineError,
     >,
 {
-    lib3h: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
+    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
 }
 
-fn server_failure(err: String, context: CoreRequestContext) -> Lib3hServerProtocol {
+fn server_failure(err: String, context: ClientRequestContext) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
         request_id: context.get_request_id(),
         space_address: "space_addr".into(),
@@ -34,7 +34,7 @@ fn server_failure(err: String, context: CoreRequestContext) -> Lib3hServerProtoc
     Lib3hServerProtocol::FailureResult(failure_data)
 }
 
-fn server_success(context: CoreRequestContext) -> Lib3hServerProtocol {
+fn server_success(context: ClientRequestContext) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
         request_id: context.get_request_id(),
         space_address: "space_addr".into(),
@@ -58,7 +58,7 @@ where
 {
     pub fn new(name: &str, engine: Engine) -> Self {
         LegacyLib3h {
-            lib3h: Detach::new(GhostParentWrapper::new(engine, name)),
+            engine: Detach::new(GhostParentWrapper::new(engine, name)),
             name: name.into(),
             client_request_responses: Vec::new(),
         }
@@ -66,13 +66,13 @@ where
 
     fn make_callback() -> GhostCallback<
         LegacyLib3h<Engine, EngineError>,
-        CoreRequestContext,
+        ClientRequestContext,
         ClientToLib3hResponse,
         EngineError,
     > {
         Box::new(
             |me: &mut LegacyLib3h<Engine, EngineError>,
-             context: CoreRequestContext,
+             context: ClientRequestContext,
              response: GhostCallbackData<ClientToLib3hResponse, EngineError>| {
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
@@ -100,37 +100,37 @@ where
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         let ctx = match &client_msg {
-            Lib3hClientProtocol::Connect(data) => CoreRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::JoinSpace(data) => CoreRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::LeaveSpace(data) => CoreRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::Connect(data) => ClientRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::JoinSpace(data) => ClientRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::LeaveSpace(data) => ClientRequestContext::new(&data.request_id),
             Lib3hClientProtocol::SendDirectMessage(data) => {
-                CoreRequestContext::new(&data.request_id)
+                ClientRequestContext::new(&data.request_id)
             }
-            Lib3hClientProtocol::FetchEntry(data) => CoreRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::QueryEntry(data) => CoreRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::FetchEntry(data) => ClientRequestContext::new(&data.request_id),
+            Lib3hClientProtocol::QueryEntry(data) => ClientRequestContext::new(&data.request_id),
             Lib3hClientProtocol::HandleSendDirectMessageResult(data) => {
-                CoreRequestContext::new(&data.request_id)
+                ClientRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleFetchEntryResult(data) => {
-                CoreRequestContext::new(&data.request_id)
+                ClientRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleQueryEntryResult(data) => {
-                CoreRequestContext::new(&data.request_id)
+                ClientRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => {
-                CoreRequestContext::new(&data.request_id)
+                ClientRequestContext::new(&data.request_id)
             }
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => {
-                CoreRequestContext::new(&data.request_id)
+                ClientRequestContext::new(&data.request_id)
             }
-            Lib3hClientProtocol::PublishEntry(_) => CoreRequestContext::new(""),
-            Lib3hClientProtocol::HoldEntry(_) => CoreRequestContext::new(""),
+            Lib3hClientProtocol::PublishEntry(_) => ClientRequestContext::new(""),
+            Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
             _ => panic!("unimplemented"),
         };
         if &ctx.get_request_id() == "" {
-            self.lib3h.publish(client_msg.into());
+            self.engine.publish(client_msg.into());
         } else {
-            self.lib3h
+            self.engine
                 .request(ctx, client_msg.into(), LegacyLib3h::make_callback());
         }
         Ok(())
@@ -139,12 +139,12 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let _ = detach_run!(&mut self.lib3h, |lib3h| lib3h.process(self));
+        let _ = detach_run!(&mut self.engine, |lib3h| lib3h.process(self));
 
         // get any "server" messages that came as responses to the client requests
         let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
 
-        for mut msg in self.lib3h.as_mut().drain_messages() {
+        for mut msg in self.engine.as_mut().drain_messages() {
             let server_msg = msg.take_message().expect("exists");
             responses.push(server_msg.into());
         }
@@ -307,7 +307,7 @@ mod tests {
             format!("{:?}", result)
         );
 
-        detach_run!(&mut legacy.lib3h, |l| l.as_mut().inject_lib3h_event(
+        detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_event(
             Lib3hToClient::Disconnected(DisconnectedData {
                 network_id: "some_network_id".into()
             })
