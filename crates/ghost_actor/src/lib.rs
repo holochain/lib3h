@@ -65,17 +65,17 @@ pub use ghost_channel::{
 };
 
 mod ghost_actor;
-pub use ghost_actor::{CanTrace, GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
+pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 mod test_types;
 pub use test_types::TestContext;
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, CanTrace, GhostActor, GhostCallback, GhostCallbackData,
-        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
-        GhostMessageData, GhostParentWrapper, GhostParentWrapperDyn, GhostResult,
-        GhostTrackRequestOptions, GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
+        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
+        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostMessageData,
+        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
+        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -84,9 +84,8 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ghost_actor::CanTrace, test_types::TestContext};
+    use crate::test_types::TestContext;
     use detach::prelude::*;
-    use lib3h_tracing::Span;
 
     type FakeError = String;
 
@@ -245,21 +244,10 @@ mod tests {
             msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
         },
     }
-    impl CanTrace for GwDht {
-        fn get_span(&self) -> Span {
-            unimplemented!()
-        }
-    }
 
     #[derive(Debug)]
-    enum RequestToParentContext {
+    enum _RequestToParentContext {
         IncomingConnection { address: String },
-    }
-
-    impl CanTrace for RequestToParentContext {
-        fn get_span(&self) -> Span {
-            unimplemented!()
-        }
     }
 
     struct GatewayTransport {
@@ -275,7 +263,7 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 GatewayTransport,
-                RequestToParentContext,
+                TestContext,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -340,9 +328,7 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.endpoint_self.as_mut().request(
-                RequestToParentContext::IncomingConnection {
-                    address: "test".to_string(),
-                },
+                TestContext::new(),
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },

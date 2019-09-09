@@ -9,6 +9,7 @@ use lib3h_protocol::{
     protocol_server::*,
     DidWork,
 };
+use lib3h_tracing::Lib3hTrace;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -136,7 +137,7 @@ where
             self.engine.publish(client_msg.into())
         } else {
             self.engine.request(
-                ctx,
+                Lib3hTrace,
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id),
             )
@@ -163,6 +164,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use lib3h_protocol::data_types::*;
+    use lib3h_tracing::Lib3hTrace;
+    use url::Url;
+
     type EngineError = String;
 
     pub struct MockGhostEngine {
@@ -178,7 +184,7 @@ mod tests {
         lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
-                ClientRequestContext,
+                Lib3hTrace,
                 Lib3hToClient,
                 Lib3hToClientResponse,
                 ClientToLib3h,
@@ -267,12 +273,9 @@ mod tests {
         }
     }
 
-    use super::*;
-    use lib3h_protocol::data_types::*;
     struct MockCore {
         //    state: String,
     }
-    use url::Url;
 
     #[test]
     fn test_ghost_engine_wrapper() {

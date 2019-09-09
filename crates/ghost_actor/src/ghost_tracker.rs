@@ -1,4 +1,4 @@
-use crate::ghost_actor::CanTrace;
+use lib3h_tracing::CanTrace;
 use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
@@ -27,7 +27,7 @@ pub type GhostCallback<UserData, CbData, E> =
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static> {
     expires: std::time::SystemTime,
-    _context: TraceContext,
+    _trace_context: TraceContext,
     cb: GhostCallback<UserData, CbData, E>,
 }
 
@@ -125,16 +125,16 @@ impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
     /// register a callback
     pub fn bookmark(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         cb: GhostCallback<UserData, CbData, E>,
     ) -> RequestId {
-        self.bookmark_options(context, cb, GhostTrackerBookmarkOptions::default())
+        self.bookmark_options(trace_context, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_options(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
@@ -151,7 +151,7 @@ impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
-                _context: context,
+                _trace_context: trace_context,
                 cb,
             },
         );
@@ -219,7 +219,7 @@ mod tests {
         let req_id = actor.tracker.bookmark(context, cb);
 
         let entry = actor.tracker.pending.get(&req_id).unwrap();
-        assert_eq!(entry._context.0, "some_context_data");
+        assert_eq!(entry._trace_context.0, "some_context_data");
 
         // the state should be empty from the new
         assert_eq!(actor.state, "");

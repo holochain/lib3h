@@ -1,11 +1,5 @@
 use crate::prelude::*;
-use lib3h_tracing::Span;
-
-/// Trait which enables a generic notion of tracing context, which is probably not necessary,
-/// but was easy to do by hijacking the old TraceContext type parameter
-pub trait CanTrace {
-    fn get_span(&self) -> Span;
-}
+use lib3h_tracing::CanTrace;
 
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.

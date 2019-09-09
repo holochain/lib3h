@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::transport::memory_mock::transport_memory::TransportMemory;
+use lib3h_tracing::Lib3hTrace;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
@@ -445,7 +446,7 @@ impl<'engine> RealEngine<'engine> {
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             let request_id = self.request_track.reserve();
             let msg = msg.clone();
-            let ctx = DhtContext::RequestAspectsOf {
+            let _ctx = DhtContext::RequestAspectsOf {
                 entry_address: entry_address.clone(),
                 aspect_address_list: aspect_address_list.clone(),
                 msg: msg.clone(),
@@ -453,7 +454,7 @@ impl<'engine> RealEngine<'engine> {
             };
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
-                ctx.clone(),
+                Lib3hTrace,
                 DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
                 Box::new(move |ud, response| {
                     let response = {

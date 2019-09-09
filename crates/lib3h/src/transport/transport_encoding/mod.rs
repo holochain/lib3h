@@ -1,17 +1,17 @@
 use crate::{
-    engine::ghost_engine::DefaultContext,
     keystore::*,
     transport::{error::*, protocol::*},
 };
 use detach::prelude::*;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_tracing::Lib3hTrace;
 use std::collections::HashMap;
 use url::Url;
 
-type ToParentContext = DefaultContext;
-type ToInnerContext = DefaultContext;
-type ToKeystoreContext = DefaultContext;
+type ToParentContext = Lib3hTrace;
+type ToInnerContext = Lib3hTrace;
+type ToKeystoreContext = Lib3hTrace;
 
 /// Wraps a lower-level transport in either Open or Encrypted communication
 /// Also adds a concept of MachineId and AgentId
@@ -251,7 +251,7 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            DefaultContext,
+            Lib3hTrace,
             RequestToChild::Bind { spec },
             Box::new(|m: &mut TransportEncoding, response| {
                 let response = {
@@ -290,7 +290,7 @@ impl TransportEncoding {
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
-            DefaultContext,
+            Lib3hTrace,
             RequestToChild::SendMessage { address, payload },
             Box::new(|_: &mut TransportEncoding, response| {
                 let response = {

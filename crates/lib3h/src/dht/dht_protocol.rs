@@ -1,6 +1,6 @@
 use crate::dht::PeerAddress;
 use lib3h_protocol::{data_types::EntryData, Address};
-use lib3h_tracing::Span;
+
 use url::Url;
 
 use crate::{dht::dht_config::DhtConfig, error::*};
@@ -18,9 +18,9 @@ pub type DhtActor = dyn GhostActor<
     DhtRequestToChildResponse,
     Lib3hError,
 >;
-pub type DhtEndpointWithContext<UserData> = GhostContextEndpoint<
+pub type DhtEndpointWithContext<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    DhtContext,
+    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -34,9 +34,9 @@ pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToParentResponse,
     Lib3hError,
 >;
-pub type ChildDhtWrapperDyn<UserData> = GhostParentWrapperDyn<
+pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
     UserData,
-    DhtContext,
+    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -63,11 +63,6 @@ pub enum DhtContext {
     },
     RequestEntry(DhtToChildMessageData),
     QueryEntry(QueryEntryData),
-}
-impl CanTrace for DhtContext {
-    fn get_span(&self) -> Span {
-        unimplemented!()
-    }
 }
 
 #[derive(Debug, Clone)]

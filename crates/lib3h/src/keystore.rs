@@ -1,10 +1,10 @@
 //! This is a stub of the keystore so we can prove out the encoding transport
 
 use crate::{
-    engine::ghost_engine::DefaultContext,
     error::{Lib3hError, Lib3hResult},
     transport::TransportEncoding,
 };
+use lib3h_tracing::Lib3hTrace;
 
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
@@ -66,7 +66,7 @@ type KeystoreParentEndpoint = GhostEndpoint<
 
 type KeystoreSelfEndpoint = GhostContextEndpoint<
     KeystoreStub,
-    DefaultContext,
+    Lib3hTrace,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

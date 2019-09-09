@@ -6,6 +6,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
+use lib3h_tracing::Lib3hTrace;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -40,7 +41,7 @@ pub struct MirrorDht {
 
     /// ghost stuff
     endpoint_parent: Option<DhtEndpoint>,
-    endpoint_self: Detach<DhtEndpointWithContext<()>>,
+    endpoint_self: Detach<DhtEndpointWithContext<(), Lib3hTrace>>,
 }
 
 /// Constructors
@@ -467,7 +468,7 @@ impl MirrorDht {
             // Ask owner to respond to self
             DhtRequestToChild::RequestEntry(entry_address) => {
                 self.endpoint_self.request(
-                    DhtContext::RequestEntry(GhostMessageData::with_message(&request)),
+                    Lib3hTrace,
                     DhtRequestToParent::RequestEntry(entry_address),
                     Box::new(|_me, response| {
                         let response = {

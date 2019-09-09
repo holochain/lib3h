@@ -1,11 +1,8 @@
-use crate::{
-    engine::ghost_engine::DefaultContext,
-    transport::{error::*, protocol::*},
-};
+use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
-use lib3h_tracing::Span;
+use lib3h_tracing::Lib3hTrace;
 use std::collections::HashMap;
 use url::Url;
 
@@ -20,24 +17,17 @@ enum MplexToInnerContext {
     AwaitBind(GhostMessageData<RequestToChild>),
     AwaitSend(GhostMessageData<RequestToChild>),
 }
-impl CanTrace for MplexToInnerContext {
-    fn get_span(&self) -> Span {
-        unimplemented!()
-    }
-}
 
 pub struct TransportMultiplex {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, DefaultContext>>,
+    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>,
     // ref to our inner transport
-    inner_transport:
-        Detach<TransportActorParentWrapperDyn<TransportMultiplex, MplexToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<TransportMultiplex, Lib3hTrace>>,
     // our map of endpoints connecting us to our Routes
-    route_endpoints: Detach<
-        HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, DefaultContext>>,
-    >,
+    route_endpoints:
+        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
 }
 
 impl TransportMultiplex {
@@ -196,9 +186,10 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
+        let _unused_context = MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg));
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg)),
+            Lib3hTrace,
             RequestToChild::Bind { spec },
             Box::new(|_, response| {
                 let response = {
@@ -224,9 +215,10 @@ impl TransportMultiplex {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
+        let _unused_context = MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg));
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg)),
+            Lib3hTrace,
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, response| {
                 let response = {
@@ -269,9 +261,10 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
+        let _unused_context = MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg));
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg)),
+            Lib3hTrace,
             RequestToChild::Bind { spec },
             Box::new(|_, response| {
                 let response = {
@@ -297,9 +290,10 @@ impl TransportMultiplex {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
+        let _unused_context = MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg));
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg)),
+            Lib3hTrace,
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, response| {
                 let response = {

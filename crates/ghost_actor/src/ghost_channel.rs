@@ -1,7 +1,8 @@
 use crate::{
-    ghost_actor::CanTrace, GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions,
-    GhostTrackerBuilder, RequestId,
+    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
+    RequestId,
 };
+use lib3h_tracing::CanTrace;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.

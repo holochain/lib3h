@@ -1,7 +1,8 @@
 use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, Address};
-use lib3h_tracing::Span;
+use lib3h_tracing::Lib3hTrace;
+
 use std::collections::{HashMap, HashSet};
 
 use super::RealEngineTrackerData;
@@ -20,19 +21,6 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
 
-pub struct DefaultContext;
-impl CanTrace for DefaultContext {
-    fn get_span(&self) -> Span {
-        unimplemented!()
-    }
-}
-
-impl From<()> for DefaultContext {
-    fn from(_: ()) -> DefaultContext {
-        DefaultContext
-    }
-}
-
 /// the context when making a request from core
 /// this is always the request_id
 pub struct ClientRequestContext(String);
@@ -45,29 +33,18 @@ impl ClientRequestContext {
     }
 }
 
-impl CanTrace for ClientRequestContext {
-    fn get_span(&self) -> Span {
-        unimplemented!()
-    }
-}
-
 /// the context when making a request
 #[derive(Clone)]
 struct RequestContext {
     pub space_address: Address,
     pub agent_id: Address,
 }
-impl CanTrace for RequestContext {
-    fn get_span(&self) -> Span {
-        unimplemented!()
-    }
-}
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
 pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
     Core,
-    ClientRequestContext,
+    Lib3hTrace,
     Lib3hToClient,
     Lib3hToClientResponse,
     ClientToLib3h,
@@ -150,7 +127,7 @@ pub struct GhostEngine<'engine> {
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
             GhostEngine<'engine>,
-            RequestContext,
+            Lib3hTrace,
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,
@@ -437,7 +414,7 @@ impl<'engine> GhostEngine<'engine> {
             };
             msg_data.request_id = self.request_track.reserve();
             let _ = self.lib3h_endpoint.request(
-                context.clone(),
+                Lib3hTrace,
                 Lib3hToClient::HandleFetchEntry(msg_data),
                 Box::new(move |me, response| {
                     let space_gateway = me
@@ -527,12 +504,12 @@ impl<'engine> GhostEngine<'engine> {
             provider_agent_id: join_msg.agent_id.clone(),
             request_id: self.request_track.reserve(),
         };
-        let context = RequestContext {
+        let _context = RequestContext {
             space_address: join_msg.space_address.to_owned(),
             agent_id: join_msg.agent_id.to_owned(),
         };
         self.lib3h_endpoint.request(
-            context.clone(),
+            Lib3hTrace,
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
             Box::new(|me, response| {
                 match response {
@@ -561,7 +538,7 @@ impl<'engine> GhostEngine<'engine> {
         list_data.request_id = self.request_track.reserve();
         self.lib3h_endpoint
             .request(
-                context.clone(),
+                Lib3hTrace,
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
                 Box::new(|me, response| {
                     match response {

@@ -8,6 +8,7 @@ use crate::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
+use lib3h_tracing::Lib3hTrace;
 use std::collections::{HashMap, VecDeque};
 use url::Url;
 
@@ -99,7 +100,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
         res
     }
 
-    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData> {
+    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace> {
         &mut self.inner_dht
     }
 
@@ -138,7 +139,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
         trace!("get_peer_list_sync() ...");
         self.inner_dht
             .request(
-                DhtContext::NoOp,
+                Lib3hTrace,
                 DhtRequestToChild::RequestPeerList,
                 Box::new(|mut ud, response| {
                     let response = {
@@ -172,7 +173,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
         }
         self.inner_dht
             .request(
-                DhtContext::NoOp,
+                Lib3hTrace,
                 DhtRequestToChild::RequestThisPeer,
                 Box::new(|mut ud, response| {
                     let response = {
@@ -202,7 +203,7 @@ impl<'gateway> Gateway for P2pGateway<'gateway> {
     fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht
             .request(
-                DhtContext::NoOp,
+                Lib3hTrace,
                 DhtRequestToChild::RequestPeer(peer_address.to_string()),
                 Box::new(|mut ud, response| {
                     let response = {

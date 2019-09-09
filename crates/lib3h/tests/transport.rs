@@ -4,11 +4,8 @@ extern crate detach;
 extern crate lazy_static;
 
 use detach::prelude::*;
-use lib3h::{
-    engine::ghost_engine::DefaultContext,
-    transport::{error::*, protocol::*},
-};
-use lib3h_ghost_actor::prelude::*;
+use lib3h::transport::{error::*, protocol::*};
+use lib3h_ghost_actor::{prelude::*, TestContext};
 use std::{
     collections::{HashMap, HashSet},
     sync::RwLock,
@@ -161,7 +158,7 @@ struct TestTransport {
     endpoint_self: Detach<
         GhostContextEndpoint<
             TestTransport,
-            DefaultContext,
+            TestContext,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -304,13 +301,13 @@ fn ghost_transport() {
     // create an object that can be used to hold state data in callbacks to the transports
     let mut owner = TestTransportOwner::new();
 
-    let mut t1: TransportActorParentWrapper<TestTransportOwner, DefaultContext, TestTransport> =
+    let mut t1: TransportActorParentWrapper<TestTransportOwner, TestContext, TestTransport> =
         GhostParentWrapper::new(
             TestTransport::new("t1"),
             "t1_requests", // prefix for request ids in the tracker
         );
     assert_eq!(t1.as_ref().name, "t1");
-    let mut t2: TransportActorParentWrapper<TestTransportOwner, DefaultContext, TestTransport> =
+    let mut t2: TransportActorParentWrapper<TestTransportOwner, TestContext, TestTransport> =
         GhostParentWrapper::new(
             TestTransport::new("t2"),
             "t2_requests", // prefix for request ids in the tracker
@@ -319,7 +316,7 @@ fn ghost_transport() {
 
     // bind t1 to the network
     t1.request(
-        ().into(),
+        TestContext::new(),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t1").expect("can parse url"),
         },
@@ -339,7 +336,7 @@ fn ghost_transport() {
     // lets do some things to test out returning of error messages, i.e. sending messages
     // to someone not bount to the network
     t1.request(
-        ().into(),
+        TestContext::new(),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
             payload: b"won't be received!".to_vec(),
@@ -360,7 +357,7 @@ fn ghost_transport() {
 
     // bind t2 to the network
     t2.request(
-        ().into(),
+        TestContext::new(),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t2").expect("can parse url"),
         },
@@ -378,7 +375,7 @@ fn ghost_transport() {
     );
 
     t1.request(
-        ().into(),
+        TestContext::new(),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
             payload: b"foo".to_vec(),
