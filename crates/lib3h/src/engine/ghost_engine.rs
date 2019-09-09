@@ -590,7 +590,7 @@ impl<'engine> GhostEngine<'engine> {
         let space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
-            .ok_or(Lib3hError::new_other("Not part of that space"))?;
+            .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
         // Check if messaging self
         let peer_address = { space_gateway.as_mut().get_this_peer_sync().peer_address };
@@ -664,7 +664,7 @@ impl<'engine> GhostEngine<'engine> {
         let _space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
-            .ok_or(Lib3hError::new_other("Not part of that space"))?;
+            .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
         /*
                 let context = "".to_string();
                     //DhtContext::RequestEntry { }
@@ -717,7 +717,7 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<&mut GatewayWrapper<'engine>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
-            .ok_or(Lib3hError::new_other(&format!(
+            .ok_or_else(|| Lib3hError::new_other(&format!(
                 "Not in space: {:?},{:?}",
                 space_address, agent_id
             )))
