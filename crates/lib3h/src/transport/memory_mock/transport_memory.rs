@@ -95,7 +95,7 @@ impl Transport for TransportMemory {
         Ok(self
             .outbound_connection_map
             .iter()
-            .map(|(_, uri)| uri.to_string())
+            .map(|(id, _)| id.to_string())
             .collect())
     }
 
