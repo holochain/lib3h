@@ -19,14 +19,14 @@ fn main() {
     let mut cli = lib3h_sim_chat::SimChat::new(
         Box::new(move |event| {
             match event {
-                // ChatEvent::JoinSuccess{channel_id, ..} => {
-                //     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
-                //         .expect("failed to set linefeed prompt");
-                // },
-                // ChatEvent::PartSuccess => {
-                //     rl_t.set_prompt("no-channel> ")
-                //         .expect("failed to set linefeed prompt");      
-                // },
+                ChatEvent::JoinSuccess{channel_id, ..} => {
+                    rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
+                        .expect("failed to set linefeed prompt");
+                },
+                ChatEvent::PartSuccess => {
+                    rl_t.set_prompt("SimChat> ")
+                        .expect("failed to set linefeed prompt");      
+                },
                 ChatEvent::ReceiveDirectMessage{from_agent, payload} => {
                     writeln!(rl_t, "*{}* {}", from_agent, payload).expect("write fail");
                 },
