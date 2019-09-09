@@ -103,7 +103,7 @@ impl Drop for SimChat {
 }
 
 impl SimChat {
-    pub fn new(mut handler: HandleEvent) -> Self {
+    pub fn new(mut handler: HandleEvent, peer_uri: Url) -> Self {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
         let (out_send, out_recv): (
@@ -126,8 +126,8 @@ impl SimChat {
                         .request_id_prefix("parent")
                         .build();
 
-                // call connect to start the networking process
-                SimChat::connect(&mut parent_endpoint, Url::parse("http://bootstrap.holo.host").unwrap());
+                // call connect to start the networking process passing a 
+                SimChat::connect(&mut parent_endpoint, peer_uri);
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -227,9 +227,12 @@ mod tests {
     #[test]
     fn it_should_echo() {
         let (s, r) = crossbeam_channel::unbounded();
-        let mut chat = SimChat::new(Box::new(move |event| {
-            s.send(event.to_owned()).expect("send fail");
-        }));
+        let mut chat = SimChat::new(
+            Box::new(move |event| {
+                s.send(event.to_owned()).expect("send fail");
+            }),
+            Url::parse("http://test.boostrap").unwrap()
+        );
 
         let msg = ChatEvent::SendDirectMessage {
             to_address: "addr".to_string(),

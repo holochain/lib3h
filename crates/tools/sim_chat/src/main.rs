@@ -2,8 +2,10 @@
 
 extern crate linefeed;
 extern crate regex;
+extern crate url;
 use lib3h_sim_chat::{channel_address_from_str, ChatEvent};
 use regex::Regex;
+use url::Url;
 
 fn main() {
     let rl =
@@ -14,9 +16,12 @@ fn main() {
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
-    let mut cli = lib3h_sim_chat::SimChat::new(Box::new(move |event| {
-        writeln!(rl_t, "GOT {:?}", event).expect("write fail");
-    }));
+    let mut cli = lib3h_sim_chat::SimChat::new(
+        Box::new(move |event| {
+            writeln!(rl_t, "GOT {:?}", event).expect("write fail");
+        }),
+        Url::parse("http://bootstrap.holo.host").unwrap()
+    );
 
     let help_text = || {
         writeln!(
