@@ -58,7 +58,7 @@ fn construct_mock_engine(
     config: &RealEngineConfig,
     name: &str,
 ) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine<MirrorDht> = RealEngine::new_mock(
+    let engine: RealEngine = RealEngine::new_mock(
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),

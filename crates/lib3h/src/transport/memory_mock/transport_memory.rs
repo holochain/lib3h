@@ -73,7 +73,7 @@ impl Drop for TransportMemory {
 /// Compose Transport
 impl Transport for TransportMemory {
     /// Get list of known connectionIds
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
+    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
         Ok(self.connections.iter().map(|uri| uri.to_string()).collect())
     }
 
