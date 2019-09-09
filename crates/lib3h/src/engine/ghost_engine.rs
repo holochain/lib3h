@@ -337,12 +337,13 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         // TODO END
     }
 
+    #[allow(non_snake_case)]
     fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
         &mut self,
         msg: EntryListData,
     ) -> Lib3hResult<()> {
         let mut request_list = Vec::new();
-        let space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+        let _space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
 
         let mut msg_data = FetchEntryData {
             space_address: msg.space_address.clone(),
@@ -353,7 +354,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         };
         // Request every Entry from Core
         let mut count = 0;
-        for (entry_address, aspect_address_list) in msg.address_map {
+        for (entry_address, _aspect_address_list) in msg.address_map {
             // Check aspects and only request entry with new aspects
             /* TODO: add back in for real Gateway
             let maybe_known_aspects = space_gateway.as_ref().get_aspects_of(&entry_address);
@@ -378,9 +379,9 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                 Box::new(|_me, _ctx, response| {
                     match response {
                         GhostCallbackData::Response(Ok(
-                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
+                            Lib3hToClientResponse::HandleFetchEntryResult(_msg),
                         )) => {
-//                            self.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg)
+                            //let _ = me.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
                         }
                         GhostCallbackData::Response(Err(e)) => {
                             error!("Got error on HandleFetchEntryResult: {:?} ", e);
@@ -396,12 +397,12 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         }
         Ok(())
     }
-
+    #[allow(non_snake_case)]
     fn serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(
         &mut self,
         msg: EntryListData,
     ) -> Lib3hResult<()> {
-        let space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+        let _space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
 
         for (entry_address, aspect_address_list) in msg.address_map {
             let mut aspect_list = Vec::new();
@@ -461,7 +462,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                     )) => {
-                        me.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
+                        let _ = me.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error on HandleGetGossipingEntryListResult: {:?} ", e);
@@ -485,7 +486,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => {
-                       me.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg);
+                       let _ = me.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg);
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
