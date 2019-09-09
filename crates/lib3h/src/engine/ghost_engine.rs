@@ -296,10 +296,8 @@ impl<'engine> GhostEngine<'engine> {
                 .handle_hold_entry(&data)
                 .map_err(|e| GhostError::from(e.to_string())),
             ClientToLib3h::QueryEntry(data) => {
-                let result = self
-                    .handle_query_entry(&data)
-                    .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
-                msg.respond(result)
+                let _ = self.handle_query_entry(msg, &data);
+                Ok(())
             }
             _ => panic!("{:?} not implemented", msg),
         }
@@ -452,7 +450,7 @@ impl<'engine> GhostEngine<'engine> {
 
     #[allow(non_snake_case)]
     fn handle_HandleGetGossipingEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
-        let _space_gateway = self.get_space(
+        let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
@@ -470,15 +468,15 @@ impl<'engine> GhostEngine<'engine> {
             }
             // Create "fake" entry, in the sense an entry with no actual content,
             // but valid addresses.
-            let _fake_entry = EntryData {
+            let fake_entry = EntryData {
                 entry_address: entry_address.clone(),
                 aspect_list,
             };
-            /* TODO: add back for real gateway
-                        space_gateway
-                            .as_dht_mut()
-                            .post(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
-            */
+            space_gateway
+                .as_mut()
+                .as_dht_mut()
+                .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry))
+                .map_err(|e| Lib3hError::new_other(&e.to_string()))?;
         }
         Ok(())
     }
@@ -489,16 +487,20 @@ impl<'engine> GhostEngine<'engine> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
-        let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
+        let this_peer = {
+            let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
+            let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
+            self.broadcast_join(join_msg.space_address.clone(), this_peer.clone());
+            this_peer
+        };
 
-        self.broadcast_join(join_msg.space_address.clone(), this_peer.clone());
+        let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
 
         // Have DHT broadcast our PeerData
-        //TODO
-        // space_gateway
-        //     .as_dht_mut()
-        //     .post(DhtCommand::HoldPeer(this_peer))?;
+        space_gateway
+            .as_mut()
+            .as_dht_mut()
+            .publish(DhtRequestToChild::HoldPeer(this_peer))?;
 
         // Send Get*Lists requests
         let mut list_data = GetListData {
@@ -653,29 +655,57 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_query_entry(&mut self, msg: &QueryEntryData) -> Lib3hResult<QueryEntryResultData> {
-        let chain_id = (msg.space_address.clone(), msg.requester_agent_id.clone());
+    fn handle_query_entry(
+        &mut self,
+        msg: ClientToLib3hMessage,
+        data: &QueryEntryData,
+    ) -> Lib3hResult<()> {
+        let chain_id = (data.space_address.clone(), data.requester_agent_id.clone());
         let _space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
             .ok_or(Lib3hError::new_other("Not part of that space"))?;
         /*
-            let msg = dht_protocol::FetchDhtEntryData {
-            msg_id: msg.request_id,
-            entry_address: msg.entry_address,
-        };
-            let cmd = DhtCommand::FetchEntry(msg);
-            space_gateway.as_dht_mut().post(cmd)?;
-             */
+                let context = "".to_string();
+                    //DhtContext::RequestEntry { }
+                space_gateway
+                    .as_mut()
+                    .as_dht_mut()
+                    .request(
+                        context,
+                        DhtRequestToChild::RequestEntry(data.entry_address),
+                        Box::new(|_me, _context, response| {
+                            match response {
+                                GhostCallbackData::Response(Ok(
+                                    DhtRequestToChildResponse::RequestEntry(entry_data),
+                                )) => {
+
+                                }
+                                GhostCallbackData::Response(Err(e)) => {
+                                    error!("Got error on DHT RequestEntry: {:?} ", e);
+                                }
+                                GhostCallbackData::Timeout => {
+                                    error!("Got timeout on DHT RequestEntry");
+                                }
+                                _ => panic!("bad response type"),
+                            }
+                            Ok(())
+                        }
+                    ))?;
+        */
         // FAKE
-        Ok(QueryEntryResultData {
-            space_address: msg.space_address.clone(),
-            entry_address: msg.entry_address.clone(),
-            request_id: msg.request_id.clone(),
-            requester_agent_id: msg.requester_agent_id.clone(),
+        let result = Ok(QueryEntryResultData {
+            space_address: data.space_address.clone(),
+            entry_address: data.entry_address.clone(),
+            request_id: data.request_id.clone(),
+            requester_agent_id: data.requester_agent_id.clone(),
             responder_agent_id: "fake_responder_id".into(),
             query_result: b"fake response".to_vec(),
         })
+        .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
+
+        msg.respond(result)
+            .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
     /// Get a space_gateway for the specified space+agent.
