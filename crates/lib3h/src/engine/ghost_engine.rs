@@ -378,72 +378,106 @@ impl<'engine> GhostEngine<'engine> {
     #[allow(non_snake_case)]
     fn handle_HandleGetAuthoringEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
         let mut request_list = Vec::new();
-        let _space_gateway = self.get_space(
+        let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
 
-        let mut msg_data = FetchEntryData {
-            space_address: msg.space_address.clone(),
-            entry_address: "".into(),
-            request_id: "".into(),
-            provider_agent_id: msg.provider_agent_id.clone(),
-            aspect_address_list: None,
-        };
-        // Request every Entry from Core
-        let mut count = 0;
-        for (entry_address, _aspect_address_list) in msg.address_map {
+       for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
-            /* TODO: add back in for real Gateway
-            let maybe_known_aspects = space_gateway.as_ref().get_aspects_of(&entry_address);
-            if let Some(known_aspects) = maybe_known_aspects {
-                if includes(&known_aspects, &aspect_address_list) {
-                    continue;
-                }
-            }*/
-            count += 1;
-            msg_data.entry_address = entry_address.clone();
-            request_list.push(msg_data.clone());
-        }
-        debug!("HandleGetAuthoringEntryListResult: {}", count);
+            space_gateway.as_mut().as_dht_mut().request(
+                DhtContext::RequestAspectsOf {
+                    entry_address: entry_address.clone(),
+                    aspect_address_list,
+                    msg: msg.clone(),
+                    request_id: self.request_track.reserve(),
+                },
+                DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
+                Box::new(|ud, context, response| {
+                    let (entry_address, aspect_address_list, msg, request_id) = {
+                        if let DhtContext::RequestAspectsOf {
+                            entry_address,
+                            aspect_address_list,
+                            msg,
+                            request_id,
+                        } = context
+                        {
+                            (entry_address, aspect_address_list, msg, request_id)
+                        } else {
+                            panic!("bad context type");
+                        }
+                    };
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
+                        response
+                    {
+                        let can_fetch = match maybe_known_aspects {
+                            None => true,
+                            Some(known_aspects) => {
+                                let can = !includes(&known_aspects, &aspect_address_list);
+                                can
+                            }
+                        };
+                        if can_fetch {
+                            let msg_data = FetchEntryData {
+                                space_address: msg.space_address.clone(),
+                                entry_address: entry_address.clone(),
+                                request_id,
+                                provider_agent_id: msg.provider_agent_id.clone(),
+                                aspect_address_list: None,
+                            };
 
-        let context = RequestContext {
-            space_address: msg.space_address.to_owned(),
-            agent_id: msg.provider_agent_id.to_owned(),
-        };
-        for mut msg_data in request_list {
-            msg_data.request_id = self.request_track.reserve();
-
-            let _ = self.lib3h_endpoint.request(
-                context.clone(),
-                Lib3hToClient::HandleFetchEntry(msg_data),
-                Box::new(|me, context, response| {
-                    let space_gateway = me
-                        .get_space(
-                            &context.space_address.to_owned(),
-                            &context.agent_id.to_owned(),
-                        )
-                        .map_err(|e| GhostError::from(e.to_string()))?;
-                    match response {
-                        GhostCallbackData::Response(Ok(
-                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
-                        )) => {
-                            space_gateway
-                                .as_mut()
-                                .as_dht_mut()
-                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry.clone()))?;
+                            let context = RequestContext {
+                                space_address: msg.space_address.to_owned(),
+                                agent_id: msg.provider_agent_id.to_owned(),
+                            };
+                            let _ = self.lib3h_endpoint.request(
+                                context.clone(),
+                                Lib3hToClient::HandleFetchEntry(msg_data),
+                                Box::new(|me, context, response| {
+                                    let space_gateway = me
+                                        .get_space(
+                                            &context.space_address.to_owned(),
+                                            &context.agent_id.to_owned(),
+                                        )
+                                        .map_err(|e| GhostError::from(e.to_string()))?;
+                                    match response {
+                                        GhostCallbackData::Response(Ok(
+                                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
+                                        )) => {
+                                            space_gateway
+                                                .as_mut()
+                                                .as_dht_mut()
+                                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry.clone()))?;
+                                        }
+                                        GhostCallbackData::Response(Err(e)) => {
+                                            error!("Got error on HandleFetchEntryResult: {:?} ", e);
+                                        }
+                                        GhostCallbackData::Timeout => {
+                                            error!("Got timeout on HandleFetchEntryResult");
+                                        }
+                                        _ => panic!("bad response type"),
+                                    }
+                                    Ok(())
+                                }),
+                            );
+/*                            ud.lib3h_outbox
+                                .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));*/
                         }
-                        GhostCallbackData::Response(Err(e)) => {
-                            error!("Got error on HandleFetchEntryResult: {:?} ", e);
-                        }
-                        GhostCallbackData::Timeout => {
-                            error!("Got timeout on HandleFetchEntryResult stResult");
-                        }
-                        _ => panic!("bad response type"),
+                    } else {
+                        panic!("bad response to RequestAspectsOf: {:?}", response);
                     }
                     Ok(())
                 }),
-            );
+            )?;
         }
         Ok(())
     }
@@ -723,6 +757,14 @@ impl<'engine> GhostEngine<'engine> {
             )))
     }
 }
+
+/// Return true if all elements of list_b are found in list_a
+fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
+    let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
+    let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
+    set_b.is_subset(&set_a)
+}
+
 
 #[cfg(test)]
 mod tests {
