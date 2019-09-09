@@ -37,7 +37,7 @@ impl TransportKeys {
     }
 }
 
-impl<'engine> RealEngine<'engine> {
+impl RealEngine {
     /// Constructor with TransportWss
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
@@ -86,8 +86,7 @@ impl<'engine> RealEngine<'engine> {
 }
 
 /// Constructor
-//#[cfg(test)]
-impl<'engine> RealEngine<'engine> {
+impl RealEngine {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
@@ -140,7 +139,7 @@ impl<'engine> RealEngine<'engine> {
     }
 }
 
-impl<'engine> NetworkEngine for RealEngine<'engine> {
+impl NetworkEngine for RealEngine {
     /// User provided identifier for this engine
     fn name(&self) -> String {
         self.name.clone()
@@ -196,7 +195,7 @@ impl<'engine> NetworkEngine for RealEngine<'engine> {
 }
 
 /// Drop
-impl<'engine> Drop for RealEngine<'engine> {
+impl Drop for RealEngine {
     fn drop(&mut self) {
         self.shutdown().unwrap_or_else(|e| {
             warn!("Graceful shutdown failed: {}", e);
@@ -205,7 +204,7 @@ impl<'engine> Drop for RealEngine<'engine> {
 }
 
 /// Private
-impl<'engine> RealEngine<'engine> {
+impl RealEngine {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
@@ -604,13 +603,12 @@ impl<'engine> RealEngine<'engine> {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway =
-            GatewayParentWrapperDyn::new(P2pGateway::new_with_space(
-                &join_msg.space_address,
-                self.network_transport,
-                self.dht_factory,
-                &dht_config,
-            ));
+        let new_space_gateway = GatewayParentWrapperDyn::new(P2pGateway::new_with_space(
+            &join_msg.space_address,
+            self.network_transport,
+            self.dht_factory,
+            &dht_config,
+        ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
@@ -639,7 +637,9 @@ impl<'engine> RealEngine<'engine> {
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = { space_gateway.get_this_peer_sync().clone() };
-        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)));
+        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
+            this_peer,
+        )));
 
         // Send Get*Lists requests
         let mut list_data = GetListData {
@@ -805,7 +805,10 @@ pub fn handle_gossipTo(
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
         // FIXME peer_address to Url convert
-        let msg = transport::protocol::SendMessage { address: "address:" + to_peer_address, payload };
+        let msg = transport::protocol::SendMessage {
+            address: "address:" + to_peer_address,
+            payload,
+        };
         gateway.publish(GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())

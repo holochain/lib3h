@@ -6,7 +6,7 @@ use crate::{
         p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    transport::{protocol::*},
+    transport::protocol::*,
 };
 
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
@@ -14,7 +14,7 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer related private methods
-impl<'engine> RealEngine<'engine> {
+impl RealEngine {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,

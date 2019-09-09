@@ -5,11 +5,7 @@ mod space_layer;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::{
-    dht::dht_protocol::*,
-    track::Tracker,
-    transport_wss::TlsConfig,
-};
+use crate::{dht::dht_protocol::*, track::Tracker, transport_wss::TlsConfig};
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
@@ -77,13 +73,12 @@ pub struct RealEngine {
     /// Transport used by the network gateway
     network_transport: ChildTransportWrapperDyn<(), ()>,
     /// P2p gateway for the network layer
-    network_gateway: GatewayParentWrapperDyn<(), ()>,
+    network_gateway: GatewayParentWrapperDyn<(), GatewayContext>,
 
-//    /// Store active connections?
-//    network_connections: HashSet<ConnectionId>,
-
+    //    /// Store active connections?
+    //    network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<(), ()>>,
+    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<(), GatewayContext>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

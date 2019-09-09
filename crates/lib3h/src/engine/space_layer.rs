@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<'engine> RealEngine<'engine> {
+impl RealEngine {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
@@ -27,7 +27,10 @@ impl<'engine> RealEngine<'engine> {
     }
 
     /// Return first space gateway for a specified space_address
-    pub fn get_first_space_mut(&mut self, space_address: &str) -> Option<GatewayParentWrapperDyn<(), ()>> {
+    pub fn get_first_space_mut(
+        &mut self,
+        space_address: &str,
+    ) -> Option<GatewayParentWrapperDyn<(), ()>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -41,14 +44,14 @@ impl<'engine> RealEngine<'engine> {
     pub(crate) fn process_space_gateways(
         &mut self,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
-        // Process all space gateways' DHT and collect requests
+        // Process all space gateways and collect requests
         let mut outbox = Vec::new();
         let mut space_outbox_map = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            // process inbox from parent & handle requests
             detach_run!(&mut self.space_gateway, |sg| sg.process(&mut ()))?;
             let request_list = self.space_gateway.drain_messages();
             space_outbox_map.insert(chain_id.clone(), request_list);
+            // DHT magic
             let mut temp = space_gateway.as_mut().drain_dht_outbox();
             self.temp_outbox.append(&mut temp);
         }
@@ -80,6 +83,8 @@ impl<'engine> RealEngine<'engine> {
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
         match request {
+            // Handle Space's DHT request
+            // ==========================
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
@@ -98,7 +103,9 @@ impl<'engine> RealEngine<'engine> {
                             peer_data,
                         );
                         // For now accept all request
-                        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)));
+                        space_gateway.publish(GatewayRequestToChild::Dht(
+                            DhtRequestToChild::HoldPeer(peer_data),
+                        ));
                     }
                     DhtRequestToParent::PeerTimedOut(_peer_address) => {
                         // no-op
@@ -138,10 +145,14 @@ impl<'engine> RealEngine<'engine> {
                         outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data))
                     }
                 }
-            },
+            }
+            // Handle Space's Transport request
+            // ================================
             GatewayRequestToParent::Transport(_transport_request) => {
-              // FIXME
-            },
+                // FIXME
+            }
+            // Handle Space's Other request
+            // ============================
             _ => (), // FIXME
         }
         Ok(outbox)

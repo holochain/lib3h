@@ -1,6 +1,7 @@
-pub mod gateway_transport;
-pub mod p2p_gateway;
 pub mod gateway_actor;
+pub mod gateway_transport;
+pub mod gateway_dht;
+pub mod p2p_gateway;
 pub mod protocol;
 // pub mod wrapper;
 
@@ -43,11 +44,11 @@ use url::Url;
 pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
-//    /// Map holding the reversed mapping between connection url and connectionId response
-//    connection_map: HashMap<Url, ConnectionId>,
-//    /// Own inbox for TransportCommands which is processed during Transport::process()
-//    transport_inbox: VecDeque<TransportCommand>,
-//    transport_inject_events: Vec<TransportEvent>,
+    //    /// Map holding the reversed mapping between connection url and connectionId response
+    //    connection_map: HashMap<Url, ConnectionId>,
+    //    /// Own inbox for TransportCommands which is processed during Transport::process()
+    //    transport_inbox: VecDeque<TransportCommand>,
+    //    transport_inject_events: Vec<TransportEvent>,
     /// Transport
     child_transport_endpoint: TransportEndpointWithContext<GatewayUserData, GatewayContext>,
     /// DHT
@@ -62,9 +63,7 @@ pub struct P2pGateway {
     endpoint_self: Detach<GatewaySelfEndpoint<()>>,
 }
 
-pub struct GatewayContext {
-
-}
+pub struct GatewayContext {}
 
 // user data for ghost callback
 pub struct GatewayUserData {

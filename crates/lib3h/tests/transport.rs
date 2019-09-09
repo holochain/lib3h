@@ -188,7 +188,7 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
-            self.handle_msg_from_parent(msg)?;
+            self.handle_RequestToChild(msg)?;
         }
         self.handle_events_from_mockernet()?;
         Ok(false.into())
@@ -214,14 +214,9 @@ impl TestTransport {
     }
 
     /// private dispatcher for messages coming from our parent
-    fn handle_msg_from_parent(
+    fn handle_RequestToChild(
         &mut self,
-        mut msg: GhostMessage<
-            RequestToChild,
-            RequestToParent,
-            RequestToChildResponse,
-            TransportError,
-        >,
+        mut msg: ToChildMessage,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => {

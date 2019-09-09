@@ -56,9 +56,7 @@ pub mod tests {
     #![allow(non_snake_case)]
 
     use crate::{
-        transport::{
-            memory_mock::transport_memory, protocol::TransportEvent,// transport_trait::Transport,
-        },
+        transport::{memory_mock::transport_memory, protocol::TransportEvent},
         transport_wss::{TlsConfig, TransportWss},
     };
 

@@ -1,4 +1,4 @@
-use crate::transport::{error::TransportError};
+use crate::transport::error::TransportError;
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
 //
@@ -37,27 +37,33 @@ pub struct BindResultData {
 #[derive(Debug)]
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { address: Url, payload: Vec<u8> },
+    SendMessage { uri: Url, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
-    SendMessage,
+    SendMessage { payload: Vec<u8> },
 }
 
 #[derive(Debug)]
 pub enum RequestToParent {
-    IncomingConnection { address: Url },
-    ReceivedData { address: Url, payload: Vec<u8> },
-    TransportError { error: TransportError },
+    ErrorOccured { error: TransportError },
+    IncomingConnection { uri: Url },
+    ReceivedData { uri: Url, payload: Vec<u8> },
 }
 
 #[derive(Debug)]
 pub enum RequestToParentResponse {
-//    Allowed,    // just for testing
-//    Disallowed, // just for testing
+    // N/A
 }
+
+pub type ToChildMessage =
+GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
+
+pub type ToParentMessage =
+GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, TransportError>;
+
 
 pub type DynTransportActor = Box<
     dyn GhostActor<
@@ -76,7 +82,8 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportEndpointWithContext<UserData, Context> = TransportActorSelfEndpoint<UserData, Context>;
+pub type TransportEndpointWithContext<UserData, Context> =
+    TransportActorSelfEndpoint<UserData, Context>;
 pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
     UserData,
     Context,
@@ -96,7 +103,8 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type ChildTransportWrapperDyn<UserData, Context> = TransportActorParentWrapperDyn<UserData, Context>;
+pub type ChildTransportWrapperDyn<UserData, Context> =
+    TransportActorParentWrapperDyn<UserData, Context>;
 pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
     UserData,
     Context,

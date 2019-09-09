@@ -1,6 +1,19 @@
+use crate::dht::dht_protocol::*;
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
-use crate::dht::dht_protocol::*;
+use lib3h_protocol::error::*;
+
+#[derive(Debug)]
+pub enum GatewayContext {
+    Transport {parent_request: transport::protocol::ToChildMessage},
+    Dht {parent_request: DhtToChildMessage},
+    Bind {
+        maybe_parent_msg: Option<transport::protocol::ToChildMessage>,
+    },
+    SendMessage {
+        maybe_parent_msg: Option<transport::protocol::ToChildMessage>,
+    },
+}
 
 /// Gateway protocol enums for use with GhostActor implementation
 #[derive(Debug)]
@@ -31,11 +44,19 @@ pub enum GatewayRequestToParentResponse {
     Dht(DhtRequestToParentResponse),
 }
 
-pub type GatewayToChildMessage =
-GhostMessage<GatewayRequestToChild, GatewayRequestToParent, GatewayRequestToChildResponse, Lib3hError>;
+pub type GatewayToChildMessage = GhostMessage<
+    GatewayRequestToChild,
+    GatewayRequestToParent,
+    GatewayRequestToChildResponse,
+    Lib3hError,
+>;
 
-pub type GatewayToParentMessage =
-GhostMessage<GatewayRequestToParent, GatewayRequestToChild, GatewayRequestToParentResponse, Lib3hError>;
+pub type GatewayToParentMessage = GhostMessage<
+    GatewayRequestToParent,
+    GatewayRequestToChild,
+    GatewayRequestToParentResponse,
+    Lib3hError,
+>;
 
 pub type GatewayActor = dyn GhostActor<
     GatewayRequestToParent,
