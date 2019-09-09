@@ -50,11 +50,13 @@ pub type ClientToLib3hMessage =
 pub type Lib3hToClientMessage =
     GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>;
 
+/*
 // temporary mock gateway...
 struct MockGateway {
     #[allow(dead_code)]
     space_address: Address,
     this_peer: PeerData,
+    dht: DhtEndpointWithContext
 }
 impl MockGateway {
     fn new((space_address, peer_id): (Address, Address)) -> Self {
@@ -70,10 +72,10 @@ impl MockGateway {
     fn this_peer(&self) -> &PeerData {
         &self.this_peer
     }
-    /*    fn as_dht_mut() -> DhtEndpointWithContext {
+    fn as_dht_mut() -> DhtEndpointWithContext {
 
-    }*/
-}
+    }
+}*/
 
 #[allow(dead_code)]
 pub struct GhostEngine<'engine> {
@@ -94,7 +96,7 @@ pub struct GhostEngine<'engine> {
     /// Store active connections?
     network_connections: HashSet<ConnectionId>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, MockGateway>, // GatewayWrapper<'engine>>,
+    space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
@@ -302,37 +304,47 @@ impl<'engine> GhostEngine<'engine> {
         space_address: Address,
         agent_id: Address,
     ) -> Lib3hResult<(Address, Address)> {
-        let chain_id = (space_address, agent_id);
+        let chain_id = (space_address.clone(), agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
             return Err(Lib3hError::new_other("Already joined space"));
         }
 
-        /* TODO
+        // First create DhtConfig for space gateway
 
-                   // First create DhtConfig for space gateway
-            let agent_id: String = join_msg.agent_id.clone().into();
-            let this_peer_transport_id_as_uri = {
+        /*TODO: FIXME
+        let this_peer_transport_id_as_uri = {
                 let gateway = self.network_gateway.as_ref();
                 // TODO #175 - encapsulate this conversion logic
                 Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
                     .expect("can parse url")
-            };
-            let dht_config = DhtConfig {
-                this_peer_address: agent_id,
-                this_peer_uri: this_peer_transport_id_as_uri,
-                custom: self.config.dht_custom_config.clone(),
-                gossip_interval: self.config.dht_gossip_interval,
-                timeout_threshold: self.config.dht_timeout_threshold,
-            };
-            // Create new space gateway for this ChainId
-            let new_space_gateway: GatewayWrapper<'engine> =
-                GatewayWrapper::new(P2pGateway::new_with_space(
-                    self.network_gateway.as_transport(),
-                    &join_msg.space_address,
-                    self.dht_factory,
-                    &dht_config,
-        ));*/
-        let new_space_gateway = MockGateway::new(chain_id.clone());
+        };
+        */
+        let this_peer_transport_id_as_uri = {
+            Url::parse(
+                format!(
+                    "transportId:{}",
+                    format!("transport_id_for_{}", agent_id.clone())
+                )
+                .as_str(),
+            )
+            .expect("can parse url")
+        };
+        let dht_config = DhtConfig {
+            this_peer_address: agent_id.into(),
+            this_peer_uri: this_peer_transport_id_as_uri,
+            custom: self.config.dht_custom_config.clone(),
+            gossip_interval: self.config.dht_gossip_interval,
+            timeout_threshold: self.config.dht_timeout_threshold,
+        };
+        // Create new space gateway for this ChainId
+        let new_space_gateway: GatewayWrapper<'engine> =
+            GatewayWrapper::new(P2pGateway::new_with_space(
+                &space_address,
+                self.network_gateway.as_transport(),
+                self.dht_factory,
+                &dht_config,
+            ));
+        //        let new_space_gateway = MockGateway::new(chain_id.clone());
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
         Ok(chain_id)
@@ -461,7 +473,7 @@ impl<'engine> GhostEngine<'engine> {
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        let this_peer = space_gateway.this_peer().to_owned();
+        let this_peer = { space_gateway.as_mut().get_this_peer_sync().clone() };
 
         self.broadcast_join(join_msg.space_address.clone(), this_peer.clone());
 
@@ -560,9 +572,9 @@ impl<'engine> GhostEngine<'engine> {
             .ok_or(Lib3hError::new_other("Not part of that space"))?;
 
         // Check if messaging self
-        let peer_address = &space_gateway.this_peer().peer_address.clone();
+        let peer_address = { space_gateway.as_mut().get_this_peer_sync().peer_address };
         let to_agent_id: String = msg.to_agent_id.clone().into();
-        if peer_address == &to_agent_id {
+        if &peer_address == &to_agent_id {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
 
@@ -655,7 +667,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         space_address: &Address,
         agent_id: &Address,
-    ) -> Lib3hResult<&mut MockGateway> {
+    ) -> Lib3hResult<&mut GatewayWrapper<'engine>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
             .ok_or(Lib3hError::new_other(&format!(
