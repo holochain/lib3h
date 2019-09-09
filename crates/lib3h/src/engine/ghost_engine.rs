@@ -5,12 +5,12 @@ use std::collections::{HashMap, HashSet};
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{dht_protocol::PeerData, dht_trait::*},
+    dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
         p2p_protocol::P2pProtocol, ChainId, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
-    error::{Lib3hError, Lib3hResult},
-    gateway::{GatewayWrapper, P2pGateway},
+    error::{ErrorKind, Lib3hError, Lib3hResult},
+    gateway::{wrapper::*, P2pGateway},
     track::Tracker,
     transport::{ConnectionId, TransportWrapper},
 };
@@ -70,16 +70,19 @@ impl MockGateway {
     fn this_peer(&self) -> &PeerData {
         &self.this_peer
     }
+    /*    fn as_dht_mut() -> DhtEndpointWithContext {
+
+    }*/
 }
 
 #[allow(dead_code)]
-pub struct GhostEngine<'engine, D: Dht + 'engine> {
+pub struct GhostEngine<'engine> {
     /// Identifier
     name: String,
     /// Config settings
     config: RealEngineConfig,
     /// Factory for building DHT's of type D
-    dht_factory: DhtFactory<D>,
+    dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
     // TODO #176: Remove this if we resolve #176 without it.
@@ -112,7 +115,7 @@ pub struct GhostEngine<'engine, D: Dht + 'engine> {
     >,
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
-            GhostEngine<'engine, D>,
+            GhostEngine<'engine>,
             String,
             Lib3hToClient,
             Lib3hToClientResponse,
@@ -123,12 +126,12 @@ pub struct GhostEngine<'engine, D: Dht + 'engine> {
     >,
 }
 
-impl<'engine, D: Dht> GhostEngine<'engine, D> {
+impl<'engine> GhostEngine<'engine> {
     pub fn new(
         name: &str,
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
-        dht_factory: DhtFactory<D>,
+        dht_factory: DhtFactory,
         network_transport: TransportWrapper<'engine>,
     ) -> Lib3hResult<Self> {
         let binding = network_transport.as_mut().bind(&config.bind_url)?;
@@ -173,14 +176,14 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
     }
 }
 
-impl<'engine, D: Dht>
+impl<'engine>
     GhostActor<
         Lib3hToClient,
         Lib3hToClientResponse,
         ClientToLib3h,
         ClientToLib3hResponse,
         Lib3hError,
-    > for GhostEngine<'engine, D>
+    > for GhostEngine<'engine>
 {
     // START BOILER PLATE--------------------------
     fn take_parent_endpoint(
@@ -213,7 +216,7 @@ impl<'engine, D: Dht>
 }
 
 /// Drop
-impl<'engine, D: Dht> Drop for GhostEngine<'engine, D> {
+impl<'engine> Drop for GhostEngine<'engine> {
     fn drop(&mut self) {
         self.shutdown().unwrap_or_else(|e| {
             warn!("Graceful shutdown failed: {}", e);
@@ -222,7 +225,7 @@ impl<'engine, D: Dht> Drop for GhostEngine<'engine, D> {
 }
 
 /// Private
-impl<'engine, D: Dht> GhostEngine<'engine, D> {
+impl<'engine> GhostEngine<'engine> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
@@ -253,7 +256,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
     /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
-            ClientToLib3h::Connect(_data) => {}
+            ClientToLib3h::Connect(_data) => Ok(()),
             //    let cmd = TransportCommand::Connect(data.peer_uri, data.request_id);
             //  self.network_gateway.as_transport_mut().post(cmd)?;
             // ARG need this to be a request with a callback!!
@@ -262,39 +265,35 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                 let result = self
                     .handle_join(&data)
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
-                msg.respond(result);
+                msg.respond(result)
             }
             ClientToLib3h::LeaveSpace(data) => {
                 let result = self
                     .handle_leave(&data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
-                msg.respond(result);
+                msg.respond(result)
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 let result = self
                     .handle_direct_message(&data, false)
                     .map(|data| ClientToLib3hResponse::SendDirectMessageResult(data));
-                msg.respond(result);
+                msg.respond(result)
             }
             /*            FetchEntry(FetchEntryData)  => {} Not being used, probably deprecated*/
-            ClientToLib3h::PublishEntry(data) => {
-                self.handle_publish_entry(&data)
-                    .map_err(|e| GhostError::from(e.to_string()))?;
-            }
-            ClientToLib3h::HoldEntry(data) => {
-                self.handle_hold_entry(&data)
-                    .map_err(|e| GhostError::from(e.to_string()))?;
-            }
+            ClientToLib3h::PublishEntry(data) => self
+                .handle_publish_entry(&data)
+                .map_err(|e| GhostError::from(e.to_string())),
+            ClientToLib3h::HoldEntry(data) => self
+                .handle_hold_entry(&data)
+                .map_err(|e| GhostError::from(e.to_string())),
             ClientToLib3h::QueryEntry(data) => {
                 let result = self
                     .handle_query_entry(&data)
                     .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
-                msg.respond(result);
+                msg.respond(result)
             }
-
             _ => panic!("{:?} not implemented", msg),
         }
-        Ok(())
     }
 
     /// create a new gateway and add it to our gateway map
@@ -395,7 +394,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
             msg_data.request_id = self.request_track.reserve();
 
             let context = "".to_string();
-            self.lib3h_endpoint.request(
+            let _ = self.lib3h_endpoint.request(
                 context,
                 Lib3hToClient::HandleFetchEntry(msg_data),
                 Box::new(|_me, _ctx, response| {
@@ -504,38 +503,40 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                 }
                 Ok(())
             }),
-        );
+        )?;
 
         let context = "".to_string();
         list_data.request_id = self.request_track.reserve();
-        self.lib3h_endpoint.request(
-            context,
-            Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-            Box::new(|me, _ctx, response| {
-                match response {
-                    GhostCallbackData::Response(Ok(
-                        Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
-                    )) => {
-                        if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
-                            error!(
+        self.lib3h_endpoint
+            .request(
+                context,
+                Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
+                Box::new(|me, _ctx, response| {
+                    match response {
+                        GhostCallbackData::Response(Ok(
+                            Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
+                        )) => {
+                            if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
+                                error!(
                                 "Got error when handling HandleGetAuthoringEntryListResult: {:?} ",
                                 err
                             );
-                        };
+                            };
+                        }
+                        GhostCallbackData::Response(Err(e)) => {
+                            error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
+                        }
+                        GhostCallbackData::Timeout => {
+                            error!("Got timeout on HandleGetAuthoringEntryListResult");
+                        }
+                        _ => panic!("bad response type"),
                     }
-                    GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
-                    }
-                    GhostCallbackData::Timeout => {
-                        error!("Got timeout on HandleGetAuthoringEntryListResult");
-                    }
-                    _ => panic!("bad response type"),
-                }
-                Ok(())
-            }),
-        );
+                    Ok(())
+                }),
+            )
+            .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))
         // Done
-        Ok(())
+        //Ok(())
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
@@ -618,6 +619,8 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
         space_gateway.as_dht_mut().post(cmd)?;
          */
+        //        space_gateway.as_dht_mut().request(
+        //        );
         Ok(())
     }
 
@@ -706,7 +709,7 @@ mod tests {
         };
         let dht_factory = MirrorDht::new_with_config;
 
-        let engine: GhostEngine<MirrorDht> = GhostEngine::new(
+        let engine: GhostEngine = GhostEngine::new(
             "test_engine",
             crypto,
             config,
@@ -714,7 +717,7 @@ mod tests {
             network_transport,
         )
         .unwrap();
-        let mut lib3h: GhostEngineParentWrapper<MockCore, GhostEngine<MirrorDht>, Lib3hError> =
+        let mut lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_engine");
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
 
