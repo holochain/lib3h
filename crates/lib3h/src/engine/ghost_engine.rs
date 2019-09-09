@@ -326,13 +326,6 @@ impl<'engine> GhostEngine<'engine> {
                 let _ = self.handle_query_entry(msg, &data);
                 Ok(())
             }
-            /*
-            SendDirectMessage(DirectMessageData) => {}
-            FetchEntry(FetchEntryData)  => {}
-            PublishEntry(ProvidedEntryData) => {}
-            HoldEntry(ProvidedEntryData)  => {}
-            QueryEntry(QueryEntryData) => {}
-            */
             _ => panic!("{:?} not implemented", msg),
         }
     }
