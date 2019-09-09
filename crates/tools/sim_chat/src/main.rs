@@ -62,12 +62,16 @@ lib3h simchat Commands:
                             }
                             (Some("join"), Some(rest)) => {
                                 let mut words = rest.split(' ');
-                                let channel_id = words.next().unwrap().to_string();
-                                let agent_id = words.next().unwrap().to_string();
-                                cli.send(ChatEvent::Join{channel_id, agent_id})
+                                let channel_id = words.next();
+                                let agent_id = words.next();
+                                if let (Some(channel_id), Some(agent_id)) = (channel_id, agent_id) {
+                                    cli.send(ChatEvent::Join{channel_id: channel_id.to_string(), agent_id: agent_id.to_string()})
+                                } else {
+                                    writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
+                                }
                             }
                             (Some("part"), Some(channel_id)) => {
-                                cli.send(ChatEvent::Part{channel_id: channel_id.to_string()})
+                                cli.send(ChatEvent::Part{channel_id:channel_id.to_string()})
                             }
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');
