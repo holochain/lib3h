@@ -3,7 +3,7 @@
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use lib3h_sim_chat::{ChatEvent};
+use lib3h_sim_chat::ChatEvent;
 use regex::Regex;
 use url::Url;
 
@@ -19,22 +19,25 @@ fn main() {
     let mut cli = lib3h_sim_chat::SimChat::new(
         Box::new(move |event| {
             match event {
-                ChatEvent::JoinSuccess{channel_id, ..} => {
+                ChatEvent::JoinSuccess { channel_id, .. } => {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
                         .expect("failed to set linefeed prompt");
-                },
+                }
                 ChatEvent::PartSuccess => {
                     rl_t.set_prompt("SimChat> ")
-                        .expect("failed to set linefeed prompt");      
-                },
-                ChatEvent::ReceiveDirectMessage{from_agent, payload} => {
+                        .expect("failed to set linefeed prompt");
+                }
+                ChatEvent::ReceiveDirectMessage {
+                    from_agent,
+                    payload,
+                } => {
                     writeln!(rl_t, "*{}* {}", from_agent, payload).expect("write fail");
-                },
+                }
                 _ => {}
             }
             writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
-        Url::parse("http://bootstrap.holo.host").unwrap()
+        Url::parse("http://bootstrap.holo.host").unwrap(),
     );
 
     let help_text = || {
@@ -79,26 +82,27 @@ lib3h simchat Commands:
                                 let channel_id = words.next();
                                 let agent_id = words.next();
                                 if let (Some(channel_id), Some(agent_id)) = (channel_id, agent_id) {
-                                    cli.send(ChatEvent::Join{channel_id: channel_id.to_string(), agent_id: agent_id.to_string()})
+                                    cli.send(ChatEvent::Join {
+                                        channel_id: channel_id.to_string(),
+                                        agent_id: agent_id.to_string(),
+                                    })
                                 } else {
                                     writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
                                 }
                             }
-                            (Some("part"), _) => {
-                                cli.send(ChatEvent::Part)
-                            }
+                            (Some("part"), _) => cli.send(ChatEvent::Part),
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');
                                 let to_agent: String = words.next().unwrap().to_string();
                                 let payload: String = words.collect();
-                                cli.send(ChatEvent::SendDirectMessage {
-                                    to_agent,
-                                    payload,
-                                });
+                                cli.send(ChatEvent::SendDirectMessage { to_agent, payload });
                             }
                             _ => {
-                                writeln!(rl, "Unrecognised command or arguments not correctly given")
-                                    .expect("write fail");
+                                writeln!(
+                                    rl,
+                                    "Unrecognised command or arguments not correctly given"
+                                )
+                                .expect("write fail");
                             }
                         }
                     } else {

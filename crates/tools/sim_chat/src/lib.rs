@@ -6,30 +6,22 @@ extern crate base64;
 extern crate crossbeam_channel;
 extern crate url;
 
-use core::convert::{TryFrom};
+use core::convert::TryFrom;
 use lib3h::{
-    engine::{
-        RealEngineConfig,
-        ghost_engine::GhostEngine,
-    },
-    dht::mirror_dht::MirrorDht, transport::memory_mock::transport_memory::TransportMemory,
-        transport_wss::TlsConfig,
-    transport::{TransportWrapper},
+    dht::mirror_dht::MirrorDht,
+    engine::{ghost_engine::GhostEngine, RealEngineConfig},
     error::Lib3hError,
+    transport::{memory_mock::transport_memory::TransportMemory, TransportWrapper},
+    transport_wss::TlsConfig,
 };
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
-    data_types::{SpaceData, ConnectData, DirectMessageData},
-    protocol::{
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        Lib3hToClient,
-        Lib3hToClientResponse,
-    },
+    data_types::{ConnectData, DirectMessageData, SpaceData},
+    protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
-use lib3h_sodium::{SodiumCryptoSystem, hash, secbuf::SecBuf};
+use lib3h_sodium::{hash, secbuf::SecBuf, SodiumCryptoSystem};
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -69,7 +61,7 @@ impl TryFrom<Lib3hToClient> for ChatEvent {
                     from_agent: message_data.from_agent_id.to_string(),
                     payload: "message from engine".to_string(),
                 })
-            },
+            }
             Lib3hToClient::Disconnected(_) => Ok(ChatEvent::Disconnected),
             _ => Err("Unknown Lib3h message".to_string()),
         }
@@ -132,14 +124,14 @@ impl SimChat {
                     config,
                     dht_factory,
                     network_transport,
-                ).unwrap();
-                let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> =
-                    engine
-                        .take_parent_endpoint()
-                        .unwrap()
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("parent")
-                        .build();
+                )
+                .unwrap();
+                let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> = engine
+                    .take_parent_endpoint()
+                    .unwrap()
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("parent")
+                    .build();
 
                 // also keep track of things like the current space in this scope
                 let mut current_space: Option<SpaceData> = None;
@@ -166,7 +158,6 @@ impl SimChat {
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
                     for chat_event in direct_chat_events.chain(n3h_chat_events) {
-
                         let local_internal_sender = internal_sender.clone();
 
                         // every chat event call the handler that was passed
@@ -175,62 +166,85 @@ impl SimChat {
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
                         match chat_event {
-
-                            ChatEvent::Join{channel_id, agent_id} => {
-                                let space_address = channel_address_from_string(&channel_id).unwrap();
+                            ChatEvent::Join {
+                                channel_id,
+                                agent_id,
+                            } => {
+                                let space_address =
+                                    channel_address_from_string(&channel_id).unwrap();
                                 let space_data = SpaceData {
                                     agent_id: Address::from(agent_id),
                                     request_id: "".to_string(),
                                     space_address,
                                 };
-                                parent_endpoint.request(
-                                    String::from("ctx"),
-                                    ClientToLib3h::JoinSpace(space_data.clone()),
-                                    Box::new(move |_, _, callback_data| {
-                                        // TODO: check the response was actually a success
-                                        local_internal_sender.send(ChatEvent::JoinSuccess {
-                                            channel_id: channel_id.clone(),
-                                            space_data: space_data.clone()
-                                        }).unwrap();
-                                            println!(
-                                                "chat received response from engine: {:?}",
-                                                callback_data
-                                            );
-                                        Ok(())
-                                    }),
-                                ).unwrap();
-                            },
-
-                            ChatEvent::JoinSuccess{space_data, channel_id} => {
-                                current_space = Some(space_data);
-                                SimChat::send_sys_message(local_internal_sender, &format!("Joined channel: {}", channel_id));
-                            },
-
-                            ChatEvent::Part => {
-                                if let Some(space_data) = current_space.clone() {
-                                    parent_endpoint.request(
+                                parent_endpoint
+                                    .request(
                                         String::from("ctx"),
-                                        ClientToLib3h::LeaveSpace(space_data.to_owned()),
+                                        ClientToLib3h::JoinSpace(space_data.clone()),
                                         Box::new(move |_, _, callback_data| {
-                                            local_internal_sender.send(ChatEvent::PartSuccess).unwrap();
+                                            // TODO: check the response was actually a success
+                                            local_internal_sender
+                                                .send(ChatEvent::JoinSuccess {
+                                                    channel_id: channel_id.clone(),
+                                                    space_data: space_data.clone(),
+                                                })
+                                                .unwrap();
                                             println!(
                                                 "chat received response from engine: {:?}",
                                                 callback_data
                                             );
                                             Ok(())
                                         }),
-                                    ).unwrap();
+                                    )
+                                    .unwrap();
+                            }
+
+                            ChatEvent::JoinSuccess {
+                                space_data,
+                                channel_id,
+                            } => {
+                                current_space = Some(space_data);
+                                SimChat::send_sys_message(
+                                    local_internal_sender,
+                                    &format!("Joined channel: {}", channel_id),
+                                );
+                            }
+
+                            ChatEvent::Part => {
+                                if let Some(space_data) = current_space.clone() {
+                                    parent_endpoint
+                                        .request(
+                                            String::from("ctx"),
+                                            ClientToLib3h::LeaveSpace(space_data.to_owned()),
+                                            Box::new(move |_, _, callback_data| {
+                                                local_internal_sender
+                                                    .send(ChatEvent::PartSuccess)
+                                                    .unwrap();
+                                                println!(
+                                                    "chat received response from engine: {:?}",
+                                                    callback_data
+                                                );
+                                                Ok(())
+                                            }),
+                                        )
+                                        .unwrap();
                                 } else {
-                                    SimChat::send_sys_message(local_internal_sender, &"No channel to leave".to_string());
+                                    SimChat::send_sys_message(
+                                        local_internal_sender,
+                                        &"No channel to leave".to_string(),
+                                    );
                                 }
-                            },
+                            }
 
                             ChatEvent::PartSuccess => {
                                 current_space = None;
-                                SimChat::send_sys_message(local_internal_sender, &"Left channel".to_string());
+                                SimChat::send_sys_message(
+                                    local_internal_sender,
+                                    &"Left channel".to_string(),
+                                );
                             }
 
-                            ChatEvent::SendDirectMessage{ to_agent, payload } => {
+                            ChatEvent::SendDirectMessage { to_agent, payload } => {
                                 if let Some(space_data) = current_space.clone() {
                                     let direct_message_data = DirectMessageData {
                                         from_agent_id: space_data.agent_id,
@@ -239,22 +253,27 @@ impl SimChat {
                                         space_address: space_data.space_address,
                                         request_id: String::from(""),
                                     };
-                                    parent_endpoint.request(
-                                        String::from("ctx"),
-                                        ClientToLib3h::SendDirectMessage(direct_message_data),
-                                        Box::new(|_, _, callback_data| {
-                                            // TODO: track if messages are sent successfully
-                                            println!(
-                                                "chat received response from engine: {:?}",
-                                                callback_data
-                                            );
-                                            Ok(())
-                                        }),
-                                    ).unwrap();
+                                    parent_endpoint
+                                        .request(
+                                            String::from("ctx"),
+                                            ClientToLib3h::SendDirectMessage(direct_message_data),
+                                            Box::new(|_, _, callback_data| {
+                                                // TODO: track if messages are sent successfully
+                                                println!(
+                                                    "chat received response from engine: {:?}",
+                                                    callback_data
+                                                );
+                                                Ok(())
+                                            }),
+                                        )
+                                        .unwrap();
                                 } else {
-                                    SimChat::send_sys_message(local_internal_sender, &"Must join a channel before sending a message".to_string());
+                                    SimChat::send_sys_message(
+                                        local_internal_sender,
+                                        &"Must join a channel before sending a message".to_string(),
+                                    );
                                 }
-                            },
+                            }
 
                             _ => {}
                         }
@@ -273,10 +292,12 @@ impl SimChat {
     }
 
     fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
-        sender.send(ChatEvent::ReceiveDirectMessage {
-            from_agent: String::from("sys"),
-            payload: String::from(msg)
-        }).expect("send fail");
+        sender
+            .send(ChatEvent::ReceiveDirectMessage {
+                from_agent: String::from("sys"),
+                payload: String::from(msg),
+            })
+            .expect("send fail");
     }
 
     fn connect(
@@ -287,25 +308,25 @@ impl SimChat {
             ClientToLib3hResponse,
             Lib3hToClient,
             Lib3hToClientResponse,
-            Lib3hError>,
+            Lib3hError,
+        >,
         peer_uri: Url,
     ) {
-        let connect_message = ClientToLib3h::Connect(ConnectData{
+        let connect_message = ClientToLib3h::Connect(ConnectData {
             network_id: String::from(""), // connect to any
             peer_uri,
             request_id: String::from("connect-request"),
         });
-        endpoint.request(
-            String::from("ctx"),
-            connect_message,
-            Box::new(|_, _, callback_data| {
-                println!(
-                    "chat received response from engine: {:?}",
-                    callback_data
-                );
-                Ok(())
-            }),
-        ).unwrap();
+        endpoint
+            .request(
+                String::from("ctx"),
+                connect_message,
+                Box::new(|_, _, callback_data| {
+                    println!("chat received response from engine: {:?}", callback_data);
+                    Ok(())
+                }),
+            )
+            .unwrap();
     }
 }
 
@@ -329,7 +350,7 @@ mod tests {
             Box::new(move |event| {
                 s.send(event.to_owned()).expect("send fail");
             }),
-            Url::parse("http://test.boostrap").unwrap()
+            Url::parse("http://test.boostrap").unwrap(),
         );
 
         let msg = ChatEvent::SendDirectMessage {
@@ -344,7 +365,8 @@ mod tests {
 
     #[test]
     fn can_convert_strings_to_channel_address() {
-        let addr = channel_address_from_string(&String::from("test channel id")).expect("failed to hash string");
+        let addr = channel_address_from_string(&String::from("test channel id"))
+            .expect("failed to hash string");
         assert_eq!(
             addr,
             Address::from("mgb/+MzdPWAYRs4ERGlj3WCg53AddXsg1HjXH7pk7pE=".to_string())
