@@ -21,7 +21,7 @@ lib3h_sodium = { "path" = "../../sodium" }
 lib3h_crypto_api = { "path" = "../../crypto_api" }
 lib3h = { "path" = "../../lib3h" }
 lib3h_ghost_actor = { "path" = "../../ghost_actor" }
-
+url = "=1.7.2"
 
 [lib]
 name = "lib3h_sim_chat"

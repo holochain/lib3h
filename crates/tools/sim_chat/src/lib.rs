@@ -4,14 +4,23 @@
 
 extern crate base64;
 extern crate crossbeam_channel;
+extern crate url;
 
 use core::convert::{TryFrom, TryInto};
-use lib3h::engine::ghost_engine::GhostEngine;
+use lib3h::engine::ghost_engine::{
+    GhostEngine,
+    EngineError,
+};
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
-    data_types::SpaceData,
-    protocol::{ClientToLib3h, Lib3hToClient},
+    data_types::{SpaceData, ConnectData},
+    protocol::{
+        ClientToLib3h,
+        ClientToLib3hResponse,
+        Lib3hToClient,
+        Lib3hToClientResponse,
+    },
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
@@ -19,6 +28,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChatEvent {
@@ -116,6 +126,9 @@ impl SimChat {
                         .request_id_prefix("parent")
                         .build();
 
+                // call connect to start the networking process
+                SimChat::connect(&mut parent_endpoint, Url::parse("http://bootstrap.holo.host").unwrap());
+
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
                     parent_endpoint.process(&mut ()).unwrap();
@@ -166,6 +179,35 @@ impl SimChat {
 
     pub fn send(&mut self, event: ChatEvent) {
         self.out_send.send(event).expect("send fail");
+    }
+
+    fn connect(
+        endpoint: &mut GhostContextEndpoint<
+            (),
+            String,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            EngineError>,
+        peer_uri: Url,
+    ) {
+        let connect_message = ClientToLib3h::Connect(ConnectData{
+            network_id: String::from(""), // connect to any
+            peer_uri,
+            request_id: String::from("connect-request"),
+        });
+        endpoint.request(
+            String::from("ctx"),
+            connect_message,
+            Box::new(|_, _, callback_data| {
+                println!(
+                    "chat received response from engine: {:?}",
+                    callback_data
+                );
+                Ok(())
+            }),
+        );
     }
 }
 

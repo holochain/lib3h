@@ -23,11 +23,11 @@ fn main() {
             rl,
             r#"
 lib3h simchat Commands:
-  /help                 - this help text
-  /join <space>         - Join a space with a given name
-  /part <space>         - Leave a space with a given name
-  /msg <agent> <msg>    - Send a direct message to an agent in your space
-  /quit                 - exit Sim Chat
+  /help                     - this help text
+  /join <space> <handle>    - Join a space assigning yourself a handle
+  /part                     - Leave the current space
+  /msg <agent> <msg>        - Send a direct message to an agent in your space
+  /quit                     - exit Sim Chat
 "#
         )
         .expect("write fail");
