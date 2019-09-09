@@ -12,23 +12,21 @@ fn main() {
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
 
     rl.set_report_signal(linefeed::terminal::Signal::Interrupt, true);
-    rl.set_prompt("no-channel> ")
+    rl.set_prompt("SimChat> ")
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
     let mut cli = lib3h_sim_chat::SimChat::new(
         Box::new(move |event| {
             match event {
-                ChatEvent::JoinSuccess{channel_id, ..} => {
-                    rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
-                        .expect("failed to set linefeed prompt");
-                    writeln!(rl_t, "").expect("write fail");
-                },
-                ChatEvent::PartSuccess => {
-                    rl_t.set_prompt("no-channel> ")
-                        .expect("failed to set linefeed prompt");      
-                    writeln!(rl_t, "").expect("write fail");         
-                },
+                // ChatEvent::JoinSuccess{channel_id, ..} => {
+                //     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
+                //         .expect("failed to set linefeed prompt");
+                // },
+                // ChatEvent::PartSuccess => {
+                //     rl_t.set_prompt("no-channel> ")
+                //         .expect("failed to set linefeed prompt");      
+                // },
                 ChatEvent::ReceiveDirectMessage{from_agent, payload} => {
                     writeln!(rl_t, "<{}> {}", from_agent, payload).expect("write fail");
                 },

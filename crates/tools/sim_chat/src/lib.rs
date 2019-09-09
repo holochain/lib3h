@@ -206,16 +206,13 @@ impl SimChat {
                                     parent_endpoint.request(
                                         String::from("ctx"),
                                         ClientToLib3h::SendDirectMessage(direct_message_data),
-                                        Box::new(|_, _, callback_data| {
-                                            println!(
-                                                "direct message request received response from engine: {:?}",
-                                                callback_data
-                                            );
+                                        Box::new(|_, _, _callback_data| {
+                                            // TODO: track if messages are send successfully
                                             Ok(())
                                         }),
                                     );
                                 } else {
-                                    println!("Must join a channel before sending a message")
+                                    SimChat::send_sys_message(local_internal_sender, &"Must join a channel before sending a message".to_string());
                                 }
                             },
 
