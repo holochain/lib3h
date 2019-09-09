@@ -70,3 +70,9 @@ impl From<&str> for GhostError {
         GhostError::new(ErrorKind::Other(s.to_string()))
     }
 }
+
+impl<T> From<crossbeam_channel::SendError<T>> for GhostError {
+    fn from(e: crossbeam_channel::SendError<T>) -> Self {
+        GhostError::new(ErrorKind::Other(format!("{:?}", e)))
+    }
+}

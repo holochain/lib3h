@@ -112,7 +112,7 @@ impl KeystoreStub {
         // THIS IS A STUB, just responding with empty signature
         msg.respond(Ok(RequestToChildResponse::Sign {
             signature: b"".to_vec(),
-        }));
+        }))?;
         Ok(())
     }
 }

@@ -2,26 +2,27 @@
 
 use super::RealEngineTrackerData;
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
-    engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine},
-    gateway::GatewayWrapper,
+    dht::dht_protocol::*,
+    engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
+    gateway::wrapper::GatewayWrapper,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
-use rmp_serde::Serializer;
-use serde::Serialize;
 use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine> RealEngine<'engine> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
         for (chainId, space_gateway) in self.space_gateway_map.iter() {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, space_gateway.as_ref().this_peer().clone()));
+            result.push((
+                space_address,
+                space_gateway.as_mut().get_this_peer_sync().clone(),
+            ));
         }
         result
     }
@@ -41,50 +42,53 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
     pub(crate) fn process_space_gateways(
         &mut self,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
-        // Process all gateways' DHT
+        // Process all space gateways' DHT and collect requests
         let mut outbox = Vec::new();
         let mut dht_outbox = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            let (did_work, event_list) = space_gateway.as_dht_mut().process()?;
-            if did_work {
-                // TODO: perf optim, don't copy chain_id
-                dht_outbox.insert(chain_id.clone(), event_list);
-            }
+            space_gateway.as_mut().process_dht().unwrap(); // FIXME unwrap
+            let request_list = space_gateway.as_mut().as_dht_mut().drain_messages();
+            dht_outbox.insert(chain_id.clone(), request_list);
+            let mut temp = space_gateway.as_mut().drain_dht_outbox();
+            self.temp_outbox.append(&mut temp);
         }
-        // Process all gateway DHT events
-        for (chain_id, evt_list) in dht_outbox {
-            for evt in evt_list {
-                let mut output = self.handle_spaceDhtEvent(&chain_id, evt.clone())?;
+        // Process all space gateway DHT requests
+        for (chain_id, request_list) in dht_outbox {
+            for mut request in request_list {
+                let dhtMessage = request.take_message().expect("exists");
+                let mut output = self.handle_spaceDhtRequest(&chain_id, dhtMessage)?;
                 outbox.append(&mut output);
             }
         }
+        // Done
         Ok(outbox)
     }
 
     /// Handle a DhtEvent sent to us by a space gateway
-    fn handle_spaceDhtEvent(
+    fn handle_spaceDhtRequest(
         &mut self,
         chain_id: &ChainId,
-        cmd: DhtEvent,
+        request: DhtRequestToParent,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
         debug!(
             "{} << handle_spaceDhtEvent: [{:?}] - {:?}",
-            self.name, chain_id, cmd,
+            self.name, chain_id, request,
         );
         let mut outbox = Vec::new();
         let space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
-        match cmd {
-            DhtEvent::GossipTo(_gossip_data) => {
-                // n/a - should have been handled by gateway
+        match request {
+            DhtRequestToParent::GossipTo(gossip_data) => {
+                handle_gossipTo(space_gateway, gossip_data)
+                    .expect("Failed to gossip with space_gateway");
             }
-            DhtEvent::GossipUnreliablyTo(_data) => {
+            DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // n/a - should have been handled by gateway
             }
             // HoldPeerRequested from gossip
-            DhtEvent::HoldPeerRequested(peer_data) => {
+            DhtRequestToParent::HoldPeerRequested(peer_data) => {
                 debug!(
                     "{} -- ({}).post() HoldPeer {:?}",
                     self.name,
@@ -92,21 +96,19 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     peer_data,
                 );
                 // For now accept all request
-                space_gateway
-                    .as_dht_mut()
-                    .post(DhtCommand::HoldPeer(peer_data))?;
+                space_gateway.as_mut().hold_peer(peer_data);
             }
-            DhtEvent::PeerTimedOut(_peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // no-op
             }
             // HoldEntryRequested from gossip
             // -> Send each aspect to Core for validation
-            DhtEvent::HoldEntryRequested(from, entry) => {
+            DhtRequestToParent::HoldEntryRequested { from_peer, entry } => {
                 for aspect in entry.aspect_list {
                     let lib3h_msg = StoreEntryAspectData {
                         request_id: self.request_track.reserve(),
                         space_address: chain_id.0.clone(),
-                        provider_agent_id: from.clone().into(),
+                        provider_agent_id: from_peer.clone().into(),
                         entry_address: entry.entry_address.clone(),
                         entry_aspect: aspect,
                     };
@@ -119,33 +121,15 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                     outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
                 }
             }
-            // FetchEntryResponse: Send back as a query response to Core
-            // TODO #169 - Discern Fetch from Query
-            DhtEvent::FetchEntryResponse(response) => {
-                let mut query_result = Vec::new();
-                response
-                    .entry
-                    .serialize(&mut Serializer::new(&mut query_result))
-                    .unwrap();
-                let msg_data = QueryEntryResultData {
-                    space_address: chain_id.0.clone(),
-                    entry_address: response.entry.entry_address.clone(),
-                    request_id: response.msg_id.clone(),
-                    requester_agent_id: chain_id.1.clone(), // TODO #150 - get requester from channel from p2p-protocol
-                    responder_agent_id: chain_id.1.clone(),
-                    query_result,
-                };
-                outbox.push(Lib3hServerProtocol::QueryEntryResult(msg_data))
-            }
-            DhtEvent::EntryPruned(_address) => {
+            DhtRequestToParent::EntryPruned(_address) => {
                 // TODO #174
             }
             // EntryDataRequested: Change it into a Lib3hServerProtocol::HandleFetchEntry.
-            DhtEvent::EntryDataRequested(fetch_entry) => {
+            DhtRequestToParent::RequestEntry(entry_address) => {
                 let msg_data = FetchEntryData {
                     space_address: chain_id.0.clone(),
-                    entry_address: fetch_entry.entry_address.clone(),
-                    request_id: fetch_entry.msg_id.clone(),
+                    entry_address: entry_address.clone(),
+                    request_id: "FIXME".to_string(),
                     provider_agent_id: chain_id.1.clone(),
                     aspect_address_list: None,
                 };

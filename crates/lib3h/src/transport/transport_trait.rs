@@ -36,7 +36,7 @@ pub trait Transport {
 
     // -- Getters -- //
     /// get a list of all open transport ids
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>>;
+    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>>;
     /// get uri from a connectionId
     fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url>;
 }
