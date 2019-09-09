@@ -21,9 +21,6 @@ impl<'gateway> Transport for P2pGateway<'gateway> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
-        if &self.identifier != "__network__" {
-            std::process::exit(127);
-        }
         // Connect
         let connection_id = self.inner_transport.as_mut().connect(&uri)?;
         // Store result in connection map
