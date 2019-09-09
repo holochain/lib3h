@@ -11,7 +11,7 @@ use std::{error::Error as StdError, fmt, io, result};
 pub type Lib3hResult<T> = result::Result<T, Lib3hError>;
 
 /// An error that can occur when interacting with the algorithm.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lib3hError(Box<ErrorKind>);
 
 impl Lib3hError {
@@ -70,6 +70,15 @@ pub enum ErrorKind {
     /// could break existing code.)
     #[doc(hidden)]
     __Nonexhaustive,
+}
+
+impl Clone for ErrorKind {
+    fn clone(&self) -> Self {
+        match self {
+            ErrorKind::Io(i) => ErrorKind::Io(i.kind().into()),
+            _ => self.clone(),
+        }
+    }
 }
 
 impl StdError for Lib3hError {

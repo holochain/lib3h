@@ -7,11 +7,11 @@ use crate::prelude::*;
 pub struct GhostParentWrapper<
     UserData,
     Context: 'static,
-    RequestToParent: 'static,
-    RequestToParentResponse: 'static,
-    RequestToChild: 'static,
-    RequestToChildResponse: 'static,
-    Error: 'static,
+    RequestToParent: 'static + Clone,
+    RequestToParentResponse: 'static + Clone,
+    RequestToChild: 'static + Clone,
+    RequestToChildResponse: 'static + Clone,
+    Error: 'static + Clone,
     Actor: GhostActor<
         RequestToParent,
         RequestToParentResponse,
@@ -35,11 +35,11 @@ pub struct GhostParentWrapper<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent: 'static,
-        RequestToParentResponse: 'static,
-        RequestToChild: 'static,
-        RequestToChildResponse: 'static,
-        Error: 'static,
+        RequestToParent: 'static + Clone,
+        RequestToParentResponse: 'static + Clone,
+        RequestToChild: 'static + Clone,
+        RequestToChildResponse: 'static + Clone,
+        Error: 'static + Clone,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -61,9 +61,9 @@ impl<
 {
     /// wrap a GhostActor instance and it's parent channel endpoint.
     pub fn new(mut actor: Actor, request_id_prefix: &str) -> Self {
-        let endpoint = actor
-            .take_parent_endpoint()
-            .expect("exists")
+        let (owner_ep, actor_ep) = create_ghost_channel();
+        actor.handle_endpoint(actor_ep);
+        let endpoint = owner_ep
             .as_context_endpoint_builder()
             .request_id_prefix(request_id_prefix)
             .build();
@@ -74,11 +74,11 @@ impl<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent: 'static,
-        RequestToParentResponse: 'static,
-        RequestToChild: 'static,
-        RequestToChildResponse: 'static,
-        Error: 'static,
+        RequestToParent: 'static + Clone,
+        RequestToParentResponse: 'static + Clone,
+        RequestToChild: 'static + Clone,
+        RequestToChildResponse: 'static + Clone,
+        Error: 'static + Clone,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -151,11 +151,11 @@ impl<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent: 'static,
-        RequestToParentResponse: 'static,
-        RequestToChild: 'static,
-        RequestToChildResponse: 'static,
-        Error: 'static,
+        RequestToParent: 'static + Clone,
+        RequestToParentResponse: 'static + Clone,
+        RequestToChild: 'static + Clone,
+        RequestToChildResponse: 'static + Clone,
+        Error: 'static + Clone,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -183,11 +183,11 @@ impl<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent: 'static,
-        RequestToParentResponse: 'static,
-        RequestToChild: 'static,
-        RequestToChildResponse: 'static,
-        Error: 'static,
+        RequestToParent: 'static + Clone,
+        RequestToParentResponse: 'static + Clone,
+        RequestToChild: 'static + Clone,
+        RequestToChildResponse: 'static + Clone,
+        Error: 'static + Clone,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -213,25 +213,25 @@ impl<
 }
 
 pub trait GhostActor<
-    RequestToParent: 'static,
-    RequestToParentResponse: 'static,
-    RequestToChild: 'static,
-    RequestToChildResponse: 'static,
-    Error: 'static,
+    RequestToParent: 'static + Clone,
+    RequestToParentResponse: 'static + Clone,
+    RequestToChild: 'static + Clone,
+    RequestToChildResponse: 'static + Clone,
+    Error: 'static + Clone,
 >
 {
-    /// our parent gets a reference to the parent side of our channel
-    fn take_parent_endpoint(
+    /// some "owner" created a reference to us,
+    /// let's handle messages to / from them.
+    fn handle_endpoint(
         &mut self,
-    ) -> Option<
-        GhostEndpoint<
-            RequestToChild,
-            RequestToChildResponse,
+        endpoint: GhostEndpoint<
             RequestToParent,
             RequestToParentResponse,
+            RequestToChild,
+            RequestToChildResponse,
             Error,
         >,
-    >;
+    );
 
     /// our parent will call this process function
     fn process(&mut self) -> GhostResult<WorkWasDone> {
@@ -251,11 +251,11 @@ pub trait GhostActor<
 pub struct GhostParentWrapperDyn<
     UserData,
     Context: 'static,
-    RequestToParent: 'static,
-    RequestToParentResponse: 'static,
-    RequestToChild: 'static,
-    RequestToChildResponse: 'static,
-    Error: 'static,
+    RequestToParent: 'static + Clone,
+    RequestToParentResponse: 'static + Clone,
+    RequestToChild: 'static + Clone,
+    RequestToChildResponse: 'static + Clone,
+    Error: 'static + Clone,
 > {
     actor: Box<
         dyn GhostActor<
@@ -280,11 +280,11 @@ pub struct GhostParentWrapperDyn<
 impl<
         UserData,
         Context: 'static,
-        RequestToParent: 'static,
-        RequestToParentResponse: 'static,
-        RequestToChild: 'static,
-        RequestToChildResponse: 'static,
-        Error: 'static,
+        RequestToParent: 'static + Clone,
+        RequestToParentResponse: 'static + Clone,
+        RequestToChild: 'static + Clone,
+        RequestToChildResponse: 'static + Clone,
+        Error: 'static + Clone,
     >
     GhostParentWrapperDyn<
         UserData,
@@ -309,9 +309,9 @@ impl<
         >,
         request_id_prefix: &str,
     ) -> Self {
-        let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = actor
-            .take_parent_endpoint()
-            .expect("exists")
+        let (owner_ep, actor_ep) = create_ghost_channel();
+        actor.handle_endpoint(actor_ep);
+        let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = owner_ep
             .as_context_endpoint_builder()
             .request_id_prefix(request_id_prefix)
             .build();
@@ -367,22 +367,19 @@ mod tests {
     // Any actor has messages that it exchanges with it's parent
     // These are the Out message, and it has messages that come internally
     // either self-generated or (presumeably) from children
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct TestMsgOut(String);
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct TestMsgOutResponse(String);
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct TestMsgIn(String);
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct TestMsgInResponse(String);
     type TestError = String;
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct TestContext(String);
 
     struct TestActor {
-        endpoint_for_parent: Option<
-            GhostEndpoint<TestMsgIn, TestMsgInResponse, TestMsgOut, TestMsgOutResponse, TestError>,
-        >,
         endpoint_as_child: Detach<
             GhostContextEndpoint<
                 TestActor,
@@ -399,15 +396,8 @@ mod tests {
 
     impl TestActor {
         pub fn new() -> Self {
-            let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
-                endpoint_for_parent: Some(endpoint_parent),
-                endpoint_as_child: Detach::new(
-                    endpoint_self
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("child")
-                        .build(),
-                ),
+                endpoint_as_child: Detach::new_empty(),
                 internal_state: Vec::new(),
             }
         }
@@ -418,12 +408,26 @@ mod tests {
     {
         // START BOILER PLATE--------------------------
 
-        fn take_parent_endpoint(
+        fn handle_endpoint(
             &mut self,
-        ) -> Option<
-            GhostEndpoint<TestMsgIn, TestMsgInResponse, TestMsgOut, TestMsgOutResponse, TestError>,
-        > {
-            std::mem::replace(&mut self.endpoint_for_parent, None)
+            endpoint: GhostEndpoint<
+                TestMsgOut,
+                TestMsgOutResponse,
+                TestMsgIn,
+                TestMsgInResponse,
+                TestError,
+            >,
+        ) {
+            if self.endpoint_as_child.is_empty() {
+                self.endpoint_as_child.put(
+                    endpoint
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("child")
+                        .build(),
+                );
+            } else {
+                self.endpoint_as_child.push_endpoint(endpoint);
+            }
         }
         // END BOILER PLATE--------------------------
 
@@ -461,7 +465,9 @@ mod tests {
         };
 
         // then we create the child actor
+        let (owner_ep, actor_ep) = create_ghost_channel();
         let mut child_actor = TestActor::new();
+        child_actor.handle_endpoint(actor_ep);
         // get the endpoint from the child actor that we as parent will interact with
         let mut parent_endpoint: GhostContextEndpoint<
             FakeParent,
@@ -471,9 +477,7 @@ mod tests {
             TestMsgOut,
             TestMsgOutResponse,
             TestError,
-        > = child_actor
-            .take_parent_endpoint()
-            .unwrap()
+        > = owner_ep
             .as_context_endpoint_builder()
             .request_id_prefix("parent")
             .build();

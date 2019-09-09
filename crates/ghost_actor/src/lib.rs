@@ -86,38 +86,29 @@ mod tests {
 
     #[allow(dead_code)]
     mod dht_protocol {
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToChild {
             ResolveAddressForId { id: String },
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub struct ResolveAddressForIdData {
             pub address: String,
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToChildResponse {
             ResolveAddressForId(ResolveAddressForIdData),
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToParent {}
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToParentResponse {}
     }
 
     struct RrDht {
-        endpoint_parent: Option<
-            GhostEndpoint<
-                dht_protocol::RequestToChild,
-                dht_protocol::RequestToChildResponse,
-                dht_protocol::RequestToParent,
-                dht_protocol::RequestToParentResponse,
-                FakeError,
-            >,
-        >,
         endpoint_self: Detach<
             GhostContextEndpoint<
                 RrDht,
@@ -133,15 +124,8 @@ mod tests {
 
     impl RrDht {
         pub fn new() -> Self {
-            let (endpoint_parent, endpoint_self) = create_ghost_channel();
             Self {
-                endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(
-                    endpoint_self
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("dht_to_parent")
-                        .build(),
-                ),
+                endpoint_self: Detach::new_empty(),
             }
         }
     }
@@ -155,18 +139,26 @@ mod tests {
             FakeError,
         > for RrDht
     {
-        fn take_parent_endpoint(
+        fn handle_endpoint(
             &mut self,
-        ) -> Option<
-            GhostEndpoint<
-                dht_protocol::RequestToChild,
-                dht_protocol::RequestToChildResponse,
+            endpoint: GhostEndpoint<
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
+                dht_protocol::RequestToChild,
+                dht_protocol::RequestToChildResponse,
                 FakeError,
             >,
-        > {
-            std::mem::replace(&mut self.endpoint_parent, None)
+        ) {
+            if self.endpoint_self.is_empty() {
+                self.endpoint_self.put(
+                    endpoint
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("dht_to_parent")
+                        .build(),
+                );
+            } else {
+                self.endpoint_self.push_endpoint(endpoint)
+            }
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
@@ -198,33 +190,33 @@ mod tests {
     mod transport_protocol {
         use super::*;
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToChild {
             Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
             Bootstrap { address: Url },
             SendMessage { address: Url, payload: Vec<u8> },
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub struct BindResultData {
             pub bound_url: String,
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToChildResponse {
             Bind(BindResultData),
             Bootstrap,
             SendMessage,
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToParent {
             IncomingConnection { address: Url },
             ReceivedData { adress: Url, payload: Vec<u8> },
             TransportError { error: TransportError },
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum RequestToParentResponse {
             Allowed,    // just for testing
             Disallowed, // just for testing
@@ -246,15 +238,6 @@ mod tests {
     }
 
     struct GatewayTransport {
-        endpoint_parent: Option<
-            GhostEndpoint<
-                RequestToChild,
-                RequestToChildResponse,
-                RequestToParent,
-                RequestToParentResponse,
-                FakeError,
-            >,
-        >,
         endpoint_self: Detach<
             GhostContextEndpoint<
                 GatewayTransport,
@@ -282,16 +265,9 @@ mod tests {
 
     impl GatewayTransport {
         pub fn new() -> Self {
-            let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let dht = Detach::new(GhostParentWrapper::new(RrDht::new(), "to_dht"));
             Self {
-                endpoint_parent: Some(endpoint_parent),
-                endpoint_self: Detach::new(
-                    endpoint_self
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("gw_to_parent")
-                        .build(),
-                ),
+                endpoint_self: Detach::new_empty(),
                 dht,
             }
         }
@@ -306,18 +282,26 @@ mod tests {
             String,
         > for GatewayTransport
     {
-        fn take_parent_endpoint(
+        fn handle_endpoint(
             &mut self,
-        ) -> Option<
-            GhostEndpoint<
-                RequestToChild,
-                RequestToChildResponse,
+            endpoint: GhostEndpoint<
                 RequestToParent,
                 RequestToParentResponse,
+                RequestToChild,
+                RequestToChildResponse,
                 FakeError,
             >,
-        > {
-            std::mem::replace(&mut self.endpoint_parent, None)
+        ) {
+            if self.endpoint_self.is_empty() {
+                self.endpoint_self.put(
+                    endpoint
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("gw_to_parent")
+                        .build(),
+                );
+            } else {
+                self.endpoint_self.push_endpoint(endpoint)
+            }
         }
 
         #[allow(irrefutable_let_patterns)]
@@ -436,11 +420,9 @@ mod tests {
         let gw = GatewayTransport::new();
 
         let mut t_actor: TransportActor = Box::new(gw);
-        let mut t_actor_endpoint = t_actor
-            .take_parent_endpoint()
-            .expect("exists")
-            .as_context_endpoint_builder()
-            .build::<(), i8>();
+        let (owner_ep, actor_ep) = create_ghost_channel();
+        t_actor.handle_endpoint(actor_ep);
+        let mut t_actor_endpoint = owner_ep.as_context_endpoint_builder().build::<(), i8>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes

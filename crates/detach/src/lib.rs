@@ -118,6 +118,21 @@
 //!     test().unwrap();
 //! }
 //! ```
+//!
+//! ## You can crate an empty detach - WARNING! most functions will panic!
+//!
+//! ```
+//! extern crate detach;
+//! use detach::prelude::*;
+//!
+//! fn main() {
+//!     let mut d: Detach<i8> = Detach::new_empty();
+//!     assert!(d.is_empty());
+//!     d.put(42);
+//!     assert!(!d.is_empty());
+//!     assert_eq!(42, *d);
+//! }
+//! ```
 
 pub mod prelude {
     pub use crate::Detach;
@@ -147,6 +162,15 @@ impl<T> Detach<T> {
     /// create a new Detach instance
     pub fn new(inner: T) -> Self {
         Self(Some(inner))
+    }
+
+    /// create a new empty Detach instance
+    pub fn new_empty() -> Self {
+        Self(None)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_none()
     }
 
     /// extract the owned inner instance

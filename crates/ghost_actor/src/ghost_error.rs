@@ -2,7 +2,7 @@
 pub type GhostResult<T> = Result<T, GhostError>;
 
 /// GhostError used in GhostResult responses
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GhostError(Box<ErrorKind>);
 
 impl GhostError {
@@ -23,7 +23,7 @@ impl GhostError {
 }
 
 /// The specific type of an error.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorKind {
     /// returned on an attempt to handle an callback for a non-existent request
     RequestIdNotFound,

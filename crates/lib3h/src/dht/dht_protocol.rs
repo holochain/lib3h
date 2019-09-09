@@ -62,7 +62,7 @@ pub enum DhtContext {
     QueryEntry(QueryEntryData),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.
@@ -92,7 +92,7 @@ pub enum DhtRequestToChild {
     RequestEntry(Address),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChildResponse {
     RequestPeer(Option<PeerData>),
     RequestPeerList(Vec<PeerData>),
@@ -102,7 +102,7 @@ pub enum DhtRequestToChildResponse {
     RequestEntry(EntryData),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToParent {
     /// Commands & Events
     /// Ask owner to send this binary gossip bundle
@@ -127,7 +127,7 @@ pub enum DhtRequestToParent {
     RequestEntry(Address),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToParentResponse {
     RequestEntry(EntryData),
 }

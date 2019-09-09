@@ -8,20 +8,20 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 pub mod keystore_protocol {
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub enum RequestToChild {
         Sign { id: String, payload: Vec<u8> },
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub enum RequestToChildResponse {
         Sign { signature: Vec<u8> },
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub enum RequestToParent {}
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub enum RequestToParentResponse {}
 }
 

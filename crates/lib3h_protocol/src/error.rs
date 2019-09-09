@@ -7,7 +7,7 @@ use std::{error::Error as StdError, fmt, io, result};
 pub type Lib3hProtocolResult<T> = result::Result<T, Lib3hProtocolError>;
 
 /// An error that can occur when interacting with the algorithm.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lib3hProtocolError(Box<ErrorKind>);
 
 impl Lib3hProtocolError {
@@ -48,6 +48,15 @@ pub enum ErrorKind {
     /// could break existing code.)
     #[doc(hidden)]
     __Nonexhaustive,
+}
+
+impl Clone for ErrorKind {
+    fn clone(&self) -> Self {
+        match self {
+            ErrorKind::Io(i) => ErrorKind::Io(i.kind().into()),
+            _ => self.clone(),
+        }
+    }
 }
 
 impl StdError for Lib3hProtocolError {
