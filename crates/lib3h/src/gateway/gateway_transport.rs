@@ -59,7 +59,7 @@ impl P2pGateway {
         // Send to other node our PeerAddress
         let this_peer = self.get_this_peer_sync().clone();
         let our_peer_address = P2pProtocol::PeerAddress(
-            self.identifier().to_string(),
+            self.identifier.to_string(),
             this_peer.peer_address,
             this_peer.timestamp,
         );
@@ -271,7 +271,9 @@ impl P2pGateway {
                                 timestamp,
                             };
                             // HACK
-                            self.hold_peer(peer);
+                            let _ = self
+                                .inner_dht
+                                .publish(DhtRequestToChild::HoldPeer(peer));
                             // TODO #58
                             // TODO #150 - Should not call process manually
                             self.process().expect("HACK");

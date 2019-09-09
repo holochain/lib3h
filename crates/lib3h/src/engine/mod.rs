@@ -75,11 +75,12 @@ pub struct RealEngine {
 
     // Should be owned by multiplexer
     // TODO #176: Remove this if we resolve #176 without it.
-    #[allow(dead_code)]
     /// Transport used by the network gateway
     network_transport: transport::protocol::ChildTransportWrapperDyn<(), ()>,
     /// P2p gateway for the network layer
     network_gateway: GatewayParentWrapperDyn<(), GatewayContext>,
+    ///
+    this_net_peer: PeerData,
 
     //    /// Store active connections?
     //    network_connections: HashSet<ConnectionId>,

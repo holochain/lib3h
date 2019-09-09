@@ -37,7 +37,7 @@ impl TransportKeys {
     }
 }
 
-//
+// FIXME TransportWss
 //impl RealEngine {
 //    /// Constructor with TransportWss
 //    pub fn new(
@@ -86,6 +86,37 @@ impl TransportKeys {
 //    }
 //}
 
+///
+pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
+    trace!("get_peer_list_sync() ...");
+    self.inner_dht
+        .request(
+            DhtContext::NoOp,
+            DhtRequestToChild::RequestPeerList,
+            Box::new(|mut ud, _context, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let DhtRequestToChildResponse::RequestPeerList(peer_list_response) = response
+                {
+                    ud.peer_list = peer_list_response;
+                } else {
+                    panic!("bad response to bind: {:?}", response);
+                }
+                Ok(())
+            }),
+        )
+        .expect("sync functions should work");
+    self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
+    self.user_data.peer_list.clone()
+}
+
 /// Constructor
 impl RealEngine {
     /// Constructor with TransportMemory
@@ -96,15 +127,49 @@ impl RealEngine {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let network_transport = transport::protocol::ChildTransportWrapperDyn::new(GhostTransportMemory::new());
-        // Bind & create DhtConfig
-        let binding = network_transport
-            .as_mut()
-            .bind(&config.bind_url)
-            .expect("TransportMemory.bind() failed. bind-url might not be unique?");
+        let memory_transport = transport::protocol::ChildTransportWrapperDyn::new(GhostTransportMemory::new());
+        let mut memory_network_endpoint: GhostTransportMemoryEndpointContextParent = memory_transport
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("tmem_to_child_")
+            .build::<(), ()>();
+
+        // Bind & create this_net_peer
+        let mut binding = Url::parse("fixme://host:123").unwrap(),
+        memory_transport
+            .request(
+                (),
+                transport::protocol::RequestToChild::Bind { spec: config.bind_url },
+                Box::new(|mut binding, _context, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let transport::protocol::RequestToChild::Bind { spec } = response
+                    {
+                        *binding = spec;
+                    } else {
+                        panic!("bad response to bind: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            );
+        let _ = memory_transport.process(&mut binding);
+        let this_net_peer = PeerData {
+            peer_address: format!("{}_tId", name),
+            peer_uri: binding,
+            timestamp: 0, // TODO #166
+        };
+        // Create DhtConfig
         let dht_config = DhtConfig {
-            this_peer_address: format!("{}_tId", name),
-            this_peer_uri: binding,
+            this_peer_address: this_net_peer.peer_address.clone(),
+            this_peer_uri: this_net_peer.peer_uri.clone(),
             custom: config.dht_custom_config.clone(),
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
@@ -112,15 +177,11 @@ impl RealEngine {
         // Create network gateway
         let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
-            network_transport.clone(),
+            memory_network_endpoint,
             dht_factory,
             &dht_config,
         ));
-        debug!(
-            "New MOCK RealEngine {} -> {:?}",
-            name,
-            network_gateway.as_mut().get_this_peer_sync(),
-        );
+        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         Ok(RealEngine {
             crypto,
@@ -131,6 +192,7 @@ impl RealEngine {
             request_track: Tracker::new("real_engine_", 2000),
             network_transport,
             network_gateway,
+            this_net_peer,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
@@ -147,9 +209,7 @@ impl NetworkEngine for RealEngine {
     }
 
     fn advertise(&self) -> Url {
-        self.network_gateway
-            .as_mut()
-            .get_this_peer_sync()
+        self.this_net_peer
             .peer_uri
             .to_owned()
     }
@@ -220,14 +280,14 @@ impl RealEngine {
                 }
             }
         }
-        // Done
-        self.network_gateway
-            .as_transport_mut()
-            .close_all()
-            .map_err(|e| {
-                error!("Closing of some connection failed: {:?}", e);
-                e
-            })?;
+        // FIXME
+//        self.network_gateway
+//            .as_transport_mut()
+//            .close_all()
+//            .map_err(|e| {
+//                error!("Closing of some connection failed: {:?}", e);
+//                e
+//            })?;
 
         result
     }
@@ -273,7 +333,8 @@ impl RealEngine {
                 let cmd = GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: msg.peer_uri,
-                    }, vec![]);
+                    payload: Vec::new(),
+                    });
                 self.network_gateway.publish(cmd)?;
 
 //                // Convert into TransportCommand & post to network gateway
@@ -324,17 +385,13 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
+                        let dht_request =
                         if is_data_for_author_list {
-                            let _ = space_gateway
-                                .as_mut()
-                                .as_dht_mut()
-                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
+                            DhtRequestToChild::BroadcastEntry(msg.entry)
                         } else {
-                            let _ = space_gateway
-                                .as_mut()
-                                .as_dht_mut()
-                                .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
-                        }
+                            DhtRequestToChild::HoldEntryAspectAddress(msg.entry)
+                        };
+                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(dht_request));
                     }
                 }
             }
@@ -350,9 +407,8 @@ impl RealEngine {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         let _ = space_gateway
-                            .as_mut()
-                            .as_dht_mut()
-                            .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
+                            .publish(GatewayRequestToChild::Dht(
+                                DhtRequestToChild::BroadcastEntry(msg.entry)));
                     }
                 }
             }
@@ -368,9 +424,8 @@ impl RealEngine {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         let _ = space_gateway
-                            .as_mut()
-                            .as_dht_mut()
-                            .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
+                            .publish(GatewayRequestToChild::Dht(
+                                DhtRequestToChild::HoldEntryAspectAddress(msg.entry)));
                     }
                 }
             }
@@ -599,9 +654,8 @@ impl RealEngine {
         // First create DhtConfig for space gateway
         let agent_id: String = join_msg.agent_id.clone().into();
         let this_peer_transport_id_as_uri = {
-            let peer = self.network_gateway.as_mut().get_this_peer_sync();
             // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", peer.peer_address).as_str())
+            Url::parse(format!("transportId:{}", self.this_net_peer.peer_address).as_str())
                 .expect("can parse url")
         };
         let dht_config = DhtConfig {
@@ -786,13 +840,14 @@ impl RealEngine {
 }
 
 pub fn handle_gossipTo(
+    gateway_identifier: &str,
     gateway: &mut GatewayParentWrapperDyn<(), ()>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
         "({}) handle_gossipTo: {:?}",
-        gateway.identifier(),
-        gossip_data
+        gateway_identifier,
+        gossip_data,
     );
     for to_peer_address in gossip_data.peer_address_list {
         // TODO #150 - should not gossip to self in the first place
@@ -803,7 +858,7 @@ pub fn handle_gossipTo(
         // TODO END
         // Convert DHT Gossip to P2P Gossip
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
-            space_address: gateway.identifier().into(),
+            space_address: gateway_identifier.into(),
             to_peer_address: to_peer_address.clone().into(),
             from_peer_address: me.clone().into(),
             bundle: gossip_data.bundle.clone(),
@@ -815,7 +870,7 @@ pub fn handle_gossipTo(
         // Forward gossip to the inner_transport
         // FIXME peer_address to Url convert
         let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: "agentId:" + to_peer_address,
+            uri: "agentId:".to_string() + to_peer_address,
             payload,
         };
         gateway.publish(GatewayRequestToChild::Transport(msg))?;

@@ -21,7 +21,7 @@ impl RealEngine {
             let space_address: String = chainId.0.clone().into();
             result.push((
                 space_address,
-                space_gateway.as_mut().get_this_peer_sync().clone(),
+                space_gateway.get_this_peer_sync().clone(),
             ));
         }
         result
@@ -100,7 +100,7 @@ impl RealEngine {
                         debug!(
                             "{} -- ({}).post() HoldPeer {:?}",
                             self.name,
-                            space_gateway.as_ref().identifier(),
+                            chain_id.0,
                             peer_data,
                         );
                         // For now accept all request

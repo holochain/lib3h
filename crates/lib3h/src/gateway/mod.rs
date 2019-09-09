@@ -18,19 +18,11 @@ use url::Url;
 ///// describes a super construct of a Transport and a Dht allowing
 ///// Transport access via peer discovery handled by the Dht
 //pub trait Gateway {
-//    fn identifier(&self) -> &str;
-//
-////    fn transport_inject_event(&mut self, evt: TransportEvent);
-////    fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
-//
 //    fn process_dht(&mut self) -> GhostResult<()>;
 //    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData>;
 //
 //    /// temp HACK. Waiting for gateway actor
 //    fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol>;
-//
-//    // TODO - remove this hack
-//    fn hold_peer(&mut self, peer_data: PeerData);
 //
 //    // sync actor requests
 //    fn get_peer_list_sync(&mut self) -> Vec<PeerData>;
@@ -45,11 +37,6 @@ use url::Url;
 pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
-    //    /// Map holding the reversed mapping between connection url and connectionId response
-    //    connection_map: HashMap<Url, ConnectionId>,
-    //    /// Own inbox for TransportCommands which is processed during Transport::process()
-    //    transport_inbox: VecDeque<TransportCommand>,
-    //    transport_inject_events: Vec<TransportEvent>,
     /// Transport
     child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
     /// DHT
@@ -63,8 +50,6 @@ pub struct P2pGateway {
     endpoint_parent: Option<GatewayParentEndpoint>,
     endpoint_self: Detach<GatewaySelfEndpoint<(), GatewayContext>>,
 }
-
-// pub struct GatewayContext {}
 
 // user data for ghost callback
 pub struct GatewayUserData {

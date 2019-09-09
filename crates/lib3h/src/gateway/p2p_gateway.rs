@@ -69,46 +69,10 @@ impl P2pGateway {
 
 /// Gateway Trait
 impl P2pGateway {
-    /// This Gateway's identifier
-    pub fn identifier(&self) -> &str {
-        self.identifier.as_str()
-    }
-
     //    fn transport_inject_event(&mut self, evt: TransportEvent) {
     //        self.transport_inject_events.push(evt);
     //    }
-    //
-    //    /// Helper for getting a connectionId from a peer_address
-    //    fn get_connection_id(&mut self, peer_address: &str) -> Option<String> {
-    //        // get peer_uri
-    //        let maybe_peer_data = self.get_peer_sync(peer_address);
-    //        if maybe_peer_data.is_none() {
-    //            return None;
-    //        }
-    //        let peer_uri = maybe_peer_data.unwrap().peer_uri;
-    //        trace!(
-    //            "({}) get_connection_id: {} -> {}",
-    //            self.identifier,
-    //            peer_address,
-    //            peer_uri,
-    //        );
-    //        // get connection_id
-    //        let maybe_connection_id = self.connection_map.get(&peer_uri);
-    //        if maybe_connection_id.is_none() {
-    //            return None;
-    //        }
-    //        let conn_id = maybe_connection_id.unwrap().clone();
-    //        trace!(
-    //            "({}) get_connection_id: {} -> {} -> {}",
-    //            self.identifier,
-    //            peer_address,
-    //            peer_uri,
-    //            conn_id,
-    //        );
-    //        Some(conn_id)
-    //    }
-
-    //    pub fn process_dht(&mut self) -> GhostResult<()> {
+     //    pub fn process_dht(&mut self) -> GhostResult<()> {
     //        let res = self.inner_dht.process(&mut self.user_data);
     //        res
     //    }
@@ -119,32 +83,6 @@ impl P2pGateway {
     //
     //    pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
     //        self.user_data.lib3h_outbox.drain(0..).collect()
-    //    }
-
-    //    // TODO - remove this hack
-    //    pub fn hold_peer(&mut self, peer_data: PeerData) {
-    //        if self.identifier != NETWORK_GATEWAY_ID {
-    //            debug!(
-    //                "({}).Dht.post(HoldPeer) - {}",
-    //                self.identifier, peer_data.peer_uri,
-    //            );
-    //            // In space_gateway `peer_uri` is a URI-ed transportId, so un-URI-ze it
-    //            // to get the transportId
-    //            let maybe_previous = self.connection_map.insert(
-    //                peer_data.peer_uri.clone(),
-    //                String::from(peer_data.peer_uri.path()),
-    //            );
-    //            if let Some(previous_cId) = maybe_previous {
-    //                debug!(
-    //                    "Replaced connectionId for {} ; was: {}",
-    //                    peer_data.peer_uri.clone(),
-    //                    previous_cId
-    //                );
-    //            }
-    //        }
-    //        let _ = self
-    //            .inner_dht
-    //            .publish(DhtRequestToChild::HoldPeer(peer_data));
     //    }
 
     ///

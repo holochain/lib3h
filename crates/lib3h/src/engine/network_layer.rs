@@ -277,7 +277,9 @@ impl RealEngine {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    space_gateway.as_mut().hold_peer(peer_data.clone());
+                    let _ = space_gateway
+                        .publish(GatewayRequestToChild::Dht(
+                            DhtRequestToChild::HoldPeer(peer_data.clone())));
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -285,7 +287,9 @@ impl RealEngine {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        space_gateway.as_mut().hold_peer(peer_data.clone());
+                        let _ = space_gateway
+                            .publish(GatewayRequestToChild::Dht(
+                                DhtRequestToChild::HoldPeer(peer_data.clone())));
                     }
                 }
             }
