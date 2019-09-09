@@ -377,7 +377,6 @@ impl<'engine> GhostEngine<'engine> {
 
     #[allow(non_snake_case)]
     fn handle_HandleGetAuthoringEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
-        let mut request_list = Vec::new();
         let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
