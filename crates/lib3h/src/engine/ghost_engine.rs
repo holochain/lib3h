@@ -717,10 +717,9 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<&mut GatewayWrapper<'engine>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
-            .ok_or_else(|| Lib3hError::new_other(&format!(
-                "Not in space: {:?},{:?}",
-                space_address, agent_id
-            )))
+            .ok_or_else(|| {
+                Lib3hError::new_other(&format!("Not in space: {:?},{:?}", space_address, agent_id))
+            })
     }
 }
 
