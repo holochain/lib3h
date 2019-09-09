@@ -1,6 +1,6 @@
 use crate::{
-    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
-    RequestId,
+    ghost_actor::GhostContext, GhostCallback, GhostResult, GhostTracker,
+    GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId,
 };
 
 /// enum used internally as the protocol for our crossbeam_channels
@@ -20,6 +20,7 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
 /// A GhostMessage contains the incoming request, as well as a hook to
 /// allow a response to automatically be returned.
+#[derive(Clone)]
 pub struct GhostMessage<
     MessageToSelf: 'static,
     MessageToOther: 'static,
@@ -214,7 +215,7 @@ impl<
         Error,
     >
 {
-    pub fn build<UserData, Context: 'static>(
+    pub fn build<UserData, Context: 'static + GhostContext>(
         self,
     ) -> GhostContextEndpoint<
         UserData,
@@ -265,7 +266,7 @@ impl GhostTrackRequestOptions {
 /// indicates this type is able to make callback requests && respond to requests
 pub trait GhostCanTrack<
     UserData,
-    Context: 'static,
+    Context: 'static + GhostContext,
     RequestToOther: 'static,
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
@@ -282,7 +283,7 @@ pub trait GhostCanTrack<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
@@ -291,7 +292,7 @@ pub trait GhostCanTrack<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()>;
 
@@ -308,7 +309,7 @@ pub trait GhostCanTrack<
 /// see `GhostEndpoint::as_context_endpoint_builder` for additional details
 pub struct GhostContextEndpoint<
     UserData,
-    Context: 'static,
+    Context: 'static + GhostContext,
     RequestToOther: 'static,
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
@@ -328,7 +329,7 @@ pub struct GhostContextEndpoint<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToOther: 'static,
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
@@ -349,7 +350,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         let request_id = match options.timeout {
@@ -370,7 +371,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToOther: 'static,
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
@@ -411,7 +412,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
         self.priv_request(context, payload, cb, GhostTrackRequestOptions::default())
     }
@@ -422,7 +423,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         self.priv_request(context, payload, cb, options)
@@ -518,6 +519,7 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_types::{TestContext, TestError};
 
     #[derive(Debug)]
     struct TestMsgOut(String);
@@ -527,9 +529,6 @@ mod tests {
     struct TestMsgIn(String);
     #[derive(Debug)]
     struct TestMsgInResponse(String);
-    type TestError = String;
-    #[derive(Debug)]
-    struct TestContext(String);
 
     #[test]
     fn test_ghost_channel_message_event() {
@@ -598,8 +597,8 @@ mod tests {
         // this genrates a callback for requests that simply puts the callbackdata  into
         // the FakeActor's state String, thus for testing we can just look in the actors's
         // state to see if the callback was run.
-        fn cb_factory() -> GhostCallback<FakeActor, TestContext, TestMsgOutResponse, TestError> {
-            Box::new(|me, _context, callback_data| {
+        fn cb_factory() -> GhostCallback<FakeActor, TestMsgOutResponse, TestError> {
+            Box::new(|me, callback_data| {
                 me.0 = format!("{:?}", callback_data);
                 Ok(())
             })

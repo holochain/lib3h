@@ -19,6 +19,11 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
 
+pub struct DefaultContext;
+impl GhostContext for DefaultContext {
+    fn get_span(&self) {}
+}
+
 /// the context when making a request from core
 /// this is always the request_id
 pub struct ClientRequestContext(String);
@@ -29,6 +34,10 @@ impl ClientRequestContext {
     pub fn get_request_id(&self) -> String {
         self.0.clone()
     }
+}
+
+impl GhostContext for ClientRequestContext {
+    fn get_span(&self) {}
 }
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
@@ -115,8 +124,13 @@ pub struct GhostEngine<'engine> {
     >,
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
+<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
             GhostEngine<'engine>,
             String,
+=======
+            GhostEngine<'engine, D>,
+            DefaultContext,
+>>>>>>> Remove context param from callback, add type constraint
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,
@@ -204,7 +218,7 @@ impl<'engine>
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // START BOILER PLATE--------------------------
         // always run the endpoint process loop
-        detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
+        detach_run!(&mut self.lib3h_endpoint, |cs| cs.process(self))?;
         // END BOILER PLATE--------------------------
 
         for msg in self.lib3h_endpoint.as_mut().drain_messages() {
@@ -292,6 +306,14 @@ impl<'engine> GhostEngine<'engine> {
                     .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
                 msg.respond(result)
             }
+<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
+=======
+            /*            SendDirectMessage(DirectMessageData) => {}
+            FetchEntry(FetchEntryData)  => {}
+            PublishEntry(ProvidedEntryData) => {}
+            HoldEntry(ProvidedEntryData)  => {}
+            QueryEntry(QueryEntryData) => {}*/
+>>>>>>> Remove context param from callback, add type constraint
             _ => panic!("{:?} not implemented", msg),
         }
     }
@@ -393,11 +415,16 @@ impl<'engine> GhostEngine<'engine> {
         for mut msg_data in request_list {
             msg_data.request_id = self.request_track.reserve();
 
+<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
             let context = "".to_string();
             let _ = self.lib3h_endpoint.request(
+=======
+            let context = DefaultContext;
+            self.lib3h_endpoint.request(
+>>>>>>> Remove context param from callback, add type constraint
                 context,
                 Lib3hToClient::HandleFetchEntry(msg_data),
-                Box::new(|_me, _ctx, response| {
+                Box::new(|_me, response| {
                     match response {
                         GhostCallbackData::Response(Ok(
                             Lib3hToClientResponse::HandleFetchEntryResult(_msg),
@@ -477,11 +504,10 @@ impl<'engine> GhostEngine<'engine> {
             provider_agent_id: join_msg.agent_id.clone(),
             request_id: self.request_track.reserve(),
         };
-        let context = "".to_string();
         self.lib3h_endpoint.request(
-            context,
+            DefaultContext,
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
-            Box::new(|me, _ctx, response| {
+            Box::new(|me, response| {
                 match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
@@ -505,8 +531,8 @@ impl<'engine> GhostEngine<'engine> {
             }),
         )?;
 
-        let context = "".to_string();
         list_data.request_id = self.request_track.reserve();
+<<<<<<< 55adcd727eed8427ed5b312da75555ed74f488ad
         self.lib3h_endpoint
             .request(
                 context,
@@ -518,6 +544,18 @@ impl<'engine> GhostEngine<'engine> {
                         )) => {
                             if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
                                 error!(
+=======
+        self.lib3h_endpoint.request(
+            DefaultContext,
+            Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
+            Box::new(|me, response| {
+                match response {
+                    GhostCallbackData::Response(Ok(
+                        Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
+                    )) => {
+                        if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
+                            error!(
+>>>>>>> Remove context param from callback, add type constraint
                                 "Got error when handling HandleGetAuthoringEntryListResult: {:?} ",
                                 err
                             );

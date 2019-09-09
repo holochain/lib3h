@@ -1,6 +1,7 @@
 //! This is a stub of the keystore so we can prove out the encoding transport
 
 use crate::{
+    engine::ghost_engine::DefaultContext,
     error::{Lib3hError, Lib3hResult},
     transport::TransportEncoding,
 };
@@ -65,7 +66,7 @@ type KeystoreParentEndpoint = GhostEndpoint<
 
 type KeystoreSelfEndpoint = GhostContextEndpoint<
     KeystoreStub,
-    (),
+    DefaultContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

@@ -28,9 +28,9 @@ where
     client_request_responses: Vec<Lib3hServerProtocol>,
 }
 
-fn server_failure(err: String, context: ClientRequestContext) -> Lib3hServerProtocol {
+fn server_failure(err: String, request_id: String) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
-        request_id: context.get_request_id(),
+        request_id,
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
         result_info: err.as_bytes().to_vec(),
@@ -38,9 +38,9 @@ fn server_failure(err: String, context: ClientRequestContext) -> Lib3hServerProt
     Lib3hServerProtocol::FailureResult(failure_data)
 }
 
-fn server_success(context: ClientRequestContext) -> Lib3hServerProtocol {
+fn server_success(request_id: String) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
-        request_id: context.get_request_id(),
+        request_id,
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
         result_info: Vec::new(),
@@ -68,32 +68,32 @@ where
         }
     }
 
-    fn make_callback() -> GhostCallback<
-        LegacyLib3h<Engine, EngineError>,
-        ClientRequestContext,
-        ClientToLib3hResponse,
-        EngineError,
-    > {
+    fn make_callback(
+        request_id: String,
+    ) -> GhostCallback<LegacyLib3h<Engine, EngineError>, ClientToLib3hResponse, EngineError> {
         Box::new(
             |me: &mut LegacyLib3h<Engine, EngineError>,
-             context: ClientRequestContext,
              response: GhostCallbackData<ClientToLib3hResponse, EngineError>| {
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
                         let response = match rsp {
-                            ClientToLib3hResponse::JoinSpaceResult => server_success(context),
-                            ClientToLib3hResponse::LeaveSpaceResult => server_success(context),
+                            ClientToLib3hResponse::JoinSpaceResult => {
+                                server_success(request_id.clone())
+                            }
+                            ClientToLib3hResponse::LeaveSpaceResult => {
+                                server_success(request_id.clone())
+                            }
                             _ => rsp.into(),
                         };
                         me.client_request_responses.push(response)
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         me.client_request_responses
-                            .push(server_failure(e.to_string(), context));
+                            .push(server_failure(e.to_string(), request_id.clone()));
                     }
                     GhostCallbackData::Timeout => {
                         me.client_request_responses
-                            .push(server_failure("Request timed out".into(), context));
+                            .push(server_failure("Request timed out".into(), request_id));
                     }
                 };
                 Ok(())
@@ -131,12 +131,16 @@ where
             Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
             _ => panic!("unimplemented"),
         };
-        let result = if &ctx.get_request_id() == "" {
-            self.engine.publish(client_msg.into())
+        let request_id = ctx.get_request_id();
+        let result = if &request_id == "" {
+            self.engine.publish(client_msg.into());
         } else {
-            self.engine
-                .request(ctx, client_msg.into(), LegacyLib3h::make_callback())
-        };
+            self.engine.request(
+                ctx,
+                client_msg.into(),
+                LegacyLib3h::make_callback(request_id),
+            );
+        }
         result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
     }
 
@@ -174,7 +178,7 @@ mod tests {
         lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
-                String,
+                ClientRequestContext,
                 Lib3hToClient,
                 Lib3hToClientResponse,
                 ClientToLib3h,
@@ -227,7 +231,7 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
-            detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
+            detach_run!(&mut self.lib3h_endpoint, |cs| cs.process(self))?;
             // END BOILER PLATE--------------------------
 
             for msg in self.lib3h_endpoint.as_mut().drain_messages() {

@@ -1,12 +1,16 @@
 use crate::prelude::*;
 
+pub trait GhostContext {
+    fn get_span(&self) -> ();
+}
+
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
 /// You only have to call process() on this one struct, and it provides
 /// all the request / drain_messages etc functions from GhostEndpoint.
 pub struct GhostParentWrapper<
     UserData,
-    Context: 'static,
+    Context: 'static + GhostContext,
     RequestToParent: 'static,
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
@@ -34,7 +38,7 @@ pub struct GhostParentWrapper<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -73,7 +77,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -117,7 +121,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
         self.endpoint.request(context, payload, cb)
     }
@@ -127,7 +131,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         self.endpoint.request_options(context, payload, cb, options)
@@ -150,7 +154,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -182,7 +186,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -250,7 +254,7 @@ pub trait GhostActor<
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
     UserData,
-    Context: 'static,
+    Context: 'static + GhostContext,
     RequestToParent: 'static,
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
@@ -279,7 +283,7 @@ pub struct GhostParentWrapperDyn<
 
 impl<
         UserData,
-        Context: 'static,
+        Context: 'static + GhostContext,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -328,7 +332,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
         self.endpoint.request(context, payload, cb)
     }
@@ -337,7 +341,7 @@ impl<
         &mut self,
         context: Context,
         payload: RequestToChild,
-        cb: GhostCallback<UserData, Context, RequestToChildResponse, Error>,
+        cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         self.endpoint.request_options(context, payload, cb, options)
@@ -361,7 +365,11 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
+    use crate::{
+        ghost_channel::create_ghost_channel,
+        ghost_tracker::GhostCallbackData,
+        test_types::{TestContext, TestError},
+    };
     use detach::prelude::*;
 
     // Any actor has messages that it exchanges with it's parent
@@ -375,9 +383,6 @@ mod tests {
     struct TestMsgIn(String);
     #[derive(Debug)]
     struct TestMsgInResponse(String);
-    type TestError = String;
-    #[derive(Debug)]
-    struct TestContext(String);
 
     struct TestActor {
         endpoint_for_parent: Option<
@@ -386,7 +391,7 @@ mod tests {
         endpoint_as_child: Detach<
             GhostContextEndpoint<
                 TestActor,
-                String,
+                TestContext,
                 TestMsgOut,
                 TestMsgOutResponse,
                 TestMsgIn,
@@ -431,7 +436,7 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
-            detach_run!(&mut self.endpoint_as_child, |cs| { cs.process(self) })?;
+            detach_run!(&mut self.endpoint_as_child, |cs| cs.process(self))?;
             // END BOILER PLATE--------------------------
 
             // In this test actor we simply take all the messages we get and
@@ -492,8 +497,8 @@ mod tests {
 
         // now lets try posting a request with a callback which just saves the response
         // value to the parent's statee
-        let cb: GhostCallback<FakeParent, TestContext, TestMsgInResponse, TestError> =
-            Box::new(|parent, _context, callback_data| {
+        let cb: GhostCallback<FakeParent, TestMsgInResponse, TestError> =
+            Box::new(|parent, callback_data| {
                 if let GhostCallbackData::Response(Ok(TestMsgInResponse(payload))) = callback_data {
                     parent.state = payload;
                 }

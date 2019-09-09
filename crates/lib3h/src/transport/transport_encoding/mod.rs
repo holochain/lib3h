@@ -1,4 +1,5 @@
 use crate::{
+    engine::ghost_engine::DefaultContext,
     keystore::*,
     transport::{error::*, protocol::*},
 };
@@ -8,18 +9,9 @@ use lib3h_ghost_actor::prelude::*;
 use std::collections::HashMap;
 use url::Url;
 
-enum ToParentContext {}
-
-enum ToInnerContext {
-    AwaitBind(
-        GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-    ),
-    AwaitSend(
-        GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-    ),
-}
-
-enum ToKeystoreContext {}
+type ToParentContext = DefaultContext;
+type ToInnerContext = DefaultContext;
+type ToKeystoreContext = DefaultContext;
 
 /// Wraps a lower-level transport in either Open or Encrypted communication
 /// Also adds a concept of MachineId and AgentId
@@ -259,15 +251,9 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            ToInnerContext::AwaitBind(msg),
+            DefaultContext,
             RequestToChild::Bind { spec },
-            Box::new(|m: &mut TransportEncoding, context, response| {
-                let msg = {
-                    match context {
-                        ToInnerContext::AwaitBind(msg) => msg,
-                        _ => panic!("bad context"),
-                    }
-                };
+            Box::new(|m: &mut TransportEncoding, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -304,15 +290,9 @@ impl TransportEncoding {
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
-            ToInnerContext::AwaitSend(msg),
+            DefaultContext,
             RequestToChild::SendMessage { address, payload },
-            Box::new(|_: &mut TransportEncoding, context, response| {
-                let msg = {
-                    match context {
-                        ToInnerContext::AwaitSend(msg) => msg,
-                        _ => panic!("bad context"),
-                    }
-                };
+            Box::new(|_: &mut TransportEncoding, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -394,6 +374,7 @@ impl
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lib3h_ghost_actor::TestContext;
     use lib3h_sodium::SodiumCryptoSystem;
 
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
@@ -507,7 +488,7 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<bool, (), TransportEncoding> =
+        let mut t1: TransportActorParentWrapper<bool, TestContext, TransportEncoding> =
             GhostParentWrapper::new(
                 TransportEncoding::new(
                     crypto.box_clone(),
@@ -520,11 +501,11 @@ mod tests {
 
         // give it a bind point
         t1.request(
-            (),
+            TestContext("".into()),
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
-            Box::new(|_: &mut bool, _, response| {
+            Box::new(|_: &mut bool, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
@@ -541,7 +522,7 @@ mod tests {
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<(), (), TransportEncoding> =
+        let mut t2: TransportActorParentWrapper<(), TestContext, TransportEncoding> =
             GhostParentWrapper::new(
                 TransportEncoding::new(
                     crypto.box_clone(),
@@ -554,11 +535,11 @@ mod tests {
 
         // give it a bind point
         t2.request(
-            (),
+            TestContext("".into()),
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
             },
-            Box::new(|_:&mut (), _, response| {
+            Box::new(|_:&mut (), response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\" })))"
@@ -574,12 +555,12 @@ mod tests {
 
         // now we're going to send a message to our sibling #2
         t1.request(
-            (),
+            TestContext("".into()),
             RequestToChild::SendMessage {
                 address: addr2full.clone(),
                 payload: b"hello".to_vec(),
             },
-            Box::new(|b: &mut bool, _, response| {
+            Box::new(|b: &mut bool, response| {
                 *b = true;
                 // make sure we get a success response
                 assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);

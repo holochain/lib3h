@@ -64,14 +64,17 @@ pub use ghost_channel::{
 };
 
 mod ghost_actor;
-pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
+pub use ghost_actor::{GhostActor, GhostContext, GhostParentWrapper, GhostParentWrapperDyn};
+
+mod test_types;
+pub use test_types::TestContext;
 
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
-        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
-        GhostTrackerBookmarkOptions, WorkWasDone,
+        GhostContext, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
+        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
+        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -80,6 +83,7 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{ghost_actor::GhostContext, test_types::TestContext};
     use detach::prelude::*;
 
     type FakeError = String;
@@ -121,7 +125,7 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 RrDht,
-                i8,
+                TestContext,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -170,7 +174,7 @@ mod tests {
         }
 
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-            detach_run!(&mut self.endpoint_self, |cs| { cs.process(self) })?;
+            detach_run!(&mut self.endpoint_self, |cs| cs.process(self))?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
@@ -239,10 +243,17 @@ mod tests {
             msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
         },
     }
+    impl GhostContext for GwDht {
+        fn get_span(&self) {}
+    }
 
     #[derive(Debug)]
     enum RequestToParentContext {
         IncomingConnection { address: String },
+    }
+
+    impl GhostContext for RequestToParentContext {
+        fn get_span(&self) {}
     }
 
     struct GatewayTransport {
@@ -269,7 +280,7 @@ mod tests {
         dht: Detach<
             GhostParentWrapper<
                 GatewayTransport,
-                GwDht,
+                TestContext,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -329,18 +340,14 @@ mod tests {
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
-                Box::new(|_m: &mut GatewayTransport, c, r| {
-                    println!(
-                        "response from parent to IncomingConnection got: {:?} with context {:?}",
-                        r, c
-                    );
+                Box::new(|_m: &mut GatewayTransport, r| {
+                    println!("response from parent to IncomingConnection got: {:?}", r);
                     Ok(())
                 }),
             )?;
-            detach_run!(&mut self.dht, |dht| { dht.process(self) })?;
-            detach_run!(&mut self.endpoint_self, |endpoint_self| {
-                endpoint_self.process(self)
-            })?;
+            detach_run!(&mut self.dht, |dht| dht.process(self))?;
+            detach_run!(&mut self.endpoint_self, |endpoint_self| endpoint_self
+                .process(self))?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 match msg.take_message().expect("exists") {
@@ -358,12 +365,13 @@ mod tests {
                         address,
                         payload: _,
                     } => {
+                        let request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
-                            GwDht::ResolveAddressForId { msg },
+                            TestContext("test1".to_string()),
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
-                            Box::new(|_m:&mut GatewayTransport, context, response| {
+                            Box::new(|_m:&mut GatewayTransport, response| {
                                 let msg = {
-                                    if let GwDht::ResolveAddressForId { msg } = context {
+                                    if let GwDht::ResolveAddressForId { msg } = request {
                                         msg
                                     } else {
                                         panic!("bad context type");
@@ -440,7 +448,7 @@ mod tests {
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .build::<(), i8>();
+            .build::<(), TestContext>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
@@ -467,11 +475,11 @@ mod tests {
         // here we simply watch that we got a response back as expected
         t_actor_endpoint
             .request(
-                42_i8,
+                TestContext("42".to_string()),
                 RequestToChild::Bind {
                     spec: "address_to_bind_to".to_string(),
                 },
-                Box::new(|_: &mut (), _, r| {
+                Box::new(|_: &mut (), r| {
                     println!("in callback 1, got: {:?}", r);
                     Ok(())
                 }),
@@ -483,12 +491,12 @@ mod tests {
 
         t_actor_endpoint
             .request(
-                42_i8,
+                TestContext("42".to_string()),
                 RequestToChild::SendMessage {
                     address: "agent_id_1".to_string(),
                     payload: b"some content".to_vec(),
                 },
-                Box::new(|_: &mut (), _, r| {
+                Box::new(|_: &mut (), r| {
                     println!("in callback 2, got: {:?}", r);
                     Ok(())
                 }),

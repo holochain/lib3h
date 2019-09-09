@@ -1,3 +1,4 @@
+use crate::ghost_actor::GhostContext;
 use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
@@ -19,15 +20,15 @@ pub enum GhostCallbackData<CbData: 'static, E: 'static> {
 /// if you want to mutate the state of a struct instance, pass it in
 /// with the `handle` or `process` call.
 /// (see detach crate for help with self refs)
-pub type GhostCallback<UserData, Context, CbData, E> =
-    Box<dyn Fn(&mut UserData, Context, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
+pub type GhostCallback<UserData, CbData, E> =
+    Box<dyn FnOnce(&mut UserData, GhostCallbackData<CbData, E>) -> GhostResult<()> + 'static>;
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
-struct GhostTrackerEntry<UserData, Context: 'static, CbData: 'static, E: 'static> {
+struct GhostTrackerEntry<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static> {
     expires: std::time::SystemTime,
     context: Context,
-    cb: GhostCallback<UserData, Context, CbData, E>,
+    cb: GhostCallback<UserData, CbData, E>,
 }
 
 #[derive(Debug, Clone)]
@@ -46,7 +47,7 @@ impl Default for GhostTrackerBuilder {
 }
 
 impl GhostTrackerBuilder {
-    pub fn build<UserData, Context: 'static, CbData: 'static, E: 'static>(
+    pub fn build<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>(
         self,
     ) -> GhostTracker<UserData, Context, CbData, E> {
         GhostTracker {
@@ -69,7 +70,7 @@ impl GhostTrackerBuilder {
 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<UserData, Context: 'static, CbData: 'static, E: 'static> {
+pub struct GhostTracker<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static> {
     request_id_prefix: String,
     default_timeout: std::time::Duration,
     pending: HashMap<RequestId, GhostTrackerEntry<UserData, Context, CbData, E>>,
@@ -93,7 +94,7 @@ impl GhostTrackerBookmarkOptions {
     }
 }
 
-impl<UserData, Context: 'static, CbData: 'static, E: 'static>
+impl<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>
     GhostTracker<UserData, Context, CbData, E>
 {
     /// trigger any periodic or delayed callbacks
@@ -113,7 +114,7 @@ impl<UserData, Context: 'static, CbData: 'static, E: 'static>
             match self.pending.remove(&request_id) {
                 None => (),
                 Some(entry) => {
-                    (entry.cb)(ga, entry.context, GhostCallbackData::Timeout)?;
+                    (entry.cb)(ga, GhostCallbackData::Timeout)?;
                 }
             }
         }
@@ -125,7 +126,7 @@ impl<UserData, Context: 'static, CbData: 'static, E: 'static>
     pub fn bookmark(
         &mut self,
         context: Context,
-        cb: GhostCallback<UserData, Context, CbData, E>,
+        cb: GhostCallback<UserData, CbData, E>,
     ) -> RequestId {
         self.bookmark_options(context, cb, GhostTrackerBookmarkOptions::default())
     }
@@ -134,7 +135,7 @@ impl<UserData, Context: 'static, CbData: 'static, E: 'static>
     pub fn bookmark_options(
         &mut self,
         context: Context,
-        cb: GhostCallback<UserData, Context, CbData, E>,
+        cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
         let request_id = RequestId::with_prefix(&self.request_id_prefix);
@@ -168,21 +169,18 @@ impl<UserData, Context: 'static, CbData: 'static, E: 'static>
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
             None => Err(GhostError::new(ErrorKind::RequestIdNotFound)),
-            Some(entry) => (entry.cb)(owner, entry.context, GhostCallbackData::Response(data)),
+            Some(entry) => (entry.cb)(owner, GhostCallbackData::Response(data)),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::test_types::{TestCallbackData, TestContext, TestError};
     use detach::prelude::*;
 
     use super::*;
-    #[derive(Debug)]
-    struct TestCallbackData(String);
-    #[derive(Debug)]
-    struct TestContext(String);
-    type TestError = String;
+
     struct TestTrackingActor {
         state: String,
         tracker: Detach<GhostTracker<TestTrackingActor, TestContext, TestCallbackData, TestError>>,
@@ -204,11 +202,8 @@ mod tests {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("some_context_data".into());
 
-        let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
-            Box::new(|me, context, callback_data| {
-                // and we'll check that we got our context back too because we
-                // might have used it to determine what to do here.
-                assert_eq!(context.0, "some_context_data");
+        let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
+            Box::new(|me, callback_data| {
                 if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
                     me.state = payload;
                 }
@@ -253,8 +248,8 @@ mod tests {
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
         let context = TestContext("foo".into());
-        let cb: GhostCallback<TestTrackingActor, TestContext, TestCallbackData, TestError> =
-            Box::new(|me, _context, callback_data| {
+        let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
+            Box::new(|me, callback_data| {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {

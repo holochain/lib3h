@@ -1,4 +1,7 @@
-use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
+use crate::{
+    engine::ghost_engine::DefaultContext,
+    transport::{error::TransportError, memory_mock::memory_server, protocol::*},
+};
 use lib3h_ghost_actor::prelude::*;
 use std::collections::HashSet;
 use url::Url;
@@ -21,7 +24,7 @@ type GhostTransportMemoryEndpoint = GhostEndpoint<
 
 type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
     UserData,
-    (),
+    DefaultContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -31,7 +34,7 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
 
 pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
     (),
-    (),
+    DefaultContext,
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -281,7 +284,7 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child1")
-            .build::<(), ()>();
+            .build::<(), DefaultContext>();
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_endpoint = transport2
@@ -289,7 +292,7 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child2")
-            .build::<(), ()>();
+            .build::<(), DefaultContext>();
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
@@ -298,7 +301,7 @@ mod tests {
         let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
         t1_endpoint
             .request(
-                (),
+                DefaultContext,
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
@@ -315,7 +318,7 @@ mod tests {
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_endpoint
             .request(
-                (),
+                DefaultContext,
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
@@ -348,7 +351,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                (),
+                DefaultContext,
                 RequestToChild::SendMessage {
                     address: Url::parse("mem://addr_2").unwrap(),
                     payload: b"test message".to_vec(),
