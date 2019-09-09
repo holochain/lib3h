@@ -374,7 +374,7 @@ impl
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib3h_ghost_actor::TestContext;
+    use lib3h_ghost_actor::TestTrace;
     use lib3h_sodium::SodiumCryptoSystem;
 
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
@@ -488,7 +488,7 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<bool, TestContext, TransportEncoding> =
+        let mut t1: TransportActorParentWrapper<bool, TestTrace, TransportEncoding> =
             GhostParentWrapper::new(
                 TransportEncoding::new(
                     crypto.box_clone(),
@@ -501,7 +501,7 @@ mod tests {
 
         // give it a bind point
         t1.request(
-            TestContext("".into()),
+            TestTrace("".into()),
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
@@ -522,7 +522,7 @@ mod tests {
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<(), TestContext, TransportEncoding> =
+        let mut t2: TransportActorParentWrapper<(), TestTrace, TransportEncoding> =
             GhostParentWrapper::new(
                 TransportEncoding::new(
                     crypto.box_clone(),
@@ -535,7 +535,7 @@ mod tests {
 
         // give it a bind point
         t2.request(
-            TestContext("".into()),
+            TestTrace("".into()),
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
             },
@@ -555,7 +555,7 @@ mod tests {
 
         // now we're going to send a message to our sibling #2
         t1.request(
-            TestContext("".into()),
+            TestTrace("".into()),
             RequestToChild::SendMessage {
                 address: addr2full.clone(),
                 payload: b"hello".to_vec(),

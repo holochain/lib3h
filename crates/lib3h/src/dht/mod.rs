@@ -14,7 +14,7 @@ pub mod tests {
         tests::enable_logging_for_test,
     };
     use detach::prelude::*;
-    use lib3h_ghost_actor::{prelude::*, TestContext};
+    use lib3h_ghost_actor::{prelude::*, TestTrace};
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
         Address,
@@ -121,15 +121,15 @@ pub mod tests {
     fn new_dht_wrapper(
         _is_mirror: bool,
         peer_address: &PeerAddressRef,
-    ) -> Detach<ChildDhtWrapperDyn<DhtData, TestContext>> {
+    ) -> Detach<ChildDhtWrapperDyn<DhtData, TestTrace>> {
         let dht = new_dht(true, peer_address);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
-    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestContext>>) -> PeerData {
+    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> PeerData {
         let mut ud = DhtData::new();
         dht.request(
-            TestContext::new(),
+            TestTrace::new(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut ud, response| {
                 let response = {
@@ -156,12 +156,12 @@ pub mod tests {
     }
 
     fn get_peer(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestContext>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
         address: &str,
     ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            TestContext::new(),
+            TestTrace::new(),
             DhtRequestToChild::RequestPeer(address.to_string()),
             Box::new(|mut ud, response| {
                 let response = {
@@ -187,10 +187,10 @@ pub mod tests {
         ud.maybe_peer
     }
 
-    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestContext>>) -> Vec<PeerData> {
+    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> Vec<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            TestContext::new(),
+            TestTrace::new(),
             DhtRequestToChild::RequestPeerList,
             Box::new(|mut ud, response| {
                 let response = {
@@ -217,11 +217,11 @@ pub mod tests {
     }
 
     fn get_entry_address_list(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestContext>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
     ) -> Vec<Address> {
         let mut ud = DhtData::new();
         dht.request(
-            TestContext::new(),
+            TestTrace::new(),
             DhtRequestToChild::RequestEntryAddressList,
             Box::new(|mut ud, response| {
                 let response = {
@@ -249,12 +249,12 @@ pub mod tests {
     }
 
     fn get_aspects_of(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestContext>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
         entry_address: &Address,
     ) -> Option<Vec<Address>> {
         let mut ud = DhtData::new();
         dht.request(
-            TestContext::new(),
+            TestTrace::new(),
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
             Box::new(|mut ud, response| {
                 let response = {
@@ -345,7 +345,7 @@ pub mod tests {
         // Fetch it
         // ========
         dht.request(
-            TestContext::new(),
+            TestTrace::new(),
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
             Box::new(|_ud, response| {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");

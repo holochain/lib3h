@@ -177,7 +177,7 @@ impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::TestContext;
+    use crate::test_types::TestTrace;
     use detach::prelude::*;
 
     type TestError = String;
@@ -187,7 +187,7 @@ mod tests {
 
     struct TestTrackingActor {
         state: String,
-        tracker: Detach<GhostTracker<TestTrackingActor, TestContext, TestCallbackData, TestError>>,
+        tracker: Detach<GhostTracker<TestTrackingActor, TestTrace, TestCallbackData, TestError>>,
     }
 
     impl TestTrackingActor {
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_bookmark_and_handle() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let context = TestContext("some_context_data".into());
+        let context = TestTrace("some_context_data".into());
 
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let context = TestContext("foo".into());
+        let context = TestTrace("foo".into());
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
                 // when the timeout happens the callback should get

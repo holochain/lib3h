@@ -263,7 +263,7 @@ mod tests {
             enum TestContex {
         }
 
-            let mut transport1_actor = GhostLocalActor::new::<TestContext>(
+            let mut transport1_actor = GhostLocalActor::new::<TestTrace>(
             transport1_engine, transport1_endpoint);
              */
 

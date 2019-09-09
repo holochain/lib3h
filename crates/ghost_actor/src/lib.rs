@@ -68,7 +68,7 @@ mod ghost_actor;
 pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 mod test_types;
-pub use test_types::TestContext;
+pub use test_types::TestTrace;
 
 pub mod prelude {
     pub use super::{
@@ -84,7 +84,7 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::TestContext;
+    use crate::test_types::TestTrace;
     use detach::prelude::*;
 
     type FakeError = String;
@@ -126,7 +126,7 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 RrDht,
-                TestContext,
+                TestTrace,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -263,7 +263,7 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 GatewayTransport,
-                TestContext,
+                TestTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -274,7 +274,7 @@ mod tests {
         dht: Detach<
             GhostParentWrapper<
                 GatewayTransport,
-                TestContext,
+                TestTrace,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -328,7 +328,7 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.endpoint_self.as_mut().request(
-                TestContext::new(),
+                TestTrace::new(),
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
@@ -359,7 +359,7 @@ mod tests {
                     } => {
                         let request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
-                            TestContext("test1".to_string()),
+                            TestTrace("test1".to_string()),
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(|_m:&mut GatewayTransport, response| {
                                 let msg = {
@@ -440,7 +440,7 @@ mod tests {
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .build::<(), TestContext>();
+            .build::<(), TestTrace>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
@@ -467,7 +467,7 @@ mod tests {
         // here we simply watch that we got a response back as expected
         t_actor_endpoint
             .request(
-                TestContext("42".to_string()),
+                TestTrace("42".to_string()),
                 RequestToChild::Bind {
                     spec: "address_to_bind_to".to_string(),
                 },
@@ -483,7 +483,7 @@ mod tests {
 
         t_actor_endpoint
             .request(
-                TestContext("42".to_string()),
+                TestTrace("42".to_string()),
                 RequestToChild::SendMessage {
                     address: "agent_id_1".to_string(),
                     payload: b"some content".to_vec(),

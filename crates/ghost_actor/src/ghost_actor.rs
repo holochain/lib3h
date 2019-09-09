@@ -364,7 +364,7 @@ mod tests {
     use super::*;
     use crate::{
         ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData,
-        test_types::TestContext,
+        test_types::TestTrace,
     };
     use detach::prelude::*;
 
@@ -389,7 +389,7 @@ mod tests {
         endpoint_as_child: Detach<
             GhostContextEndpoint<
                 TestActor,
-                TestContext,
+                TestTrace,
                 TestMsgOut,
                 TestMsgOutResponse,
                 TestMsgIn,
@@ -468,7 +468,7 @@ mod tests {
         // get the endpoint from the child actor that we as parent will interact with
         let mut parent_endpoint: GhostContextEndpoint<
             FakeParent,
-            TestContext,
+            TestTrace,
             TestMsgIn,
             TestMsgInResponse,
             TestMsgOut,
@@ -505,7 +505,7 @@ mod tests {
 
         parent_endpoint
             .request(
-                TestContext("context data".into()),
+                TestTrace("context data".into()),
                 TestMsgIn("event from parent".into()),
                 cb,
             )
@@ -528,7 +528,7 @@ mod tests {
         // create the wrapper
         let mut wrapped_child: GhostParentWrapper<
             FakeParent,
-            TestContext,
+            TestTrace,
             TestMsgOut,
             TestMsgOutResponse,
             TestMsgIn,

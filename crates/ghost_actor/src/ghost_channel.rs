@@ -536,7 +536,7 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::TestContext;
+    use crate::test_types::TestTrace;
     type TestError = String;
 
     #[derive(Debug)]
@@ -657,7 +657,7 @@ mod tests {
 
         endpoint
             .request(
-                TestContext("context data".into()),
+                TestTrace("context data".into()),
                 TestMsgOut("request to my parent".into()),
                 cb_factory(),
             )
@@ -698,7 +698,7 @@ mod tests {
         // Now we'll send a request that should timeout
         endpoint
             .request_options(
-                TestContext("context data".into()),
+                TestTrace("context data".into()),
                 TestMsgOut("another request to my parent".into()),
                 cb_factory(),
                 GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),

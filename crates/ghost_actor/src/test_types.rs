@@ -1,16 +1,16 @@
 use lib3h_tracing::{CanTrace, Span};
 
 #[derive(Debug)]
-pub struct TestContext(pub String);
+pub struct TestTrace(pub String);
 
-impl CanTrace for TestContext {
+impl CanTrace for TestTrace {
     fn get_span(&self) -> Span {
         unimplemented!()
     }
 }
 
-impl TestContext {
+impl TestTrace {
     pub fn new() -> Self {
-        Self("Unnamed TestContext".into())
+        Self("Unnamed TestTrace".into())
     }
 }
