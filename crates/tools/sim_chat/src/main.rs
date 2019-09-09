@@ -3,7 +3,7 @@
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use lib3h_sim_chat::{channel_address_from_str, ChatEvent};
+use lib3h_sim_chat::{ChatEvent};
 use regex::Regex;
 use url::Url;
 
@@ -60,15 +60,14 @@ lib3h simchat Commands:
                             (Some("help"), _) => {
                                 help_text();
                             }
-                            (Some("join"), Some(channel_id)) => {
-                                let channel_addr = channel_address_from_str(channel_id)
-                                    .expect("failed to hash channel address");
-                                cli.send(ChatEvent::Join(channel_addr))
+                            (Some("join"), Some(rest)) => {
+                                let mut words = rest.split(' ');
+                                let channel_id = words.next().unwrap().to_string();
+                                let agent_id = words.next().unwrap().to_string();
+                                cli.send(ChatEvent::Join{channel_id, agent_id})
                             }
                             (Some("part"), Some(channel_id)) => {
-                                let channel_addr = channel_address_from_str(channel_id)
-                                    .expect("failed to hash channel address");
-                                cli.send(ChatEvent::Part(channel_addr))
+                                cli.send(ChatEvent::Part{channel_id: channel_id.to_string()})
                             }
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');

@@ -40,8 +40,13 @@ pub enum ChatEvent {
         from_address: String,
         payload: String,
     },
-    Join(Address),
-    Part(Address),
+    Join {
+        channel_id: String,
+        agent_id: String,
+    },
+    Part {
+        channel_id: String,
+    },
 }
 
 impl TryFrom<Lib3hToClient> for ChatEvent {
@@ -63,19 +68,23 @@ impl TryInto<ClientToLib3h> for ChatEvent {
     type Error = String;
     fn try_into(self) -> Result<ClientToLib3h, Self::Error> {
         match self {
-            ChatEvent::Join(ref addr) => {
+            ChatEvent::Join{channel_id, agent_id} => {
+                let space_address = channel_address_from_string(&channel_id)
+                    .map_err(|e| e.to_string())?;
                 let space_data = SpaceData {
-                    agent_id: Address::new(),
+                    agent_id: Address::from(agent_id),
                     request_id: "".to_string(),
-                    space_address: addr.to_owned(),
+                    space_address,
                 };
                 Ok(ClientToLib3h::JoinSpace(space_data))
             }
-            ChatEvent::Part(ref addr) => {
+            ChatEvent::Part{channel_id} => {
+                let space_address = channel_address_from_string(&channel_id)
+                    .map_err(|e| e.to_string())?;
                 let space_data = SpaceData {
                     agent_id: Address::new(),
                     request_id: "".to_string(),
-                    space_address: addr.to_owned(),
+                    space_address,
                 };
                 Ok(ClientToLib3h::LeaveSpace(space_data))
             }
@@ -211,7 +220,7 @@ impl SimChat {
     }
 }
 
-pub fn channel_address_from_str(channel_id: &str) -> Result<Address, CryptoError> {
+pub fn channel_address_from_string(channel_id: &String) -> Result<Address, CryptoError> {
     let mut input = SecBuf::with_insecure_from_string(channel_id.to_string());
     let mut output = SecBuf::with_insecure(hash::BYTES256);
     hash::sha256(&mut input, &mut output).unwrap();
@@ -246,7 +255,7 @@ mod tests {
 
     #[test]
     fn can_convert_strings_to_channel_address() {
-        let addr = channel_address_from_str("test channel id").expect("failed to hash string");
+        let addr = channel_address_from_string(&String::from("test channel id")).expect("failed to hash string");
         assert_eq!(
             addr,
             Address::from("mgb/+MzdPWAYRs4ERGlj3WCg53AddXsg1HjXH7pk7pE=".to_string())
