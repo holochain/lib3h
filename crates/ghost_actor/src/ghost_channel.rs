@@ -298,7 +298,7 @@ pub trait GhostCanTrack<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()>;
@@ -307,7 +307,7 @@ pub trait GhostCanTrack<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -365,15 +365,15 @@ impl<
 {
     fn priv_request(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(context, cb),
+            None => self.pending_responses_tracker.bookmark(trace_context, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                context,
+                trace_context,
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
@@ -427,23 +427,28 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
-        self.priv_request(context, payload, cb, GhostTrackRequestOptions::default())
+        self.priv_request(
+            trace_context,
+            payload,
+            cb,
+            GhostTrackRequestOptions::default(),
+        )
     }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        self.priv_request(context, payload, cb, options)
+        self.priv_request(trace_context, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side

@@ -116,22 +116,23 @@ impl<
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
-        self.endpoint.request(context, payload, cb)
+        self.endpoint.request(trace_context, payload, cb)
     }
 
     /// see GhostContextEndpoint::request
     fn request_options(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        self.endpoint.request_options(context, payload, cb, options)
+        self.endpoint
+            .request_options(trace_context, payload, cb, options)
     }
 
     /// see GhostContextEndpoint::drain_messages
@@ -327,21 +328,22 @@ impl<
     /// see GhostContextEndpoint::request
     pub fn request(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
-        self.endpoint.request(context, payload, cb)
+        self.endpoint.request(trace_context, payload, cb)
     }
 
     pub fn request_options(
         &mut self,
-        context: TraceContext,
+        trace_context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        self.endpoint.request_options(context, payload, cb, options)
+        self.endpoint
+            .request_options(trace_context, payload, cb, options)
     }
 
     /// see GhostContextEndpoint::drain_messages

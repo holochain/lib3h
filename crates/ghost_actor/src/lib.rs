@@ -239,7 +239,7 @@ mod tests {
     use transport_protocol::*;
 
     #[derive(Debug)]
-    enum GwDht {
+    enum _GwDht {
         ResolveAddressForId {
             msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
         },
@@ -357,18 +357,11 @@ mod tests {
                         address,
                         payload: _,
                     } => {
-                        let request = GwDht::ResolveAddressForId { msg };
+                        // let _request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
                             TestTrace("test1".to_string()),
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
-                            Box::new(|_m:&mut GatewayTransport, response| {
-                                let msg = {
-                                    if let GwDht::ResolveAddressForId { msg } = request {
-                                        msg
-                                    } else {
-                                        panic!("bad context type");
-                                    }
-                                };
+                            Box::new(move |_m:&mut GatewayTransport, response| {
 
                                 // got a timeout error
                                 if let GhostCallbackData::Timeout = response {

@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_bookmark_and_handle() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let context = TestTrace("some_context_data".into());
+        let trace_context = TestTrace("some_context_data".into());
 
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
@@ -216,7 +216,7 @@ mod tests {
 
         // lets bookmark a callback that should set our actors state to the value
         // of the callback response
-        let req_id = actor.tracker.bookmark(context, cb);
+        let req_id = actor.tracker.bookmark(trace_context, cb);
 
         let entry = actor.tracker.pending.get(&req_id).unwrap();
         assert_eq!(entry._trace_context.0, "some_context_data");
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let context = TestTrace("foo".into());
+        let trace_context = TestTrace("foo".into());
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
                 // when the timeout happens the callback should get
@@ -263,7 +263,7 @@ mod tests {
                 Ok(())
             });
         let _req_id = actor.tracker.bookmark_options(
-            context,
+            trace_context,
             cb,
             GhostTrackerBookmarkOptions::default().timeout(std::time::Duration::from_millis(1)),
         );
