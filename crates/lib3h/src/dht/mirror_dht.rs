@@ -1,17 +1,14 @@
 use crate::{
-    dht::{
-        dht_protocol::*,
-        dht_trait::{Dht, DhtConfig},
-        PeerAddress, PeerAddressRef,
-    },
+    dht::{dht_config::DhtConfig, dht_protocol::*, PeerAddress, PeerAddressRef},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     time,
 };
+use detach::prelude::*;
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
-use std::collections::{HashMap, HashSet, VecDeque};
-
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 type HasTimedOut = bool;
@@ -28,8 +25,6 @@ enum MirrorGossip {
 ///  - Gossip can only be a *HoldRequest
 ///  - Monotonic data
 pub struct MirrorDht {
-    /// FIFO of DhtCommands send to us
-    inbox: VecDeque<DhtCommand>,
     /// Storage of EntryData with empty aspect content?
     entry_list: HashMap<Address, HashSet<Address>>,
     /// Monotonic Storage of PeerData
@@ -38,25 +33,30 @@ pub struct MirrorDht {
     timed_out_map: HashMap<PeerAddress, HasTimedOut>,
     /// PeerData of this peer
     this_peer: PeerData,
-    /// Keep track of fetch requests sent to Core
-    pending_fetch_request_list: HashSet<String>,
     /// Keep track of last time this peer gossiped self to others
     last_gossip_of_self: u64,
     /// Store Dht config used by this peer
     config: DhtConfig,
+
+    /// ghost stuff
+    endpoint_parent: Option<DhtEndpoint>,
+    endpoint_self: Detach<DhtEndpointWithContext<()>>,
 }
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Self {
+    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Box<DhtActor> {
         let dht_config = DhtConfig::new(this_peer_address, this_peer_uri);
-        Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht")
+        let dht = Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht");
+        // Box::new(dht)
+        dht
     }
 
-    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Self> {
+    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>> {
         let timestamp = time::since_epoch_ms();
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+
         let this = MirrorDht {
-            inbox: VecDeque::new(),
             peer_map: HashMap::new(),
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
@@ -65,16 +65,22 @@ impl MirrorDht {
                 peer_uri: config.this_peer_uri.clone(),
                 timestamp,
             },
-            pending_fetch_request_list: HashSet::new(),
             last_gossip_of_self: timestamp,
             config: config.clone(),
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self: Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("dht_to_parent_")
+                    .build(),
+            ),
         };
-        Ok(this)
+        Ok(Box::new(this))
     }
 }
 
-/// Impl Dht interface
-impl Dht for MirrorDht {
+// was Dht Interface
+impl MirrorDht {
     // -- Peer info -- //
 
     fn get_peer_list(&self) -> Vec<PeerData> {
@@ -89,14 +95,10 @@ impl Dht for MirrorDht {
         None
     }
 
-    fn this_peer(&self) -> &PeerData {
-        &self.this_peer
-    }
-
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<&Address> {
-        self.entry_list.iter().map(|kv| kv.0).collect()
+    fn get_entry_address_list(&self) -> Vec<Address> {
+        self.entry_list.iter().map(|kv| kv.0.clone()).collect()
     }
 
     fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
@@ -111,31 +113,11 @@ impl Dht for MirrorDht {
 
     // -- Processing -- //
 
-    /// Add to inbox
-    fn post(&mut self, cmd: DhtCommand) -> Lib3hResult<()> {
-        self.inbox.push_back(cmd);
-        Ok(())
-    }
-
     /// Serve each item in inbox
-    fn process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtEvent>)> {
+    fn internal_process(&mut self) -> Lib3hResult<(DidWork, Vec<DhtRequestToParent>)> {
         let now = time::since_epoch_ms();
         let mut outbox = Vec::new();
-        // Process inbox
         let mut did_work = false;
-        loop {
-            let cmd = match self.inbox.pop_front() {
-                None => break,
-                Some(msg) => msg,
-            };
-            let res = self.serve_DhtCommand(&cmd);
-            if let Ok(mut output) = res {
-                did_work = true;
-                outbox.append(&mut output);
-            } else {
-                error!("serve_DhtCommand() failed: {:?}", res);
-            }
-        }
         // Check if others timed-out
         // TODO: Might need to optimize performance as walking a map is expensive
         // see comment: https://github.com/holochain/lib3h/pull/210/#discussion_r304518608
@@ -156,7 +138,7 @@ impl Dht for MirrorDht {
             // Check if timed-out
             if now - peer.timestamp > self.config.timeout_threshold {
                 debug!("@MirrorDht@ peer {} timed-out", peer_address);
-                outbox.push(DhtEvent::PeerTimedOut(peer_address.clone()));
+                outbox.push(DhtRequestToParent::PeerTimedOut(peer_address.clone()));
                 timed_out_list.push(peer_address.clone());
                 did_work = true;
             }
@@ -176,7 +158,7 @@ impl Dht for MirrorDht {
             self.last_gossip_of_self = now;
             let gossip_data = self.gossip_self(self.get_other_peer_list());
             if gossip_data.peer_address_list.len() > 0 {
-                outbox.push(DhtEvent::GossipTo(gossip_data));
+                outbox.push(DhtRequestToParent::GossipTo(gossip_data));
                 did_work = true;
             }
         }
@@ -198,15 +180,14 @@ impl MirrorDht {
 
     // Create gossipTo event of your own PeerData (but not to yourself)
     fn gossip_self(&mut self, peer_address_list: Vec<PeerAddress>) -> GossipToData {
-        let this_peer = self.this_peer();
-        let gossip_this_peer = MirrorGossip::Peer(this_peer.clone());
+        let gossip_this_peer = MirrorGossip::Peer(self.this_peer.clone());
         let mut buf = Vec::new();
         gossip_this_peer
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
         trace!(
             "@MirrorDht@ gossip_self: {:?} | to: {:?}",
-            this_peer,
+            self.this_peer,
             peer_address_list,
         );
         GossipToData {
@@ -291,7 +272,7 @@ impl MirrorDht {
     }
 
     /// Create GossipTo event for entry to all known peers
-    fn gossip_entry(&self, entry: &EntryData) -> DhtEvent {
+    fn gossip_entry(&self, entry: &EntryData) -> DhtRequestToParent {
         let entry_gossip = MirrorGossip::Entry(entry.clone());
         let mut buf = Vec::new();
         entry_gossip
@@ -301,18 +282,46 @@ impl MirrorDht {
             peer_address_list: self.get_other_peer_list(),
             bundle: buf,
         };
-        DhtEvent::GossipTo(gossip_evt)
+        DhtRequestToParent::GossipTo(gossip_evt)
+    }
+}
+
+/// Impl DhtActor interface
+impl
+    GhostActor<
+        DhtRequestToParent,
+        DhtRequestToParentResponse,
+        DhtRequestToChild,
+        DhtRequestToChildResponse,
+        Lib3hError,
+    > for MirrorDht
+{
+    fn take_parent_endpoint(&mut self) -> Option<DhtEndpoint> {
+        std::mem::replace(&mut self.endpoint_parent, None)
     }
 
-    /// Process a DhtEvent Command, sent by our owner.
-    /// Return a list of DhtEvent to owner.
-    #[allow(non_snake_case)]
-    fn serve_DhtCommand(&mut self, cmd: &DhtCommand) -> Lib3hResult<Vec<DhtEvent>> {
-        debug!("@MirrorDht@ serving cmd: {:?}", cmd);
-        // Note: use same order as the enum
-        match cmd {
+    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        detach_run!(&mut self.endpoint_self, |es| es.process(&mut ()))?;
+        for request in self.endpoint_self.as_mut().drain_messages() {
+            //debug!("@MirrorDht@ serving request: {:?}", request);
+            self.handle_request_from_parent(request)
+                .expect("no ghost errors");
+        }
+        let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
+        for command in command_list {
+            self.endpoint_self.publish(command)?;
+        }
+        Ok(did_work.into())
+    }
+}
+
+impl MirrorDht {
+    #[allow(irrefutable_let_patterns)]
+    fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
+        debug!("@MirrorDht@ serving request: {:?}", request);
+        match request.take_message().expect("exists") {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
-            DhtCommand::HandleGossip(msg) => {
+            DhtRequestToChild::HandleGossip(msg) => {
                 trace!("Deserializer msg.bundle: {:?}", msg.bundle);
                 let mut de = Deserializer::new(&msg.bundle[..]);
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
@@ -326,44 +335,42 @@ impl MirrorDht {
                     MirrorGossip::Entry(entry) => {
                         let diff = self.diff_aspects(&entry);
                         if diff.len() > 0 {
-                            return Ok(vec![DhtEvent::HoldEntryRequested(
-                                self.this_peer.peer_address.clone(),
-                                entry,
-                            )]);
+                            self.endpoint_self
+                                .publish(DhtRequestToParent::HoldEntryRequested {
+                                    from_peer: self.this_peer.peer_address.clone(),
+                                    entry,
+                                })?;
                         }
-                        return Ok(vec![]);
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
                         let maybe_known_peer = self.get_peer(&gossiped_peer.peer_address);
-                        if maybe_known_peer.is_none() {
-                            return Ok(vec![DhtEvent::HoldPeerRequested(gossiped_peer)]);
+                        match maybe_known_peer {
+                            None => {
+                                self.endpoint_self.publish(
+                                    DhtRequestToParent::HoldPeerRequested(gossiped_peer.clone()),
+                                )?;
+                            }
+                            Some(known_peer) => {
+                                // Update Peer timestamp
+                                if gossiped_peer.timestamp > known_peer.timestamp {
+                                    let _is_new_content = self.add_peer(&gossiped_peer);
+                                }
+                            }
                         }
-                        let known_peer = maybe_known_peer.unwrap();
-                        // Update Peer timestamp
-                        if gossiped_peer.timestamp > known_peer.timestamp {
-                            let _ = self.add_peer(&gossiped_peer);
-                        }
-                        return Ok(vec![]);
                     }
                 }
             }
-            // Ask owner to respond to self
-            DhtCommand::FetchEntry(fetch_entry) => {
-                self.pending_fetch_request_list
-                    .insert(fetch_entry.msg_id.clone());
-                return Ok(vec![DhtEvent::EntryDataRequested(fetch_entry.clone())]);
-            }
+
             // Owner is asking us to hold a peer info
-            DhtCommand::HoldPeer(new_peer_data) => {
+            DhtRequestToChild::HoldPeer(new_peer_data) => {
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let others_list = self.get_other_peer_list();
                 // Store it
-                let received_new_content = self.add_peer(new_peer_data);
+                let received_new_content = self.add_peer(&new_peer_data);
                 // Bail if peer is known and up to date.
                 if !received_new_content {
-                    return Ok(vec![]);
+                    return Ok(());
                 }
-                let mut event_list = Vec::new();
                 // Gossip to everyone to also hold it
                 let peer = self
                     .peer_map
@@ -383,67 +390,112 @@ impl MirrorDht {
                     peer_address_list: others_list,
                     bundle: buf,
                 };
-                event_list.push(DhtEvent::GossipTo(gossip_evt));
+                self.endpoint_self
+                    .publish(DhtRequestToParent::GossipTo(gossip_evt))?;
 
                 // Gossip back your own PeerData (but not to yourself)
-                if new_peer_data.peer_address != self.this_peer().peer_address {
+                if new_peer_data.peer_address != self.this_peer.peer_address {
                     let gossip_data = self.gossip_self(vec![new_peer_data.peer_address.clone()]);
                     if gossip_data.peer_address_list.len() > 0 {
-                        event_list.push(DhtEvent::GossipTo(gossip_data));
+                        self.endpoint_self
+                            .publish(DhtRequestToParent::GossipTo(gossip_data))?;
                     }
                 }
-                // Done
-                Ok(event_list)
             }
+
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
-            DhtCommand::HoldEntryAspectAddress(entry) => {
+            DhtRequestToChild::HoldEntryAspectAddress(entry) => {
+                println!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
                 let received_new_content = self.add_entry_aspects(&entry);
                 if !received_new_content {
-                    return Ok(vec![]);
+                    println!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");
+                    return Ok(());
                 }
-                // Use entry_address as request_id
-                let address_str = entry.entry_address.clone();
-                self.pending_fetch_request_list
-                    .insert(address_str.to_string());
-                let fetch_entry = FetchDhtEntryData {
-                    msg_id: address_str.to_string(),
-                    entry_address: entry.entry_address.to_owned(),
-                };
-                Ok(vec![DhtEvent::EntryDataRequested(fetch_entry)])
+                // broadcast it by gossiping it to every known peer
+                let gossip_evt = self.gossip_entry(&entry);
+                self.endpoint_self.publish(gossip_evt)?;
             }
+
             // Owner has some entry and wants it stored on the network
             // Bookkeep address and gossip entry to every known peer.
-            DhtCommand::BroadcastEntry(entry) => {
+            DhtRequestToChild::BroadcastEntry(entry) => {
                 // Store address
                 let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
                 if !received_new_content {
-                    return Ok(vec![]);
+                    return Ok(());
                 }
-                let gossip_evt = self.gossip_entry(entry);
-                // Done
-                Ok(vec![gossip_evt])
+                let gossip_evt = self.gossip_entry(&entry);
+                self.endpoint_self.publish(gossip_evt)?;
             }
+
             // N/A. Do nothing since this is a monotonic fullsync dht
-            DhtCommand::DropEntryAddress(_) => Ok(vec![]),
-            // EntryDataResponse:
-            //   - From a Publish: Forward response back to self
-            //   - From a Hold   : Broadcast entry
-            DhtCommand::EntryDataResponse(response) => {
-                if !self.pending_fetch_request_list.remove(&response.msg_id) {
-                    return Err(Lib3hError::new(ErrorKind::Other(String::from(
-                        "Received response for an unknown request",
-                    ))));
-                }
-                // From a Hold if msg_id matches one set in HoldEntryAspectAddress
-                let address_str: String = (&response.entry.entry_address).clone().into();
-                if address_str == response.msg_id {
-                    let gossip_evt = self.gossip_entry(&response.entry);
-                    return Ok(vec![gossip_evt]);
-                }
-                Ok(vec![DhtEvent::FetchEntryResponse(response.clone())])
+            DhtRequestToChild::DropEntryAddress(_) => (),
+
+            DhtRequestToChild::RequestPeer(peer_address) => {
+                let maybe_peer = self.get_peer(&peer_address);
+                let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
+                request.respond(payload)?;
             }
-        }
+
+            DhtRequestToChild::RequestPeerList => {
+                let list = self.get_peer_list();
+                let payload = Ok(DhtRequestToChildResponse::RequestPeerList(list));
+                request.respond(payload)?;
+            }
+
+            DhtRequestToChild::RequestThisPeer => {
+                let payload = Ok(DhtRequestToChildResponse::RequestThisPeer(
+                    self.this_peer.clone(),
+                ));
+                request.respond(payload)?;
+            }
+
+            DhtRequestToChild::RequestEntryAddressList => {
+                let list = self.get_entry_address_list();
+                let payload = Ok(DhtRequestToChildResponse::RequestEntryAddressList(list));
+                request.respond(payload)?;
+            }
+
+            DhtRequestToChild::RequestAspectsOf(address) => {
+                let maybe_list = self.get_aspects_of(&address);
+                let payload = Ok(DhtRequestToChildResponse::RequestAspectsOf(maybe_list));
+                request.respond(payload)?;
+            }
+
+            // Ask owner to respond to self
+            DhtRequestToChild::RequestEntry(entry_address) => {
+                self.endpoint_self.request(
+                    DhtContext::RequestEntry(request),
+                    DhtRequestToParent::RequestEntry(entry_address),
+                    Box::new(|_me, context, response| {
+                        let response = {
+                            match response {
+                                GhostCallbackData::Timeout => panic!("timeout"),
+                                GhostCallbackData::Response(response) => match response {
+                                    Err(e) => panic!("{:?}", e),
+                                    Ok(response) => response,
+                                },
+                            }
+                        };
+                        let request = match context {
+                            DhtContext::RequestEntry(request) => request,
+                            _ => panic!("bad context"),
+                        };
+                        if let DhtRequestToParentResponse::RequestEntry(entry_response) = response {
+                            println!("4. In DhtRequestToChild::RequestEntry Responding...");
+                            let payload =
+                                Ok(DhtRequestToChildResponse::RequestEntry(entry_response));
+                            request.respond(payload)?;
+                        } else {
+                            panic!("bad response to RequestEntry: {:?}", response);
+                        }
+                        Ok(())
+                    }),
+                )?;
+            }
+        };
+        Ok(())
     }
 }

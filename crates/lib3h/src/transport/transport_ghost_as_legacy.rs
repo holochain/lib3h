@@ -211,7 +211,7 @@ impl<'lt> Transport for TransportGhostAsLegacy<'lt> {
         Ok((true, self.outbox.drain(..).collect()))
     }
 
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
+    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
         unimplemented!();
     }
 
