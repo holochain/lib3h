@@ -281,17 +281,9 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                 self.handle_publish_entry(&data)
                     .map_err(|e| GhostError::from(e.to_string()))?;
             }
-            ClientToLib3h::HoldEntry(msg) => {
-                let _space_gateway = self
-                    .get_space(
-                        &msg.space_address.to_owned(),
-                        &msg.provider_agent_id.to_owned(),
-                    )
+            ClientToLib3h::HoldEntry(data) => {
+                self.handle_hold_entry(&data)
                     .map_err(|e| GhostError::from(e.to_string()))?;
-                /* TODO: fix with real gateway
-                                let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
-                                space_gateway.as_dht_mut().post(cmd)?;
-                */
             }
             ClientToLib3h::QueryEntry(data) => {
                 let result = self
@@ -617,6 +609,18 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         Ok(())
     }
 
+    fn handle_hold_entry(&mut self, msg: &ProvidedEntryData) -> Lib3hResult<()> {
+        let _space_gateway = self.get_space(
+            &msg.space_address.to_owned(),
+            &msg.provider_agent_id.to_owned(),
+        )?;
+        /* TODO: fix with real gateway
+        let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
+        space_gateway.as_dht_mut().post(cmd)?;
+         */
+        Ok(())
+    }
+
     fn handle_query_entry(&mut self, msg: &QueryEntryData) -> Lib3hResult<QueryEntryResultData> {
         let chain_id = (msg.space_address.clone(), msg.requester_agent_id.clone());
         let _space_gateway = self
@@ -752,6 +756,9 @@ mod tests {
         };
 
         let result = lib3h.as_mut().handle_publish_entry(&entry_data);
+        assert!(result.is_ok());
+
+        let result = lib3h.as_mut().handle_hold_entry(&entry_data);
         assert!(result.is_ok());
 
         let result = lib3h.as_mut().handle_leave(&req_data);
