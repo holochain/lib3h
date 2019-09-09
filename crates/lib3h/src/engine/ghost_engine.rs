@@ -338,12 +338,12 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
     }
 
     #[allow(non_snake_case)]
-    fn handle_HandleGetAuthoringEntryListResult(
-        &mut self,
-        msg: EntryListData,
-    ) -> Lib3hResult<()> {
+    fn handle_HandleGetAuthoringEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
         let mut request_list = Vec::new();
-        let space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+        let _space_gateway = self.get_space(
+            &msg.space_address.to_owned(),
+            &msg.provider_agent_id.to_owned(),
+        )?;
 
         let mut msg_data = FetchEntryData {
             space_address: msg.space_address.clone(),
@@ -400,11 +400,11 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         Ok(())
     }
     #[allow(non_snake_case)]
-    fn handle_HandleGetGossipingEntryListResult(
-        &mut self,
-        msg: EntryListData,
-    ) -> Lib3hResult<()> {
-        let _space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+    fn handle_HandleGetGossipingEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
+        let _space_gateway = self.get_space(
+            &msg.space_address.to_owned(),
+            &msg.provider_agent_id.to_owned(),
+        )?;
 
         for (entry_address, aspect_address_list) in msg.address_map {
             let mut aspect_list = Vec::new();
@@ -424,10 +424,10 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                 aspect_list,
             };
             /* TODO: add back for real gateway
-            space_gateway
-                .as_dht_mut()
-                .post(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
-*/
+                        space_gateway
+                            .as_dht_mut()
+                            .post(DhtCommand::HoldEntryAspectAddress(fake_entry))?;
+            */
         }
         Ok(())
     }
@@ -465,7 +465,10 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                     )) => {
                         if let Err(err) = me.handle_HandleGetGossipingEntryListResult(msg) {
-                            error!("Got error when handling HandleGetGossipingEntryListResult: {:?} ", err);
+                            error!(
+                                "Got error when handling HandleGetGossipingEntryListResult: {:?} ",
+                                err
+                            );
                         };
                     }
                     GhostCallbackData::Response(Err(e)) => {
@@ -491,7 +494,10 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => {
                         if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
-                            error!("Got error when handling HandleGetAuthoringEntryListResult: {:?} ", err);
+                            error!(
+                                "Got error when handling HandleGetAuthoringEntryListResult: {:?} ",
+                                err
+                            );
                         };
                     }
                     GhostCallbackData::Response(Err(e)) => {
@@ -515,11 +521,13 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         &mut self,
         space_address: &Address,
         agent_id: &Address,
-    ) -> Lib3hResult<&mut MockGateway>{
-       self
-            .space_gateway_map
+    ) -> Lib3hResult<&mut MockGateway> {
+        self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
-            .ok_or(Lib3hError::new_other(&format!("Not in space: {:?},{:?}", space_address,agent_id)))
+            .ok_or(Lib3hError::new_other(&format!(
+                "Not in space: {:?},{:?}",
+                space_address, agent_id
+            )))
     }
 }
 
