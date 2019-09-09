@@ -65,15 +65,15 @@ pub use ghost_channel::{
 };
 
 mod ghost_actor;
-pub use ghost_actor::{GhostActor, GhostContext, GhostParentWrapper, GhostParentWrapperDyn};
+pub use ghost_actor::{CanTrace, GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 mod test_types;
 pub use test_types::TestContext;
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContext, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
+        create_ghost_channel, CanTrace, GhostActor, GhostCallback, GhostCallbackData,
+        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
         GhostMessageData, GhostParentWrapper, GhostParentWrapperDyn, GhostResult,
         GhostTrackRequestOptions, GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
@@ -84,7 +84,7 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ghost_actor::GhostContext, test_types::TestContext};
+    use crate::{ghost_actor::CanTrace, test_types::TestContext};
     use detach::prelude::*;
     use lib3h_tracing::Span;
 
@@ -245,7 +245,7 @@ mod tests {
             msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
         },
     }
-    impl GhostContext for GwDht {
+    impl CanTrace for GwDht {
         fn get_span(&self) -> Span {
             unimplemented!()
         }
@@ -256,7 +256,7 @@ mod tests {
         IncomingConnection { address: String },
     }
 
-    impl GhostContext for RequestToParentContext {
+    impl CanTrace for RequestToParentContext {
         fn get_span(&self) -> Span {
             unimplemented!()
         }

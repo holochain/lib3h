@@ -1,4 +1,4 @@
-use crate::ghost_actor::GhostContext;
+use crate::ghost_actor::CanTrace;
 use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
@@ -25,9 +25,9 @@ pub type GhostCallback<UserData, CbData, E> =
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
-struct GhostTrackerEntry<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static> {
+struct GhostTrackerEntry<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static> {
     expires: std::time::SystemTime,
-    _context: Context,
+    _context: TraceContext,
     cb: GhostCallback<UserData, CbData, E>,
 }
 
@@ -47,9 +47,9 @@ impl Default for GhostTrackerBuilder {
 }
 
 impl GhostTrackerBuilder {
-    pub fn build<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>(
+    pub fn build<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>(
         self,
-    ) -> GhostTracker<UserData, Context, CbData, E> {
+    ) -> GhostTracker<UserData, TraceContext, CbData, E> {
         GhostTracker {
             request_id_prefix: self.request_id_prefix,
             default_timeout: self.default_timeout,
@@ -70,10 +70,10 @@ impl GhostTrackerBuilder {
 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static> {
+pub struct GhostTracker<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static> {
     request_id_prefix: String,
     default_timeout: std::time::Duration,
-    pending: HashMap<RequestId, GhostTrackerEntry<UserData, Context, CbData, E>>,
+    pending: HashMap<RequestId, GhostTrackerEntry<UserData, TraceContext, CbData, E>>,
 }
 
 #[derive(Debug, Clone)]
@@ -94,8 +94,8 @@ impl GhostTrackerBookmarkOptions {
     }
 }
 
-impl<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>
-    GhostTracker<UserData, Context, CbData, E>
+impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
+    GhostTracker<UserData, TraceContext, CbData, E>
 {
     /// trigger any periodic or delayed callbacks
     /// also check / cleanup any timeouts
@@ -125,7 +125,7 @@ impl<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>
     /// register a callback
     pub fn bookmark(
         &mut self,
-        context: Context,
+        context: TraceContext,
         cb: GhostCallback<UserData, CbData, E>,
     ) -> RequestId {
         self.bookmark_options(context, cb, GhostTrackerBookmarkOptions::default())
@@ -134,7 +134,7 @@ impl<UserData, Context: 'static + GhostContext, CbData: 'static, E: 'static>
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_options(
         &mut self,
-        context: Context,
+        context: TraceContext,
         cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {

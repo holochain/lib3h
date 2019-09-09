@@ -1,10 +1,9 @@
 use crate::prelude::*;
 use lib3h_tracing::Span;
 
-/// Trait which all contexts must implement.
-/// It's OK for contexts to hold whatever user-specific data they want,
-/// but they must also hold a rustracing::Span
-pub trait GhostContext {
+/// Trait which enables a generic notion of tracing context, which is probably not necessary,
+/// but was easy to do by hijacking the old TraceContext type parameter
+pub trait CanTrace {
     fn get_span(&self) -> Span;
 }
 
@@ -14,7 +13,7 @@ pub trait GhostContext {
 /// all the request / drain_messages etc functions from GhostEndpoint.
 pub struct GhostParentWrapper<
     UserData,
-    Context: 'static + GhostContext,
+    TraceContext: 'static + CanTrace,
     RequestToParent: 'static,
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
@@ -31,7 +30,7 @@ pub struct GhostParentWrapper<
     actor: Actor,
     endpoint: GhostContextEndpoint<
         UserData,
-        Context,
+        TraceContext,
         RequestToChild,
         RequestToChildResponse,
         RequestToParent,
@@ -42,7 +41,7 @@ pub struct GhostParentWrapper<
 
 impl<
         UserData,
-        Context: 'static + GhostContext,
+        TraceContext: 'static + CanTrace,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -58,7 +57,7 @@ impl<
     >
     GhostParentWrapper<
         UserData,
-        Context,
+        TraceContext,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
@@ -81,7 +80,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static + GhostContext,
+        TraceContext: 'static + CanTrace,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -97,7 +96,7 @@ impl<
     >
     GhostCanTrack<
         UserData,
-        Context,
+        TraceContext,
         RequestToChild,
         RequestToChildResponse,
         RequestToParent,
@@ -106,7 +105,7 @@ impl<
     >
     for GhostParentWrapper<
         UserData,
-        Context,
+        TraceContext,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
@@ -123,7 +122,7 @@ impl<
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        context: Context,
+        context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -133,7 +132,7 @@ impl<
     /// see GhostContextEndpoint::request
     fn request_options(
         &mut self,
-        context: Context,
+        context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -158,7 +157,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static + GhostContext,
+        TraceContext: 'static + CanTrace,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -174,7 +173,7 @@ impl<
     > std::convert::AsRef<Actor>
     for GhostParentWrapper<
         UserData,
-        Context,
+        TraceContext,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
@@ -190,7 +189,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static + GhostContext,
+        TraceContext: 'static + CanTrace,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -206,7 +205,7 @@ impl<
     > std::convert::AsMut<Actor>
     for GhostParentWrapper<
         UserData,
-        Context,
+        TraceContext,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
@@ -258,7 +257,7 @@ pub trait GhostActor<
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
     UserData,
-    Context: 'static + GhostContext,
+    TraceContext: 'static + CanTrace,
     RequestToParent: 'static,
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
@@ -276,7 +275,7 @@ pub struct GhostParentWrapperDyn<
     >,
     endpoint: GhostContextEndpoint<
         UserData,
-        Context,
+        TraceContext,
         RequestToChild,
         RequestToChildResponse,
         RequestToParent,
@@ -287,7 +286,7 @@ pub struct GhostParentWrapperDyn<
 
 impl<
         UserData,
-        Context: 'static + GhostContext,
+        TraceContext: 'static + CanTrace,
         RequestToParent: 'static,
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
@@ -296,7 +295,7 @@ impl<
     >
     GhostParentWrapperDyn<
         UserData,
-        Context,
+        TraceContext,
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
@@ -317,7 +316,7 @@ impl<
         >,
         request_id_prefix: &str,
     ) -> Self {
-        let endpoint: GhostContextEndpoint<UserData, Context, _, _, _, _, _> = actor
+        let endpoint: GhostContextEndpoint<UserData, TraceContext, _, _, _, _, _> = actor
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
@@ -334,7 +333,7 @@ impl<
     /// see GhostContextEndpoint::request
     pub fn request(
         &mut self,
-        context: Context,
+        context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -343,7 +342,7 @@ impl<
 
     pub fn request_options(
         &mut self,
-        context: Context,
+        context: TraceContext,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,

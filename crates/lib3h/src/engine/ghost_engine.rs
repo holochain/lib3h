@@ -21,7 +21,7 @@ use serde::Serialize;
 use url::Url;
 
 pub struct DefaultContext;
-impl GhostContext for DefaultContext {
+impl CanTrace for DefaultContext {
     fn get_span(&self) -> Span {
         unimplemented!()
     }
@@ -45,7 +45,7 @@ impl ClientRequestContext {
     }
 }
 
-impl GhostContext for ClientRequestContext {
+impl CanTrace for ClientRequestContext {
     fn get_span(&self) -> Span {
         unimplemented!()
     }
@@ -57,7 +57,7 @@ struct RequestContext {
     pub space_address: Address,
     pub agent_id: Address,
 }
-impl GhostContext for RequestContext {
+impl CanTrace for RequestContext {
     fn get_span(&self) -> Span {
         unimplemented!()
     }

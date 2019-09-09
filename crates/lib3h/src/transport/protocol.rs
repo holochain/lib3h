@@ -76,18 +76,18 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
+pub type TransportActorSelfEndpoint<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
     RequestToChildResponse,
     TransportError,
 >;
-pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
+pub type TransportActorParentWrapper<UserData, TraceContext, Actor> = GhostParentWrapper<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -95,9 +95,9 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

@@ -64,7 +64,7 @@ pub enum DhtContext {
     RequestEntry(DhtToChildMessageData),
     QueryEntry(QueryEntryData),
 }
-impl GhostContext for DhtContext {
+impl CanTrace for DhtContext {
     fn get_span(&self) -> Span {
         unimplemented!()
     }

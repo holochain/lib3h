@@ -46,9 +46,9 @@ pub type KeystoreActorParentEndpoint = GhostEndpoint<
     Lib3hError,
 >;
 
-pub type KeystoreActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
+pub type KeystoreActorParentWrapperDyn<TraceContext> = GhostParentWrapperDyn<
     TransportEncoding,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

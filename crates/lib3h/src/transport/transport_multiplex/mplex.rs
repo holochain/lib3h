@@ -20,7 +20,7 @@ enum MplexToInnerContext {
     AwaitBind(GhostMessageData<RequestToChild>),
     AwaitSend(GhostMessageData<RequestToChild>),
 }
-impl GhostContext for MplexToInnerContext {
+impl CanTrace for MplexToInnerContext {
     fn get_span(&self) -> Span {
         unimplemented!()
     }
