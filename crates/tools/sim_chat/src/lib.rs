@@ -186,12 +186,16 @@ impl SimChat {
                                 parent_endpoint.request(
                                     String::from("ctx"),
                                     ClientToLib3h::JoinSpace(space_data.clone()),
-                                    Box::new(move |_, _, _callback_data| {
+                                    Box::new(move |_, _, callback_data| {
                                         // TODO: check the response was actually a success
                                         local_internal_sender.send(ChatEvent::JoinSuccess {
                                             channel_id: channel_id.clone(),
                                             space_data: space_data.clone()
                                         }).unwrap();
+                                            println!(
+                                                "chat received response from engine: {:?}",
+                                                callback_data
+                                            );
                                         Ok(())
                                     }),
                                 ).unwrap();
@@ -207,8 +211,12 @@ impl SimChat {
                                     parent_endpoint.request(
                                         String::from("ctx"),
                                         ClientToLib3h::LeaveSpace(space_data.to_owned()),
-                                        Box::new(move |_, _, _callback_data| {
+                                        Box::new(move |_, _, callback_data| {
                                             local_internal_sender.send(ChatEvent::PartSuccess).unwrap();
+                                            println!(
+                                                "chat received response from engine: {:?}",
+                                                callback_data
+                                            );
                                             Ok(())
                                         }),
                                     ).unwrap();
@@ -234,8 +242,12 @@ impl SimChat {
                                     parent_endpoint.request(
                                         String::from("ctx"),
                                         ClientToLib3h::SendDirectMessage(direct_message_data),
-                                        Box::new(|_, _, _callback_data| {
-                                            // TODO: track if messages are send successfully
+                                        Box::new(|_, _, callback_data| {
+                                            // TODO: track if messages are sent successfully
+                                            println!(
+                                                "chat received response from engine: {:?}",
+                                                callback_data
+                                            );
                                             Ok(())
                                         }),
                                     ).unwrap();
