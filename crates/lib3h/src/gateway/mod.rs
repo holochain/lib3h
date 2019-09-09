@@ -7,11 +7,12 @@ pub mod protocol;
 
 use crate::{
     dht::dht_protocol::*,
-    transport::{protocol::*, ConnectionId, TransportWrapper},
+    gateway::protocol::*,
+    transport,
 };
+use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
-use std::collections::{HashMap, VecDeque};
 use url::Url;
 
 ///// describes a super construct of a Transport and a Dht allowing
@@ -50,7 +51,7 @@ pub struct P2pGateway {
     //    transport_inbox: VecDeque<TransportCommand>,
     //    transport_inject_events: Vec<TransportEvent>,
     /// Transport
-    child_transport_endpoint: TransportEndpointWithContext<GatewayUserData, GatewayContext>,
+    child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
     /// DHT
     inner_dht: ChildDhtWrapperDyn<GatewayUserData>,
     // Cache
@@ -60,10 +61,10 @@ pub struct P2pGateway {
 
     /// self ghost stuff
     endpoint_parent: Option<GatewayParentEndpoint>,
-    endpoint_self: Detach<GatewaySelfEndpoint<()>>,
+    endpoint_self: Detach<GatewaySelfEndpoint<(), GatewayContext>>,
 }
 
-pub struct GatewayContext {}
+// pub struct GatewayContext {}
 
 // user data for ghost callback
 pub struct GatewayUserData {

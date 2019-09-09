@@ -1,13 +1,21 @@
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::dht_protocol::*,
     gateway::protocol::*,
     transport::{error::TransportError, protocol::*},
+    error::*,
+    gateway::{P2pGateway, protocol::*},
 };
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
 
 /// GhostActor
-impl GatewayActor for P2pGateway {
+impl GhostActor<
+    GatewayRequestToParent,
+    GatewayRequestToParentResponse,
+    GatewayRequestToChild,
+    GatewayRequestToChildResponse,
+    Lib3hError,
+> for P2pGateway {
     fn take_parent_endpoint(&mut self) -> Option<GatewayParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
@@ -21,7 +29,7 @@ impl GatewayActor for P2pGateway {
         }
 
         // Process inbox from child transport & handle requests
-        detach_run!(&mut self.child_transport_endpoint, |cte| { cte.process(self.as_any()) })?;
+        detach_run!(&mut self.child_transport_endpoint, |cte| { cte.process(self) })?;
         for request in self.child_transport_endpoint.as_mut().drain_messages() {
             self.handle_transport_RequestToParent(request)
                 .expect("no ghost errors");
@@ -51,11 +59,11 @@ impl P2pGateway {
         );
         let parent_request = request.clone();
         match request.take_message().expect("exists") {
-            Transport(transport_request) => {
+            GatewayRequestToChild::Transport(transport_request) => {
                 // Forward to child transport
-                self.handle_transport_RequestToChild(dht_request, parent_request)
+                self.handle_transport_RequestToChild(transport_request, parent_request)
             }
-            Dht(dht_request) => {
+            GatewayRequestToChild::Dht(dht_request) => {
                 // Forward to child dht
                 self.handle_dht_RequestToChild(dht_request, parent_request)
             }

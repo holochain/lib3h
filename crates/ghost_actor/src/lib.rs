@@ -355,12 +355,12 @@ mod tests {
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
                     RequestToChild::SendMessage {
-                        address,
+                        uri,
                         payload: _,
                     } => {
                         self.dht.as_mut().request(
                             GwDht::ResolveAddressForId { msg },
-                            dht_protocol::RequestToChild::ResolveAddressForId { id: address },
+                            dht_protocol::RequestToChild::ResolveAddressForId { id: uri },
                             Box::new(|_m:&mut GatewayTransport, context, response| {
                                 let msg = {
                                     if let GwDht::ResolveAddressForId { msg } = context {
@@ -405,7 +405,9 @@ mod tests {
 
                                 println!("yay? {:?}", response);
 
-                                msg.respond(Ok(RequestToChildResponse::SendMessage))?;
+                                msg.respond(Ok(RequestToChildResponse::SendMessage {
+                                    payload: vec![],
+                                }))?;
 
                                 Ok(())
                             }),
@@ -485,7 +487,7 @@ mod tests {
             .request(
                 42_i8,
                 RequestToChild::SendMessage {
-                    address: "agent_id_1".to_string(),
+                    uri: "agentId:agent_id_1".to_string(),
                     payload: b"some content".to_vec(),
                 },
                 Box::new(|_: &mut (), _, r| {

@@ -13,7 +13,7 @@ use predicates::prelude::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
-    transport_wss::TlsConfig,
+    //transport_wss::TlsConfig,
 };
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,

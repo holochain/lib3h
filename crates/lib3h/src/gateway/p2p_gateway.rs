@@ -3,8 +3,8 @@
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::NETWORK_GATEWAY_ID,
-    gateway::{Gateway, GatewayUserData, P2pGateway},
-    transport::{protocol::*, TransportWrapper},
+    gateway::{GatewayUserData, P2pGateway, protocol::*},
+    transport,
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
@@ -21,11 +21,18 @@ impl P2pGateway {
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        child_transport_endpoint: TransportEndpointWithContext<GatewayUserData, GatewayContext>,
+        child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
         let dht = dht_factory(dht_config).expect("Failed to construct DHT");
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix(&format!("{}_to_parent_", identifier))
+                .build(),
+        );
         P2pGateway {
             identifier: identifier.to_owned(),
             child_transport_endpoint,
@@ -39,12 +46,14 @@ impl P2pGateway {
                 timestamp: 0,
             },
             user_data: GatewayUserData::new(),
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self,
         }
     }
     /// Helper Ctor
     pub fn new_with_space(
         space_address: &Address,
-        child_transport_endpoint: TransportEndpointWithContext<GatewayUserData, GatewayContext>,
+        child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {

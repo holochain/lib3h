@@ -1,5 +1,4 @@
 use crate::{
-    gateway::Gateway,
     transport::TransportWrapper,
 };
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};

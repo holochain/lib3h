@@ -96,7 +96,7 @@ mod tests {
                             bound_url: spec,
                         })))?;
                     }
-                    RequestToChild::SendMessage { address, payload } => {
+                    RequestToChild::SendMessage { uri, payload } => {
                         self.mock_sender.send((address, payload))?;
                         msg.respond(Ok(RequestToChildResponse::SendMessage))?;
                     }
@@ -145,7 +145,7 @@ mod tests {
             .request(
                 (),
                 RequestToChild::SendMessage {
-                    address: addr_none.clone(),
+                    uri: addr_none.clone(),
                     payload: b"hello-from-a".to_vec(),
                 },
                 Box::new(|_, _, response| {

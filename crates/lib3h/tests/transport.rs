@@ -231,7 +231,7 @@ impl TestTransport {
                 self.bound_url = Some(spec);
                 msg.respond(response)?;
             }
-            RequestToChild::SendMessage { address, payload } => {
+            RequestToChild::SendMessage { uri, payload } => {
                 if self.bound_url.is_none() {
                     msg.respond(Err(TransportError::new(format!("{} not bound", self.name))))?;
                 } else {
@@ -266,11 +266,12 @@ impl TestTransport {
                     }
                     MockernetEvent::Connection { from } => {
                         self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection { address: from })?;
+                            .publish(RequestToParent::IncomingConnection { uri: from })?;
                     }
                     MockernetEvent::Error(err) => {
                         self.endpoint_self
-                            .publish(RequestToParent::TransportError {
+                            .publish(RequestToParent::ErrorOccured {
+                                uri: our_url.clone(),
                                 error: TransportError::new(err),
                             })?;
                     }
@@ -334,7 +335,7 @@ fn ghost_transport() {
     t1.request(
         (),
         RequestToChild::SendMessage {
-            address: Url::parse("mocknet://t2").expect("can parse url"),
+            uri: Url::parse("mocknet://t2").expect("can parse url"),
             payload: b"won't be received!".to_vec(),
         },
         // callback should simply log the response
@@ -373,7 +374,7 @@ fn ghost_transport() {
     t1.request(
         (),
         RequestToChild::SendMessage {
-            address: Url::parse("mocknet://t2").expect("can parse url"),
+            uri: Url::parse("mocknet://t2").expect("can parse url"),
             payload: b"foo".to_vec(),
         },
         // callback should simply log the response
@@ -397,7 +398,7 @@ fn ghost_transport() {
     let mut messages = t2.drain_messages();
     assert_eq!(messages.len(), 2);
     assert_eq!(
-        "IncomingConnection { address: \"mocknet://t1/\" }",
+        "IncomingConnection { uri: \"mocknet://t1/\" }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
     assert_eq!(

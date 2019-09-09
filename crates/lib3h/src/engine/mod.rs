@@ -5,7 +5,13 @@ mod space_layer;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::{dht::dht_protocol::*, track::Tracker, transport_wss::TlsConfig};
+use crate::{
+    dht::dht_protocol::*,
+    track::Tracker,
+    //transport_wss::TlsConfig,
+    gateway::protocol::*,
+    transport,
+};
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
@@ -33,7 +39,7 @@ enum RealEngineTrackerData {
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {
-    pub tls_config: TlsConfig,
+    //pub tls_config: TlsConfig,
     pub socket_type: String,
     pub bootstrap_nodes: Vec<String>,
     pub work_dir: String,
@@ -71,7 +77,7 @@ pub struct RealEngine {
     // TODO #176: Remove this if we resolve #176 without it.
     #[allow(dead_code)]
     /// Transport used by the network gateway
-    network_transport: ChildTransportWrapperDyn<(), ()>,
+    network_transport: transport::protocol::ChildTransportWrapperDyn<(), ()>,
     /// P2p gateway for the network layer
     network_gateway: GatewayParentWrapperDyn<(), GatewayContext>,
 

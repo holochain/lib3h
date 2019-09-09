@@ -4,6 +4,7 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
     engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
+    gateway::protocol::*,
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -30,7 +31,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<GatewayParentWrapperDyn<(), ()>> {
+    ) -> Option<GatewayParentWrapperDyn<(), GatewayContext>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {

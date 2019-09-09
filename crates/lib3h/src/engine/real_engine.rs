@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use crate::transport::memory_mock::transport_memory::TransportMemory;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
@@ -9,10 +8,11 @@ use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID},
     error::Lib3hResult,
-    gateway::{wrapper::*, P2pGateway},
+    gateway::{P2pGateway, protocol::*},
     track::Tracker,
-    transport::{protocol::TransportCommand, TransportWrapper},
-    transport_wss::TransportWss,
+    transport,
+    transport::memory_mock::ghost_transport_memory::*,
+    // transport_wss::TransportWss,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
@@ -37,53 +37,54 @@ impl TransportKeys {
     }
 }
 
-impl RealEngine {
-    /// Constructor with TransportWss
-    pub fn new(
-        crypto: Box<dyn CryptoSystem>,
-        config: RealEngineConfig,
-        name: &str,
-        dht_factory: DhtFactory,
-    ) -> Lib3hResult<Self> {
-        // Create Transport and bind
-        let network_transport =
-            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
-        let binding = network_transport.as_mut().bind(&config.bind_url)?;
-        // Generate keys
-        // TODO #209 - Check persistence first before generating
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-        // Generate DHT config and create network_gateway
-        let dht_config = DhtConfig {
-            this_peer_address: transport_keys.transport_id.clone(),
-            this_peer_uri: binding,
-            custom: config.dht_custom_config.clone(),
-            gossip_interval: config.dht_gossip_interval,
-            timeout_threshold: config.dht_timeout_threshold,
-        };
-        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
-            NETWORK_GATEWAY_ID,
-            network_transport.clone(),
-            dht_factory,
-            &dht_config,
-        ));
-        // Done
-        Ok(RealEngine {
-            crypto,
-            config,
-            inbox: VecDeque::new(),
-            name: name.to_string(),
-            dht_factory,
-            request_track: Tracker::new("real_engine_", 2000),
-            network_transport,
-            network_gateway,
-            network_connections: HashSet::new(),
-            space_gateway_map: HashMap::new(),
-            transport_keys,
-            process_count: 0,
-            temp_outbox: Vec::new(),
-        })
-    }
-}
+//
+//impl RealEngine {
+//    /// Constructor with TransportWss
+//    pub fn new(
+//        crypto: Box<dyn CryptoSystem>,
+//        config: RealEngineConfig,
+//        name: &str,
+//        dht_factory: DhtFactory,
+//    ) -> Lib3hResult<Self> {
+//        // Create Transport and bind
+//        let network_transport =
+//            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
+//        let binding = network_transport.as_mut().bind(&config.bind_url)?;
+//        // Generate keys
+//        // TODO #209 - Check persistence first before generating
+//        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+//        // Generate DHT config and create network_gateway
+//        let dht_config = DhtConfig {
+//            this_peer_address: transport_keys.transport_id.clone(),
+//            this_peer_uri: binding,
+//            custom: config.dht_custom_config.clone(),
+//            gossip_interval: config.dht_gossip_interval,
+//            timeout_threshold: config.dht_timeout_threshold,
+//        };
+//        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
+//            NETWORK_GATEWAY_ID,
+//            network_transport.clone(),
+//            dht_factory,
+//            &dht_config,
+//        ));
+//        // Done
+//        Ok(RealEngine {
+//            crypto,
+//            config,
+//            inbox: VecDeque::new(),
+//            name: name.to_string(),
+//            dht_factory,
+//            request_track: Tracker::new("real_engine_", 2000),
+//            network_transport,
+//            network_gateway,
+//            network_connections: HashSet::new(),
+//            space_gateway_map: HashMap::new(),
+//            transport_keys,
+//            process_count: 0,
+//            temp_outbox: Vec::new(),
+//        })
+//    }
+//}
 
 /// Constructor
 impl RealEngine {
@@ -95,7 +96,7 @@ impl RealEngine {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let network_transport = TransportWrapper::new(TransportMemory::new());
+        let network_transport = transport::protocol::ChildTransportWrapperDyn::new(GhostTransportMemory::new());
         // Bind & create DhtConfig
         let binding = network_transport
             .as_mut()
@@ -267,9 +268,17 @@ impl RealEngine {
                 // TODO #168
             }
             Lib3hClientProtocol::Connect(msg) => {
-                // Convert into TransportCommand & post to network gateway
-                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
-                self.network_gateway.as_transport_mut().post(cmd)?;
+                // no-op ?
+                // send empty message so it connects
+                let cmd = GatewayRequestToChild::Transport(
+                    transport::protocol::RequestToChild::SendMessage {
+                        uri: msg.peer_uri,
+                    }, vec![]);
+                self.network_gateway.publish(cmd)?;
+
+//                // Convert into TransportCommand & post to network gateway
+//                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
+//                self.network_gateway.as_transport_mut().post(cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
@@ -805,8 +814,8 @@ pub fn handle_gossipTo(
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
         // FIXME peer_address to Url convert
-        let msg = transport::protocol::SendMessage {
-            address: "address:" + to_peer_address,
+        let msg = transport::protocol::RequestToChild::SendMessage {
+            uri: "agentId:" + to_peer_address,
             payload,
         };
         gateway.publish(GatewayRequestToChild::Transport(msg))?;

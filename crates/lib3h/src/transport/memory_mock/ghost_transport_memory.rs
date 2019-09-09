@@ -1,4 +1,9 @@
-use crate::transport::{error::TransportError, memory_mock::memory_server, protocol::*};
+use crate::transport::{
+    protocol::*,
+    error::TransportError,
+    memory_mock::memory_server,
+    memory_mock::memory_server::*,
+};
 use lib3h_ghost_actor::prelude::*;
 use std::collections::HashSet;
 use url::Url;
@@ -6,7 +11,7 @@ use url::Url;
 #[derive(Debug)]
 #[allow(dead_code)]
 enum RequestToParentContext {
-    Source { address: Url },
+    Source { uri: Url },
 }
 
 pub type UserData = GhostTransportMemory;
@@ -110,11 +115,12 @@ impl
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
-                    msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                    msg.respond(Ok(RequestToChildResponse::Bind(
+                        BindResultData {
                         bound_url: bound_url,
                     })))?;
                 }
-                RequestToChild::SendMessage { address, payload } => {
+                RequestToChild::SendMessage { uri, payload } => {
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
 
@@ -128,10 +134,10 @@ impl
                         Some(my_addr) => {
                             // get destinations server
                             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                            let maybe_server = server_map.get(&address);
+                            let maybe_server = server_map.get(&uri);
                             if let None = maybe_server {
                                 msg.respond(Err(TransportError::new(format!(
-                                    "No Memory server at this address: {}",
+                                    "No Memory server at this uri: {}",
                                     my_addr
                                 ))))?;
                                 continue;
@@ -139,20 +145,20 @@ impl
                             let mut server = maybe_server.unwrap().lock().unwrap();
 
                             // if not already connected, request a connections
-                            if self.connections.get(&address).is_none() {
+                            if self.connections.get(&uri).is_none() {
                                 match server.request_connect(&my_addr) {
                                     Err(err) => {
                                         msg.respond(Err(err))?;
                                         continue;
                                     }
-                                    Ok(()) => self.connections.insert(address.clone()),
+                                    Ok(()) => self.connections.insert(uri.clone()),
                                 };
                             };
 
                             trace!(
                                 "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
                                 my_addr,
-                                address,
+                                uri,
                                 payload
                             );
                             // Send it data from us
@@ -160,7 +166,8 @@ impl
                                 .post(&my_addr, &payload)
                                 .expect("Post on memory server should work");
 
-                            msg.respond(Ok(RequestToChildResponse::SendMessage))?;
+//                            msg.respond(Ok(RequestToChildResponse::SendMessage {
+//                            }))?;
                         }
                     };
                 }
@@ -179,7 +186,7 @@ impl
         let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
         let maybe_server = server_map.get(&my_addr);
         if let None = maybe_server {
-            return Err(format!("No Memory server at this address: {}", my_addr).into());
+            return Err(format!("No Memory server at this uri: {}", my_addr).into());
         }
         let mut server = maybe_server.unwrap().lock().unwrap();
         let (success, event_list) = server.process()?;
@@ -190,14 +197,12 @@ impl
             // process any connection events
             for event in event_list {
                 match event {
-                    TransportEvent::IncomingConnectionEstablished(in_cid) => {
-                        let to_connect_uri =
-                            Url::parse(&in_cid).expect("connectionId is not a valid Url");
-                        to_connect_list.push(to_connect_uri.clone());
+                    MemoryEvent::IncomingConnectionEstablished(in_cid) => {
+                        to_connect_list.push(in_cid.clone());
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::IncomingConnection {
-                                address: to_connect_uri.clone(),
+                                uri: to_connect_uri.clone(),
                             },
                         )?;
                         std::mem::replace(&mut self.endpoint_self, endpoint_self);
@@ -223,12 +228,12 @@ impl
             // process any other events
             for event in non_connect_events {
                 match event {
-                    TransportEvent::ReceivedData(from_addr, payload) => {
+                    MemoryEvent::ReceivedData(from_addr, payload) => {
                         println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::ReceivedData {
-                                address: Url::parse(&from_addr).unwrap(),
+                                uri: from_addr,
                                 payload,
                             },
                         )?;
@@ -350,7 +355,7 @@ mod tests {
             .request(
                 (),
                 RequestToChild::SendMessage {
-                    address: Url::parse("mem://addr_2").unwrap(),
+                    uri: Url::parse("mem://addr_2").unwrap(),
                     payload: b"test message".to_vec(),
                 },
                 Box::new(|_: &mut (), _, r| {
@@ -370,9 +375,9 @@ mod tests {
         let mut requests = t2_endpoint.drain_messages();
         assert_eq!(2, requests.len());
         assert_eq!(
-            "Some(IncomingConnection { address: \"mem://addr_1/\" })",
+            "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
             format!("{:?}", requests[0].take_message())
         );
-        assert_eq!("Some(ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
+        assert_eq!("Some(ReceivedData { uri: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
     }
 }

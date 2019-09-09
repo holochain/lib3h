@@ -113,7 +113,7 @@ impl TransportMultiplex {
             None => panic!("no such route"),
             Some(ep) => {
                 ep.publish(RequestToParent::ReceivedData {
-                    address: path,
+                    uri: path,
                     payload: unpacked_payload,
                 })?;
             }
@@ -132,37 +132,37 @@ impl TransportMultiplex {
         >,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { address } => {
-                self.handle_incoming_connection(address)
+            RequestToParent::IncomingConnection { uri } => {
+                self.handle_incoming_connection(uri)
             }
-            RequestToParent::ReceivedData { address, payload } => {
-                self.handle_received_data(address, payload)
+            RequestToParent::ReceivedData { uri, payload } => {
+                self.handle_received_data(uri, payload)
             }
-            RequestToParent::TransportError { error } => self.handle_transport_error(error),
+            RequestToParent::ErrorOccured { uri, error } => self.handle_transport_error(uri, error),
         }
     }
 
     /// private handler for inner transport IncomingConnection events
-    fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
+    fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::IncomingConnection { address })?;
+            .publish(RequestToParent::IncomingConnection { uri })?;
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+    fn handle_received_data(&mut self, uri: Url, payload: Vec<u8>) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::ReceivedData { address, payload })?;
+            .publish(RequestToParent::ReceivedData { uri, payload })?;
         Ok(())
     }
 
     /// private handler for inner transport TransportError events
-    fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
+    fn handle_transport_error(&mut self, uri: Url, error: TransportError) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::TransportError { error })?;
+            .publish(RequestToParent::ErrorOccured { uri, error })?;
         Ok(())
     }
 
@@ -178,8 +178,8 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_route_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_route_send_message(msg, uri, payload)
             }
         }
     }
@@ -225,13 +225,13 @@ impl TransportMultiplex {
     fn handle_route_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             MplexToInnerContext::AwaitSend(msg),
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_, context, response| {
                 let msg = {
                     match context {
@@ -271,8 +271,8 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_send_message(msg, uri, payload)
             }
         }
     }
@@ -318,13 +318,13 @@ impl TransportMultiplex {
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             MplexToInnerContext::AwaitSend(msg),
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_, context, response| {
                 let msg = {
                     match context {

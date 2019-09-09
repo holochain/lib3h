@@ -1,9 +1,12 @@
-use crate::dht::dht_protocol::*;
+use crate::{
+    dht::dht_protocol::*,
+    error::*,
+    transport,
+};
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
-use lib3h_protocol::error::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GatewayContext {
     Transport {parent_request: transport::protocol::ToChildMessage},
     Dht {parent_request: DhtToChildMessage},
@@ -16,28 +19,28 @@ pub enum GatewayContext {
 }
 
 /// Gateway protocol enums for use with GhostActor implementation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GatewayRequestToChild {
     // FIXME
     Transport(transport::protocol::RequestToChild),
     Dht(DhtRequestToChild),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GatewayRequestToChildResponse {
     // FIXME
     Transport(transport::protocol::RequestToChildResponse),
     Dht(DhtRequestToChildResponse),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GatewayRequestToParent {
     // FIXME
     Transport(transport::protocol::RequestToParent),
     Dht(DhtRequestToParent),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GatewayRequestToParentResponse {
     // FIXME
     Transport(transport::protocol::RequestToParentResponse),

@@ -3,25 +3,27 @@
 use crate::{
     dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
-    gateway::{Gateway, P2pGateway},
+    gateway::{P2pGateway, protocol::*},
+    transport,
     transport::error::{TransportError, TransportResult},
+    error::*,
 };
 use lib3h_protocol::DidWork;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
-
+use lib3h_ghost_actor::prelude::*;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
-    fn handle_dht_RequestToChild(
+    pub(crate) fn handle_dht_RequestToChild(
         &mut self,
         mut request: DhtToChildMessage,
     ) -> Lib3hResult<()> {
         // forward to child dht
         let _ = self.inner_dht.request(
-            GatewayContext::Dht { parent_request: dht_request},
-            transport_request,
+            GatewayContext::Dht { parent_request: request.clone() },
+            GatewayRequestToChild::Dht(request),
             Box::new(|_me, context, response| {
                 let msg = {
                     match context {
@@ -55,7 +57,7 @@ impl P2pGateway {
 
 
     /// Handle a request sent to us by our child DHT
-    fn handle_dht_RequestToParent(&mut self, mut request: DhtToParentMessage) {
+    pub(crate) fn handle_dht_RequestToParent(&mut self, mut request: DhtToParentMessage) {
         debug!(
             "({}) Serving request from child dht: {:?}",
             self.identifier, request
@@ -76,8 +78,8 @@ impl P2pGateway {
                 );
                 // Send phony SendMessage request so we connect to it
                 self.child_transport_endpoint
-                    .publish(TransportRequestToChild::SendMessage {
-                        address: peer_data.peer_uri,
+                    .publish(transport::protocol::RequestToParent::SendMessage {
+                        uri: peer_data.peer_uri,
                         payload: Vec::new(),
                     });
             }
@@ -85,7 +87,7 @@ impl P2pGateway {
                 // TODO
             }
             // No entries in Network DHT
-            DhtRequestToParent::HoldEntryRequested(_, _) => {
+            DhtRequestToParent::HoldEntryRequested { from_peer: _, entry: _ } => {
                 unreachable!();
             }
             DhtRequestToParent::EntryPruned(_) => {
