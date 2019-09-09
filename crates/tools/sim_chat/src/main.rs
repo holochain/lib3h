@@ -12,13 +12,24 @@ fn main() {
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
 
     rl.set_report_signal(linefeed::terminal::Signal::Interrupt, true);
-    rl.set_prompt("simchat> ")
+    rl.set_prompt("no-channel> ")
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
     let mut cli = lib3h_sim_chat::SimChat::new(
         Box::new(move |event| {
-            writeln!(rl_t, "GOT {:?}", event).expect("write fail");
+            match event {
+                ChatEvent::JoinSuccess{channel_id, ..} => {
+                    rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
+                        .expect("failed to set linefeed prompt");
+                },
+                ChatEvent::PartSuccess => {
+                    rl_t.set_prompt("no-channel> ")
+                        .expect("failed to set linefeed prompt");               
+                }
+                _ => {}
+            }
+            writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
         Url::parse("http://bootstrap.holo.host").unwrap()
     );
@@ -70,24 +81,25 @@ lib3h simchat Commands:
                                     writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
                                 }
                             }
-                            (Some("part"), Some(channel_id)) => {
-                                cli.send(ChatEvent::Part{channel_id:channel_id.to_string()})
+                            (Some("part"), _) => {
+                                cli.send(ChatEvent::Part)
                             }
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');
-                                let to_address: String = words.next().unwrap().to_string();
+                                let to_agent: String = words.next().unwrap().to_string();
                                 let payload: String = words.collect();
                                 cli.send(ChatEvent::SendDirectMessage {
-                                    to_address,
+                                    to_agent,
                                     payload,
                                 });
                             }
                             _ => {
-                                println!("Unrecognised command or arguments not correctly given");
+                                writeln!(rl, "Unrecognised command or arguments not correctly given")
+                                    .expect("write fail");
                             }
                         }
                     } else {
-                        writeln!(rl, "UNIMPLEMENTD - Cannot send non-direct messages yet")
+                        writeln!(rl, "UNIMPLEMENTD - Cannot send channel messages yet")
                             .expect("write fail");
                     }
                 }
@@ -105,5 +117,6 @@ lib3h simchat Commands:
                 break;
             }
         }
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }

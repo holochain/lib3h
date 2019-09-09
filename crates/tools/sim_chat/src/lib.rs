@@ -6,7 +6,7 @@ extern crate base64;
 extern crate crossbeam_channel;
 extern crate url;
 
-use core::convert::{TryFrom, TryInto};
+use core::convert::{TryFrom};
 use lib3h::engine::ghost_engine::{
     GhostEngine,
     EngineError,
@@ -14,7 +14,7 @@ use lib3h::engine::ghost_engine::{
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
-    data_types::{SpaceData, ConnectData},
+    data_types::{SpaceData, ConnectData, DirectMessageData},
     protocol::{
         ClientToLib3h,
         ClientToLib3hResponse,
@@ -30,23 +30,27 @@ use std::sync::{
 };
 use url::Url;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ChatEvent {
     SendDirectMessage {
-        to_address: String,
+        to_agent: String,
         payload: String,
     },
     ReceiveDirectMessage {
-        from_address: String,
+        from_agent: String,
         payload: String,
     },
     Join {
         channel_id: String,
         agent_id: String,
     },
-    Part {
+    JoinSuccess {
         channel_id: String,
+        space_data: SpaceData,
     },
+    Part,
+    PartSuccess,
+    Disconnected,
 }
 
 impl TryFrom<Lib3hToClient> for ChatEvent {
@@ -55,40 +59,12 @@ impl TryFrom<Lib3hToClient> for ChatEvent {
         match lib3h_message {
             Lib3hToClient::HandleSendDirectMessage(message_data) => {
                 Ok(ChatEvent::ReceiveDirectMessage {
-                    from_address: message_data.from_agent_id.to_string(),
+                    from_agent: message_data.from_agent_id.to_string(),
                     payload: "message from engine".to_string(),
                 })
-            }
-            _ => Err("Nope".to_string()),
-        }
-    }
-}
-
-impl TryInto<ClientToLib3h> for ChatEvent {
-    type Error = String;
-    fn try_into(self) -> Result<ClientToLib3h, Self::Error> {
-        match self {
-            ChatEvent::Join{channel_id, agent_id} => {
-                let space_address = channel_address_from_string(&channel_id)
-                    .map_err(|e| e.to_string())?;
-                let space_data = SpaceData {
-                    agent_id: Address::from(agent_id),
-                    request_id: "".to_string(),
-                    space_address,
-                };
-                Ok(ClientToLib3h::JoinSpace(space_data))
-            }
-            ChatEvent::Part{channel_id} => {
-                let space_address = channel_address_from_string(&channel_id)
-                    .map_err(|e| e.to_string())?;
-                let space_data = SpaceData {
-                    agent_id: Address::new(),
-                    request_id: "".to_string(),
-                    space_address,
-                };
-                Ok(ClientToLib3h::LeaveSpace(space_data))
-            }
-            _ => Err("Not implemented".to_string()),
+            },
+            Lib3hToClient::Disconnected(_) => Ok(ChatEvent::Disconnected),
+            _ => Err("Unknown Lib3h message".to_string()),
         }
     }
 }
@@ -120,6 +96,8 @@ impl SimChat {
             crossbeam_channel::Receiver<ChatEvent>,
         ) = crossbeam_channel::unbounded();
 
+        let internal_sender = out_send.clone();
+
         let thread_continue_inner = thread_continue.clone();
         Self {
             thread: Some(std::thread::spawn(move || {
@@ -135,7 +113,11 @@ impl SimChat {
                         .request_id_prefix("parent")
                         .build();
 
-                // call connect to start the networking process passing a 
+                // also keep track of things like the current space in this scope
+                let mut current_space: Option<SpaceData> = None;
+
+                // call connect to start the networking process
+                // (should probably wait for confirmatio before continuing)
                 SimChat::connect(&mut parent_endpoint, peer_uri);
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
@@ -155,28 +137,89 @@ impl SimChat {
 
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
-                    direct_chat_events
-                        .chain(n3h_chat_events)
-                        .for_each(|chat_event| {
-                            handler(&chat_event);
-                            chat_event
-                                .try_into()
-                                .and_then(|lib3h_message: ClientToLib3h| {
+                    for chat_event in direct_chat_events.chain(n3h_chat_events) {
+
+                        let local_internal_sender = internal_sender.clone();
+
+                        // every chat event call the handler that was passed
+                        handler(&chat_event);
+
+                        // also do internal logic for certain events e.g. converting them to lib3h events
+                        // and also handling the responses to mutate local state
+                        match chat_event {
+
+                            ChatEvent::Join{channel_id, agent_id} => {
+                                let space_address = channel_address_from_string(&channel_id).unwrap();
+                                let space_data = SpaceData {
+                                    agent_id: Address::from(agent_id),
+                                    request_id: "".to_string(),
+                                    space_address,
+                                };
+                                parent_endpoint.request(
+                                    String::from("ctx"),
+                                    ClientToLib3h::JoinSpace(space_data.clone()),
+                                    Box::new(move |_, _, _callback_data| {
+                                        // TODO: check the response was actually a success
+                                        local_internal_sender.send(ChatEvent::JoinSuccess {
+                                            channel_id: channel_id.clone(),
+                                            space_data: space_data.clone()
+                                        }).unwrap();
+                                        Ok(())
+                                    }),
+                                );
+                            },
+
+                            ChatEvent::JoinSuccess{space_data, ..} => {
+                                current_space = Some(space_data);
+                            },
+
+                            ChatEvent::Part => {
+                                if let Some(space_data) = current_space.clone() {
                                     parent_endpoint.request(
                                         String::from("ctx"),
-                                        lib3h_message,
+                                        ClientToLib3h::LeaveSpace(space_data.to_owned()),
+                                        Box::new(move |_, _, _callback_data| {
+                                            local_internal_sender.send(ChatEvent::PartSuccess).unwrap();
+                                            Ok(())
+                                        }),
+                                    );
+                                } else {
+                                    println!("No space to leave")
+                                }
+                            },
+
+                            ChatEvent::PartSuccess => {
+                                current_space = None;
+                            }
+
+                            ChatEvent::SendDirectMessage{ to_agent, payload } => {
+                                if let Some(space_data) = current_space.clone() {
+                                    let direct_message_data = DirectMessageData {
+                                        from_agent_id: space_data.agent_id,
+                                        content: payload.into(),
+                                        to_agent_id: Address::from(to_agent),
+                                        space_address: space_data.space_address,
+                                        request_id: String::from(""),
+                                    };
+                                    parent_endpoint.request(
+                                        String::from("ctx"),
+                                        ClientToLib3h::SendDirectMessage(direct_message_data),
                                         Box::new(|_, _, callback_data| {
                                             println!(
-                                                "chat received response from engine: {:?}",
+                                                "direct message request received response from engine: {:?}",
                                                 callback_data
                                             );
                                             Ok(())
                                         }),
                                     );
-                                    Ok(())
-                                })
-                                .ok();
-                        });
+                                } else {
+                                    println!("Must join a channel before sending a message")
+                                }
+                            }
+
+                            _ => {}
+                        }
+                    }
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
@@ -244,7 +287,7 @@ mod tests {
         );
 
         let msg = ChatEvent::SendDirectMessage {
-            to_address: "addr".to_string(),
+            to_agent: "addr".to_string(),
             payload: "yo".to_string(),
         };
 
