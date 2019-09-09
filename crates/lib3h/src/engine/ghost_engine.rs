@@ -2,8 +2,8 @@ use lib3h_ghost_actor::GhostParentWrapper;
 use lib3h_protocol::protocol::*;
 /// the context when making a request from core
 /// this is always the request_id
-pub struct CoreRequestContext(String);
-impl CoreRequestContext {
+pub struct ClientRequestContext(String);
+impl ClientRequestContext {
     pub fn new(id: &str) -> Self {
         Self(id.to_string())
     }
@@ -16,7 +16,7 @@ impl CoreRequestContext {
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
 pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
     Core,
-    CoreRequestContext,
+    ClientRequestContext,
     Lib3hToClient,
     Lib3hToClientResponse,
     ClientToLib3h,
