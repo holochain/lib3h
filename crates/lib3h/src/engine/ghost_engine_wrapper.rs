@@ -2,8 +2,12 @@ use crate::engine::ghost_engine::{ClientRequestContext, GhostEngineParentWrapper
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
-    data_types::GenericResultData, error::Lib3hProtocolResult, protocol::*, protocol_client::*,
-    protocol_server::*, DidWork,
+    data_types::GenericResultData,
+    error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
+    protocol::*,
+    protocol_client::*,
+    protocol_server::*,
+    DidWork,
 };
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
@@ -127,13 +131,13 @@ where
             Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
             _ => panic!("unimplemented"),
         };
-        if &ctx.get_request_id() == "" {
-            self.engine.publish(client_msg.into());
+        let result = if &ctx.get_request_id() == "" {
+            self.engine.publish(client_msg.into())
         } else {
             self.engine
-                .request(ctx, client_msg.into(), LegacyLib3h::make_callback());
-        }
-        Ok(())
+                .request(ctx, client_msg.into(), LegacyLib3h::make_callback())
+        };
+        result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
     }
 
     /// Process Lib3hClientProtocol message inbox and
@@ -239,23 +243,23 @@ mod tests {
             &mut self,
             mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
         ) -> Result<(), EngineError> {
-            match msg.take_message().expect("exists") {
+            let result = match msg.take_message().expect("exists") {
                 ClientToLib3h::Connect(_data) => {
                     // pretend the connection request failed
-                    msg.respond(Err("connection failed!".to_string()));
+                    msg.respond(Err("connection failed!".to_string()))
                 }
                 ClientToLib3h::JoinSpace(_data) => {
                     // pretend the request succeeded
-                    msg.respond(Ok(ClientToLib3hResponse::JoinSpaceResult));
+                    msg.respond(Ok(ClientToLib3hResponse::JoinSpaceResult))
                 }
                 _ => panic!("{:?} not implemented", msg),
-            }
-            Ok(())
+            };
+            result.map_err(|e| e.to_string())
         }
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            self.lib3h_endpoint.publish(msg);
+            let _ = self.lib3h_endpoint.publish(msg);
         }
     }
 
