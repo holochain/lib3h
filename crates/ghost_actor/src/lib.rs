@@ -2,6 +2,7 @@ extern crate crossbeam_channel;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate detach;
+extern crate lib3h_tracing;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -85,6 +86,7 @@ mod tests {
     use super::*;
     use crate::{ghost_actor::GhostContext, test_types::TestContext};
     use detach::prelude::*;
+    use lib3h_tracing::Span;
 
     type FakeError = String;
 
@@ -244,7 +246,9 @@ mod tests {
         },
     }
     impl GhostContext for GwDht {
-        fn get_span(&self) {}
+        fn get_span(&self) -> Span {
+            unimplemented!()
+        }
     }
 
     #[derive(Debug)]
@@ -253,7 +257,9 @@ mod tests {
     }
 
     impl GhostContext for RequestToParentContext {
-        fn get_span(&self) {}
+        fn get_span(&self) -> Span {
+            unimplemented!()
+        }
     }
 
     struct GatewayTransport {

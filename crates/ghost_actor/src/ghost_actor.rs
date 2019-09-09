@@ -1,7 +1,11 @@
 use crate::prelude::*;
+use lib3h_tracing::Span;
 
+/// Trait which all contexts must implement.
+/// It's OK for contexts to hold whatever user-specific data they want,
+/// but they must also hold a rustracing::Span
 pub trait GhostContext {
-    fn get_span(&self) -> ();
+    fn get_span(&self) -> Span;
 }
 
 /// helper struct that merges (on the parent side) the actual child

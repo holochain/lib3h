@@ -1,6 +1,7 @@
 use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, Address};
+use lib3h_tracing::Span;
 use std::collections::{HashMap, HashSet};
 
 use super::RealEngineTrackerData;
@@ -21,7 +22,9 @@ use url::Url;
 
 pub struct DefaultContext;
 impl GhostContext for DefaultContext {
-    fn get_span(&self) {}
+    fn get_span(&self) -> Span {
+        unimplemented!()
+    }
 }
 
 impl From<()> for DefaultContext {
@@ -43,7 +46,9 @@ impl ClientRequestContext {
 }
 
 impl GhostContext for ClientRequestContext {
-    fn get_span(&self) {}
+    fn get_span(&self) -> Span {
+        unimplemented!()
+    }
 }
 
 /// the context when making a request
@@ -53,7 +58,9 @@ struct RequestContext {
     pub agent_id: Address,
 }
 impl GhostContext for RequestContext {
-    fn get_span(&self) {}
+    fn get_span(&self) -> Span {
+        unimplemented!()
+    }
 }
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have

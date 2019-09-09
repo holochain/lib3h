@@ -5,6 +5,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
+use lib3h_tracing::Span;
 use std::collections::HashMap;
 use url::Url;
 
@@ -20,7 +21,9 @@ enum MplexToInnerContext {
     AwaitSend(GhostMessageData<RequestToChild>),
 }
 impl GhostContext for MplexToInnerContext {
-    fn get_span(&self) {}
+    fn get_span(&self) -> Span {
+        unimplemented!()
+    }
 }
 
 pub struct TransportMultiplex {

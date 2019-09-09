@@ -1,5 +1,6 @@
 use crate::dht::PeerAddress;
 use lib3h_protocol::{data_types::EntryData, Address};
+use lib3h_tracing::Span;
 use url::Url;
 
 use crate::{dht::dht_config::DhtConfig, error::*};
@@ -64,7 +65,9 @@ pub enum DhtContext {
     QueryEntry(QueryEntryData),
 }
 impl GhostContext for DhtContext {
-    fn get_span(&self) {}
+    fn get_span(&self) -> Span {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]
