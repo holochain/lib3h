@@ -249,7 +249,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
     }
 
     /// get a list of all open transport ids
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
+    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
         Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
     }
 

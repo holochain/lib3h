@@ -1,18 +1,20 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
-    engine::{p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID},
+    dht::dht_protocol::*,
+    engine::{
+        p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
+    },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     transport::{protocol::*, ConnectionIdRef},
 };
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
 /// Network layer related private methods
-impl<'engine, D: Dht> RealEngine<'engine, D> {
+impl<'engine> RealEngine<'engine> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_network_gateway(
         &mut self,
@@ -49,29 +51,33 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             outbox.append(&mut output);
         }
         // Process the network gateway as a DHT
-        let (dht_did_work, event_list) = self.network_gateway.as_dht_mut().process()?;
-        if dht_did_work {
+        debug!("{} - network_gateway DHT.process() ...", self.name);
+        self.network_gateway.as_mut().process_dht().unwrap(); // FIXME
+        let request_list = self.network_gateway.as_mut().as_dht_mut().drain_messages();
+        for request in request_list {
             did_work = true;
+            self.handle_netDhtRequest(request)?;
         }
-        for evt in event_list {
-            let mut output = self.handle_netDhtEvent(evt)?;
-            outbox.append(&mut output);
-        }
+        // Done
         Ok((did_work, outbox))
     }
 
     /// Handle a DhtEvent sent to us by our network gateway
-    fn handle_netDhtEvent(&mut self, cmd: DhtEvent) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_netDhtEvent: {:?}", self.name, cmd);
+    fn handle_netDhtRequest(
+        &mut self,
+        mut msg: DhtToParentMessage,
+    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        debug!("{} << handle_netDhtEvent: {:?}", self.name, msg);
         let outbox = Vec::new();
-        match cmd {
-            DhtEvent::GossipTo(_data) => {
+        match msg.take_message().expect("exists") {
+            DhtRequestToParent::GossipTo(gossip_data) => {
+                handle_gossipTo(&mut self.network_gateway, gossip_data)
+                    .expect("Failed to gossip with network_gateway");
+            }
+            DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
             }
-            DhtEvent::GossipUnreliablyTo(_data) => {
-                // no-op
-            }
-            DhtEvent::HoldPeerRequested(peer_data) => {
+            DhtRequestToParent::HoldPeerRequested(peer_data) => {
                 // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
                 // Connect to every peer we are requested to hold.
                 info!(
@@ -81,11 +87,11 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 let cmd = TransportCommand::Connect(peer_data.peer_uri.clone(), "".to_string());
                 self.network_gateway.as_transport_mut().post(cmd)?;
             }
-            DhtEvent::PeerTimedOut(peer_address) => {
+            DhtRequestToParent::PeerTimedOut(peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
                 let maybe_connection_id = self
                     .network_gateway
-                    .as_ref()
+                    .as_mut()
                     .get_connection_id(&peer_address);
                 trace!(
                     "{} -- maybe_connection_id: {:?}",
@@ -99,16 +105,16 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 }
             }
             // No entries in Network DHT
-            DhtEvent::HoldEntryRequested(_, _) => {
+            DhtRequestToParent::HoldEntryRequested {
+                from_peer: _,
+                entry: _,
+            } => {
                 unreachable!();
             }
-            DhtEvent::FetchEntryResponse(_) => {
+            DhtRequestToParent::EntryPruned(_) => {
                 unreachable!();
             }
-            DhtEvent::EntryPruned(_) => {
-                unreachable!();
-            }
-            DhtEvent::EntryDataRequested(_) => {
+            DhtRequestToParent::RequestEntry(_) => {
                 unreachable!();
             }
         }
@@ -120,17 +126,26 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         id: &ConnectionIdRef,
         request_id: String,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let mut outbox = Vec::new();
-        let mut network_gateway = self.network_gateway.as_mut();
-        if let Some(uri) = network_gateway.get_uri(id) {
-            info!("Network Connection opened: {} ({})", id, uri);
-            // TODO #150 - Should do this in next process instead
-            // Send to other node our Joined Spaces
+        // TODO #150 - Should do this in next process instead
+        let peer_list = self.network_gateway.as_mut().get_peer_list_sync();
+        trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
+        // get uri from id
+        let mut network_transport = self.network_gateway.as_transport_mut();
+        let maybe_uri = network_transport.get_uri(id);
+        if maybe_uri.is_none() {
+            return Ok(Vec::new());
+        }
+        let uri = maybe_uri.unwrap();
+        info!("Network Connection opened: {} ({})", id, uri);
+
+        // TODO #150 - Should do this in next process instead
+        // Send to other node our Joined Spaces
+        {
             let space_list = self.get_all_spaces();
             let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-            let mut buf = Vec::new();
+            let mut payload = Vec::new();
             our_joined_space_list
-                .serialize(&mut Serializer::new(&mut buf))
+                .serialize(&mut Serializer::new(&mut payload))
                 .unwrap();
             trace!(
                 "AllJoinedSpaceList: {:?} to {:?}",
@@ -138,22 +153,21 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 id
             );
             // id is connectionId but we need a transportId, so search for it in the DHT
-            let peer_list = network_gateway.get_peer_list();
-            trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
             let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
             if let Some(peer_data) = maybe_peer_data {
                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                network_gateway.send(&[&peer_data.peer_address], &buf)?;
+                network_transport.send(&[&peer_data.peer_address], &payload)?;
             }
             // TODO END
-
-            // Output a Lib3hServerProtocol::Connected if its the first connection
-            if self.network_connections.is_empty() {
-                let data = ConnectedData { request_id, uri };
-                outbox.push(Lib3hServerProtocol::Connected(data));
-            }
-            let _ = self.network_connections.insert(id.to_owned());
         }
+
+        // Output a Lib3hServerProtocol::Connected if its the first connection
+        let mut outbox = Vec::new();
+        if self.network_connections.is_empty() {
+            let data = ConnectedData { request_id, uri };
+            outbox.push(Lib3hServerProtocol::Connected(data));
+        }
+        let _ = self.network_connections.insert(id.to_owned());
         Ok(outbox)
     }
 
@@ -224,20 +238,27 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
-                let cmd = DhtCommand::HandleGossip(RemoteGossipBundleData {
+                let gossip = RemoteGossipBundleData {
                     from_peer_address: msg.from_peer_address.clone().into(),
                     bundle: msg.bundle.clone(),
-                });
+                };
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    self.network_gateway.as_dht_mut().post(cmd)?;
+                    let _ = self
+                        .network_gateway
+                        .as_mut()
+                        .as_dht_mut()
+                        .publish(DhtRequestToChild::HandleGossip(gossip));
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        space_gateway.as_dht_mut().post(cmd)?;
+                        let _ = space_gateway
+                            .as_mut()
+                            .as_dht_mut()
+                            .publish(DhtRequestToChild::HandleGossip(gossip));
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -280,9 +301,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    space_gateway
-                        .as_dht_mut()
-                        .post(DhtCommand::HoldPeer(peer_data.clone()))?;
+                    space_gateway.as_mut().hold_peer(peer_data.clone());
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -290,9 +309,7 @@ impl<'engine, D: Dht> RealEngine<'engine, D> {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        space_gateway
-                            .as_dht_mut()
-                            .post(DhtCommand::HoldPeer(peer_data.clone()))?;
+                        space_gateway.as_mut().hold_peer(peer_data.clone());
                     }
                 }
             }

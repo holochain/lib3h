@@ -61,7 +61,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine<MirrorDht> {
+fn basic_setup_mock_bootstrap<'a>(name: &str, bs: Option<Vec<Url>>) -> RealEngine<'a> {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
@@ -92,11 +92,11 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine<Mi
     engine
 }
 
-fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
+fn basic_setup_mock<'a>(name: &str) -> RealEngine<'a> {
     basic_setup_mock_bootstrap(name, None)
 }
 
-fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
+fn basic_setup_wss<'a>() -> RealEngine<'a> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),

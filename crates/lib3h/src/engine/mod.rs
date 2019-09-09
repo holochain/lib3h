@@ -6,16 +6,17 @@ mod space_layer;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
-    dht::dht_trait::{Dht, DhtFactory},
-    gateway::GatewayWrapper,
+    dht::dht_protocol::*,
+    gateway::wrapper::GatewayWrapper,
     track::Tracker,
     transport::{ConnectionId, TransportWrapper},
     transport_wss::TlsConfig,
 };
-
 use lib3h_crypto_api::{Buffer, CryptoSystem};
-use lib3h_protocol::{protocol_client::Lib3hClientProtocol, Address};
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
+use lib3h_protocol::{
+    protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
+};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
@@ -87,7 +88,7 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'engine, D: Dht + 'engine> {
+pub struct RealEngine<'engine> {
     /// Identifier
     name: String,
     /// Config settings
@@ -95,7 +96,7 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
     /// Factory for building DHT's of type D
-    dht_factory: DhtFactory<D>,
+    dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
     // TODO #176: Remove this if we resolve #176 without it.
@@ -116,4 +117,7 @@ pub struct RealEngine<'engine, D: Dht + 'engine> {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
+    /// dht ghost user_data
+    /// temp HACK. Waiting for gateway actor
+    temp_outbox: Vec<Lib3hServerProtocol>,
 }
