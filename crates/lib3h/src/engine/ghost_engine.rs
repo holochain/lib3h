@@ -31,6 +31,13 @@ impl ClientRequestContext {
     }
 }
 
+/// the context when making a request
+#[derive(Clone)]
+struct RequestContext {
+    pub space_address: Address,
+    pub agent_id: Address,
+}
+
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
 pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
@@ -118,7 +125,7 @@ pub struct GhostEngine<'engine> {
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
             GhostEngine<'engine>,
-            String,
+            RequestContext,
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,
@@ -402,21 +409,27 @@ impl<'engine> GhostEngine<'engine> {
         }
         debug!("HandleGetAuthoringEntryListResult: {}", count);
 
+
+        let context = RequestContext {
+            space_address: msg.space_address.to_owned(),
+            agent_id: msg.provider_agent_id.to_owned(),
+        };
         for mut msg_data in request_list {
             msg_data.request_id = self.request_track.reserve();
 
-            let context = "".to_string();
             let _ = self.lib3h_endpoint.request(
-                context,
+                context.clone(),
                 Lib3hToClient::HandleFetchEntry(msg_data),
-                Box::new(|_me, _ctx, response| {
+                Box::new(|me, context, response| {
+                    let space_gateway = me.get_space(
+                        &context.space_address.to_owned(),
+                        &context.agent_id.to_owned(),
+                    ).map_err(|e|GhostError::from(e.to_string()))?;
                     match response {
                         GhostCallbackData::Response(Ok(
-                            Lib3hToClientResponse::HandleFetchEntryResult(_msg),
+                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
                         )) => {
-                            // TODO: add back in when gateway completed
-                            // let cmd = DhtCommand::BroadcastEntry(msg.entry);
-                            // space_gateway.as_dht_mut().post(cmd)?;
+                            space_gateway.as_mut().as_dht_mut().publish(DhtRequestToChild::BroadcastEntry(msg.entry.clone()))?;
                         }
                         GhostCallbackData::Response(Err(e)) => {
                             error!("Got error on HandleFetchEntryResult: {:?} ", e);
@@ -489,9 +502,12 @@ impl<'engine> GhostEngine<'engine> {
             provider_agent_id: join_msg.agent_id.clone(),
             request_id: self.request_track.reserve(),
         };
-        let context = "".to_string();
+        let context = RequestContext {
+            space_address: join_msg.space_address.to_owned(),
+            agent_id: join_msg.agent_id.to_owned(),
+        };
         self.lib3h_endpoint.request(
-            context,
+            context.clone(),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
             Box::new(|me, _ctx, response| {
                 match response {
@@ -517,7 +533,6 @@ impl<'engine> GhostEngine<'engine> {
             }),
         )?;
 
-        let context = "".to_string();
         list_data.request_id = self.request_track.reserve();
         self.lib3h_endpoint
             .request(
@@ -611,29 +626,19 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     fn handle_publish_entry(&mut self, msg: &ProvidedEntryData) -> Lib3hResult<()> {
-        let _space_gateway = self.get_space(
+        let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
-        /* TODO: fix with real gateway
-           let cmd = DhtCommand::BroadcastEntry(msg.entry);
-           space_gateway.as_dht_mut().post(cmd)?;
-        */
-        Ok(())
+        space_gateway.as_mut().as_dht_mut().publish(DhtRequestToChild::BroadcastEntry(msg.entry.clone())).map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
     fn handle_hold_entry(&mut self, msg: &ProvidedEntryData) -> Lib3hResult<()> {
-        let _space_gateway = self.get_space(
+        let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
-        /* TODO: fix with real gateway
-        let cmd = DhtCommand::HoldEntryAspectAddress(msg.entry);
-        space_gateway.as_dht_mut().post(cmd)?;
-         */
-        //        space_gateway.as_dht_mut().request(
-        //        );
-        Ok(())
+        space_gateway.as_mut().as_dht_mut().publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry.clone())).map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
     fn handle_query_entry(&mut self, msg: &QueryEntryData) -> Lib3hResult<QueryEntryResultData> {
