@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
     gateway::{Gateway, P2pGateway},
     transport::{
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Compose Transport
-impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
+impl<'gateway> Transport for P2pGateway<'gateway> {
     // TODO #176 - Return a higher-level uri instead?
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         trace!("({}).connect() {}", self.identifier, uri);
@@ -123,8 +123,8 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
     }
 
     /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
-        let peer_data_list = self.inner_dht.get_peer_list();
+    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
+        let peer_data_list = self.get_peer_list_sync();
         let mut id_list = Vec::new();
         for peer_data in peer_data_list {
             id_list.push(peer_data.peer_address);
@@ -141,15 +141,15 @@ impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
 }
 
 /// Private internals
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+impl<'gateway> P2pGateway<'gateway> {
     /// Get Uris from DHT peer_address'
     pub(crate) fn dht_address_to_uri_list(
-        &self,
+        &mut self,
         address_list: &[&str],
     ) -> TransportResult<Vec<Url>> {
         let mut uri_list = Vec::with_capacity(address_list.len());
         for address in address_list {
-            let maybe_peer = self.inner_dht.get_peer(address);
+            let maybe_peer = self.get_peer_sync(address);
             match maybe_peer {
                 None => {
                     return Err(TransportError::new(format!(
@@ -169,7 +169,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
             return Ok(());
         }
         let uri = maybe_uri.unwrap();
-        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id,);
+        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id);
         // TODO #176 - Maybe we shouldn't have different code paths for populating
         // the connection_map between space and network gateways.
         let maybe_previous = self.connection_map.insert(uri.clone(), id.to_string());
@@ -178,7 +178,7 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
         }
 
         // Send to other node our PeerAddress
-        let this_peer = self.this_peer().clone();
+        let this_peer = self.get_this_peer_sync().clone();
         let our_peer_address = P2pProtocol::PeerAddress(
             self.identifier().to_string(),
             this_peer.peer_address,
@@ -249,9 +249,11 @@ impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
                                 peer_uri,
                                 timestamp: peer_timestamp,
                             };
-                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
-                                                                                         // TODO #150 - Should not call process manually
-                            Dht::process(self).expect("HACK");
+                            // HACK
+                            self.hold_peer(peer);
+                            // TODO #58
+                            // TODO #150 - Should not call process manually
+                            self.process().expect("HACK");
                         }
                     }
                 }

@@ -28,7 +28,7 @@ fn main() {
                 //         .expect("failed to set linefeed prompt");      
                 // },
                 ChatEvent::ReceiveDirectMessage{from_agent, payload} => {
-                    writeln!(rl_t, "<{}> {}", from_agent, payload).expect("write fail");
+                    writeln!(rl_t, "*{}* {}", from_agent, payload).expect("write fail");
                 },
                 _ => {}
             }

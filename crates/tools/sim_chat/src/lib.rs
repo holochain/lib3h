@@ -7,9 +7,15 @@ extern crate crossbeam_channel;
 extern crate url;
 
 use core::convert::{TryFrom};
-use lib3h::engine::ghost_engine::{
-    GhostEngine,
-    EngineError,
+use lib3h::{
+    engine::{
+        RealEngineConfig,
+        ghost_engine::GhostEngine,
+    },
+    dht::mirror_dht::MirrorDht, transport::memory_mock::transport_memory::TransportMemory,
+        transport_wss::TlsConfig,
+    transport::{TransportWrapper},
+    error::Lib3hError,
 };
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
@@ -23,7 +29,8 @@ use lib3h_protocol::{
     },
     Address,
 };
-use lib3h_sodium::{hash, secbuf::SecBuf};
+use lib3h_sodium::{SodiumCryptoSystem, hash, secbuf::SecBuf};
+
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -104,9 +111,30 @@ impl SimChat {
                 // this thread owns the ghost engine instance
                 // and is responsible for calling process
                 // and handling messages
-                let mut lib3h_engine = GhostEngine::new();
+                let network_transport = TransportWrapper::new(TransportMemory::new());
+                let crypto = Box::new(SodiumCryptoSystem::new());
+                let config = RealEngineConfig {
+                    tls_config: TlsConfig::Unencrypted,
+                    socket_type: "mem".into(),
+                    bootstrap_nodes: vec![],
+                    work_dir: String::new(),
+                    log_level: 'd',
+                    bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
+                    dht_gossip_interval: 100,
+                    dht_timeout_threshold: 1000,
+                    dht_custom_config: vec![],
+                };
+                let dht_factory = MirrorDht::new_with_config;
+
+                let mut engine: GhostEngine = GhostEngine::new(
+                    "test_engine",
+                    crypto,
+                    config,
+                    dht_factory,
+                    network_transport,
+                ).unwrap();
                 let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> =
-                    lib3h_engine
+                    engine
                         .take_parent_endpoint()
                         .unwrap()
                         .as_context_endpoint_builder()
@@ -123,7 +151,7 @@ impl SimChat {
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
                     parent_endpoint.process(&mut ()).unwrap();
-                    lib3h_engine.process().unwrap();
+                    engine.process().unwrap();
 
                     // gather all the ChatEvents
                     // Receive directly from the crossbeam channel
@@ -166,7 +194,7 @@ impl SimChat {
                                         }).unwrap();
                                         Ok(())
                                     }),
-                                );
+                                ).unwrap();
                             },
 
                             ChatEvent::JoinSuccess{space_data, channel_id} => {
@@ -183,7 +211,7 @@ impl SimChat {
                                             local_internal_sender.send(ChatEvent::PartSuccess).unwrap();
                                             Ok(())
                                         }),
-                                    );
+                                    ).unwrap();
                                 } else {
                                     SimChat::send_sys_message(local_internal_sender, &"No channel to leave".to_string());
                                 }
@@ -210,7 +238,7 @@ impl SimChat {
                                             // TODO: track if messages are send successfully
                                             Ok(())
                                         }),
-                                    );
+                                    ).unwrap();
                                 } else {
                                     SimChat::send_sys_message(local_internal_sender, &"Must join a channel before sending a message".to_string());
                                 }
@@ -247,7 +275,7 @@ impl SimChat {
             ClientToLib3hResponse,
             Lib3hToClient,
             Lib3hToClientResponse,
-            EngineError>,
+            Lib3hError>,
         peer_uri: Url,
     ) {
         let connect_message = ClientToLib3h::Connect(ConnectData{
@@ -265,7 +293,7 @@ impl SimChat {
                 );
                 Ok(())
             }),
-        );
+        ).unwrap();
     }
 }
 

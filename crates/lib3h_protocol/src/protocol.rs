@@ -3,10 +3,10 @@ use crate::{
 };
 /// Enum holding the message types describe the lib3h protocol.
 /// There are 4 categories of messages:
-///  - ClientToLib3h: An a request or event sent from the user/client of lib3h
+///  - ClientToLib3h: A request or event sent from the user/client of lib3h
 /// (i.e. the Holochain node) to lib3h.
 ///  - ClientToLib3hResponse: A response to a ClientToLib3h. The name always matches what it's a response to. The response may have no data associated with it, in which case its use is in the Err
-///  - Lib3hToClient: An request or event sent from lib3h its user/client.
+///  - Lib3hToClient: A request or event sent from lib3h its user/client.
 ///  - Lib3hToClientResponse: A response from the client back to lib3h.
 /// Fetch = Request between node and the network (other nodes)
 /// Get   = Request within a node between p2p module and core
@@ -18,9 +18,9 @@ pub enum ClientToLib3h {
     Connect(ConnectData),
 
     // -- Space -- //
-    /// Order the p2p module to be part of the network of the specified space.
+    /// Order the engine to be part of the network of the specified space.
     JoinSpace(SpaceData),
-    /// Order the p2p module to leave the network of the specified space.
+    /// Order the engine to leave the network of the specified space.
     LeaveSpace(SpaceData),
 
     // -- Direct Messaging -- //
@@ -32,7 +32,7 @@ pub enum ClientToLib3h {
     FetchEntry(FetchEntryData), // NOTE: MAY BE DEPRECATED
     /// Publish data to the dht (event)
     PublishEntry(ProvidedEntryData),
-    /// Tell network module Core is holding this entry (event)
+    /// Tell Engine that Client is holding this entry (event)
     HoldEntry(ProvidedEntryData),
     /// Request some info / data from a Entry
     QueryEntry(QueryEntryData),

@@ -8,7 +8,7 @@ const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20
 /// into the system through the `handle` pathway, or to indicate a failure
 /// such as a timeout
 #[derive(Debug)]
-pub enum GhostCallbackData<CbData, E> {
+pub enum GhostCallbackData<CbData: 'static, E: 'static> {
     Response(Result<CbData, E>),
     Timeout,
 }
@@ -24,7 +24,7 @@ pub type GhostCallback<UserData, Context, CbData, E> =
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
-struct GhostTrackerEntry<UserData, Context, CbData, E> {
+struct GhostTrackerEntry<UserData, Context: 'static, CbData: 'static, E: 'static> {
     expires: std::time::SystemTime,
     context: Context,
     cb: GhostCallback<UserData, Context, CbData, E>,
@@ -46,7 +46,9 @@ impl Default for GhostTrackerBuilder {
 }
 
 impl GhostTrackerBuilder {
-    pub fn build<UserData, Context, CbData, E>(self) -> GhostTracker<UserData, Context, CbData, E> {
+    pub fn build<UserData, Context: 'static, CbData: 'static, E: 'static>(
+        self,
+    ) -> GhostTracker<UserData, Context, CbData, E> {
         GhostTracker {
             request_id_prefix: self.request_id_prefix,
             default_timeout: self.default_timeout,
@@ -67,7 +69,7 @@ impl GhostTrackerBuilder {
 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<UserData, Context, CbData, E> {
+pub struct GhostTracker<UserData, Context: 'static, CbData: 'static, E: 'static> {
     request_id_prefix: String,
     default_timeout: std::time::Duration,
     pending: HashMap<RequestId, GhostTrackerEntry<UserData, Context, CbData, E>>,

@@ -64,7 +64,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
+fn basic_setup_mock(name: &str) -> RealEngine {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
@@ -91,7 +91,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
     engine
 }
 
-fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
+fn basic_setup_wss<'a>() -> RealEngine<'a> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
