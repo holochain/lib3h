@@ -6,21 +6,20 @@ use url::Url;
 
 use super::RealEngineTrackerData;
 use crate::{
+    dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
-        p2p_protocol::P2pProtocol,
+        p2p_protocol::{GossipData, P2pProtocol},
         RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
-    dht::{dht_config::DhtConfig, dht_protocol::*},
     error::Lib3hResult,
     gateway::{wrapper::*, P2pGateway},
     track::Tracker,
     transport::{protocol::TransportCommand, TransportWrapper},
     transport_wss::TransportWss,
 };
-use crate::engine::p2p_protocol::GossipData;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{    
+use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
@@ -143,8 +142,7 @@ impl<'engine> RealEngine<'engine> {
 }
 
 impl<'engine> RealEngine<'engine> {
- 
-fn priv_connect_bootstraps(&mut self) -> Lib3hProtocolResult<()> {
+    fn priv_connect_bootstraps(&mut self) -> Lib3hProtocolResult<()> {
         // TODO
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
@@ -155,7 +153,7 @@ fn priv_connect_bootstraps(&mut self) -> Lib3hProtocolResult<()> {
             }))?;
         }
         Ok(())
-}
+    }
 }
 
 impl<'engine> NetworkEngine for RealEngine<'engine> {
@@ -581,23 +579,23 @@ impl<'engine> RealEngine<'engine> {
         );
         match maybe_space {
             Err(res) => outbox.push(res),
-/*<<<<<<< HEAD
-            Ok(space_gateway) => {
-                for (entry_address, aspect_address_list) in msg.address_map {
-                    let mut aspect_list = Vec::new();
-                    for aspect_address in aspect_address_list {
-                        let fake_aspect = EntryAspectData {
-                            aspect_address: aspect_address.clone(),
-                            type_hint: String::new(),
-                            aspect: vec![].into(),
-                            publish_ts: 0,
-                        };
-                        aspect_list.push(fake_aspect);
-                    }
-                    // Create "fake" entry, in the sense an entry with no actual content,
-                    // but valid addresses.
-                    let fake_entry = EntryData {
-======= */
+            /*<<<<<<< HEAD
+                        Ok(space_gateway) => {
+                            for (entry_address, aspect_address_list) in msg.address_map {
+                                let mut aspect_list = Vec::new();
+                                for aspect_address in aspect_address_list {
+                                    let fake_aspect = EntryAspectData {
+                                        aspect_address: aspect_address.clone(),
+                                        type_hint: String::new(),
+                                        aspect: vec![].into(),
+                                        publish_ts: 0,
+                                    };
+                                    aspect_list.push(fake_aspect);
+                                }
+                                // Create "fake" entry, in the sense an entry with no actual content,
+                                // but valid addresses.
+                                let fake_entry = EntryData {
+            ======= */
             Ok(_space_gateway) => {
                 for (entry_address, _aspect_address_list) in msg.address_map {
                     // #fullsync hack

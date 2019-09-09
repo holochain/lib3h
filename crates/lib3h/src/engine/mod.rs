@@ -13,10 +13,10 @@ use crate::{
     transport_wss::TlsConfig,
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
 };
+use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId

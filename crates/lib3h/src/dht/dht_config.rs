@@ -40,11 +40,11 @@ impl DhtConfig {
     }
 
     pub fn timeout_threshold(&self) -> u64 {
-        self.timeout_threshold 
+        self.timeout_threshold
     }
 
     pub fn gossip_interval(&self) -> u64 {
-        self.gossip_interval 
+        self.gossip_interval
     }
 
     pub fn this_peer_address(&self) -> PeerAddress {
@@ -54,5 +54,4 @@ impl DhtConfig {
     pub fn this_peer_uri(&self) -> Url {
         self.this_peer_uri.clone()
     }
-
 }

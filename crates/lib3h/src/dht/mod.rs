@@ -450,8 +450,7 @@ pub mod tests {
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 1);
-        let mut bundle : 
-            lib3h_protocol::data_types::Opaque = "".into();
+        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
             match request.take_message().expect("exists") {
                 DhtRequestToParent::GossipTo(gossip_data) => {
@@ -522,7 +521,7 @@ pub mod tests {
         // Should return gossipTos of C to B
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 2);
-        let mut bundle : lib3h_protocol::data_types::Opaque =               "".into();
+        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
             match request.take_message().expect("exists") {
                 DhtRequestToParent::GossipTo(gossip_to) => {
