@@ -169,8 +169,9 @@ impl SimChat {
                                 );
                             },
 
-                            ChatEvent::JoinSuccess{space_data, ..} => {
+                            ChatEvent::JoinSuccess{space_data, channel_id} => {
                                 current_space = Some(space_data);
+                                SimChat::send_sys_message(local_internal_sender, &format!("Joined channel: {}", channel_id));
                             },
 
                             ChatEvent::Part => {
@@ -184,12 +185,13 @@ impl SimChat {
                                         }),
                                     );
                                 } else {
-                                    println!("No space to leave")
+                                    SimChat::send_sys_message(local_internal_sender, &"No channel to leave".to_string());
                                 }
                             },
 
                             ChatEvent::PartSuccess => {
                                 current_space = None;
+                                SimChat::send_sys_message(local_internal_sender, &"Left channel".to_string());
                             }
 
                             ChatEvent::SendDirectMessage{ to_agent, payload } => {
@@ -215,7 +217,7 @@ impl SimChat {
                                 } else {
                                     println!("Must join a channel before sending a message")
                                 }
-                            }
+                            },
 
                             _ => {}
                         }
@@ -231,6 +233,13 @@ impl SimChat {
 
     pub fn send(&mut self, event: ChatEvent) {
         self.out_send.send(event).expect("send fail");
+    }
+
+    fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
+        sender.send(ChatEvent::ReceiveDirectMessage {
+            from_agent: String::from("sys"),
+            payload: String::from(msg)
+        }).expect("send fail");
     }
 
     fn connect(

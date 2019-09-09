@@ -22,11 +22,16 @@ fn main() {
                 ChatEvent::JoinSuccess{channel_id, ..} => {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
                         .expect("failed to set linefeed prompt");
+                    writeln!(rl_t, "").expect("write fail");
                 },
                 ChatEvent::PartSuccess => {
                     rl_t.set_prompt("no-channel> ")
-                        .expect("failed to set linefeed prompt");               
-                }
+                        .expect("failed to set linefeed prompt");      
+                    writeln!(rl_t, "").expect("write fail");         
+                },
+                ChatEvent::ReceiveDirectMessage{from_agent, payload} => {
+                    writeln!(rl_t, "<{}> {}", from_agent, payload).expect("write fail");
+                },
                 _ => {}
             }
             writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
