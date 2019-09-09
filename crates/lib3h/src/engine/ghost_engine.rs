@@ -338,12 +338,12 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
     }
 
     #[allow(non_snake_case)]
-    fn serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(
+    fn handle_HandleGetAuthoringEntryListResult(
         &mut self,
         msg: EntryListData,
     ) -> Lib3hResult<()> {
         let mut request_list = Vec::new();
-        let _space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
+        let space_gateway = self.get_space(&msg.space_address.to_owned(), &msg.provider_agent_id.to_owned())?;
 
         let mut msg_data = FetchEntryData {
             space_address: msg.space_address.clone(),
@@ -381,7 +381,9 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                         GhostCallbackData::Response(Ok(
                             Lib3hToClientResponse::HandleFetchEntryResult(_msg),
                         )) => {
-                            //let _ = me.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
+                            // TODO: add back in when gateway completed
+                            // let cmd = DhtCommand::BroadcastEntry(msg.entry);
+                            // space_gateway.as_dht_mut().post(cmd)?;
                         }
                         GhostCallbackData::Response(Err(e)) => {
                             error!("Got error on HandleFetchEntryResult: {:?} ", e);
@@ -398,7 +400,7 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         Ok(())
     }
     #[allow(non_snake_case)]
-    fn serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(
+    fn handle_HandleGetGossipingEntryListResult(
         &mut self,
         msg: EntryListData,
     ) -> Lib3hResult<()> {
@@ -462,10 +464,12 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                     )) => {
-                        let _ = me.serve_Lib3hClientProtocol_HandleGetGossipingEntryListResult(msg);
+                        if let Err(err) = me.handle_HandleGetGossipingEntryListResult(msg) {
+                            error!("Got error when handling HandleGetGossipingEntryListResult: {:?} ", err);
+                        };
                     }
                     GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error on HandleGetGossipingEntryListResult: {:?} ", e);
+                        error!("Got error from HandleGetGossipingEntryListResult: {:?} ", e);
                     }
                     GhostCallbackData::Timeout => {
                         error!("Got timeout on HandleGetGossipingEntryListResult");
@@ -486,7 +490,9 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => {
-                       let _ = me.serve_Lib3hClientProtocol_HandleGetAuthoringEntryListResult(msg);
+                        if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
+                            error!("Got error when handling HandleGetAuthoringEntryListResult: {:?} ", err);
+                        };
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
