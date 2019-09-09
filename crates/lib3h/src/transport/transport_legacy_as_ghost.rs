@@ -77,6 +77,8 @@ impl<'gt> TransportLegacyAsGhost<'gt> {
         address: Url,
         payload: Vec<u8>,
     ) -> TransportResult<()> {
+        // HACK - we apparently don't connect!!
+        /*
         if !self.url_to_con_id.contains_key(&address) {
             // connect if needed
             let con_id = self.inner_transport.as_mut().connect(&address)?;
@@ -87,6 +89,11 @@ impl<'gt> TransportLegacyAsGhost<'gt> {
         warn!("@@@ - LAG:SEND({}->{})", &address, &con_id);
         // forward the request to our inner_transport
         self.inner_transport.as_mut().send(&[&con_id], &payload)?;
+        */
+        self.inner_transport
+            .as_mut()
+            .send(&[address.path()], &payload)?;
+        // END HACK
         msg.respond(Ok(RequestToChildResponse::SendMessage))?;
         Ok(())
     }
@@ -127,7 +134,9 @@ impl<'gt>
                     // ??
                 }
                 TransportEvent::IncomingConnectionEstablished(id) => {
-                    let address = self.inner_transport.as_ref().get_uri(&id).ok_or(TransportError::from(format!("no address for con id {:?}", &id)))?;
+                    let address = self.inner_transport.as_ref().get_uri(&id).ok_or_else(|| {
+                        TransportError::from(format!("no address for con id {:?}", &id))
+                    })?;
                     warn!("@@@ - LAG:IN({}->{})", &id, &address);
                     self.con_id_to_url.insert(id.clone(), address.clone());
                     self.url_to_con_id.insert(address.clone(), id.clone());
@@ -136,7 +145,9 @@ impl<'gt>
                 }
                 TransportEvent::ConnectionClosed(_id) => {}
                 TransportEvent::ReceivedData(id, payload) => {
-                    let address = self.inner_transport.as_ref().get_uri(&id).ok_or(TransportError::from(format!("no address for con id {:?}", &id)))?;
+                    let address = self.inner_transport.as_ref().get_uri(&id).ok_or_else(|| {
+                        TransportError::from(format!("no address for con id {:?}", &id))
+                    })?;
                     warn!("@@@ - LAG:RECV({}->{})", &id, &address);
                     self.con_id_to_url.insert(id.clone(), address.clone());
                     self.url_to_con_id.insert(address.clone(), id.clone());
