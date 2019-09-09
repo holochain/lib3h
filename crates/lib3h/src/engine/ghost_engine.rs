@@ -264,8 +264,13 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
                 msg.respond(result);
             }
-            /*            LeaveSpace(SpaceData) => {}
-            SendDirectMessage(DirectMessageData) => {}
+            ClientToLib3h::LeaveSpace(data) => {
+                let result = self
+                    .handle_leave(&data)
+                    .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
+                msg.respond(result);
+            }
+/*            SendDirectMessage(DirectMessageData) => {}
             FetchEntry(FetchEntryData)  => {}
             PublishEntry(ProvidedEntryData) => {}
             HoldEntry(ProvidedEntryData)  => {}
@@ -515,6 +520,15 @@ impl<'engine, D: Dht> GhostEngine<'engine, D> {
         Ok(())
     }
 
+    /// Destroy gateway for this agent in this space, if part of it.
+    fn handle_leave(&mut self, join_msg: &SpaceData) -> Lib3hResult<()> {
+        let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
+        match self.space_gateway_map.remove(&chain_id) {
+            Some(_) => Ok(()), //TODO is there shutdown code we need to call
+            None => Err(Lib3hError::new_other("Not part of that space"))
+        }
+    }
+
     /// Get a space_gateway for the specified space+agent.
     /// If agent did not join that space, construct error
     fn get_space(
@@ -594,5 +608,15 @@ mod tests {
             "Err(Lib3hError(Other(\"Already joined space\")))",
             format!("{:?}", result)
         );
+
+        let result = lib3h.as_mut().handle_leave(&req_data);
+        assert!(result.is_ok());
+
+        let result = lib3h.as_mut().handle_leave(&req_data);
+        assert_eq!(
+            "Err(Lib3hError(Other(\"Not part of that space\")))",
+            format!("{:?}", result)
+        );
+
     }
 }
