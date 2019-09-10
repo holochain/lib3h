@@ -1,6 +1,7 @@
 use lib3h_ghost_actor::prelude::WorkWasDone;
 use lib3h_protocol::{
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
+    data_types::ConnectedData,
 };
 use lib3h::{
     error::Lib3hError,
@@ -95,14 +96,17 @@ impl MockEngine<'_> {
         /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
-            ClientToLib3h::Connect(_data) => {
-                Ok(())
+            ClientToLib3h::Connect(data) => {
+                msg.respond(Ok(ClientToLib3hResponse::ConnectResult(ConnectedData {
+                    request_id: data.request_id,
+                    uri: data.peer_uri,
+                })))
             }
             ClientToLib3h::JoinSpace(_data) => {
-                Ok(())
+                msg.respond(Ok(ClientToLib3hResponse::JoinSpaceResult))
             }
             ClientToLib3h::LeaveSpace(_data) => {
-                Ok(())
+                msg.respond(Ok(ClientToLib3hResponse::LeaveSpaceResult))
             }
             ClientToLib3h::SendDirectMessage(_data) => {
                 Ok(())

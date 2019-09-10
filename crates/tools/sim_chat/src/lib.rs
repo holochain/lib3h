@@ -335,26 +335,131 @@ mod tests {
     mod mock_engine;
     use mock_engine::MockEngine;
 
+    fn new_sim_chat_mock_engine(callback: HandleEvent) -> SimChat {
+        SimChat::new(
+            MockEngine::new,
+            callback,
+            Url::parse("http://test.boostrap").unwrap(),
+        )
+    }
+
+    /*----------  example messages  ----------*/
+    
+    fn chat_event() -> ChatEvent {
+        ChatEvent::SendDirectMessage {
+            to_agent: "addr".to_string(),
+            payload: "yo".to_string(),
+        }
+    }
+
+    fn receive_sys_message(payload: String) -> ChatEvent {
+        ChatEvent::ReceiveDirectMessage {
+            from_agent: String::from("sys"),
+            payload,
+        }
+    }
+
+    fn join_event() -> ChatEvent {
+        ChatEvent::Join {
+            agent_id: "test_agent".to_string(),
+            channel_id: "test_channel".to_string(),
+        }
+    }
+
+    fn join_success_event() -> ChatEvent {
+        let space_address = channel_address_from_string(&"test_channel".to_string())
+            .expect("failed to hash string");
+
+        ChatEvent::JoinSuccess{
+            channel_id: "test_channel".to_string(),
+            space_data: SpaceData {
+                agent_id: Address::from("test_agent"),
+                request_id: "".to_string(),
+                space_address,
+            }
+        }
+    }
+
+    fn part_event() -> ChatEvent {
+        ChatEvent::Part
+    }
+
+    fn part_success_event() -> ChatEvent {
+        ChatEvent::PartSuccess
+    }
+
     #[test]
     fn it_should_echo() {
         let (s, r) = crossbeam_channel::unbounded();
+        let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
+            s.send(event.to_owned()).expect("send fail");
+        }));
+        chat.send(chat_event());
+        assert_eq!(chat_event(), r.recv().expect("receive fail"));
+    }
 
-        let mut chat = SimChat::new(
-            MockEngine::new,
-            Box::new(move |event| {
-                s.send(event.to_owned()).expect("send fail");
-            }),
-            Url::parse("http://test.boostrap").unwrap(),
+    /*----------  join/part ----------*/
+
+    #[test]
+    fn calling_join_space_triggers_success_message() {
+        let (s, r) = crossbeam_channel::unbounded();
+        let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
+            s.send(event.to_owned()).expect("send fail");
+        }));
+    
+        chat.send(join_event());
+        
+        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
+        assert_eq!(
+            chat_messages,
+            vec![
+                join_event(),
+                join_success_event(),
+            ],
         );
+    }
 
-        let msg = ChatEvent::SendDirectMessage {
-            to_agent: "addr".to_string(),
-            payload: "yo".to_string(),
-        };
+    #[test]
+    fn calling_part_before_join_fails() {
+        let (s, r) = crossbeam_channel::unbounded();
+        let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
+            s.send(event.to_owned()).expect("send fail");
+        }));
+    
+        chat.send(part_event());
+        
+        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
+        assert_eq!(
+            chat_messages,
+            vec![
+                part_event(),
+                receive_sys_message("No channel to leave".to_string()),
+            ],
+        );
+    }
 
-        chat.send(msg.clone());
-
-        assert_eq!(msg, r.recv().expect("receive fail"));
+    #[test]
+    fn calling_join_then_part_succeeds() {
+        let (s, r) = crossbeam_channel::unbounded();
+        let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
+            s.send(event.to_owned()).expect("send fail");
+        }));
+    
+        chat.send(join_event());
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        chat.send(part_event());
+        
+        let chat_messages = r.iter().take(5).collect::<Vec<_>>();
+        assert_eq!(
+            chat_messages,
+            vec![
+                join_event(),
+                join_success_event(),
+                receive_sys_message("Joined channel: test_channel".to_string()),
+                part_event(),
+                part_success_event(),
+            ],
+        );
     }
 
     #[test]
