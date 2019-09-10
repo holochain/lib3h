@@ -84,7 +84,7 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::TestTrace;
+    use lib3h_tracing::test_span;
 
     type FakeError = String;
 
@@ -125,7 +125,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 RrDht,
-                TestTrace,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -250,7 +249,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 GatewayTransport,
-                TestTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -261,7 +259,6 @@ mod tests {
         dht: Detach<
             GhostParentWrapper<
                 GatewayTransport,
-                TestTrace,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -315,7 +312,7 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.endpoint_self.as_mut().request(
-                TestTrace::default(),
+                test_span(""),
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
@@ -346,7 +343,7 @@ mod tests {
                     } => {
                         // let _request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
-                            TestTrace::new("test1"),
+                            test_span("test1"),
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(move |_m:&mut GatewayTransport, response| {
 
@@ -420,7 +417,7 @@ mod tests {
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .build::<(), TestTrace>();
+            .build::<()>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
@@ -447,7 +444,7 @@ mod tests {
         // here we simply watch that we got a response back as expected
         t_actor_endpoint
             .request(
-                TestTrace::new("42"),
+                test_span("42"),
                 RequestToChild::Bind {
                     spec: "address_to_bind_to".to_string(),
                 },
@@ -463,7 +460,7 @@ mod tests {
 
         t_actor_endpoint
             .request(
-                TestTrace::new("42"),
+                test_span("42"),
                 RequestToChild::SendMessage {
                     address: "agent_id_1".to_string(),
                     payload: b"some content".to_vec(),

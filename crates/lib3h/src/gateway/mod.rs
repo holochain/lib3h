@@ -8,7 +8,7 @@ use crate::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
-use lib3h_tracing::Lib3hTrace;
+
 use std::collections::{HashMap, VecDeque};
 use url::Url;
 /// describes a super construct of a Transport and a Dht allowing
@@ -19,7 +19,7 @@ pub trait Gateway: Transport {
     fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
 
     fn process_dht(&mut self) -> GhostResult<()>;
-    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>;
+    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData>;
 
     /// temp HACK. Waiting for gateway actor
     fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol>;
@@ -47,7 +47,7 @@ pub struct P2pGateway<'gateway> {
     transport_inbox: VecDeque<TransportCommand>,
     transport_inject_events: Vec<TransportEvent>,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>,
+    inner_dht: ChildDhtWrapperDyn<GatewayUserData>,
     // Cache
     this_peer: PeerData,
     // user data for ghost callback

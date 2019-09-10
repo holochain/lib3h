@@ -2,7 +2,7 @@ use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, Address};
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 use url::Url;
 
@@ -16,12 +16,12 @@ pub struct TransportMultiplex {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>,
+    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex>>,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<TransportMultiplex, Lib3hTrace>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<TransportMultiplex>>,
     // our map of endpoints connecting us to our Routes
     route_endpoints:
-        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
+        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex>>>,
 }
 
 impl TransportMultiplex {
@@ -102,10 +102,13 @@ impl TransportMultiplex {
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {
-                ep.publish(RequestToParent::ReceivedData {
-                    address: path,
-                    payload: unpacked_payload,
-                })?;
+                ep.publish(
+                    Lib3hSpan::todo(),
+                    RequestToParent::ReceivedData {
+                        address: path,
+                        payload: unpacked_payload,
+                    },
+                )?;
             }
         }
         Ok(())
@@ -135,16 +138,20 @@ impl TransportMultiplex {
     /// private handler for inner transport IncomingConnection events
     fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
         // forward
-        self.endpoint_self
-            .publish(RequestToParent::IncomingConnection { address })?;
+        self.endpoint_self.publish(
+            Lib3hSpan::todo(),
+            RequestToParent::IncomingConnection { address },
+        )?;
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
     fn handle_received_data(&mut self, address: Url, payload: Opaque) -> TransportResult<()> {
         // forward
-        self.endpoint_self
-            .publish(RequestToParent::ReceivedData { address, payload })?;
+        self.endpoint_self.publish(
+            Lib3hSpan::todo(),
+            RequestToParent::ReceivedData { address, payload },
+        )?;
         Ok(())
     }
 
@@ -152,7 +159,7 @@ impl TransportMultiplex {
     fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::TransportError { error })?;
+            .publish(Lib3hSpan::todo(), RequestToParent::TransportError { error })?;
         Ok(())
     }
 
@@ -182,7 +189,7 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             RequestToChild::Bind { spec },
             Box::new(|_, response| {
                 let response = {
@@ -210,7 +217,7 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, response| {
                 let response = {
@@ -255,7 +262,7 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             RequestToChild::Bind { spec },
             Box::new(|_, response| {
                 let response = {
@@ -283,7 +290,7 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, response| {
                 let response = {

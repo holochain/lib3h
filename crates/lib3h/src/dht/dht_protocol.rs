@@ -19,9 +19,8 @@ pub type DhtActor = dyn GhostActor<
     DhtRequestToChildResponse,
     Lib3hError,
 >;
-pub type DhtEndpointWithContext<UserData, TraceContext> = GhostContextEndpoint<
+pub type DhtEndpointWithContext<UserData> = GhostContextEndpoint<
     UserData,
-    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -35,9 +34,8 @@ pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToParentResponse,
     Lib3hError,
 >;
-pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
+pub type ChildDhtWrapperDyn<UserData> = GhostParentWrapperDyn<
     UserData,
-    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,

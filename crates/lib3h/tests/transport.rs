@@ -160,7 +160,6 @@ struct TestTransport {
     endpoint_self: Detach<
         GhostContextEndpoint<
             TestTransport,
-            TestTrace,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -265,20 +264,27 @@ impl TestTransport {
             for e in events {
                 match e {
                     MockernetEvent::Message { from, payload } => {
-                        self.endpoint_self.publish(RequestToParent::ReceivedData {
-                            address: from,
-                            payload,
-                        })?;
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            RequestToParent::ReceivedData {
+                                address: from,
+                                payload,
+                            },
+                        )?;
                     }
                     MockernetEvent::Connection { from } => {
-                        self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection { address: from })?;
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            RequestToParent::IncomingConnection { address: from },
+                        )?;
                     }
                     MockernetEvent::Error(err) => {
-                        self.endpoint_self
-                            .publish(RequestToParent::TransportError {
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            RequestToParent::TransportError {
                                 error: TransportError::new(err),
-                            })?;
+                            },
+                        )?;
                     }
                 }
             }
@@ -303,13 +309,13 @@ fn ghost_transport() {
     // create an object that can be used to hold state data in callbacks to the transports
     let mut owner = TestTransportOwner::new();
 
-    let mut t1: TransportActorParentWrapper<TestTransportOwner, TestTrace, TestTransport> =
+    let mut t1: TransportActorParentWrapper<TestTransportOwner, TestTransport> =
         GhostParentWrapper::new(
             TestTransport::new("t1"),
             "t1_requests", // prefix for request ids in the tracker
         );
     assert_eq!(t1.as_ref().name, "t1");
-    let mut t2: TransportActorParentWrapper<TestTransportOwner, TestTrace, TestTransport> =
+    let mut t2: TransportActorParentWrapper<TestTransportOwner, TestTransport> =
         GhostParentWrapper::new(
             TestTransport::new("t2"),
             "t2_requests", // prefix for request ids in the tracker
@@ -318,7 +324,7 @@ fn ghost_transport() {
 
     // bind t1 to the network
     t1.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t1").expect("can parse url"),
         },
@@ -338,7 +344,7 @@ fn ghost_transport() {
     // lets do some things to test out returning of error messages, i.e. sending messages
     // to someone not bount to the network
     t1.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
             payload: "won't be received!".into(),
@@ -359,7 +365,7 @@ fn ghost_transport() {
 
     // bind t2 to the network
     t2.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t2").expect("can parse url"),
         },
@@ -377,7 +383,7 @@ fn ghost_transport() {
     );
 
     t1.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::SendMessage {
             address: Url::parse("mocknet://t2").expect("can parse url"),
             payload: "foo".into(),

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::transport::memory_mock::transport_memory::TransportMemory;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
@@ -334,15 +334,15 @@ impl<'engine> RealEngine<'engine> {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
                         if is_data_for_author_list {
-                            let _ = space_gateway
-                                .as_mut()
-                                .as_dht_mut()
-                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
+                            let _ = space_gateway.as_mut().as_dht_mut().publish(
+                                Lib3hSpan::todo(),
+                                DhtRequestToChild::BroadcastEntry(msg.entry),
+                            );
                         } else {
-                            let _ = space_gateway
-                                .as_mut()
-                                .as_dht_mut()
-                                .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
+                            let _ = space_gateway.as_mut().as_dht_mut().publish(
+                                Lib3hSpan::todo(),
+                                DhtRequestToChild::HoldEntryAspectAddress(msg.entry),
+                            );
                         }
                     }
                 }
@@ -373,10 +373,10 @@ impl<'engine> RealEngine<'engine> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let _ = space_gateway
-                            .as_mut()
-                            .as_dht_mut()
-                            .publish(DhtRequestToChild::BroadcastEntry(msg.entry));
+                        let _ = space_gateway.as_mut().as_dht_mut().publish(
+                            Lib3hSpan::todo(),
+                            DhtRequestToChild::BroadcastEntry(msg.entry),
+                        );
                     }
                 }
             }
@@ -391,10 +391,10 @@ impl<'engine> RealEngine<'engine> {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let _ = space_gateway
-                            .as_mut()
-                            .as_dht_mut()
-                            .publish(DhtRequestToChild::HoldEntryAspectAddress(msg.entry));
+                        let _ = space_gateway.as_mut().as_dht_mut().publish(
+                            Lib3hSpan::todo(),
+                            DhtRequestToChild::HoldEntryAspectAddress(msg.entry),
+                        );
                     }
                 }
             }
@@ -479,7 +479,7 @@ impl<'engine> RealEngine<'engine> {
             let msg = msg.clone();
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
                 Box::new(move |ud, response| {
                     let response = {

@@ -6,7 +6,7 @@ use detach::prelude::*;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 use url::Url;
 
@@ -19,14 +19,13 @@ pub struct TransportEncoding {
     // the machine_id or agent_id of this encoding instance
     this_id: String,
     // the keystore to use for getting signatures for `this_id`
-    keystore: Detach<KeystoreActorParentWrapperDyn<Lib3hTrace>>,
+    keystore: Detach<KeystoreActorParentWrapperDyn>,
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
             Self,
-            Lib3hTrace,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -35,7 +34,7 @@ pub struct TransportEncoding {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding, Lib3hTrace>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes
@@ -115,10 +114,13 @@ impl TransportEncoding {
 
     /// private send a handshake to a remote address
     fn send_handshake(&mut self, address: &Url) -> GhostResult<()> {
-        self.inner_transport.publish(RequestToChild::SendMessage {
-            address: address.clone(),
-            payload: self.this_id.clone().into(),
-        })
+        self.inner_transport.publish(
+            Lib3hSpan::todo(),
+            RequestToChild::SendMessage {
+                address: address.clone(),
+                payload: self.this_id.clone().into(),
+            },
+        )
     }
 
     /// private handler for inner transport IncomingConnection events
@@ -126,10 +128,12 @@ impl TransportEncoding {
         match self.connections_no_id_to_id.get(&address) {
             Some(remote_addr) => {
                 // if we've already seen this connection, just forward it?
-                self.endpoint_self
-                    .publish(RequestToParent::IncomingConnection {
+                self.endpoint_self.publish(
+                    Lib3hSpan::todo(),
+                    RequestToParent::IncomingConnection {
                         address: remote_addr.clone(),
-                    })?;
+                    },
+                )?;
             }
             None => {
                 // we've never seen this connection, handshake before
@@ -147,10 +151,13 @@ impl TransportEncoding {
         match self.connections_no_id_to_id.get(&address) {
             Some(remote_addr) => {
                 // if we've seen this connection before, just forward it
-                self.endpoint_self.publish(RequestToParent::ReceivedData {
-                    address: remote_addr.clone(),
-                    payload,
-                })?;
+                self.endpoint_self.publish(
+                    Lib3hSpan::todo(),
+                    RequestToParent::ReceivedData {
+                        address: remote_addr.clone(),
+                        payload,
+                    },
+                )?;
             }
             None => {
                 // never seen this connection before
@@ -172,18 +179,23 @@ impl TransportEncoding {
                         .insert(remote_url.clone(), address.clone());
 
                     // forward an IncomingConnection event to our parent
-                    self.endpoint_self
-                        .publish(RequestToParent::IncomingConnection {
+                    self.endpoint_self.publish(
+                        Lib3hSpan::todo(),
+                        RequestToParent::IncomingConnection {
                             address: remote_url.clone(),
-                        })?;
+                        },
+                    )?;
 
                     // if we have any pending received data, send it up
                     if let Some(items) = self.pending_received_data.remove(&address) {
                         for payload in items {
-                            self.endpoint_self.publish(RequestToParent::ReceivedData {
-                                address: remote_url.clone(),
-                                payload,
-                            })?;
+                            self.endpoint_self.publish(
+                                Lib3hSpan::todo(),
+                                RequestToParent::ReceivedData {
+                                    address: remote_url.clone(),
+                                    payload,
+                                },
+                            )?;
                         }
                     }
 
@@ -214,7 +226,7 @@ impl TransportEncoding {
     fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
         // just forward this
         self.endpoint_self
-            .publish(RequestToParent::TransportError { error })?;
+            .publish(Lib3hSpan::todo(), RequestToParent::TransportError { error })?;
         Ok(())
     }
 
@@ -248,7 +260,7 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             RequestToChild::Bind { spec },
             Box::new(|m: &mut TransportEncoding, response| {
                 let response = {
@@ -287,7 +299,7 @@ impl TransportEncoding {
         payload: Opaque,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             RequestToChild::SendMessage { address, payload },
             Box::new(|_: &mut TransportEncoding, response| {
                 let response = {
@@ -372,7 +384,7 @@ impl
 mod tests {
     use super::*;
     use lib3h_sodium::SodiumCryptoSystem;
-    use lib3h_tracing::TestTrace;
+    use lib3h_tracing::test_span;
 
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
     const ID_2: &'static str = "HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r";
@@ -382,7 +394,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 TransportMock,
-                Lib3hTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -453,12 +464,16 @@ mod tests {
                     Ok((address, payload)) => {
                         // bit of a hack, just always send an incoming connection
                         // in front of all received data messages
-                        self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection {
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            RequestToParent::IncomingConnection {
                                 address: address.clone(),
-                            })?;
-                        self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload })?;
+                            },
+                        )?;
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            RequestToParent::ReceivedData { address, payload },
+                        )?;
                     }
                     Err(_) => break,
                 }
@@ -485,20 +500,19 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<bool, TestTrace, TransportEncoding> =
-            GhostParentWrapper::new(
-                TransportEncoding::new(
-                    crypto.box_clone(),
-                    ID_1.to_string(),
-                    Box::new(KeystoreStub::new()),
-                    Box::new(TransportMock::new(s1out, r1in)),
-                ),
-                "test1",
-            );
+        let mut t1: TransportActorParentWrapper<bool, TransportEncoding> = GhostParentWrapper::new(
+            TransportEncoding::new(
+                crypto.box_clone(),
+                ID_1.to_string(),
+                Box::new(KeystoreStub::new()),
+                Box::new(TransportMock::new(s1out, r1in)),
+            ),
+            "test1",
+        );
 
         // give it a bind point
         t1.request(
-            TestTrace("".into()),
+            test_span(""),
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
@@ -519,20 +533,19 @@ mod tests {
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<(), TestTrace, TransportEncoding> =
-            GhostParentWrapper::new(
-                TransportEncoding::new(
-                    crypto.box_clone(),
-                    ID_2.to_string(),
-                    Box::new(KeystoreStub::new()),
-                    Box::new(TransportMock::new(s2out, r2in)),
-                ),
-                "test2",
-            );
+        let mut t2: TransportActorParentWrapper<(), TransportEncoding> = GhostParentWrapper::new(
+            TransportEncoding::new(
+                crypto.box_clone(),
+                ID_2.to_string(),
+                Box::new(KeystoreStub::new()),
+                Box::new(TransportMock::new(s2out, r2in)),
+            ),
+            "test2",
+        );
 
         // give it a bind point
         t2.request(
-            TestTrace("".into()),
+            test_span(""),
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
             },
@@ -552,7 +565,7 @@ mod tests {
 
         // now we're going to send a message to our sibling #2
         t1.request(
-            TestTrace("".into()),
+            test_span(""),
             RequestToChild::SendMessage {
                 address: addr2full.clone(),
                 payload: "hello".into(),

@@ -10,6 +10,7 @@ use crate::{
 };
 
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
+use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -248,7 +249,7 @@ impl<'engine> RealEngine<'engine> {
                         .network_gateway
                         .as_mut()
                         .as_dht_mut()
-                        .publish(DhtRequestToChild::HandleGossip(gossip));
+                        .publish(Lib3hSpan::todo(), DhtRequestToChild::HandleGossip(gossip));
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
@@ -258,7 +259,7 @@ impl<'engine> RealEngine<'engine> {
                         let _ = space_gateway
                             .as_mut()
                             .as_dht_mut()
-                            .publish(DhtRequestToChild::HandleGossip(gossip));
+                            .publish(Lib3hSpan::todo(), DhtRequestToChild::HandleGossip(gossip));
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }

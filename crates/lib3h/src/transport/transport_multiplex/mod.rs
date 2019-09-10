@@ -28,7 +28,7 @@ mod tests {
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::data_types::Opaque;
-    use lib3h_tracing::Lib3hTrace;
+    use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
     pub struct TransportMock {
@@ -36,7 +36,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 TransportMock,
-                Lib3hTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -105,8 +104,10 @@ mod tests {
             loop {
                 match self.mock_receiver.try_recv() {
                     Ok((address, payload)) => {
-                        self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload })?;
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            RequestToParent::ReceivedData { address, payload },
+                        )?;
                     }
                     Err(_) => break,
                 }
@@ -122,7 +123,7 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: TransportActorParentWrapper<(), Lib3hTrace, TransportMultiplex> =
+        let mut mplex: TransportActorParentWrapper<(), TransportMultiplex> =
             GhostParentWrapper::new(
                 TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
                 "test_mplex_",
@@ -132,18 +133,18 @@ mod tests {
             .as_mut()
             .create_agent_space_route(&"space_a".into(), &"agent_a".into())
             .as_context_endpoint_builder()
-            .build::<(), Lib3hTrace>();
+            .build::<()>();
 
         let mut route_b = mplex
             .as_mut()
             .create_agent_space_route(&"space_b".into(), &"agent_b".into())
             .as_context_endpoint_builder()
-            .build::<(), Lib3hTrace>();
+            .build::<()>();
 
         // send a message from route A
         route_a
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::SendMessage {
                     address: addr_none.clone(),
                     payload: "hello-from-a".into(),
