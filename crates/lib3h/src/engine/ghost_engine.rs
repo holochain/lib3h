@@ -19,18 +19,6 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
 
-/// the context when making a request from core
-/// this is always the request_id
-pub struct ClientRequestContext(String);
-impl ClientRequestContext {
-    pub fn new(id: &str) -> Self {
-        Self(id.to_string())
-    }
-    pub fn get_request_id(&self) -> String {
-        self.0.clone()
-    }
-}
-
 /// the context when making a request
 #[derive(Clone)]
 struct RequestContext {
@@ -40,9 +28,9 @@ struct RequestContext {
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
-pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
+pub type GhostEngineParentWrapper<Core, Context, Engine, EngineError> = GhostParentWrapper<
     Core,
-    ClientRequestContext,
+    Context,
     Lib3hToClient,
     Lib3hToClientResponse,
     ClientToLib3h,
@@ -382,7 +370,7 @@ impl<'engine> GhostEngine<'engine> {
             &msg.provider_agent_id.to_owned(),
         )?;
 
-       for (entry_address, aspect_address_list) in msg.address_map.clone() {
+        for (entry_address, aspect_address_list) in msg.address_map.clone() {
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
                 DhtContext::RequestAspectsOf {
@@ -452,10 +440,11 @@ impl<'engine> GhostEngine<'engine> {
                                         GhostCallbackData::Response(Ok(
                                             Lib3hToClientResponse::HandleFetchEntryResult(msg),
                                         )) => {
-                                            space_gateway
-                                                .as_mut()
-                                                .as_dht_mut()
-                                                .publish(DhtRequestToChild::BroadcastEntry(msg.entry.clone()))?;
+                                            space_gateway.as_mut().as_dht_mut().publish(
+                                                DhtRequestToChild::BroadcastEntry(
+                                                    msg.entry.clone(),
+                                                ),
+                                            )?;
                                         }
                                         GhostCallbackData::Response(Err(e)) => {
                                             error!("Got error on HandleFetchEntryResult: {:?} ", e);
@@ -468,8 +457,8 @@ impl<'engine> GhostEngine<'engine> {
                                     Ok(())
                                 }),
                             );
-/*                            ud.lib3h_outbox
-                                .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));*/
+                            /*                            ud.lib3h_outbox
+                            .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));*/
                         }
                     } else {
                         panic!("bad response to RequestAspectsOf: {:?}", response);
@@ -764,7 +753,6 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     set_b.is_subset(&set_a)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -817,7 +805,7 @@ mod tests {
             network_transport,
         )
         .unwrap();
-        let mut lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
+        let mut lib3h: GhostEngineParentWrapper<MockCore, RequestContext, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_engine");
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
 
