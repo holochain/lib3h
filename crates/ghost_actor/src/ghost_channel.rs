@@ -2,10 +2,11 @@ use crate::{
     GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
     RequestId,
 };
+use lib3h_tracing::CanTrace;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
@@ -15,6 +16,23 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
         request_id: RequestId,
         payload: Result<Response, Error>,
     },
+}
+
+/// A GhostMessage with only the data, i.e. minus the Sender
+/// This is so that it is more easily cloneable
+#[derive(Debug, Clone)]
+pub struct GhostMessageData<T: 'static + Clone> {
+    pub request_id: Option<RequestId>,
+    pub message: Option<T>,
+}
+
+impl<T: 'static + Clone> GhostMessageData<T> {
+    pub fn with_message<A, B, C>(msg: &GhostMessage<T, A, B, C>) -> Self {
+        GhostMessageData {
+            request_id: msg.request_id.clone(),
+            message: msg.message.clone(),
+        }
+    }
 }
 
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
@@ -160,7 +178,7 @@ impl<
     }
 
     /// expand a raw endpoint into something usable.
-    /// <Context> let's you store data with individual `request` calls
+    /// <TraceContext> let's you store data with individual `request` calls
     /// that will be available again when the callback is invoked.
     /// Feel free to use `as_context_endpoint_builder::<()>("prefix")` if you
     /// don't need any context.
@@ -214,11 +232,11 @@ impl<
         Error,
     >
 {
-    pub fn build<UserData, Context: 'static>(
+    pub fn build<UserData, TraceContext: 'static + CanTrace>(
         self,
     ) -> GhostContextEndpoint<
         UserData,
-        Context,
+        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -265,7 +283,7 @@ impl GhostTrackRequestOptions {
 /// indicates this type is able to make callback requests && respond to requests
 pub trait GhostCanTrack<
     UserData,
-    Context: 'static,
+    TraceContext: 'static + CanTrace,
     RequestToOther: 'static,
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
@@ -280,18 +298,18 @@ pub trait GhostCanTrack<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        context: Context,
+        trace_context: TraceContext,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        context: Context,
+        trace_context: TraceContext,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()>;
 
@@ -308,7 +326,7 @@ pub trait GhostCanTrack<
 /// see `GhostEndpoint::as_context_endpoint_builder` for additional details
 pub struct GhostContextEndpoint<
     UserData,
-    Context: 'static,
+    TraceContext: 'static + CanTrace,
     RequestToOther: 'static,
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
@@ -321,14 +339,14 @@ pub struct GhostContextEndpoint<
     receiver: crossbeam_channel::Receiver<
         GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
-    pending_responses_tracker: GhostTracker<UserData, Context, RequestToOtherResponse, Error>,
+    pending_responses_tracker: GhostTracker<UserData, TraceContext, RequestToOtherResponse, Error>,
     outbox_messages_to_self:
         Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>,
 }
 
 impl<
         UserData,
-        Context: 'static,
+        TraceContext: 'static + CanTrace,
         RequestToOther: 'static,
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
@@ -337,7 +355,7 @@ impl<
     >
     GhostContextEndpoint<
         UserData,
-        Context,
+        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -347,19 +365,21 @@ impl<
 {
     fn priv_request(
         &mut self,
-        context: Context,
+        trace_context: TraceContext,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
+        trace!("GhostChannel::priv_request");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(context, cb),
+            None => self.pending_responses_tracker.bookmark(trace_context, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                context,
+                trace_context,
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
+        trace!("ghost_channel: send request (id={:?})", request_id);
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
@@ -370,7 +390,7 @@ impl<
 
 impl<
         UserData,
-        Context: 'static,
+        TraceContext: 'static + CanTrace,
         RequestToOther: 'static,
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
@@ -379,7 +399,7 @@ impl<
     >
     GhostCanTrack<
         UserData,
-        Context,
+        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -388,7 +408,7 @@ impl<
     >
     for GhostContextEndpoint<
         UserData,
-        Context,
+        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -409,23 +429,29 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        context: Context,
+        trace_context: TraceContext,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
-        self.priv_request(context, payload, cb, GhostTrackRequestOptions::default())
+        trace!("GhostChannel::request");
+        self.priv_request(
+            trace_context,
+            payload,
+            cb,
+            GhostTrackRequestOptions::default(),
+        )
     }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        context: Context,
+        trace_context: TraceContext,
         payload: RequestToOther,
-        cb: GhostCallback<UserData, Context, RequestToOtherResponse, Error>,
+        cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        self.priv_request(context, payload, cb, options)
+        self.priv_request(trace_context, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -518,6 +544,8 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lib3h_tracing::TestTrace;
+    type TestError = String;
 
     #[derive(Debug)]
     struct TestMsgOut(String);
@@ -527,9 +555,6 @@ mod tests {
     struct TestMsgIn(String);
     #[derive(Debug)]
     struct TestMsgInResponse(String);
-    type TestError = String;
-    #[derive(Debug)]
-    struct TestContext(String);
 
     #[test]
     fn test_ghost_channel_message_event() {
@@ -598,8 +623,8 @@ mod tests {
         // this genrates a callback for requests that simply puts the callbackdata  into
         // the FakeActor's state String, thus for testing we can just look in the actors's
         // state to see if the callback was run.
-        fn cb_factory() -> GhostCallback<FakeActor, TestContext, TestMsgOutResponse, TestError> {
-            Box::new(|me, _context, callback_data| {
+        fn cb_factory() -> GhostCallback<FakeActor, TestMsgOutResponse, TestError> {
+            Box::new(|me, callback_data| {
                 me.0 = format!("{:?}", callback_data);
                 Ok(())
             })
@@ -640,7 +665,7 @@ mod tests {
 
         endpoint
             .request(
-                TestContext("context data".into()),
+                TestTrace("context data".into()),
                 TestMsgOut("request to my parent".into()),
                 cb_factory(),
             )
@@ -681,7 +706,7 @@ mod tests {
         // Now we'll send a request that should timeout
         endpoint
             .request_options(
-                TestContext("context data".into()),
+                TestTrace("context data".into()),
                 TestMsgOut("another request to my parent".into()),
                 cb_factory(),
                 GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),

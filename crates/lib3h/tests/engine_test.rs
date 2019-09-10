@@ -23,10 +23,7 @@ use lib3h_sodium::SodiumCryptoSystem;
 use url::Url;
 use utils::{
     constants::*,
-    processor_harness::{
-        is_connected, DidWorkAssert, Lib3hServerProtocolAssert, Lib3hServerProtocolEquals,
-        Processor,
-    },
+    processor_harness::{Lib3hServerProtocolAssert, Lib3hServerProtocolEquals, Processor},
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -64,11 +61,15 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock(name: &str) -> RealEngine {
+fn basic_setup_mock_bootstrap<'a>(name: &str, bs: Option<Vec<Url>>) -> RealEngine<'a> {
+    let bootstrap_nodes = match bs {
+        Some(s) => s,
+        None => vec![],
+    };
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
-        bootstrap_nodes: vec![],
+        bootstrap_nodes,
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
@@ -89,6 +90,10 @@ fn basic_setup_mock(name: &str) -> RealEngine {
         name, p2p_binding
     );
     engine
+}
+
+fn basic_setup_mock<'a>(name: &str) -> RealEngine<'a> {
+    basic_setup_mock_bootstrap(name, None)
 }
 
 fn basic_setup_wss<'a>() -> RealEngine<'a> {
@@ -149,7 +154,7 @@ fn basic_connect_test_mock() {
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
     // Send Connect Command
-    let request_id: String = "connect_a_1".into();
+    let request_id: String = "".into();
     let connect_msg = ConnectData {
         request_id: request_id.clone(),
         peer_uri: url_b.clone(),
@@ -160,10 +165,26 @@ fn basic_connect_test_mock() {
         .unwrap();
     println!("\nengine_a.process()...");
 
-    // TODO should not be blank request id!
-    let is_connected = Box::new(is_connected("", engine_a.advertise()));
+    wait_connect!(engine_a, connect_msg, engine_b);
+}
 
-    assert_one_processed!(engine_a, engine_b, is_connected);
+#[test]
+fn basic_connect_bootstrap_test_mock() {
+    enable_logging_for_test(true);
+    // Setup
+    let engine_b = basic_setup_mock("basic_connect_bootstrap_test_node_b");
+    // Get URL
+    let url_b = engine_b.advertise();
+    println!("url_b: {}", url_b);
+
+    // Create a with b as a bootstrap
+    let mut engine_a =
+        basic_setup_mock_bootstrap("basic_connect_bootstrap_test_node_a", Some(vec![url_b]));
+
+    println!("\nengine_a.process()...");
+    let (did_work, srv_msg_list) = engine_a.process().unwrap();
+    println!("engine_a: {:?}", srv_msg_list);
+    assert!(did_work);
 }
 
 #[test]
@@ -287,22 +308,16 @@ fn setup_only(_alex: &mut Box<dyn NetworkEngine>, _billy: &mut Box<dyn NetworkEn
 fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
     // Connect Alex to Billy
     let req_connect = ConnectData {
-        request_id: "connect".to_string(),
+        // TODO Should be able to specify a non blank string
+        request_id: "".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
-    let alex_engine_name = alex.name();
-    let billy_engine_name = billy.name();
 
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
-    // TODO fix bug in request id tracking
-    let request_id = "";
-    //    req_connect.clone().request_id.as_str(),
 
-    let is_connected = Box::new(is_connected(request_id, req_connect.clone().peer_uri));
-
-    assert_one_processed!(alex, billy, is_connected);
+    wait_connect!(alex, req_connect, billy);
 
     // Alex joins space A
     println!("\n Alex joins space \n");
@@ -322,12 +337,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 
     // TODO check for join space response messages.
 
-    let processors /*: Vec<Box<dyn Processor>> = */ = vec![
-        Box::new(DidWorkAssert(alex_engine_name)),
-        Box::new(DidWorkAssert(billy_engine_name)),
-    ];
-
-    assert_processed!(alex, billy, processors);
+    wait_did_work!(alex, billy);
     wait_until_no_work!(alex, billy);
 
     println!("DONE basic_two_setup DONE \n\n\n");
@@ -341,7 +351,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
         request_id: "dm_1".to_string(),
         to_agent_id: BILLY_AGENT_ID.clone(),
         from_agent_id: ALEX_AGENT_ID.clone(),
-        content: "wah".as_bytes().to_vec(),
+        content: "wah".into(),
     };
     // Send
     println!("\nAlex sends DM to Billy...\n");
@@ -366,14 +376,9 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
 
     // Post response
     let mut res_dm = req_dm.clone();
-    res_dm.to_agent_id = req_dm.clone().from_agent_id.clone();
-    res_dm.from_agent_id = req_dm.clone().to_agent_id.clone();
-    res_dm.content = format!(
-        "echo: {}",
-        String::from_utf8(req_dm.clone().content).unwrap()
-    )
-    .as_bytes()
-    .to_vec();
+    res_dm.to_agent_id = req_dm.from_agent_id.clone();
+    res_dm.from_agent_id = req_dm.to_agent_id.clone();
+    res_dm.content = format!("echo: {}", req_dm.content).as_bytes().into();
     billy
         .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
             res_dm.clone(),
@@ -423,7 +428,8 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
 
     // Connect Alex to Billy
     let req_connect = ConnectData {
-        request_id: "connect".to_string(),
+        // TODO Should be able to set a non blank request id
+        request_id: "".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
@@ -431,11 +437,7 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
     alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
         .unwrap();
 
-    let alex_bind_url = alex.advertise();
-
-    let is_connected = Box::new(is_connected("", alex_bind_url));
-
-    assert_one_processed!(alex, billy, is_connected);
+    wait_connect!(alex, req_connect, billy);
 
     println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
 

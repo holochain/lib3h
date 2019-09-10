@@ -4,6 +4,7 @@ use crate::{
     error::{Lib3hError, Lib3hResult},
     transport::TransportEncoding,
 };
+use lib3h_tracing::Lib3hTrace;
 
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
@@ -45,9 +46,9 @@ pub type KeystoreActorParentEndpoint = GhostEndpoint<
     Lib3hError,
 >;
 
-pub type KeystoreActorParentWrapperDyn<Context> = GhostParentWrapperDyn<
+pub type KeystoreActorParentWrapperDyn<TraceContext> = GhostParentWrapperDyn<
     TransportEncoding,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -65,7 +66,7 @@ type KeystoreParentEndpoint = GhostEndpoint<
 
 type KeystoreSelfEndpoint = GhostContextEndpoint<
     KeystoreStub,
-    (),
+    Lib3hTrace,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
