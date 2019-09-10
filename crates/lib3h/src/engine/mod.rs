@@ -1,3 +1,5 @@
+pub mod ghost_engine;
+pub mod ghost_engine_wrapper;
 mod network_layer;
 pub mod p2p_protocol;
 pub mod real_engine;
