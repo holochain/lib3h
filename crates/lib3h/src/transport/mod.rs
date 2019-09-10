@@ -186,7 +186,7 @@ pub mod tests {
             _ => panic!("Received wrong TransportEvent type"),
         };
         assert!(node_A.get_uri(recv_id.as_str()).is_some());
-//        assert!(node_B.get_uri(idBA.as_str()).is_some());
+        //        assert!(node_B.get_uri(idBA.as_str()).is_some());
 
         assert_eq!(payload, recv_payload.as_slice());
     }

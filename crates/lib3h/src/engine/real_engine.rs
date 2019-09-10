@@ -579,23 +579,6 @@ impl<'engine> RealEngine<'engine> {
         );
         match maybe_space {
             Err(res) => outbox.push(res),
-            /*<<<<<<< HEAD
-                        Ok(space_gateway) => {
-                            for (entry_address, aspect_address_list) in msg.address_map {
-                                let mut aspect_list = Vec::new();
-                                for aspect_address in aspect_address_list {
-                                    let fake_aspect = EntryAspectData {
-                                        aspect_address: aspect_address.clone(),
-                                        type_hint: String::new(),
-                                        aspect: vec![].into(),
-                                        publish_ts: 0,
-                                    };
-                                    aspect_list.push(fake_aspect);
-                                }
-                                // Create "fake" entry, in the sense an entry with no actual content,
-                                // but valid addresses.
-                                let fake_entry = EntryData {
-            ======= */
             Ok(_space_gateway) => {
                 for (entry_address, _aspect_address_list) in msg.address_map {
                     // #fullsync hack
