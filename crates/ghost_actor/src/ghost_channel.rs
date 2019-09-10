@@ -2,19 +2,21 @@ use crate::{
     GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
     RequestId,
 };
-use lib3h_tracing::CanTrace;
+use lib3h_tracing::{CanTrace, Lib3hTrace};
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
+        // span: Lib3hTrace,
     },
     Response {
         request_id: RequestId,
         payload: Result<Response, Error>,
+        // span: Lib3hTrace,
     },
 }
 
@@ -275,7 +277,7 @@ pub trait GhostCanTrack<
 >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, payload: RequestToOther) -> GhostResult<()>;
+    fn publish(&mut self, mut span: TraceContext, payload: RequestToOther) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
@@ -348,16 +350,16 @@ impl<
 {
     fn priv_request(
         &mut self,
-        trace_context: TraceContext,
+        span: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        trace!("GhostChannel::priv_request");
+        let child = span.child_span("bookmark");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(trace_context, cb),
+            None => self.pending_responses_tracker.bookmark(child, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                trace_context,
+                child,
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
@@ -366,6 +368,7 @@ impl<
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
+            // span: span.child("request", |o| o.start()).into(),
         })?;
         Ok(())
     }
@@ -400,7 +403,8 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, payload: RequestToOther) -> GhostResult<()> {
+    fn publish(&mut self, mut span: TraceContext, payload: RequestToOther) -> GhostResult<()> {
+        span.event("GhostChannel::publish");
         self.sender.send(GhostEndpointMessage::Request {
             request_id: None,
             payload,
@@ -412,29 +416,25 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        trace_context: TraceContext,
+        mut span: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
-        trace!("GhostChannel::request");
-        self.priv_request(
-            trace_context,
-            payload,
-            cb,
-            GhostTrackRequestOptions::default(),
-        )
+        span.event("GhostChannel::request");
+        self.priv_request(span, payload, cb, GhostTrackRequestOptions::default())
     }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        trace_context: TraceContext,
+        mut span: TraceContext,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        self.priv_request(trace_context, payload, cb, options)
+        span.event("GhostChannel::request_options");
+        self.priv_request(span, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side

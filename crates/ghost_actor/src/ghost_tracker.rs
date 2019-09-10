@@ -219,7 +219,7 @@ mod tests {
         let req_id = actor.tracker.bookmark(trace_context, cb);
 
         let entry = actor.tracker.pending.get(&req_id).unwrap();
-        assert_eq!(entry._trace_context.0, "some_context_data");
+        assert_eq!(entry._trace_context.name, "some_context_data");
 
         // the state should be empty from the new
         assert_eq!(actor.state, "");
