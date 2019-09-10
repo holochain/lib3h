@@ -44,7 +44,7 @@ impl From<&String> for Opaque {
 
 impl From<&str> for Opaque {
     fn from(str: &str) -> Self {
-        str.clone().as_bytes().into()
+        str.as_bytes().into()
     }
 }
 
