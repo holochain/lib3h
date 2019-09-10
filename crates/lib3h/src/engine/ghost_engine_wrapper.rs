@@ -52,7 +52,7 @@ fn server_failure(err: String, context: ClientRequestContext) -> Lib3hServerProt
         request_id: context.get_request_id(),
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: err.as_bytes().to_vec(),
+        result_info: err.as_bytes().into(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
@@ -62,7 +62,7 @@ fn server_success(context: ClientRequestContext) -> Lib3hServerProtocol {
         request_id: context.get_request_id(),
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: Vec::new(),
+        result_info: vec![].into()
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
