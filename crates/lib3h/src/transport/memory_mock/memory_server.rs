@@ -13,10 +13,8 @@ use url::Url;
 // Memory Server MAP
 //--------------------------------------------------------------------------------------------------
 
-pub type ServerInst = std::sync::Arc<Mutex<MemoryServer>>;
-
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<Url, std::sync::Weak<Mutex<MemoryServer>>>;
+type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
@@ -33,46 +31,28 @@ pub fn new_url() -> Url {
 }
 
 /// Add new MemoryServer to the global server map
-pub fn ensure_server(uri: &Url) -> TransportResult<ServerInst> {
-    trace!("MemoryServer::ensure_server: {}", uri);
+pub fn set_server(uri: &Url) -> TransportResult<()> {
+    debug!("MemoryServer::set_server: {}", uri);
+    // Create server with that name if it doesn't already exist
     let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-
-    // make sure we keep a STRONG reference around for the first one,
-    // or it'll get cleaned up before we even send it out.
-    let mut out = None;
-
-    let tmp = server_map.entry(uri.clone()).or_insert_with(|| {
-        let s = std::sync::Arc::new(Mutex::new(MemoryServer::new(uri)));
-        let r = std::sync::Arc::downgrade(&s);
-        out = Some(s);
-        r
-    });
-
-    Ok(match out {
-        Some(s) => s,
-        None => std::sync::Weak::upgrade(tmp).unwrap(),
-    })
+    if server_map.contains_key(uri) {
+        return Ok(());
+    }
+    let server = MemoryServer::new(uri);
+    server_map.insert(uri.clone(), Mutex::new(server));
+    Ok(())
 }
 
-pub struct ServerRef(std::sync::Arc<Mutex<MemoryServer>>);
-impl ServerRef {
-    pub fn get(&self) -> std::sync::MutexGuard<'_, MemoryServer> {
-        trace!("(MemoryServer) server_ref.get()");
-        self.0.lock().expect("can read MemoryServer")
+/// Remove a MemoryServer from the global server map
+pub fn unset_server(uri: &Url) -> TransportResult<()> {
+    debug!("MemoryServer::unset_server: {}", uri);
+    // Create server with that name if it doesn't already exist
+    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
+    if !server_map.contains_key(uri) {
+        return Err(TransportError::new("Server doesn't exist".to_string()));
     }
-}
-
-pub fn read_ref(uri: &Url) -> TransportResult<ServerRef> {
-    trace!("read_server_map: {:?}", uri);
-    let server_map = MEMORY_SERVER_MAP.read().expect("map exists");
-    trace!("read_ref: {:?}", uri);
-    let maybe_server = server_map.get(uri);
-    if maybe_server.is_none() {
-        return Err(TransportError::new(format!("No Memory server at {}", uri)));
-    }
-    Ok(ServerRef(
-        std::sync::Weak::upgrade(maybe_server.unwrap()).expect("server still exists"),
-    ))
+    server_map.remove(uri);
+    Ok(())
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -93,13 +73,7 @@ pub struct MemoryServer {
 
 impl Drop for MemoryServer {
     fn drop(&mut self) {
-        println!("(MemoryServer) dropped: {:?}", self.this_uri);
-        let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-        if !server_map.contains_key(&self.this_uri) {
-            panic!("Server doesn't exist");
-        }
-
-        server_map.remove(&self.this_uri);
+        trace!("(MemoryServer) dropped: {:?}", self.this_uri);
     }
 }
 
@@ -185,14 +159,14 @@ impl MemoryServer {
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connection inbox
-        for (in_uri, is_new) in self.connection_inbox.drain(..) {
+        for (in_uri, is_new) in self.connection_inbox.iter() {
             trace!(
                 "(MemoryServer {}). connection_inbox: {} | {}",
                 self.this_uri,
                 in_uri,
                 is_new,
             );
-            let event = if is_new {
+            let event = if *is_new {
                 TransportEvent::IncomingConnectionEstablished(in_uri.to_string())
             } else {
                 TransportEvent::ConnectionClosed(in_uri.to_string())
@@ -201,7 +175,7 @@ impl MemoryServer {
             outbox.push(event);
             did_work = true;
         }
-        trace!("(MemoryServer) process inbox map");
+        self.connection_inbox.clear();
         // Process msg inboxes
         for (uri, inbox) in self.inbox_map.iter_mut() {
             loop {
@@ -220,11 +194,6 @@ impl MemoryServer {
                 outbox.push(evt);
             }
         }
-        trace!(
-            "(MemoryServer) process complete (did_work={:?}, outbox={:?})",
-            did_work,
-            outbox
-        );
         Ok((did_work, outbox))
     }
 }

@@ -6,75 +6,52 @@ use crate::transport::{
     ConnectionId, ConnectionIdRef,
 };
 use lib3h_protocol::DidWork;
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::{Arc, Mutex},
-};
+use std::collections::{HashSet, VecDeque};
 use url::Url;
+
 /// Transport for mocking network layer in-memory
 /// Binding creates a MemoryServer at url that can be accessed by other nodes
 pub struct TransportMemory {
-    /// Reference to our memory servers
-    memory_servers: Vec<Arc<Mutex<memory_server::MemoryServer>>>,
     /// Commands sent to us by owner for async processing
     cmd_inbox: VecDeque<TransportCommand>,
     /// Addresses (url-ish) of all our servers
     my_servers: HashSet<Url>,
-    //    /// Mapping of connectionId -> serverUrl
-    outbound_connection_map: HashMap<ConnectionId, Url>,
-    /// Mapping of in:connectionId -> out:connectionId
-    //    inbound_connection_map: HashMap<ConnectionId, ConnectionId>,
-    /// Counter for generating new connectionIds
-    n_id: u32,
-    own_id: u32,
-    /// My peer uri on the network layer
-    maybe_my_uri: Option<Url>,
-}
-
-lazy_static! {
-    /// Counter of the number of TransportMemory that spawned
-    static ref TRANSPORT_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+    /// Addresses of connections to remotes
+    connections: HashSet<Url>,
+    /// The bound uri of my main server
+    maybe_my_bound_uri: Option<Url>,
 }
 
 impl TransportMemory {
     pub fn new() -> Self {
-        let mut tc = TRANSPORT_COUNT
-            .lock()
-            .expect("could not lock transport count mutex");
-        *tc += 1;
         TransportMemory {
-            memory_servers: vec![],
             cmd_inbox: VecDeque::new(),
             my_servers: HashSet::new(),
-            outbound_connection_map: HashMap::new(),
-            n_id: 0,
-            own_id: *tc,
-            maybe_my_uri: None,
+            connections: HashSet::new(),
+            maybe_my_bound_uri: None,
         }
     }
 
     pub fn name(&self) -> &str {
-        match &self.maybe_my_uri {
+        match &self.maybe_my_bound_uri {
             None => "",
             Some(uri) => uri.as_str(),
         }
     }
 
-    pub fn is_bound(&self, uri_as_connection_id: &ConnectionIdRef) -> bool {
-        match &self.maybe_my_uri {
+    ///
+    pub fn is_connected_to(&self, uri_as_cid: &ConnectionIdRef) -> bool {
+        match &self.maybe_my_bound_uri {
             None => false,
-            Some(uri) => {
+            Some(my_bound_uri) => {
                 let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
                 server_map
-                    .get(uri)
-                    .map(|server| {
-                        std::sync::Weak::upgrade(server)
-                            .expect("server still exists")
+                    .get(my_bound_uri)
+                    .map(|my_server| {
+                        my_server
                             .lock()
                             .unwrap()
-                            .is_connected_to(
-                                &Url::parse(uri_as_connection_id).expect("uri as connection id"),
-                            )
+                            .is_connected_to(&Url::parse(uri_as_cid).unwrap())
                     })
                     .unwrap_or(false)
             }
@@ -86,25 +63,27 @@ impl Drop for TransportMemory {
     fn drop(&mut self) {
         // Close all connections
         self.close_all().ok();
+        // Drop my servers
+        for bounded_url in &self.my_servers {
+            memory_server::unset_server(&bounded_url)
+                .expect("unset_server() during drop should never fail");
+        }
     }
 }
 /// Compose Transport
 impl Transport for TransportMemory {
     /// Get list of known connectionIds
     fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
-        Ok(self
-            .outbound_connection_map
-            .iter()
-            .map(|(id, _)| id.to_string())
-            .collect())
+        Ok(self.connections.iter().map(|uri| uri.to_string()).collect())
     }
 
     /// get uri from a connectionId
-    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-        let res = self.outbound_connection_map.get(&id.to_string());
+    fn get_uri(&self, uri_as_cid: &ConnectionIdRef) -> Option<Url> {
+        let uri = Url::parse(uri_as_cid).expect("connectionId is not a valid Url");
+        let res = self.connections.get(&uri);
         res.map(|url| url.clone()).or_else(|| {
-            if self.is_bound(id) {
-                match &self.maybe_my_uri {
+            if self.is_connected_to(uri_as_cid) {
+                match &self.maybe_my_bound_uri {
                     Some(uri) => Some(uri.clone()),
                     None => None,
                 }
@@ -116,58 +95,69 @@ impl Transport for TransportMemory {
 
     /// Connect to another node's "bind".
     /// Get server from the uri and connect to it with a new connectionId for ourself.
-    fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
+    fn connect(&mut self, remote_uri: &Url) -> TransportResult<ConnectionId> {
         // Check if already connected
-        let maybe_cid = self
-            .outbound_connection_map
-            .iter()
-            .find(|(_, cur_uri)| *cur_uri == uri);
-        if let Some((cid, _)) = maybe_cid {
-            return Ok(cid.clone());
+        let maybe_uri = self.connections.get(remote_uri);
+        if let Some(uri) = maybe_uri {
+            return Ok(uri.to_string());
         }
         // Get my uri
-        let my_uri = match &self.maybe_my_uri {
+        let my_uri = match &self.maybe_my_bound_uri {
             None => {
                 return Err(TransportError::new(
-                    "Must bind before connecting".to_string(),
+                    "Must bind before attempting to connect".to_string(),
                 ));
             }
             Some(u) => u,
         };
-        let server = memory_server::read_ref(uri)?;
-        let mut server = server.get();
-        // Generate and store a connectionId to act like other Transport types
-        self.n_id += 1;
-        let id = format!("mem_conn_{}_{}", self.own_id, self.n_id);
-        self.outbound_connection_map.insert(id.clone(), uri.clone());
+        // Get other node's server
+        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+        let maybe_remote_server = server_map.get(remote_uri);
+        if let None = maybe_remote_server {
+            return Err(TransportError::new(format!(
+                "No Memory server at this url address: {}",
+                remote_uri
+            )));
+        }
         // Connect to it
-        server.request_connect(my_uri)?;
-        Ok(id)
+        let mut remote_server = maybe_remote_server.unwrap().lock().unwrap();
+        remote_server.request_connect(my_uri)?;
+        self.connections.insert(remote_uri.clone());
+        Ok(remote_uri.to_string())
     }
 
-    /// Notify other server on that connectionId that we are closing connection and
+    /// Notify remote server on that connectionId that we are closing connection and
     /// locally clear that connectionId.
-    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        trace!("TransportMemory[{}].close({})", self.own_id, id);
-        if self.maybe_my_uri.is_none() {
+    fn close(&mut self, uri_as_cid: &ConnectionIdRef) -> TransportResult<()> {
+        let remote_uri = Url::parse(uri_as_cid).expect("connectionId is not a valid Url");
+        trace!("TransportMemory.close({})", remote_uri.path());
+        if self.maybe_my_bound_uri.is_none() {
             return Err(TransportError::new(
-                "Cannot close a connection before bounding".to_string(),
+                "Cannot close a connection before binding".to_string(),
             ));
         }
-        let my_uri = self.maybe_my_uri.clone().unwrap();
-        // Get the other node's uri on that connection
-        let maybe_other_uri = self.outbound_connection_map.get(id);
-        if let None = maybe_other_uri {
-            return Err(TransportError::new(format!("Unknown connectionId: {}", id)));
+        let my_uri = self.maybe_my_bound_uri.clone().unwrap();
+        // Check if we are connected to that uri
+        if !self.connections.contains(&remote_uri) {
+            return Err(TransportError::new(format!(
+                "Unknown connectionId: {}",
+                uri_as_cid
+            )));
         }
-        let other_uri = maybe_other_uri.unwrap();
-        let other_server = memory_server::read_ref(other_uri)?;
-        let mut other_server = other_server.get();
-
+        // Get other node's server
+        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+        let maybe_remote_server = server_map.get(&remote_uri);
+        if let None = maybe_remote_server {
+            return Err(TransportError::new(format!(
+                "No Memory server at this url: {}",
+                remote_uri,
+            )));
+        }
+        let mut remote_server = maybe_remote_server.unwrap().lock().unwrap();
         // Tell it we closed connection with it
-        let _ = other_server.request_close(&my_uri);
+        let _ = remote_server.request_close(&my_uri);
         // Locally remove connection
-        self.outbound_connection_map.remove(id);
+        self.connections.remove(&remote_uri);
         // Done
         Ok(())
     }
@@ -185,25 +175,41 @@ impl Transport for TransportMemory {
     }
 
     /// Send payload to known connectionIds in `id_list`
-    fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        if self.maybe_my_uri.is_none() {
+    fn send(
+        &mut self,
+        uri_as_cid_list: &[&ConnectionIdRef],
+        payload: &[u8],
+    ) -> TransportResult<()> {
+        if self.maybe_my_bound_uri.is_none() {
             return Err(TransportError::new(
                 "Cannot send before bounding".to_string(),
             ));
         }
-        let my_uri = self.maybe_my_uri.clone().unwrap();
-        for id in id_list {
+        let my_uri = self.maybe_my_bound_uri.clone().unwrap();
+        for uri_as_cid in uri_as_cid_list {
             // Get the other node's uri on that connection
-            let maybe_uri = self.outbound_connection_map.get(*id);
-            if let None = maybe_uri {
-                warn!("No known connection for connectionId: {}", id);
+            let remote_uri = Url::parse(uri_as_cid).expect("connectionId is not a valid Url");
+            if !self.connections.contains(&remote_uri) {
+                warn!("No known connection for: {}", uri_as_cid);
                 continue;
             }
-            let uri = maybe_uri.unwrap();
-            let server = memory_server::read_ref(uri)?;
-            let mut server = server.get();
+            // Get the other node's server
+            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+            let maybe_remote_server = server_map.get(&remote_uri);
+            if let None = maybe_remote_server {
+                return Err(TransportError::new(format!(
+                    "No Memory server at this url address: {}",
+                    remote_uri
+                )));
+            }
+            trace!(
+                "(TransportMemory).send() {} | {}",
+                remote_uri,
+                payload.len()
+            );
+            let mut remote_server = maybe_remote_server.unwrap().lock().unwrap();
             // Send it data from us
-            server
+            remote_server
                 .post(&my_uri, payload)
                 .expect("Post on memory server should work");
         }
@@ -212,9 +218,9 @@ impl Transport for TransportMemory {
 
     /// Send to all known connectionIds
     fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        let id_list = self.connection_id_list()?;
-        for id in id_list {
-            self.send(&[id.as_str()], payload)?;
+        let cid_list = self.connection_id_list()?;
+        for cid in cid_list {
+            self.send(&[cid.as_str()], payload)?;
         }
         Ok(())
     }
@@ -227,12 +233,11 @@ impl Transport for TransportMemory {
 
     /// Create a new server inbox for myself
     fn bind(&mut self, uri: &Url) -> TransportResult<Url> {
-        let bounded_uri = Url::parse(format!("{}_bound/{}", uri, self.own_id).as_str()).unwrap();
-        self.maybe_my_uri = Some(bounded_uri.clone());
-        self.memory_servers
-            .push(memory_server::ensure_server(&bounded_uri)?);
-        self.my_servers.insert(bounded_uri.clone());
-        Ok(bounded_uri.clone())
+        let bound_uri = Url::parse(format!("{}_bound", uri).as_str()).unwrap();
+        self.maybe_my_bound_uri = Some(bound_uri.clone());
+        memory_server::set_server(&bound_uri)?;
+        self.my_servers.insert(bound_uri.clone());
+        Ok(bound_uri.clone())
     }
 
     /// Process my TransportCommand inbox and all my server inboxes
@@ -256,12 +261,15 @@ impl Transport for TransportMemory {
         let mut to_connect_list: Vec<Url> = Vec::new();
         let mut output = Vec::new();
         for my_server_uri in &self.my_servers {
-            let my_server = memory_server::read_ref(my_server_uri)?;
-            let mut my_server = my_server.get();
+            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
+            let mut my_server = server_map
+                .get(my_server_uri)
+                .expect("My server should exist.")
+                .lock()
+                .unwrap();
             let (success, event_list) = my_server.process()?;
             if success {
                 did_work = true;
-
                 for event in event_list {
                     if let TransportEvent::IncomingConnectionEstablished(in_cid) = event {
                         let to_connect_uri =
@@ -274,31 +282,26 @@ impl Transport for TransportMemory {
             }
         }
         // Connect back to received connections if not already connected to them
-        for uri in to_connect_list {
-            trace!("(TransportMemory) {} <- {:?}", uri, self.maybe_my_uri);
-            let out_cid = self.connect(&uri)?;
-            //            self.inbound_connection_map
-            //               .insert(in_cid.clone(), out_cid.clone());
+        for in_uri in to_connect_list {
+            trace!(
+                "(TransportMemory) {} <- {:?}",
+                in_uri,
+                self.maybe_my_bound_uri
+            );
+            let cid = self.connect(&in_uri)?;
             // Note: Add IncomingConnectionEstablished events at start of outbox
             // so they can be processed first.
-            outbox.insert(0, TransportEvent::IncomingConnectionEstablished(out_cid));
+            outbox.insert(0, TransportEvent::IncomingConnectionEstablished(cid));
         }
         // process other messages
         for event in output {
             match event {
                 TransportEvent::ConnectionClosed(in_cid) => {
-                    // convert inbound connectionId to outbound connectionId.
-                    // let out_cid = self.inbound_connection_map.get(&in_cid).expect("Should have outbound at this stage");
                     // close will fail as other side isn't there anymore
                     let _ = self.close(&in_cid);
                     outbox.push(TransportEvent::ConnectionClosed(in_cid.to_string()));
                 }
                 TransportEvent::ReceivedData(in_cid, data) => {
-                    // convert inbound connectionId to outbound connectionId.
-                    //                    let out_cid = self
-                    //                      .inbound_connection_map
-                    //                    .get(&in_cid)
-                    //                  .expect("Should have outbound at this stage");
                     outbox.push(TransportEvent::ReceivedData(
                         in_cid.to_string(),
                         data.clone(),
@@ -324,14 +327,14 @@ impl TransportMemory {
         debug!(">>> '(TransportMemory)' recv cmd: {:?}", cmd);
         // Note: use same order as the enum
         match cmd {
-            TransportCommand::Connect(url, request_id) => {
-                let id = self.connect(url)?;
-                let evt = TransportEvent::ConnectResult(id, request_id.clone());
+            TransportCommand::Connect(remote_uri, request_id) => {
+                let remote_uri_as_cid = self.connect(remote_uri)?;
+                let evt = TransportEvent::ConnectResult(remote_uri_as_cid, request_id.clone());
                 Ok(vec![evt])
             }
-            TransportCommand::Send(id_list, payload) => {
-                let mut id_ref_list = Vec::with_capacity(id_list.len());
-                for id in id_list {
+            TransportCommand::Send(uri_as_cid_list, payload) => {
+                let mut id_ref_list = Vec::with_capacity(uri_as_cid_list.len());
+                for id in uri_as_cid_list {
                     id_ref_list.push(id.as_str());
                 }
                 let _id = self.send(&id_ref_list, payload)?;
@@ -341,16 +344,16 @@ impl TransportMemory {
                 let _id = self.send_all(payload)?;
                 Ok(vec![])
             }
-            TransportCommand::Close(id) => {
-                self.close(id)?;
-                let evt = TransportEvent::ConnectionClosed(id.to_string());
+            TransportCommand::Close(uri_as_cid) => {
+                self.close(uri_as_cid)?;
+                let evt = TransportEvent::ConnectionClosed(uri_as_cid.to_string());
                 Ok(vec![evt])
             }
             TransportCommand::CloseAll => {
                 self.close_all()?;
                 let mut outbox = Vec::new();
-                for (id, _url) in &self.outbound_connection_map {
-                    let evt = TransportEvent::ConnectionClosed(id.to_string());
+                for remote_uri in &self.connections {
+                    let evt = TransportEvent::ConnectionClosed(remote_uri.to_string());
                     outbox.push(evt);
                 }
                 Ok(outbox)
