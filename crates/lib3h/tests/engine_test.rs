@@ -154,7 +154,7 @@ fn basic_connect_test_mock() {
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
     // Send Connect Command
-    let request_id: String = "connect_a_1".into();
+    let request_id: String = "".into();
     let connect_msg = ConnectData {
         request_id: request_id.clone(),
         peer_uri: url_b.clone(),
@@ -308,7 +308,8 @@ fn setup_only(_alex: &mut Box<dyn NetworkEngine>, _billy: &mut Box<dyn NetworkEn
 fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
     // Connect Alex to Billy
     let req_connect = ConnectData {
-        request_id: "connect".to_string(),
+        // TODO Should be able to specify a non blank string
+        request_id: "".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
@@ -427,7 +428,8 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
 
     // Connect Alex to Billy
     let req_connect = ConnectData {
-        request_id: "connect".to_string(),
+        // TODO test request ids
+        request_id: "".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
     };
