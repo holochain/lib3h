@@ -27,13 +27,6 @@ pub enum TransportContext {
 
 /// Private internals
 impl P2pGateway {
-    //    /// TODO: return a higher-level uri instead
-    //    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-    //        self.inner_transport.as_ref().get_uri(id)
-    //        //let maybe_peer_data = self.inner_dht.get_peer(id);
-    //        //maybe_peer_data.map(|pd| pd.peer_address)
-    //    }
-
     /// Get Uris from DHT peer_address'
     pub(crate) fn address_to_uri(&mut self, address_list: &[&str]) -> TransportResult<Vec<Url>> {
         let mut uri_list = Vec::with_capacity(address_list.len());
@@ -95,10 +88,6 @@ impl P2pGateway {
             // Might receive a response back from our message.
             // Forward it back to parent
             Box::new(|_me, context, response| {
-                //                let me = match me.downcast_mut::<GhostGateway<D>>() {
-                //                    None => panic!("received unexpected actor"),
-                //                    Some(me) => me,
-                //                };
                 // Get parent's message from context
                 let maybe_parent_msg = {
                     if let GatewayContext::MaybeParentRequest(maybe_parent_msg) = context {
@@ -155,7 +144,7 @@ impl P2pGateway {
         transport_request: transport::protocol::RequestToChild,
         parent_request: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
-        match transport_request.clone() {
+        match transport_request {
             transport::protocol::RequestToChild::Bind { spec: _ } => {
                 // Forward to child transport
                 let _ = self.child_transport_endpoint.as_mut().request(

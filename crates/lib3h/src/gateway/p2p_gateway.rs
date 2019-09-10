@@ -72,20 +72,8 @@ impl P2pGateway {
     }
 }
 
-/// Gateway Trait
 impl P2pGateway {
-    //    fn transport_inject_event(&mut self, evt: TransportEvent) {
-    //        self.transport_inject_events.push(evt);
-    //    }
-    //    pub fn process_dht(&mut self) -> GhostResult<()> {
-    //        let res = self.inner_dht.process(&mut self.user_data);
-    //        res
-    //    }
-    //
-    //    pub fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData> {
-    //        &mut self.inner_dht
-    //    }
-    //
+    // FIXME
     pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
         self.user_data.lib3h_outbox.drain(0..).collect()
     }

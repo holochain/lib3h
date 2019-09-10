@@ -2,32 +2,32 @@ use crate::transport::error::TransportError;
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BindResultData {
     pub bound_url: Url,
 }
 
 /// Transport protocol enums for use with GhostActor implementation
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
     SendMessage { uri: Url, payload: Vec<u8> },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
     SendMessage { payload: Vec<u8> },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum RequestToParent {
     ErrorOccured { uri: Url, error: TransportError },
     IncomingConnection { uri: Url },
     ReceivedData { uri: Url, payload: Vec<u8> },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum RequestToParentResponse {
     // N/A
 }

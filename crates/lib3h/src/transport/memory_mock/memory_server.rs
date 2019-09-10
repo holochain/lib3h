@@ -10,24 +10,9 @@ use url::Url;
 // Memory Server protocol
 //--------------------------------------------------------------------------------------------------
 
-/// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
-#[derive(Debug, PartialEq, Clone)]
-pub enum MemoryCommand {
-    Connect(Url, /*request_id*/ String),
-    Send(Vec<Url>, Vec<u8>),
-    SendAll(Vec<u8>),
-    Close(Url),
-    CloseAll,
-    Bind(Url),
-}
-
 /// Events that can be generated during a `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum MemoryEvent {
-    /// Notify that some TransportError occured
-    ErrorOccured(Url, TransportError),
-    /// an outgoing connection has been established
-    ConnectResult(Url, /*request_id*/ String),
     /// we have received an incoming connection
     IncomingConnectionEstablished(Url),
     /// We have received data from a connection

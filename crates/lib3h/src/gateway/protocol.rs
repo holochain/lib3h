@@ -1,13 +1,9 @@
-use crate::{
-    dht::dht_protocol::*, error::*, gateway::gateway_transport::TransportContext, transport,
-};
+use crate::{dht::dht_protocol::*, error::*, transport};
 use lib3h_ghost_actor::prelude::*;
 
 #[derive(Debug)]
 pub enum GatewayContext {
     NoOp,
-    Dht(DhtContext),
-    Transport(TransportContext),
     ParentRequest(GatewayToChildMessage),
     MaybeParentRequest(Option<GatewayToChildMessage>),
 }
@@ -18,28 +14,24 @@ pub enum GatewayRequestToChild {
     Transport(transport::protocol::RequestToChild),
     Dht(DhtRequestToChild),
     SendAll(Vec<u8>),
-    // FIXME
 }
 
 #[derive(Debug)]
 pub enum GatewayRequestToChildResponse {
     Transport(transport::protocol::RequestToChildResponse),
     Dht(DhtRequestToChildResponse),
-    // FIXME
 }
 
 #[derive(Debug)]
 pub enum GatewayRequestToParent {
     Transport(transport::protocol::RequestToParent),
     Dht(DhtRequestToParent),
-    // FIXME
 }
 
 #[derive(Debug)]
 pub enum GatewayRequestToParentResponse {
     Transport(transport::protocol::RequestToParentResponse),
     Dht(DhtRequestToParentResponse),
-    // FIXME
 }
 
 pub type GatewayToChildMessage = GhostMessage<

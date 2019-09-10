@@ -93,7 +93,8 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
 }
-//
+
+// FIXME
 //fn setup_wss_node(
 //    name: &str,
 //    agent_id_arg: Address,
@@ -240,6 +241,7 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
 }
 
 // -- Wss Transport Tests --
+// FIXME
 //#[test]
 //fn test_two_wss_nodes_basic_suite() {
 //    enable_logging_for_test(true);

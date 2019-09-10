@@ -97,9 +97,6 @@ impl RealEngine {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        //        let memory_transport = transport::protocol::TransportActorParentWrapperDyn::new(
-        //            GhostTransportMemory::new(),
-        //        "memory_transport_");
         let mut memory_transport = GhostTransportMemory::new();
         let mut memory_network_endpoint = Detach::new(
             memory_transport
@@ -171,7 +168,6 @@ impl RealEngine {
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
             multiplexer,
-            // network_transport_endpoint: memory_network_endpoint,
             network_gateway,
             this_net_peer,
             network_connections: HashSet::new(),

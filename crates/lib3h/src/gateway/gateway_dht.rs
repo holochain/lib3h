@@ -39,8 +39,6 @@ impl P2pGateway {
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                // FIXME: handle it?
-                // me.handle_dht_RequestToChildResponse(response)?;
                 // forward back to parent
                 msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
                 Ok(())

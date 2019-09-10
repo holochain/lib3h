@@ -163,9 +163,6 @@ impl
                             server
                                 .post(&my_addr, &payload)
                                 .expect("Post on memory server should work");
-
-                            //                            msg.respond(Ok(RequestToChildResponse::SendMessage {
-                            //                            }))?;
                         }
                     };
                 }

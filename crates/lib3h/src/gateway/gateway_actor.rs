@@ -4,7 +4,6 @@ use crate::{
 };
 use lib3h_ghost_actor::prelude::*;
 
-/// GhostActor
 impl
     GhostActor<
         GatewayRequestToParent,
