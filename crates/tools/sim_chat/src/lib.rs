@@ -446,7 +446,7 @@ mod tests {
         }));
     
         chat.send(join_event());
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(part_event());
         
         let chat_messages = r.iter().take(5).collect::<Vec<_>>();
@@ -461,6 +461,51 @@ mod tests {
             ],
         );
     }
+
+    /*----------  direct message  ----------*/
+
+    #[test]
+    fn sending_direct_message_before_join_fails() {
+        let (s, r) = crossbeam_channel::unbounded();
+        let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
+            s.send(event.to_owned()).expect("send fail");
+        }));
+    
+        chat.send(chat_event());
+        
+        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
+        assert_eq!(
+            chat_messages,
+            vec![
+                chat_event(),
+                receive_sys_message("Must join a channel before sending a message".to_string()),
+            ],
+        );        
+    }
+
+    #[test]
+    fn can_join_and_send_direct_message() {
+        let (s, r) = crossbeam_channel::unbounded();
+        let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
+            s.send(event.to_owned()).expect("send fail");
+        }));
+    
+        chat.send(join_event());
+        std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
+        chat.send(chat_event());
+        
+        let chat_messages = r.iter().take(4).collect::<Vec<_>>();
+        assert_eq!(
+            chat_messages,
+            vec![
+                join_event(),
+                join_success_event(),
+                receive_sys_message("Joined channel: test_channel".to_string()),
+                chat_event(),
+            ],
+        );        
+    }
+    
 
     #[test]
     fn can_convert_strings_to_channel_address() {
