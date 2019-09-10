@@ -1,3 +1,4 @@
+#![feature(rustc_private)]
 extern crate crossbeam_channel;
 #[allow(unused_imports)]
 #[macro_use]
@@ -6,6 +7,9 @@ extern crate lib3h_tracing;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
+
+#[macro_use]
+extern crate log;
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
@@ -75,8 +79,6 @@ pub mod prelude {
         GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
-
-//pub type UserData = ();
 
 #[cfg(test)]
 mod tests {

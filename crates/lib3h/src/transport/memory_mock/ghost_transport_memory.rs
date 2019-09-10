@@ -352,7 +352,7 @@ mod tests {
                 Lib3hTrace,
                 RequestToChild::SendMessage {
                     address: Url::parse("mem://addr_2").unwrap(),
-                    payload: b"test message".to_vec(),
+                    payload: b"test message".to_vec().into(),
                 },
                 Box::new(|_: &mut (), r| {
                     // parent should see that the send request was OK
@@ -374,6 +374,9 @@ mod tests {
             "Some(IncomingConnection { address: \"mem://addr_1/\" })",
             format!("{:?}", requests[0].take_message())
         );
-        assert_eq!("Some(ReceivedData { address: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
+        assert_eq!(
+            "Some(ReceivedData { address: \"mem://addr_1/\", payload: \"test message\" })",
+            format!("{:?}", requests[1].take_message())
+        );
     }
 }

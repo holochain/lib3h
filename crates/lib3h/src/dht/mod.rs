@@ -91,7 +91,7 @@ pub mod tests {
         let aspect = EntryAspectData {
             aspect_address: aspect_address.to_owned(),
             type_hint: "dht_test".to_string(),
-            aspect: aspect_content.to_owned(),
+            aspect: aspect_content.into(),
             publish_ts: crate::time::since_epoch_ms(),
         };
         EntryData {
@@ -456,7 +456,7 @@ pub mod tests {
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 1);
-        let mut bundle = Vec::new();
+        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
             match request.take_message().expect("exists") {
                 DhtRequestToParent::GossipTo(gossip_data) => {
@@ -527,7 +527,7 @@ pub mod tests {
         // Should return gossipTos of C to B
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 2);
-        let mut bundle = Vec::new();
+        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
             match request.take_message().expect("exists") {
                 DhtRequestToParent::GossipTo(gossip_to) => {

@@ -6,12 +6,12 @@ pub const DEFAULT_TIMEOUT_THRESHOLD_MS: u64 = 60000;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DhtConfig {
-    pub this_peer_address: PeerAddress,
+    this_peer_address: PeerAddress,
     #[serde(with = "url_serde")]
-    pub this_peer_uri: Url,
-    pub custom: Vec<u8>,
-    pub gossip_interval: u64,
-    pub timeout_threshold: u64,
+    this_peer_uri: Url,
+    custom: Vec<u8>,
+    gossip_interval: u64,
+    timeout_threshold: u64,
 }
 
 impl DhtConfig {
@@ -23,5 +23,35 @@ impl DhtConfig {
             gossip_interval: DEFAULT_GOSSIP_INTERVAL_MS,
             timeout_threshold: DEFAULT_TIMEOUT_THRESHOLD_MS,
         }
+    }
+
+    pub fn with_real_engine_config(
+        peer_address: &str,
+        peer_uri: &Url,
+        config: &crate::engine::RealEngineConfig,
+    ) -> Self {
+        Self {
+            this_peer_address: peer_address.to_owned(),
+            this_peer_uri: peer_uri.to_owned(),
+            custom: config.clone().dht_custom_config,
+            gossip_interval: config.dht_gossip_interval,
+            timeout_threshold: config.dht_timeout_threshold,
+        }
+    }
+
+    pub fn timeout_threshold(&self) -> u64 {
+        self.timeout_threshold
+    }
+
+    pub fn gossip_interval(&self) -> u64 {
+        self.gossip_interval
+    }
+
+    pub fn this_peer_address(&self) -> PeerAddress {
+        self.this_peer_address.clone()
+    }
+
+    pub fn this_peer_uri(&self) -> Url {
+        self.this_peer_uri.clone()
     }
 }

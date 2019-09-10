@@ -370,6 +370,7 @@ impl<
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
+        trace!("GhostChannel::priv_request");
         let request_id = match options.timeout {
             None => self.pending_responses_tracker.bookmark(trace_context, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
@@ -378,6 +379,7 @@ impl<
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
+        trace!("ghost_channel: send request (id={:?})", request_id);
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
@@ -431,6 +433,7 @@ impl<
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
+        trace!("GhostChannel::request");
         self.priv_request(
             trace_context,
             payload,
