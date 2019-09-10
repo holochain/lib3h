@@ -129,7 +129,7 @@ where
             }
             Lib3hClientProtocol::PublishEntry(_) => ClientRequestContext::new(""),
             Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
-            _ => panic!("unimplemented"),
+            _ => unimplemented!(),
         };
         let result = if &ctx.get_request_id() == "" {
             self.engine.publish(client_msg.into())
@@ -143,7 +143,8 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let _ = detach_run!(&mut self.engine, |lib3h| lib3h.process(self));
+        detach_run!(&mut self.engine, |lib3h| lib3h.process(self))
+            .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
 
         // get any "server" messages that came as responses to the client requests
         let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
