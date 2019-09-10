@@ -14,6 +14,7 @@ use lib3h_ghost_actor::{
 	GhostContextEndpoint,
     GhostCanTrack,
     GhostError,
+    create_ghost_channel,
 };
 
 pub struct MockEngine<'engine> {
@@ -77,6 +78,20 @@ impl GhostActor<
 }
 
 impl MockEngine<'_> {
+
+    pub fn new() -> Self {
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        Self {
+            client_endpoint: Some(endpoint_parent),
+            lib3h_endpoint: Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("mock-engine")
+                    .build(),
+            ),
+        }
+    }
+
         /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
