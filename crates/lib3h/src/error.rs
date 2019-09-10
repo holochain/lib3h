@@ -148,7 +148,7 @@ impl From<CryptoError> for Lib3hError {
     }
 }
 
-// I'm not so sure about this...
+// TODO I'm not so sure about this...
 impl From<Lib3hError> for Lib3hProtocolError {
     fn from(err: Lib3hError) -> Self {
         let bt = backtrace::Backtrace::new();

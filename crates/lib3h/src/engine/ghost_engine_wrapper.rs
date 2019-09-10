@@ -52,7 +52,7 @@ fn server_failure(err: String, context: ClientRequestContext) -> Lib3hServerProt
         request_id: context.get_request_id(),
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: err.as_bytes().to_vec(),
+        result_info: err.as_bytes().into(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
@@ -62,7 +62,7 @@ fn server_success(context: ClientRequestContext) -> Lib3hServerProtocol {
         request_id: context.get_request_id(),
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: Vec::new(),
+        result_info: vec![].into(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
@@ -312,7 +312,7 @@ mod tests {
 
         // The mock engine allways returns failure on connect requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: [99, 111, 110, 110, 101, 99, 116, 105, 111, 110, 32, 102, 97, 105, 108, 101, 100, 33] })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: \"connection failed!\" })]))",
             format!("{:?}", result)
         );
 
@@ -327,7 +327,7 @@ mod tests {
 
         // The mock engine allways returns success on Join requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: [] })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: \"\" })]))",
             format!("{:?}", result)
         );
 

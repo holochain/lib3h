@@ -1,7 +1,7 @@
 use crate::transport::{error::*, protocol::*};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::Address;
+use lib3h_protocol::{data_types::Opaque, Address};
 use std::collections::HashMap;
 use url::Url;
 
@@ -98,7 +98,7 @@ impl TransportMultiplex {
         local_agent_id: &Address,
         remote_agent_id: &Address,
         remote_machine_id: &Address,
-        unpacked_payload: Vec<u8>,
+        unpacked_payload: Opaque,
     ) -> TransportResult<()> {
         let route_spec = LocalRouteSpec {
             space_address: space_address.clone(),
@@ -151,7 +151,7 @@ impl TransportMultiplex {
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, address: Url, payload: Vec<u8>) -> TransportResult<()> {
+    fn handle_received_data(&mut self, address: Url, payload: Opaque) -> TransportResult<()> {
         // forward
         self.endpoint_self
             .publish(RequestToParent::ReceivedData { address, payload })?;
@@ -226,7 +226,7 @@ impl TransportMultiplex {
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         address: Url,
-        payload: Vec<u8>,
+        payload: Opaque,
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
@@ -319,7 +319,7 @@ impl TransportMultiplex {
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         address: Url,
-        payload: Vec<u8>,
+        payload: Opaque,
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
