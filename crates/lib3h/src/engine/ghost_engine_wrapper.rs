@@ -1,4 +1,4 @@
-use crate::engine::ghost_engine::{ClientRequestContext, GhostEngineParentWrapper};
+use crate::engine::ghost_engine::GhostEngineParentWrapper;
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -10,6 +10,18 @@ use lib3h_protocol::{
     DidWork,
 };
 use lib3h_tracing::Lib3hTrace;
+
+/// the context when making a request from core
+/// this is always the request_id
+pub struct ClientRequestContext(String);
+impl ClientRequestContext {
+    pub fn new(id: &str) -> Self {
+        Self(id.to_string())
+    }
+    pub fn get_request_id(&self) -> String {
+        self.0.clone()
+    }
+}
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -23,7 +35,9 @@ where
         EngineError,
     >,
 {
-    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
+    engine: Detach<
+        GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Lib3hTrace, Engine, EngineError>,
+    >,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
@@ -130,7 +144,7 @@ where
             }
             Lib3hClientProtocol::PublishEntry(_) => ClientRequestContext::new(""),
             Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
-            _ => panic!("unimplemented"),
+            _ => unimplemented!(),
         };
         let request_id = ctx.get_request_id();
         let result = if &request_id == "" {
@@ -148,7 +162,8 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let _ = detach_run!(&mut self.engine, |lib3h| lib3h.process(self));
+        detach_run!(&mut self.engine, |lib3h| lib3h.process(self))
+            .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
 
         // get any "server" messages that came as responses to the client requests
         let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
