@@ -269,12 +269,10 @@ impl<'engine> GhostEngine<'engine> {
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
-            ClientToLib3h::SendDirectMessage(data) => {
-                let result = self
-                    .handle_direct_message(&data, false)
-                    .map(|data| ClientToLib3hResponse::SendDirectMessageResult(data));
-                msg.respond(result)
-            }
+            ClientToLib3h::SendDirectMessage(data) => self
+                .handle_direct_message(&data, false)
+                .map_err(|e| GhostError::from(e.to_string())),
+
             /*            FetchEntry(FetchEntryData)  => {} Not being used, probably deprecated*/
             ClientToLib3h::PublishEntry(data) => self
                 .handle_publish_entry(&data)
@@ -591,7 +589,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         msg: &DirectMessageData,
         is_response: bool,
-    ) -> Lib3hResult<DirectMessageData> {
+    ) -> Lib3hResult<()> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
         let space_gateway = self
             .space_gateway_map
@@ -619,22 +617,28 @@ impl<'engine> GhostEngine<'engine> {
             .unwrap();
         // Send
         let _peer_address: String = msg.to_agent_id.clone().into();
-        /* TODO: fix when gateway implemented
-            let res = space_gateway
-                .as_transport_mut()
-                .send(&[peer_address.as_str()], &payload);
-            if let Err(e) = res {
-                response.result_info = e.to_string().as_bytes().to_vec();
-                return Lib3hServerProtocol::FailureResult(response);
-        }*/
-        // TODO: FAKE MESSAGE
-        Ok(DirectMessageData {
-            space_address: msg.space_address.clone(),
-            request_id: msg.request_id.clone(),
-            to_agent_id: msg.from_agent_id.clone(),
-            from_agent_id: msg.to_agent_id.clone(),
-            content: b"fake response".to_vec(),
-        })
+        /*
+                let res = space_gateway
+                    .as_transport_mut()
+                    .send(&[peer_address.as_str()], &payload);
+                if let Err(e) = res {
+                    response.result_info = e.to_string().as_bytes().to_vec();
+                    return Lib3hServerProtocol::FailureResult(response);
+                }
+
+
+                .map(|data| ClientToLib3hResponse::SendDirectMessageResult(data));
+                msg.respond(result)
+        */
+        /*
+            Ok(DirectMessageData {
+                space_address: msg.space_address.clone(),
+                request_id: msg.request_id.clone(),
+                to_agent_id: msg.from_agent_id.clone(),
+                from_agent_id: msg.to_agent_id.clone(),
+                content: b"fake response".to_vec(),
+        })*/
+        Ok(())
     }
 
     fn handle_publish_entry(&mut self, msg: &ProvidedEntryData) -> Lib3hResult<()> {
@@ -853,11 +857,13 @@ mod tests {
         };
 
         let result = lib3h.as_mut().handle_direct_message(&direct_message, false);
-        // TODO: clean up test when possbie: this is fake data because we don't really have a gateway, bu
-        assert_eq!(
+        assert!(result.is_ok());
+        // TODO: assert somehow that the message got queued to the right place
+
+        /*
             "Ok(DirectMessageData { space_address: HashString(\"space_addr\"), request_id: \"foo_id\", to_agent_id: HashString(\"agent_id\"), from_agent_id: HashString(\"to_agent_id\"), content: [102, 97, 107, 101, 32, 114, 101, 115, 112, 111, 110, 115, 101] })",
             format!("{:?}", result)
-        );
+        );*/
     }
 
     fn make_test_entry() -> ProvidedEntryData {
