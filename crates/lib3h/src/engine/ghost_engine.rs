@@ -364,8 +364,8 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     #[allow(non_snake_case)]
-    fn handle_HandleGetAuthoringEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
-        let space_gateway = self.get_space(
+    fn handle_HandleGetAuthoringEntryListResult(&mut self, _msg: EntryListData) -> Lib3hResult<()> {
+        /*      let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
@@ -414,7 +414,7 @@ impl<'engine> GhostEngine<'engine> {
                             }
                         };
                         if can_fetch {
-                            let msg_data = FetchEntryData {
+                            let _msg_data = FetchEntryData {
                                 space_address: msg.space_address.clone(),
                                 entry_address: entry_address.clone(),
                                 request_id,
@@ -422,7 +422,7 @@ impl<'engine> GhostEngine<'engine> {
                                 aspect_address_list: None,
                             };
 
-                            let context = RequestContext {
+                            let _context = RequestContext {
                                 space_address: msg.space_address.to_owned(),
                                 agent_id: msg.provider_agent_id.to_owned(),
                             };
@@ -457,8 +457,6 @@ impl<'engine> GhostEngine<'engine> {
                                     Ok(())
                                 }),
                             );
-                            /*                            ud.lib3h_outbox
-                            .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));*/
                         }
                     } else {
                         panic!("bad response to RequestAspectsOf: {:?}", response);
@@ -466,7 +464,7 @@ impl<'engine> GhostEngine<'engine> {
                     Ok(())
                 }),
             )?;
-        }
+        }*/
         Ok(())
     }
 
@@ -747,6 +745,7 @@ impl<'engine> GhostEngine<'engine> {
 }
 
 /// Return true if all elements of list_b are found in list_a
+#[allow(dead_code)]
 fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
