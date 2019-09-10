@@ -6,12 +6,13 @@ use url::Url;
 use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    engine::{p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID, ChainId},
+    engine::{
+        p2p_protocol::*, ChainId, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
+    },
     error::Lib3hResult,
     gateway::{protocol::*, GatewayUserData, P2pGateway},
     track::Tracker,
-    transport::{self, memory_mock::ghost_transport_memory::*},
-    transport::TransportMultiplex,
+    transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
 };
 use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -111,7 +112,7 @@ impl RealEngine {
 
         // Bind & create this_net_peer
         let mut gateway_ud = GatewayUserData::new();
-        memory_network_endpoint.as_mut().request(
+        let _res = memory_network_endpoint.as_mut().request(
             GatewayContext::NoOp,
             transport::protocol::RequestToChild::Bind {
                 spec: config.bind_url.clone(),
@@ -183,14 +184,10 @@ impl RealEngine {
     }
 
     ///
-    pub fn get_this_peer_sync(
-        &mut self,
-        maybe_chainId: Option<ChainId>,
-    ) -> PeerData {
+    pub fn get_this_peer_sync(&mut self, maybe_chainId: Option<ChainId>) -> PeerData {
         trace!("engine.get_this_peer_sync() ...");
         let gateway = if let Some(chain_id) = maybe_chainId {
-            self
-                .space_gateway_map
+            self.space_gateway_map
                 .get_mut(&chain_id)
                 .expect("Should have the space gateway")
         } else {
@@ -227,9 +224,7 @@ impl RealEngine {
     }
 
     ///
-    pub fn get_peer_list_sync(
-        &mut self,
-    ) -> Vec<PeerData> {
+    pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
         trace!("engine.get_peer_list_sync() ...");
         self.network_gateway
             .request(
@@ -257,7 +252,9 @@ impl RealEngine {
                 }),
             )
             .expect("sync functions should work");
-        self.network_gateway.process(&mut self.gateway_user_data).unwrap(); // FIXME unwrap
+        self.network_gateway
+            .process(&mut self.gateway_user_data)
+            .unwrap(); // FIXME unwrap
         self.gateway_user_data.peer_list.clone()
     }
 }
@@ -725,11 +722,12 @@ impl RealEngine {
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let uniplex_endpoint = Detach::new(self
-            .multiplexer
-            .create_agent_space_route(&join_msg.space_address, &agent_id.into())
-            .as_context_endpoint_builder()
-            .build::<GatewayUserData, GatewayContext>());
+        let uniplex_endpoint = Detach::new(
+            self.multiplexer
+                .create_agent_space_route(&join_msg.space_address, &agent_id.into())
+                .as_context_endpoint_builder()
+                .build::<GatewayUserData, GatewayContext>(),
+        );
         let new_space_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new_with_space(
                 &join_msg.space_address,
@@ -754,7 +752,8 @@ impl RealEngine {
             space_address,
             peer.peer_address,
         );
-        self.network_gateway
+        let _res = self
+            .network_gateway
             .publish(GatewayRequestToChild::SendAll(payload));
         // TODO END
 
@@ -765,7 +764,7 @@ impl RealEngine {
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = peer.clone(); // FIXME
-        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
+        let _res = space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
             this_peer,
         )));
 
@@ -879,7 +878,8 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>, Lib3hServerProtocol> {
+    ) -> Result<&mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>, Lib3hServerProtocol>
+    {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
@@ -895,55 +895,56 @@ impl RealEngine {
                 "Agent {} does not track space {}",
                 &agent_id, &space_address,
             )
-                .as_bytes()
-                .to_vec(),
+            .as_bytes()
+            .to_vec(),
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }
 }
 
-    pub fn handle_gossipTo(
-        gateway_identifier: &str,
-        gateway: &mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>,
-        gossip_data: GossipToData,
-    ) -> Lib3hResult<()> {
-        debug!(
-            "({}) handle_gossipTo: {:?}",
-            gateway_identifier, gossip_data,
-        );
+pub fn handle_gossipTo(
+    gateway_identifier: &str,
+    gateway: &mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>,
+    gossip_data: GossipToData,
+) -> Lib3hResult<()> {
+    debug!(
+        "({}) handle_gossipTo: {:?}",
+        gateway_identifier, gossip_data,
+    );
 
-        for to_peer_address in gossip_data.peer_address_list {
-            // FIXME
-//            // TODO #150 - should not gossip to self in the first place
-//            let me = self.get_this_peer_sync(&mut gateway).peer_address;
-//            if to_peer_address == me {
-//                continue;
-//            }
-//            // TODO END
+    for to_peer_address in gossip_data.peer_address_list {
+        // FIXME
+        //            // TODO #150 - should not gossip to self in the first place
+        //            let me = self.get_this_peer_sync(&mut gateway).peer_address;
+        //            if to_peer_address == me {
+        //                continue;
+        //            }
+        //            // TODO END
 
-            // Convert DHT Gossip to P2P Gossip
-            let p2p_gossip = P2pProtocol::Gossip(GossipData {
-                space_address: gateway_identifier.into(),
-                to_peer_address: to_peer_address.clone().into(),
-                from_peer_address: "FIXME".into(), // FIXME
-                bundle: gossip_data.bundle.clone(),
-            });
-            let mut payload = Vec::new();
-            p2p_gossip
-                .serialize(&mut Serializer::new(&mut payload))
-                .expect("P2pProtocol::Gossip serialization failed");
-            // Forward gossip to the inner_transport
-            // FIXME peer_address to Url convert
-            let msg = transport::protocol::RequestToChild::SendMessage {
-                uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
-                payload,
-            };
-            gateway.publish(GatewayRequestToChild::Transport(msg))?;
-        }
-        Ok(())
+        // Convert DHT Gossip to P2P Gossip
+        let p2p_gossip = P2pProtocol::Gossip(GossipData {
+            space_address: gateway_identifier.into(),
+            to_peer_address: to_peer_address.clone().into(),
+            from_peer_address: "FIXME".into(), // FIXME
+            bundle: gossip_data.bundle.clone(),
+        });
+        let mut payload = Vec::new();
+        p2p_gossip
+            .serialize(&mut Serializer::new(&mut payload))
+            .expect("P2pProtocol::Gossip serialization failed");
+        // Forward gossip to the inner_transport
+        // FIXME peer_address to Url convert
+        let msg = transport::protocol::RequestToChild::SendMessage {
+            uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
+            payload,
+        };
+        gateway.publish(GatewayRequestToChild::Transport(msg))?;
     }
+    Ok(())
+}
 
 /// Return true if all elements of list_b are found in list_a
+#[allow(dead_code)]
 fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();

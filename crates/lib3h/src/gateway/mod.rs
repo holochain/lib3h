@@ -1,29 +1,14 @@
+#[allow(non_snake_case)]
 pub mod gateway_actor;
 pub mod gateway_dht;
 pub mod gateway_transport;
 pub mod p2p_gateway;
 pub mod protocol;
-// pub mod wrapper;
 
 use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
 use detach::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 use url::Url;
-
-///// describes a super construct of a Transport and a Dht allowing
-///// Transport access via peer discovery handled by the Dht
-//pub trait Gateway {
-//    fn process_dht(&mut self) -> GhostResult<()>;
-//    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData>;
-//
-//    /// temp HACK. Waiting for gateway actor
-//    fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol>;
-//
-//    // sync actor requests
-//    fn get_peer_list_sync(&mut self) -> Vec<PeerData>;
-//    fn get_this_peer_sync(&mut self) -> PeerData;
-//    fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData>;
-//}
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -31,7 +16,6 @@ pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
     /// Transport
-    //child_transport_endpoint: transport::protocol::TransportActorParentEndpoint,
     child_transport_endpoint: Detach<
         transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, GatewayContext>,
     >,

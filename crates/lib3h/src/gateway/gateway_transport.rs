@@ -110,7 +110,7 @@ impl P2pGateway {
                 // check for timeout
                 if let GhostCallbackData::Timeout = response {
                     if let Some(parent_msg) = maybe_parent_msg {
-                        parent_msg.respond(Err(Lib3hError::new_other("timeout")));
+                        parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
                         return Ok(());
                     }
                 }
@@ -125,7 +125,7 @@ impl P2pGateway {
                 // Check if response is an error
                 if let Err(e) = response {
                     if let Some(parent_msg) = maybe_parent_msg {
-                        parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))));
+                        parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?;
                     }
                     return Ok(());
                 };
@@ -138,14 +138,12 @@ impl P2pGateway {
                 println!("yay? {:?}", response);
                 // Act on response: forward to parent
                 if let Some(parent_msg) = maybe_parent_msg {
-                    parent_msg.respond(Ok(GatewayRequestToChildResponse::Transport(response)));
+                    parent_msg.respond(Ok(GatewayRequestToChildResponse::Transport(response)))?;
                 }
                 // Done
                 Ok(())
             }),
-        );
-        // Done
-        Ok(())
+        )
     }
 }
 
@@ -198,7 +196,7 @@ impl P2pGateway {
                 // get actual uri from the inner dht before sending
                 let dht_uri_list = self.address_to_uri(&[&uri.to_string()])?;
                 let dht_uri = &dht_uri_list[0];
-                self.send(dht_uri, &payload, Some(parent_request));
+                self.send(dht_uri, &payload, Some(parent_request))?;
             }
         }
         // Done
@@ -207,6 +205,7 @@ impl P2pGateway {
 
     /// handle RequestToChildResponse received from child Transport
     /// before forwarding it to our parent
+    #[allow(dead_code)]
     pub(crate) fn handle_transport_RequestToChildResponse(
         &mut self,
         response: &transport::protocol::RequestToChildResponse,
@@ -276,12 +275,14 @@ impl P2pGateway {
             }
         };
         // Bubble up to parent
-        self.endpoint_self
+        let _res = self
+            .endpoint_self
             .as_mut()
             .publish(GatewayRequestToParent::Transport(request));
     }
 
     /// handle response we got from our parent
+    #[allow(dead_code)]
     pub(crate) fn handle_transport_RequestToParentResponse(
         &mut self,
         _response: &transport::protocol::RequestToParentResponse,

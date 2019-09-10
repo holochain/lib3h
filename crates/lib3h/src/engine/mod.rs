@@ -9,10 +9,8 @@ use crate::{
     dht::dht_protocol::*,
     gateway::{protocol::*, GatewayUserData},
     track::Tracker,
-    transport,
     transport::TransportMultiplex,
 };
-use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
@@ -77,14 +75,10 @@ pub struct RealEngine {
     multiplexer: TransportMultiplex,
     // Should be owned by multiplexer
     // TODO #176: Remove this if we resolve #176 without it.
-    /// Transport used by the network gateway
-//    network_transport_endpoint: Detach<
-//        transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, GatewayContext>,
-//    >,
     /// P2p gateway for the network layer
     network_gateway: GatewayParentWrapperDyn<GatewayUserData, GatewayContext>,
 
-    ///
+    /// Cached this_peer of the network_gateway
     this_net_peer: PeerData,
 
     /// Store active connections?

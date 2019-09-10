@@ -3,7 +3,7 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine, real_engine::handle_gossipTo},
+    engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
     gateway::{protocol::*, GatewayUserData},
 };
 use lib3h_protocol::{
@@ -17,10 +17,17 @@ impl RealEngine {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&mut self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
-        let chain_id_list: Vec<ChainId> = self.space_gateway_map.iter().map(|(id, _)| id.clone()).collect();
+        let chain_id_list: Vec<ChainId> = self
+            .space_gateway_map
+            .iter()
+            .map(|(id, _)| id.clone())
+            .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, self.get_this_peer_sync(Some(chainId.clone())).clone()));
+            result.push((
+                space_address,
+                self.get_this_peer_sync(Some(chainId.clone())).clone(),
+            ));
         }
         result
     }
@@ -47,12 +54,12 @@ impl RealEngine {
         let mut outbox = Vec::new();
         let mut space_outbox_map = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            space_gateway.process(&mut self.gateway_user_data);
+            let _res = space_gateway.process(&mut self.gateway_user_data);
             let request_list = space_gateway.drain_messages();
             space_outbox_map.insert(chain_id.clone(), request_list);
-//            // FIXME: DHT magic
-//            let mut temp = space_gateway.drain_dht_outbox();
-//            self.temp_outbox.append(&mut temp);
+            //            // FIXME: DHT magic
+            //            let mut temp = space_gateway.drain_dht_outbox();
+            //            self.temp_outbox.append(&mut temp);
         }
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
@@ -100,7 +107,7 @@ impl RealEngine {
                             self.name, chain_id.0, peer_data,
                         );
                         // For now accept all request
-                        space_gateway.publish(GatewayRequestToChild::Dht(
+                        let _res = space_gateway.publish(GatewayRequestToChild::Dht(
                             DhtRequestToChild::HoldPeer(peer_data),
                         ));
                     }

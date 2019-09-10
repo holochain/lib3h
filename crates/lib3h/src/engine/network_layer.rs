@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_protocol::*,
     engine::{
-        p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID, real_engine::handle_gossipTo,
+        p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
@@ -29,9 +29,9 @@ impl RealEngine {
             let mut output = self.handle_network_request(payload)?;
             outbox.append(&mut output);
         }
-//        // FIXME: DHT magic
-//        let mut temp = self.network_gateway.drain_dht_outbox();
-//        self.temp_outbox.append(&mut temp);
+        //        // FIXME: DHT magic
+        //        let mut temp = self.network_gateway.drain_dht_outbox();
+        //        self.temp_outbox.append(&mut temp);
         // Done
         Ok((true /* fixme */, outbox))
     }

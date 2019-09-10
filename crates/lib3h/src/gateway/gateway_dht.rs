@@ -71,7 +71,7 @@ impl P2pGateway {
                     self.identifier, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
-                self.child_transport_endpoint.publish(
+                let _res = self.child_transport_endpoint.publish(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Vec::new(),
