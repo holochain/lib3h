@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_bookmark_and_handle() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let trace_context = TestTrace("some_context_data".into());
+        let trace_context = TestTrace::new("some_context_data");
 
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let trace_context = TestTrace("foo".into());
+        let trace_context = TestTrace::new("foo");
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
                 // when the timeout happens the callback should get

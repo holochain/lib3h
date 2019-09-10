@@ -505,7 +505,7 @@ mod tests {
 
         parent_endpoint
             .request(
-                TestTrace("context data".into()),
+                TestTrace::new("context data"),
                 TestMsgIn("event from parent".into()),
                 cb,
             )

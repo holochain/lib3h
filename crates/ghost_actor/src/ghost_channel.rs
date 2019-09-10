@@ -648,7 +648,7 @@ mod tests {
 
         endpoint
             .request(
-                TestTrace("context data".into()),
+                TestTrace::new("context data"),
                 TestMsgOut("request to my parent".into()),
                 cb_factory(),
             )
@@ -689,7 +689,7 @@ mod tests {
         // Now we'll send a request that should timeout
         endpoint
             .request_options(
-                TestTrace("context data".into()),
+                TestTrace::new("context data"),
                 TestMsgOut("another request to my parent".into()),
                 cb_factory(),
                 GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),
