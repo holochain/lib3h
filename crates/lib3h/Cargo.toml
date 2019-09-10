@@ -21,6 +21,7 @@ holochain_persistence_api = "=0.0.8"
 lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
 lib3h_crypto_api = { version = "=0.0.10", path = "../crypto_api" }
 lib3h_ghost_actor = { version = "=0.0.10", path = "../ghost_actor" }
+lib3h_tracing = { version = "=0.0.1", path = "../tracing" }
 nanoid = "=0.2.0"
 tungstenite = "=0.6.1"
 url = "=1.7.2"

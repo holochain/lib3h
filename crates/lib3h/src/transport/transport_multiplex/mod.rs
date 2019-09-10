@@ -28,9 +28,10 @@ mod tests {
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::data_types::Opaque;
+    use lib3h_tracing::Lib3hTrace;
     use url::Url;
 
-    enum MockToParentContext {}
+    type MockToParentContext = Lib3hTrace;
 
     pub struct TransportMock {
         endpoint_parent: Option<TransportActorParentEndpoint>,
@@ -123,7 +124,7 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: TransportActorParentWrapper<(), (), TransportMultiplex> =
+        let mut mplex: TransportActorParentWrapper<(), Lib3hTrace, TransportMultiplex> =
             GhostParentWrapper::new(
                 TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
                 "test_mplex_",
@@ -133,23 +134,23 @@ mod tests {
             .as_mut()
             .create_agent_space_route(&"space_a".into(), &"agent_a".into())
             .as_context_endpoint_builder()
-            .build::<(), ()>();
+            .build::<(), Lib3hTrace>();
 
         let mut route_b = mplex
             .as_mut()
             .create_agent_space_route(&"space_b".into(), &"agent_b".into())
             .as_context_endpoint_builder()
-            .build::<(), ()>();
+            .build::<(), Lib3hTrace>();
 
         // send a message from route A
         route_a
             .request(
-                (),
+                Lib3hTrace,
                 RequestToChild::SendMessage {
                     address: addr_none.clone(),
                     payload: "hello-from-a".into(),
                 },
-                Box::new(|_, _, response| {
+                Box::new(|_, response| {
                     assert_eq!(&format!("{:?}", response), "");
                     Ok(())
                 }),

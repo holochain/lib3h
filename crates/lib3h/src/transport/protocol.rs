@@ -31,31 +31,31 @@ pub enum TransportEvent {
 }
 
 /// Transport protocol enums for use with GhostActor implementation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
     SendMessage { address: Url, payload: Opaque },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BindResultData {
     pub bound_url: Url,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
     SendMessage,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToParent {
     IncomingConnection { address: Url },
     ReceivedData { address: Url, payload: Opaque },
     TransportError { error: TransportError },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToParentResponse {
     Allowed,    // just for testing
     Disallowed, // just for testing
@@ -78,18 +78,18 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
+pub type TransportActorSelfEndpoint<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
     RequestToChildResponse,
     TransportError,
 >;
-pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
+pub type TransportActorParentWrapper<UserData, TraceContext, Actor> = GhostParentWrapper<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -97,9 +97,9 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

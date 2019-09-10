@@ -6,6 +6,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
+use lib3h_tracing::Lib3hTrace;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -40,7 +41,7 @@ pub struct MirrorDht {
 
     /// ghost stuff
     endpoint_parent: Option<DhtEndpoint>,
-    endpoint_self: Detach<DhtEndpointWithContext<()>>,
+    endpoint_self: Detach<DhtEndpointWithContext<(), Lib3hTrace>>,
 }
 
 /// Constructors
@@ -467,9 +468,9 @@ impl MirrorDht {
             // Ask owner to respond to self
             DhtRequestToChild::RequestEntry(entry_address) => {
                 self.endpoint_self.request(
-                    DhtContext::RequestEntry(request),
+                    Lib3hTrace,
                     DhtRequestToParent::RequestEntry(entry_address),
-                    Box::new(|_me, context, response| {
+                    Box::new(|_me, response| {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => panic!("timeout"),
@@ -478,10 +479,6 @@ impl MirrorDht {
                                     Ok(response) => response,
                                 },
                             }
-                        };
-                        let request = match context {
-                            DhtContext::RequestEntry(request) => request,
-                            _ => panic!("bad context"),
                         };
                         if let DhtRequestToParentResponse::RequestEntry(entry_response) = response {
                             println!("4. In DhtRequestToChild::RequestEntry Responding...");

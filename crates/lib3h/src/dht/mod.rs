@@ -19,6 +19,7 @@ pub mod tests {
         data_types::{EntryAspectData, EntryData},
         Address,
     };
+    use lib3h_tracing::TestTrace;
     use url::Url;
 
     lazy_static! {
@@ -121,17 +122,17 @@ pub mod tests {
     fn new_dht_wrapper(
         _is_mirror: bool,
         peer_address: &PeerAddressRef,
-    ) -> Detach<ChildDhtWrapperDyn<DhtData>> {
+    ) -> Detach<ChildDhtWrapperDyn<DhtData, TestTrace>> {
         let dht = new_dht(true, peer_address);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
-    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> PeerData {
+    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> PeerData {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestThisPeer,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -155,12 +156,15 @@ pub mod tests {
         ud.this_peer
     }
 
-    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>, address: &str) -> Option<PeerData> {
+    fn get_peer(
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
+        address: &str,
+    ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestPeer(address.to_string()),
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -184,12 +188,12 @@ pub mod tests {
         ud.maybe_peer
     }
 
-    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<PeerData> {
+    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> Vec<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestPeerList,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -213,12 +217,14 @@ pub mod tests {
         ud.peer_list
     }
 
-    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<Address> {
+    fn get_entry_address_list(
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
+    ) -> Vec<Address> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestEntryAddressList,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -244,14 +250,14 @@ pub mod tests {
     }
 
     fn get_aspects_of(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
         entry_address: &Address,
     ) -> Option<Vec<Address>> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -340,9 +346,9 @@ pub mod tests {
         // Fetch it
         // ========
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
-            Box::new(|_ud, _context, response| {
+            Box::new(|_ud, response| {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");
                 let response = {
                     match response {

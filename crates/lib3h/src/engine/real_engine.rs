@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::transport::memory_mock::transport_memory::TransportMemory;
+use lib3h_tracing::Lib3hTrace;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
@@ -474,29 +475,19 @@ impl<'engine> RealEngine<'engine> {
         let space_gateway = maybe_space.unwrap();
         // Request every 'new' Entry from Core
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
+            let request_id = self.request_track.reserve();
+            let msg = msg.clone();
+            let _ctx = DhtContext::RequestAspectsOf {
+                entry_address: entry_address.clone(),
+                aspect_address_list: aspect_address_list.clone(),
+                msg: msg.clone(),
+                request_id: request_id.clone(),
+            };
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
-                DhtContext::RequestAspectsOf {
-                    entry_address: entry_address.clone(),
-                    aspect_address_list,
-                    msg: msg.clone(),
-                    request_id: self.request_track.reserve(),
-                },
+                Lib3hTrace,
                 DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                Box::new(|ud, context, response| {
-                    let (entry_address, aspect_address_list, msg, request_id) = {
-                        if let DhtContext::RequestAspectsOf {
-                            entry_address,
-                            aspect_address_list,
-                            msg,
-                            request_id,
-                        } = context
-                        {
-                            (entry_address, aspect_address_list, msg, request_id)
-                        } else {
-                            panic!("bad context type");
-                        }
-                    };
+                Box::new(move |ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -520,7 +511,7 @@ impl<'engine> RealEngine<'engine> {
                             let msg_data = FetchEntryData {
                                 space_address: msg.space_address.clone(),
                                 entry_address: entry_address.clone(),
-                                request_id,
+                                request_id: request_id.clone(),
                                 provider_agent_id: msg.provider_agent_id.clone(),
                                 aspect_address_list: None,
                             };
