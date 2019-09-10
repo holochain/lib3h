@@ -7,6 +7,40 @@ use lib3h_sim_chat::ChatEvent;
 use regex::Regex;
 use url::Url;
 
+use lib3h::{
+    dht::mirror_dht::MirrorDht,
+    engine::{ghost_engine::GhostEngine, RealEngineConfig},
+    transport::{memory_mock::transport_memory::TransportMemory, TransportWrapper},
+    transport_wss::TlsConfig,
+};
+use lib3h_sodium::SodiumCryptoSystem;
+
+fn engine_builder() -> GhostEngine<'static> {
+    let network_transport = TransportWrapper::new(TransportMemory::new());
+    let crypto = Box::new(SodiumCryptoSystem::new());
+    let config = RealEngineConfig {
+        tls_config: TlsConfig::Unencrypted,
+        socket_type: "mem".into(),
+        bootstrap_nodes: vec![],
+        work_dir: String::new(),
+        log_level: 'd',
+        bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
+        dht_gossip_interval: 100,
+        dht_timeout_threshold: 1000,
+        dht_custom_config: vec![],
+    };
+    let dht_factory = MirrorDht::new_with_config;
+
+    GhostEngine::new(
+        "test_engine",
+        crypto,
+        config,
+        dht_factory,
+        network_transport,
+    )
+    .unwrap()
+}
+
 fn main() {
     let rl =
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
@@ -17,6 +51,7 @@ fn main() {
 
     let rl_t = rl.clone();
     let mut cli = lib3h_sim_chat::SimChat::new(
+        engine_builder,
         Box::new(move |event| {
             match event {
                 ChatEvent::JoinSuccess { channel_id, .. } => {

@@ -8,11 +8,8 @@ extern crate url;
 
 use core::convert::TryFrom;
 use lib3h::{
-    dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine::GhostEngine, RealEngineConfig},
+    engine::{ghost_engine::GhostEngine},
     error::Lib3hError,
-    transport::{memory_mock::transport_memory::TransportMemory, TransportWrapper},
-    transport_wss::TlsConfig,
 };
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
@@ -21,13 +18,15 @@ use lib3h_protocol::{
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
-use lib3h_sodium::{hash, secbuf::SecBuf, SodiumCryptoSystem};
+use lib3h_sodium::{hash, secbuf::SecBuf};
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use url::Url;
+
+type EngineBuilder = fn() -> GhostEngine<'static>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChatEvent {
@@ -87,7 +86,10 @@ impl Drop for SimChat {
 }
 
 impl SimChat {
-    pub fn new(mut handler: HandleEvent, peer_uri: Url) -> Self {
+    pub fn new(
+        engine_builder: EngineBuilder,
+        mut handler: HandleEvent,
+        peer_uri: Url) -> Self {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
         let (out_send, out_recv): (
@@ -103,29 +105,7 @@ impl SimChat {
                 // this thread owns the ghost engine instance
                 // and is responsible for calling process
                 // and handling messages
-                let network_transport = TransportWrapper::new(TransportMemory::new());
-                let crypto = Box::new(SodiumCryptoSystem::new());
-                let config = RealEngineConfig {
-                    tls_config: TlsConfig::Unencrypted,
-                    socket_type: "mem".into(),
-                    bootstrap_nodes: vec![],
-                    work_dir: String::new(),
-                    log_level: 'd',
-                    bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
-                    dht_gossip_interval: 100,
-                    dht_timeout_threshold: 1000,
-                    dht_custom_config: vec![],
-                };
-                let dht_factory = MirrorDht::new_with_config;
-
-                let mut engine: GhostEngine = GhostEngine::new(
-                    "test_engine",
-                    crypto,
-                    config,
-                    dht_factory,
-                    network_transport,
-                )
-                .unwrap();
+                let mut engine = engine_builder();
                 let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> = engine
                     .take_parent_endpoint()
                     .unwrap()
@@ -342,11 +322,46 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lib3h::{
+        dht::mirror_dht::MirrorDht,
+        engine::{ghost_engine::GhostEngine, RealEngineConfig},
+        transport::{memory_mock::transport_memory::TransportMemory, TransportWrapper},
+        transport_wss::TlsConfig,
+    };
+    use lib3h_sodium::SodiumCryptoSystem;
+
+    fn test_engine_builder() -> GhostEngine<'static> {
+        let network_transport = TransportWrapper::new(TransportMemory::new());
+        let crypto = Box::new(SodiumCryptoSystem::new());
+        let config = RealEngineConfig {
+            tls_config: TlsConfig::Unencrypted,
+            socket_type: "mem".into(),
+            bootstrap_nodes: vec![],
+            work_dir: String::new(),
+            log_level: 'd',
+            bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
+            dht_gossip_interval: 100,
+            dht_timeout_threshold: 1000,
+            dht_custom_config: vec![],
+        };
+        let dht_factory = MirrorDht::new_with_config;
+
+        GhostEngine::new(
+            "test_engine",
+            crypto,
+            config,
+            dht_factory,
+            network_transport,
+        )
+        .unwrap()
+    }
 
     #[test]
     fn it_should_echo() {
         let (s, r) = crossbeam_channel::unbounded();
+
         let mut chat = SimChat::new(
+            test_engine_builder,
             Box::new(move |event| {
                 s.send(event.to_owned()).expect("send fail");
             }),
