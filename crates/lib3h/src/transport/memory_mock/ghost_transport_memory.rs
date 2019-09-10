@@ -1,8 +1,7 @@
 use crate::transport::{
-    protocol::*,
     error::TransportError,
-    memory_mock::memory_server,
-    memory_mock::memory_server::*,
+    memory_mock::memory_server::{self, *},
+    protocol::*,
 };
 use lib3h_ghost_actor::prelude::*;
 use std::collections::HashSet;
@@ -115,8 +114,7 @@ impl
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
-                    msg.respond(Ok(RequestToChildResponse::Bind(
-                        BindResultData {
+                    msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                         bound_url: bound_url,
                     })))?;
                 }
@@ -166,8 +164,8 @@ impl
                                 .post(&my_addr, &payload)
                                 .expect("Post on memory server should work");
 
-//                            msg.respond(Ok(RequestToChildResponse::SendMessage {
-//                            }))?;
+                            //                            msg.respond(Ok(RequestToChildResponse::SendMessage {
+                            //                            }))?;
                         }
                     };
                 }
@@ -202,7 +200,7 @@ impl
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
                             RequestToParent::IncomingConnection {
-                                uri: to_connect_uri.clone(),
+                                uri: in_cid.clone(),
                             },
                         )?;
                         std::mem::replace(&mut self.endpoint_self, endpoint_self);

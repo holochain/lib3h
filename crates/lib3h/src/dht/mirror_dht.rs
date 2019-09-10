@@ -40,7 +40,7 @@ pub struct MirrorDht {
 
     /// ghost stuff
     endpoint_parent: Option<DhtEndpoint>,
-    endpoint_self: Detach<DhtEndpointWithContext<()>>,
+    endpoint_self: Detach<DhtEndpointWithContext<(), DhtContext>>,
 }
 
 /// Constructors

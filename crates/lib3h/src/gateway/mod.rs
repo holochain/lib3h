@@ -1,17 +1,12 @@
 pub mod gateway_actor;
-pub mod gateway_transport;
 pub mod gateway_dht;
+pub mod gateway_transport;
 pub mod p2p_gateway;
 pub mod protocol;
 // pub mod wrapper;
 
-use crate::{
-    dht::dht_protocol::*,
-    gateway::protocol::*,
-    transport,
-};
+use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
 use detach::prelude::*;
-use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 use url::Url;
 
@@ -30,33 +25,36 @@ use url::Url;
 //    fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData>;
 //}
 
-/// Gateway to a P2P network.
-/// Combines a transport and a DHT.
+/// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
-/// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
 pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
     /// Transport
-    child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
+    //child_transport_endpoint: transport::protocol::TransportActorParentEndpoint,
+    child_transport_endpoint: Detach<
+        transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, GatewayContext>,
+    >,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn<GatewayUserData>,
+    inner_dht: ChildDhtWrapperDyn<GatewayUserData, GatewayContext>,
+
     // Cache
     this_peer: PeerData,
     // user data for ghost callback
     user_data: GatewayUserData,
 
-    /// self ghost stuff
+    /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,
     endpoint_self: Detach<GatewaySelfEndpoint<(), GatewayContext>>,
 }
 
 // user data for ghost callback
 pub struct GatewayUserData {
-    this_peer: PeerData,
-    maybe_peer: Option<PeerData>,
-    peer_list: Vec<PeerData>,
+    pub this_peer: PeerData,
+    pub maybe_peer: Option<PeerData>,
+    pub peer_list: Vec<PeerData>,
     pub lib3h_outbox: Vec<Lib3hServerProtocol>,
+    pub binding: Url,
 }
 
 impl GatewayUserData {
@@ -70,6 +68,7 @@ impl GatewayUserData {
             maybe_peer: None,
             peer_list: Vec::new(),
             lib3h_outbox: Vec::new(),
+            binding: Url::parse("fixme://host:123").unwrap(),
         }
     }
 }

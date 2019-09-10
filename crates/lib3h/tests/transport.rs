@@ -214,10 +214,7 @@ impl TestTransport {
     }
 
     /// private dispatcher for messages coming from our parent
-    fn handle_RequestToChild(
-        &mut self,
-        mut msg: ToChildMessage,
-    ) -> TransportResult<()> {
+    fn handle_RequestToChild(&mut self, mut msg: ToChildMessage) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => {
                 let mut mockernet = MOCKERNET.write().unwrap();
@@ -269,11 +266,10 @@ impl TestTransport {
                             .publish(RequestToParent::IncomingConnection { uri: from })?;
                     }
                     MockernetEvent::Error(err) => {
-                        self.endpoint_self
-                            .publish(RequestToParent::ErrorOccured {
-                                uri: our_url.clone(),
-                                error: TransportError::new(err),
-                            })?;
+                        self.endpoint_self.publish(RequestToParent::ErrorOccured {
+                            uri: our_url.clone(),
+                            error: TransportError::new(err),
+                        })?;
                     }
                 }
             }

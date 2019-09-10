@@ -121,12 +121,12 @@ pub mod tests {
     fn new_dht_wrapper(
         _is_mirror: bool,
         peer_address: &PeerAddressRef,
-    ) -> Detach<ChildDhtWrapperDyn<DhtData>> {
+    ) -> Detach<ChildDhtWrapperDyn<DhtData, DhtContext>> {
         let dht = new_dht(true, peer_address);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
-    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> PeerData {
+    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>) -> PeerData {
         let mut ud = DhtData::new();
         dht.request(
             DhtContext::NoOp,
@@ -155,7 +155,10 @@ pub mod tests {
         ud.this_peer
     }
 
-    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>, address: &str) -> Option<PeerData> {
+    fn get_peer(
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>,
+        address: &str,
+    ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
             DhtContext::NoOp,
@@ -184,7 +187,7 @@ pub mod tests {
         ud.maybe_peer
     }
 
-    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<PeerData> {
+    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>) -> Vec<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
             DhtContext::NoOp,
@@ -213,7 +216,9 @@ pub mod tests {
         ud.peer_list
     }
 
-    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<Address> {
+    fn get_entry_address_list(
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>,
+    ) -> Vec<Address> {
         let mut ud = DhtData::new();
         dht.request(
             DhtContext::NoOp,
@@ -244,7 +249,7 @@ pub mod tests {
     }
 
     fn get_aspects_of(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>,
         entry_address: &Address,
     ) -> Option<Vec<Address>> {
         let mut ud = DhtData::new();

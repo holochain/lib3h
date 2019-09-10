@@ -2,14 +2,12 @@
 
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    engine::NETWORK_GATEWAY_ID,
-    gateway::{GatewayUserData, P2pGateway, protocol::*},
+    gateway::{protocol::*, GatewayUserData, P2pGateway},
     transport,
 };
+use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
-use std::collections::{HashMap, VecDeque};
-use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -21,7 +19,12 @@ impl P2pGateway {
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
+        child_transport_endpoint: Detach<
+            transport::protocol::TransportActorParentContextEndpoint<
+                GatewayUserData,
+                GatewayContext,
+            >,
+        >,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
@@ -37,13 +40,10 @@ impl P2pGateway {
             identifier: identifier.to_owned(),
             child_transport_endpoint,
             inner_dht: ChildDhtWrapperDyn::new(dht, "gateway_dht"),
-            //            connection_map: HashMap::new(),
-            //            transport_inbox: VecDeque::new(),
-            //            transport_inject_events: Vec::new(),
             this_peer: PeerData {
-                peer_address: String::new(),
-                peer_uri: Url::parse("dummy://default").unwrap(),
-                timestamp: 0,
+                peer_address: dht_config.this_peer_address.clone(),
+                peer_uri: dht_config.this_peer_uri.clone(),
+                timestamp: 0, // FIXME
             },
             user_data: GatewayUserData::new(),
             endpoint_parent: Some(endpoint_parent),
@@ -53,7 +53,12 @@ impl P2pGateway {
     /// Helper Ctor
     pub fn new_with_space(
         space_address: &Address,
-        child_transport_endpoint: transport::protocol::TransportEndpointWithContext<GatewayUserData, GatewayContext>,
+        child_transport_endpoint: Detach<
+            transport::protocol::TransportActorParentContextEndpoint<
+                GatewayUserData,
+                GatewayContext,
+            >,
+        >,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
@@ -72,7 +77,7 @@ impl P2pGateway {
     //    fn transport_inject_event(&mut self, evt: TransportEvent) {
     //        self.transport_inject_events.push(evt);
     //    }
-     //    pub fn process_dht(&mut self) -> GhostResult<()> {
+    //    pub fn process_dht(&mut self) -> GhostResult<()> {
     //        let res = self.inner_dht.process(&mut self.user_data);
     //        res
     //    }
@@ -81,16 +86,16 @@ impl P2pGateway {
     //        &mut self.inner_dht
     //    }
     //
-    //    pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
-    //        self.user_data.lib3h_outbox.drain(0..).collect()
-    //    }
+    pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
+        self.user_data.lib3h_outbox.drain(0..).collect()
+    }
 
     ///
     pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
         trace!("get_peer_list_sync() ...");
         self.inner_dht
             .request(
-                DhtContext::NoOp,
+                GatewayContext::NoOp,
                 DhtRequestToChild::RequestPeerList,
                 Box::new(|mut ud, _context, response| {
                     let response = {
@@ -124,7 +129,7 @@ impl P2pGateway {
         }
         self.inner_dht
             .request(
-                DhtContext::NoOp,
+                GatewayContext::NoOp,
                 DhtRequestToChild::RequestThisPeer,
                 Box::new(|mut ud, _context, response| {
                     let response = {
@@ -154,7 +159,7 @@ impl P2pGateway {
     pub fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht
             .request(
-                DhtContext::NoOp,
+                GatewayContext::NoOp,
                 DhtRequestToChild::RequestPeer(peer_address.to_string()),
                 Box::new(|mut ud, _context, response| {
                     let response = {

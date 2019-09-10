@@ -114,9 +114,7 @@ impl TransportEncoding {
         >,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { uri } => {
-                self.handle_incoming_connection(uri)
-            }
+            RequestToParent::IncomingConnection { uri } => self.handle_incoming_connection(uri),
             RequestToParent::ReceivedData { uri, payload } => {
                 self.handle_received_data(uri, payload)
             }
@@ -476,9 +474,7 @@ mod tests {
                         // bit of a hack, just always send an incoming connection
                         // in front of all received data messages
                         self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection {
-                                uri: uri.clone(),
-                            })?;
+                            .publish(RequestToParent::IncomingConnection { uri: uri.clone() })?;
                         self.endpoint_self
                             .publish(RequestToParent::ReceivedData { uri, payload })?;
                     }

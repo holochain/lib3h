@@ -3,11 +3,11 @@
 use crate::{
     dht::dht_protocol::*,
     engine::{
-        p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
+        p2p_protocol::P2pProtocol, RealEngine, NETWORK_GATEWAY_ID, real_engine::handle_gossipTo,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    transport,
     gateway::protocol::*,
+    transport,
 };
 
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
@@ -23,15 +23,15 @@ impl RealEngine {
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network gateway
-        detach_run!(&mut self.network_gateway, |ng| ng.process(&mut ()))?;
+        self.network_gateway.process(&mut self.gateway_user_data)?;
         for mut request in self.network_gateway.drain_messages() {
             let payload = request.take_message().expect("exists");
             let mut output = self.handle_network_request(payload)?;
             outbox.append(&mut output);
         }
-        // DHT magic
-        let mut temp = self.network_gateway.as_mut().drain_dht_outbox();
-        self.temp_outbox.append(&mut temp);
+//        // FIXME: DHT magic
+//        let mut temp = self.network_gateway.drain_dht_outbox();
+//        self.temp_outbox.append(&mut temp);
         // Done
         Ok((true /* fixme */, outbox))
     }
@@ -41,34 +41,28 @@ impl RealEngine {
         &mut self,
         request: GatewayRequestToParent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!(
-            "{} << handle_network_request: [{:?}]",
-            self.name, request,
-        );
+        debug!("{} << handle_network_request: [{:?}]", self.name, request,);
+        //let parent_request = request.clone();
         match request {
             GatewayRequestToParent::Dht(dht_request) => {
                 self.handle_network_dht_request(dht_request)
-            },
-            GatewayRequestToParent::Transport(transport_request) => {
-                self.handle_network_transport_request(transport_request)
             }
-            _ => {
-                // FIXME: no-op ?
-                Ok(vec![])
-            },
+            GatewayRequestToParent::Transport(transport_request) => {
+                self.handle_network_transport_request(&transport_request)
+            }
         }
     }
 
-    /// Handle a DhtToParentMessage sent to us by our network gateway
+    /// Handle a DhtRequestToParent sent to us by our network gateway
     fn handle_network_dht_request(
         &mut self,
-        mut msg: DhtToParentMessage,
+        request: DhtRequestToParent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_network_dht_request: {:?}", self.name, msg);
+        debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         let outbox = Vec::new();
-        match msg.take_message().expect("exists") {
+        match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(&mut self.network_gateway, gossip_data)
+                handle_gossipTo(NETWORK_GATEWAY_ID, &mut self.network_gateway, gossip_data)
                     .expect("Failed to gossip with network_gateway");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
@@ -84,12 +78,14 @@ impl RealEngine {
                 let cmd = GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
-                    }, vec![]);
+                        payload: Vec::new(),
+                    },
+                );
                 self.network_gateway.publish(cmd)?;
             }
-            DhtRequestToParent::PeerTimedOut(peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
-               // FIXME
+                // FIXME
             }
             // No entries in Network DHT
             DhtRequestToParent::HoldEntryRequested {
@@ -113,7 +109,10 @@ impl RealEngine {
         &mut self,
         request: &transport::protocol::RequestToParent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_network_transport_request: {:?}", self.name, request);
+        debug!(
+            "{} << handle_network_transport_request: {:?}",
+            self.name, request
+        );
         let mut outbox = Vec::new();
         // Note: use same order as the enum
         match request {
@@ -127,21 +126,21 @@ impl RealEngine {
                     };
                     outbox.push(Lib3hServerProtocol::Disconnected(data));
                 }
-            },
+            }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
-                let mut output = self.handle_incoming_connection(uri)?;
+                let mut output = self.handle_incoming_connection(uri.clone())?;
                 outbox.append(&mut output);
-            },
-//            TransportEvent::ConnectionClosed(id) => {
-//                self.network_connections.remove(id);
-//                // Output a Lib3hServerProtocol::Disconnected if it was the last connection
-//                if self.network_connections.is_empty() {
-//                    let data = DisconnectedData {
-//                        network_id: "FIXME".to_string(), // TODO #172
-//                    };
-//                    outbox.push(Lib3hServerProtocol::Disconnected(data));
-//                }
-//            }
+            }
+            //            TransportEvent::ConnectionClosed(id) => {
+            //                self.network_connections.remove(id);
+            //                // Output a Lib3hServerProtocol::Disconnected if it was the last connection
+            //                if self.network_connections.is_empty() {
+            //                    let data = DisconnectedData {
+            //                        network_id: "FIXME".to_string(), // TODO #172
+            //                    };
+            //                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+            //                }
+            //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
                 let mut de = Deserializer::new(&payload[..]);
@@ -159,14 +158,12 @@ impl RealEngine {
         Ok(outbox)
     }
 
-
     fn handle_incoming_connection(
         &mut self,
-        uri: &Url,
-        request_id: String,
+        net_uri: Url,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // TODO #150 - Should do this in next process instead
-        let peer_list = self.network_gateway.as_mut().get_peer_list_sync();
+        let peer_list = self.get_peer_list_sync();
         trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
 
         // TODO #150 - Should do this in next process instead
@@ -181,13 +178,19 @@ impl RealEngine {
             trace!(
                 "AllJoinedSpaceList: {:?} to {:?}",
                 our_joined_space_list,
-                uri,
+                net_uri,
             );
-            // id is connectionId but we need a transportId, so search for it in the DHT
-            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri);
+            // we need a transportId, so search for it in the DHT
+            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == net_uri);
             if let Some(peer_data) = maybe_peer_data {
                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                self.network_transport.send(&[&peer_data.peer_address], &payload)?;
+                self.network_gateway
+                    .publish(GatewayRequestToChild::Transport(
+                        transport::protocol::RequestToChild::SendMessage {
+                            uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
+                            payload,
+                        },
+                    ))?;
             }
             // TODO END
         }
@@ -195,10 +198,13 @@ impl RealEngine {
         // Output a Lib3hServerProtocol::Connected if its the first connection
         let mut outbox = Vec::new();
         if self.network_connections.is_empty() {
-            let data = ConnectedData { request_id, uri };
+            let data = ConnectedData {
+                request_id: "fixme".to_string(),
+                uri: net_uri.clone(),
+            };
             outbox.push(Lib3hServerProtocol::Connected(data));
         }
-        let _ = self.network_connections.insert(uri.to_owned());
+        let _ = self.network_connections.insert(net_uri.to_owned());
         Ok(outbox)
     }
 
@@ -220,21 +226,18 @@ impl RealEngine {
                 };
                 // Check if its for the network_gateway
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    let _ = self
-                        .network_gateway
-                        .as_mut()
-                        .as_dht_mut()
-                        .publish(DhtRequestToChild::HandleGossip(gossip));
+                    let _ = self.network_gateway.publish(GatewayRequestToChild::Dht(
+                        DhtRequestToChild::HandleGossip(gossip),
+                    ));
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        let _ = space_gateway
-                            .as_mut()
-                            .as_dht_mut()
-                            .publish(DhtRequestToChild::HandleGossip(gossip));
+                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
+                            DhtRequestToChild::HandleGossip(gossip),
+                        ));
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -277,9 +280,9 @@ impl RealEngine {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    let _ = space_gateway
-                        .publish(GatewayRequestToChild::Dht(
-                            DhtRequestToChild::HoldPeer(peer_data.clone())));
+                    let _ = space_gateway.publish(GatewayRequestToChild::Dht(
+                        DhtRequestToChild::HoldPeer(peer_data.clone()),
+                    ));
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -287,9 +290,9 @@ impl RealEngine {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        let _ = space_gateway
-                            .publish(GatewayRequestToChild::Dht(
-                                DhtRequestToChild::HoldPeer(peer_data.clone())));
+                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
+                            DhtRequestToChild::HoldPeer(peer_data.clone()),
+                        ));
                     }
                 }
             }

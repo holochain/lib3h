@@ -2,32 +2,27 @@
 
 use crate::{
     dht::dht_protocol::*,
-    engine::p2p_protocol::P2pProtocol,
-    gateway::{P2pGateway, protocol::*},
-    transport,
-    transport::error::{TransportError, TransportResult},
     error::*,
+    gateway::{protocol::*, P2pGateway},
+    transport,
 };
-use lib3h_protocol::DidWork;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
-use url::Url;
 use lib3h_ghost_actor::prelude::*;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
     pub(crate) fn handle_dht_RequestToChild(
         &mut self,
-        mut request: DhtToChildMessage,
+        request: DhtRequestToChild,
+        parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
         // forward to child dht
         let _ = self.inner_dht.request(
-            GatewayContext::Dht { parent_request: request.clone() },
-            GatewayRequestToChild::Dht(request),
+            GatewayContext::ParentRequest(parent_msg),
+            request,
             Box::new(|_me, context, response| {
                 let msg = {
                     match context {
-                        GatewayContext::Dht { parent_request } => parent_request,
+                        GatewayContext::ParentRequest(parent_request) => parent_request,
                         _ => {
                             return Err(
                                 format!("wanted GatewayContext::Dht, got {:?}", context).into()
@@ -38,7 +33,7 @@ impl P2pGateway {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                            msg.respond(Err(Lib3hError::new_other("timeout")))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
@@ -47,14 +42,13 @@ impl P2pGateway {
                 // FIXME: handle it?
                 // me.handle_dht_RequestToChildResponse(response)?;
                 // forward back to parent
-                msg.respond(response)?;
+                msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
                 Ok(())
             }),
         );
         // Done
         Ok(())
     }
-
 
     /// Handle a request sent to us by our child DHT
     pub(crate) fn handle_dht_RequestToParent(&mut self, mut request: DhtToParentMessage) {
@@ -77,17 +71,21 @@ impl P2pGateway {
                     self.identifier, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
-                self.child_transport_endpoint
-                    .publish(transport::protocol::RequestToParent::SendMessage {
+                self.child_transport_endpoint.publish(
+                    transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Vec::new(),
-                    });
+                    },
+                );
             }
-            DhtRequestToParent::PeerTimedOut(peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // TODO
             }
             // No entries in Network DHT
-            DhtRequestToParent::HoldEntryRequested { from_peer: _, entry: _ } => {
+            DhtRequestToParent::HoldEntryRequested {
+                from_peer: _,
+                entry: _,
+            } => {
                 unreachable!();
             }
             DhtRequestToParent::EntryPruned(_) => {

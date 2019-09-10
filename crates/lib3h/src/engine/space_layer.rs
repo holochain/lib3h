@@ -3,8 +3,8 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
-    gateway::protocol::*,
+    engine::{p2p_protocol::SpaceAddress, ChainId, RealEngine, real_engine::handle_gossipTo},
+    gateway::{protocol::*, GatewayUserData},
 };
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
@@ -15,14 +15,12 @@ use std::collections::HashMap;
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
 impl RealEngine {
     /// Return list of space+this_peer for all currently joined Spaces
-    pub fn get_all_spaces(&self) -> Vec<(SpaceAddress, PeerData)> {
+    pub fn get_all_spaces(&mut self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
-        for (chainId, space_gateway) in self.space_gateway_map.iter() {
+        let chain_id_list: Vec<ChainId> = self.space_gateway_map.iter().map(|(id, _)| id.clone()).collect();
+        for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((
-                space_address,
-                space_gateway.get_this_peer_sync().clone(),
-            ));
+            result.push((space_address, self.get_this_peer_sync(Some(chainId.clone())).clone()));
         }
         result
     }
@@ -31,11 +29,11 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<GatewayParentWrapperDyn<(), GatewayContext>> {
+    ) -> Option<&mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
-                return Some(space_gateway.clone());
+                return Some(space_gateway);
             }
         }
         None
@@ -49,12 +47,12 @@ impl RealEngine {
         let mut outbox = Vec::new();
         let mut space_outbox_map = HashMap::new();
         for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            detach_run!(&mut self.space_gateway, |sg| sg.process(&mut ()))?;
-            let request_list = self.space_gateway.drain_messages();
+            space_gateway.process(&mut self.gateway_user_data);
+            let request_list = space_gateway.drain_messages();
             space_outbox_map.insert(chain_id.clone(), request_list);
-            // DHT magic
-            let mut temp = space_gateway.as_mut().drain_dht_outbox();
-            self.temp_outbox.append(&mut temp);
+//            // FIXME: DHT magic
+//            let mut temp = space_gateway.drain_dht_outbox();
+//            self.temp_outbox.append(&mut temp);
         }
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
@@ -79,7 +77,7 @@ impl RealEngine {
             self.name, chain_id, request,
         );
         let mut outbox = Vec::new();
-        let space_gateway = self
+        let mut space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
@@ -89,7 +87,7 @@ impl RealEngine {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossipTo(space_gateway, gossip_data)
+                        handle_gossipTo(&chain_id.0.to_string(), &mut space_gateway, gossip_data)
                             .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
@@ -99,9 +97,7 @@ impl RealEngine {
                     DhtRequestToParent::HoldPeerRequested(peer_data) => {
                         debug!(
                             "{} -- ({}).post() HoldPeer {:?}",
-                            self.name,
-                            chain_id.0,
-                            peer_data,
+                            self.name, chain_id.0, peer_data,
                         );
                         // For now accept all request
                         space_gateway.publish(GatewayRequestToChild::Dht(
@@ -152,9 +148,6 @@ impl RealEngine {
             GatewayRequestToParent::Transport(_transport_request) => {
                 // FIXME
             }
-            // Handle Space's Other request
-            // ============================
-            _ => (), // FIXME
         }
         Ok(outbox)
     }

@@ -33,11 +33,10 @@ pub enum RequestToParentResponse {
 }
 
 pub type ToChildMessage =
-GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
+    GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
 
 pub type ToParentMessage =
-GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, TransportError>;
-
+    GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, TransportError>;
 
 pub type DynTransportActor = Box<
     dyn GhostActor<
@@ -56,8 +55,17 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportEndpointWithContext<UserData, Context> =
-    TransportActorSelfEndpoint<UserData, Context>;
+
+pub type TransportActorParentContextEndpoint<UserData, Context> = GhostContextEndpoint<
+    UserData,
+    Context,
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
 pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
     UserData,
     Context,
@@ -77,8 +85,6 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type ChildTransportWrapperDyn<UserData, Context> =
-    TransportActorParentWrapperDyn<UserData, Context>;
 pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
     UserData,
     Context,

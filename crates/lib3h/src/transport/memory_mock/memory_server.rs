@@ -1,6 +1,4 @@
-use crate::transport::{
-    error::{TransportError, TransportResult},
-};
+use crate::transport::error::{TransportError, TransportResult};
 use lib3h_protocol::DidWork;
 use std::{
     collections::{HashMap, VecDeque},

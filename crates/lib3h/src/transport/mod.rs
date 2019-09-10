@@ -51,10 +51,7 @@ pub use transport_multiplex::TransportMultiplex;
 pub mod tests {
     #![allow(non_snake_case)]
 
-    use crate::{
-        transport::{memory_mock::transport_memory, protocol::*},
-        // transport_wss::{TlsConfig, TransportWss},
-    };
+    use crate::transport::{memory_mock::transport_memory, protocol::*};
 
     use crate::tests::enable_logging_for_test;
     use url::Url;
@@ -75,27 +72,27 @@ pub mod tests {
         send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
     }
 
-//    #[test]
-//    fn wss_send_test() {
-//        enable_logging_for_test(true);
-//        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
-//        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
-//        let uri_A = Url::parse("wss://127.0.0.1:64529/A").unwrap();
-//        let uri_B = Url::parse("wss://127.0.0.1:64530/B").unwrap();
-//
-//        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
-//    }
+    //    #[test]
+    //    fn wss_send_test() {
+    //        enable_logging_for_test(true);
+    //        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
+    //        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
+    //        let uri_A = Url::parse("wss://127.0.0.1:64529/A").unwrap();
+    //        let uri_B = Url::parse("wss://127.0.0.1:64530/B").unwrap();
+    //
+    //        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
+    //    }
 
-//    #[test]
-//    fn wss_send_test_tls() {
-//        enable_logging_for_test(true);
-//        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
-//        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
-//        let uri_A = Url::parse("wss://127.0.0.1:64531/TLS_A").unwrap();
-//        let uri_B = Url::parse("wss://127.0.0.1:64532/TLS_B").unwrap();
-//
-//        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
-//    }
+    //    #[test]
+    //    fn wss_send_test_tls() {
+    //        enable_logging_for_test(true);
+    //        let mut node_A = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
+    //        let mut node_B = TransportWss::with_std_tcp_stream(TlsConfig::FakeServer);
+    //        let uri_A = Url::parse("wss://127.0.0.1:64531/TLS_A").unwrap();
+    //        let uri_B = Url::parse("wss://127.0.0.1:64532/TLS_B").unwrap();
+    //
+    //        send_test(&mut node_A, &mut node_B, &uri_A, &uri_B);
+    //    }
 
     fn send_test(
         node_A: &mut impl Transport,

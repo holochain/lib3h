@@ -132,9 +132,7 @@ impl TransportMultiplex {
         >,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { uri } => {
-                self.handle_incoming_connection(uri)
-            }
+            RequestToParent::IncomingConnection { uri } => self.handle_incoming_connection(uri),
             RequestToParent::ReceivedData { uri, payload } => {
                 self.handle_received_data(uri, payload)
             }

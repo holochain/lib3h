@@ -1,50 +1,45 @@
 use crate::{
-    dht::dht_protocol::*,
-    error::*,
-    transport,
+    dht::dht_protocol::*, error::*, gateway::gateway_transport::TransportContext, transport,
 };
 use lib3h_ghost_actor::prelude::*;
-use url::Url;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GatewayContext {
-    Transport {parent_request: transport::protocol::ToChildMessage},
-    Dht {parent_request: DhtToChildMessage},
-    Bind {
-        maybe_parent_msg: Option<transport::protocol::ToChildMessage>,
-    },
-    SendMessage {
-        maybe_parent_msg: Option<transport::protocol::ToChildMessage>,
-    },
+    NoOp,
+    Dht(DhtContext),
+    Transport(TransportContext),
+    ParentRequest(GatewayToChildMessage),
+    MaybeParentRequest(Option<GatewayToChildMessage>),
 }
 
 /// Gateway protocol enums for use with GhostActor implementation
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GatewayRequestToChild {
-    // FIXME
     Transport(transport::protocol::RequestToChild),
     Dht(DhtRequestToChild),
+    SendAll(Vec<u8>),
+    // FIXME
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GatewayRequestToChildResponse {
-    // FIXME
     Transport(transport::protocol::RequestToChildResponse),
     Dht(DhtRequestToChildResponse),
+    // FIXME
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GatewayRequestToParent {
-    // FIXME
     Transport(transport::protocol::RequestToParent),
     Dht(DhtRequestToParent),
+    // FIXME
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GatewayRequestToParentResponse {
-    // FIXME
     Transport(transport::protocol::RequestToParentResponse),
     Dht(DhtRequestToParentResponse),
+    // FIXME
 }
 
 pub type GatewayToChildMessage = GhostMessage<

@@ -6,14 +6,14 @@ use url::Url;
 use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    engine::{p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID},
+    engine::{p2p_protocol::*, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID, ChainId},
     error::Lib3hResult,
-    gateway::{P2pGateway, protocol::*},
+    gateway::{protocol::*, GatewayUserData, P2pGateway},
     track::Tracker,
-    transport,
-    transport::memory_mock::ghost_transport_memory::*,
-    // transport_wss::TransportWss,
+    transport::{self, memory_mock::ghost_transport_memory::*},
+    transport::TransportMultiplex,
 };
+use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
@@ -86,37 +86,6 @@ impl TransportKeys {
 //    }
 //}
 
-///
-pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
-    trace!("get_peer_list_sync() ...");
-    self.inner_dht
-        .request(
-            DhtContext::NoOp,
-            DhtRequestToChild::RequestPeerList,
-            Box::new(|mut ud, _context, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
-                    }
-                };
-                if let DhtRequestToChildResponse::RequestPeerList(peer_list_response) = response
-                {
-                    ud.peer_list = peer_list_response;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        )
-        .expect("sync functions should work");
-    self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
-    self.user_data.peer_list.clone()
-}
-
 /// Constructor
 impl RealEngine {
     /// Constructor with TransportMemory
@@ -127,43 +96,49 @@ impl RealEngine {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let memory_transport = transport::protocol::ChildTransportWrapperDyn::new(GhostTransportMemory::new());
-        let mut memory_network_endpoint: GhostTransportMemoryEndpointContextParent = memory_transport
-            .take_parent_endpoint()
-            .expect("exists")
-            .as_context_endpoint_builder()
-            .request_id_prefix("tmem_to_child_")
-            .build::<(), ()>();
+        //        let memory_transport = transport::protocol::TransportActorParentWrapperDyn::new(
+        //            GhostTransportMemory::new(),
+        //        "memory_transport_");
+        let mut memory_transport = GhostTransportMemory::new();
+        let mut memory_network_endpoint = Detach::new(
+            memory_transport
+                .take_parent_endpoint()
+                .expect("exists")
+                .as_context_endpoint_builder()
+                .request_id_prefix("tmem_to_child_")
+                .build::<GatewayUserData, GatewayContext>(),
+        );
 
         // Bind & create this_net_peer
-        let mut binding = Url::parse("fixme://host:123").unwrap(),
-        memory_transport
-            .request(
-                (),
-                transport::protocol::RequestToChild::Bind { spec: config.bind_url },
-                Box::new(|mut binding, _context, response| {
-                    let response = {
-                        match response {
-                            GhostCallbackData::Timeout => panic!("timeout"),
-                            GhostCallbackData::Response(response) => match response {
-                                Err(e) => panic!("{:?}", e),
-                                Ok(response) => response,
-                            },
-                        }
-                    };
-                    if let transport::protocol::RequestToChild::Bind { spec } = response
-                    {
-                        *binding = spec;
-                    } else {
-                        panic!("bad response to bind: {:?}", response);
+        let mut gateway_ud = GatewayUserData::new();
+        memory_network_endpoint.as_mut().request(
+            GatewayContext::NoOp,
+            transport::protocol::RequestToChild::Bind {
+                spec: config.bind_url.clone(),
+            },
+            Box::new(|mut ud, _context, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
                     }
-                    Ok(())
-                }),
-            );
-        let _ = memory_transport.process(&mut binding);
+                };
+                if let transport::protocol::RequestToChildResponse::Bind(bind_data) = response {
+                    ud.binding = bind_data.bound_url;
+                } else {
+                    panic!("bad response to bind: {:?}", response);
+                }
+                Ok(())
+            }),
+        );
+        let _ = memory_transport.process();
+        let _ = memory_network_endpoint.process(&mut gateway_ud);
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
-            peer_uri: binding,
+            peer_uri: gateway_ud.binding,
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
@@ -175,14 +150,18 @@ impl RealEngine {
             timeout_threshold: config.dht_timeout_threshold,
         };
         // Create network gateway
-        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
-            NETWORK_GATEWAY_ID,
-            memory_network_endpoint,
-            dht_factory,
-            &dht_config,
-        ));
+        let network_gateway = GatewayParentWrapperDyn::new(
+            Box::new(P2pGateway::new(
+                NETWORK_GATEWAY_ID,
+                memory_network_endpoint,
+                dht_factory,
+                &dht_config,
+            )),
+            "network_gateway_",
+        );
         debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        let multiplexer = TransportMultiplex::new(Box::new(memory_transport));
         Ok(RealEngine {
             crypto,
             config,
@@ -190,7 +169,8 @@ impl RealEngine {
             name: name.to_string(),
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
-            network_transport,
+            multiplexer,
+            // network_transport_endpoint: memory_network_endpoint,
             network_gateway,
             this_net_peer,
             network_connections: HashSet::new(),
@@ -198,7 +178,87 @@ impl RealEngine {
             transport_keys,
             process_count: 0,
             temp_outbox: Vec::new(),
+            gateway_user_data: GatewayUserData::new(),
         })
+    }
+
+    ///
+    pub fn get_this_peer_sync(
+        &mut self,
+        maybe_chainId: Option<ChainId>,
+    ) -> PeerData {
+        trace!("engine.get_this_peer_sync() ...");
+        let gateway = if let Some(chain_id) = maybe_chainId {
+            self
+                .space_gateway_map
+                .get_mut(&chain_id)
+                .expect("Should have the space gateway")
+        } else {
+            &mut self.network_gateway
+        };
+        gateway
+            .request(
+                GatewayContext::NoOp,
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestThisPeer),
+                Box::new(|mut ud, _context, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let GatewayRequestToChildResponse::Dht(
+                        DhtRequestToChildResponse::RequestThisPeer(peer_response),
+                    ) = response
+                    {
+                        ud.this_peer = peer_response;
+                    } else {
+                        panic!("bad response to bind: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
+        gateway.process(&mut self.gateway_user_data).unwrap(); // FIXME unwrap
+        self.gateway_user_data.this_peer.clone()
+    }
+
+    ///
+    pub fn get_peer_list_sync(
+        &mut self,
+    ) -> Vec<PeerData> {
+        trace!("engine.get_peer_list_sync() ...");
+        self.network_gateway
+            .request(
+                GatewayContext::NoOp,
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
+                Box::new(|mut ud, _context, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let GatewayRequestToChildResponse::Dht(
+                        DhtRequestToChildResponse::RequestPeerList(peer_list_response),
+                    ) = response
+                    {
+                        ud.peer_list = peer_list_response;
+                    } else {
+                        panic!("bad response to bind: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
+        self.network_gateway.process(&mut self.gateway_user_data).unwrap(); // FIXME unwrap
+        self.gateway_user_data.peer_list.clone()
     }
 }
 
@@ -209,9 +269,7 @@ impl NetworkEngine for RealEngine {
     }
 
     fn advertise(&self) -> Url {
-        self.this_net_peer
-            .peer_uri
-            .to_owned()
+        self.this_net_peer.peer_uri.to_owned()
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
@@ -269,25 +327,25 @@ impl RealEngine {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        let mut result: Lib3hResult<()> = Ok(());
+        let /*mut*/ result: Lib3hResult<()> = Ok(());
 
-        for space_gatway in self.space_gateway_map.values_mut() {
-            let res = space_gatway.as_transport_mut().close_all();
-            // Continue closing connections even if some failed
-            if let Err(e) = res {
-                if result.is_ok() {
-                    result = Err(e.into());
-                }
-            }
-        }
         // FIXME
-//        self.network_gateway
-//            .as_transport_mut()
-//            .close_all()
-//            .map_err(|e| {
-//                error!("Closing of some connection failed: {:?}", e);
-//                e
-//            })?;
+        //        for space_gatway in self.space_gateway_map.values_mut() {
+        //            let res = space_gatway.as_transport_mut().close_all();
+        //            // Continue closing connections even if some failed
+        //            if let Err(e) = res {
+        //                if result.is_ok() {
+        //                    result = Err(e.into());
+        //                }
+        //            }
+        //        }
+        //        self.network_gateway
+        //            .as_transport_mut()
+        //            .close_all()
+        //            .map_err(|e| {
+        //                error!("Closing of some connection failed: {:?}", e);
+        //                e
+        //            })?;
 
         result
     }
@@ -333,13 +391,14 @@ impl RealEngine {
                 let cmd = GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: msg.peer_uri,
-                    payload: Vec::new(),
-                    });
+                        payload: Vec::new(),
+                    },
+                );
                 self.network_gateway.publish(cmd)?;
 
-//                // Convert into TransportCommand & post to network gateway
-//                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
-//                self.network_gateway.as_transport_mut().post(cmd)?;
+                //                // Convert into TransportCommand & post to network gateway
+                //                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
+                //                self.network_gateway.as_transport_mut().post(cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
@@ -385,8 +444,7 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let dht_request =
-                        if is_data_for_author_list {
+                        let dht_request = if is_data_for_author_list {
                             DhtRequestToChild::BroadcastEntry(msg.entry)
                         } else {
                             DhtRequestToChild::HoldEntryAspectAddress(msg.entry)
@@ -406,9 +464,9 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let _ = space_gateway
-                            .publish(GatewayRequestToChild::Dht(
-                                DhtRequestToChild::BroadcastEntry(msg.entry)));
+                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
+                            DhtRequestToChild::BroadcastEntry(msg.entry),
+                        ));
                     }
                 }
             }
@@ -423,9 +481,9 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let _ = space_gateway
-                            .publish(GatewayRequestToChild::Dht(
-                                DhtRequestToChild::HoldEntryAspectAddress(msg.entry)));
+                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
+                            DhtRequestToChild::HoldEntryAspectAddress(msg.entry),
+                        ));
                     }
                 }
             }
@@ -479,93 +537,94 @@ impl RealEngine {
 
     fn serve_HandleGetAuthoringEntryListResult(
         &mut self,
-        outbox: &mut Vec<Lib3hServerProtocol>,
-        msg: EntryListData,
+        _outbox: &mut Vec<Lib3hServerProtocol>,
+        _msg: EntryListData,
     ) -> Lib3hResult<()> {
-        if !self.request_track.has(&msg.request_id) {
-            error!("untracked HandleGetAuthoringEntryListResult");
-        } else {
-            match self.request_track.remove(&msg.request_id) {
-                Some(data) => match data {
-                    RealEngineTrackerData::GetAuthoringEntryList => (),
-                    _ => error!("bad track type HandleGetAuthoringEntryListResult"),
-                },
-                None => error!("bad track type HandleGetAuthoringEntryListResult"),
-            };
-        }
-        let maybe_space = self.get_space_or_fail(
-            &msg.space_address,
-            &msg.provider_agent_id,
-            &msg.request_id,
-            None,
-        );
-        if let Err(res) = maybe_space {
-            outbox.push(res);
-            return Ok(());
-        }
-        let space_gateway = maybe_space.unwrap();
-        // Request every 'new' Entry from Core
-        for (entry_address, aspect_address_list) in msg.address_map.clone() {
-            // Check aspects and only request entry with new aspects
-            space_gateway.as_mut().as_dht_mut().request(
-                DhtContext::RequestAspectsOf {
-                    entry_address: entry_address.clone(),
-                    aspect_address_list,
-                    msg: msg.clone(),
-                    request_id: self.request_track.reserve(),
-                },
-                DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                Box::new(|ud, context, response| {
-                    let (entry_address, aspect_address_list, msg, request_id) = {
-                        if let DhtContext::RequestAspectsOf {
-                            entry_address,
-                            aspect_address_list,
-                            msg,
-                            request_id,
-                        } = context
-                        {
-                            (entry_address, aspect_address_list, msg, request_id)
-                        } else {
-                            panic!("bad context type");
-                        }
-                    };
-                    let response = {
-                        match response {
-                            GhostCallbackData::Timeout => panic!("timeout"),
-                            GhostCallbackData::Response(response) => match response {
-                                Err(e) => panic!("{:?}", e),
-                                Ok(response) => response,
-                            },
-                        }
-                    };
-                    if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
-                        response
-                    {
-                        let can_fetch = match maybe_known_aspects {
-                            None => true,
-                            Some(known_aspects) => {
-                                let can = !includes(&known_aspects, &aspect_address_list);
-                                can
-                            }
-                        };
-                        if can_fetch {
-                            let msg_data = FetchEntryData {
-                                space_address: msg.space_address.clone(),
-                                entry_address: entry_address.clone(),
-                                request_id,
-                                provider_agent_id: msg.provider_agent_id.clone(),
-                                aspect_address_list: None,
-                            };
-                            ud.lib3h_outbox
-                                .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
-                        }
-                    } else {
-                        panic!("bad response to RequestAspectsOf: {:?}", response);
-                    }
-                    Ok(())
-                }),
-            )?;
-        }
+        // FIXME
+        //        if !self.request_track.has(&msg.request_id) {
+        //            error!("untracked HandleGetAuthoringEntryListResult");
+        //        } else {
+        //            match self.request_track.remove(&msg.request_id) {
+        //                Some(data) => match data {
+        //                    RealEngineTrackerData::GetAuthoringEntryList => (),
+        //                    _ => error!("bad track type HandleGetAuthoringEntryListResult"),
+        //                },
+        //                None => error!("bad track type HandleGetAuthoringEntryListResult"),
+        //            };
+        //        }
+        //        let maybe_space = self.get_space_or_fail(
+        //            &msg.space_address,
+        //            &msg.provider_agent_id,
+        //            &msg.request_id,
+        //            None,
+        //        );
+        //        if let Err(res) = maybe_space {
+        //            outbox.push(res);
+        //            return Ok(());
+        //        }
+        //        let space_gateway = maybe_space.unwrap();
+        //        // Request every 'new' Entry from Core
+        //        for (entry_address, aspect_address_list) in msg.address_map.clone() {
+        //            // Check aspects and only request entry with new aspects
+        //            space_gateway.request(
+        //                GatewayContext::Dht(DhtContext::RequestAspectsOf {
+        //                    entry_address: entry_address.clone(),
+        //                    aspect_address_list,
+        //                    msg: msg.clone(),
+        //                    request_id: self.request_track.reserve(),
+        //                }),
+        //                GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(entry_address.clone())),
+        //                Box::new(|ud, context, response| {
+        //                    let (entry_address, aspect_address_list, msg, request_id) = {
+        //                        if let DhtContext::RequestAspectsOf {
+        //                            entry_address,
+        //                            aspect_address_list,
+        //                            msg,
+        //                            request_id,
+        //                        } = context
+        //                        {
+        //                            (entry_address, aspect_address_list, msg, request_id)
+        //                        } else {
+        //                            panic!("bad context type");
+        //                        }
+        //                    };
+        //                    let response = {
+        //                        match response {
+        //                            GhostCallbackData::Timeout => panic!("timeout"),
+        //                            GhostCallbackData::Response(response) => match response {
+        //                                Err(e) => panic!("{:?}", e),
+        //                                Ok(response) => response,
+        //                            },
+        //                        }
+        //                    };
+        //                    if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
+        //                        response
+        //                    {
+        //                        let can_fetch = match maybe_known_aspects {
+        //                            None => true,
+        //                            Some(known_aspects) => {
+        //                                let can = !includes(&known_aspects, &aspect_address_list);
+        //                                can
+        //                            }
+        //                        };
+        //                        if can_fetch {
+        //                            let msg_data = FetchEntryData {
+        //                                space_address: msg.space_address.clone(),
+        //                                entry_address: entry_address.clone(),
+        //                                request_id,
+        //                                provider_agent_id: msg.provider_agent_id.clone(),
+        //                                aspect_address_list: None,
+        //                            };
+        //                            ud.lib3h_outbox
+        //                                .push(Lib3hServerProtocol::HandleFetchEntry(msg_data));
+        //                        }
+        //                    } else {
+        //                        panic!("bad response to RequestAspectsOf: {:?}", response);
+        //                    }
+        //                    Ok(())
+        //                }),
+        //            )?;
+        //        }
         Ok(())
     }
 
@@ -659,23 +718,31 @@ impl RealEngine {
                 .expect("can parse url")
         };
         let dht_config = DhtConfig {
-            this_peer_address: agent_id,
+            this_peer_address: agent_id.clone(),
             this_peer_uri: this_peer_transport_id_as_uri,
             custom: self.config.dht_custom_config.clone(),
             gossip_interval: self.config.dht_gossip_interval,
             timeout_threshold: self.config.dht_timeout_threshold,
         };
         // Create new space gateway for this ChainId
-        let new_space_gateway = GatewayParentWrapperDyn::new(P2pGateway::new_with_space(
-            &join_msg.space_address,
-            self.network_transport,
-            self.dht_factory,
-            &dht_config,
-        ));
+        let uniplex_endpoint = Detach::new(self
+            .multiplexer
+            .create_agent_space_route(&join_msg.space_address, &agent_id.into())
+            .as_context_endpoint_builder()
+            .build::<GatewayUserData, GatewayContext>());
+        let new_space_gateway = GatewayParentWrapperDyn::new(
+            Box::new(P2pGateway::new_with_space(
+                &join_msg.space_address,
+                uniplex_endpoint,
+                self.dht_factory,
+                &dht_config,
+            )),
+            "space_gateway_",
+        );
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
-        let peer = new_space_gateway.as_mut().get_this_peer_sync().to_owned();
+        let peer = self.get_this_peer_sync(Some(chain_id.clone())).to_owned();
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
         p2p_msg
@@ -688,9 +755,7 @@ impl RealEngine {
             peer.peer_address,
         );
         self.network_gateway
-            .as_transport_mut()
-            .send_all(&payload)
-            .ok();
+            .publish(GatewayRequestToChild::SendAll(payload));
         // TODO END
 
         // Add it to space map
@@ -699,7 +764,7 @@ impl RealEngine {
 
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
-        let this_peer = { space_gateway.get_this_peer_sync().clone() };
+        let this_peer = peer.clone(); // FIXME
         space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
             this_peer,
         )));
@@ -732,6 +797,9 @@ impl RealEngine {
         msg: DirectMessageData,
         is_response: bool,
     ) -> Lib3hServerProtocol {
+        // get sender's peer address
+        let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
+        let peer_address = self.get_this_peer_sync(Some(chain_id)).peer_address.clone();
         // Check if space is joined by sender
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
@@ -752,13 +820,8 @@ impl RealEngine {
             result_info: vec![],
         };
         // Check if messaging self
-        let peer_address = &space_gateway
-            .as_mut()
-            .get_this_peer_sync()
-            .peer_address
-            .clone();
         let to_agent_id: String = msg.to_agent_id.clone().into();
-        if peer_address == &to_agent_id {
+        if peer_address == to_agent_id {
             response.result_info = "Messaging self".as_bytes().to_vec();
             return Lib3hServerProtocol::FailureResult(response);
         }
@@ -775,13 +838,13 @@ impl RealEngine {
             .unwrap();
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
-        let res = space_gateway
-            .as_transport_mut()
-            .send(&[peer_address.as_str()], &payload);
-        if let Err(e) = res {
-            response.result_info = e.to_string().as_bytes().to_vec();
-            return Lib3hServerProtocol::FailureResult(response);
-        }
+        let _res = space_gateway.publish(GatewayRequestToChild::Transport(
+            transport::protocol::RequestToChild::SendMessage {
+                uri: Url::parse(&("agentId:".to_string() + &peer_address))
+                    .expect("invalid url format"),
+                payload,
+            },
+        ));
         Lib3hServerProtocol::SuccessResult(response)
     }
 
@@ -816,12 +879,12 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<GatewayParentWrapperDyn<(), ()>, Lib3hServerProtocol> {
+    ) -> Result<&mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
         if let Some(space_gateway) = maybe_space {
-            return Ok(space_gateway.clone());
+            return Ok(space_gateway);
         }
         let to_agent_id = maybe_sender_agent_id.unwrap_or(agent_id);
         let res = GenericResultData {
@@ -832,51 +895,53 @@ impl RealEngine {
                 "Agent {} does not track space {}",
                 &agent_id, &space_address,
             )
-            .as_bytes()
-            .to_vec(),
+                .as_bytes()
+                .to_vec(),
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }
 }
 
-pub fn handle_gossipTo(
-    gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapperDyn<(), ()>,
-    gossip_data: GossipToData,
-) -> Lib3hResult<()> {
-    debug!(
-        "({}) handle_gossipTo: {:?}",
-        gateway_identifier,
-        gossip_data,
-    );
-    for to_peer_address in gossip_data.peer_address_list {
-        // TODO #150 - should not gossip to self in the first place
-        let me = &gateway.get_this_peer_sync().peer_address;
-        if &to_peer_address == me {
-            continue;
+    pub fn handle_gossipTo(
+        gateway_identifier: &str,
+        gateway: &mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>,
+        gossip_data: GossipToData,
+    ) -> Lib3hResult<()> {
+        debug!(
+            "({}) handle_gossipTo: {:?}",
+            gateway_identifier, gossip_data,
+        );
+
+        for to_peer_address in gossip_data.peer_address_list {
+            // FIXME
+//            // TODO #150 - should not gossip to self in the first place
+//            let me = self.get_this_peer_sync(&mut gateway).peer_address;
+//            if to_peer_address == me {
+//                continue;
+//            }
+//            // TODO END
+
+            // Convert DHT Gossip to P2P Gossip
+            let p2p_gossip = P2pProtocol::Gossip(GossipData {
+                space_address: gateway_identifier.into(),
+                to_peer_address: to_peer_address.clone().into(),
+                from_peer_address: "FIXME".into(), // FIXME
+                bundle: gossip_data.bundle.clone(),
+            });
+            let mut payload = Vec::new();
+            p2p_gossip
+                .serialize(&mut Serializer::new(&mut payload))
+                .expect("P2pProtocol::Gossip serialization failed");
+            // Forward gossip to the inner_transport
+            // FIXME peer_address to Url convert
+            let msg = transport::protocol::RequestToChild::SendMessage {
+                uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
+                payload,
+            };
+            gateway.publish(GatewayRequestToChild::Transport(msg))?;
         }
-        // TODO END
-        // Convert DHT Gossip to P2P Gossip
-        let p2p_gossip = P2pProtocol::Gossip(GossipData {
-            space_address: gateway_identifier.into(),
-            to_peer_address: to_peer_address.clone().into(),
-            from_peer_address: me.clone().into(),
-            bundle: gossip_data.bundle.clone(),
-        });
-        let mut payload = Vec::new();
-        p2p_gossip
-            .serialize(&mut Serializer::new(&mut payload))
-            .expect("P2pProtocol::Gossip serialization failed");
-        // Forward gossip to the inner_transport
-        // FIXME peer_address to Url convert
-        let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: "agentId:".to_string() + to_peer_address,
-            payload,
-        };
-        gateway.publish(GatewayRequestToChild::Transport(msg))?;
+        Ok(())
     }
-    Ok(())
-}
 
 /// Return true if all elements of list_b are found in list_a
 fn includes(list_a: &[Address], list_b: &[Address]) -> bool {

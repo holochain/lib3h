@@ -19,7 +19,6 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{RealEngine, RealEngineConfig},
     error::Lib3hResult,
-    // transport_wss::TlsConfig,
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address};
 use node_mock::NodeMock;
