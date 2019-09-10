@@ -204,9 +204,17 @@ impl<'engine>
         detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
         // END BOILER PLATE--------------------------
 
+        // process any messages from the client to us
         for msg in self.lib3h_endpoint.as_mut().drain_messages() {
             self.handle_msg_from_client(msg)?;
         }
+
+        // process all our embedded gateways
+        for space_gateway in self.space_gateway_map.values_mut() {
+            space_gateway.as_mut().process_dht()?;
+            space_gateway.as_mut().process()?; //TODO why both?
+        }
+        self.network_gateway.as_mut().process()?;
 
         Ok(true.into())
     }
@@ -741,23 +749,18 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    //    use lib3h_protocol::data_types::*;
+    use crate::{
+        dht::mirror_dht::MirrorDht, tests::enable_logging_for_test,
+        transport::memory_mock::transport_memory::TransportMemory, transport_wss::TlsConfig,
+    };
+    use lib3h_sodium::SodiumCryptoSystem;
+    use url::Url;
+
     struct MockCore {
         //    state: String,
     }
-    use crate::{
-        dht::mirror_dht::MirrorDht, transport::memory_mock::transport_memory::TransportMemory,
-        transport_wss::TlsConfig,
-    };
-    use url::Url;
-
-    use lib3h_sodium::SodiumCryptoSystem;
 
     fn make_test_engine() -> GhostEngine<'static> {
-        let mut _core = MockCore {
-            //        state: "".to_string(),
-        };
-
         let network_transport = TransportWrapper::new(TransportMemory::new());
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = RealEngineConfig {
@@ -877,6 +880,8 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_publish() {
+        enable_logging_for_test(true);
+
         let mut lib3h = make_test_engine_wrapper();
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(&req_data);
@@ -885,10 +890,44 @@ mod tests {
 
         let result = lib3h.as_mut().handle_publish_entry(&entry_data);
         assert!(result.is_ok());
+
+        let mut core = MockCore {
+            //        state: "".to_string(),
+        };
+
+        let space_gateway = lib3h
+            .as_mut()
+            .get_space(
+                &req_data.space_address.to_owned(),
+                &req_data.agent_id.to_owned(),
+            )
+            .unwrap();
+        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
+        assert_eq!(msgs.len(), 0);
+
+        {
+            lib3h.process(&mut core).unwrap();
+        }
+
+        let space_gateway = lib3h
+            .as_mut()
+            .get_space(
+                &req_data.space_address.to_owned(),
+                &req_data.agent_id.to_owned(),
+            )
+            .unwrap();
+
+        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
+        assert_eq!(
+            "[GhostMessage {request_id: None, ..}]",
+            format!("{:?}", msgs)
+        );
     }
 
     #[test]
     fn test_ghost_engine_hold() {
+        enable_logging_for_test(true);
+
         let mut lib3h = make_test_engine_wrapper();
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(&req_data);
@@ -897,6 +936,38 @@ mod tests {
 
         let result = lib3h.as_mut().handle_hold_entry(&entry_data);
         assert!(result.is_ok());
+
+        let mut core = MockCore {
+            //        state: "".to_string(),
+        };
+
+        let space_gateway = lib3h
+            .as_mut()
+            .get_space(
+                &req_data.space_address.to_owned(),
+                &req_data.agent_id.to_owned(),
+            )
+            .unwrap();
+        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
+        assert_eq!(msgs.len(), 0);
+
+        {
+            lib3h.process(&mut core).unwrap();
+        }
+
+        let space_gateway = lib3h
+            .as_mut()
+            .get_space(
+                &req_data.space_address.to_owned(),
+                &req_data.agent_id.to_owned(),
+            )
+            .unwrap();
+
+        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
+        assert_eq!(
+            "[GhostMessage {request_id: None, ..}]",
+            format!("{:?}", msgs)
+        );
     }
 
 }

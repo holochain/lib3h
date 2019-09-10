@@ -322,7 +322,7 @@ impl MirrorDht {
         match request.take_message().expect("exists") {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {
-                trace!("Deserializer msg.bundle: {:?}", msg.bundle);
+                trace!("DhtRequestToChild::HandleGossip: {:?}", msg);
                 let mut de = Deserializer::new(&msg.bundle[..]);
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -363,6 +363,7 @@ impl MirrorDht {
 
             // Owner is asking us to hold a peer info
             DhtRequestToChild::HoldPeer(new_peer_data) => {
+                trace!("DhtRequestToChild::HoldPeer: {:?}", new_peer_data);
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let others_list = self.get_other_peer_list();
                 // Store it
@@ -406,7 +407,7 @@ impl MirrorDht {
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
             DhtRequestToChild::HoldEntryAspectAddress(entry) => {
-                println!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
+                trace!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
                 let received_new_content = self.add_entry_aspects(&entry);
                 if !received_new_content {
                     println!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");
@@ -420,6 +421,7 @@ impl MirrorDht {
             // Owner has some entry and wants it stored on the network
             // Bookkeep address and gossip entry to every known peer.
             DhtRequestToChild::BroadcastEntry(entry) => {
+                trace!("@MirrorDht@ BroadcastEntry: {:?}", entry);
                 // Store address
                 let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
@@ -434,6 +436,7 @@ impl MirrorDht {
             DhtRequestToChild::DropEntryAddress(_) => (),
 
             DhtRequestToChild::RequestPeer(peer_address) => {
+                trace!("DhtRequestToChild::RequestPeer: {:?}", peer_address);
                 let maybe_peer = self.get_peer(&peer_address);
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
                 request.respond(payload)?;
@@ -466,6 +469,7 @@ impl MirrorDht {
 
             // Ask owner to respond to self
             DhtRequestToChild::RequestEntry(entry_address) => {
+                trace!("DhtRequestToChild::RequestEntry: {:?}", entry_address);
                 self.endpoint_self.request(
                     DhtContext::RequestEntry(request),
                     DhtRequestToParent::RequestEntry(entry_address),
