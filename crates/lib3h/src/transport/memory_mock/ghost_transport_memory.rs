@@ -143,20 +143,6 @@ impl
                             let maybe_server =
                                 memory_server::read_ref(&address).expect(expected.as_str());
                             let mut server = maybe_server.get();
-                            /*                            // get destinations server
-                                                        // TODO propagate error
-                                                        if let Err(e) = maybe_server {
-                                                            println!("server error: {:?}", e);
-                                                            msg.respond(Err(TransportError::new(format!(
-                                                                "No Memory server at this address: {}",
-                                                                my_addr
-                                                            ))))?;
-                                                            continue;
-                                                        }
-
-                                                        let server_ref = maybe_server.unwrap();
-                                                        let mut server = server_ref.get();
-                            */
                             // if not already connected, request a connections
                             if self.connections.get(&address).is_none() {
                                 match server.request_connect(&my_addr) {
