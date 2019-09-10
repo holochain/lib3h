@@ -1,0 +1,17 @@
+[package]
+name = "lib3h_tracing"
+version = "0.0.1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+description = "abstraction for distributed tracing choices"
+keywords = ["holochain", "holo", "tracing"]
+categories = ["tracing"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/holochain_tracing"
+repository = "https://github.com/holochain/holochain-tracing"
+
+[dependencies]
+crossbeam-channel = "=0.3.8"
+rustracing = "=0.2.0"
+rustracing_jaeger = "=0.2.1"

@@ -15,22 +15,22 @@ use crate::{
     transport::{ConnectionId, TransportWrapper},
 };
 use lib3h_crypto_api::CryptoSystem;
+use lib3h_tracing::Lib3hTrace;
 use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
 
-/// the context when making a request
-#[derive(Clone)]
-struct RequestContext {
-    pub space_address: Address,
-    pub agent_id: Address,
-}
+pub type ClientToLib3hMessage =
+    GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>;
+
+pub type Lib3hToClientMessage =
+    GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>;
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
-pub type GhostEngineParentWrapper<Core, Context, Engine, EngineError> = GhostParentWrapper<
+pub type GhostEngineParentWrapper<Core, TraceContext, Engine, EngineError> = GhostParentWrapper<
     Core,
-    Context,
+    TraceContext,
     Lib3hToClient,
     Lib3hToClientResponse,
     ClientToLib3h,
@@ -38,12 +38,6 @@ pub type GhostEngineParentWrapper<Core, Context, Engine, EngineError> = GhostPar
     EngineError,
     Engine,
 >;
-
-pub type ClientToLib3hMessage =
-    GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>;
-
-pub type Lib3hToClientMessage =
-    GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>;
 
 /*
 // temporary mock gateway...
@@ -113,7 +107,7 @@ pub struct GhostEngine<'engine> {
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
             GhostEngine<'engine>,
-            RequestContext,
+            Lib3hTrace,
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,
@@ -136,13 +130,11 @@ impl<'engine> GhostEngine<'engine> {
         // TODO #209 - Check persistence first before generating
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         // Generate DHT config and create network_gateway
-        let dht_config = DhtConfig {
-            this_peer_address: transport_keys.transport_id.clone(),
-            this_peer_uri: binding,
-            custom: config.dht_custom_config.clone(),
-            gossip_interval: config.dht_gossip_interval,
-            timeout_threshold: config.dht_timeout_threshold,
-        };
+        let dht_config = DhtConfig::with_real_engine_config(
+            transport_keys.transport_id.clone().as_str(),
+            &binding,
+            &config,
+        );
         let network_gateway = GatewayWrapper::new(P2pGateway::new(
             NETWORK_GATEWAY_ID,
             network_transport.clone(),
@@ -311,13 +303,11 @@ impl<'engine> GhostEngine<'engine> {
             Url::parse(format!("transportId:{}", peer.peer_address).as_str())
                 .expect("can parse url")
         };
-        let dht_config = DhtConfig {
-            this_peer_address: agent_id.into(),
-            this_peer_uri: this_peer_transport_id_as_uri,
-            custom: self.config.dht_custom_config.clone(),
-            gossip_interval: self.config.dht_gossip_interval,
-            timeout_threshold: self.config.dht_timeout_threshold,
-        };
+        let dht_config = DhtConfig::with_real_engine_config(
+            agent_id.to_string().as_str(),
+            &this_peer_transport_id_as_uri,
+            &self.config,
+        );
         // Create new space gateway for this ChainId
         let new_space_gateway: GatewayWrapper<'engine> =
             GatewayWrapper::new(P2pGateway::new_with_space(
@@ -470,7 +460,7 @@ impl<'engine> GhostEngine<'engine> {
                 let fake_aspect = EntryAspectData {
                     aspect_address: aspect_address.clone(),
                     type_hint: String::new(),
-                    aspect: vec![],
+                    aspect: vec![].into(),
                     publish_ts: 0,
                 };
                 aspect_list.push(fake_aspect);
@@ -517,14 +507,10 @@ impl<'engine> GhostEngine<'engine> {
             provider_agent_id: join_msg.agent_id.clone(),
             request_id: self.request_track.reserve(),
         };
-        let context = RequestContext {
-            space_address: join_msg.space_address.to_owned(),
-            agent_id: join_msg.agent_id.to_owned(),
-        };
         self.lib3h_endpoint.request(
-            context.clone(),
+            Lib3hTrace,
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
-            Box::new(|me, _ctx, response| {
+            Box::new(|me, response| {
                 match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
@@ -551,9 +537,9 @@ impl<'engine> GhostEngine<'engine> {
         list_data.request_id = self.request_track.reserve();
         self.lib3h_endpoint
             .request(
-                context,
+                Lib3hTrace,
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-                Box::new(|me, _ctx, response| {
+                Box::new(|me, response| {
                     match response {
                         GhostCallbackData::Response(Ok(
                             Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
@@ -715,7 +701,7 @@ impl<'engine> GhostEngine<'engine> {
             request_id: data.request_id.clone(),
             requester_agent_id: data.requester_agent_id.clone(),
             responder_agent_id: "fake_responder_id".into(),
-            query_result: b"fake response".to_vec(),
+            query_result: b"fake response".to_vec().into(),
         })
         .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
 
@@ -788,9 +774,9 @@ mod tests {
     }
 
     fn make_test_engine_wrapper(
-    ) -> GhostEngineParentWrapper<MockCore, RequestContext, GhostEngine<'static>, Lib3hError> {
+    ) -> GhostEngineParentWrapper<MockCore, Lib3hTrace, GhostEngine<'static>, Lib3hError> {
         let engine = make_test_engine();
-        let lib3h: GhostEngineParentWrapper<MockCore, RequestContext, GhostEngine, Lib3hError> =
+        let lib3h: GhostEngineParentWrapper<MockCore, Lib3hTrace, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_engine");
         lib3h
     }
@@ -852,7 +838,7 @@ mod tests {
             space_address: "space_addr".into(),
             from_agent_id: "agent_id".into(),
             to_agent_id: "to_agent_id".into(),
-            content: b"foo content".to_vec(),
+            content: b"foo content".to_vec().into(),
         };
 
         let result = lib3h.as_mut().handle_direct_message(&direct_message, false);

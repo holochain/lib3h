@@ -1,5 +1,8 @@
 use crate::dht::PeerAddress;
-use lib3h_protocol::{data_types::EntryData, Address};
+use lib3h_protocol::{
+    data_types::{EntryData, Opaque},
+    Address,
+};
 use url::Url;
 
 use crate::{dht::dht_config::DhtConfig, error::*};
@@ -17,9 +20,9 @@ pub type DhtActor = dyn GhostActor<
     DhtRequestToChildResponse,
     Lib3hError,
 >;
-pub type DhtEndpointWithContext<UserData> = GhostContextEndpoint<
+pub type DhtEndpointWithContext<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    DhtContext,
+    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -33,9 +36,9 @@ pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToParentResponse,
     Lib3hError,
 >;
-pub type ChildDhtWrapperDyn<UserData> = GhostParentWrapperDyn<
+pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
     UserData,
-    DhtContext,
+    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -45,11 +48,13 @@ pub type ChildDhtWrapperDyn<UserData> = GhostParentWrapperDyn<
 
 pub type DhtToChildMessage =
     GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
+pub type DhtToChildMessageData = GhostMessageData<DhtRequestToChild>;
 
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
+pub type DhtToParentMessageData = GhostMessageData<DhtRequestToParent>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtContext {
     NoOp,
     RequestAspectsOf {
@@ -58,11 +63,11 @@ pub enum DhtContext {
         msg: EntryListData,
         request_id: String,
     },
-    RequestEntry(DhtToChildMessage),
+    RequestEntry(DhtToChildMessageData),
     QueryEntry(QueryEntryData),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.
@@ -92,7 +97,7 @@ pub enum DhtRequestToChild {
     RequestEntry(Address),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChildResponse {
     RequestPeer(Option<PeerData>),
     RequestPeerList(Vec<PeerData>),
@@ -102,7 +107,7 @@ pub enum DhtRequestToChildResponse {
     RequestEntry(EntryData),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToParent {
     /// Commands & Events
     /// Ask owner to send this binary gossip bundle
@@ -127,7 +132,7 @@ pub enum DhtRequestToParent {
     RequestEntry(Address),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToParentResponse {
     RequestEntry(EntryData),
 }
@@ -139,13 +144,13 @@ pub enum DhtRequestToParentResponse {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct RemoteGossipBundleData {
     pub from_peer_address: PeerAddress,
-    pub bundle: Vec<u8>,
+    pub bundle: Opaque,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct GossipToData {
     pub peer_address_list: Vec<PeerAddress>,
-    pub bundle: Vec<u8>,
+    pub bundle: Opaque,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]

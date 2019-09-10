@@ -6,6 +6,61 @@ use url::Url;
 /// (entry_address, aspect_address)
 pub type AspectKey = (Address, Address);
 
+/// Represents an opaque vector of bytes. Lib3h will
+/// store or transfer this data but will never inspect
+/// or interpret its contents
+#[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
+pub struct Opaque(#[serde(with = "base64")] Vec<u8>);
+
+impl Opaque {
+    pub fn as_bytes(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl From<Vec<u8>> for Opaque {
+    fn from(vec: Vec<u8>) -> Self {
+        Opaque(vec)
+    }
+}
+
+impl From<&[u8]> for Opaque {
+    fn from(bytes: &[u8]) -> Self {
+        Opaque(Vec::from(bytes))
+    }
+}
+
+impl From<String> for Opaque {
+    fn from(str: String) -> Self {
+        str.as_bytes().into()
+    }
+}
+
+impl From<&String> for Opaque {
+    fn from(str: &String) -> Self {
+        str.clone().into()
+    }
+}
+
+impl From<&str> for Opaque {
+    fn from(str: &str) -> Self {
+        str.as_bytes().into()
+    }
+}
+
+impl std::ops::Deref for Opaque {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Opaque {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 //--------------------------------------------------------------------------------------------------
 // Entry (Semi-opaque Holochain entry type)
 //--------------------------------------------------------------------------------------------------
@@ -14,8 +69,7 @@ pub type AspectKey = (Address, Address);
 pub struct EntryAspectData {
     pub aspect_address: Address,
     pub type_hint: String,
-    #[serde(with = "base64")]
-    pub aspect: Vec<u8>,
+    pub aspect: Opaque,
     pub publish_ts: u64,
 }
 impl Ord for EntryAspectData {
@@ -82,8 +136,20 @@ pub struct GenericResultData {
     pub request_id: String,
     pub space_address: Address,
     pub to_agent_id: Address,
-    #[serde(with = "base64")]
-    pub result_info: Vec<u8>,
+    pub result_info: Opaque,
+}
+
+impl std::fmt::Debug for Opaque {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let bytes = String::from_utf8_lossy(self.0.as_ref());
+        write!(f, "{:?}", bytes)
+    }
+}
+
+impl std::fmt::Display for Opaque {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -147,8 +213,7 @@ pub struct DirectMessageData {
     pub request_id: String,
     pub to_agent_id: Address,
     pub from_agent_id: Address,
-    #[serde(with = "base64")]
-    pub content: Vec<u8>,
+    pub content: Opaque,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -161,8 +226,7 @@ pub struct QueryEntryData {
     pub entry_address: Address,
     pub request_id: String,
     pub requester_agent_id: Address,
-    #[serde(with = "base64")]
-    pub query: Vec<u8>, // opaque query struct
+    pub query: Opaque,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -172,8 +236,7 @@ pub struct QueryEntryResultData {
     pub request_id: String,
     pub requester_agent_id: Address,
     pub responder_agent_id: Address,
-    #[serde(with = "base64")]
-    pub query_result: Vec<u8>, // opaque query-result struct
+    pub query_result: Opaque, // opaque query-result struct
 }
 
 //--------------------------------------------------------------------------------------------------

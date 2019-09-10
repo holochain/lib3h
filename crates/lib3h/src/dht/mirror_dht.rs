@@ -6,6 +6,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
+use lib3h_tracing::Lib3hTrace;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -40,7 +41,7 @@ pub struct MirrorDht {
 
     /// ghost stuff
     endpoint_parent: Option<DhtEndpoint>,
-    endpoint_self: Detach<DhtEndpointWithContext<()>>,
+    endpoint_self: Detach<DhtEndpointWithContext<(), Lib3hTrace>>,
 }
 
 /// Constructors
@@ -61,8 +62,8 @@ impl MirrorDht {
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
-                peer_address: config.this_peer_address.to_owned(),
-                peer_uri: config.this_peer_uri.clone(),
+                peer_address: config.this_peer_address().to_owned(),
+                peer_uri: config.this_peer_uri().clone(),
                 timestamp,
             },
             last_gossip_of_self: timestamp,
@@ -136,7 +137,7 @@ impl MirrorDht {
                 continue;
             }
             // Check if timed-out
-            if now - peer.timestamp > self.config.timeout_threshold {
+            if now - peer.timestamp > self.config.timeout_threshold() {
                 debug!("@MirrorDht@ peer {} timed-out", peer_address);
                 outbox.push(DhtRequestToParent::PeerTimedOut(peer_address.clone()));
                 timed_out_list.push(peer_address.clone());
@@ -152,9 +153,9 @@ impl MirrorDht {
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
             now,
             self.last_gossip_of_self,
-            self.config.gossip_interval,
+            self.config.gossip_interval(),
         );
-        if now - self.last_gossip_of_self > self.config.gossip_interval {
+        if now - self.last_gossip_of_self > self.config.gossip_interval() {
             self.last_gossip_of_self = now;
             let gossip_data = self.gossip_self(self.get_other_peer_list());
             if gossip_data.peer_address_list.len() > 0 {
@@ -192,7 +193,7 @@ impl MirrorDht {
         );
         GossipToData {
             peer_address_list,
-            bundle: buf,
+            bundle: buf.into(),
         }
     }
 
@@ -202,7 +203,7 @@ impl MirrorDht {
         let maybe_peer = self.peer_map.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {
-                trace!("@MirrorDht@ Adding peer - OK NEW");
+                debug!("@MirrorDht@ Adding peer - OK NEW");
                 self.peer_map
                     .insert(peer_info.peer_address.clone(), peer_info.clone());
                 self.timed_out_map
@@ -211,16 +212,16 @@ impl MirrorDht {
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
-                    trace!("@MirrorDht@ Adding peer - BAD");
+                    debug!("@MirrorDht@ Adding peer - BAD");
                     return false;
                 }
-                trace!(
+                debug!(
                     "@MirrorDht@ Adding peer - OK UPDATED: {} > {}",
-                    peer_info.timestamp,
-                    peer.timestamp,
+                    peer_info.timestamp, peer.timestamp,
                 );
                 peer.timestamp = peer_info.timestamp;
-                if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold {
+                if crate::time::since_epoch_ms() - peer.timestamp < self.config.timeout_threshold()
+                {
                     self.timed_out_map
                         .insert(peer_info.peer_address.clone(), false);
                 }
@@ -280,7 +281,7 @@ impl MirrorDht {
             .unwrap();
         let gossip_evt = GossipToData {
             peer_address_list: self.get_other_peer_list(),
-            bundle: buf,
+            bundle: buf.into(),
         };
         DhtRequestToParent::GossipTo(gossip_evt)
     }
@@ -389,7 +390,7 @@ impl MirrorDht {
                 );
                 let gossip_evt = GossipToData {
                     peer_address_list: others_list,
-                    bundle: buf,
+                    bundle: buf.into(),
                 };
                 self.endpoint_self
                     .publish(DhtRequestToParent::GossipTo(gossip_evt))?;
@@ -471,9 +472,9 @@ impl MirrorDht {
             DhtRequestToChild::RequestEntry(entry_address) => {
                 trace!("DhtRequestToChild::RequestEntry: {:?}", entry_address);
                 self.endpoint_self.request(
-                    DhtContext::RequestEntry(request),
+                    Lib3hTrace,
                     DhtRequestToParent::RequestEntry(entry_address),
-                    Box::new(|_me, context, response| {
+                    Box::new(|_me, response| {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => panic!("timeout"),
@@ -482,10 +483,6 @@ impl MirrorDht {
                                     Ok(response) => response,
                                 },
                             }
-                        };
-                        let request = match context {
-                            DhtContext::RequestEntry(request) => request,
-                            _ => panic!("bad context"),
                         };
                         if let DhtRequestToParentResponse::RequestEntry(entry_response) = response {
                             println!("4. In DhtRequestToChild::RequestEntry Responding...");
