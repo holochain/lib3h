@@ -5,6 +5,9 @@
 extern crate base64;
 extern crate crossbeam_channel;
 extern crate url;
+#[cfg(test)]
+#[macro_use]
+extern crate detach;
 
 use core::convert::TryFrom;
 use lib3h::{
@@ -336,6 +339,8 @@ mod tests {
         transport_wss::TlsConfig,
     };
     use lib3h_sodium::SodiumCryptoSystem;
+
+    mod mock_engine;
 
     // creates a mock engine for testing purposes
     fn mock_engine_builder() -> GhostEngine<'static> {
