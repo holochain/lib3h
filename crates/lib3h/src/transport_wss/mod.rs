@@ -112,6 +112,7 @@ impl<T: Read + Write + std::fmt::Debug> WssInfo<T> {
     pub fn new(id: ConnectionId, url: url::Url, socket: BaseStream<T>, is_server: bool) -> Self {
         WssInfo {
             id: id.clone(),
+            // TODO set a request id
             request_id: "".to_string(),
             url,
             last_msg: std::time::Instant::now(),

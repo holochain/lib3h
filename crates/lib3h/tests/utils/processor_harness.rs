@@ -402,6 +402,7 @@ macro_rules! wait_connect {
         let connected_data =
             Lib3hServerProtocol::Connected(lib3h_protocol::data_types::ConnectedData {
                 uri: $other.advertise(),
+                // TODO should be able to set non a blank request id
                 request_id: "".into(), //$connect_data.clone().request_id,
             });
         let predicate: Box<dyn $crate::utils::processor_harness::Processor> = Box::new(

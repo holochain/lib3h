@@ -428,6 +428,7 @@ fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn N
 
     // Connect Alex to Billy
     let req_connect = ConnectData {
+        // TODO Should be able to set a non blank request id
         request_id: "".to_string(),
         peer_uri: billy.advertise(),
         network_id: NETWORK_A_ID.clone(),
