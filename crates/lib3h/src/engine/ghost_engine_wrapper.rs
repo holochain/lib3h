@@ -1,4 +1,4 @@
-use crate::engine::ghost_engine::{ClientRequestContext, GhostEngineParentWrapper};
+use crate::engine::ghost_engine::GhostEngineParentWrapper;
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -9,6 +9,18 @@ use lib3h_protocol::{
     protocol_server::*,
     DidWork,
 };
+
+/// the context when making a request from core
+/// this is always the request_id
+pub struct ClientRequestContext(String);
+impl ClientRequestContext {
+    pub fn new(id: &str) -> Self {
+        Self(id.to_string())
+    }
+    pub fn get_request_id(&self) -> String {
+        self.0.clone()
+    }
+}
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -22,7 +34,14 @@ where
         EngineError,
     >,
 {
-    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
+    engine: Detach<
+        GhostEngineParentWrapper<
+            LegacyLib3h<Engine, EngineError>,
+            ClientRequestContext,
+            Engine,
+            EngineError,
+        >,
+    >,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
