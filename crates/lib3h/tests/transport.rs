@@ -214,6 +214,7 @@ impl TestTransport {
     }
 
     /// private dispatcher for messages coming from our parent
+    #[allow(non_snake_case)]
     fn handle_RequestToChild(&mut self, mut msg: ToChildMessage) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => {
@@ -235,12 +236,14 @@ impl TestTransport {
                     let mut mockernet = MOCKERNET.write().unwrap();
                     // return error if not bound.
                     let response = match mockernet.send_to(
-                        address,
+                        uri,
                         self.bound_url.as_ref().unwrap().clone(),
                         payload,
                     ) {
                         Err(err) => Err(TransportError::new(err)),
-                        Ok(()) => Ok(RequestToChildResponse::SendMessage),
+                        Ok(()) => Ok(RequestToChildResponse::SendMessage {
+                            payload: Vec::new(),
+                        }),
                     };
                     msg.respond(response)?;
                 }
@@ -256,10 +259,8 @@ impl TestTransport {
             for e in events {
                 match e {
                     MockernetEvent::Message { from, payload } => {
-                        self.endpoint_self.publish(RequestToParent::ReceivedData {
-                            address: from,
-                            payload,
-                        })?;
+                        self.endpoint_self
+                            .publish(RequestToParent::ReceivedData { uri: from, payload })?;
                     }
                     MockernetEvent::Connection { from } => {
                         self.endpoint_self

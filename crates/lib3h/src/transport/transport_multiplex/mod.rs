@@ -97,16 +97,18 @@ mod tests {
                         })))?;
                     }
                     RequestToChild::SendMessage { uri, payload } => {
-                        self.mock_sender.send((address, payload))?;
-                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
+                        self.mock_sender.send((uri, payload))?;
+                        msg.respond(Ok(RequestToChildResponse::SendMessage {
+                            payload: Vec::new(),
+                        }))?;
                     }
                 }
             }
             loop {
                 match self.mock_receiver.try_recv() {
-                    Ok((address, payload)) => {
+                    Ok((uri, payload)) => {
                         self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { address, payload })?;
+                            .publish(RequestToParent::ReceivedData { uri, payload })?;
                     }
                     Err(_) => break,
                 }
@@ -175,8 +177,8 @@ mod tests {
         assert_eq!(1, msgs.len());
 
         let msg = msgs.remove(0).take_message().unwrap();
-        if let RequestToParent::ReceivedData { address, payload } = msg {
-            assert_eq!(&addr_none, &address);
+        if let RequestToParent::ReceivedData { uri, payload } = msg {
+            assert_eq!(&addr_none, &uri);
             assert_eq!(&b"hello-to-b".to_vec(), &payload);
         } else {
             panic!("bad type");
@@ -202,10 +204,10 @@ mod tests {
         assert_eq!(1, msgs.len());
 
         let msg = msgs.remove(0).take_message().unwrap();
-        if let RequestToParent::ReceivedData { address, payload } = msg {
+        if let RequestToParent::ReceivedData { uri, payload } = msg {
             assert_eq!(
                 &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
-                &address
+                &uri
             );
             assert_eq!(&b"hello".to_vec(), &payload);
         } else {
