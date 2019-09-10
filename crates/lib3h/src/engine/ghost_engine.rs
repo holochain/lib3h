@@ -302,24 +302,11 @@ impl<'engine> GhostEngine<'engine> {
         }
 
         // First create DhtConfig for space gateway
-
-        /*TODO: FIXME
         let this_peer_transport_id_as_uri = {
-                let gateway = self.network_gateway.as_ref();
-                // TODO #175 - encapsulate this conversion logic
-                Url::parse(format!("transportId:{}", gateway.this_peer().peer_address).as_str())
-                    .expect("can parse url")
-        };
-        */
-        let this_peer_transport_id_as_uri = {
-            Url::parse(
-                format!(
-                    "transportId:{}",
-                    format!("transport_id_for_{}", agent_id.clone())
-                )
-                .as_str(),
-            )
-            .expect("can parse url")
+            let peer = self.network_gateway.as_mut().get_this_peer_sync();
+            // TODO #175 - encapsulate this conversion logic
+            Url::parse(format!("transportId:{}", peer.peer_address).as_str())
+                .expect("can parse url")
         };
         let dht_config = DhtConfig {
             this_peer_address: agent_id.into(),
