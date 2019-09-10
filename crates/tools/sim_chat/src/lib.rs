@@ -10,11 +10,11 @@ extern crate url;
 extern crate detach;
 
 use core::convert::TryFrom;
-use lib3h::{
-    error::Lib3hError,
-};
+use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
-use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint, GhostCallbackData::Response};
+use lib3h_ghost_actor::{
+    GhostActor, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint,
+};
 use lib3h_protocol::{
     data_types::{ConnectData, DirectMessageData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
@@ -88,18 +88,16 @@ impl Drop for SimChat {
 }
 
 impl SimChat {
-    pub fn new<T>(
-        engine_builder: EngineBuilder<T>,
-        mut handler: HandleEvent,
-        peer_uri: Url) -> Self 
-    where T: 
-    GhostActor<
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        ClientToLib3h,  
-        ClientToLib3hResponse,
-        Lib3hError,
-    > + 'static {
+    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url) -> Self
+    where
+        T: GhostActor<
+                Lib3hToClient,
+                Lib3hToClientResponse,
+                ClientToLib3h,
+                ClientToLib3hResponse,
+                Lib3hError,
+            > + 'static,
+    {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
         let (out_send, out_recv): (
@@ -347,7 +345,7 @@ mod tests {
     }
 
     /*----------  example messages  ----------*/
-    
+
     fn chat_event() -> ChatEvent {
         ChatEvent::SendDirectMessage {
             to_agent: "addr".to_string(),
@@ -373,13 +371,13 @@ mod tests {
         let space_address = channel_address_from_string(&"test_channel".to_string())
             .expect("failed to hash string");
 
-        ChatEvent::JoinSuccess{
+        ChatEvent::JoinSuccess {
             channel_id: "test_channel".to_string(),
             space_data: SpaceData {
                 agent_id: Address::from("test_agent"),
                 request_id: "".to_string(),
                 space_address,
-            }
+            },
         }
     }
 
@@ -409,17 +407,11 @@ mod tests {
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
             s.send(event.to_owned()).expect("send fail");
         }));
-    
+
         chat.send(join_event());
-        
+
         let chat_messages = r.iter().take(2).collect::<Vec<_>>();
-        assert_eq!(
-            chat_messages,
-            vec![
-                join_event(),
-                join_success_event(),
-            ],
-        );
+        assert_eq!(chat_messages, vec![join_event(), join_success_event(),],);
     }
 
     #[test]
@@ -428,9 +420,9 @@ mod tests {
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
             s.send(event.to_owned()).expect("send fail");
         }));
-    
+
         chat.send(part_event());
-        
+
         let chat_messages = r.iter().take(2).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
@@ -447,11 +439,11 @@ mod tests {
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
             s.send(event.to_owned()).expect("send fail");
         }));
-    
+
         chat.send(join_event());
         std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(part_event());
-        
+
         let chat_messages = r.iter().take(5).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
@@ -473,9 +465,9 @@ mod tests {
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
             s.send(event.to_owned()).expect("send fail");
         }));
-    
+
         chat.send(chat_event());
-        
+
         let chat_messages = r.iter().take(2).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
@@ -483,7 +475,7 @@ mod tests {
                 chat_event(),
                 receive_sys_message("Must join a channel before sending a message".to_string()),
             ],
-        );        
+        );
     }
 
     #[test]
@@ -492,11 +484,11 @@ mod tests {
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
             s.send(event.to_owned()).expect("send fail");
         }));
-    
+
         chat.send(join_event());
         std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(chat_event());
-        
+
         let chat_messages = r.iter().take(4).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
@@ -506,9 +498,8 @@ mod tests {
                 receive_sys_message("Joined channel: test_channel".to_string()),
                 chat_event(),
             ],
-        );        
+        );
     }
-    
 
     #[test]
     fn can_convert_strings_to_channel_address() {

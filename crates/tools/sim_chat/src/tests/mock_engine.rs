@@ -1,21 +1,12 @@
-use lib3h_ghost_actor::prelude::WorkWasDone;
-use lib3h_protocol::{
-    protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
-    data_types::ConnectedData,
-};
-use lib3h::{
-    error::Lib3hError,
-    engine::ghost_engine::{ClientToLib3hMessage}
-};
 use detach::Detach;
+use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
 use lib3h_ghost_actor::{
-	GhostActor,
-	GhostEndpoint,
-	GhostResult,
-	GhostContextEndpoint,
-    GhostCanTrack,
-    GhostError,
-    create_ghost_channel,
+    create_ghost_channel, prelude::WorkWasDone, GhostActor, GhostCanTrack, GhostContextEndpoint,
+    GhostEndpoint, GhostError, GhostResult,
+};
+use lib3h_protocol::{
+    data_types::ConnectedData,
+    protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
 };
 
 pub struct MockEngine<'engine> {
@@ -41,13 +32,15 @@ pub struct MockEngine<'engine> {
     >,
 }
 
-impl GhostActor<
-    Lib3hToClient,
-    Lib3hToClientResponse,
-    ClientToLib3h,  
-    ClientToLib3hResponse,
-    Lib3hError,
-> for MockEngine<'_> {
+impl
+    GhostActor<
+        Lib3hToClient,
+        Lib3hToClientResponse,
+        ClientToLib3h,
+        ClientToLib3hResponse,
+        Lib3hError,
+    > for MockEngine<'_>
+{
     // START BOILER PLATE--------------------------
     fn take_parent_endpoint(
         &mut self,
@@ -79,7 +72,6 @@ impl GhostActor<
 }
 
 impl MockEngine<'_> {
-
     pub fn new() -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {
@@ -93,7 +85,7 @@ impl MockEngine<'_> {
         }
     }
 
-        /// Process any Client events or requests
+    /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(data) => {
@@ -108,18 +100,10 @@ impl MockEngine<'_> {
             ClientToLib3h::LeaveSpace(_data) => {
                 msg.respond(Ok(ClientToLib3hResponse::LeaveSpaceResult))
             }
-            ClientToLib3h::SendDirectMessage(_data) => {
-                Ok(())
-            }
-            ClientToLib3h::PublishEntry(_data) => {
-                Ok(())
-            },
-            ClientToLib3h::HoldEntry(_data) => {
-                Ok(())
-            },
-            ClientToLib3h::QueryEntry(_data) => {
-                Ok(())
-            }
+            ClientToLib3h::SendDirectMessage(_data) => Ok(()),
+            ClientToLib3h::PublishEntry(_data) => Ok(()),
+            ClientToLib3h::HoldEntry(_data) => Ok(()),
+            ClientToLib3h::QueryEntry(_data) => Ok(()),
             _ => panic!("{:?} not implemented", msg),
         }
     }
