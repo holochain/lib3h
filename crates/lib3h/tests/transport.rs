@@ -5,7 +5,8 @@ extern crate lazy_static;
 
 use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};
-use lib3h_ghost_actor::{prelude::*, TestTrace};
+use lib3h_ghost_actor::prelude::*;
+use lib3h_tracing::TestTrace;
 use std::{
     collections::{HashMap, HashSet},
     sync::RwLock,

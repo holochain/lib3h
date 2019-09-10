@@ -744,7 +744,7 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib3h_ghost_actor::TestTrace;
+    use lib3h_tracing::TestTrace;
     //    use lib3h_protocol::data_types::*;
     struct MockCore {
         //    state: String,

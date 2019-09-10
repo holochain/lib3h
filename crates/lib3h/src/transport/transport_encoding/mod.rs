@@ -374,8 +374,8 @@ impl
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib3h_ghost_actor::TestTrace;
     use lib3h_sodium::SodiumCryptoSystem;
+    use lib3h_tracing::TestTrace;
 
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
     const ID_2: &'static str = "HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r";

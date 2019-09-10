@@ -67,9 +67,6 @@ pub use ghost_channel::{
 mod ghost_actor;
 pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
-mod test_types;
-pub use test_types::TestTrace;
-
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
@@ -84,8 +81,8 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::TestTrace;
     use detach::prelude::*;
+    use lib3h_tracing::TestTrace;
 
     type FakeError = String;
 

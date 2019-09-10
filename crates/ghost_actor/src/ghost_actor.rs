@@ -364,11 +364,9 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData,
-        test_types::TestTrace,
-    };
+    use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
+    use lib3h_tracing::TestTrace;
 
     type TestError = String;
 

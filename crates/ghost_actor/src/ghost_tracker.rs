@@ -177,8 +177,8 @@ impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::TestTrace;
     use detach::prelude::*;
+    use lib3h_tracing::TestTrace;
 
     type TestError = String;
 

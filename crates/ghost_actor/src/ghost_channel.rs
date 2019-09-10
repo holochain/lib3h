@@ -541,7 +541,7 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_types::TestTrace;
+    use lib3h_tracing::TestTrace;
     type TestError = String;
 
     #[derive(Debug)]
