@@ -272,19 +272,16 @@ impl<'engine> GhostEngine<'engine> {
             ClientToLib3h::SendDirectMessage(data) => self
                 .handle_direct_message(&data, false)
                 .map_err(|e| GhostError::from(e.to_string())),
-
-            /*            FetchEntry(FetchEntryData)  => {} Not being used, probably deprecated*/
             ClientToLib3h::PublishEntry(data) => self
                 .handle_publish_entry(&data)
                 .map_err(|e| GhostError::from(e.to_string())),
             ClientToLib3h::HoldEntry(data) => self
                 .handle_hold_entry(&data)
                 .map_err(|e| GhostError::from(e.to_string())),
-            ClientToLib3h::QueryEntry(data) => {
-                let _ = self.handle_query_entry(msg, &data);
-                Ok(())
-            }
-            _ => panic!("{:?} not implemented", msg),
+            ClientToLib3h::QueryEntry(data) => self
+                .handle_query_entry(msg, &data)
+                .map_err(|e| GhostError::from(e.to_string())),
+            ClientToLib3h::FetchEntry(_) => panic!("FetchEntry Deprecated"),
         }
     }
 
