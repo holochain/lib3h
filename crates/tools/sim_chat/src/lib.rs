@@ -8,7 +8,6 @@ extern crate url;
 
 use core::convert::TryFrom;
 use lib3h::{
-    engine::{ghost_engine::GhostEngine},
     error::Lib3hError,
 };
 use lib3h_crypto_api::CryptoError;
@@ -26,7 +25,7 @@ use std::sync::{
 };
 use url::Url;
 
-type EngineBuilder = fn() -> GhostEngine<'static>;
+type EngineBuilder<T> = fn() -> T;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChatEvent {
@@ -86,10 +85,18 @@ impl Drop for SimChat {
 }
 
 impl SimChat {
-    pub fn new(
-        engine_builder: EngineBuilder,
+    pub fn new<T>(
+        engine_builder: EngineBuilder<T>,
         mut handler: HandleEvent,
-        peer_uri: Url) -> Self {
+        peer_uri: Url) -> Self 
+    where T: 
+    GhostActor<
+        Lib3hToClient,
+        Lib3hToClientResponse,
+        ClientToLib3h,  
+        ClientToLib3hResponse,
+        Lib3hError,
+    > + 'static {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
         let (out_send, out_recv): (
@@ -330,7 +337,8 @@ mod tests {
     };
     use lib3h_sodium::SodiumCryptoSystem;
 
-    fn test_engine_builder() -> GhostEngine<'static> {
+    // creates a mock engine for testing purposes
+    fn mock_engine_builder() -> GhostEngine<'static> {
         let network_transport = TransportWrapper::new(TransportMemory::new());
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = RealEngineConfig {
@@ -361,7 +369,7 @@ mod tests {
         let (s, r) = crossbeam_channel::unbounded();
 
         let mut chat = SimChat::new(
-            test_engine_builder,
+            mock_engine_builder,
             Box::new(move |event| {
                 s.send(event.to_owned()).expect("send fail");
             }),
