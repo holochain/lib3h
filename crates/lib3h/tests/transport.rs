@@ -407,7 +407,7 @@ fn ghost_transport() {
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
     assert_eq!(
-        "ReceivedData { address: \"mocknet://t1/\", payload: [102, 111, 111] }",
+        "ReceivedData { address: \"mocknet://t1/\", payload: \"foo\" }",
         format!("{:?}", messages[1].take_message().expect("exists"))
     );
 

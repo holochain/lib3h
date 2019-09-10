@@ -147,7 +147,7 @@ impl<'engine> RealEngine<'engine> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
             self.post(Lib3hClientProtocol::Connect(ConnectData {
-                request_id: "".to_string(), // fire-and-forget
+                request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
                 peer_uri: bs,
                 network_id: "".to_string(), // unimplemented
             }))?;

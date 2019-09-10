@@ -398,10 +398,11 @@ macro_rules! wait_connect {
         $connect_data: ident,
         $other: ident
     ) => {{
+        let _connect_data = $connect_data;
         let connected_data =
             Lib3hServerProtocol::Connected(lib3h_protocol::data_types::ConnectedData {
                 uri: $other.advertise(),
-                request_id: $connect_data.clone().request_id,
+                request_id: "".into(), //$connect_data.clone().request_id,
             });
         let predicate: Box<dyn $crate::utils::processor_harness::Processor> = Box::new(
             $crate::utils::processor_harness::Lib3hServerProtocolEquals(connected_data),

@@ -23,12 +23,14 @@ impl<'engine> RealEngine<'engine> {
         let mut outbox = Vec::new();
         // Process the network gateway as a Transport
         let (tranport_did_work, event_list) = self.network_transport.as_mut().process()?;
-        debug!(
-            "{} - network_gateway Transport.process(): {} {}",
-            self.name,
-            tranport_did_work,
-            event_list.len(),
-        );
+        if !event_list.is_empty() {
+            debug!(
+                "{} - network_gateway Transport.process(): {} {}",
+                self.name,
+                tranport_did_work,
+                event_list.len(),
+            );
+        }
         if tranport_did_work {
             did_work = true;
         }

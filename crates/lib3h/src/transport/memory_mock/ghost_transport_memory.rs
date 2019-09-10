@@ -373,6 +373,9 @@ mod tests {
             "Some(IncomingConnection { address: \"mem://addr_1/\" })",
             format!("{:?}", requests[0].take_message())
         );
-        assert_eq!("Some(ReceivedData { address: \"mem://addr_1/\", payload: \"test message\" })",format!("{:?}",requests[1].take_message()));
+        assert_eq!(
+            "Some(ReceivedData { address: \"mem://addr_1/\", payload: \"test message\" })",
+            format!("{:?}", requests[1].take_message())
+        );
     }
 }
