@@ -661,52 +661,34 @@ impl<'engine> GhostEngine<'engine> {
         msg: ClientToLib3hMessage,
         data: &QueryEntryData,
     ) -> Lib3hResult<()> {
-        let chain_id = (data.space_address.clone(), data.requester_agent_id.clone());
-        let _space_gateway = self
-            .space_gateway_map
-            .get_mut(&chain_id)
-            .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
-        /*
-                let context = "".to_string();
-                    //DhtContext::RequestEntry { }
-                space_gateway
-                    .as_mut()
-                    .as_dht_mut()
-                    .request(
-                        context,
-                        DhtRequestToChild::RequestEntry(data.entry_address),
-                        Box::new(|_me, _context, response| {
-                            match response {
-                                GhostCallbackData::Response(Ok(
-                                    DhtRequestToChildResponse::RequestEntry(entry_data),
-                                )) => {
-
-                                }
-                                GhostCallbackData::Response(Err(e)) => {
-                                    error!("Got error on DHT RequestEntry: {:?} ", e);
-                                }
-                                GhostCallbackData::Timeout => {
-                                    error!("Got timeout on DHT RequestEntry");
-                                }
-                                _ => panic!("bad response type"),
-                            }
-                            Ok(())
-                        }
-                    ))?;
-        */
-        // FAKE
-        let result = Ok(QueryEntryResultData {
-            space_address: data.space_address.clone(),
-            entry_address: data.entry_address.clone(),
-            request_id: data.request_id.clone(),
-            requester_agent_id: data.requester_agent_id.clone(),
-            responder_agent_id: "fake_responder_id".into(),
-            query_result: b"fake response".to_vec().into(),
-        })
-        .map(|data| ClientToLib3hResponse::QueryEntryResult(data));
-
-        msg.respond(result)
-            .map_err(|e| Lib3hError::new_other(&e.to_string()))
+        let _ = self.lib3h_endpoint.request(
+            Lib3hTrace,
+            Lib3hToClient::HandleQueryEntry(data.clone()),
+            Box::new(|me, response| {
+                 let space_gateway = me
+                     .get_space(
+                         &data.space_address.to_owned(),
+                         &data.requester_agent_id.to_owned(),
+                     )
+                     .map_err(|e| GhostError::from(e.to_string()))?;
+                 match response {
+                     GhostCallbackData::Response(Ok(
+                         Lib3hToClientResponse::HandleQueryEntryResult(data),
+                     )) => {
+                         msg.respond(Ok(ClientToLib3hResponse::QueryEntryResult(data)))?
+                     }
+                     GhostCallbackData::Response(Err(e)) => {
+                         error!("Got error on HandleQueryEntryResult: {:?} ", e);
+                     }
+                     GhostCallbackData::Timeout => {
+                         error!("Got timeout on HandleQueryEntryResult");
+                     }
+                     _ => panic!("bad response type"),
+                 }
+                 Ok(())
+             }),
+         );
+        Ok(())
     }
 
     /// Get a space_gateway for the specified space+agent.
