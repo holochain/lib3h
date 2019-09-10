@@ -226,8 +226,7 @@ impl<'engine> GhostEngine<'engine> {
     /// Called on drop.
     /// Close all connections gracefully
     fn shutdown(&mut self) -> Lib3hResult<()> {
-        Ok(())
-        /*   let mut result: Lib3hResult<()> = Ok(());
+        let mut result: Lib3hResult<()> = Ok(());
 
         for space_gatway in self.space_gateway_map.values_mut() {
             let res = space_gatway.as_transport_mut().close_all();
@@ -247,7 +246,7 @@ impl<'engine> GhostEngine<'engine> {
                 e
             })?;
 
-        result*/
+        result
     }
 
     /// Process any Client events or requests
@@ -767,16 +766,7 @@ mod tests {
 
     use lib3h_sodium::SodiumCryptoSystem;
 
-    fn make_test_entry() -> EntryData {
-        let aspect_list = Vec::new();
-        EntryData {
-            entry_address: "fake_address".into(),
-            aspect_list,
-        }
-    }
-
-    #[test]
-    fn test_ghost_engine() {
+    fn make_test_engine() -> GhostEngine<'static> {
         let mut _core = MockCore {
             //        state: "".to_string(),
         };
@@ -804,17 +794,37 @@ mod tests {
             network_transport,
         )
         .unwrap();
-        let mut lib3h: GhostEngineParentWrapper<MockCore, RequestContext, GhostEngine, Lib3hError> =
-            GhostParentWrapper::new(engine, "test_engine");
-        assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
+        engine
+    }
 
-        let req_data = SpaceData {
+    fn make_test_engine_wrapper(
+    ) -> GhostEngineParentWrapper<MockCore, RequestContext, GhostEngine<'static>, Lib3hError> {
+        let engine = make_test_engine();
+        let lib3h: GhostEngineParentWrapper<MockCore, RequestContext, GhostEngine, Lib3hError> =
+            GhostParentWrapper::new(engine, "test_engine");
+        lib3h
+    }
+
+    #[test]
+    fn test_ghost_engine_construct() {
+        let lib3h = make_test_engine_wrapper();
+        assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
+    }
+
+    fn make_test_join_request() -> SpaceData {
+        SpaceData {
             /// Identifier of this request
             request_id: "foo_id".into(),
             space_address: "space_addr".into(),
             agent_id: "agent_id".into(),
-        };
+        }
+    }
 
+    #[test]
+    fn test_ghost_engine_join() {
+        let mut lib3h = make_test_engine_wrapper();
+
+        let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(&req_data);
         assert!(result.is_ok());
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 1);
@@ -823,6 +833,29 @@ mod tests {
             "Err(Lib3hError(Other(\"Already joined space\")))",
             format!("{:?}", result)
         );
+    }
+
+    #[test]
+    fn test_ghost_engine_leave() {
+        let mut lib3h = make_test_engine_wrapper();
+        let req_data = make_test_join_request();
+        let result = lib3h.as_mut().handle_join(&req_data);
+        assert!(result.is_ok());
+        let result = lib3h.as_mut().handle_leave(&req_data);
+        assert!(result.is_ok());
+        let result = lib3h.as_mut().handle_leave(&req_data);
+        assert_eq!(
+            "Err(Lib3hError(Other(\"Not part of that space\")))",
+            format!("{:?}", result)
+        );
+    }
+
+    #[test]
+    fn test_ghost_engine_dm() {
+        let mut lib3h = make_test_engine_wrapper();
+        let req_data = make_test_join_request();
+        let result = lib3h.as_mut().handle_join(&req_data);
+        assert!(result.is_ok());
 
         let direct_message = DirectMessageData {
             request_id: "foo_id".into(),
@@ -838,26 +871,43 @@ mod tests {
             "Ok(DirectMessageData { space_address: HashString(\"space_addr\"), request_id: \"foo_id\", to_agent_id: HashString(\"agent_id\"), from_agent_id: HashString(\"to_agent_id\"), content: [102, 97, 107, 101, 32, 114, 101, 115, 112, 111, 110, 115, 101] })",
             format!("{:?}", result)
         );
+    }
 
-        let entry_data = ProvidedEntryData {
+    fn make_test_entry() -> ProvidedEntryData {
+        let aspect_list = Vec::new();
+        let entry_data = EntryData {
+            entry_address: "fake_address".into(),
+            aspect_list,
+        };
+        ProvidedEntryData {
             space_address: "space_addr".into(),
             provider_agent_id: "agent_id".into(),
-            entry: make_test_entry(),
-        };
+            entry: entry_data,
+        }
+    }
+
+    #[test]
+    fn test_ghost_engine_publish() {
+        let mut lib3h = make_test_engine_wrapper();
+        let req_data = make_test_join_request();
+        let result = lib3h.as_mut().handle_join(&req_data);
+        assert!(result.is_ok());
+        let entry_data = make_test_entry();
 
         let result = lib3h.as_mut().handle_publish_entry(&entry_data);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_ghost_engine_hold() {
+        let mut lib3h = make_test_engine_wrapper();
+        let req_data = make_test_join_request();
+        let result = lib3h.as_mut().handle_join(&req_data);
+        assert!(result.is_ok());
+        let entry_data = make_test_entry();
 
         let result = lib3h.as_mut().handle_hold_entry(&entry_data);
         assert!(result.is_ok());
-
-        let result = lib3h.as_mut().handle_leave(&req_data);
-        assert!(result.is_ok());
-
-        let result = lib3h.as_mut().handle_leave(&req_data);
-        assert_eq!(
-            "Err(Lib3hError(Other(\"Not part of that space\")))",
-            format!("{:?}", result)
-        );
     }
+
 }

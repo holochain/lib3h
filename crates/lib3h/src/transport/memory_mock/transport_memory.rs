@@ -65,8 +65,8 @@ impl Drop for TransportMemory {
         self.close_all().ok();
         // Drop my servers
         for bounded_url in &self.my_servers {
-            memory_server::unset_server(&bounded_url)
-                .expect("unset_server() during drop should never fail");
+           let _ = memory_server::unset_server(&bounded_url);
+//                .expect("unset_server() during drop should never fail");
         }
     }
 }
