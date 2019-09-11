@@ -3,7 +3,7 @@
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use lib3h_sim_chat::{simchat::SimChat, ChatEvent};
+use lib3h_sim_chat::{simchat::SimChat, ChatEvent, SimChatMessage};
 use regex::Regex;
 use url::Url;
 
@@ -62,11 +62,12 @@ fn main() {
                     rl_t.set_prompt("SimChat> ")
                         .expect("failed to set linefeed prompt");
                 }
-                ChatEvent::ReceiveDirectMessage {
+                ChatEvent::ReceiveDirectMessage(SimChatMessage{
                     from_agent,
                     payload,
-                } => {
-                    writeln!(rl_t, "*{}* {}", from_agent, payload).expect("write fail");
+                    timestamp,
+                }) => {
+                    writeln!(rl_t, "[{}] | *{}* {}", timestamp, from_agent, payload).expect("write fail");
                 }
                 _ => {}
             }

@@ -10,16 +10,15 @@ extern crate url;
 extern crate detach;
 
 pub mod simchat;
-pub use simchat::{ChatEvent, SimChat};
+pub use simchat::{ChatEvent, SimChat, SimChatMessage};
 
-use core::convert::TryFrom;
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{
     GhostActor, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint,
 };
 use lib3h_protocol::{
-    data_types::{ConnectData, DirectMessageData, SpaceData},
+    data_types::{ConnectData, DirectMessageData, SpaceData, QueryEntryData, QueryEntryResultData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
@@ -32,25 +31,10 @@ use std::{
         Arc,
     },
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
-
-impl TryFrom<Lib3hToClient> for ChatEvent {
-    type Error = String;
-    fn try_from(lib3h_message: Lib3hToClient) -> Result<ChatEvent, Self::Error> {
-        match lib3h_message {
-            Lib3hToClient::HandleSendDirectMessage(message_data) => {
-                Ok(ChatEvent::ReceiveDirectMessage {
-                    from_agent: message_data.from_agent_id.to_string(),
-                    payload: "message from engine".to_string(),
-                })
-            }
-            Lib3hToClient::Disconnected(_) => Ok(ChatEvent::Disconnected),
-            _ => Err("Unknown Lib3h message".to_string()),
-        }
-    }
-}
 
 pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
 
@@ -106,7 +90,8 @@ impl Lib3hSimChat {
 
                 // also keep track of things like the spaces and current space in this scope
                 let mut current_space: Option<SpaceData> = None;
-                let mut spaces: HashMap<String, SpaceData> = HashMap::new();
+                let mut spaces: HashMap<Address, SpaceData> = HashMap::new();
+                let _cas: HashMap<Address, HashMap<Address, SimChatMessage>> = HashMap::new();
 
                 // call connect to start the networking process
                 // (should probably wait for confirmatio before continuing)
@@ -117,15 +102,56 @@ impl Lib3hSimChat {
                     parent_endpoint.process(&mut ()).unwrap();
                     engine.process().unwrap();
 
+                    // grab any new events from lib3h
+                    let engine_chat_events = parent_endpoint
+                        .drain_messages();
+
                     // gather all the ChatEvents
                     // Receive directly from the crossbeam channel
                     // and convert relevent N3H protocol messages to chat events
                     let direct_chat_events = out_recv.try_iter();
-                    let engine_chat_events = parent_endpoint
-                        .drain_messages()
+                    let engine_chat_events = engine_chat_events
                         .into_iter()
+                        // process any that should be handled silently (without generating a chat event)
                         .filter_map(|mut engine_message| {
-                            ChatEvent::try_from(engine_message.take_message().unwrap()).ok()
+                            match engine_message.take_message() {
+                                Some(Lib3hToClient::HandleQueryEntry(QueryEntryData {
+                                    space_address,
+                                    entry_address,
+                                    request_id,
+                                    requester_agent_id,
+                                    query: _,
+                                })) => {
+                                    engine_message.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(QueryEntryResultData {
+                                        request_id,
+                                        entry_address,
+                                        requester_agent_id: requester_agent_id.clone(),
+                                        space_address: space_address.clone(),
+                                        responder_agent_id: requester_agent_id,
+                                        query_result: Vec::new(),
+                                    }))).ok();
+                                    None
+                                },
+                                Some(Lib3hToClient::HandleStoreEntryAspect{..}) => {
+                                    None
+                                },
+                                Some(Lib3hToClient::HandleGetAuthoringEntryList{..}) => {
+                                    None
+                                },
+                                Some(Lib3hToClient::HandleGetGossipingEntryList{..}) => {
+                                    None
+                                },
+                                Some(Lib3hToClient::HandleSendDirectMessage(message_data)) => {
+                                    Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
+                                        from_agent: message_data.from_agent_id.to_string(),
+                                        payload: "message from engine".to_string(),
+                                        timestamp: current_timestamp(),
+                                    }))
+                                }
+                                Some(Lib3hToClient::Disconnected(_)) => Some(ChatEvent::Disconnected),
+                                Some(_) => {None}, // event we don't care about
+                                None => {None}, // there was nothing in the message
+                            }
                         });
 
                     // process all the chat events by calling the handler for all events
@@ -177,7 +203,7 @@ impl Lib3hSimChat {
                                 space_data,
                                 channel_id,
                             } => {
-                                spaces.insert(channel_id.clone(), space_data.clone());
+                                spaces.insert(channel_address_from_string(&channel_id).unwrap(), space_data.clone());
                                 current_space = Some(space_data);
                                 Self::send_sys_message(
                                     local_internal_sender,
@@ -217,7 +243,7 @@ impl Lib3hSimChat {
 
                             ChatEvent::PartSuccess(channel_id) => {
                                 current_space = None;
-                                spaces.remove(&channel_id);
+                                spaces.remove(&channel_address_from_string(&channel_id).unwrap());
                                 Self::send_sys_message(
                                     local_internal_sender,
                                     &"Left channel".to_string(),
@@ -253,6 +279,10 @@ impl Lib3hSimChat {
                                         &"Must join a channel before sending a message".to_string(),
                                     );
                                 }
+                            },
+
+                            ChatEvent::SendChannelMessage{..} => {
+
                             }
 
                             _ => {}
@@ -269,10 +299,11 @@ impl Lib3hSimChat {
 
     fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
         sender
-            .send(ChatEvent::ReceiveDirectMessage {
+            .send(ChatEvent::ReceiveDirectMessage(SimChatMessage{
                 from_agent: String::from("sys"),
                 payload: String::from(msg),
-            })
+                timestamp: current_timestamp(),
+            }))
             .expect("send fail");
     }
 
@@ -321,6 +352,10 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
     Ok(Address::from(signature_str))
 }
 
+pub fn current_timestamp() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,10 +380,11 @@ mod tests {
     }
 
     fn receive_sys_message(payload: String) -> ChatEvent {
-        ChatEvent::ReceiveDirectMessage {
+        ChatEvent::ReceiveDirectMessage(SimChatMessage{
             from_agent: String::from("sys"),
             payload,
-        }
+            timestamp: current_timestamp(),
+        })
     }
 
     fn join_event() -> ChatEvent {
