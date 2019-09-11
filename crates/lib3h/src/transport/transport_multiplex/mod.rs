@@ -31,14 +31,12 @@ mod tests {
     use lib3h_tracing::Lib3hTrace;
     use url::Url;
 
-    type MockToParentContext = Lib3hTrace;
-
     pub struct TransportMock {
         endpoint_parent: Option<TransportActorParentEndpoint>,
         endpoint_self: Detach<
             GhostContextEndpoint<
                 TransportMock,
-                MockToParentContext,
+                Lib3hTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,

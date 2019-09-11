@@ -18,23 +18,6 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     },
 }
 
-/// A GhostMessage with only the data, i.e. minus the Sender
-/// This is so that it is more easily cloneable
-#[derive(Debug, Clone)]
-pub struct GhostMessageData<T: 'static + Clone> {
-    pub request_id: Option<RequestId>,
-    pub message: Option<T>,
-}
-
-impl<T: 'static + Clone> GhostMessageData<T> {
-    pub fn with_message<A, B, C>(msg: &GhostMessage<T, A, B, C>) -> Self {
-        GhostMessageData {
-            request_id: msg.request_id.clone(),
-            message: msg.message.clone(),
-        }
-    }
-}
-
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
 /// A GhostMessage contains the incoming request, as well as a hook to
 /// allow a response to automatically be returned.
