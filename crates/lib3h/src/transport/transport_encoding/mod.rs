@@ -10,10 +10,6 @@ use lib3h_tracing::Lib3hTrace;
 use std::collections::HashMap;
 use url::Url;
 
-type ToParentContext = Lib3hTrace;
-type ToInnerContext = Lib3hTrace;
-type ToKeystoreContext = Lib3hTrace;
-
 /// Wraps a lower-level transport in either Open or Encrypted communication
 /// Also adds a concept of MachineId and AgentId
 /// This is currently a stub, only the Id concept is in place.
@@ -23,14 +19,14 @@ pub struct TransportEncoding {
     // the machine_id or agent_id of this encoding instance
     this_id: String,
     // the keystore to use for getting signatures for `this_id`
-    keystore: Detach<KeystoreActorParentWrapperDyn<ToKeystoreContext>>,
+    keystore: Detach<KeystoreActorParentWrapperDyn<Lib3hTrace>>,
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
     endpoint_self: Detach<
         GhostContextEndpoint<
             Self,
-            ToParentContext,
+            Lib3hTrace,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -39,7 +35,7 @@ pub struct TransportEncoding {
         >,
     >,
     // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding, ToInnerContext>>,
+    inner_transport: Detach<TransportActorParentWrapperDyn<TransportEncoding, Lib3hTrace>>,
     // if we have never sent a message to this node before,
     // we need to first handshake. Store the send payload && msg object
     // we will continue the transaction once the handshake completes
@@ -386,7 +382,7 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 TransportMock,
-                ToParentContext,
+                Lib3hTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,

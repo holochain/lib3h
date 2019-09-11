@@ -7,7 +7,6 @@ use url::Url;
 
 use crate::{dht::dht_config::DhtConfig, error::*};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::*;
 
 pub type FromPeerAddress = PeerAddress;
 
@@ -48,24 +47,9 @@ pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
 
 pub type DhtToChildMessage =
     GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
-pub type DhtToChildMessageData = GhostMessageData<DhtRequestToChild>;
 
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
-pub type DhtToParentMessageData = GhostMessageData<DhtRequestToParent>;
-
-#[derive(Debug, Clone)]
-pub enum DhtContext {
-    NoOp,
-    RequestAspectsOf {
-        entry_address: Address,
-        aspect_address_list: Vec<Address>,
-        msg: EntryListData,
-        request_id: String,
-    },
-    RequestEntry(DhtToChildMessageData),
-    QueryEntry(QueryEntryData),
-}
 
 #[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
