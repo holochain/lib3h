@@ -189,7 +189,7 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for msg in self.endpoint_self.as_mut().drain_messages() {
-            self.handle_msg_from_parent(msg)?;
+            self.handle_RequestToChild(msg)?;
         }
         self.handle_events_from_mockernet()?;
         Ok(false.into())
@@ -215,15 +215,8 @@ impl TestTransport {
     }
 
     /// private dispatcher for messages coming from our parent
-    fn handle_msg_from_parent(
-        &mut self,
-        mut msg: GhostMessage<
-            RequestToChild,
-            RequestToParent,
-            RequestToChildResponse,
-            TransportError,
-        >,
-    ) -> TransportResult<()> {
+    #[allow(non_snake_case)]
+    fn handle_RequestToChild(&mut self, mut msg: ToChildMessage) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => {
                 let mut mockernet = MOCKERNET.write().unwrap();
@@ -237,19 +230,21 @@ impl TestTransport {
                 self.bound_url = Some(spec);
                 msg.respond(response)?;
             }
-            RequestToChild::SendMessage { address, payload } => {
+            RequestToChild::SendMessage { uri, payload } => {
                 if self.bound_url.is_none() {
                     msg.respond(Err(TransportError::new(format!("{} not bound", self.name))))?;
                 } else {
                     let mut mockernet = MOCKERNET.write().unwrap();
                     // return error if not bound.
                     let response = match mockernet.send_to(
-                        address,
+                        uri,
                         self.bound_url.as_ref().unwrap().clone(),
                         payload,
                     ) {
                         Err(err) => Err(TransportError::new(err)),
-                        Ok(()) => Ok(RequestToChildResponse::SendMessage),
+                        Ok(()) => Ok(RequestToChildResponse::SendMessage {
+                            payload: Opaque::new(),
+                        }),
                     };
                     msg.respond(response)?;
                 }
@@ -265,20 +260,18 @@ impl TestTransport {
             for e in events {
                 match e {
                     MockernetEvent::Message { from, payload } => {
-                        self.endpoint_self.publish(RequestToParent::ReceivedData {
-                            address: from,
-                            payload,
-                        })?;
+                        self.endpoint_self
+                            .publish(RequestToParent::ReceivedData { uri: from, payload })?;
                     }
                     MockernetEvent::Connection { from } => {
                         self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection { address: from })?;
+                            .publish(RequestToParent::IncomingConnection { uri: from })?;
                     }
                     MockernetEvent::Error(err) => {
-                        self.endpoint_self
-                            .publish(RequestToParent::TransportError {
-                                error: TransportError::new(err),
-                            })?;
+                        self.endpoint_self.publish(RequestToParent::ErrorOccured {
+                            uri: our_url.clone(),
+                            error: TransportError::new(err),
+                        })?;
                     }
                 }
             }
@@ -340,7 +333,7 @@ fn ghost_transport() {
     t1.request(
         TestTrace::new(),
         RequestToChild::SendMessage {
-            address: Url::parse("mocknet://t2").expect("can parse url"),
+            uri: Url::parse("mocknet://t2").expect("can parse url"),
             payload: "won't be received!".into(),
         },
         // callback should simply log the response
@@ -379,7 +372,7 @@ fn ghost_transport() {
     t1.request(
         TestTrace::new(),
         RequestToChild::SendMessage {
-            address: Url::parse("mocknet://t2").expect("can parse url"),
+            uri: Url::parse("mocknet://t2").expect("can parse url"),
             payload: "foo".into(),
         },
         // callback should simply log the response
@@ -403,7 +396,7 @@ fn ghost_transport() {
     let mut messages = t2.drain_messages();
     assert_eq!(messages.len(), 2);
     assert_eq!(
-        "IncomingConnection { address: \"mocknet://t1/\" }",
+        "IncomingConnection { uri: \"mocknet://t1/\" }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
     assert_eq!(

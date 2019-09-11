@@ -21,7 +21,7 @@ impl RrDht {
             inbox: VecDeque::new(),
             this_peer: PeerData {
                 peer_address: "FIXME".to_string(),
-                peer_uri: Url::parse("fixme://host:123").expect("a valid transport url"),
+                peer_uri: Url::parse("fixme://host:123").unwrap(),
                 timestamp: 0, // TODO #166
             },
         }

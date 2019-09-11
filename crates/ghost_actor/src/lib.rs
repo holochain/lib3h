@@ -340,10 +340,7 @@ mod tests {
                         })))?;
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
-                    RequestToChild::SendMessage {
-                        address,
-                        payload: _,
-                    } => {
+                    RequestToChild::SendMessage { address, payload: _ } => {
                         // let _request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
                             TestTrace("test1".to_string()),
@@ -465,7 +462,7 @@ mod tests {
             .request(
                 TestTrace("42".to_string()),
                 RequestToChild::SendMessage {
-                    address: "agent_id_1".to_string(),
+                    address: "agentId:agent_id_1".to_string(),
                     payload: b"some content".to_vec(),
                 },
                 Box::new(|_: &mut (), r| {
