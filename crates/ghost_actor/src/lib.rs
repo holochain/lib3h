@@ -352,11 +352,11 @@ mod tests {
                         })))?;
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
-                    RequestToChild::SendMessage { uri, payload: _ } => {
+                    RequestToChild::SendMessage { address, payload: _ } => {
                         // let _request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
                             TestTrace("test1".to_string()),
-                            dht_protocol::RequestToChild::ResolveAddressForId { id: uri },
+                            dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(move |_m:&mut GatewayTransport, response| {
 
                                 // got a timeout error
@@ -394,9 +394,7 @@ mod tests {
 
                                 println!("yay? {:?}", response);
 
-                                msg.respond(Ok(RequestToChildResponse::SendMessage {
-                                    payload: vec![],
-                                }))?;
+                                msg.respond(Ok(RequestToChildResponse::SendMessage))?;
 
                                 Ok(())
                             }),
@@ -476,7 +474,7 @@ mod tests {
             .request(
                 TestTrace("42".to_string()),
                 RequestToChild::SendMessage {
-                    uri: "agentId:agent_id_1".to_string(),
+                    address: "agentId:agent_id_1".to_string(),
                     payload: b"some content".to_vec(),
                 },
                 Box::new(|_: &mut (), r| {
