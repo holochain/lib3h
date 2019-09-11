@@ -71,6 +71,9 @@ pub use ghost_channel::{
 mod ghost_actor;
 pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
+#[macro_use]
+pub mod ghost_test_harness;
+
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,

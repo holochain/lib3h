@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use lib3h_tracing::CanTrace;
+use crate::ghost_test_harness::*;
 
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
@@ -439,6 +440,7 @@ mod tests {
 
             // In this test actor we simply take all the messages we get and
             // add them to our internal state.
+            let mut did_work = false;
             for mut msg in self.endpoint_as_child.as_mut().drain_messages() {
                 let payload = match msg.take_message().expect("exists") {
                     TestMsgIn(payload) => payload,
@@ -447,8 +449,9 @@ mod tests {
                 if msg.is_request() {
                     msg.respond(Ok(TestMsgInResponse(format!("we got: {}", payload))))?;
                 };
+                did_work |= true;
             }
-            Ok(false.into())
+            Ok(did_work.into())
         }
     }
 
@@ -548,6 +551,41 @@ mod tests {
         assert_eq!(
             "\"event from parent\"",
             format!("{:?}", wrapped_child.as_ref().internal_state[0])
+        )
+    }
+
+    #[test]
+    fn test_ghost_actor_parent_wrapper2() {
+        // much of the previous test is the parent creating instances of the actor
+        // and taking control of the parent endpoint.  Parent wrapper implements
+        // much of this work as a convenience
+
+        let mut fake_parent = FakeParent {
+            state: "".to_string(),
+        };
+
+        // create the wrapper
+        let mut wrapped_child: GhostParentWrapper<
+            FakeParent,
+            TestTrace,
+            TestMsgOut,
+            TestMsgOutResponse,
+            TestMsgIn,
+            TestMsgInResponse,
+            TestError,
+            TestActor,
+        > = GhostParentWrapper::new(TestActor::new(), "parent");
+
+        // use it to publish an event via the wrapper
+        wrapped_child
+            .publish(TestMsgIn("event from parent".into()))
+            .unwrap();
+
+        // process via the wrapper
+        assert!(wrapped_child.process(&mut fake_parent).is_ok());
+
+        assert_callback_eq!(wrapped_child, fake_parent, context, 
+            TestMsgInResponse("event from parent"),
         )
     }
 

@@ -18,7 +18,7 @@ lib3h_tracing = { version = "=0.0.1", path = "../tracing" }
 nanoid = "=0.2.0"
 shrinkwraprs = "=0.2.1"
 log = "=0.4.8"
-
+predicates = "=1.0.0"
 [dev-dependencies]
 env_logger = "=0.6.1"
 
