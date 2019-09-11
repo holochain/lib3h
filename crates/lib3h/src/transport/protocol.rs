@@ -1,8 +1,9 @@
 use crate::transport::error::TransportError;
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
+use lib3h_protocol::data_types::Opaque;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BindResultData {
     pub bound_url: Url,
 }
@@ -12,11 +13,6 @@ pub struct BindResultData {
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
     SendMessage { uri: Url, payload: Opaque },
-}
-
-#[derive(Debug, Clone)]
-pub struct BindResultData {
-    pub bound_url: Url,
 }
 
 #[derive(Debug, Clone)]

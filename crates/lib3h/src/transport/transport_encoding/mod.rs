@@ -309,8 +309,8 @@ impl TransportEncoding {
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
-        uri: Opaque,
+        uri: Url,
+        payload: Opaque,
     ) -> TransportResult<()> {
         match self.connections_id_to_no_id.get(&uri) {
             Some(sub_address) => {

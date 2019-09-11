@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use crate::transport::memory_mock::transport_memory::TransportMemory;
 use lib3h_tracing::Lib3hTrace;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
@@ -107,17 +106,17 @@ impl RealEngine {
                 .expect("exists")
                 .as_context_endpoint_builder()
                 .request_id_prefix("tmem_to_child_")
-                .build::<GatewayUserData, GatewayContext>(),
+                .build::<GatewayUserData, Lib3hTrace>(),
         );
 
         // Bind & create this_net_peer
         let mut gateway_ud = GatewayUserData::new();
-        let _res = memory_network_endpoint.as_mut().request(
-            GatewayContext::NoOp,
+        let _res = memory_network_endpoint.request(
+            Lib3hTrace,
             transport::protocol::RequestToChild::Bind {
                 spec: config.bind_url.clone(),
             },
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -139,17 +138,15 @@ impl RealEngine {
         let _ = memory_network_endpoint.process(&mut gateway_ud);
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
-            peer_uri: gateway_ud.binding,
+            peer_uri: gateway_ud.binding.clone(),
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
-        let dht_config = DhtConfig {
-            this_peer_address: format!("{}_tId", name),
-            this_peer_uri: binding,
-            custom: config.dht_custom_config.clone(),
-            gossip_interval: config.dht_gossip_interval,
-            timeout_threshold: config.dht_timeout_threshold,
-        };
+        let dht_config = DhtConfig::with_real_engine_config(
+            &format!("{}_tId", name),
+            &gateway_ud.binding,
+            &config,
+        );
         // Create network gateway
         let network_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new(
@@ -209,9 +206,9 @@ impl RealEngine {
         };
         gateway
             .request(
-                GatewayContext::NoOp,
+                Lib3hTrace,
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestThisPeer),
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -242,9 +239,9 @@ impl RealEngine {
         trace!("engine.get_peer_list_sync() ...");
         self.network_gateway
             .request(
-                GatewayContext::NoOp,
+                Lib3hTrace,
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -402,7 +399,7 @@ impl RealEngine {
                 let cmd = GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: msg.peer_uri,
-                        payload: Vec::new(),
+                        payload: Opaque::new(),
                     },
                 );
                 self.network_gateway.publish(cmd)?;
@@ -744,7 +741,7 @@ impl RealEngine {
                 .expect("can parse url")
         };
         let dht_config = DhtConfig::with_real_engine_config(
-            agent_id.clone(),
+            &agent_id,
             &this_peer_transport_id_as_uri,
             &self.config,
         );
@@ -753,7 +750,7 @@ impl RealEngine {
             self.multiplexer
                 .create_agent_space_route(&join_msg.space_address, &agent_id.into())
                 .as_context_endpoint_builder()
-                .build::<GatewayUserData, GatewayContext>(),
+                .build::<GatewayUserData, Lib3hTrace>(),
         );
         let new_space_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new_with_space(
@@ -868,7 +865,7 @@ impl RealEngine {
             transport::protocol::RequestToChild::SendMessage {
                 uri: Url::parse(&("agentId:".to_string() + &peer_address))
                     .expect("invalid url format"),
-                payload,
+                payload: payload.into(),
             },
         ));
         Lib3hServerProtocol::SuccessResult(response)
@@ -908,7 +905,7 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>, Lib3hServerProtocol>
+    ) -> Result<&mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>, Lib3hServerProtocol>
     {
         let maybe_space = self
             .space_gateway_map
@@ -935,7 +932,7 @@ impl RealEngine {
 
 pub fn handle_gossipTo(
     gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>,
+    gateway: &mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
@@ -967,7 +964,7 @@ pub fn handle_gossipTo(
         // FIXME peer_address to Url convert
         let msg = transport::protocol::RequestToChild::SendMessage {
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
-            payload,
+            payload: payload.into(),
         };
         gateway.publish(GatewayRequestToChild::Transport(msg))?;
     }

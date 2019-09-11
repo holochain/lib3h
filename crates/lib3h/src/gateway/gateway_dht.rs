@@ -7,6 +7,8 @@ use crate::{
     transport,
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_tracing::Lib3hTrace;
+use lib3h_protocol::data_types::Opaque;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
@@ -17,30 +19,20 @@ impl P2pGateway {
     ) -> Lib3hResult<()> {
         // forward to child dht
         let _ = self.inner_dht.request(
-            GatewayContext::ParentRequest(parent_msg),
+            Lib3hTrace,
             request,
-            Box::new(|_me, context, response| {
-                let msg = {
-                    match context {
-                        GatewayContext::ParentRequest(parent_request) => parent_request,
-                        _ => {
-                            return Err(
-                                format!("wanted GatewayContext::Dht, got {:?}", context).into()
-                            )
-                        }
-                    }
-                };
+            Box::new(|_me, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                            parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
                 // forward back to parent
-                msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
+                parent_msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
                 Ok(())
             }),
         );
@@ -72,7 +64,7 @@ impl P2pGateway {
                 let _res = self.child_transport_endpoint.publish(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
-                        payload: Vec::new(),
+                        payload: Opaque::new(),
                     },
                 );
             }

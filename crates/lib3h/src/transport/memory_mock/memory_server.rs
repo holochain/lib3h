@@ -1,5 +1,7 @@
 use crate::transport::error::{TransportError, TransportResult};
-use lib3h_protocol::DidWork;
+use lib3h_protocol::{
+    DidWork, data_types::Opaque,
+};
 use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, Mutex, RwLock},
@@ -16,7 +18,7 @@ pub enum MemoryEvent {
     /// we have received an incoming connection
     IncomingConnectionEstablished(Url),
     /// We have received data from a connection
-    ReceivedData(Url, Vec<u8>),
+    ReceivedData(Url, Opaque),
     /// A connection closed for whatever reason
     ConnectionClosed(Url),
 }

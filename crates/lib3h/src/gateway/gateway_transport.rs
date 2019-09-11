@@ -14,6 +14,7 @@ use lib3h_ghost_actor::prelude::*;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
+use lib3h_tracing::Lib3hTrace;
 
 #[derive(Debug)]
 pub enum TransportContext {
@@ -80,22 +81,14 @@ impl P2pGateway {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
         self.child_transport_endpoint.request(
-            GatewayContext::MaybeParentRequest(maybe_parent_msg),
+            Lib3hTrace,
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
-                payload: payload.to_vec(),
+                payload: payload.to_vec().into(),
             },
             // Might receive a response back from our message.
             // Forward it back to parent
-            Box::new(|_me, context, response| {
-                // Get parent's message from context
-                let maybe_parent_msg = {
-                    if let GatewayContext::MaybeParentRequest(maybe_parent_msg) = context {
-                        maybe_parent_msg
-                    } else {
-                        panic!("received unexpected context type");
-                    }
-                };
+            Box::new(|_me, response| {
                 // check for timeout
                 if let GhostCallbackData::Timeout = response {
                     if let Some(parent_msg) = maybe_parent_msg {
@@ -148,32 +141,20 @@ impl P2pGateway {
             transport::protocol::RequestToChild::Bind { spec: _ } => {
                 // Forward to child transport
                 let _ = self.child_transport_endpoint.as_mut().request(
-                    GatewayContext::ParentRequest(parent_request),
+                   Lib3hTrace,
                     transport_request,
-                    Box::new(|_me, context, response| {
-                        let msg = {
-                            match context {
-                                GatewayContext::ParentRequest(parent_request) => parent_request,
-                                _ => {
-                                    return Err(format!(
-                                        "wanted GatewayContext::ParentRequest, got {:?}",
-                                        context
-                                    )
-                                    .into())
-                                }
-                            }
-                        };
+                    Box::new(|_me, response| {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => {
-                                    msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                                    parent_request.respond(Err(Lib3hError::new_other("timeout")))?;
                                     return Ok(());
                                 }
                                 GhostCallbackData::Response(response) => response,
                             }
                         };
                         // forward back to parent
-                        msg.respond(Ok(GatewayRequestToChildResponse::Transport(
+                        parent_request.respond(Ok(GatewayRequestToChildResponse::Transport(
                             response.unwrap(),
                         )))?;
                         Ok(())

@@ -18,7 +18,7 @@ pub struct P2pGateway {
     identifier: String,
     /// Transport
     child_transport_endpoint: Detach<
-        transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, GatewayContext>,
+        transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, Lib3hTrace>,
     >,
     /// DHT
     inner_dht: ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>,
@@ -29,7 +29,7 @@ pub struct P2pGateway {
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,
-    endpoint_self: Detach<GatewaySelfEndpoint<(), GatewayContext>>,
+    endpoint_self: Detach<GatewaySelfEndpoint<(), Lib3hTrace>>,
 }
 
 // user data for ghost callback

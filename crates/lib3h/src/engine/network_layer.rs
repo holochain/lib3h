@@ -78,7 +78,7 @@ impl RealEngine {
                 let cmd = GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
-                        payload: Vec::new(),
+                        payload: Opaque::new(),
                     },
                 );
                 self.network_gateway.publish(cmd)?;
@@ -188,7 +188,7 @@ impl RealEngine {
                     .publish(GatewayRequestToChild::Transport(
                         transport::protocol::RequestToChild::SendMessage {
                             uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
-                            payload,
+                            payload: payload.into(),
                         },
                     ))?;
             }

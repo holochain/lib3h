@@ -17,6 +17,7 @@ use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
 };
+use lib3h_tracing::Lib3hTrace;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use url::Url;
 
@@ -105,7 +106,7 @@ pub struct RealEngine {
     // Should be owned by multiplexer
     // TODO #176: Remove this if we resolve #176 without it.
     /// P2p gateway for the network layer
-    network_gateway: GatewayParentWrapperDyn<GatewayUserData, GatewayContext>,
+    network_gateway: GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>,
 
     /// Cached this_peer of the network_gateway
     this_net_peer: PeerData,
@@ -114,7 +115,7 @@ pub struct RealEngine {
     network_connections: HashSet<Url>,
 
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<GatewayUserData, GatewayContext>>,
+    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

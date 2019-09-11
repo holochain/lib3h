@@ -10,6 +10,7 @@ use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
 use std::collections::HashMap;
+use lib3h_tracing::Lib3hTrace;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
@@ -36,7 +37,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<&mut GatewayParentWrapperDyn<GatewayUserData, GatewayContext>> {
+    ) -> Option<&mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {

@@ -2,7 +2,7 @@
 
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    gateway::{protocol::*, GatewayUserData, P2pGateway},
+    gateway::{GatewayUserData, P2pGateway},
     transport,
 };
 use detach::prelude::*;
@@ -23,7 +23,7 @@ impl P2pGateway {
         child_transport_endpoint: Detach<
             transport::protocol::TransportActorParentContextEndpoint<
                 GatewayUserData,
-                GatewayContext,
+                Lib3hTrace,
             >,
         >,
         dht_factory: DhtFactory,
@@ -42,8 +42,8 @@ impl P2pGateway {
             child_transport_endpoint,
             inner_dht: ChildDhtWrapperDyn::new(dht, "gateway_dht"),
             this_peer: PeerData {
-                peer_address: dht_config.this_peer_address.clone(),
-                peer_uri: dht_config.this_peer_uri.clone(),
+                peer_address: dht_config.this_peer_address(),
+                peer_uri: dht_config.this_peer_uri(),
                 timestamp: 0, // FIXME
             },
             user_data: GatewayUserData::new(),
@@ -57,7 +57,7 @@ impl P2pGateway {
         child_transport_endpoint: Detach<
             transport::protocol::TransportActorParentContextEndpoint<
                 GatewayUserData,
-                GatewayContext,
+                Lib3hTrace,
             >,
         >,
         dht_factory: DhtFactory,
