@@ -134,8 +134,8 @@ impl RealEngine {
                 Ok(())
             }),
         );
-        let _ = memory_transport.process();
-        let _ = memory_network_endpoint.process(&mut gateway_ud);
+        memory_transport.process()?;
+        memory_network_endpoint.process(&mut gateway_ud)?;
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
             peer_uri: gateway_ud.binding.clone(),
@@ -776,9 +776,8 @@ impl RealEngine {
             space_address,
             peer.peer_address,
         );
-        let _res = self
-            .network_gateway
-            .publish(GatewayRequestToChild::SendAll(payload));
+        self.network_gateway
+            .publish(GatewayRequestToChild::SendAll(payload))?;
         // TODO END
 
         // Add it to space map
@@ -788,9 +787,9 @@ impl RealEngine {
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = peer.clone(); // FIXME
-        let _res = space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
+        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
             this_peer,
-        )));
+        )))?;
 
         // Send Get*Lists requests
         let mut list_data = GetListData {
