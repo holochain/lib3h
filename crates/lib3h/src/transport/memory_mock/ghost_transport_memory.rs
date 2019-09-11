@@ -374,6 +374,9 @@ mod tests {
             "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
             format!("{:?}", requests[0].take_message())
         );
-        assert_eq!("Some(ReceivedData { uri: \"mem://addr_1/\", payload: [116, 101, 115, 116, 32, 109, 101, 115, 115, 97, 103, 101] })",format!("{:?}",requests[1].take_message()));
+        assert_eq!(
+            "Some(ReceivedData { uri: \"mem://addr_1/\", payload: \"test message\" })",
+            format!("{:?}", requests[1].take_message())
+        );
     }
 }

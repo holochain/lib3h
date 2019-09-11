@@ -1,7 +1,7 @@
 use crate::transport::error::TransportError;
 use lib3h_ghost_actor::prelude::*;
-use url::Url;
 use lib3h_protocol::data_types::Opaque;
+use url::Url;
 
 #[derive(Debug, Clone)]
 pub struct BindResultData {

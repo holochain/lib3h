@@ -101,7 +101,7 @@ mod tests {
                     RequestToChild::SendMessage { uri, payload } => {
                         self.mock_sender.send((uri, payload))?;
                         msg.respond(Ok(RequestToChildResponse::SendMessage {
-                            payload: Vec::new(),
+                            payload: Opaque::new(),
                         }))?;
                     }
                 }

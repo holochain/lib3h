@@ -60,7 +60,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap<'a>(name: &str, bs: Option<Vec<Url>>) -> RealEngine<'a> {
+fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
@@ -91,9 +91,9 @@ fn basic_setup_mock_bootstrap<'a>(name: &str, bs: Option<Vec<Url>>) -> RealEngin
     engine
 }
 
-//fn basic_setup_mock<'a>(name: &str) -> RealEngine<'a> {
-//    basic_setup_mock_bootstrap(name, None)
-//}
+fn basic_setup_mock(name: &str) -> RealEngine {
+    basic_setup_mock_bootstrap(name, None)
+}
 
 // FIXME
 //fn basic_setup_wss() -> RealEngine {

@@ -21,10 +21,7 @@ impl P2pGateway {
     pub fn new(
         identifier: &str,
         child_transport_endpoint: Detach<
-            transport::protocol::TransportActorParentContextEndpoint<
-                GatewayUserData,
-                Lib3hTrace,
-            >,
+            transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, Lib3hTrace>,
         >,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
@@ -55,10 +52,7 @@ impl P2pGateway {
     pub fn new_with_space(
         space_address: &Address,
         child_transport_endpoint: Detach<
-            transport::protocol::TransportActorParentContextEndpoint<
-                GatewayUserData,
-                Lib3hTrace,
-            >,
+            transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, Lib3hTrace>,
         >,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,

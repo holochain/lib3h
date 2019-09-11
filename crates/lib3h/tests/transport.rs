@@ -243,7 +243,7 @@ impl TestTransport {
                     ) {
                         Err(err) => Err(TransportError::new(err)),
                         Ok(()) => Ok(RequestToChildResponse::SendMessage {
-                            payload: Vec::new(),
+                            payload: Opaque::new(),
                         }),
                     };
                     msg.respond(response)?;

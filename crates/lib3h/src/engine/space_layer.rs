@@ -9,8 +9,8 @@ use crate::{
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
-use std::collections::HashMap;
 use lib3h_tracing::Lib3hTrace;
+use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer

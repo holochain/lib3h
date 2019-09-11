@@ -7,8 +7,8 @@ use crate::{
     transport,
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_tracing::Lib3hTrace;
 use lib3h_protocol::data_types::Opaque;
+use lib3h_tracing::Lib3hTrace;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent

@@ -11,10 +11,10 @@ use crate::{
     },
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_tracing::Lib3hTrace;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
-use lib3h_tracing::Lib3hTrace;
 
 #[derive(Debug)]
 pub enum TransportContext {
@@ -141,13 +141,14 @@ impl P2pGateway {
             transport::protocol::RequestToChild::Bind { spec: _ } => {
                 // Forward to child transport
                 let _ = self.child_transport_endpoint.as_mut().request(
-                   Lib3hTrace,
+                    Lib3hTrace,
                     transport_request,
                     Box::new(|_me, response| {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => {
-                                    parent_request.respond(Err(Lib3hError::new_other("timeout")))?;
+                                    parent_request
+                                        .respond(Err(Lib3hError::new_other("timeout")))?;
                                     return Ok(());
                                 }
                                 GhostCallbackData::Response(response) => response,
