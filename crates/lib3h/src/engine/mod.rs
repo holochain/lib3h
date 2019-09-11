@@ -3,7 +3,10 @@ pub mod p2p_protocol;
 pub mod real_engine;
 mod space_layer;
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    path::PathBuf,
+};
 
 use crate::{
     dht::dht_trait::{Dht, DhtFactory},
@@ -41,7 +44,7 @@ pub struct RealEngineConfig {
     pub tls_config: TlsConfig,
     pub socket_type: String,
     pub bootstrap_nodes: Vec<String>,
-    pub work_dir: String,
+    pub work_dir: PathBuf,
     pub log_level: char,
     #[serde(with = "url_serde")]
     pub bind_url: Url,
