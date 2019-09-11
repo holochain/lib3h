@@ -104,7 +104,8 @@ impl MapRecord {
 
             let mut map_record = MapRecord(HashMapRecord::with_capacity(records.len()));
             for new_record in records.iter() {
-                let fake_map_record = MapRecord::with_record(&new_record.networkid, &[new_record.clone()]);
+                let fake_map_record =
+                    MapRecord::with_record(&new_record.networkid, &[new_record.clone()]);
                 map_record.update(&fake_map_record);
             }
 
