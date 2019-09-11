@@ -164,8 +164,6 @@ impl<
     }
 
     /// expand a raw endpoint into something usable.
-    /// <Lib3hSpan> let's you store data with individual `request` calls
-    /// that will be available again when the callback is invoked.
     /// Feel free to use `as_context_endpoint_builder::<()>("prefix")` if you
     /// don't need any context.
     /// request_id_prefix is a debugging hint... the request_ids generated
