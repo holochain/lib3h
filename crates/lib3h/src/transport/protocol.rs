@@ -18,7 +18,7 @@ pub enum RequestToChild {
 #[derive(Debug, Clone)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
-    SendMessage { payload: Opaque },
+    SendMessageSuccess,
 }
 
 #[derive(Debug, Clone)]
