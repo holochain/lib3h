@@ -26,6 +26,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::collections::HashMap;
 use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
@@ -48,8 +49,8 @@ pub enum ChatEvent {
         channel_id: String,
         space_data: SpaceData,
     },
-    Part,
-    PartSuccess,
+    Part(String),
+    PartSuccess(String),
     Disconnected,
 }
 
@@ -121,8 +122,9 @@ impl SimChat {
                     .request_id_prefix("parent")
                     .build();
 
-                // also keep track of things like the current space in this scope
+                // also keep track of things like the spaces and current space in this scope
                 let mut current_space: Option<SpaceData> = None;
+                let mut spaces: HashMap<String, SpaceData> = HashMap::new();
 
                 // call connect to start the networking process
                 // (should probably wait for confirmatio before continuing)
@@ -192,6 +194,7 @@ impl SimChat {
                                 space_data,
                                 channel_id,
                             } => {
+                                spaces.insert(channel_id.clone(), space_data.clone());
                                 current_space = Some(space_data);
                                 SimChat::send_sys_message(
                                     local_internal_sender,
@@ -199,7 +202,7 @@ impl SimChat {
                                 );
                             }
 
-                            ChatEvent::Part => {
+                            ChatEvent::Part(channel_id) => {
                                 if let Some(space_data) = current_space.clone() {
                                     parent_endpoint
                                         .request(
@@ -212,7 +215,7 @@ impl SimChat {
                                                 );
                                                 if let Response(Ok(_payload)) = callback_data {
                                                     local_internal_sender
-                                                        .send(ChatEvent::PartSuccess)
+                                                        .send(ChatEvent::PartSuccess(channel_id.clone()))
                                                         .unwrap();
                                                 }
                                                 Ok(())
@@ -227,8 +230,9 @@ impl SimChat {
                                 }
                             }
 
-                            ChatEvent::PartSuccess => {
+                            ChatEvent::PartSuccess(channel_id) => {
                                 current_space = None;
+                                spaces.remove(&channel_id);
                                 SimChat::send_sys_message(
                                     local_internal_sender,
                                     &"Left channel".to_string(),
@@ -382,11 +386,11 @@ mod tests {
     }
 
     fn part_event() -> ChatEvent {
-        ChatEvent::Part
+        ChatEvent::Part("test_channel".to_string())
     }
 
     fn part_success_event() -> ChatEvent {
-        ChatEvent::PartSuccess
+        ChatEvent::PartSuccess("test_channel".to_string())
     }
 
     #[test]

@@ -58,7 +58,7 @@ fn main() {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
                         .expect("failed to set linefeed prompt");
                 }
-                ChatEvent::PartSuccess => {
+                ChatEvent::PartSuccess(_) => {
                     rl_t.set_prompt("SimChat> ")
                         .expect("failed to set linefeed prompt");
                 }
@@ -82,7 +82,7 @@ fn main() {
 lib3h simchat Commands:
   /help                     - this help text
   /join <space> <handle>    - Join a space assigning yourself a handle
-  /part                     - Leave the current space
+  /part <space>             - Leave a given space
   /msg <agent> <msg>        - Send a direct message to an agent in your space
   /quit                     - exit Sim Chat
 "#
@@ -125,7 +125,7 @@ lib3h simchat Commands:
                                     writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
                                 }
                             }
-                            (Some("part"), _) => cli.send(ChatEvent::Part),
+                            (Some("part"), Some(channel_id)) => cli.send(ChatEvent::Part(channel_id.to_string())),
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');
                                 let to_agent: String = words.next().unwrap().to_string();
