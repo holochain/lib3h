@@ -242,14 +242,15 @@ mod tests {
             &mut self,
             mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
         ) -> Result<(), EngineError> {
+            let span = Lib3hSpan::todo();
             let result = match msg.take_message().expect("exists") {
                 ClientToLib3h::Connect(_data) => {
                     // pretend the connection request failed
-                    msg.respond(Err("connection failed!".to_string()))
+                    msg.respond(span, Err("connection failed!".to_string()))
                 }
                 ClientToLib3h::JoinSpace(_data) => {
                     // pretend the request succeeded
-                    msg.respond(Ok(ClientToLib3hResponse::JoinSpaceResult))
+                    msg.respond(span, Ok(ClientToLib3hResponse::JoinSpaceResult))
                 }
                 _ => panic!("{:?} not implemented", msg),
             };

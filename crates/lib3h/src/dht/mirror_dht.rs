@@ -320,6 +320,7 @@ impl MirrorDht {
     #[allow(irrefutable_let_patterns)]
     fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
         debug!("@MirrorDht@ serving request: {:?}", request);
+        let span = Lib3hSpan::todo();
         match request.take_message().expect("exists") {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {
@@ -337,7 +338,7 @@ impl MirrorDht {
                         let diff = self.diff_aspects(&entry);
                         if diff.len() > 0 {
                             self.endpoint_self.publish(
-                                Lib3hSpan::todo(),
+                                span,
                                 DhtRequestToParent::HoldEntryRequested {
                                     from_peer: self.this_peer.peer_address.clone(),
                                     entry,
@@ -350,7 +351,7 @@ impl MirrorDht {
                         match maybe_known_peer {
                             None => {
                                 self.endpoint_self.publish(
-                                    Lib3hSpan::todo(),
+                                    span,
                                     DhtRequestToParent::HoldPeerRequested(gossiped_peer.clone()),
                                 )?;
                             }
@@ -442,32 +443,32 @@ impl MirrorDht {
             DhtRequestToChild::RequestPeer(peer_address) => {
                 let maybe_peer = self.get_peer(&peer_address);
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
-                request.respond(payload)?;
+                request.respond(span, payload)?;
             }
 
             DhtRequestToChild::RequestPeerList => {
                 let list = self.get_peer_list();
                 let payload = Ok(DhtRequestToChildResponse::RequestPeerList(list));
-                request.respond(payload)?;
+                request.respond(span, payload)?;
             }
 
             DhtRequestToChild::RequestThisPeer => {
                 let payload = Ok(DhtRequestToChildResponse::RequestThisPeer(
                     self.this_peer.clone(),
                 ));
-                request.respond(payload)?;
+                request.respond(span, payload)?;
             }
 
             DhtRequestToChild::RequestEntryAddressList => {
                 let list = self.get_entry_address_list();
                 let payload = Ok(DhtRequestToChildResponse::RequestEntryAddressList(list));
-                request.respond(payload)?;
+                request.respond(span, payload)?;
             }
 
             DhtRequestToChild::RequestAspectsOf(address) => {
                 let maybe_list = self.get_aspects_of(&address);
                 let payload = Ok(DhtRequestToChildResponse::RequestAspectsOf(maybe_list));
-                request.respond(payload)?;
+                request.respond(span, payload)?;
             }
 
             // Ask owner to respond to self
@@ -489,7 +490,7 @@ impl MirrorDht {
                             println!("4. In DhtRequestToChild::RequestEntry Responding...");
                             let payload =
                                 Ok(DhtRequestToChildResponse::RequestEntry(entry_response));
-                            request.respond(payload)?;
+                            request.respond(span, payload)?;
                         } else {
                             panic!("bad response to RequestEntry: {:?}", response);
                         }

@@ -11,12 +11,12 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
-        // span: Lib3hSpan,
+        span: Lib3hSpan,
     },
     Response {
         request_id: RequestId,
         payload: Result<Response, Error>,
-        // span: Lib3hSpan,
+        span: Lib3hSpan,
     },
 }
 
@@ -100,12 +100,16 @@ impl<
     }
 
     /// send a response back to the origin of this request
-    /// TODO: add span
-    pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
+    pub fn respond(
+        self,
+        span: Lib3hSpan,
+        payload: Result<RequestToSelfResponse, Error>,
+    ) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
             self.sender.send(GhostEndpointMessage::Response {
                 request_id: request_id.clone(),
                 payload,
+                span,
             })?;
         }
         Ok(())
@@ -362,6 +366,7 @@ impl<
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
+            span,
             // span: span.child("request", |o| o.start()).into(),
         })?;
         Ok(())
@@ -399,6 +404,7 @@ impl<
         self.sender.send(GhostEndpointMessage::Request {
             request_id: None,
             payload,
+            span,
         })?;
         Ok(())
     }
@@ -448,6 +454,7 @@ impl<
                     GhostEndpointMessage::Request {
                         request_id,
                         payload,
+                        span: _,
                     } => {
                         self.outbox_messages_to_self.push(GhostMessage::new(
                             request_id,
@@ -458,6 +465,7 @@ impl<
                     GhostEndpointMessage::Response {
                         request_id,
                         payload,
+                        span: _,
                     } => {
                         self.pending_responses_tracker
                             .handle(request_id, user_data, payload)?;
@@ -548,9 +556,12 @@ mod tests {
             format!("{:?}", payload)
         );
 
-        msg.respond(Ok(TestMsgInResponse(
-            "response back to child which should fail because no request id".into(),
-        )))
+        msg.respond(
+            Lib3hSpan::todo(),
+            Ok(TestMsgInResponse(
+                "response back to child which should fail because no request id".into(),
+            )),
+        )
         .unwrap();
         // check to see if the message was sent
         let response = child_as_parent_recv.recv();
@@ -569,8 +580,11 @@ mod tests {
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
             );
-        msg.respond(Ok(TestMsgInResponse("response back to child".into())))
-            .unwrap();
+        msg.respond(
+            Lib3hSpan::todo(),
+            Ok(TestMsgInResponse("response back to child".into())),
+        )
+        .unwrap();
 
         // check to see if the response was sent
         let response = child_as_parent_recv.recv();
@@ -578,6 +592,7 @@ mod tests {
             Ok(GhostEndpointMessage::Response {
                 request_id: req_id,
                 payload,
+                span: _,
             }) => {
                 assert_eq!(req_id, request_id);
                 assert_eq!(
@@ -630,6 +645,7 @@ mod tests {
             Ok(GhostEndpointMessage::Request {
                 request_id,
                 payload,
+                span: _,
             }) => {
                 assert_eq!(request_id, None);
                 assert_eq!(
@@ -654,6 +670,7 @@ mod tests {
             Ok(GhostEndpointMessage::Request {
                 request_id,
                 payload,
+                span,
             }) => {
                 assert!(request_id.is_some());
                 assert_eq!(
@@ -667,6 +684,7 @@ mod tests {
                     .send(GhostEndpointMessage::Response {
                         request_id: request_id.unwrap(),
                         payload: Ok(TestMsgOutResponse("response from parent".into())),
+                        span,
                     })
                     .expect("should send");
             }
@@ -701,6 +719,7 @@ mod tests {
             .send(GhostEndpointMessage::Request {
                 request_id: None,
                 payload: TestMsgIn("event from a parent".into()),
+                span: test_span(""),
             })
             .expect("should send");
 

@@ -187,21 +187,23 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
+        let span = Lib3hSpan::todo();
+        let follower = span.follower_span("handle_route_bind");
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hSpan::todo(),
+            span,
             RequestToChild::Bind { spec },
             Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                            msg.respond(follower, Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response)?;
+                msg.respond(follower, response)?;
                 Ok(())
             }),
         )?;
@@ -215,21 +217,23 @@ impl TransportMultiplex {
         address: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
+        let span = Lib3hSpan::todo();
+        let follower = span.follower_span("handle_route_send_message");
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hSpan::todo(),
+            span,
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                            msg.respond(follower, Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response)?;
+                msg.respond(follower, response)?;
                 Ok(())
             }),
         )?;
@@ -260,21 +264,23 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
+        let span = Lib3hSpan::todo();
+        let follower = span.follower_span("handle_bind");
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hSpan::todo(),
+            span,
             RequestToChild::Bind { spec },
             Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                            msg.respond(follower, Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response)?;
+                msg.respond(follower, response)?;
                 Ok(())
             }),
         )?;
@@ -288,21 +294,23 @@ impl TransportMultiplex {
         address: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
+        let span = Lib3hSpan::todo();
+        let follower = span.follower_span("handle_send_message");
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hSpan::todo(),
+            span,
             RequestToChild::SendMessage { address, payload },
             Box::new(|_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                            msg.respond(follower, Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(response)?;
+                msg.respond(follower, response)?;
                 Ok(())
             }),
         )?;

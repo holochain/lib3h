@@ -37,6 +37,10 @@ impl Lib3hSpan {
         self.child(operation_name, |o| o.start()).into()
     }
 
+    pub fn follower_span<S: Into<Cow<'static, str>>>(&self, operation_name: S) -> Self {
+        self.follower(operation_name, |o| o.start()).into()
+    }
+
     pub fn todo() -> Self {
         test_span("TODO Span")
     }

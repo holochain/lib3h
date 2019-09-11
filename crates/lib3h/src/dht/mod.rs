@@ -387,7 +387,10 @@ pub mod tests {
                 _ => panic!("Expecting a different request type"),
             }
             request
-                .respond(Ok(DhtRequestToParentResponse::RequestEntry(entry.clone())))
+                .respond(
+                    test_span(""),
+                    Ok(DhtRequestToParentResponse::RequestEntry(entry.clone())),
+                )
                 .unwrap();
         }
         println!("3. dht.process(RequestEntry)...");

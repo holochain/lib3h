@@ -422,12 +422,13 @@ mod tests {
             // In this test actor we simply take all the messages we get and
             // add them to our internal state.
             for mut msg in self.endpoint_as_child.as_mut().drain_messages() {
+                let span = Lib3hSpan::todo();
                 let payload = match msg.take_message().expect("exists") {
                     TestMsgIn(payload) => payload,
                 };
                 self.internal_state.push(payload.clone());
                 if msg.is_request() {
-                    msg.respond(Ok(TestMsgInResponse(format!("we got: {}", payload))))?;
+                    msg.respond(span, Ok(TestMsgInResponse(format!("we got: {}", payload))))?;
                 };
             }
             Ok(false.into())

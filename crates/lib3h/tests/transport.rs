@@ -223,6 +223,7 @@ impl TestTransport {
             TransportError,
         >,
     ) -> TransportResult<()> {
+        let span = test_span("");
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => {
                 let mut mockernet = MOCKERNET.write().unwrap();
@@ -234,11 +235,14 @@ impl TestTransport {
                     Err(TransportError::new("already bound".to_string()))
                 };
                 self.bound_url = Some(spec);
-                msg.respond(response)?;
+                msg.respond(span, response)?;
             }
             RequestToChild::SendMessage { address, payload } => {
                 if self.bound_url.is_none() {
-                    msg.respond(Err(TransportError::new(format!("{} not bound", self.name))))?;
+                    msg.respond(
+                        span,
+                        Err(TransportError::new(format!("{} not bound", self.name))),
+                    )?;
                 } else {
                     let mut mockernet = MOCKERNET.write().unwrap();
                     // return error if not bound.
@@ -250,7 +254,7 @@ impl TestTransport {
                         Err(err) => Err(TransportError::new(err)),
                         Ok(()) => Ok(RequestToChildResponse::SendMessage),
                     };
-                    msg.respond(response)?;
+                    msg.respond(span, response)?;
                 }
             }
         }
