@@ -9,6 +9,9 @@ extern crate url;
 #[macro_use]
 extern crate detach;
 
+pub mod simchat;
+pub use simchat::{ChatEvent, SimChat};
+
 use core::convert::TryFrom;
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
@@ -31,29 +34,6 @@ use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ChatEvent {
-    SendDirectMessage {
-        to_agent: String,
-        payload: String,
-    },
-    ReceiveDirectMessage {
-        from_agent: String,
-        payload: String,
-    },
-    Join {
-        channel_id: String,
-        agent_id: String,
-    },
-    JoinSuccess {
-        channel_id: String,
-        space_data: SpaceData,
-    },
-    Part(String),
-    PartSuccess(String),
-    Disconnected,
-}
-
 impl TryFrom<Lib3hToClient> for ChatEvent {
     type Error = String;
     fn try_from(lib3h_message: Lib3hToClient) -> Result<ChatEvent, Self::Error> {
@@ -72,13 +52,13 @@ impl TryFrom<Lib3hToClient> for ChatEvent {
 
 pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
 
-pub struct SimChat {
+pub struct Lib3hSimChat {
     thread: Option<std::thread::JoinHandle<()>>,
     thread_continue: Arc<AtomicBool>,
     out_send: crossbeam_channel::Sender<ChatEvent>,
 }
 
-impl Drop for SimChat {
+impl Drop for Lib3hSimChat {
     fn drop(&mut self) {
         self.thread_continue.store(false, Ordering::Relaxed);
         std::mem::replace(&mut self.thread, None)
@@ -88,7 +68,7 @@ impl Drop for SimChat {
     }
 }
 
-impl SimChat {
+impl Lib3hSimChat {
     pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url) -> Self
     where
         T: GhostActor<
@@ -128,7 +108,7 @@ impl SimChat {
 
                 // call connect to start the networking process
                 // (should probably wait for confirmatio before continuing)
-                SimChat::connect(&mut parent_endpoint, peer_uri);
+                Self::connect(&mut parent_endpoint, peer_uri);
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -196,7 +176,7 @@ impl SimChat {
                             } => {
                                 spaces.insert(channel_id.clone(), space_data.clone());
                                 current_space = Some(space_data);
-                                SimChat::send_sys_message(
+                                Self::send_sys_message(
                                     local_internal_sender,
                                     &format!("Joined channel: {}", channel_id),
                                 );
@@ -223,7 +203,7 @@ impl SimChat {
                                         )
                                         .unwrap();
                                 } else {
-                                    SimChat::send_sys_message(
+                                    Self::send_sys_message(
                                         local_internal_sender,
                                         &"No channel to leave".to_string(),
                                     );
@@ -233,7 +213,7 @@ impl SimChat {
                             ChatEvent::PartSuccess(channel_id) => {
                                 current_space = None;
                                 spaces.remove(&channel_id);
-                                SimChat::send_sys_message(
+                                Self::send_sys_message(
                                     local_internal_sender,
                                     &"Left channel".to_string(),
                                 );
@@ -263,7 +243,7 @@ impl SimChat {
                                         )
                                         .unwrap();
                                 } else {
-                                    SimChat::send_sys_message(
+                                    Self::send_sys_message(
                                         local_internal_sender,
                                         &"Must join a channel before sending a message".to_string(),
                                     );
@@ -280,10 +260,6 @@ impl SimChat {
             thread_continue,
             out_send,
         }
-    }
-
-    pub fn send(&mut self, event: ChatEvent) {
-        self.out_send.send(event).expect("send fail");
     }
 
     fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
@@ -325,6 +301,12 @@ impl SimChat {
     }
 }
 
+impl SimChat for Lib3hSimChat {
+    fn send(&mut self, event: ChatEvent) {
+        self.out_send.send(event).expect("send fail");
+    }
+}
+
 pub fn channel_address_from_string(channel_id: &String) -> Result<Address, CryptoError> {
     let mut input = SecBuf::with_insecure_from_string(channel_id.to_string());
     let mut output = SecBuf::with_insecure(hash::BYTES256);
@@ -340,8 +322,8 @@ mod tests {
     mod mock_engine;
     use mock_engine::MockEngine;
 
-    fn new_sim_chat_mock_engine(callback: HandleEvent) -> SimChat {
-        SimChat::new(
+    fn new_sim_chat_mock_engine(callback: HandleEvent) -> Lib3hSimChat {
+        Lib3hSimChat::new(
             MockEngine::new,
             callback,
             Url::parse("http://test.boostrap").unwrap(),

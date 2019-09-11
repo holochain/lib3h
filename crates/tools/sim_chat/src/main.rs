@@ -3,6 +3,7 @@
 extern crate linefeed;
 extern crate regex;
 extern crate url;
+use lib3h_sim_chat::simchat::SimChat;
 use lib3h_sim_chat::ChatEvent;
 use regex::Regex;
 use url::Url;
@@ -50,7 +51,7 @@ fn main() {
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
-    let mut cli = lib3h_sim_chat::SimChat::new(
+    let mut cli = lib3h_sim_chat::Lib3hSimChat::new(
         engine_builder,
         Box::new(move |event| {
             match event {

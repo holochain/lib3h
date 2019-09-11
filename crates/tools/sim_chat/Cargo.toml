@@ -30,5 +30,5 @@ name = "lib3h_sim_chat"
 path = "src/lib.rs"
 
 [[bin]]
-name = "half_busy_chat"
+name = "lib3h_sim_chat"
 path = "src/main.rs"
