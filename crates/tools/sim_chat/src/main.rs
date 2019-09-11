@@ -3,8 +3,7 @@
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use lib3h_sim_chat::simchat::SimChat;
-use lib3h_sim_chat::ChatEvent;
+use lib3h_sim_chat::{simchat::SimChat, ChatEvent};
 use regex::Regex;
 use url::Url;
 
@@ -126,7 +125,9 @@ lib3h simchat Commands:
                                     writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
                                 }
                             }
-                            (Some("part"), Some(channel_id)) => cli.send(ChatEvent::Part(channel_id.to_string())),
+                            (Some("part"), Some(channel_id)) => {
+                                cli.send(ChatEvent::Part(channel_id.to_string()))
+                            }
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');
                                 let to_agent: String = words.next().unwrap().to_string();

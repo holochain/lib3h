@@ -25,11 +25,13 @@ use lib3h_protocol::{
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
-use std::collections::HashMap;
 use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
@@ -119,11 +121,12 @@ impl Lib3hSimChat {
                     // Receive directly from the crossbeam channel
                     // and convert relevent N3H protocol messages to chat events
                     let direct_chat_events = out_recv.try_iter();
-                    let engine_chat_events = parent_endpoint.drain_messages().into_iter().filter_map(
-                        |mut engine_message| {
+                    let engine_chat_events = parent_endpoint
+                        .drain_messages()
+                        .into_iter()
+                        .filter_map(|mut engine_message| {
                             ChatEvent::try_from(engine_message.take_message().unwrap()).ok()
-                        },
-                    );
+                        });
 
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
@@ -195,7 +198,9 @@ impl Lib3hSimChat {
                                                 );
                                                 if let Response(Ok(_payload)) = callback_data {
                                                     local_internal_sender
-                                                        .send(ChatEvent::PartSuccess(channel_id.clone()))
+                                                        .send(ChatEvent::PartSuccess(
+                                                            channel_id.clone(),
+                                                        ))
                                                         .unwrap();
                                                 }
                                                 Ok(())

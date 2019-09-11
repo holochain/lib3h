@@ -21,8 +21,8 @@ pub enum ChatEvent {
     Part(String),
     PartSuccess(String),
     Disconnected,
-} 
+}
 
 pub trait SimChat {
-	fn send(&mut self, event: ChatEvent);
+    fn send(&mut self, event: ChatEvent);
 }
