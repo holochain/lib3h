@@ -150,10 +150,10 @@ impl RealEngine {
         // Create network gateway
         let network_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new(
-                NETWORK_GATEWAY_ID,
+            NETWORK_GATEWAY_ID,
                 memory_network_endpoint,
-                dht_factory,
-                &dht_config,
+            dht_factory,
+            &dht_config,
             )),
             "network_gateway_",
         );

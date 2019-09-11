@@ -65,7 +65,7 @@ pub use ghost_tracker::{
 mod ghost_channel;
 pub use ghost_channel::{
     create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
-    GhostMessageData, GhostTrackRequestOptions,
+    GhostTrackRequestOptions,
 };
 
 mod ghost_actor;
@@ -74,9 +74,9 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostMessageData,
-        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
-        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
+        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
+        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
+        GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -236,18 +236,6 @@ mod tests {
     }
 
     use transport_protocol::*;
-
-    #[derive(Debug)]
-    enum _GwDht {
-        ResolveAddressForId {
-            msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
-        },
-    }
-
-    #[derive(Debug)]
-    enum _RequestToParentContext {
-        IncomingConnection { address: String },
-    }
 
     struct GatewayTransport {
         endpoint_parent: Option<

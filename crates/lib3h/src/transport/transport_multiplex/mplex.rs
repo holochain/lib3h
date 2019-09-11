@@ -12,12 +12,6 @@ struct LocalRouteSpec {
     pub local_agent_id: Address,
 }
 
-#[derive(Debug)]
-enum MplexToInnerContext {
-    AwaitBind(GhostMessageData<RequestToChild>),
-    AwaitSend(GhostMessageData<RequestToChild>),
-}
-
 pub struct TransportMultiplex {
     // our parent channel endpoint
     endpoint_parent: Option<TransportActorParentEndpoint>,
@@ -184,7 +178,6 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
-        let _unused_context = MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg));
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
             Lib3hTrace,
@@ -213,7 +206,6 @@ impl TransportMultiplex {
         uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
-        let _unused_context = MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg));
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             Lib3hTrace,
@@ -259,7 +251,6 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
     ) -> TransportResult<()> {
-        let _unused_context = MplexToInnerContext::AwaitBind(GhostMessageData::with_message(&msg));
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
             Lib3hTrace,
@@ -288,7 +279,6 @@ impl TransportMultiplex {
         uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
-        let _unused_context = MplexToInnerContext::AwaitSend(GhostMessageData::with_message(&msg));
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             Lib3hTrace,

@@ -47,13 +47,9 @@ pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
 
 pub type DhtToChildMessage =
     GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
-pub type DhtToChildMessageData = GhostMessageData<DhtRequestToChild>;
 
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
-pub type DhtToParentMessageData = GhostMessageData<DhtRequestToParent>;
-
-#[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.

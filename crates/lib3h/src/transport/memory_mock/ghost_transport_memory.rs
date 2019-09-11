@@ -8,12 +8,6 @@ use lib3h_tracing::Lib3hTrace;
 use std::collections::HashSet;
 use url::Url;
 
-#[derive(Debug)]
-#[allow(dead_code)]
-enum RequestToParentContext {
-    Source { uri: Url },
-}
-
 pub type UserData = GhostTransportMemory;
 
 type GhostTransportMemoryEndpoint = GhostEndpoint<
