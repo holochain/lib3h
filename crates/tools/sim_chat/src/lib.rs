@@ -137,15 +137,15 @@ impl SimChat {
                     // Receive directly from the crossbeam channel
                     // and convert relevent N3H protocol messages to chat events
                     let direct_chat_events = out_recv.try_iter();
-                    let n3h_chat_events = parent_endpoint.drain_messages().into_iter().filter_map(
-                        |mut n3h_message| {
-                            ChatEvent::try_from(n3h_message.take_message().unwrap()).ok()
+                    let engine_chat_events = parent_endpoint.drain_messages().into_iter().filter_map(
+                        |mut engine_message| {
+                            ChatEvent::try_from(engine_message.take_message().unwrap()).ok()
                         },
                     );
 
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
-                    for chat_event in direct_chat_events.chain(n3h_chat_events) {
+                    for chat_event in direct_chat_events.chain(engine_chat_events) {
                         let local_internal_sender = internal_sender.clone();
 
                         // every chat event call the handler that was passed
