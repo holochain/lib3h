@@ -98,7 +98,7 @@ mod tests {
                     }
                     RequestToChild::SendMessage { uri, payload } => {
                         self.mock_sender.send((uri, payload))?;
-                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
+                        msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?;
                     }
                 }
             }

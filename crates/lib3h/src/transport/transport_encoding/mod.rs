@@ -442,7 +442,7 @@ mod tests {
                     }
                     RequestToChild::SendMessage { uri, payload } => {
                         self.mock_sender.send((uri, payload)).unwrap();
-                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
+                        msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?;
                     }
                 }
             }
@@ -556,7 +556,10 @@ mod tests {
             Box::new(|b: &mut bool, response| {
                 *b = true;
                 // make sure we get a success response
-                assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
+                assert_eq!(
+                    "Response(Ok(SendMessageSuccess))",
+                    format!("{:?}", response),
+                );
                 Ok(())
             }),
         )

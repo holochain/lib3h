@@ -114,7 +114,7 @@ impl P2pGateway {
                 let response = response.unwrap();
                 // Must be a SendMessage response
                 match response {
-                    transport::protocol::RequestToChildResponse::SendMessage => (),
+                    transport::protocol::RequestToChildResponse::SendMessageSuccess => (),
                     _ => panic!("received unexpected response type"),
                 };
                 println!("yay? {:?}", response);
@@ -184,7 +184,7 @@ impl P2pGateway {
             transport::protocol::RequestToChildResponse::Bind(_result_data) => {
                 // no-op
             }
-            transport::protocol::RequestToChildResponse::SendMessage => {
+            transport::protocol::RequestToChildResponse::SendMessageSuccess => {
                 // no-op
             }
         };

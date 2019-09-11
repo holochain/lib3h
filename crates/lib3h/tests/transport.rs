@@ -242,7 +242,7 @@ impl TestTransport {
                         payload,
                     ) {
                         Err(err) => Err(TransportError::new(err)),
-                        Ok(()) => Ok(RequestToChildResponse::SendMessage),
+                        Ok(()) => Ok(RequestToChildResponse::SendMessageSuccess),
                     };
                     msg.respond(response)?;
                 }
@@ -384,7 +384,7 @@ fn ghost_transport() {
     // we should get back an Ok on having sent the message when t1 gets processed
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Ok(SendMessage))\"",
+        "\"Response(Ok(SendMessageSuccess))\"",
         format!("{:?}", owner.log[3])
     );
 
