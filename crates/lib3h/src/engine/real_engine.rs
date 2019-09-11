@@ -477,12 +477,6 @@ impl<'engine> RealEngine<'engine> {
         for (entry_address, aspect_address_list) in msg.address_map.clone() {
             let request_id = self.request_track.reserve();
             let msg = msg.clone();
-            let _ctx = DhtContext::RequestAspectsOf {
-                entry_address: entry_address.clone(),
-                aspect_address_list: aspect_address_list.clone(),
-                msg: msg.clone(),
-                request_id: request_id.clone(),
-            };
             // Check aspects and only request entry with new aspects
             space_gateway.as_mut().as_dht_mut().request(
                 Lib3hTrace,
