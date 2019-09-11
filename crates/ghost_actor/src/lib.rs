@@ -340,7 +340,10 @@ mod tests {
                         })))?;
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
-                    RequestToChild::SendMessage { address, payload: _ } => {
+                    RequestToChild::SendMessage {
+                        address,
+                        payload: _,
+                    } => {
                         // let _request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
                             TestTrace("test1".to_string()),
