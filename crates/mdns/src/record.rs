@@ -33,7 +33,12 @@ impl DerefMut for MapRecord {
 }
 
 impl MapRecord {
-    pub fn new(networkid: &str, record: &[Record]) -> Self {
+    pub fn new() -> Self {
+        Self(HashMapRecord::new())
+    }
+
+    /// Creates a new [`MapRecord`] with one record.
+    pub fn with_record(networkid: &str, record: &[Record]) -> Self {
         let mut hmr = HashMapRecord::new();
         hmr.insert(networkid.to_string(), record.to_vec());
 
@@ -99,7 +104,7 @@ impl MapRecord {
 
             let mut map_record = MapRecord(HashMapRecord::with_capacity(records.len()));
             for new_record in records.iter() {
-                let fake_map_record = MapRecord::new(&new_record.networkid, &[new_record.clone()]);
+                let fake_map_record = MapRecord::with_record(&new_record.networkid, &[new_record.clone()]);
                 map_record.update(&fake_map_record);
             }
 
@@ -272,7 +277,7 @@ fn map_record_update_test() {
     // Because this record has the smallest ttl, it's the one that supposed to be kept during the dedup
     // process
     let record_to_keep = Record::new(networkid, url, 100);
-    let mut map_record = MapRecord::new(
+    let mut map_record = MapRecord::with_record(
         networkid,
         &[record_to_prune1, record_to_prune2, record_to_keep.clone()],
     );

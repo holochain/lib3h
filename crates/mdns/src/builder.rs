@@ -22,14 +22,15 @@ pub struct MulticastDnsBuilder {
 }
 
 impl MulticastDnsBuilder {
-    /// create a new mdns builder
+    /// Create a new mDNS builder
     pub fn new() -> Self {
         MulticastDnsBuilder::default()
     }
 
+    /// Create a new mDNS instance with a defined own record.
     pub fn with_own_record(networkid: &str, rec: &Record) -> Self {
         Self {
-            own_map_record: MapRecord::new(networkid, &[rec.clone()]),
+            own_map_record: MapRecord::with_record(networkid, &[rec.clone()]),
             ..Default::default()
         }
     }
@@ -76,7 +77,7 @@ impl MulticastDnsBuilder {
             .iter()
             .map(|url| Record::new(networkid, url, DEFAULT_TTL))
             .collect();
-        self.own_map_record = MapRecord::new(networkid, &records);
+        self.own_map_record.insert(networkid.to_string(), records);
         self
     }
 
@@ -119,7 +120,7 @@ impl Default for MulticastDnsBuilder {
             &hostname::get_hostname().unwrap_or_else(|| String::from("Anonymous-host"))
         );
         let record = Record::new(&networkid, DEFAULT_BIND_ADRESS, DEFAULT_TTL);
-        let map_record = MapRecord::new(&networkid, &[record]);
+        let map_record = MapRecord::with_record(&networkid, &[record]);
 
         MulticastDnsBuilder {
             bind_address: String::from(DEFAULT_BIND_ADRESS),

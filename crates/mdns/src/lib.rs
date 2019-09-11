@@ -7,6 +7,8 @@
 //! use std::{thread, time::Duration};
 //!
 //! let mut mdns = mdns::MulticastDnsBuilder::new()
+//!     // Let's define our own networkId (the network we operate on) and how to access us
+//!     .own_record("holonaute.holo.host", &["wss://192.168.0.87:88088?a=hc0"])
 //!     .bind_port(8585)
 //!     .build()
 //!     .expect("Fail to build mDNS.");
