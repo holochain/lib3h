@@ -127,10 +127,7 @@ impl P2pGateway {
             }),
         )
     }
-}
 
-/// Private internals
-impl P2pGateway {
     /// Handle Transport request sent to use by our parent
     pub(crate) fn handle_transport_RequestToChild(
         &mut self,
