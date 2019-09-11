@@ -160,6 +160,8 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                // TODO Change `address_to_uri()` to an async actor model call
+                // and have it handle just one address
                 // uri is actually a dht peerAddress
                 // get actual uri from the inner dht before sending
                 let dht_uri_list = self.address_to_uri(&[&uri.to_string()])?;

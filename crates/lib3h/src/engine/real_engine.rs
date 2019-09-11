@@ -110,6 +110,7 @@ impl RealEngine {
         );
 
         // Bind & create this_net_peer
+        // TODO: Find better way to do init with GhostEngine
         let mut gateway_ud = GatewayUserData::new();
         let _res = memory_network_endpoint.request(
             Lib3hTrace,
@@ -159,6 +160,7 @@ impl RealEngine {
         );
         debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        // TODO: put network_gateway within multiplexer instead
         let multiplexer = TransportMultiplex::new(Box::new(memory_transport));
         let mut real_engine = RealEngine {
             crypto,
@@ -194,7 +196,8 @@ impl RealEngine {
         Ok(())
     }
 
-    ///
+    // TODO: Find better way to do this:
+    // Pure actor model or have a direct request on the concrete gateway
     pub fn get_this_peer_sync(&mut self, maybe_chainId: Option<ChainId>) -> PeerData {
         trace!("engine.get_this_peer_sync() ...");
         let gateway = if let Some(chain_id) = maybe_chainId {
@@ -234,7 +237,8 @@ impl RealEngine {
         self.gateway_user_data.this_peer.clone()
     }
 
-    ///
+    // TODO: Find better way to do this:
+    // Pure actor model or have a direct request on the concrete gateway
     pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
         trace!("engine.get_peer_list_sync() ...");
         self.network_gateway
@@ -402,8 +406,8 @@ impl RealEngine {
                         payload: Opaque::new(),
                     },
                 );
+                // TODO: Figure out how we want to handle Connect and ConnectResult with GhostEngine
                 self.network_gateway.publish(cmd)?;
-
                 //                // Convert into TransportCommand & post to network gateway
                 //                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
                 //                self.network_gateway.as_transport_mut().post(cmd)?;

@@ -23,6 +23,7 @@ pub enum RequestToChildResponse {
 
 #[derive(Debug, Clone)]
 pub enum RequestToParent {
+    // TODO remove `uri` field once we have refactored how we handle Connection/Disconnection
     ErrorOccured { uri: Url, error: TransportError },
     IncomingConnection { uri: Url },
     ReceivedData { uri: Url, payload: Opaque },
