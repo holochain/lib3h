@@ -252,35 +252,48 @@ impl<'engine> GhostEngine<'engine> {
     /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
-            ClientToLib3h::Connect(_data) => Ok(()),
-            //    let cmd = TransportCommand::Connect(data.peer_uri, data.request_id);
-            //  self.network_gateway.as_transport_mut().post(cmd)?;
-            // ARG need this to be a request with a callback!!
-            // msg.respond(Err(Lib3hError::new_other("connection failed!".into())));
+            ClientToLib3h::Connect(data) => {
+                trace!("ClientToLib3h::Connect: {:?}", data);
+                //    let cmd = TransportCommand::Connect(data.peer_uri, data.request_id);
+                //  self.network_gateway.as_transport_mut().post(cmd)?;
+                // ARG need this to be a request with a callback!!
+                // msg.respond(Err(Lib3hError::new_other("connection failed!".into())));
+                Ok(())
+            }
             ClientToLib3h::JoinSpace(data) => {
+                trace!("ClientToLib3h::JoinSpace: {:?}", data);
                 let result = self
                     .handle_join(&data)
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::LeaveSpace(data) => {
+                trace!("ClientToLib3h::LeaveSpace: {:?}", data);
                 let result = self
                     .handle_leave(&data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
-            ClientToLib3h::SendDirectMessage(data) => self
-                .handle_direct_message(&data, false)
-                .map_err(|e| GhostError::from(e.to_string())),
-            ClientToLib3h::PublishEntry(data) => self
-                .handle_publish_entry(&data)
-                .map_err(|e| GhostError::from(e.to_string())),
-            ClientToLib3h::HoldEntry(data) => self
-                .handle_hold_entry(&data)
-                .map_err(|e| GhostError::from(e.to_string())),
-            ClientToLib3h::QueryEntry(data) => self
-                .handle_query_entry(msg, &data)
-                .map_err(|e| GhostError::from(e.to_string())),
+            ClientToLib3h::SendDirectMessage(data) => {
+                trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
+                self.handle_direct_message(&data, false)
+                    .map_err(|e| GhostError::from(e.to_string()))
+            }
+            ClientToLib3h::PublishEntry(data) => {
+                trace!("ClientToLib3h::PublishEntry: {:?}", data);
+                self.handle_publish_entry(&data)
+                    .map_err(|e| GhostError::from(e.to_string()))
+            }
+            ClientToLib3h::HoldEntry(data) => {
+                trace!("ClientToLib3h::HoldEntry: {:?}", data);
+                self.handle_hold_entry(&data)
+                    .map_err(|e| GhostError::from(e.to_string()))
+            }
+            ClientToLib3h::QueryEntry(data) => {
+                trace!("ClientToLib3h::QueryEntry: {:?}", data);
+                self.handle_query_entry(msg, data)
+                    .map_err(|e| GhostError::from(e.to_string()))
+            }
             ClientToLib3h::FetchEntry(_) => panic!("FetchEntry Deprecated"),
         }
     }
