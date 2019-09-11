@@ -202,7 +202,7 @@ impl MemoryServer {
                     payload.len(),
                     uri
                 );
-                let evt = MemoryEvent::ReceivedData(uri.clone(), payload);
+                let evt = MemoryEvent::ReceivedData(uri.clone(), payload.into());
                 outbox.push(evt);
             }
         }

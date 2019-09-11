@@ -1,5 +1,8 @@
 use crate::dht::{dht_protocol::PeerData, PeerAddress};
-use lib3h_protocol::{data_types::DirectMessageData, Address};
+use lib3h_protocol::{
+    data_types::{DirectMessageData, Opaque},
+    Address,
+};
 
 pub type SpaceAddress = String;
 pub type GatewayId = String;
@@ -26,5 +29,5 @@ pub struct GossipData {
     pub space_address: Address,
     pub to_peer_address: Address,
     pub from_peer_address: Address,
-    pub bundle: Vec<u8>,
+    pub bundle: Opaque,
 }

@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use crate::transport::memory_mock::transport_memory::TransportMemory;
+use lib3h_tracing::Lib3hTrace;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
@@ -21,6 +23,7 @@ use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, network_engine::NetworkEngine,
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address, DidWork,
 };
+
 use rmp_serde::Serializer;
 use serde::Serialize;
 
@@ -141,8 +144,8 @@ impl RealEngine {
         };
         // Create DhtConfig
         let dht_config = DhtConfig {
-            this_peer_address: this_net_peer.peer_address.clone(),
-            this_peer_uri: this_net_peer.peer_uri.clone(),
+            this_peer_address: format!("{}_tId", name),
+            this_peer_uri: binding,
             custom: config.dht_custom_config.clone(),
             gossip_interval: config.dht_gossip_interval,
             timeout_threshold: config.dht_timeout_threshold,
@@ -150,17 +153,17 @@ impl RealEngine {
         // Create network gateway
         let network_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new(
-                NETWORK_GATEWAY_ID,
+            NETWORK_GATEWAY_ID,
                 memory_network_endpoint,
-                dht_factory,
-                &dht_config,
+            dht_factory,
+            &dht_config,
             )),
             "network_gateway_",
         );
         debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         let multiplexer = TransportMultiplex::new(Box::new(memory_transport));
-        Ok(RealEngine {
+        let mut real_engine = RealEngine {
             crypto,
             config,
             inbox: VecDeque::new(),
@@ -176,7 +179,22 @@ impl RealEngine {
             process_count: 0,
             temp_outbox: Vec::new(),
             gateway_user_data: GatewayUserData::new(),
-        })
+        };
+        real_engine.priv_connect_bootstraps()?;
+        Ok(real_engine)
+    }
+
+    fn priv_connect_bootstraps(&mut self) -> Lib3hProtocolResult<()> {
+        // TODO
+        let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
+        for bs in nodes {
+            self.post(Lib3hClientProtocol::Connect(ConnectData {
+                request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
+                peer_uri: bs,
+                network_id: "".to_string(), // unimplemented
+            }))?;
+        }
+        Ok(())
     }
 
     ///
@@ -448,6 +466,21 @@ impl RealEngine {
             }
             // PublishEntry: Broadcast on the space DHT
             Lib3hClientProtocol::PublishEntry(msg) => {
+                // MIRROR - reflecting hold for now
+                for aspect in &msg.entry.aspect_list {
+                    let msg = StoreEntryAspectData {
+                        request_id: self.request_track.reserve(),
+                        space_address: msg.space_address.clone(),
+                        provider_agent_id: msg.provider_agent_id.clone(),
+                        entry_address: msg.entry.entry_address.clone(),
+                        entry_aspect: aspect.clone(),
+                    };
+                    self.request_track.set(
+                        &msg.request_id,
+                        Some(RealEngineTrackerData::HoldEntryRequested),
+                    );
+                    outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(msg));
+                }
                 let maybe_space = self.get_space_or_fail(
                     &msg.space_address,
                     &msg.provider_agent_id,
@@ -480,7 +513,6 @@ impl RealEngine {
                     }
                 }
             }
-            // QueryEntry: Converting to DHT FetchEntry for now
             // TODO #169
             Lib3hClientProtocol::QueryEntry(msg) => {
                 let maybe_space = self.get_space_or_fail(
@@ -492,13 +524,13 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(_space_gateway) => {
-                        // #fullsync hack
-                        // just send handle query back to self
-                        outbox.push(Lib3hServerProtocol::HandleQueryEntry(msg));
+                        // TODO #169 reflecting for now...
+                        // ultimately this should get forwarded to the
+                        // correct neighborhood
+                        outbox.push(Lib3hServerProtocol::HandleQueryEntry(msg))
                     }
                 }
             }
-            // HandleQueryEntryResult: Convert into DhtCommand::ProvideEntryResponse
             // TODO #169
             Lib3hClientProtocol::HandleQueryEntryResult(msg) => {
                 let maybe_space = self.get_space_or_fail(
@@ -510,9 +542,10 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(_space_gateway) => {
-                        // #fullsync hack
-                        // just send handle query back to self
-                        outbox.push(Lib3hServerProtocol::QueryEntryResult(msg));
+                        // TODO #169 reflecting for now...
+                        // ultimately this should get forwarded to the
+                        // original requestor
+                        outbox.push(Lib3hServerProtocol::QueryEntryResult(msg))
                     }
                 }
             }
@@ -693,12 +726,12 @@ impl RealEngine {
             request_id: join_msg.request_id.clone(),
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
-            result_info: vec![],
+            result_info: vec![].into(),
         };
         // Bail if space already joined by agent
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
-            res.result_info = "Already joined space".to_string().into_bytes();
+            res.result_info = "Already joined space".to_string().into();
             return Ok(vec![Lib3hServerProtocol::FailureResult(res)]);
         }
         let mut output = Vec::new();
@@ -710,13 +743,11 @@ impl RealEngine {
             Url::parse(format!("transportId:{}", self.this_net_peer.peer_address).as_str())
                 .expect("can parse url")
         };
-        let dht_config = DhtConfig {
-            this_peer_address: agent_id.clone(),
-            this_peer_uri: this_peer_transport_id_as_uri,
-            custom: self.config.dht_custom_config.clone(),
-            gossip_interval: self.config.dht_gossip_interval,
-            timeout_threshold: self.config.dht_timeout_threshold,
-        };
+        let dht_config = DhtConfig::with_real_engine_config(
+            agent_id.clone(),
+            &this_peer_transport_id_as_uri,
+            &self.config,
+        );
         // Create new space gateway for this ChainId
         let uniplex_endpoint = Detach::new(
             self.multiplexer
@@ -812,12 +843,12 @@ impl RealEngine {
             request_id: msg.request_id.clone(),
             space_address: msg.space_address.clone(),
             to_agent_id: msg.from_agent_id.clone(),
-            result_info: vec![],
+            result_info: vec![].into(),
         };
         // Check if messaging self
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if peer_address == to_agent_id {
-            response.result_info = "Messaging self".as_bytes().to_vec();
+            response.result_info = "Messaging self".as_bytes().to_vec().into();
             return Lib3hServerProtocol::FailureResult(response);
         }
         // Change into P2pProtocol
@@ -855,8 +886,11 @@ impl RealEngine {
             space_address: join_msg.space_address.clone(),
             to_agent_id: join_msg.agent_id.clone(),
             result_info: match res {
-                None => "Agent is not part of the space".to_string().into_bytes(),
-                Some(_) => vec![],
+                None => "Agent is not part of the space"
+                    .to_string()
+                    .into_bytes()
+                    .into(),
+                Some(_) => vec![].into(),
             },
         };
         // Done
@@ -892,7 +926,8 @@ impl RealEngine {
                 &agent_id, &space_address,
             )
             .as_bytes()
-            .to_vec(),
+            .to_vec()
+            .into(),
         };
         Err(Lib3hServerProtocol::FailureResult(res))
     }

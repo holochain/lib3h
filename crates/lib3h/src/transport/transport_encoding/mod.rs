@@ -5,21 +5,14 @@ use crate::{
 use detach::prelude::*;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::Opaque;
+use lib3h_tracing::Lib3hTrace;
 use std::collections::HashMap;
 use url::Url;
 
-enum ToParentContext {}
-
-enum ToInnerContext {
-    AwaitBind(
-        GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-    ),
-    AwaitSend(
-        GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-    ),
-}
-
-enum ToKeystoreContext {}
+type ToParentContext = Lib3hTrace;
+type ToInnerContext = Lib3hTrace;
+type ToKeystoreContext = Lib3hTrace;
 
 /// Wraps a lower-level transport in either Open or Encrypted communication
 /// Also adds a concept of MachineId and AgentId
@@ -54,14 +47,14 @@ pub struct TransportEncoding {
     pending_send_data: HashMap<
         Url,
         Vec<(
-            Vec<u8>,
+            Opaque,
             GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         )>,
     >,
     // if we have never received data from this remote before, we need to
     // handshake... this should never exactly happen... we should get a
     // handshake as the first request they send
-    pending_received_data: HashMap<Url, Vec<Vec<u8>>>,
+    pending_received_data: HashMap<Url, Vec<Opaque>>,
     // map low-level connection addresses to id connection addresses
     // i.e. wss://1.1.1.1:55888 -> wss://1.1.1.1:55888?a=HcMyadayada
     connections_no_id_to_id: HashMap<Url, Url>,
@@ -126,7 +119,7 @@ impl TransportEncoding {
     fn send_handshake(&mut self, uri: &Url) -> GhostResult<()> {
         self.inner_transport.publish(RequestToChild::SendMessage {
             uri: uri.clone(),
-            payload: self.this_id.as_bytes().to_vec(),
+            payload: self.this_id.clone().into(),
         })
     }
 
@@ -151,8 +144,8 @@ impl TransportEncoding {
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, uri: Url, payload: Vec<u8>) -> TransportResult<()> {
-        trace!("got {:?} {}", &uri, &String::from_utf8_lossy(&payload));
+    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> TransportResult<()> {
+        trace!("got {:?} {}", &uri, payload);
         match self.connections_no_id_to_id.get(&uri) {
             Some(remote_addr) => {
                 // if we've seen this connection before, just forward it
@@ -257,15 +250,9 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            ToInnerContext::AwaitBind(msg),
+            Lib3hTrace,
             RequestToChild::Bind { spec },
-            Box::new(|m: &mut TransportEncoding, context, response| {
-                let msg = {
-                    match context {
-                        ToInnerContext::AwaitBind(msg) => msg,
-                        _ => panic!("bad context"),
-                    }
-                };
+            Box::new(|m: &mut TransportEncoding, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -299,18 +286,12 @@ impl TransportEncoding {
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         uri: Url,
-        payload: Vec<u8>,
+        payload: Opaque,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
-            ToInnerContext::AwaitSend(msg),
+            Lib3hTrace,
             RequestToChild::SendMessage { uri, payload },
-            Box::new(|_: &mut TransportEncoding, context, response| {
-                let msg = {
-                    match context {
-                        ToInnerContext::AwaitSend(msg) => msg,
-                        _ => panic!("bad context"),
-                    }
-                };
+            Box::new(|_: &mut TransportEncoding, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -328,8 +309,8 @@ impl TransportEncoding {
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        uri: Url,
-        payload: Vec<u8>,
+        address: Url,
+        uri: Opaque,
     ) -> TransportResult<()> {
         match self.connections_id_to_no_id.get(&uri) {
             Some(sub_address) => {
@@ -393,6 +374,7 @@ impl
 mod tests {
     use super::*;
     use lib3h_sodium::SodiumCryptoSystem;
+    use lib3h_tracing::TestTrace;
 
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
     const ID_2: &'static str = "HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r";
@@ -411,14 +393,14 @@ mod tests {
             >,
         >,
         bound_url: Url,
-        mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-        mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+        mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
+        mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
     }
 
     impl TransportMock {
         pub fn new(
-            mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-            mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+            mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
+            mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
@@ -505,7 +487,7 @@ mod tests {
         let (s1in, r1in) = crossbeam_channel::unbounded();
 
         // create the first encoding transport
-        let mut t1: TransportActorParentWrapper<bool, (), TransportEncoding> =
+        let mut t1: TransportActorParentWrapper<bool, TestTrace, TransportEncoding> =
             GhostParentWrapper::new(
                 TransportEncoding::new(
                     crypto.box_clone(),
@@ -518,11 +500,11 @@ mod tests {
 
         // give it a bind point
         t1.request(
-            (),
+            TestTrace("".into()),
             RequestToChild::Bind {
                 spec: Url::parse("test://1").expect("can parse url"),
             },
-            Box::new(|_: &mut bool, _, response| {
+            Box::new(|_: &mut bool, response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
@@ -539,7 +521,7 @@ mod tests {
         let (s2in, r2in) = crossbeam_channel::unbounded();
 
         // create the second encoding transport
-        let mut t2: TransportActorParentWrapper<(), (), TransportEncoding> =
+        let mut t2: TransportActorParentWrapper<(), TestTrace, TransportEncoding> =
             GhostParentWrapper::new(
                 TransportEncoding::new(
                     crypto.box_clone(),
@@ -552,11 +534,11 @@ mod tests {
 
         // give it a bind point
         t2.request(
-            (),
+            TestTrace("".into()),
             RequestToChild::Bind {
                 spec: Url::parse("test://2").expect("can parse url"),
             },
-            Box::new(|_:&mut (), _, response| {
+            Box::new(|_:&mut (), response| {
                 assert_eq!(
                     &format!("{:?}", response),
                     "Response(Ok(Bind(BindResultData { bound_url: \"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\" })))"
@@ -572,12 +554,12 @@ mod tests {
 
         // now we're going to send a message to our sibling #2
         t1.request(
-            (),
+            TestTrace("".into()),
             RequestToChild::SendMessage {
                 uri: addr2full.clone(),
-                payload: b"hello".to_vec(),
+                payload: "hello".into(),
             },
-            Box::new(|b: &mut bool, _, response| {
+            Box::new(|b: &mut bool, response| {
                 *b = true;
                 // make sure we get a success response
                 assert_eq!(
@@ -623,7 +605,8 @@ mod tests {
         // we get the actual payload that needs to be forwarded to #2
         let (address, payload) = r1out.recv().unwrap();
         assert_eq!(&addr2, &address);
-        assert_eq!(&b"hello".to_vec(), &payload);
+        let expected: Opaque = "hello".into();
+        assert_eq!(&expected, &payload);
         s2in.send((addr1.clone(), payload)).unwrap();
 
         t2.process(&mut ()).unwrap();
@@ -633,7 +616,7 @@ mod tests {
         let msg = msg_list.get_mut(2).unwrap().take_message();
         if let Some(RequestToParent::ReceivedData { uri, payload }) = msg {
             assert_eq!(&uri, &addr1full);
-            assert_eq!(&b"hello".to_vec(), &payload);
+            assert_eq!(&expected, &payload);
         } else {
             panic!("bad type {:?}", msg);
         }

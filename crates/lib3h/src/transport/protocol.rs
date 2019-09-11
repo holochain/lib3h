@@ -8,26 +8,31 @@ pub struct BindResultData {
 }
 
 /// Transport protocol enums for use with GhostActor implementation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { uri: Url, payload: Vec<u8> },
+    SendMessage { uri: Url, payload: Opaque },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct BindResultData {
+    pub bound_url: Url,
+}
+
+#[derive(Debug, Clone)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
-    SendMessage { payload: Vec<u8> },
+    SendMessage { payload: Opaque },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToParent {
     ErrorOccured { uri: Url, error: TransportError },
     IncomingConnection { uri: Url },
-    ReceivedData { uri: Url, payload: Vec<u8> },
+    ReceivedData { uri: Url, payload: Opaque },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToParentResponse {
     // N/A
 }
@@ -56,9 +61,9 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     TransportError,
 >;
 
-pub type TransportActorParentContextEndpoint<UserData, Context> = GhostContextEndpoint<
+pub type TransportActorParentContextEndpoint<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    Context,
+    TraceContext,
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -66,18 +71,18 @@ pub type TransportActorParentContextEndpoint<UserData, Context> = GhostContextEn
     TransportError,
 >;
 
-pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
+pub type TransportActorSelfEndpoint<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
     RequestToChildResponse,
     TransportError,
 >;
-pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
+pub type TransportActorParentWrapper<UserData, TraceContext, Actor> = GhostParentWrapper<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -85,9 +90,9 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

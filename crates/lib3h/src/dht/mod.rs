@@ -19,6 +19,7 @@ pub mod tests {
         data_types::{EntryAspectData, EntryData},
         Address,
     };
+    use lib3h_tracing::TestTrace;
     use url::Url;
 
     lazy_static! {
@@ -90,7 +91,7 @@ pub mod tests {
         let aspect = EntryAspectData {
             aspect_address: aspect_address.to_owned(),
             type_hint: "dht_test".to_string(),
-            aspect: aspect_content.to_owned(),
+            aspect: aspect_content.into(),
             publish_ts: crate::time::since_epoch_ms(),
         };
         EntryData {
@@ -121,17 +122,17 @@ pub mod tests {
     fn new_dht_wrapper(
         _is_mirror: bool,
         peer_address: &PeerAddressRef,
-    ) -> Detach<ChildDhtWrapperDyn<DhtData, DhtContext>> {
+    ) -> Detach<ChildDhtWrapperDyn<DhtData, TestTrace>> {
         let dht = new_dht(true, peer_address);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
-    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>) -> PeerData {
+    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> PeerData {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestThisPeer,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -156,14 +157,14 @@ pub mod tests {
     }
 
     fn get_peer(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
         address: &str,
     ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestPeer(address.to_string()),
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -187,12 +188,12 @@ pub mod tests {
         ud.maybe_peer
     }
 
-    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>) -> Vec<PeerData> {
+    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> Vec<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestPeerList,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -217,13 +218,13 @@ pub mod tests {
     }
 
     fn get_entry_address_list(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
     ) -> Vec<Address> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestEntryAddressList,
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -249,14 +250,14 @@ pub mod tests {
     }
 
     fn get_aspects_of(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, DhtContext>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
         entry_address: &Address,
     ) -> Option<Vec<Address>> {
         let mut ud = DhtData::new();
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-            Box::new(|mut ud, _context, response| {
+            Box::new(|mut ud, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -345,9 +346,9 @@ pub mod tests {
         // Fetch it
         // ========
         dht.request(
-            DhtContext::NoOp,
+            TestTrace::new(),
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
-            Box::new(|_ud, _context, response| {
+            Box::new(|_ud, response| {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");
                 let response = {
                     match response {
@@ -455,7 +456,7 @@ pub mod tests {
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 1);
-        let mut bundle = Vec::new();
+        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
             match request.take_message().expect("exists") {
                 DhtRequestToParent::GossipTo(gossip_data) => {
@@ -526,7 +527,7 @@ pub mod tests {
         // Should return gossipTos of C to B
         let request_list = dht_a.drain_messages();
         assert_eq!(request_list.len(), 2);
-        let mut bundle = Vec::new();
+        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
             match request.take_message().expect("exists") {
                 DhtRequestToParent::GossipTo(gossip_to) => {

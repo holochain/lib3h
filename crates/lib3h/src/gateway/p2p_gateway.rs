@@ -8,6 +8,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
+use lib3h_tracing::Lib3hTrace;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -83,9 +84,9 @@ impl P2pGateway {
         trace!("get_peer_list_sync() ...");
         self.inner_dht
             .request(
-                GatewayContext::NoOp,
+                Lib3hTrace,
                 DhtRequestToChild::RequestPeerList,
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -117,9 +118,9 @@ impl P2pGateway {
         }
         self.inner_dht
             .request(
-                GatewayContext::NoOp,
+                Lib3hTrace,
                 DhtRequestToChild::RequestThisPeer,
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -147,9 +148,9 @@ impl P2pGateway {
     pub fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData> {
         self.inner_dht
             .request(
-                GatewayContext::NoOp,
+                Lib3hTrace,
                 DhtRequestToChild::RequestPeer(peer_address.to_string()),
-                Box::new(|mut ud, _context, response| {
+                Box::new(|mut ud, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),

@@ -8,6 +8,7 @@ pub mod protocol;
 use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
 use detach::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
+use lib3h_tracing::Lib3hTrace;
 use url::Url;
 
 /// Combines a Transport and a DHT.
@@ -20,8 +21,7 @@ pub struct P2pGateway {
         transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, GatewayContext>,
     >,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn<GatewayUserData, GatewayContext>,
-
+    inner_dht: ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>,
     // Cache
     this_peer: PeerData,
     // user data for ghost callback
