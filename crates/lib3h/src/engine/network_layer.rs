@@ -34,7 +34,7 @@ impl RealEngine {
         //        self.temp_outbox.append(&mut temp);
         // Done
         Ok((true /* fixme */, outbox))
-        }
+    }
 
     /// Handle a GatewayRequestToParent sent to us by our network gateway
     fn handle_network_request(
@@ -49,7 +49,7 @@ impl RealEngine {
             }
             GatewayRequestToParent::Transport(transport_request) => {
                 self.handle_network_transport_request(&transport_request)
-        }
+            }
         }
     }
 

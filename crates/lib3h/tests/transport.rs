@@ -270,8 +270,8 @@ impl TestTransport {
                     MockernetEvent::Error(err) => {
                         self.endpoint_self.publish(RequestToParent::ErrorOccured {
                             uri: our_url.clone(),
-                                error: TransportError::new(err),
-                            })?;
+                            error: TransportError::new(err),
+                        })?;
                     }
                 }
             }
