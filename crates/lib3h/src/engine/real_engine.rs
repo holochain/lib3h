@@ -12,8 +12,12 @@ use crate::{
     },
     error::Lib3hResult,
     gateway::{protocol::*, GatewayUserData, P2pGateway},
+    keystore::*,
     track::Tracker,
-    transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
+    transport::{
+        self, memory_mock::ghost_transport_memory::*, protocol::*, TransportEncoding,
+        TransportMultiplex,
+    },
 };
 use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -40,57 +44,28 @@ impl TransportKeys {
     }
 }
 
-// FIXME TransportWss
-//impl RealEngine {
-//    /// Constructor with TransportWss
-//    pub fn new(
-//        crypto: Box<dyn CryptoSystem>,
-//        config: RealEngineConfig,
-//        name: &str,
-//        dht_factory: DhtFactory,
-//    ) -> Lib3hResult<Self> {
-//        // Create Transport and bind
-//        let network_transport =
-//            TransportWrapper::new(TransportWss::with_std_tcp_stream(config.tls_config.clone()));
-//        let binding = network_transport.as_mut().bind(&config.bind_url)?;
-//        // Generate keys
-//        // TODO #209 - Check persistence first before generating
-//        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-//        // Generate DHT config and create network_gateway
-//        let dht_config = DhtConfig {
-//            this_peer_address: transport_keys.transport_id.clone(),
-//            this_peer_uri: binding,
-//            custom: config.dht_custom_config.clone(),
-//            gossip_interval: config.dht_gossip_interval,
-//            timeout_threshold: config.dht_timeout_threshold,
-//        };
-//        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
-//            NETWORK_GATEWAY_ID,
-//            network_transport.clone(),
-//            dht_factory,
-//            &dht_config,
-//        ));
-//        // Done
-//        Ok(RealEngine {
-//            crypto,
-//            config,
-//            inbox: VecDeque::new(),
-//            name: name.to_string(),
-//            dht_factory,
-//            request_track: Tracker::new("real_engine_", 2000),
-//            network_transport,
-//            network_gateway,
-//            network_connections: HashSet::new(),
-//            space_gateway_map: HashMap::new(),
-//            transport_keys,
-//            process_count: 0,
-//            temp_outbox: Vec::new(),
-//        })
-//    }
-//}
-
 /// Constructor
 impl RealEngine {
+    /*
+    /// Constructor with TransportWss
+    /// FIXME
+    pub fn new(
+        crypto: Box<dyn CryptoSystem>,
+        config: RealEngineConfig,
+        name: &str,
+        dht_factory: DhtFactory,
+    ) -> Lib3hResult<Self> {
+        // Create WssTransport as the network transport
+        Self::with_transport(
+            crypto,
+            config,
+            name,
+            dht_factory,
+            Box::new(GhostTransportWss::with_std_tcp_stream(config.tls_config.clone())),
+        )
+    }
+    */
+
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
@@ -99,9 +74,35 @@ impl RealEngine {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let mut memory_transport = GhostTransportMemory::new();
-        let mut memory_network_endpoint = Detach::new(
-            memory_transport
+        Self::with_transport(
+            crypto,
+            config,
+            name,
+            dht_factory,
+            Box::new(GhostTransportMemory::new()),
+        )
+    }
+
+    pub fn with_transport(
+        crypto: Box<dyn CryptoSystem>,
+        config: RealEngineConfig,
+        name: &str,
+        dht_factory: DhtFactory,
+        transport: DynTransportActor,
+    ) -> Lib3hResult<Self> {
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+
+        let keystore: DynKeystoreActor = Box::new(KeystoreStub::new());
+
+        let mut encoding_transport = TransportEncoding::new(
+            crypto.box_clone(),
+            transport_keys.transport_id.clone(),
+            keystore,
+            transport,
+        );
+
+        let mut network_endpoint = Detach::new(
+            encoding_transport
                 .take_parent_endpoint()
                 .expect("exists")
                 .as_context_endpoint_builder()
@@ -112,7 +113,7 @@ impl RealEngine {
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
         let mut gateway_ud = GatewayUserData::new();
-        let _res = memory_network_endpoint.request(
+        network_endpoint.request(
             Lib3hTrace,
             transport::protocol::RequestToChild::Bind {
                 spec: config.bind_url.clone(),
@@ -134,9 +135,9 @@ impl RealEngine {
                 }
                 Ok(())
             }),
-        );
-        memory_transport.process()?;
-        memory_network_endpoint.process(&mut gateway_ud)?;
+        )?;
+        encoding_transport.process()?;
+        network_endpoint.process(&mut gateway_ud)?;
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
             peer_uri: gateway_ud.binding.clone(),
@@ -152,16 +153,17 @@ impl RealEngine {
         let network_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
-                memory_network_endpoint,
+                network_endpoint,
                 dht_factory,
                 &dht_config,
             )),
             "network_gateway_",
         );
         debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+
         // TODO: put network_gateway within multiplexer instead
-        let multiplexer = TransportMultiplex::new(Box::new(memory_transport));
+        let multiplexer = TransportMultiplex::new(Box::new(encoding_transport));
+
         let mut real_engine = RealEngine {
             crypto,
             config,
@@ -750,16 +752,18 @@ impl RealEngine {
             &self.config,
         );
         // Create new space gateway for this ChainId
-        let uniplex_endpoint = Detach::new(
-            self.multiplexer
-                .create_agent_space_route(&join_msg.space_address, &agent_id.into())
-                .as_context_endpoint_builder()
-                .build::<GatewayUserData, Lib3hTrace>(),
+        let keystore: DynKeystoreActor = Box::new(KeystoreStub::new());
+        let encoding_transport = TransportEncoding::new(
+            self.crypto.box_clone(),
+            agent_id.clone(),
+            keystore,
+            Box::new(self.multiplexer
+                .create_agent_space_route(&join_msg.space_address, &agent_id.into())),
         );
         let new_space_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new_with_space(
                 &join_msg.space_address,
-                uniplex_endpoint,
+                Detach::new(encoding_transport),
                 self.dht_factory,
                 &dht_config,
             )),
