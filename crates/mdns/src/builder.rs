@@ -115,21 +115,14 @@ impl MulticastDnsBuilder {
 use std::default::Default;
 impl Default for MulticastDnsBuilder {
     fn default() -> Self {
-        let networkid = format!(
-            "{}.holo.host",
-            &hostname::get_hostname().unwrap_or_else(|| String::from("Anonymous-host"))
-        );
-        let record = Record::new(&networkid, DEFAULT_BIND_ADRESS, DEFAULT_TTL);
-        let map_record = MapRecord::with_record(&networkid, &[record]);
-
-        MulticastDnsBuilder {
+        Self {
             bind_address: String::from(DEFAULT_BIND_ADRESS),
             bind_port: SERVICE_LISTENER_PORT,
             multicast_loop: true,
             multicast_ttl: DEFAULT_TTL,
             multicast_address: String::from(MDNS_MULCAST_IPV4_ADRESS),
             every: DEFAULT_EVERY_MS,
-            own_map_record: map_record,
+            own_map_record: MapRecord::new(),
         }
     }
 }
