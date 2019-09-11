@@ -672,35 +672,27 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_query_entry(
         &mut self,
         msg: ClientToLib3hMessage,
-        data: &QueryEntryData,
+        data: QueryEntryData,
     ) -> Lib3hResult<()> {
         let _ = self.lib3h_endpoint.request(
             Lib3hTrace,
             Lib3hToClient::HandleQueryEntry(data.clone()),
-            Box::new(|me, response| {
-                 let space_gateway = me
-                     .get_space(
-                         &data.space_address.to_owned(),
-                         &data.requester_agent_id.to_owned(),
-                     )
-                     .map_err(|e| GhostError::from(e.to_string()))?;
-                 match response {
-                     GhostCallbackData::Response(Ok(
-                         Lib3hToClientResponse::HandleQueryEntryResult(data),
-                     )) => {
-                         msg.respond(Ok(ClientToLib3hResponse::QueryEntryResult(data)))?
-                     }
-                     GhostCallbackData::Response(Err(e)) => {
-                         error!("Got error on HandleQueryEntryResult: {:?} ", e);
-                     }
-                     GhostCallbackData::Timeout => {
-                         error!("Got timeout on HandleQueryEntryResult");
-                     }
-                     _ => panic!("bad response type"),
-                 }
-                 Ok(())
-             }),
-         );
+            Box::new(move |_me, response| {
+                match response {
+                    GhostCallbackData::Response(Ok(
+                        Lib3hToClientResponse::HandleQueryEntryResult(data),
+                    )) => msg.respond(Ok(ClientToLib3hResponse::QueryEntryResult(data)))?,
+                    GhostCallbackData::Response(Err(e)) => {
+                        error!("Got error on HandleQueryEntryResult: {:?} ", e);
+                    }
+                    GhostCallbackData::Timeout => {
+                        error!("Got timeout on HandleQueryEntryResult");
+                    }
+                    _ => panic!("bad response type"),
+                }
+                Ok(())
+            }),
+        );
         Ok(())
     }
 
@@ -913,14 +905,19 @@ mod tests {
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(&req_data);
         assert!(result.is_ok());
-        let entry_data = make_test_entry();
-
-        let result = lib3h.as_mut().handle_hold_entry(&entry_data);
-        assert!(result.is_ok());
 
         let mut core = MockCore {
             //        state: "".to_string(),
         };
+
+        lib3h.process(&mut core).unwrap();
+
+        let entry_data = make_test_entry();
+
+        println!("Before handle_hold_entry ---------------------------");
+
+        let result = lib3h.as_mut().handle_hold_entry(&entry_data);
+        assert!(result.is_ok());
 
         let space_gateway = lib3h
             .as_mut()
@@ -945,10 +942,77 @@ mod tests {
             .unwrap();
 
         let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
-        assert_eq!(
-            "[GhostMessage {request_id: None, ..}]",
-            format!("{:?}", msgs)
-        );
+        for mut msg in msgs {
+            let _payload = msg.take_message();
+          /*  assert_eq!(
+                "dht publish",
+                format!("{:?}", payload)
+            );*/
+        }
     }
 
+    fn make_test_query(space_address: Address) -> QueryEntryData {
+        QueryEntryData {
+            space_address: space_address,
+            entry_address: "fake_entry_address".into(),
+            request_id: "fake_request_id".into(),
+            requester_agent_id: "fake_requester_agent_id".into(),
+            query: b"fake query".to_vec().into(),
+        }
+    }
+
+    #[test]
+    fn test_ghost_engine_query() {
+        enable_logging_for_test(true);
+
+        let mut lib3h = make_test_engine_wrapper();
+        let req_data = make_test_join_request();
+        let result = lib3h.as_mut().handle_join(&req_data);
+        assert!(result.is_ok());
+
+        let mut core = MockCore {
+            //        state: "".to_string(),
+        };
+
+        lib3h.process(&mut core).unwrap();
+
+        let query = make_test_query(req_data.space_address.clone());
+
+        let _result = lib3h.request(
+            Lib3hTrace,
+            ClientToLib3h::QueryEntry(query),
+            Box::new(move |_me, _response| {
+                panic!("BANG");
+            }),
+        );
+
+        let space_gateway = lib3h
+            .as_mut()
+            .get_space(
+                &req_data.space_address.to_owned(),
+                &req_data.agent_id.to_owned(),
+            )
+            .unwrap();
+        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
+        assert_eq!(msgs.len(), 0);
+
+        lib3h.process(&mut core).unwrap();
+
+        let space_gateway = lib3h
+            .as_mut()
+            .get_space(
+                &req_data.space_address.to_owned(),
+                &req_data.agent_id.to_owned(),
+            )
+            .unwrap();
+
+        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
+        for mut msg in msgs {
+            let payload = msg.take_message();
+            assert_eq!(
+                "[GhostMessage {request_id: None, ..}]",
+                format!("{:?}", payload)
+            );
+        }
+    }
 }
