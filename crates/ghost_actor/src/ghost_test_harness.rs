@@ -213,7 +213,7 @@ macro_rules! assert_callback_eq {
     ($ghost_actor1:ident, //: &mumut t Vec<&mut Box<dyn Networkghost_actor>>,
      $equal_to:ident,// Box<dyn Processor>,
     ) => {{
-        let p = Box::new($crate::ghost_actor::ghost_test_harness::CallbackDataEqual($equal_to));
+        let p = Box::new($crate::ghost_test_harness::CallbackDataEqual($equal_to));
         assert_one_processed!($ghost_actor1, $ghost_actor2, p)
     }};
 }
@@ -253,7 +253,8 @@ macro_rules! process_one {
             .unwrap_or(false);
         if !did_work {
         } else {
-            let processor_result = $crate::ghost_actor::ghost_test_harness::ProcessorResult<_,_,_,_> {
+            let processor_result = $crate::ghost_test_harness::ProcessorResult<_,_,_,_> {
+                ghost_actor_name : "unsupported".into(),
                 did_work,
                 events : $events
                 previous: $previous.clone(),
@@ -344,7 +345,7 @@ macro_rules! assert_processed {
                     p.test(&args)
                 } else {
                     // Make degenerate result which should fail
-                    p.test(&$crate::utils::ghost_test_harness::ProcessorResult {
+                    p.test(&$crate::ghost_test_harness::ProcessorResult {
                         ghost_actor_name: "none".into(),
                         previous: vec![],
                         events: vec![],
@@ -391,4 +392,11 @@ macro_rules! wait_until_no_work {
         }
         result
     }};
+}
+
+
+mod tests {
+
+    
+
 }
