@@ -1,3 +1,4 @@
+use lib3h_tracing::TestTrace;
 use detach::Detach;
 use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
 use lib3h_ghost_actor::{
@@ -13,7 +14,7 @@ pub struct MockEngine<'engine> {
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
             MockEngine<'engine>,
-            (),
+            TestTrace,
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,

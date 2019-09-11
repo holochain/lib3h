@@ -22,6 +22,7 @@ use lib3h_protocol::{
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
+use lib3h_tracing::TestTrace;
 use lib3h_sodium::{hash, secbuf::SecBuf};
 
 use std::{
@@ -81,7 +82,7 @@ impl Lib3hSimChat {
                 // and is responsible for calling process
                 // and handling messages
                 let mut engine = engine_builder();
-                let mut parent_endpoint: GhostContextEndpoint<(), String, _, _, _, _, _> = engine
+                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> = engine
                     .take_parent_endpoint()
                     .unwrap()
                     .as_context_endpoint_builder()
@@ -128,7 +129,7 @@ impl Lib3hSimChat {
                                         requester_agent_id: requester_agent_id.clone(),
                                         space_address: space_address.clone(),
                                         responder_agent_id: requester_agent_id,
-                                        query_result: Vec::new(),
+                                        query_result: Vec::new().into(),
                                     }))).ok();
                                     None
                                 },
@@ -178,9 +179,9 @@ impl Lib3hSimChat {
                                 };
                                 parent_endpoint
                                     .request(
-                                        String::from("ctx"),
+                                        TestTrace::new(),
                                         ClientToLib3h::JoinSpace(space_data.clone()),
-                                        Box::new(move |_, _, callback_data| {
+                                        Box::new(move |_, callback_data| {
                                             println!(
                                                 "chat received response from engine: {:?}",
                                                 callback_data
@@ -215,9 +216,9 @@ impl Lib3hSimChat {
                                 if let Some(space_data) = current_space.clone() {
                                     parent_endpoint
                                         .request(
-                                            String::from("ctx"),
+                                            TestTrace::new(),
                                             ClientToLib3h::LeaveSpace(space_data.to_owned()),
-                                            Box::new(move |_, _, callback_data| {
+                                            Box::new(move |_, callback_data| {
                                                 println!(
                                                     "chat received response from engine: {:?}",
                                                     callback_data
@@ -261,9 +262,9 @@ impl Lib3hSimChat {
                                     };
                                     parent_endpoint
                                         .request(
-                                            String::from("ctx"),
+                                            TestTrace::new(),
                                             ClientToLib3h::SendDirectMessage(direct_message_data),
-                                            Box::new(|_, _, callback_data| {
+                                            Box::new(|_, callback_data| {
                                                 println!(
                                                     "chat received response from engine: {:?}",
                                                     callback_data
@@ -310,7 +311,7 @@ impl Lib3hSimChat {
     fn connect(
         endpoint: &mut GhostContextEndpoint<
             (),
-            String,
+            TestTrace,
             ClientToLib3h,
             ClientToLib3hResponse,
             Lib3hToClient,
@@ -326,9 +327,9 @@ impl Lib3hSimChat {
         });
         endpoint
             .request(
-                String::from("ctx"),
+                TestTrace::new(),
                 connect_message,
-                Box::new(|_, _, callback_data| {
+                Box::new(|_, callback_data| {
                     println!("chat received response from engine: {:?}", callback_data);
                     Ok(())
                 }),

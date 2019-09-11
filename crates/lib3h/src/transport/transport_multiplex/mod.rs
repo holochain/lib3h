@@ -27,16 +27,16 @@ mod tests {
     use crate::transport::{error::*, protocol::*};
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
+    use lib3h_protocol::data_types::Opaque;
+    use lib3h_tracing::Lib3hTrace;
     use url::Url;
-
-    enum MockToParentContext {}
 
     pub struct TransportMock {
         endpoint_parent: Option<TransportActorParentEndpoint>,
         endpoint_self: Detach<
             GhostContextEndpoint<
                 TransportMock,
-                MockToParentContext,
+                Lib3hTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -45,14 +45,14 @@ mod tests {
             >,
         >,
         bound_url: Url,
-        mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-        mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+        mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
+        mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
     }
 
     impl TransportMock {
         pub fn new(
-            mock_sender: crossbeam_channel::Sender<(Url, Vec<u8>)>,
-            mock_receiver: crossbeam_channel::Receiver<(Url, Vec<u8>)>,
+            mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
+            mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
@@ -122,7 +122,7 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: TransportActorParentWrapper<(), (), TransportMultiplex> =
+        let mut mplex: TransportActorParentWrapper<(), Lib3hTrace, TransportMultiplex> =
             GhostParentWrapper::new(
                 TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
                 "test_mplex_",
@@ -132,23 +132,23 @@ mod tests {
             .as_mut()
             .create_agent_space_route(&"space_a".into(), &"agent_a".into())
             .as_context_endpoint_builder()
-            .build::<(), ()>();
+            .build::<(), Lib3hTrace>();
 
         let mut route_b = mplex
             .as_mut()
             .create_agent_space_route(&"space_b".into(), &"agent_b".into())
             .as_context_endpoint_builder()
-            .build::<(), ()>();
+            .build::<(), Lib3hTrace>();
 
         // send a message from route A
         route_a
             .request(
-                (),
+                Lib3hTrace,
                 RequestToChild::SendMessage {
                     address: addr_none.clone(),
-                    payload: b"hello-from-a".to_vec(),
+                    payload: "hello-from-a".into(),
                 },
-                Box::new(|_, _, response| {
+                Box::new(|_, response| {
                     assert_eq!(&format!("{:?}", response), "");
                     Ok(())
                 }),
@@ -163,11 +163,11 @@ mod tests {
         // should receive that out the bottom
         let (address, payload) = r_out.recv().unwrap();
         assert_eq!(&addr_none, &address);
-        assert_eq!(&b"hello-from-a".to_vec(), &payload);
+        let expected: Opaque = "hello-from-a".into();
+        assert_eq!(&expected, &payload);
 
         // send a message up the bottom
-        s_in.send((addr_none.clone(), b"hello-to-b".to_vec()))
-            .unwrap();
+        s_in.send((addr_none.clone(), "hello-to-b".into())).unwrap();
 
         // process "receive" that message
         mplex.process(&mut ()).unwrap();
@@ -177,7 +177,8 @@ mod tests {
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { address, payload } = msg {
             assert_eq!(&addr_none, &address);
-            assert_eq!(&b"hello-to-b".to_vec(), &payload);
+            let expected: Opaque = "hello-to-b".into();
+            assert_eq!(&expected, &payload);
         } else {
             panic!("bad type");
         }
@@ -191,7 +192,7 @@ mod tests {
                 &"agent_b".into(),
                 &"agent_x".into(),
                 &"machine_x".into(),
-                b"hello".to_vec(),
+                "hello".into(),
             )
             .unwrap();
 
@@ -207,7 +208,8 @@ mod tests {
                 &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
                 &address
             );
-            assert_eq!(&b"hello".to_vec(), &payload);
+            let expected: Opaque = "hello".into();
+            assert_eq!(&expected, &payload);
         } else {
             panic!("bad type");
         }

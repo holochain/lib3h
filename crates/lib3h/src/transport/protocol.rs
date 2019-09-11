@@ -1,13 +1,15 @@
-use crate::transport::{error::TransportError, ConnectionId};
+use crate::{
+    lib3h_protocol::data_types::Opaque,
+    transport::{error::TransportError, ConnectionId},
+};
 use lib3h_ghost_actor::prelude::*;
 use url::Url;
-
 /// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TransportCommand {
     Connect(Url, /*request_id*/ String),
-    Send(Vec<ConnectionId>, Vec<u8>),
-    SendAll(Vec<u8>),
+    Send(Vec<ConnectionId>, Opaque),
+    SendAll(Opaque),
     Close(ConnectionId),
     CloseAll,
     Bind(Url),
@@ -23,37 +25,37 @@ pub enum TransportEvent {
     /// we have received an incoming connection
     IncomingConnectionEstablished(ConnectionId),
     /// We have received data from a connection
-    ReceivedData(ConnectionId, Vec<u8>),
+    ReceivedData(ConnectionId, Opaque),
     /// A connection closed for whatever reason
     ConnectionClosed(ConnectionId),
 }
 
 /// Transport protocol enums for use with GhostActor implementation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToChild {
     Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { address: Url, payload: Vec<u8> },
+    SendMessage { address: Url, payload: Opaque },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BindResultData {
     pub bound_url: Url,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
     SendMessage,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToParent {
     IncomingConnection { address: Url },
-    ReceivedData { address: Url, payload: Vec<u8> },
+    ReceivedData { address: Url, payload: Opaque },
     TransportError { error: TransportError },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestToParentResponse {
     Allowed,    // just for testing
     Disallowed, // just for testing
@@ -76,18 +78,18 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportActorSelfEndpoint<UserData, Context> = GhostContextEndpoint<
+pub type TransportActorSelfEndpoint<UserData, TraceContext> = GhostContextEndpoint<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
     RequestToChildResponse,
     TransportError,
 >;
-pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
+pub type TransportActorParentWrapper<UserData, TraceContext, Actor> = GhostParentWrapper<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -95,9 +97,9 @@ pub type TransportActorParentWrapper<UserData, Context, Actor> = GhostParentWrap
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
     UserData,
-    Context,
+    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
