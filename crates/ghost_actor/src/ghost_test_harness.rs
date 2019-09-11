@@ -9,13 +9,11 @@ use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct ProcessorResult<UserData, Context, Cb, E> {
-    /// Whether the ghost_actor denoted by ghost_actor_name reported doing work or not
+    /// Whether the ghost_actor reported doing work or not
     pub did_work: bool,
-    /// The name of the ghost_actor which produced these results
-    pub ghost_actor_name: String,
-    /// All events produced by the last call to process for ghost_actor by denoted by ghost_actor_name
+    /// All events produced by the last call to process for ghost_actor
     pub events: Vec<(UserData, Context, GhostCallbackData<Cb, E>)>,
-    /// All previously processed results, regardless of ghost_actor name
+    /// All previously processed results
     pub previous: Vec<ProcessorResult<UserData, Context, Cb, E>>,
 }
 
@@ -180,11 +178,10 @@ impl<Cb> predicates::reflection::PredicateReflection for CallbackDataAssert<Cb> 
 /// Asserts work was done
 #[allow(dead_code)]
 #[derive(PartialEq, Debug)]
-pub struct DidWorkAssert(pub String /* ghost_actor name */);
+pub struct DidWorkAssert;
 
 impl<UserData, Context, Cb, E> Processor<UserData, Context, Cb, E> for DidWorkAssert {
     fn test(&self, args: &ProcessorResult<UserData, Context, Cb, E>) {
-        assert!(args.ghost_actor_name == self.0);
         assert!(args.did_work);
     }
 
@@ -195,66 +192,45 @@ impl<UserData, Context, Cb, E> Processor<UserData, Context, Cb, E> for DidWorkAs
 
 impl<UserData, Context, Cb, E> Predicate<ProcessorResult<UserData, Context<Cb, E>>> for DidWorkAssert {
     fn eval(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> bool {
-        args.ghost_actor_name == self.0 && args.did_work
+        args.did_work
     }
 }
 
 impl std::fmt::Display for DidWorkAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}: {:?} did work", self.name(), self.0)
+        write!(f, "{:?} did work", self.name())
     }
 }
+
 impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 
 #[allow(unused_macros)]
 /// Convenience function that asserts only one particular equality predicate
 /// passes for a collection of . See assert_processed for
 macro_rules! assert_callback_eq {
-    ($ghost_actor1:ident, //: &mumut t Vec<&mut Box<dyn Networkghost_actor>>,
+    ($ghost_can_track:ident, //: &mumut t Vec<&mut Box<dyn Networkghost_actor>>,
      $equal_to:ident,// Box<dyn Processor>,
     ) => {{
         let p = Box::new($crate::ghost_test_harness::CallbackDataEqual($equal_to));
-        assert_one_processed!($ghost_actor1, $ghost_actor2, p)
+        assert_processed!($ghost_can_track, p)
     }};
-}
-
-#[allow(unused_macros)]
-/// Convenience function that asserts only one particular predicate
-/// passes for a collection of ghost_actors. See assert_processed for
-/// more information.
-macro_rules! assert_one_processed {
-    ($ghost_actor1:ident,
-     $ghost_actor2:ident,
-     $processor:ident,
-    $should_abort:expr
-    ) => {{
-        let processors = vec![$processor];
-        let result = assert_processed!($ghost_actor1, $ghost_actor2, processors, $should_abort);
-        result
-    }};
-    ($ghost_actor1:ident,
-     $ghost_actor2:ident,
-     $processor:ident
-     ) => {
-        assert_one_processed!($ghost_actor1, $ghost_actor2, $processor, true)
-    };
 }
 
 #[allow(unused_macros)]
 macro_rules! process_one {
-    ($ghost_actor: ident,
-  $previous: ident,
-  $events: ident,
-  $errors: ident
-  ) => {{
-        let did_work = $ghost_actor
-            .process()
+    ($ghost_can_track: ident,
+     $user_data: ident,
+     $previous: ident,
+     $events: ident,
+     $errors: ident
+    ) => {{
+        let did_work = $ghost_can_track
+            .process(&mut $user_data)
             .map_err(|err| dbg!(err))
             .unwrap_or(false);
         if !did_work {
         } else {
-            let processor_result = $crate::ghost_test_harness::ProcessorResult<_,_,_,_> {
-                ghost_actor_name : "unsupported".into(),
+            let processor_result = $crate::ghost_test_harness::ProcessorResult<_, _, _, _> {
                 did_work,
                 events : $events
                 previous: $previous.clone(),
@@ -291,18 +267,13 @@ macro_rules! process_one {
 /// subsequent tests.
 #[allow(unused_macros)]
 macro_rules! assert_processed {
-    ($ghost_actor1:ident,
-     $context1:ident,
-     $cb_data1:ident,
-     $processors:ident
+    ($ghost_can_track:ident,
+     $user_data:ident,
+     $context:ident,
+     $cb_data:ident,
+     $processor:ident
  ) => {
-        assert_processed!($ghost_actor1, $context1, $cb_data1, $processors, true)
-    };
-    ($ghost_actor1:ident,
-     $context1:ident,
-     $cb_data1:ident,
-     $processors:ident,
-     $should_abort:expr) => {{
+     {
         let mut previous = Vec::new();
         let mut errors: Vec<(
             Box<dyn $crate::ghost_test_harness::Processor<_, _, _, _>>,
@@ -318,20 +289,20 @@ macro_rules! assert_processed {
                Ok(())
            });
     
-       $ghost_actor1.request(
-           $context1,
-           $cb_data1
+       $ghost_can_track.request(
+           $context,
+           $cb_data
            cb
        ).expect("request to ghost_actor1");
 
-       for p in processors {
-           errors.push((p, None))
-       }
+//       for p in vec![$processor] {
+           errors.push(($processor, None))
+  //     }
 
         for epoch in 0..20 {
             println!("[{:?}] {:?}", epoch, previous);
 
-            process_one!($ghost_actor1, previous, events, errors);
+            process_one!($ghost_can_track, $user_data, previous, events, errors);
             if errors.is_empty() {
                 break;
             }
@@ -346,7 +317,6 @@ macro_rules! assert_processed {
                 } else {
                     // Make degenerate result which should fail
                     p.test(&$crate::ghost_test_harness::ProcessorResult {
-                        ghost_actor_name: "none".into(),
                         previous: vec![],
                         events: vec![],
                         did_work: false,
@@ -357,46 +327,53 @@ macro_rules! assert_processed {
         previous
     }};
 }
+
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort
 /// is true
 #[allow(unused_macros)]
 macro_rules! wait_did_work {
-    ($ghost_actor1:ident, //&mut Vec<&mut Box<dyn Networkghost_actor>>,
+    ($ghost_actor:ident, //&mut Vec<&mut Box<dyn Networkghost_actor>>,
      $should_abort: expr
     ) => {{
-        let p1: Box<dyn Processor> = Box::new(DidWorkAssert($ghost_actor1.name()));
-        let processors: Vec<Box<dyn Processor>> = vec![p1];
-        assert_processed!($ghost_actor1, (), (), processors, $should_abort)
+
+        let mut did_work = false;
+        for i in 0..20 {
+           let did_work = $ghost_actor
+               .process()
+               .map_err(|e| error!("ghost actor processing error: {:?}", e))
+               .map(|work_was_done| work_was_done.into())
+               .unwrap_or(false);
+            if did_work {
+                break;
+            }
+        }
+        if should_abort {
+            assert!(did_work);
+        }
+        return false;
     }};
-    ($ghost_actor1:ident) => {
-        wait_did_work!($ghost_actor1, true)
+    ($ghost_actor:ident) => {
+        wait_did_work!($ghost_actor, true)
     };
 }
 
 /// Continues processing the ghost_actor until no work is being done.
 #[allow(unused_macros)]
 macro_rules! wait_until_no_work {
-    ($ghost_actor1: ident) => {{
-        let mut result;
+    ($ghost_actor: ident) => {{
+        let mut did_work;
         loop {
-            result = wait_did_work!($ghost_actor1, false);
-            if result.is_empty() {
+            did_work = wait_did_work!($ghost_actor, false);
+            if !did_work {
                 break;
-            } else {
-                if result.iter().find(|x| x.did_work).is_some() {
-                    continue;
-                } else {
-                    break;
-                }
             }
         }
-        result
+        did_work
     }};
 }
 
 
 mod tests {
-
     
 
 }
