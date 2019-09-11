@@ -1,13 +1,6 @@
 use crate::{dht::dht_protocol::*, error::*, transport};
 use lib3h_ghost_actor::prelude::*;
 
-//#[derive(Debug)]
-//pub enum GatewayContext {
-//    NoOp,
-//    ParentRequest(GatewayToChildMessage),
-//    MaybeParentRequest(Option<GatewayToChildMessage>),
-//}
-
 /// Gateway protocol enums for use with GhostActor implementation
 #[derive(Debug)]
 pub enum GatewayRequestToChild {

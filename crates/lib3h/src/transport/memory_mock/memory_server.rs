@@ -71,7 +71,6 @@ pub fn unset_server(uri: &Url) -> TransportResult<()> {
 // Memory Server
 //--------------------------------------------------------------------------------------------------
 
-/// We use the uri as the connectionId
 #[derive(Debug)]
 pub struct MemoryServer {
     /// Address of this server

@@ -53,19 +53,6 @@ pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
 pub type DhtToParentMessageData = GhostMessageData<DhtRequestToParent>;
 
-//#[derive(Debug, Clone)]
-//pub enum DhtContext {
-//    NoOp,
-//    RequestAspectsOf {
-//        entry_address: Address,
-//        aspect_address_list: Vec<Address>,
-//        msg: EntryListData,
-//        request_id: String,
-//    },
-//    RequestEntry(DhtToChildMessageData),
-//    QueryEntry(QueryEntryData),
-//}
-
 #[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
