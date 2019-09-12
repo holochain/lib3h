@@ -149,13 +149,13 @@ impl RealEngine {
             &config,
         );
         // Create network gateway
-        let network_gateway = Detach::new(GatewayParentWrapperDyn::new(
-            Box::new(P2pGateway::new(
+        let network_gateway = Detach::new(GatewayParentWrapper::new(
+            P2pGateway::new(
                 NETWORK_GATEWAY_ID,
                 memory_network_endpoint,
                 dht_factory,
                 &dht_config,
-            )),
+            ),
             "network_gateway_",
         ));
         debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
@@ -753,13 +753,13 @@ impl RealEngine {
                 .as_context_endpoint_builder()
                 .build::<GatewayUserData, Lib3hTrace>(),
         );
-        let new_space_gateway = Detach::new(GatewayParentWrapperDyn::new(
-            Box::new(P2pGateway::new_with_space(
+        let new_space_gateway = Detach::new(GatewayParentWrapper::new(
+            P2pGateway::new_with_space(
                 &join_msg.space_address,
                 uniplex_endpoint,
                 self.dht_factory,
                 &dht_config,
-            )),
+            ),
             "space_gateway_",
         ));
 
@@ -905,7 +905,8 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>, Lib3hServerProtocol> {
+    ) -> Result<&mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>, Lib3hServerProtocol>
+    {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
@@ -931,7 +932,7 @@ impl RealEngine {
 
 pub fn handle_gossipTo(
     gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>,
+    gateway: &mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
