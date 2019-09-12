@@ -1,6 +1,6 @@
 use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, error::Lib3hProtocolResult, protocol::*, Address};
+use lib3h_protocol::{data_types::*, protocol::*, Address};
 use std::collections::{HashMap, HashSet};
 
 use super::RealEngineTrackerData;
@@ -157,21 +157,23 @@ impl<'engine> GhostEngine<'engine> {
                     .build(),
             ),
         };
+
         engine.priv_connect_bootstraps()?;
         Ok(engine)
     }
-    fn priv_connect_bootstraps(&mut self) -> Lib3hProtocolResult<()> {
-        /*// TODO
+
+    fn priv_connect_bootstraps(&mut self) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
-            self.post(Lib3hClientProtocol::Connect(ConnectData {
+            self.handle_connect(ConnectData {
                 request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
                 peer_uri: bs,
                 network_id: "".to_string(), // unimplemented
-            }))?;
-        }*/
+            })?;
+        }
         Ok(())
     }
+
     ///
     pub fn get_this_peer_sync(&mut self, maybe_chain_id: Option<ChainId>) -> PeerData {
         trace!("engine.get_this_peer_sync() ...");
@@ -337,18 +339,21 @@ impl<'engine> GhostEngine<'engine> {
         result
     }
 
+    fn handle_connect(&mut self, data: ConnectData) -> GhostResult<()> {
+        let cmd =
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
+                uri: data.peer_uri,
+                payload: Opaque::new(),
+            });
+        self.network_gateway.publish(cmd)
+    }
+
     /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(data) => {
-                trace!("ClientToLib3h::Connect: {:?}", data);
-                let cmd = GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage {
-                        uri: data.peer_uri,
-                        payload: Opaque::new(),
-                    },
-                );
-                self.network_gateway.publish(cmd)
+                trace!("ClientToLib3h::Connect: {:?}", &data);
+                self.handle_connect(data)
             }
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
@@ -870,6 +875,8 @@ mod tests {
     fn test_ghost_engine_construct() {
         let lib3h = make_test_engine_wrapper();
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
+
+        // check that bootstrap nodes were connected to
     }
 
     fn make_test_join_request() -> SpaceData {
