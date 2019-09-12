@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use lib3h_tracing::CanTrace;
-use crate::ghost_test_harness::*;
-
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
 /// You only have to call process() on this one struct, and it provides
@@ -368,6 +366,7 @@ mod tests {
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
     use lib3h_tracing::TestTrace;
+    use crate::ghost_test_harness::*;
 
     type TestError = String;
 
