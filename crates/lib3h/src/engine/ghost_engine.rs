@@ -137,11 +137,8 @@ impl<'engine> GhostEngine<'engine> {
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
-        let dht_config = DhtConfig::with_real_engine_config(
-            &format!("{}_tId", name),
-            &peer_uri,
-            &config,
-        );
+        let dht_config =
+            DhtConfig::with_real_engine_config(&format!("{}_tId", name), &peer_uri, &config);
 
         let multiplexer_endpoint = Detach::new(
             multiplexer
@@ -314,17 +311,17 @@ impl<'engine>
             self.handle_msg_from_client(msg)?;
         }
 
-/*
-        let outbox: Vec<Lib3hServerProtocol> = Vec::new();
-        let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
-        outbox.append(&mut net_outbox);
-        // Process the space layer
-        let mut p2p_output = self.process_space_gateways()?;
-        outbox.append(&mut p2p_output);
-        // Hack
-        let (ugly_did_work, mut ugly_outbox) = self.process_ugly();
-        outbox.append(&mut ugly_outbox);
-*/
+        /*
+                let outbox: Vec<Lib3hServerProtocol> = Vec::new();
+                let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
+                outbox.append(&mut net_outbox);
+                // Process the space layer
+                let mut p2p_output = self.process_space_gateways()?;
+                outbox.append(&mut p2p_output);
+                // Hack
+                let (ugly_did_work, mut ugly_outbox) = self.process_ugly();
+                outbox.append(&mut ugly_outbox);
+        */
 
         Ok(true.into())
     }
@@ -592,7 +589,7 @@ impl<'engine> GhostEngine<'engine> {
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
-/*
+        /*
         for (entry_address, aspect_address_list) in msg.address_map {
             let mut aspect_list = Vec::new();
             for aspect_address in aspect_address_list {
@@ -716,7 +713,7 @@ impl<'engine> GhostEngine<'engine> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
 
         let this_peer = {
-        // Check if messaging self
+            // Check if messaging self
             self.get_this_peer_sync(Some(chain_id.clone()))
         };
 
@@ -771,16 +768,22 @@ impl<'engine> GhostEngine<'engine> {
                 Lib3hToClient::HandleStoreEntryAspect(data),
                 Box::new(move |_me, response| {
                     // should just be OK
-                    debug!("On HandleStoreEntryAspect request from handle_publish_entry got: {:?} ",response);
+                    debug!(
+                        "On HandleStoreEntryAspect request from handle_publish_entry got: {:?} ",
+                        response
+                    );
                     Ok(())
-                }))?;
+                }),
+            )?;
         }
         let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
         space_gateway
-            .publish(GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(msg.entry.clone())))
+            .publish(GatewayRequestToChild::Dht(
+                DhtRequestToChild::BroadcastEntry(msg.entry.clone()),
+            ))
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
@@ -801,25 +804,27 @@ impl<'engine> GhostEngine<'engine> {
         msg: ClientToLib3hMessage,
         data: QueryEntryData,
     ) -> Lib3hResult<()> {
-        self.lib3h_endpoint.request(
-            Lib3hTrace,
-            Lib3hToClient::HandleQueryEntry(data.clone()),
-            Box::new(move |_me, response| {
-                match response {
-                    GhostCallbackData::Response(Ok(
-                        Lib3hToClientResponse::HandleQueryEntryResult(data),
-                    )) => msg.respond(Ok(ClientToLib3hResponse::QueryEntryResult(data)))?,
-                    GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error on HandleQueryEntryResult: {:?} ", e);
+        self.lib3h_endpoint
+            .request(
+                Lib3hTrace,
+                Lib3hToClient::HandleQueryEntry(data.clone()),
+                Box::new(move |_me, response| {
+                    match response {
+                        GhostCallbackData::Response(Ok(
+                            Lib3hToClientResponse::HandleQueryEntryResult(data),
+                        )) => msg.respond(Ok(ClientToLib3hResponse::QueryEntryResult(data)))?,
+                        GhostCallbackData::Response(Err(e)) => {
+                            error!("Got error on HandleQueryEntryResult: {:?} ", e);
+                        }
+                        GhostCallbackData::Timeout => {
+                            error!("Got timeout on HandleQueryEntryResult");
+                        }
+                        _ => panic!("bad response type"),
                     }
-                    GhostCallbackData::Timeout => {
-                        error!("Got timeout on HandleQueryEntryResult");
-                    }
-                    _ => panic!("bad response type"),
-                }
-                Ok(())
-            }),
-        ).map_err(|e| Lib3hError::new_other(&e.to_string()))
+                    Ok(())
+                }),
+            )
+            .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
     /// Get a space_gateway for the specified space+agent.
@@ -848,9 +853,7 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        dht::mirror_dht::MirrorDht, tests::enable_logging_for_test,
-    };
+    use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
     use lib3h_sodium::SodiumCryptoSystem;
     use url::Url;
 
@@ -872,13 +875,8 @@ mod tests {
         };
         let dht_factory = MirrorDht::new_with_config;
 
-        let engine: GhostEngine = GhostEngine::new(
-            "test_engine",
-            crypto,
-            config,
-            dht_factory,
-        )
-        .unwrap();
+        let engine: GhostEngine =
+            GhostEngine::new("test_engine", crypto, config, dht_factory).unwrap();
         engine
     }
 
