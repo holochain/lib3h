@@ -102,36 +102,34 @@ impl TransportEncoding {
         >,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { address } => {
-                self.handle_incoming_connection(address)
+            RequestToParent::IncomingConnection { uri } => self.handle_incoming_connection(uri),
+            RequestToParent::ReceivedData { uri, payload } => {
+                self.handle_received_data(uri, payload)
             }
-            RequestToParent::ReceivedData { address, payload } => {
-                self.handle_received_data(address, payload)
-            }
-            RequestToParent::TransportError { error } => self.handle_transport_error(error),
+            RequestToParent::ErrorOccured { uri, error } => self.handle_transport_error(uri, error),
         }
     }
 
     /// private send a handshake to a remote address
-    fn send_handshake(&mut self, address: &Url) -> GhostResult<()> {
+    fn send_handshake(&mut self, uri: &Url) -> GhostResult<()> {
         self.inner_transport.publish(
             Lib3hSpan::todo(),
             RequestToChild::SendMessage {
-                address: address.clone(),
+                uri: uri.clone(),
                 payload: self.this_id.clone().into(),
             },
         )
     }
 
     /// private handler for inner transport IncomingConnection events
-    fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
-        match self.connections_no_id_to_id.get(&address) {
+    fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
+        match self.connections_no_id_to_id.get(&uri) {
             Some(remote_addr) => {
                 // if we've already seen this connection, just forward it?
                 self.endpoint_self.publish(
                     Lib3hSpan::todo(),
                     RequestToParent::IncomingConnection {
-                        address: remote_addr.clone(),
+                        uri: remote_addr.clone(),
                     },
                 )?;
             }
@@ -139,22 +137,22 @@ impl TransportEncoding {
                 // we've never seen this connection, handshake before
                 // forwarding the IncomingConnection msg
                 // (see handle_recveived_data for where it's actually sent)
-                self.send_handshake(&address)?;
+                self.send_handshake(&uri)?;
             }
         }
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, address: Url, payload: Opaque) -> TransportResult<()> {
-        trace!("got {:?} {}", &address, payload);
-        match self.connections_no_id_to_id.get(&address) {
+    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> TransportResult<()> {
+        trace!("got {:?} {}", &uri, payload);
+        match self.connections_no_id_to_id.get(&uri) {
             Some(remote_addr) => {
                 // if we've seen this connection before, just forward it
                 self.endpoint_self.publish(
                     Lib3hSpan::todo(),
                     RequestToParent::ReceivedData {
-                        address: remote_addr.clone(),
+                        uri: remote_addr.clone(),
                         payload,
                     },
                 )?;
@@ -169,30 +167,30 @@ impl TransportEncoding {
                     let remote_id = String::from_utf8_lossy(&payload);
 
                     // build a higher-level id address
-                    let mut remote_url = address.clone();
+                    let mut remote_url = uri.clone();
                     remote_url.query_pairs_mut().append_pair("a", &remote_id);
 
                     // set up low->high and high->low mappings
                     self.connections_no_id_to_id
-                        .insert(address.clone(), remote_url.clone());
+                        .insert(uri.clone(), remote_url.clone());
                     self.connections_id_to_no_id
-                        .insert(remote_url.clone(), address.clone());
+                        .insert(remote_url.clone(), uri.clone());
 
                     // forward an IncomingConnection event to our parent
                     self.endpoint_self.publish(
                         Lib3hSpan::todo(),
                         RequestToParent::IncomingConnection {
-                            address: remote_url.clone(),
+                            uri: remote_url.clone(),
                         },
                     )?;
 
                     // if we have any pending received data, send it up
-                    if let Some(items) = self.pending_received_data.remove(&address) {
+                    if let Some(items) = self.pending_received_data.remove(&uri) {
                         for payload in items {
                             self.endpoint_self.publish(
                                 Lib3hSpan::todo(),
                                 RequestToParent::ReceivedData {
-                                    address: remote_url.clone(),
+                                    uri: remote_url.clone(),
                                     payload,
                                 },
                             )?;
@@ -200,20 +198,20 @@ impl TransportEncoding {
                     }
 
                     // if we have any pending send data, send it down
-                    if let Some(items) = self.pending_send_data.remove(&address) {
+                    if let Some(items) = self.pending_send_data.remove(&uri) {
                         for (payload, msg) in items {
-                            self.fwd_send_message_result(msg, address.clone(), payload)?;
+                            self.fwd_send_message_result(msg, uri.clone(), payload)?;
                         }
                     }
                 } else {
                     // for some reason, the remote is sending us data
                     // without handshaking, let's try to handshake back?
-                    self.send_handshake(&address)?;
+                    self.send_handshake(&uri)?;
 
                     // store this msg to forward after we handshake
                     let e = self
                         .pending_received_data
-                        .entry(address)
+                        .entry(uri)
                         .or_insert_with(|| vec![]);
                     e.push(payload);
                 }
@@ -223,10 +221,12 @@ impl TransportEncoding {
     }
 
     /// private handler for inner transport TransportError events
-    fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
+    fn handle_transport_error(&mut self, uri: Url, error: TransportError) -> TransportResult<()> {
         // just forward this
-        self.endpoint_self
-            .publish(Lib3hSpan::todo(), RequestToParent::TransportError { error })?;
+        self.endpoint_self.publish(
+            Lib3hSpan::todo(),
+            RequestToParent::ErrorOccured { uri, error },
+        )?;
         Ok(())
     }
 
@@ -242,8 +242,8 @@ impl TransportEncoding {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_send_message(msg, uri, payload)
             }
         }
     }
@@ -295,12 +295,12 @@ impl TransportEncoding {
     fn fwd_send_message_result(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
         self.inner_transport.as_mut().request(
             Lib3hSpan::todo(),
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_: &mut TransportEncoding, response| {
                 let response = {
                     match response {
@@ -319,10 +319,10 @@ impl TransportEncoding {
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
-        match self.connections_id_to_no_id.get(&address) {
+        match self.connections_id_to_no_id.get(&uri) {
             Some(sub_address) => {
                 // we have seen this connection before
                 // we can just forward the message along
@@ -333,8 +333,8 @@ impl TransportEncoding {
                 // we don't have an established connection to this remote
                 // we need to handshake first
 
-                // first make a low-level address by removing the ?a=Hcyada
-                let mut sub_address = address.clone();
+                // first make a low-level uri by removing the ?a=Hcyada
+                let mut sub_address = uri.clone();
                 sub_address.set_query(None);
 
                 // send along a handshake message
@@ -453,26 +453,24 @@ mod tests {
                             bound_url: spec,
                         })))?;
                     }
-                    RequestToChild::SendMessage { address, payload } => {
-                        self.mock_sender.send((address, payload)).unwrap();
-                        msg.respond(Ok(RequestToChildResponse::SendMessage))?;
+                    RequestToChild::SendMessage { uri, payload } => {
+                        self.mock_sender.send((uri, payload)).unwrap();
+                        msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?;
                     }
                 }
             }
             loop {
                 match self.mock_receiver.try_recv() {
-                    Ok((address, payload)) => {
+                    Ok((uri, payload)) => {
                         // bit of a hack, just always send an incoming connection
                         // in front of all received data messages
                         self.endpoint_self.publish(
                             Lib3hSpan::todo(),
-                            RequestToParent::IncomingConnection {
-                                address: address.clone(),
-                            },
+                            RequestToParent::IncomingConnection { uri: uri.clone() },
                         )?;
                         self.endpoint_self.publish(
                             Lib3hSpan::todo(),
-                            RequestToParent::ReceivedData { address, payload },
+                            RequestToParent::ReceivedData { uri, payload },
                         )?;
                     }
                     Err(_) => break,
@@ -567,13 +565,16 @@ mod tests {
         t1.request(
             test_span(""),
             RequestToChild::SendMessage {
-                address: addr2full.clone(),
+                uri: addr2full.clone(),
                 payload: "hello".into(),
             },
             Box::new(|b: &mut bool, response| {
                 *b = true;
                 // make sure we get a success response
-                assert_eq!("Response(Ok(SendMessage))", format!("{:?}", response),);
+                assert_eq!(
+                    "Response(Ok(SendMessageSuccess))",
+                    format!("{:?}", response),
+                );
                 Ok(())
             }),
         )
@@ -622,8 +623,8 @@ mod tests {
         // #2 now gets the payload!
         let mut msg_list = t2.drain_messages();
         let msg = msg_list.get_mut(2).unwrap().take_message();
-        if let Some(RequestToParent::ReceivedData { address, payload }) = msg {
-            assert_eq!(&address, &addr1full);
+        if let Some(RequestToParent::ReceivedData { uri, payload }) = msg {
+            assert_eq!(&uri, &addr1full);
             assert_eq!(&expected, &payload);
         } else {
             panic!("bad type {:?}", msg);
