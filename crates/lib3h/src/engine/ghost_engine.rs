@@ -12,7 +12,7 @@ use crate::{
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, GatewayUserData, P2pGateway},
     track::Tracker,
-    transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
+    transport::{self, TransportMultiplex},
 };
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_tracing::Lib3hTrace;
@@ -126,9 +126,9 @@ impl<'engine> GhostEngine<'engine> {
         crypto: Box<dyn CryptoSystem>,
         config: RealEngineConfig,
         dht_factory: DhtFactory,
+        multiplexer: TransportMultiplex,
     ) -> Lib3hResult<Self> {
-        // Create TransportMemory as the network transport
-        let mut multiplexer = TransportMultiplex::new(Box::new(GhostTransportMemory::new()));
+        let mut multiplexer = multiplexer;
         let peer_uri = multiplexer.boot(config.bind_url.clone())?.unwrap();
 
         let this_net_peer = PeerData {
@@ -853,7 +853,11 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
+    use crate::{
+        dht::mirror_dht::MirrorDht,
+        tests::enable_logging_for_test,
+        transport::{memory_mock::ghost_transport_memory::*, TransportMultiplex},
+    };
     use lib3h_sodium::SodiumCryptoSystem;
     use url::Url;
 
@@ -875,8 +879,9 @@ mod tests {
         };
         let dht_factory = MirrorDht::new_with_config;
 
+        let multiplexer = TransportMultiplex::new(Box::new(GhostTransportMemory::new()));
         let engine: GhostEngine =
-            GhostEngine::new("test_engine", crypto, config, dht_factory).unwrap();
+            GhostEngine::new("test_engine", crypto, config, dht_factory, multiplexer).unwrap();
         engine
     }
 
