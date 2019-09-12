@@ -27,10 +27,7 @@ impl RealEngine {
             .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((
-                space_address,
-                self.get_this_peer_sync(chainId.clone()).clone(),
-            ));
+            result.push((space_address, self.this_space_peer(chainId.clone()).clone()));
         }
         result
     }

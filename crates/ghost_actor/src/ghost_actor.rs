@@ -1,6 +1,10 @@
 use crate::prelude::*;
 use lib3h_tracing::CanTrace;
 
+//--------------------------------------------------------------------------------------------------
+// GhostParentWrapper
+//---------------------------------------------------------------------------------------------------
+
 /// helper struct that merges (on the parent side) the actual child
 /// GhostActor instance, with the child's ghost channel endpoint.
 /// You only have to call process() on this one struct, and it provides
@@ -214,6 +218,10 @@ impl<
     }
 }
 
+//--------------------------------------------------------------------------------------------------
+// GhostActor
+//---------------------------------------------------------------------------------------------------
+
 pub trait GhostActor<
     RequestToParent: 'static,
     RequestToParentResponse: 'static,
@@ -248,6 +256,10 @@ pub trait GhostActor<
         Ok(false.into())
     }
 }
+
+//--------------------------------------------------------------------------------------------------
+// GhostParentWrapperDyn
+//---------------------------------------------------------------------------------------------------
 
 /// same as above, but takes a trait object child
 pub struct GhostParentWrapperDyn<
