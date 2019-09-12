@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_protocol::*,
-    gateway::{protocol::*, GatewayUserData, P2pGateway},
+    gateway::{protocol::*, P2pGateway},
     track::Tracker,
     transport::TransportMultiplex,
 };
@@ -129,7 +129,4 @@ pub struct RealEngine {
     /// dht ghost user_data
     /// temp HACK. Waiting for gateway actor
     temp_outbox: Vec<Lib3hServerProtocol>,
-
-    // user data for ghost callback
-    gateway_user_data: GatewayUserData,
 }
