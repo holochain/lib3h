@@ -22,7 +22,7 @@ fn discover_neighbourhood() {
 
     let mut mdns = mdns::MulticastDnsBuilder::new()
         .own_record("holonaute.holo.host", &urls)
-        .every_ms(1_000)
+        .query_interval_ms(1_000)
         .bind_port(8585)
         .build()
         .expect("Fail to build mDNS.");

@@ -72,7 +72,7 @@ impl MulticastDnsBuilder {
     }
 
     /// Sets the amount of time between two queries originating from ourself.
-    pub fn every_ms(&mut self, every_ms: u128) -> &mut Self {
+    pub fn query_interval_ms(&mut self, every_ms: u128) -> &mut Self {
         self.query_interval_ms = every_ms;
         self
     }

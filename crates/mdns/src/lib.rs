@@ -170,7 +170,7 @@ impl MulticastDns {
     }
 
     /// Returns the amount of time we wait between two queries.
-    pub fn every_ms(&self) -> u128 {
+    pub fn query_interval_ms(&self) -> u128 {
         self.query_interval_ms
     }
 
