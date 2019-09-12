@@ -22,6 +22,8 @@ pub struct TransportMultiplex {
     // our map of endpoints connecting us to our Routes
     route_endpoints:
         Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
+    // cached binding
+    maybe_bind: Option<Url>,
 }
 
 impl TransportMultiplex {
@@ -44,6 +46,7 @@ impl TransportMultiplex {
             endpoint_self,
             inner_transport,
             route_endpoints: Detach::new(HashMap::new()),
+            maybe_bind: None,
         }
     }
 
@@ -103,7 +106,7 @@ impl TransportMultiplex {
             None => panic!("no such route"),
             Some(ep) => {
                 ep.publish(RequestToParent::ReceivedData {
-                    address: path,
+                    uri: path,
                     payload: unpacked_payload,
                 })?;
             }
@@ -122,37 +125,35 @@ impl TransportMultiplex {
         >,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { address } => {
-                self.handle_incoming_connection(address)
+            RequestToParent::IncomingConnection { uri } => self.handle_incoming_connection(uri),
+            RequestToParent::ReceivedData { uri, payload } => {
+                self.handle_received_data(uri, payload)
             }
-            RequestToParent::ReceivedData { address, payload } => {
-                self.handle_received_data(address, payload)
-            }
-            RequestToParent::TransportError { error } => self.handle_transport_error(error),
+            RequestToParent::ErrorOccured { uri, error } => self.handle_transport_error(uri, error),
         }
     }
 
     /// private handler for inner transport IncomingConnection events
-    fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
+    fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::IncomingConnection { address })?;
+            .publish(RequestToParent::IncomingConnection { uri })?;
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, address: Url, payload: Opaque) -> TransportResult<()> {
+    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::ReceivedData { address, payload })?;
+            .publish(RequestToParent::ReceivedData { uri, payload })?;
         Ok(())
     }
 
     /// private handler for inner transport TransportError events
-    fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
+    fn handle_transport_error(&mut self, uri: Url, error: TransportError) -> TransportResult<()> {
         // forward
         self.endpoint_self
-            .publish(RequestToParent::TransportError { error })?;
+            .publish(RequestToParent::ErrorOccured { uri, error })?;
         Ok(())
     }
 
@@ -168,8 +169,8 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_route_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_route_send_message(msg, uri, payload)
             }
         }
     }
@@ -205,13 +206,13 @@ impl TransportMultiplex {
     fn handle_route_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             Lib3hTrace,
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_, response| {
                 let response = {
                     match response {
@@ -241,8 +242,8 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_send_message(msg, uri, payload)
             }
         }
     }
@@ -278,13 +279,13 @@ impl TransportMultiplex {
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             Lib3hTrace,
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_, response| {
                 let response = {
                     match response {
@@ -300,6 +301,33 @@ impl TransportMultiplex {
             }),
         )?;
         Ok(())
+    }
+
+    pub fn boot(&mut self, spec: Url) -> TransportResult<Option<Url>> {
+        // Bind & create this_net_peer
+        let _res = self.inner_transport.request(
+            Lib3hTrace,
+            RequestToChild::Bind { spec },
+            Box::new(|mut me, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let RequestToChildResponse::Bind(bind_data) = response {
+                    me.maybe_bind = Some(bind_data.bound_url);
+                } else {
+                    panic!("bad response to bind: {:?}", response);
+                }
+                Ok(())
+            }),
+        );
+        detach_run!(&mut self.inner_transport, |t| { t.process(self) })?;
+        Ok(self.maybe_bind.clone())
     }
 }
 

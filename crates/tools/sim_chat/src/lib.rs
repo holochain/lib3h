@@ -8,6 +8,7 @@ extern crate url;
 #[cfg(test)]
 #[macro_use]
 extern crate detach;
+extern crate lib3h_tracing;
 
 pub mod simchat;
 pub use simchat::{ChatEvent, SimChat, SimChatMessage};
@@ -22,8 +23,8 @@ use lib3h_protocol::{
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
-use lib3h_tracing::TestTrace;
 use lib3h_sodium::{hash, secbuf::SecBuf};
+use lib3h_tracing::TestTrace;
 
 use std::{
     collections::HashMap,
@@ -82,12 +83,14 @@ impl Lib3hSimChat {
                 // and is responsible for calling process
                 // and handling messages
                 let mut engine = engine_builder();
-                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> = engine
-                    .take_parent_endpoint()
-                    .unwrap()
-                    .as_context_endpoint_builder()
-                    .request_id_prefix("parent")
-                    .build();
+
+                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> =
+                    engine
+                        .take_parent_endpoint()
+                        .unwrap()
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("parent")
+                        .build();
 
                 // also keep track of things like the spaces and current space in this scope
                 let mut current_space: Option<SpaceData> = None;

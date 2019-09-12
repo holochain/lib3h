@@ -13,6 +13,9 @@ pub type AspectKey = (Address, Address);
 pub struct Opaque(#[serde(with = "base64")] Vec<u8>);
 
 impl Opaque {
+    pub fn new() -> Self {
+        Vec::new().into()
+    }
     pub fn as_bytes(self) -> Vec<u8> {
         self.0
     }

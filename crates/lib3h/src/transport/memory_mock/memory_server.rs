@@ -1,13 +1,25 @@
-use crate::transport::{
-    error::{TransportError, TransportResult},
-    protocol::TransportEvent,
-};
-use lib3h_protocol::DidWork;
+use crate::transport::error::{TransportError, TransportResult};
+use lib3h_protocol::{data_types::Opaque, DidWork};
 use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, Mutex, RwLock},
 };
 use url::Url;
+
+//--------------------------------------------------------------------------------------------------
+// Memory Server protocol
+//--------------------------------------------------------------------------------------------------
+
+/// Events that can be generated during a `process()`
+#[derive(Debug, PartialEq, Clone)]
+pub enum MemoryEvent {
+    /// we have received an incoming connection
+    IncomingConnectionEstablished(Url),
+    /// We have received data from a connection
+    ReceivedData(Url, Opaque),
+    /// A connection closed for whatever reason
+    ConnectionClosed(Url),
+}
 
 //--------------------------------------------------------------------------------------------------
 // Memory Server MAP
@@ -59,7 +71,6 @@ pub fn unset_server(uri: &Url) -> TransportResult<()> {
 // Memory Server
 //--------------------------------------------------------------------------------------------------
 
-/// We use the uri as the connectionId
 #[derive(Debug)]
 pub struct MemoryServer {
     /// Address of this server
@@ -154,7 +165,7 @@ impl MemoryServer {
     /// Process all inboxes: payload inboxes and incoming connections inbox.
     /// Return a TransportEvent::ReceivedData for each payload processed and
     /// a TransportEvent::IncomingConnectionEstablished for each incoming connection.
-    pub fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
+    pub fn process(&mut self) -> TransportResult<(DidWork, Vec<MemoryEvent>)> {
         trace!("(MemoryServer {}).process()", self.this_uri);
         let mut outbox = Vec::new();
         let mut did_work = false;
@@ -167,9 +178,9 @@ impl MemoryServer {
                 is_new,
             );
             let event = if *is_new {
-                TransportEvent::IncomingConnectionEstablished(in_uri.to_string())
+                MemoryEvent::IncomingConnectionEstablished(in_uri.clone())
             } else {
-                TransportEvent::ConnectionClosed(in_uri.to_string())
+                MemoryEvent::ConnectionClosed(in_uri.clone())
             };
             trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
             outbox.push(event);
@@ -190,7 +201,7 @@ impl MemoryServer {
                     payload.len(),
                     uri
                 );
-                let evt = TransportEvent::ReceivedData(uri.to_string(), payload.into());
+                let evt = MemoryEvent::ReceivedData(uri.clone(), payload.into());
                 outbox.push(evt);
             }
         }

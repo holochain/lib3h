@@ -465,7 +465,7 @@ mod tests {
             .request(
                 TestTrace("42".to_string()),
                 RequestToChild::SendMessage {
-                    address: "agent_id_1".to_string(),
+                    address: "agentId:agent_id_1".to_string(),
                     payload: b"some content".to_vec(),
                 },
                 Box::new(|_: &mut (), r| {
