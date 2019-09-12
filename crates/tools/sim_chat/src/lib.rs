@@ -99,12 +99,13 @@ impl Lib3hSimChat {
                 // and is responsible for calling process
                 // and handling messages
                 let mut engine = engine_builder();
-                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> = engine
-                    .take_parent_endpoint()
-                    .unwrap()
-                    .as_context_endpoint_builder()
-                    .request_id_prefix("parent")
-                    .build();
+                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> =
+                    engine
+                        .take_parent_endpoint()
+                        .unwrap()
+                        .as_context_endpoint_builder()
+                        .request_id_prefix("parent")
+                        .build();
 
                 // also keep track of things like the spaces and current space in this scope
                 let mut current_space: Option<SpaceData> = None;

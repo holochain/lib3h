@@ -777,7 +777,6 @@ impl<'engine> GhostEngine<'engine> {
         msg: ClientToLib3hMessage,
         data: QueryEntryData,
     ) -> Lib3hResult<()> {
-
         self.lib3h_endpoint
             .request(
                 Lib3hTrace,

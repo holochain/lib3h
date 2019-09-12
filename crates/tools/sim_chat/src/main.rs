@@ -10,7 +10,7 @@ use url::Url;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine::GhostEngine, RealEngineConfig},
-    transport::{TransportMultiplex, memory_mock::ghost_transport_memory::GhostTransportMemory},
+    transport::{memory_mock::ghost_transport_memory::GhostTransportMemory, TransportMultiplex},
 };
 use lib3h_sodium::SodiumCryptoSystem;
 
@@ -28,14 +28,7 @@ fn engine_builder() -> GhostEngine<'static> {
     };
     let dht_factory = MirrorDht::new_with_config;
     let multiplexer = TransportMultiplex::new(Box::new(GhostTransportMemory::new()));
-    GhostEngine::new(
-        "test_engine",
-        crypto,
-        config,
-        dht_factory,
-        multiplexer,
-    )
-    .unwrap()
+    GhostEngine::new("test_engine", crypto, config, dht_factory, multiplexer).unwrap()
 }
 
 fn main() {
