@@ -23,7 +23,7 @@ impl RealEngine {
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network gateway
-        self.network_gateway.process(&mut self.gateway_user_data)?;
+        detach_run!(&mut self.network_gateway, |ng| ng.process(self))?;
         for mut request in self.network_gateway.drain_messages() {
             let payload = request.take_message().expect("exists");
             let mut output = self.handle_network_request(payload)?;

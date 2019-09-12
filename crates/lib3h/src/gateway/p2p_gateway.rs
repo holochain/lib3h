@@ -37,7 +37,7 @@ impl P2pGateway {
         P2pGateway {
             identifier: identifier.to_owned(),
             child_transport_endpoint,
-            inner_dht: ChildDhtWrapperDyn::new(dht, "gateway_dht"),
+            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht")),
             this_peer: PeerData {
                 peer_address: dht_config.this_peer_address(),
                 peer_uri: dht_config.this_peer_uri(),
@@ -80,7 +80,7 @@ impl P2pGateway {
             .request(
                 Lib3hTrace,
                 DhtRequestToChild::RequestPeerList,
-                Box::new(|mut ud, response| {
+                Box::new(|mut me, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -92,7 +92,7 @@ impl P2pGateway {
                     };
                     if let DhtRequestToChildResponse::RequestPeerList(peer_list_response) = response
                     {
-                        ud.peer_list = peer_list_response;
+                        me.user_data.peer_list = peer_list_response;
                     } else {
                         panic!("bad response to bind: {:?}", response);
                     }
@@ -100,7 +100,7 @@ impl P2pGateway {
                 }),
             )
             .expect("sync functions should work");
-        self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
+        detach_run!(self.inner_dht, |dht| { dht.process(self) }).unwrap(); // FIXME unwrap
         self.user_data.peer_list.clone()
     }
 
@@ -133,7 +133,7 @@ impl P2pGateway {
                 }),
             )
             .expect("sync functions should work");
-        self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
+        detach_run!(self.inner_dht, |dht| { dht.process(self) }).unwrap(); // FIXME unwrap
         self.this_peer = self.user_data.this_peer.clone();
         self.this_peer.clone()
     }
@@ -144,7 +144,7 @@ impl P2pGateway {
             .request(
                 Lib3hTrace,
                 DhtRequestToChild::RequestPeer(peer_address.to_string()),
-                Box::new(|mut ud, response| {
+                Box::new(|mut me, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -155,7 +155,7 @@ impl P2pGateway {
                         }
                     };
                     if let DhtRequestToChildResponse::RequestPeer(peer_response) = response {
-                        ud.maybe_peer = peer_response;
+                        me.user_data.maybe_peer = peer_response;
                     } else {
                         panic!("bad response to bind: {:?}", response);
                     }
@@ -163,7 +163,7 @@ impl P2pGateway {
                 }),
             )
             .expect("sync functions should work");
-        let _res = self.inner_dht.process(&mut self.user_data).unwrap(); // FIXME unwrap
+        detach_run!(self.inner_dht, |dht| { dht.process(self) }).unwrap(); // FIXME unwrap
         self.user_data.maybe_peer.clone()
     }
 }

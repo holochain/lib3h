@@ -18,7 +18,7 @@ impl P2pGateway {
         parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
         // forward to child dht
-        let _ = self.inner_dht.request(
+        self.inner_dht.request(
             Lib3hTrace,
             request,
             Box::new(|_me, response| {
@@ -35,8 +35,7 @@ impl P2pGateway {
                 parent_msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
                 Ok(())
             }),
-        );
-        // Done
+        ).unwrap(); // FIXME unwrap
         Ok(())
     }
 

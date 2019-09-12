@@ -149,7 +149,7 @@ impl RealEngine {
             &config,
         );
         // Create network gateway
-        let network_gateway = GatewayParentWrapperDyn::new(
+        let network_gateway = Detach::new(GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
                 memory_network_endpoint,
@@ -157,7 +157,7 @@ impl RealEngine {
                 &dht_config,
             )),
             "network_gateway_",
-        );
+        ));
         debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         // TODO: put network_gateway within multiplexer instead
@@ -198,20 +198,16 @@ impl RealEngine {
 
     // TODO: Find better way to do this:
     // Pure actor model or have a direct request on the concrete gateway
-    pub fn get_this_peer_sync(&mut self, maybe_chainId: Option<ChainId>) -> PeerData {
+    pub fn get_this_peer_sync(&mut self, chain_id: ChainId) -> PeerData {
         trace!("engine.get_this_peer_sync() ...");
-        let gateway = if let Some(chain_id) = maybe_chainId {
-            self.space_gateway_map
-                .get_mut(&chain_id)
-                .expect("Should have the space gateway")
-        } else {
-            &mut self.network_gateway
-        };
-        gateway
+        let mut space_gateway = self.space_gateway_map
+                .remove(&chain_id)
+                .expect("No space at chainId");
+        space_gateway
             .request(
                 Lib3hTrace,
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestThisPeer),
-                Box::new(|mut ud, response| {
+                Box::new(|mut me, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -225,7 +221,7 @@ impl RealEngine {
                         DhtRequestToChildResponse::RequestThisPeer(peer_response),
                     ) = response
                     {
-                        ud.this_peer = peer_response;
+                        me.gateway_user_data.this_peer = peer_response;
                     } else {
                         panic!("bad response to bind: {:?}", response);
                     }
@@ -233,7 +229,9 @@ impl RealEngine {
                 }),
             )
             .expect("sync functions should work");
-        gateway.process(&mut self.gateway_user_data).unwrap(); // FIXME unwrap
+        detach_run!(space_gateway, |g| g.process(self))
+            .expect("space_gateway.process() failed");
+        self.space_gateway_map.insert(chain_id, space_gateway);
         self.gateway_user_data.this_peer.clone()
     }
 
@@ -245,7 +243,7 @@ impl RealEngine {
             .request(
                 Lib3hTrace,
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
-                Box::new(|mut ud, response| {
+                Box::new(|mut me, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => panic!("timeout"),
@@ -259,7 +257,7 @@ impl RealEngine {
                         DhtRequestToChildResponse::RequestPeerList(peer_list_response),
                     ) = response
                     {
-                        ud.peer_list = peer_list_response;
+                        me.gateway_user_data.peer_list = peer_list_response;
                     } else {
                         panic!("bad response to bind: {:?}", response);
                     }
@@ -267,9 +265,8 @@ impl RealEngine {
                 }),
             )
             .expect("sync functions should work");
-        self.network_gateway
-            .process(&mut self.gateway_user_data)
-            .unwrap(); // FIXME unwrap
+        detach_run!(&mut self.network_gateway, |ng| ng.process(self))
+            .expect("network_gateway.process() failed");
         self.gateway_user_data.peer_list.clone()
     }
 }
@@ -756,7 +753,7 @@ impl RealEngine {
                 .as_context_endpoint_builder()
                 .build::<GatewayUserData, Lib3hTrace>(),
         );
-        let new_space_gateway = GatewayParentWrapperDyn::new(
+        let new_space_gateway = Detach::new(GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new_with_space(
                 &join_msg.space_address,
                 uniplex_endpoint,
@@ -764,11 +761,11 @@ impl RealEngine {
                 &dht_config,
             )),
             "space_gateway_",
-        );
+        ));
 
         // TODO #150 - Send JoinSpace to all known peers
         let space_address: String = join_msg.space_address.clone().into();
-        let peer = self.get_this_peer_sync(Some(chain_id.clone())).to_owned();
+        let peer = self.get_this_peer_sync(chain_id.clone()).to_owned();
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
         p2p_msg
@@ -825,7 +822,7 @@ impl RealEngine {
     ) -> Lib3hServerProtocol {
         // get sender's peer address
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
-        let peer_address = self.get_this_peer_sync(Some(chain_id)).peer_address.clone();
+        let peer_address = self.get_this_peer_sync(chain_id).peer_address.clone();
         // Check if space is joined by sender
         let maybe_space = self.get_space_or_fail(
             &msg.space_address,
@@ -908,7 +905,7 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>, Lib3hServerProtocol>
+    ) -> Result<&mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>, Lib3hServerProtocol>
     {
         let maybe_space = self
             .space_gateway_map
@@ -935,7 +932,7 @@ impl RealEngine {
 
 pub fn handle_gossipTo(
     gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>,
+    gateway: &mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
