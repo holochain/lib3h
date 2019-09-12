@@ -7,6 +7,8 @@ extern crate lib3h_tracing;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use]
 extern crate log;

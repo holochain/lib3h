@@ -30,8 +30,8 @@ impl From<Span> for Lib3hSpan {
     }
 }
 
-// 296 bytes total == 8 * 37, so ideally we would use a [u8; 37]
-// but this is easier...
+// Binary representation is exactly 37 bytes, so ideally
+// we would use a [u8; 37], but this is easier...
 pub type EncodedSpanContext = Vec<u8>;
 
 pub struct IpcSpanContext(pub SpanContext);
@@ -61,25 +61,6 @@ impl IpcSpanContext {
         SpanContextState::extract_from_binary(&mut cursor).map(|x| IpcSpanContext(x.unwrap()))
     }
 }
-
-// impl Serialize for IpcSpanContext {
-//     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         let bytes: Vec<u8> = self.encode().map_err(|e| SerError::custom(e.to_string()))?;
-//         serializer.serialize_bytes(&bytes)
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for IpcSpanContext {
-//     fn deserialize<D>(deserializer: D) -> Result<IpcSpanContext, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         deserializer.deserialize_bytes()
-//     }
-// }
 
 impl Lib3hSpan {
     pub fn event<S: Into<Cow<'static, str>>>(&mut self, msg: S) {
