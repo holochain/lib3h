@@ -16,7 +16,7 @@ fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: std::path::PathBuf::default(),
         log_level: 'd',
         bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
         dht_gossip_interval: 200,
