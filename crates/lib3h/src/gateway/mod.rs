@@ -16,16 +16,13 @@ use url::Url;
 pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
+
     /// Transport
     child_transport_endpoint: Detach<
-        transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, Lib3hTrace>,
+        transport::protocol::TransportActorParentContextEndpoint<P2pGateway, Lib3hTrace>,
     >,
     /// DHT
     inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway, Lib3hTrace>>,
-    // Cache
-    this_peer: PeerData,
-    // user data for ghost callback
-    pub user_data: GatewayUserData,
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,

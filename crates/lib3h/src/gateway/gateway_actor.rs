@@ -27,7 +27,7 @@ impl
 
         // Process inbox from child transport & handle requests
         detach_run!(&mut self.child_transport_endpoint, |cte| {
-            cte.process(&mut self.user_data)
+            cte.process(self)
         })?;
         for request in self.child_transport_endpoint.drain_messages() {
             self.handle_transport_RequestToParent(request);

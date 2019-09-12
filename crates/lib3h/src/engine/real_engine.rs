@@ -100,52 +100,54 @@ impl RealEngine {
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
         let mut memory_transport = GhostTransportMemory::new();
-        let mut memory_network_endpoint = Detach::new(
+        let memory_network_endpoint = Detach::new(
             memory_transport
                 .take_parent_endpoint()
                 .expect("exists")
                 .as_context_endpoint_builder()
                 .request_id_prefix("tmem_to_child_")
-                .build::<GatewayUserData, Lib3hTrace>(),
+                .build::<P2pGateway, Lib3hTrace>(),
         );
 
-        // Bind & create this_net_peer
-        // TODO: Find better way to do init with GhostEngine
-        let mut gateway_ud = GatewayUserData::new();
-        let _res = memory_network_endpoint.request(
-            Lib3hTrace,
-            transport::protocol::RequestToChild::Bind {
-                spec: config.bind_url.clone(),
-            },
-            Box::new(|mut ud, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
-                    }
-                };
-                if let transport::protocol::RequestToChildResponse::Bind(bind_data) = response {
-                    ud.binding = bind_data.bound_url;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
-        memory_transport.process()?;
-        memory_network_endpoint.process(&mut gateway_ud)?;
+//        // Bind & create this_net_peer
+//        // TODO: Find better way to do init with GhostEngine
+//        let mut gateway_ud = GatewayUserData::new();
+//        let _res = memory_network_endpoint.request(
+//            Lib3hTrace,
+//            transport::protocol::RequestToChild::Bind {
+//                spec: config.bind_url.clone(),
+//            },
+//            Box::new(|mut ud, response| {
+//                let response = {
+//                    match response {
+//                        GhostCallbackData::Timeout => panic!("timeout"),
+//                        GhostCallbackData::Response(response) => match response {
+//                            Err(e) => panic!("{:?}", e),
+//                            Ok(response) => response,
+//                        },
+//                    }
+//                };
+//                if let transport::protocol::RequestToChildResponse::Bind(bind_data) = response {
+//                    ud.binding = bind_data.bound_url;
+//                } else {
+//                    panic!("bad response to bind: {:?}", response);
+//                }
+//                Ok(())
+//            }),
+//        );
+//        memory_transport.process()?;
+//        memory_network_endpoint.process(&mut gateway_ud)?;
+
+        let fixme_binding = Url::parse("fixme::host:123").unwrap();
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
-            peer_uri: gateway_ud.binding.clone(),
+            peer_uri: fixme_binding.clone(),
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
         let dht_config = DhtConfig::with_real_engine_config(
             &format!("{}_tId", name),
-            &gateway_ud.binding,
+            &fixme_binding,
             &config,
         );
         // Create network gateway
@@ -751,7 +753,7 @@ impl RealEngine {
             self.multiplexer
                 .create_agent_space_route(&join_msg.space_address, &agent_id.into())
                 .as_context_endpoint_builder()
-                .build::<GatewayUserData, Lib3hTrace>(),
+                .build::<P2pGateway, Lib3hTrace>(),
         );
         let new_space_gateway = Detach::new(GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new_with_space(
