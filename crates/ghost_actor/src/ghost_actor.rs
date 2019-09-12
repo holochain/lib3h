@@ -363,10 +363,12 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
+    use crate::{
+        ghost_channel::create_ghost_channel, ghost_test_harness::*,
+        ghost_tracker::GhostCallbackData,
+    };
     use detach::prelude::*;
     use lib3h_tracing::TestTrace;
-    use crate::ghost_test_harness::*;
 
     type TestError = String;
 
@@ -583,7 +585,10 @@ mod tests {
         // process via the wrapper
         assert!(wrapped_child.process(&mut fake_parent).is_ok());
 
-        assert_callback_eq!(wrapped_child, fake_parent, context, 
+        assert_callback_eq!(
+            wrapped_child,
+            fake_parent,
+            context,
             TestMsgInResponse("event from parent"),
         )
     }

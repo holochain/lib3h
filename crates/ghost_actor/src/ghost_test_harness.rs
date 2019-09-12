@@ -1,26 +1,26 @@
+use crate::GhostCallbackData;
 /// A test harness for ghost actors. Provides specialized assertion functions
 /// to verify predicates have passed, calling the ghost_actor process function as many
 /// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
-use crate::GhostCallbackData;
 
 /// Represents all useful state after a single call to an ghost_actor's process function
 #[derive(Debug)]
-pub struct ProcessorResult<Cb:'static, E:'static> {
+pub struct ProcessorResult<Cb: 'static, E: 'static> {
     /// Whether the ghost_actor reported doing work or not
     pub did_work: bool,
     /// All events produced by the last call to process for ghost_actor
-    pub callback_data : Option<GhostCallbackData<Cb, E>>,
+    pub callback_data: Option<GhostCallbackData<Cb, E>>,
     /// All previously processed results
     pub previous: Vec<ProcessorResult<Cb, E>>,
-//    pub user_data : UserData
+    //    pub user_data : UserData
 }
 
 /// An assertion style processor which provides a
 /// predicate over ProcessorResult (the eval function) and a
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
-pub trait Processor<Cb:'static, E:'static>: Predicate<ProcessorResult<Cb, E>> {
+pub trait Processor<Cb: 'static, E: 'static>: Predicate<ProcessorResult<Cb, E>> {
     /// Processor name, for debugging and mapping purposes
     fn name(&self) -> String {
         "default_processor".into()
@@ -32,7 +32,7 @@ pub trait Processor<Cb:'static, E:'static>: Predicate<ProcessorResult<Cb, E>> {
 }
 
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
-pub trait AssertEquals<Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> {
+pub trait AssertEquals<Cb: 'static, E: 'static, T: PartialEq + std::fmt::Debug> {
     /// User defined function for extracting a collection data of a specific
     /// type from the proessor arguments
     fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a T>;
@@ -41,18 +41,22 @@ pub trait AssertEquals<Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> {
     fn expected(&self) -> &T;
 }
 
-impl<Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> std::fmt::Display for dyn AssertEquals<Cb, E, T> {
+impl<Cb: 'static, E: 'static, T: PartialEq + std::fmt::Debug> std::fmt::Display
+    for dyn AssertEquals<Cb, E, T>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", "assert_equals")
     }
 }
 
-impl<Cb:'static, E:'static, T> predicates::reflection::PredicateReflection for dyn AssertEquals<Cb, E, T> where
-    T: PartialEq + std::fmt::Debug
+impl<Cb: 'static, E: 'static, T> predicates::reflection::PredicateReflection
+    for dyn AssertEquals<Cb, E, T>
+where
+    T: PartialEq + std::fmt::Debug,
 {
 }
 
-impl<Cb:'static, E:'static, T> Predicate<ProcessorResult<Cb, E>> for dyn AssertEquals<Cb, E, T>
+impl<Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>> for dyn AssertEquals<Cb, E, T>
 where
     T: PartialEq + std::fmt::Debug,
 {
@@ -64,7 +68,7 @@ where
 }
 
 /// Asserts some extracted data from ProcessorResult passes a predicate.  
-pub trait Assert<Cb:'static, E:'static, T> {
+pub trait Assert<Cb: 'static, E: 'static, T> {
     fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a T>;
 
     fn assert_inner(&self, args: &T) -> bool;
@@ -74,28 +78,26 @@ pub trait Assert<Cb:'static, E:'static, T> {
 #[derive(PartialEq, Debug)]
 pub struct CallbackDataEquals<Cb, E>(pub Cb, std::marker::PhantomData<E>);
 
-impl<Cb, E:'static> predicates::Predicate<ProcessorResult<Cb, E>> for CallbackDataEquals<Cb, E>
+impl<Cb, E: 'static> predicates::Predicate<ProcessorResult<Cb, E>> for CallbackDataEquals<Cb, E>
 where
-    Cb: PartialEq + std::fmt::Debug + 'static
+    Cb: PartialEq + std::fmt::Debug + 'static,
 {
     fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         self.extracted(args)
-            .map(|actual| {
-                actual == self.expected()
-            })
+            .map(|actual| actual == self.expected())
             .unwrap_or(false)
     }
 }
 
-impl<Cb, E:'static> AssertEquals<Cb, E, Cb> for CallbackDataEquals<Cb, E> 
+impl<Cb, E: 'static> AssertEquals<Cb, E, Cb> for CallbackDataEquals<Cb, E>
 where
-    Cb: PartialEq + std::fmt::Debug + 'static
+    Cb: PartialEq + std::fmt::Debug + 'static,
 {
     fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a Cb> {
         match &args.callback_data {
             Some(GhostCallbackData::Response(Ok(cb))) => Some(cb),
-            _ => None
-        } 
+            _ => None,
+        }
     }
     fn expected(&self) -> &Cb {
         &self.0
@@ -104,14 +106,17 @@ where
 
 impl<Cb, E> std::fmt::Display for CallbackDataEquals<Cb, E>
 where
-    Cb: PartialEq + std::fmt::Debug + 'static {
+    Cb: PartialEq + std::fmt::Debug + 'static,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self.0)
     }
 }
 
-impl<Cb, E:'static> Processor<Cb, E> 
-    for CallbackDataEquals<Cb, E> where Cb : std::fmt::Debug + 'static + PartialEq {
+impl<Cb, E: 'static> Processor<Cb, E> for CallbackDataEquals<Cb, E>
+where
+    Cb: std::fmt::Debug + 'static + PartialEq,
+{
     fn test(&self, args: &ProcessorResult<Cb, E>) {
         let actual = self.extracted(args);
         assert_eq!(Some(self.expected()), actual);
@@ -122,19 +127,20 @@ impl<Cb, E:'static> Processor<Cb, E>
     }
 }
 
-impl<Cb, E:'static> predicates::reflection::PredicateReflection for CallbackDataEquals<Cb, E> 
-where Cb : std::fmt::Debug + 'static + PartialEq {}
-
+impl<Cb, E: 'static> predicates::reflection::PredicateReflection for CallbackDataEquals<Cb, E> where
+    Cb: std::fmt::Debug + 'static + PartialEq
+{
+}
 
 /// Asserts using an arbitrary predicate over a lib3h server protocol event
 pub struct CallbackDataAssert<Cb, E>(pub Box<dyn Predicate<Cb>>, std::marker::PhantomData<E>);
 
-impl<Cb:'static, E:'static> Assert<Cb, E, Cb> for CallbackDataAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Assert<Cb, E, Cb> for CallbackDataAssert<Cb, E> {
     fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a Cb> {
         match &args.callback_data {
             Some(GhostCallbackData::Response(Ok(cb))) => Some(cb),
-            _ => None
-        } 
+            _ => None,
+        }
     }
 
     fn assert_inner(&self, cb: &Cb) -> bool {
@@ -142,8 +148,7 @@ impl<Cb:'static, E:'static> Assert<Cb, E, Cb> for CallbackDataAssert<Cb, E> {
     }
 }
 
-
-impl<Cb:'static, E:'static> Processor<Cb, E> for CallbackDataAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Processor<Cb, E> for CallbackDataAssert<Cb, E> {
     fn test(&self, args: &ProcessorResult<Cb, E>) {
         let actual = self.extracted(args);
 
@@ -159,7 +164,7 @@ impl<Cb:'static, E:'static> Processor<Cb, E> for CallbackDataAssert<Cb, E> {
     }
 }
 
-impl<Cb:'static, E:'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAssert<Cb, E> {
     fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         self.extracted(args)
             .map(|actual| self.assert_inner(&actual))
@@ -167,19 +172,19 @@ impl<Cb:'static, E:'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAs
     }
 }
 
-impl<Cb, E:'static> std::fmt::Display for CallbackDataAssert<Cb, E> {
+impl<Cb, E: 'static> std::fmt::Display for CallbackDataAssert<Cb, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", "callback data assertion")
     }
 }
 
-impl<Cb, E:'static> predicates::reflection::PredicateReflection for CallbackDataAssert<Cb, E> {}
+impl<Cb, E: 'static> predicates::reflection::PredicateReflection for CallbackDataAssert<Cb, E> {}
 
 /// Asserts work was done
 #[derive(PartialEq, Debug)]
 pub struct DidWorkAssert<Cb, E>(std::marker::PhantomData<Cb>, std::marker::PhantomData<E>);
 
-impl<Cb:'static, E:'static> Processor<Cb, E> for DidWorkAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Processor<Cb, E> for DidWorkAssert<Cb, E> {
     fn test(&self, args: &ProcessorResult<Cb, E>) {
         assert!(args.did_work);
     }
@@ -189,19 +194,19 @@ impl<Cb:'static, E:'static> Processor<Cb, E> for DidWorkAssert<Cb, E> {
     }
 }
 
-impl<Cb:'static, E:'static> Predicate<ProcessorResult<Cb, E>> for DidWorkAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for DidWorkAssert<Cb, E> {
     fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         args.did_work
     }
 }
 
-impl<Cb:'static, E:'static> std::fmt::Display for DidWorkAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> std::fmt::Display for DidWorkAssert<Cb, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?} did work", self.name())
     }
 }
 
-impl<Cb:'static, E:'static> predicates::reflection::PredicateReflection for DidWorkAssert<Cb, E> {}
+impl<Cb: 'static, E: 'static> predicates::reflection::PredicateReflection for DidWorkAssert<Cb, E> {}
 
 #[allow(unused_macros)]
 /// Convenience function that asserts only one particular equality predicate
@@ -212,7 +217,9 @@ macro_rules! assert_callback_eq {
      $equal_to:ident,// Box<dyn Processor>,
      $e_type:tt
     ) => {{
-        let p = Box::new($crate::ghost_test_harness::CallbackDataEqual($equal_to.clone()));
+        let p = Box::new($crate::ghost_test_harness::CallbackDataEqual(
+            $equal_to.clone(),
+        ));
         assert_callback_processed!($ghost_can_track, $user_data, $equal_to.clone(), $e_type, p)
     }};
 }
@@ -284,13 +291,13 @@ macro_rules! assert_callback_processed {
         )> = Vec::new();
 
        let mut callback_data = None;
-       let cb: 
+       let cb:
            $crate::ghost_actor::GhostCallback<_, _, _, _> =
            Box::new(|_user_data, _context, callback_data| {
                callback_data = Some(callback_data);
                Ok(())
            });
-   
+
        let context = lib3h_tracing::TestTrace("assert_callback_processed");
 
        $ghost_can_track.request(
@@ -306,7 +313,7 @@ macro_rules! assert_callback_processed {
         for epoch in 0..20 {
             trace!("[{:?}] {:?}", epoch, previous);
 
-            process_one!($ghost_can_track, $user_data, 
+            process_one!($ghost_can_track, $user_data,
                 previous, callback_data, errors);
             if errors.is_empty() {
                 break;
@@ -337,14 +344,13 @@ macro_rules! wait_did_work {
     ($ghost_actor:ident, //&mut Vec<&mut Box<dyn Networkghost_actor>>,
      $should_abort: expr
     ) => {{
-
         let mut did_work = false;
         for i in 0..20 {
-           let did_work = $ghost_actor
-               .process()
-               .map_err(|e| error!("ghost actor processing error: {:?}", e))
-               .map(|work_was_done| work_was_done.into())
-               .unwrap_or(false);
+            let did_work = $ghost_actor
+                .process()
+                .map_err(|e| error!("ghost actor processing error: {:?}", e))
+                .map(|work_was_done| work_was_done.into())
+                .unwrap_or(false);
             if did_work {
                 break;
             }
@@ -375,6 +381,4 @@ macro_rules! wait_until_no_work {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
