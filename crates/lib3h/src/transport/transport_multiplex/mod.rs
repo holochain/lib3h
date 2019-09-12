@@ -21,6 +21,7 @@
 mod mplex;
 pub use mplex::TransportMultiplex;
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,3 +216,4 @@ mod tests {
         }
     }
 }
+*/
