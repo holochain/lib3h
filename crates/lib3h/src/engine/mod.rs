@@ -104,7 +104,8 @@ pub struct RealEngine {
     request_track: Tracker<RealEngineTrackerData>,
 
     /// holds our network gateway and allows connecting routes to space gateways
-    multiplexer: Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, TransportMultiplex>>,
+    multiplexer:
+        Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, TransportMultiplex<P2pGateway>>>,
 
     /// Cached this_peer of the network_gateway
     this_net_peer: PeerData,

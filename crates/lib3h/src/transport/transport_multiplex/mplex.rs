@@ -1,6 +1,6 @@
 use crate::{
     error::{Lib3hError, Lib3hResult},
-    gateway::{protocol::*, P2pGateway},
+    gateway::protocol::*,
     transport::{error::*, protocol::*},
 };
 use detach::prelude::*;
@@ -16,21 +16,39 @@ struct LocalRouteSpec {
     pub local_agent_id: Address,
 }
 
-pub struct TransportMultiplex {
+pub struct TransportMultiplex<
+    G: GhostActor<
+        GatewayRequestToParent,
+        GatewayRequestToParentResponse,
+        GatewayRequestToChild,
+        GatewayRequestToChildResponse,
+        Lib3hError,
+    >,
+> {
     // our parent channel endpoint
     endpoint_parent: Option<GatewayParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<GatewaySelfEndpoint<TransportMultiplex, Lib3hTrace>>,
+    endpoint_self: Detach<GatewaySelfEndpoint<TransportMultiplex<G>, Lib3hTrace>>,
     // ref to our inner gateway
-    inner_gateway: Detach<GatewayParentWrapper<TransportMultiplex, Lib3hTrace, P2pGateway>>,
+    inner_gateway: Detach<GatewayParentWrapper<TransportMultiplex<G>, Lib3hTrace, G>>,
     // our map of endpoints connecting us to our Routes
-    route_endpoints:
-        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
+    route_endpoints: Detach<
+        HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex<G>, Lib3hTrace>>,
+    >,
 }
 
-impl TransportMultiplex {
+impl<
+        G: GhostActor<
+            GatewayRequestToParent,
+            GatewayRequestToParentResponse,
+            GatewayRequestToChild,
+            GatewayRequestToChildResponse,
+            Lib3hError,
+        >,
+    > TransportMultiplex<G>
+{
     /// create a new TransportMultiplex Instance
-    pub fn new(inner_gateway: P2pGateway) -> Self {
+    pub fn new(inner_gateway: G) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(
@@ -289,14 +307,22 @@ impl TransportMultiplex {
     }
 }
 
-impl
+impl<
+        G: GhostActor<
+            GatewayRequestToParent,
+            GatewayRequestToParentResponse,
+            GatewayRequestToChild,
+            GatewayRequestToChildResponse,
+            Lib3hError,
+        >,
+    >
     GhostActor<
         GatewayRequestToParent,
         GatewayRequestToParentResponse,
         GatewayRequestToChild,
         GatewayRequestToChildResponse,
         Lib3hError,
-    > for TransportMultiplex
+    > for TransportMultiplex<G>
 {
     fn take_parent_endpoint(&mut self) -> Option<GatewayParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
