@@ -520,6 +520,7 @@ mod tests {
 
     #[test]
     fn release_test() {
+        // Let's share the same NetworkId, meaning we are on the same network.
         let networkid = "holonaute-release.holo.host";
 
         // This is the one from which we want to see another node disapearing from its cache
@@ -573,6 +574,7 @@ mod tests {
 
     #[test]
     fn query_test() {
+        // Let's share the same NetworkId, meaning we are on the same network.
         let networkid = "holonaute-query.holo.host";
 
         let mut mdns = MulticastDnsBuilder::new()
@@ -598,16 +600,23 @@ mod tests {
 
         eprintln!("mdns = {:#?}", &mdns.map_record);
 
-        let records = mdns
+        let mut records = mdns
             .map_record
             .get(networkid)
-            .expect("Fail to get records from the networkid");
+            .expect("Fail to get records from the networkid")
+            .to_vec();
+
+        // Make the order deterministic
+        records.sort_by(|a, b| a.url.cmp(&b.url));
 
         assert_eq!(records.len(), 2);
+        assert_eq!(records[0].url, "wss://192.168.0.87:88088?a=hc-other");
+        assert_eq!(records[1].url, "wss://192.168.0.88:88088?a=hc0");
     }
 
     #[test]
     fn advertise_test() {
+        // Let's share the same NetworkId, meaning we are on the same network.
         let networkid = "holonaute-advertise.holo.host";
 
         // This is the one from which we want to see another node disapearing from its cache
