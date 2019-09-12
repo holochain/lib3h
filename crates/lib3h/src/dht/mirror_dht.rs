@@ -84,10 +84,6 @@ impl MirrorDht {
 impl MirrorDht {
     // -- Peer info -- //
 
-    fn this_peer(&self) -> PeerData {
-        self.this_peer
-    }
-
     fn get_peer_list(&self) -> Vec<PeerData> {
         self.peer_map.values().map(|v| v.clone()).collect()
     }

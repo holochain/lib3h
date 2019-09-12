@@ -38,6 +38,11 @@ impl P2pGateway {
             inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht")),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
+            this_peer: PeerData {
+                peer_address: dht_config.this_peer_address(),
+                peer_uri: dht_config.this_peer_uri(),
+                timestamp: 0, // FIXME
+            },
         }
     }
     /// Helper Ctor
@@ -59,12 +64,7 @@ impl P2pGateway {
     }
 
     pub fn this_peer(&self) -> PeerData {
-        // self.inner_dht().as_mut().as_mut()
-        PeerData {
-            peer_address: "FIXME".to_string(),
-            peer_uri: Url::parse("fixme://host:123").unwrap(),
-            timestamp: 0,
-        }
+        self.this_peer.clone()
     }
 }
 //
