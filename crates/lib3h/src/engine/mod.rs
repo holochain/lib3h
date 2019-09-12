@@ -9,10 +9,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_protocol::*,
-    gateway::{protocol::*, GatewayUserData},
+    gateway::{protocol::*, P2pGateway},
     track::Tracker,
     transport::TransportMultiplex,
 };
+use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
@@ -102,11 +103,9 @@ pub struct RealEngine {
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
 
-    multiplexer: TransportMultiplex,
-    // Should be owned by multiplexer
-    // TODO #176: Remove this if we resolve #176 without it.
-    /// P2p gateway for the network layer
-    network_gateway: GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>,
+    /// holds our network gateway and allows connecting routes to space gateways
+    multiplexer:
+        Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, TransportMultiplex<P2pGateway>>>,
 
     /// Cached this_peer of the network_gateway
     this_net_peer: PeerData,
@@ -115,7 +114,8 @@ pub struct RealEngine {
     network_connections: HashSet<Url>,
 
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>>,
+    space_gateway_map:
+        HashMap<ChainId, Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
@@ -127,7 +127,4 @@ pub struct RealEngine {
     /// dht ghost user_data
     /// temp HACK. Waiting for gateway actor
     temp_outbox: Vec<Lib3hServerProtocol>,
-
-    // user data for ghost callback
-    gateway_user_data: GatewayUserData,
 }

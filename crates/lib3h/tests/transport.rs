@@ -242,9 +242,7 @@ impl TestTransport {
                         payload,
                     ) {
                         Err(err) => Err(TransportError::new(err)),
-                        Ok(()) => Ok(RequestToChildResponse::SendMessage {
-                            payload: Opaque::new(),
-                        }),
+                        Ok(()) => Ok(RequestToChildResponse::SendMessageSuccess),
                     };
                     msg.respond(response)?;
                 }
@@ -386,7 +384,7 @@ fn ghost_transport() {
     // we should get back an Ok on having sent the message when t1 gets processed
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Ok(SendMessage))\"",
+        "\"Response(Ok(SendMessageSuccess))\"",
         format!("{:?}", owner.log[3])
     );
 
@@ -400,7 +398,7 @@ fn ghost_transport() {
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
     assert_eq!(
-        "ReceivedData { address: \"mocknet://t1/\", payload: \"foo\" }",
+        "ReceivedData { uri: \"mocknet://t1/\", payload: \"foo\" }",
         format!("{:?}", messages[1].take_message().expect("exists"))
     );
 
@@ -412,7 +410,7 @@ fn ghost_transport() {
     let mut messages = t1.drain_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(
-        "TransportError { error: TransportError(\"mocknet://t1/ has become unbound\") }",
+        "ErrorOccured { uri: \"mocknet://t1/\", error: TransportError(\"mocknet://t1/ has become unbound\") }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
 }

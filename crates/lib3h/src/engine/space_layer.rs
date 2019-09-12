@@ -4,8 +4,10 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
     engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
-    gateway::{protocol::*, GatewayUserData},
+    gateway::{protocol::*, P2pGateway},
 };
+use detach::prelude::*;
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
@@ -25,10 +27,7 @@ impl RealEngine {
             .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((
-                space_address,
-                self.get_this_peer_sync(Some(chainId.clone())).clone(),
-            ));
+            result.push((space_address, self.this_space_peer(chainId.clone()).clone()));
         }
         result
     }
@@ -37,7 +36,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<&mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>> {
+    ) -> Option<&mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -54,10 +53,15 @@ impl RealEngine {
         // Process all space gateways and collect requests
         let mut outbox = Vec::new();
         let mut space_outbox_map = HashMap::new();
-        for (chain_id, space_gateway) in self.space_gateway_map.iter_mut() {
-            let _res = space_gateway.process(&mut self.gateway_user_data);
+        let mut space_gateway_map: HashMap<
+            ChainId,
+            Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>,
+        > = self.space_gateway_map.drain().collect();
+        for (chain_id, mut space_gateway) in space_gateway_map.drain() {
+            detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap
             let request_list = space_gateway.drain_messages();
             space_outbox_map.insert(chain_id.clone(), request_list);
+            self.space_gateway_map.insert(chain_id, space_gateway);
             //            // FIXME: DHT magic
             //            let mut temp = space_gateway.drain_dht_outbox();
             //            self.temp_outbox.append(&mut temp);
@@ -85,7 +89,7 @@ impl RealEngine {
             self.name, chain_id, request,
         );
         let mut outbox = Vec::new();
-        let mut space_gateway = self
+        let space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
@@ -95,8 +99,12 @@ impl RealEngine {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossipTo(&chain_id.0.to_string(), &mut space_gateway, gossip_data)
-                            .expect("Failed to gossip with space_gateway");
+                        handle_gossipTo(
+                            &chain_id.0.to_string(),
+                            space_gateway.as_mut(),
+                            gossip_data,
+                        )
+                        .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
                         // n/a - should have been handled by gateway

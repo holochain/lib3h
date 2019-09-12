@@ -1,8 +1,10 @@
 use crate::{
+    dht::dht_protocol::*,
     error::*,
     gateway::{protocol::*, P2pGateway},
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_tracing::Lib3hTrace;
 
 impl
     GhostActor<
@@ -27,14 +29,37 @@ impl
 
         // Process inbox from child transport & handle requests
         detach_run!(&mut self.child_transport_endpoint, |cte| {
-            cte.process(&mut self.user_data)
+            cte.process(self)
         })?;
         for request in self.child_transport_endpoint.drain_messages() {
             self.handle_transport_RequestToParent(request);
         }
 
+        // Update this_peer cache
+        self.inner_dht.request(
+            Lib3hTrace,
+            DhtRequestToChild::RequestThisPeer,
+            Box::new(|mut me, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
+                    me.this_peer = peer_response;
+                } else {
+                    panic!("bad response to RequestThisPeer: {:?}", response);
+                }
+                Ok(())
+            }),
+        )?;
+
         // Process internal dht & handle requests
-        let _res = self.inner_dht.process(&mut self.user_data);
+        detach_run!(self.inner_dht, |dht| { dht.process(self) })?;
         for request in self.inner_dht.drain_messages() {
             self.handle_dht_RequestToParent(request);
         }
