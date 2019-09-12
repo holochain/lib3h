@@ -12,12 +12,18 @@ use net2::unix::UnixUdpBuilderExt;
 
 /// mdns builder
 pub struct MulticastDnsBuilder {
+    /// Our IP address bound to UDP Socket, default to `0.0.0.0`
     pub(crate) bind_address: String,
+    /// Port used by the mDNS protocol. mDNS use the `5353` by default
     pub(crate) bind_port: u16,
+    /// If true, multicast packets will be looped back to the local socket
     pub(crate) multicast_loop: bool,
+    /// Time to Live: default to `255`
     pub(crate) multicast_ttl: u32,
+    /// Multicast address used by the mDNS protocol: `224.0.0.251`
     pub(crate) multicast_address: String,
-    pub(crate) every: u128,
+    /// The amount of time we should wait between two queries.
+    pub(crate) every_ms: u128,
     pub(crate) own_map_record: MapRecord,
 }
 
@@ -66,8 +72,8 @@ impl MulticastDnsBuilder {
     }
 
     /// Sets the amount of time between two queries originating from ourself.
-    pub fn every(&mut self, every_ms: u128) -> &mut Self {
-        self.every = every_ms;
+    pub fn every_ms(&mut self, every_ms: u128) -> &mut Self {
+        self.every_ms = every_ms;
         self
     }
 
@@ -102,7 +108,7 @@ impl MulticastDnsBuilder {
             multicast_ttl: self.multicast_ttl,
             multicast_address: self.multicast_address.to_owned(),
             timestamp: Instant::now(),
-            every: self.every,
+            every_ms: self.every_ms,
             send_socket,
             recv_socket,
             buffer: [0; READ_BUF_SIZE],
@@ -121,7 +127,7 @@ impl Default for MulticastDnsBuilder {
             multicast_loop: true,
             multicast_ttl: DEFAULT_TTL,
             multicast_address: String::from(MDNS_MULCAST_IPV4_ADRESS),
-            every: DEFAULT_EVERY_MS,
+            every_ms: DEFAULT_EVERY_MS,
             own_map_record: MapRecord::new(),
         }
     }
