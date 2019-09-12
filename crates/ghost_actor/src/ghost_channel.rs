@@ -348,25 +348,26 @@ impl<
 {
     fn priv_request(
         &mut self,
-        span: Lib3hSpan,
+        mut span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        let child = span.child_span("bookmark");
+        let span_bookmark = span.child("bookmark");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(child, cb),
+            None => self.pending_responses_tracker.bookmark(span_bookmark, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                child,
+                span_bookmark,
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
         trace!("ghost_channel: send request (id={:?})", request_id);
+        span.event(format!("ghost_channel: send request (id={:?})", request_id));
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
-            span,
+            span: span.child("send request"),
             // span: span.child("request", |o| o.start()).into(),
         })?;
         Ok(())
@@ -418,7 +419,12 @@ impl<
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
         span.event("GhostChannel::request");
-        self.priv_request(span, payload, cb, GhostTrackRequestOptions::default())
+        self.priv_request(
+            span.child("priv_request"),
+            payload,
+            cb,
+            GhostTrackRequestOptions::default(),
+        )
     }
 
     /// make a request of the other side. When a response is sent back to us
@@ -431,7 +437,7 @@ impl<
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         span.event("GhostChannel::request_options");
-        self.priv_request(span, payload, cb, options)
+        self.priv_request(span.child("priv_request"), payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
