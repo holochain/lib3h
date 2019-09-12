@@ -11,15 +11,17 @@ extern crate detach;
 extern crate lib3h_tracing;
 
 pub mod simchat;
+mod lib3h_simchat;
+use lib3h_simchat::handle_chat_event;
 pub use simchat::{ChatEvent, SimChat, SimChatMessage};
 
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{
-    GhostActor, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint,
+    GhostActor, GhostCanTrack, GhostContextEndpoint,
 };
 use lib3h_protocol::{
-    data_types::{ConnectData, DirectMessageData, SpaceData, QueryEntryData, QueryEntryResultData},
+    data_types::{ConnectData, SpaceData, QueryEntryData, QueryEntryResultData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
@@ -44,6 +46,22 @@ pub struct Lib3hSimChat {
     thread: Option<std::thread::JoinHandle<()>>,
     thread_continue: Arc<AtomicBool>,
     out_send: crossbeam_channel::Sender<ChatEvent>,
+}
+
+pub struct Lib3hSimChatState {
+    current_space: Option<SpaceData>,
+    spaces: HashMap<Address, SpaceData>,
+    // cas: HashMap<Address, HashMap<Address, SimChatMessage>>,
+}
+
+impl Lib3hSimChatState {
+    pub fn new() -> Self {
+        Self {
+            current_space: None,
+            spaces: HashMap::new(),
+            // cas: HashMap::new(),
+        }
+    }
 }
 
 impl Drop for Lib3hSimChat {
@@ -93,9 +111,7 @@ impl Lib3hSimChat {
                         .build();
 
                 // also keep track of things like the spaces and current space in this scope
-                let mut current_space: Option<SpaceData> = None;
-                let mut spaces: HashMap<Address, SpaceData> = HashMap::new();
-                let _cas: HashMap<Address, HashMap<Address, SimChatMessage>> = HashMap::new();
+                let mut state = Lib3hSimChatState::new();
 
                 // call connect to start the networking process
                 // (should probably wait for confirmatio before continuing)
@@ -161,136 +177,13 @@ impl Lib3hSimChat {
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
                     for chat_event in direct_chat_events.chain(engine_chat_events) {
-                        let local_internal_sender = internal_sender.clone();
 
                         // every chat event call the handler that was passed
                         handler(&chat_event);
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
-                        match chat_event {
-                            ChatEvent::Join {
-                                channel_id,
-                                agent_id,
-                            } => {
-                                let space_address =
-                                    channel_address_from_string(&channel_id).unwrap();
-                                let space_data = SpaceData {
-                                    agent_id: Address::from(agent_id),
-                                    request_id: "".to_string(),
-                                    space_address,
-                                };
-                                parent_endpoint
-                                    .request(
-                                        TestTrace::new(),
-                                        ClientToLib3h::JoinSpace(space_data.clone()),
-                                        Box::new(move |_, callback_data| {
-                                            println!(
-                                                "chat received response from engine: {:?}",
-                                                callback_data
-                                            );
-                                            if let Response(Ok(_payload)) = callback_data {
-                                                local_internal_sender
-                                                    .send(ChatEvent::JoinSuccess {
-                                                        channel_id: channel_id.clone(),
-                                                        space_data: space_data.clone(),
-                                                    })
-                                                    .unwrap();
-                                            }
-                                            Ok(())
-                                        }),
-                                    )
-                                    .unwrap();
-                            }
-
-                            ChatEvent::JoinSuccess {
-                                space_data,
-                                channel_id,
-                            } => {
-                                spaces.insert(channel_address_from_string(&channel_id).unwrap(), space_data.clone());
-                                current_space = Some(space_data);
-                                Self::send_sys_message(
-                                    local_internal_sender,
-                                    &format!("Joined channel: {}", channel_id),
-                                );
-                            }
-
-                            ChatEvent::Part(channel_id) => {
-                                if let Some(space_data) = current_space.clone() {
-                                    parent_endpoint
-                                        .request(
-                                            TestTrace::new(),
-                                            ClientToLib3h::LeaveSpace(space_data.to_owned()),
-                                            Box::new(move |_, callback_data| {
-                                                println!(
-                                                    "chat received response from engine: {:?}",
-                                                    callback_data
-                                                );
-                                                if let Response(Ok(_payload)) = callback_data {
-                                                    local_internal_sender
-                                                        .send(ChatEvent::PartSuccess(
-                                                            channel_id.clone(),
-                                                        ))
-                                                        .unwrap();
-                                                }
-                                                Ok(())
-                                            }),
-                                        )
-                                        .unwrap();
-                                } else {
-                                    Self::send_sys_message(
-                                        local_internal_sender,
-                                        &"No channel to leave".to_string(),
-                                    );
-                                }
-                            }
-
-                            ChatEvent::PartSuccess(channel_id) => {
-                                current_space = None;
-                                spaces.remove(&channel_address_from_string(&channel_id).unwrap());
-                                Self::send_sys_message(
-                                    local_internal_sender,
-                                    &"Left channel".to_string(),
-                                );
-                            }
-
-                            ChatEvent::SendDirectMessage { to_agent, payload } => {
-                                if let Some(space_data) = current_space.clone() {
-                                    let direct_message_data = DirectMessageData {
-                                        from_agent_id: space_data.agent_id,
-                                        content: payload.into(),
-                                        to_agent_id: Address::from(to_agent),
-                                        space_address: space_data.space_address,
-                                        request_id: String::from(""),
-                                    };
-                                    parent_endpoint
-                                        .request(
-                                            TestTrace::new(),
-                                            ClientToLib3h::SendDirectMessage(direct_message_data),
-                                            Box::new(|_, callback_data| {
-                                                println!(
-                                                    "chat received response from engine: {:?}",
-                                                    callback_data
-                                                );
-                                                // TODO: Track delivered state of message
-                                                Ok(())
-                                            }),
-                                        )
-                                        .unwrap();
-                                } else {
-                                    Self::send_sys_message(
-                                        local_internal_sender,
-                                        &"Must join a channel before sending a message".to_string(),
-                                    );
-                                }
-                            },
-
-                            ChatEvent::SendChannelMessage{..} => {
-
-                            }
-
-                            _ => {}
-                        }
+                        handle_chat_event(chat_event, &mut state, &mut parent_endpoint, internal_sender.clone());
                     }
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -299,16 +192,6 @@ impl Lib3hSimChat {
             thread_continue,
             out_send,
         }
-    }
-
-    fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
-        sender
-            .send(ChatEvent::ReceiveDirectMessage(SimChatMessage{
-                from_agent: String::from("sys"),
-                payload: String::from(msg),
-                timestamp: current_timestamp(),
-            }))
-            .expect("send fail");
     }
 
     fn connect(
