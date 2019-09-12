@@ -97,7 +97,7 @@ pub struct MulticastDns {
     /// Determine if we need to query / announce.
     pub(crate) timestamp: Instant,
     /// The amount of time we should wait between two queries.
-    pub(crate) every: u128,
+    pub(crate) every_ms: u128,
     /// The socket used by the mDNS service protocol to send packets
     pub(crate) send_socket: net::UdpSocket,
     /// The socket used to receive mDNS packets
@@ -170,8 +170,8 @@ impl MulticastDns {
     }
 
     /// Returns the amount of time we wait between two queries.
-    pub fn every(&self) -> u128 {
-        self.every
+    pub fn every_ms(&self) -> u128 {
+        self.every_ms
     }
 
     /// Insert a new record to our cache.
@@ -258,9 +258,7 @@ impl MulticastDns {
         }
     }
 
-    /// mDNS Querier
-    /// One-Shot Multicast DNS Queries
-    /// Not used in our actual mDNS implementation use case.
+    /// mDNS Querier, implementing the "One-Shot Multicast DNS Queries" from the standard.
     pub fn query(&mut self) -> MulticastDnsResult<()> {
         if let Some(query_message) = self.build_query_message() {
             self.broadcast_message(&query_message)?;
@@ -269,9 +267,7 @@ impl MulticastDns {
         Ok(())
     }
 
-    /// A mDNS Responder that listen to the network in order to defend its name and respond to
-    /// queries
-    /// Not used in our actual mDNS implementation use case.
+    /// A mDNS Responder that listen to the network in order to repond to the queries.
     fn responder(&mut self) -> MulticastDnsResult<()> {
         // Process all elements of the UDP socket stack
         loop {
@@ -282,13 +278,28 @@ impl MulticastDns {
                     // Here we update our cache with the responses gathered from the network
                     if dmesg.nb_answers > 0 {
                         if let Some(new_map_record) = MapRecord::from_dns_message(&dmesg) {
-                            self.update_cache(&new_map_record);
+                            let own_networkids: Vec<String> = self.own_networkids().iter()
+                                .map(|v| v.to_string())
+                                .collect();
+
+                            // Only update our cache with the answers for our own NetworkId
+                            for (netid, new_records) in new_map_record.iter() {
+                                // Let's only operate on the networks we belong to
+                                if own_networkids.contains(netid) {
+                                    let tmp_new_map_record = MapRecord::with_record(netid, new_records);
+                                    self.update_cache(&tmp_new_map_record);
+                                }
+                            }
                         }
                     }
+                    // According to the standard: "Multicast DNS responses MUST NOT contain
+                    // any questions in the Question Section.  Any questions in the
+                    // Question Section of a received Multicast DNS response MUST be silently ignored
+
                     // We send response only for record we have authority on.
                     // We send the response directly to the sender instead of broadcasting it to
                     // avoid any unnecessary burden on the network.
-                    if dmesg.nb_questions > 0 {
+                    else if dmesg.nb_questions > 0 {
                         let question_list: Vec<&str> = dmesg
                             .questions
                             .iter()
@@ -297,8 +308,11 @@ impl MulticastDns {
                         if let Some(response) =
                             self.own_map_record.to_dns_response_message(&question_list)
                         {
-                            self.broadcast_message(&response)?;
                             self.send_socket.send_to(&response.to_raw()?, sender_addr)?;
+                            // As the direct send message to the querier tends to fail on a local
+                            // machine during our tests, we broadcast the response as well for
+                            // safety reasons
+                            self.broadcast_message(&response)?;
                         }
                     }
                 }
@@ -363,7 +377,8 @@ impl MulticastDns {
             .own_map_record
             .to_dns_response_message(&own_net_id_list)
         {
-            // Sends at least 2 time an unsolicited response, up to 8 times maximum
+            // Sends at least 2 time an unsolicited response, up to 8 times maximum (according to
+            // the standard https://tools.ietf.org/html/rfc6762#section-8.3)
             self.broadcast_message(&dmesg)?;
             self.broadcast_message(&dmesg)?;
         }
@@ -383,9 +398,9 @@ impl Discovery for MulticastDns {
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
         self.responder()?;
 
-        // We should query (and announce in the same time because we will anser to our query in the
+        // We should query (and announce in the same time because we will anwser to our query in the
         // next iteration) "every amount of time"
-        if self.timestamp.elapsed().as_millis() > self.every {
+        if self.timestamp.elapsed().as_millis() > self.every_ms {
             self.query()?;
             self.timestamp = Instant::now();
         }
@@ -421,16 +436,6 @@ impl Discovery for MulticastDns {
     }
 }
 
-pub fn get_available_port(addr: &str) -> MulticastDnsResult<u16> {
-    for port in SERVICE_LISTENER_PORT + 1..65535 - SERVICE_LISTENER_PORT {
-        if net::UdpSocket::bind((addr, port)).is_ok() {
-            return Ok(port);
-        }
-    }
-    Err(MulticastDnsError::new(
-        crate::error::ErrorKind::NoAvailablePort,
-    ))
-}
 
 #[cfg(test)]
 mod tests {

@@ -93,10 +93,18 @@ impl MapRecord {
     /// Builds a [`MapRecord`] from a [`DnsMessage`].
     pub fn from_dns_message(dmesg: &DnsMessage) -> Option<MapRecord> {
         if !dmesg.answers.is_empty() {
+            // Let's create a vector of records, applying a filter on the class and type
+            // (INET + CNAME)
             let mut records: Vec<Record> = dmesg
                 .answers
                 .iter()
-                .map(|a_sec| Record::new(&a_sec.domain_name, &a_sec.data.target, a_sec.ttl))
+                .filter_map(|a_sec| {
+                    if a_sec.answer_class == 1 && a_sec.answer_type == 5 {
+                        Some(Record::new(&a_sec.domain_name, &a_sec.data.target, a_sec.ttl))
+                    } else {
+                        None
+                    }
+                })
                 .collect();
 
             records.sort();
@@ -104,9 +112,11 @@ impl MapRecord {
 
             let mut map_record = MapRecord(HashMapRecord::with_capacity(records.len()));
             for new_record in records.iter() {
-                let fake_map_record =
+                // Create a temporary MapRecord so we can update the one that we are about to
+                // return with the new records we found on the network
+                let tmp_map_record =
                     MapRecord::with_record(&new_record.networkid, &[new_record.clone()]);
-                map_record.update(&fake_map_record);
+                map_record.update(&tmp_map_record);
             }
 
             Some(map_record)
