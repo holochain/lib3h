@@ -9,11 +9,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_protocol::*,
-    gateway::wrapper::GatewayWrapper,
+    gateway::{protocol::*, GatewayUserData, P2pGateway},
     track::Tracker,
-    transport::{ConnectionId, TransportWrapper},
-    transport_wss::TlsConfig,
+    transport::TransportMultiplex,
 };
+use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
@@ -67,7 +67,7 @@ enum RealEngineTrackerData {
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RealEngineConfig {
-    pub tls_config: TlsConfig,
+    //pub tls_config: TlsConfig,
     pub socket_type: String,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,
@@ -90,27 +90,32 @@ pub struct TransportKeys {
 }
 
 /// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine<'engine> {
+pub struct RealEngine {
     /// Identifier
     name: String,
     /// Config settings
     config: RealEngineConfig,
     /// FIFO of Lib3hClientProtocol messages received from Core
     inbox: VecDeque<Lib3hClientProtocol>,
-    /// Factory for building DHT's of type D
+    /// Factory for building the DHTs used by the gateways
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
+
+    multiplexer: TransportMultiplex,
+    // Should be owned by multiplexer
     // TODO #176: Remove this if we resolve #176 without it.
-    #[allow(dead_code)]
-    /// Transport used by the network gateway
-    network_transport: TransportWrapper<'engine>,
     /// P2p gateway for the network layer
-    network_gateway: GatewayWrapper<'engine>,
+    network_gateway: Detach<GatewayParentWrapper<RealEngine, P2pGateway>>,
+
+    /// Cached this_peer of the network_gateway
+    this_net_peer: PeerData,
+
     /// Store active connections?
-    network_connections: HashSet<ConnectionId>,
+    network_connections: HashSet<Url>,
+
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayWrapper<'engine>>,
+    space_gateway_map: HashMap<ChainId, Detach<GatewayParentWrapper<RealEngine, P2pGateway>>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
@@ -122,4 +127,7 @@ pub struct RealEngine<'engine> {
     /// dht ghost user_data
     /// temp HACK. Waiting for gateway actor
     temp_outbox: Vec<Lib3hServerProtocol>,
+
+    // user data for ghost callback
+    gateway_user_data: GatewayUserData,
 }

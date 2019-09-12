@@ -27,7 +27,6 @@ pub type GhostCallback<UserData, CbData, E> =
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<UserData, CbData: 'static, E: 'static> {
     expires: std::time::SystemTime,
-    _trace_context: Lib3hSpan,
     cb: GhostCallback<UserData, CbData, E>,
 }
 
@@ -121,16 +120,16 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
     /// register a callback
     pub fn bookmark(
         &mut self,
-        trace_context: Lib3hSpan,
+        span: Lib3hSpan,
         cb: GhostCallback<UserData, CbData, E>,
     ) -> RequestId {
-        self.bookmark_options(trace_context, cb, GhostTrackerBookmarkOptions::default())
+        self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_options(
         &mut self,
-        trace_context: Lib3hSpan,
+        _span: Lib3hSpan,
         cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
@@ -147,7 +146,6 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
-                _trace_context: trace_context,
                 cb,
             },
         );
@@ -200,7 +198,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_bookmark_and_handle() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let trace_context = test_span("some_context_data");
+        let span = test_span("some_context_data");
 
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
@@ -212,7 +210,7 @@ mod tests {
 
         // lets bookmark a callback that should set our actors state to the value
         // of the callback response
-        let req_id = actor.tracker.bookmark(trace_context, cb);
+        let req_id = actor.tracker.bookmark(span, cb);
 
         let _entry = actor.tracker.pending.get(&req_id).unwrap();
 
@@ -246,7 +244,7 @@ mod tests {
     #[test]
     fn test_ghost_tracker_should_timeout() {
         let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let trace_context = test_span("foo");
+        let span = test_span("foo");
         let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
             Box::new(|me, callback_data| {
                 // when the timeout happens the callback should get
@@ -258,7 +256,7 @@ mod tests {
                 Ok(())
             });
         let _req_id = actor.tracker.bookmark_options(
-            trace_context,
+            span,
             cb,
             GhostTrackerBookmarkOptions::default().timeout(std::time::Duration::from_millis(1)),
         );

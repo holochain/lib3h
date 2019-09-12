@@ -99,18 +99,18 @@ mod tests {
                             })),
                         )?;
                     }
-                    RequestToChild::SendMessage { address, payload } => {
-                        self.mock_sender.send((address, payload))?;
-                        msg.respond(span, Ok(RequestToChildResponse::SendMessage))?;
+                    RequestToChild::SendMessage { uri, payload } => {
+                        self.mock_sender.send((uri, payload))?;
+                        msg.respond(span, Ok(RequestToChildResponse::SendMessageSuccess))?;
                     }
                 }
             }
             loop {
                 match self.mock_receiver.try_recv() {
-                    Ok((address, payload)) => {
+                    Ok((uri, payload)) => {
                         self.endpoint_self.publish(
                             Lib3hSpan::todo(),
-                            RequestToParent::ReceivedData { address, payload },
+                            RequestToParent::ReceivedData { uri, payload },
                         )?;
                     }
                     Err(_) => break,
@@ -150,7 +150,7 @@ mod tests {
             .request(
                 Lib3hSpan::todo(),
                 RequestToChild::SendMessage {
-                    address: addr_none.clone(),
+                    uri: addr_none.clone(),
                     payload: "hello-from-a".into(),
                 },
                 Box::new(|_, response| {
@@ -180,8 +180,8 @@ mod tests {
         assert_eq!(1, msgs.len());
 
         let msg = msgs.remove(0).take_message().unwrap();
-        if let RequestToParent::ReceivedData { address, payload } = msg {
-            assert_eq!(&addr_none, &address);
+        if let RequestToParent::ReceivedData { uri, payload } = msg {
+            assert_eq!(&addr_none, &uri);
             let expected: Opaque = "hello-to-b".into();
             assert_eq!(&expected, &payload);
         } else {
@@ -208,10 +208,10 @@ mod tests {
         assert_eq!(1, msgs.len());
 
         let msg = msgs.remove(0).take_message().unwrap();
-        if let RequestToParent::ReceivedData { address, payload } = msg {
+        if let RequestToParent::ReceivedData { uri, payload } = msg {
             assert_eq!(
                 &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
-                &address
+                &uri
             );
             let expected: Opaque = "hello".into();
             assert_eq!(&expected, &payload);

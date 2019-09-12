@@ -28,7 +28,8 @@ pub mod keystore;
 pub mod time;
 pub mod track;
 pub mod transport;
-pub mod transport_wss;
+// FIXME
+// pub mod transport_wss;
 
 #[cfg(test)]
 pub mod tests {

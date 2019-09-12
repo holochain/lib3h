@@ -105,7 +105,7 @@ impl TransportMultiplex {
                 ep.publish(
                     Lib3hSpan::todo(),
                     RequestToParent::ReceivedData {
-                        address: path,
+                        uri: path,
                         payload: unpacked_payload,
                     },
                 )?;
@@ -125,41 +125,41 @@ impl TransportMultiplex {
         >,
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { address } => {
-                self.handle_incoming_connection(address)
+            RequestToParent::IncomingConnection { uri } => self.handle_incoming_connection(uri),
+            RequestToParent::ReceivedData { uri, payload } => {
+                self.handle_received_data(uri, payload)
             }
-            RequestToParent::ReceivedData { address, payload } => {
-                self.handle_received_data(address, payload)
-            }
-            RequestToParent::TransportError { error } => self.handle_transport_error(error),
+            RequestToParent::ErrorOccured { uri, error } => self.handle_transport_error(uri, error),
         }
     }
 
     /// private handler for inner transport IncomingConnection events
-    fn handle_incoming_connection(&mut self, address: Url) -> TransportResult<()> {
+    fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
         // forward
         self.endpoint_self.publish(
             Lib3hSpan::todo(),
-            RequestToParent::IncomingConnection { address },
+            RequestToParent::IncomingConnection { uri },
         )?;
         Ok(())
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, address: Url, payload: Opaque) -> TransportResult<()> {
+    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> TransportResult<()> {
         // forward
         self.endpoint_self.publish(
             Lib3hSpan::todo(),
-            RequestToParent::ReceivedData { address, payload },
+            RequestToParent::ReceivedData { uri, payload },
         )?;
         Ok(())
     }
 
     /// private handler for inner transport TransportError events
-    fn handle_transport_error(&mut self, error: TransportError) -> TransportResult<()> {
+    fn handle_transport_error(&mut self, uri: Url, error: TransportError) -> TransportResult<()> {
         // forward
-        self.endpoint_self
-            .publish(Lib3hSpan::todo(), RequestToParent::TransportError { error })?;
+        self.endpoint_self.publish(
+            Lib3hSpan::todo(),
+            RequestToParent::ErrorOccured { uri, error },
+        )?;
         Ok(())
     }
 
@@ -175,8 +175,8 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_route_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_route_send_message(msg, uri, payload)
             }
         }
     }
@@ -188,7 +188,7 @@ impl TransportMultiplex {
         spec: Url,
     ) -> TransportResult<()> {
         let span = Lib3hSpan::todo();
-        let follower = span.follower_span("handle_route_bind");
+        let follower = span.follower("handle_route_bind");
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
             span,
@@ -214,15 +214,15 @@ impl TransportMultiplex {
     fn handle_route_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
         let span = Lib3hSpan::todo();
-        let follower = span.follower_span("handle_route_send_message");
+        let follower = span.follower("handle_route_send_message");
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             span,
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_, response| {
                 let response = {
                     match response {
@@ -252,8 +252,8 @@ impl TransportMultiplex {
     ) -> TransportResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_bind(msg, spec),
-            RequestToChild::SendMessage { address, payload } => {
-                self.handle_send_message(msg, address, payload)
+            RequestToChild::SendMessage { uri, payload } => {
+                self.handle_send_message(msg, uri, payload)
             }
         }
     }
@@ -265,7 +265,7 @@ impl TransportMultiplex {
         spec: Url,
     ) -> TransportResult<()> {
         let span = Lib3hSpan::todo();
-        let follower = span.follower_span("handle_bind");
+        let follower = span.follower("handle_bind");
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
             span,
@@ -291,15 +291,15 @@ impl TransportMultiplex {
     fn handle_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        address: Url,
+        uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
         let span = Lib3hSpan::todo();
-        let follower = span.follower_span("handle_send_message");
+        let follower = span.follower("handle_send_message");
         // forward the request to our inner_transport
         self.inner_transport.as_mut().request(
             span,
-            RequestToChild::SendMessage { address, payload },
+            RequestToChild::SendMessage { uri, payload },
             Box::new(|_, response| {
                 let response = {
                     match response {
