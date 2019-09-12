@@ -10,7 +10,7 @@ use crate::{
     engine::{
         p2p_protocol::*, ChainId, RealEngine, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
-    error::Lib3hResult,
+    error::{Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
     transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
@@ -56,7 +56,7 @@ impl TransportKeys {
 //        // Generate keys
 //        // TODO #209 - Check persistence first before generating
 //        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-//        // Generate DHT config and create network_gateway
+//        // Generate DHT config and create multiplexer
 //        let dht_config = DhtConfig {
 //            this_peer_address: transport_keys.transport_id.clone(),
 //            this_peer_uri: binding,
@@ -64,7 +64,7 @@ impl TransportKeys {
 //            gossip_interval: config.dht_gossip_interval,
 //            timeout_threshold: config.dht_timeout_threshold,
 //        };
-//        let network_gateway = GatewayParentWrapperDyn::new(P2pGateway::new(
+//        let multiplexer = GatewayParentWrapperDyn::new(P2pGateway::new(
 //            NETWORK_GATEWAY_ID,
 //            network_transport.clone(),
 //            dht_factory,
@@ -79,7 +79,7 @@ impl TransportKeys {
 //            dht_factory,
 //            request_track: Tracker::new("real_engine_", 2000),
 //            network_transport,
-//            network_gateway,
+//            multiplexer,
 //            network_connections: HashSet::new(),
 //            space_gateway_map: HashMap::new(),
 //            transport_keys,
@@ -147,20 +147,17 @@ impl RealEngine {
         // Create DhtConfig
         let dht_config =
             DhtConfig::with_real_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
-        // Create network gateway
-        let network_gateway = Detach::new(GatewayParentWrapper::new(
-            P2pGateway::new(
+        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        let multiplexer = Detach::new(GatewayParentWrapper::new(
+            TransportMultiplex::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
                 memory_network_endpoint,
                 dht_factory,
                 &dht_config,
-            ),
-            "network_gateway_",
+            )),
+            "to_multiplexer_",
         ));
-        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-        // TODO: put network_gateway within multiplexer instead
-        let multiplexer = TransportMultiplex::new(Box::new(memory_transport));
         let mut real_engine = RealEngine {
             crypto,
             config,
@@ -169,7 +166,6 @@ impl RealEngine {
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
             multiplexer,
-            network_gateway,
             this_net_peer,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
@@ -230,7 +226,7 @@ impl NetworkEngine for RealEngine {
         // Process all received Lib3hClientProtocol messages from Core
         let (inbox_did_work, mut outbox) = self.process_inbox()?;
         // Process the network layer
-        let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
+        let (net_did_work, mut net_outbox) = self.process_multiplexer()?;
         outbox.append(&mut net_outbox);
         // Process the space layer
         let mut p2p_output = self.process_space_gateways()?;
@@ -281,7 +277,7 @@ impl RealEngine {
         //                }
         //            }
         //        }
-        //        self.network_gateway
+        //        self.multiplexer
         //            .as_transport_mut()
         //            .close_all()
         //            .map_err(|e| {
@@ -337,10 +333,10 @@ impl RealEngine {
                     },
                 );
                 // TODO: Figure out how we want to handle Connect and ConnectResult with GhostEngine
-                self.network_gateway.publish(cmd)?;
+                self.multiplexer.publish(cmd)?;
                 //                // Convert into TransportCommand & post to network gateway
                 //                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
-                //                self.network_gateway.as_transport_mut().post(cmd)?;
+                //                self.multiplexer.as_transport_mut().post(cmd)?;
             }
             Lib3hClientProtocol::JoinSpace(msg) => {
                 let mut output = self.serve_JoinSpace(&msg)?;
@@ -682,6 +678,8 @@ impl RealEngine {
         // Create new space gateway for this ChainId
         let uniplex_endpoint = Detach::new(
             self.multiplexer
+                .as_mut()
+                .as_mut()
                 .create_agent_space_route(&join_msg.space_address, &agent_id.into())
                 .as_context_endpoint_builder()
                 .build::<P2pGateway, Lib3hTrace>(),
@@ -710,7 +708,7 @@ impl RealEngine {
             space_address,
             peer.peer_address,
         );
-        self.network_gateway
+        self.multiplexer
             .publish(GatewayRequestToChild::SendAll(payload))?;
         // TODO END
 
@@ -863,9 +861,17 @@ impl RealEngine {
     }
 }
 
-pub fn handle_gossipTo(
+pub fn handle_gossipTo<
+    G: GhostActor<
+        GatewayRequestToParent,
+        GatewayRequestToParentResponse,
+        GatewayRequestToChild,
+        GatewayRequestToChildResponse,
+        Lib3hError,
+    >,
+>(
     gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>,
+    gateway: &mut GatewayParentWrapper<RealEngine, Lib3hTrace, G>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(

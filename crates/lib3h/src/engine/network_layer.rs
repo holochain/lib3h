@@ -20,19 +20,19 @@ use url::Url;
 /// Network layer related private methods
 impl RealEngine {
     /// Process whatever the network has in for us.
-    pub(crate) fn process_network_gateway(
+    pub(crate) fn process_multiplexer(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network gateway
-        detach_run!(&mut self.network_gateway, |ng| ng.process(self))?;
-        for mut request in self.network_gateway.drain_messages() {
+        detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
+        for mut request in self.multiplexer.drain_messages() {
             let payload = request.take_message().expect("exists");
             let mut output = self.handle_network_request(payload)?;
             outbox.append(&mut output);
         }
         //        // FIXME: DHT magic
-        //        let mut temp = self.network_gateway.drain_dht_outbox();
+        //        let mut temp = self.multiplexer.drain_dht_outbox();
         //        self.temp_outbox.append(&mut temp);
         // Done
         Ok((true /* fixme */, outbox))
@@ -64,8 +64,8 @@ impl RealEngine {
         let outbox = Vec::new();
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(NETWORK_GATEWAY_ID, &mut self.network_gateway, gossip_data)
-                    .expect("Failed to gossip with network_gateway");
+                handle_gossipTo(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
+                    .expect("Failed to gossip with multiplexer");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
@@ -83,7 +83,7 @@ impl RealEngine {
                         payload: Opaque::new(),
                     },
                 );
-                self.network_gateway.publish(cmd)?;
+                self.multiplexer.publish(cmd)?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
@@ -166,7 +166,7 @@ impl RealEngine {
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // Get list of known peers
         let uri_copy = net_uri.clone();
-        self.network_gateway
+        self.multiplexer
             .request(
                 Lib3hTrace,
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
@@ -203,14 +203,13 @@ impl RealEngine {
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                                me.network_gateway
-                                    .publish(GatewayRequestToChild::Transport(
-                                        transport::protocol::RequestToChild::SendMessage {
-                                            uri: Url::parse(&peer_data.peer_address)
-                                                .expect("invalid url format"),
-                                            payload: payload.into(),
-                                        },
-                                    ))?;
+                                me.multiplexer.publish(GatewayRequestToChild::Transport(
+                                    transport::protocol::RequestToChild::SendMessage {
+                                        uri: Url::parse(&peer_data.peer_address)
+                                            .expect("invalid url format"),
+                                        payload: payload.into(),
+                                    },
+                                ))?;
                             }
                         }
                     // TODO END
@@ -251,9 +250,9 @@ impl RealEngine {
                     from_peer_address: msg.from_peer_address.clone().into(),
                     bundle: msg.bundle.clone(),
                 };
-                // Check if its for the network_gateway
+                // Check if its for the multiplexer
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    let _ = self.network_gateway.publish(GatewayRequestToChild::Dht(
+                    let _ = self.multiplexer.publish(GatewayRequestToChild::Dht(
                         DhtRequestToChild::HandleGossip(gossip),
                     ));
                 } else {

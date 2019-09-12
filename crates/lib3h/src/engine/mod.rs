@@ -103,11 +103,9 @@ pub struct RealEngine {
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
 
-    multiplexer: TransportMultiplex,
-    // Should be owned by multiplexer
-    // TODO #176: Remove this if we resolve #176 without it.
-    /// P2p gateway for the network layer
-    network_gateway: Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>,
+    /// holds our network gateway and allows connecting routes to space gateways
+    multiplexer:
+        Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, TransportMultiplex<P2pGateway>>>,
 
     /// Cached this_peer of the network_gateway
     this_net_peer: PeerData,
