@@ -1,5 +1,5 @@
 
-use crate::current_timestamp;
+use super::current_timestamp;
 use crate::simchat::{ChatEvent, SimChatMessage};
 use lib3h_protocol::{
     data_types::{QueryEntryData, QueryEntryResultData},

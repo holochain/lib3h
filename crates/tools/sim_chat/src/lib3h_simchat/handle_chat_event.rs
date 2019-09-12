@@ -1,7 +1,7 @@
 
-use crate::current_timestamp;
-use crate::Lib3hSimChatState;
-use crate::channel_address_from_string;
+use super::current_timestamp;
+use super::Lib3hSimChatState;
+use super::channel_address_from_string;
 use crate::simchat::{ChatEvent, SimChatMessage};
 use lib3h::error::Lib3hError;
 use lib3h_ghost_actor::{
@@ -137,9 +137,9 @@ pub fn handle_chat_event(
             }
         },
 
-        ChatEvent::SendChannelMessage{..} => {
+        // ChatEvent::SendChannelMessage{..} => {
 
-        }
+        // }
 
         _ => {}
     }

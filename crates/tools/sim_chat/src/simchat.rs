@@ -22,14 +22,14 @@ pub enum ChatEvent {
         channel_id: String,
         space_data: SpaceData,
     },
-    RetrieveChannelMessages { // retrieve any messages found within this time box
-        start_time: u64,
-        end_time: u64,
-    },
-    SendChannelMessage {
-        payload: String,
-    },
-    ReceiveChannelMessage(SimChatMessage),
+    // RetrieveChannelMessages { // retrieve any messages found within this time box
+    //     start_time: u64,
+    //     end_time: u64,
+    // },
+    // SendChannelMessage {
+    //     payload: String,
+    // },
+    // ReceiveChannelMessage(SimChatMessage),
     Part(String),
     PartSuccess(String),
     Disconnected,

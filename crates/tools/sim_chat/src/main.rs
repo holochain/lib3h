@@ -1,9 +1,12 @@
 //! SimChat Command Line Utility / Manual Testing CLI
 
+mod simchat;
+mod lib3h_simchat;
+
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use lib3h_sim_chat::{simchat::SimChat, ChatEvent, SimChatMessage};
+use crate::simchat::{SimChat, ChatEvent, SimChatMessage};
 use regex::Regex;
 use url::Url;
 
@@ -40,7 +43,7 @@ fn main() {
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
-    let mut cli = lib3h_sim_chat::Lib3hSimChat::new(
+    let mut cli = lib3h_simchat::Lib3hSimChat::new(
         engine_builder,
         Box::new(move |event| {
             match event {
