@@ -100,7 +100,11 @@ impl MapRecord {
                 .iter()
                 .filter_map(|a_sec| {
                     if a_sec.answer_class == 1 && a_sec.answer_type == 5 {
-                        Some(Record::new(&a_sec.domain_name, &a_sec.data.target, a_sec.ttl))
+                        Some(Record::new(
+                            &a_sec.domain_name,
+                            &a_sec.data.target,
+                            a_sec.ttl,
+                        ))
                     } else {
                         None
                     }

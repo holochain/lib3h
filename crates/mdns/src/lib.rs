@@ -278,7 +278,9 @@ impl MulticastDns {
                     // Here we update our cache with the responses gathered from the network
                     if dmesg.nb_answers > 0 {
                         if let Some(new_map_record) = MapRecord::from_dns_message(&dmesg) {
-                            let own_networkids: Vec<String> = self.own_networkids().iter()
+                            let own_networkids: Vec<String> = self
+                                .own_networkids()
+                                .iter()
                                 .map(|v| v.to_string())
                                 .collect();
 
@@ -286,7 +288,8 @@ impl MulticastDns {
                             for (netid, new_records) in new_map_record.iter() {
                                 // Let's only operate on the networks we belong to
                                 if own_networkids.contains(netid) {
-                                    let tmp_new_map_record = MapRecord::with_record(netid, new_records);
+                                    let tmp_new_map_record =
+                                        MapRecord::with_record(netid, new_records);
                                     self.update_cache(&tmp_new_map_record);
                                 }
                             }
@@ -310,7 +313,8 @@ impl MulticastDns {
                                 } else {
                                     None
                                 }
-                            }).collect();
+                            })
+                            .collect();
                         if let Some(response) =
                             self.own_map_record.to_dns_response_message(&question_list)
                         {
@@ -441,7 +445,6 @@ impl Discovery for MulticastDns {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
