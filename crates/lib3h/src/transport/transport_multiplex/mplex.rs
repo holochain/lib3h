@@ -21,7 +21,9 @@ pub struct TransportMultiplex {
     inner_transport: Detach<TransportActorParentWrapperDyn<TransportMultiplex, Lib3hTrace>>,
     // our map of endpoints connecting us to our Routes
     route_endpoints:
-        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
+    Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
+    // cached binding
+    maybe_bind: Option<Url>,
 }
 
 impl TransportMultiplex {
@@ -44,6 +46,7 @@ impl TransportMultiplex {
             endpoint_self,
             inner_transport,
             route_endpoints: Detach::new(HashMap::new()),
+            maybe_bind: None,
         }
     }
 
@@ -298,6 +301,36 @@ impl TransportMultiplex {
             }),
         )?;
         Ok(())
+    }
+
+   pub fn boot(&mut self, spec: Url) -> TransportResult<Option<Url>> {
+
+        // Bind & create this_net_peer
+        let _res = self.inner_transport.request(
+            Lib3hTrace,
+            RequestToChild::Bind {
+                spec
+            },
+            Box::new(|mut me, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let RequestToChildResponse::Bind(bind_data) = response {
+                    me.maybe_bind = Some(bind_data.bound_url);
+                } else {
+                    panic!("bad response to bind: {:?}", response);
+                }
+                Ok(())
+            }),
+        );
+       detach_run!(&mut self.inner_transport, |t| { t.process(self) })?;
+       Ok(self.maybe_bind.clone())
     }
 }
 

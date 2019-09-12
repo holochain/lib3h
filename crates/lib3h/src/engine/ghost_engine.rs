@@ -128,9 +128,23 @@ impl<'engine> GhostEngine<'engine> {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let mut memory_transport = GhostTransportMemory::new();
-        let mut memory_network_endpoint = Detach::new(
-            memory_transport
+        let mut multiplexer = TransportMultiplex::new(Box::new(GhostTransportMemory::new()));
+        let peer_uri = multiplexer.boot(config.bind_url.clone())?.unwrap();
+
+        let this_net_peer = PeerData {
+            peer_address: format!("{}_tId", name),
+            peer_uri: peer_uri.clone(),
+            timestamp: 0, // TODO #166
+        };
+        // Create DhtConfig
+        let dht_config = DhtConfig::with_real_engine_config(
+            &format!("{}_tId", name),
+            &peer_uri,
+            &config,
+        );
+
+        let multiplexer_endpoint = Detach::new(
+            multiplexer
                 .take_parent_endpoint()
                 .expect("exists")
                 .as_context_endpoint_builder()
@@ -138,57 +152,18 @@ impl<'engine> GhostEngine<'engine> {
                 .build::<GatewayUserData, Lib3hTrace>(),
         );
 
-        // Bind & create this_net_peer
-        let mut gateway_ud = GatewayUserData::new();
-        let _res = memory_network_endpoint.request(
-            Lib3hTrace,
-            transport::protocol::RequestToChild::Bind {
-                spec: config.bind_url.clone(),
-            },
-            Box::new(|mut ud, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
-                    }
-                };
-                if let transport::protocol::RequestToChildResponse::Bind(bind_data) = response {
-                    ud.binding = bind_data.bound_url;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
-        memory_transport.process()?;
-        memory_network_endpoint.process(&mut gateway_ud)?;
-        let this_net_peer = PeerData {
-            peer_address: format!("{}_tId", name),
-            peer_uri: gateway_ud.binding.clone(),
-            timestamp: 0, // TODO #166
-        };
-        // Create DhtConfig
-        let dht_config = DhtConfig::with_real_engine_config(
-            &format!("{}_tId", name),
-            &gateway_ud.binding,
-            &config,
-        );
         // Create network gateway
         let network_gateway = GatewayParentWrapperDyn::new(
             Box::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
-                memory_network_endpoint,
+                multiplexer_endpoint,
                 dht_factory,
                 &dht_config,
             )),
             "network_gateway_",
         );
-        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
+        debug!("New GhostEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-        let multiplexer = TransportMultiplex::new(Box::new(memory_transport));
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let mut engine = GhostEngine {
             crypto,
