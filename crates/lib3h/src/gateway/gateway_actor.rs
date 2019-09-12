@@ -34,7 +34,7 @@ impl
         }
 
         // Process internal dht & handle requests
-        let _res = self.inner_dht.process(&mut self.user_data);
+        detach_run!(self.inner_dht, |dht| { dht.process(self) })?;
         for request in self.inner_dht.drain_messages() {
             self.handle_dht_RequestToParent(request);
         }

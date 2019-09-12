@@ -21,11 +21,11 @@ pub struct P2pGateway {
         transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, Lib3hTrace>,
     >,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>,
+    inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway, Lib3hTrace>>,
     // Cache
     this_peer: PeerData,
     // user data for ghost callback
-    user_data: GatewayUserData,
+    pub user_data: GatewayUserData,
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,

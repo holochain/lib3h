@@ -5,10 +5,7 @@ use crate::{
     engine::p2p_protocol::P2pProtocol,
     error::*,
     gateway::{protocol::*, P2pGateway},
-    transport::{
-        self,
-        error::{TransportError, TransportResult},
-    },
+    transport::{self, error::TransportResult},
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_tracing::Lib3hTrace;
@@ -16,36 +13,8 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-#[derive(Debug)]
-pub enum TransportContext {
-    Bind {
-        maybe_parent_msg: Option<transport::protocol::ToChildMessage>,
-    },
-    SendMessage {
-        maybe_parent_msg: Option<transport::protocol::ToChildMessage>,
-    },
-}
-
 /// Private internals
 impl P2pGateway {
-    /// Get Uris from DHT peer_address'
-    pub(crate) fn address_to_uri(&mut self, address_list: &[&str]) -> TransportResult<Vec<Url>> {
-        let mut uri_list = Vec::with_capacity(address_list.len());
-        for address in address_list {
-            let maybe_peer = self.get_peer_sync(address);
-            match maybe_peer {
-                None => {
-                    return Err(TransportError::new(format!(
-                        "Unknown peerAddress: {}",
-                        address
-                    )));
-                }
-                Some(peer) => uri_list.push(peer.peer_uri),
-            }
-        }
-        Ok(uri_list)
-    }
-
     /// Handle IncomingConnection event from child transport
     fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
         // Send to other node our PeerAddress
@@ -69,7 +38,7 @@ impl P2pGateway {
         Ok(())
     }
 
-    /// id_list =
+    /// uri =
     ///   - Network : transportId
     ///   - space   : agentId
     fn send(
@@ -160,13 +129,34 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
-                // TODO Change `address_to_uri()` to an async actor model call
-                // and have it handle just one address
-                // uri is actually a dht peerAddress
+                // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
-                let dht_uri_list = self.address_to_uri(&[&uri.to_string()])?;
-                let dht_uri = &dht_uri_list[0];
-                self.send(dht_uri, &payload, Some(parent_request))?;
+                self.inner_dht.request(
+                    Lib3hTrace,
+                    DhtRequestToChild::RequestPeer(uri.to_string()),
+                    Box::new(move |me, response| {
+                        let response = {
+                            match response {
+                                GhostCallbackData::Timeout => panic!("timeout"),
+                                GhostCallbackData::Response(response) => match response {
+                                    Err(e) => panic!("{:?}", e),
+                                    Ok(response) => response,
+                                },
+                            }
+                        };
+                        if let DhtRequestToChildResponse::RequestPeer(maybe_peer_data) = response {
+                            return if let Some(peer_data) = maybe_peer_data {
+                                me.send(&peer_data.peer_uri, &payload, Some(parent_request))
+                                    .unwrap(); // FIXME unwrap
+                                Ok(())
+                            } else {
+                                panic!("no peer found");
+                            };
+                        } else {
+                            panic!("bad response to RequestPeer: {:?}", response);
+                        }
+                    }),
+                )?;
             }
         }
         // Done
