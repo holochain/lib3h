@@ -10,7 +10,7 @@ use crate::{
         p2p_protocol::P2pProtocol, ChainId, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    gateway::{protocol::*, GatewayUserData, P2pGateway},
+    gateway::{protocol::*, P2pGateway},
     track::Tracker,
     transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
 };
@@ -49,17 +49,18 @@ pub struct GhostEngine<'engine> {
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
-    // TODO #176: Remove this if we resolve #176 without it.
-    multiplexer: TransportMultiplex,
     /// P2p gateway for the network layer
-    network_gateway: GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>,
-    /// Cached this_peer of the network_gateway
+    multiplexer: Detach<
+        GatewayParentWrapper<GhostEngine<'engine>, Lib3hTrace, TransportMultiplex<P2pGateway>>,
+    >,
+    /// Cached this_peer of the multiplexer
     this_net_peer: PeerData,
 
     /// Store active connections?
     network_connections: HashSet<Url>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>>,
+    space_gateway_map:
+        HashMap<ChainId, GatewayParentWrapper<GhostEngine<'engine>, Lib3hTrace, P2pGateway>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
@@ -68,8 +69,6 @@ pub struct GhostEngine<'engine> {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
-
-    gateway_user_data: GatewayUserData,
 
     client_endpoint: Option<
         GhostEndpoint<
@@ -118,19 +117,19 @@ impl<'engine> GhostEngine<'engine> {
         dht_factory: DhtFactory,
         mut transport: GhostTransportMemory, // FIXME: TEMPORARY hardcoded to memory
     ) -> Lib3hResult<Self> {
-        let mut memory_network_endpoint = Detach::new(
+        let memory_network_endpoint = Detach::new(
             transport
                 .take_parent_endpoint()
                 .expect("exists")
                 .as_context_endpoint_builder()
                 .request_id_prefix("tmem_to_child_")
-                .build::<GatewayUserData, Lib3hTrace>(),
+                .build::<P2pGateway, Lib3hTrace>(),
         );
 
+        /*
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
-        let mut gateway_ud = GatewayUserData::new();
-        let _res = memory_network_endpoint.request(
+        memory_network_endpoint.request(
             Lib3hTrace,
             transport::protocol::RequestToChild::Bind {
                 spec: config.bind_url.clone(),
@@ -152,34 +151,30 @@ impl<'engine> GhostEngine<'engine> {
                 }
                 Ok(())
             }),
-        );
+        )?;
         transport.process()?;
         memory_network_endpoint.process(&mut gateway_ud)?;
+        */
+        let fixme_binding = Url::parse("fixme::host:123").unwrap();
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
-            peer_uri: gateway_ud.binding.clone(),
+            peer_uri: fixme_binding.clone(),
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
-        let dht_config = DhtConfig::with_real_engine_config(
-            &format!("{}_tId", name),
-            &gateway_ud.binding,
-            &config,
-        );
-        // Create network gateway
-        let network_gateway = GatewayParentWrapperDyn::new(
-            Box::new(P2pGateway::new(
+        let dht_config =
+            DhtConfig::with_real_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
+        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        let multiplexer = Detach::new(GatewayParentWrapper::new(
+            TransportMultiplex::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
                 memory_network_endpoint,
                 dht_factory,
                 &dht_config,
             )),
-            "network_gateway_",
-        );
-        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
-        // TODO: put network_gateway within multiplexer instead
-        let multiplexer = TransportMultiplex::new(Box::new(network_gateway));
+            "to_multiplexer_",
+        ));
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let mut engine = GhostEngine {
             crypto,
@@ -188,13 +183,11 @@ impl<'engine> GhostEngine<'engine> {
             dht_factory,
             request_track: Tracker::new("real_engine_", 2000),
             multiplexer,
-            network_gateway,
             this_net_peer,
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
-            gateway_user_data: GatewayUserData::new(),
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -220,79 +213,13 @@ impl<'engine> GhostEngine<'engine> {
         Ok(())
     }
 
-    ///
-    pub fn get_this_peer_sync(&mut self, maybe_chain_id: Option<ChainId>) -> PeerData {
-        trace!("engine.get_this_peer_sync() ...");
-        let gateway = if let Some(chain_id) = maybe_chain_id {
-            self.space_gateway_map
-                .get_mut(&chain_id)
-                .expect("Should have the space gateway")
-        } else {
-            &mut self.network_gateway
-        };
-        gateway
-            .request(
-                Lib3hTrace,
-                GatewayRequestToChild::Dht(DhtRequestToChild::RequestThisPeer),
-                Box::new(|mut ud, response| {
-                    let response = {
-                        match response {
-                            GhostCallbackData::Timeout => panic!("timeout"),
-                            GhostCallbackData::Response(response) => match response {
-                                Err(e) => panic!("{:?}", e),
-                                Ok(response) => response,
-                            },
-                        }
-                    };
-                    if let GatewayRequestToChildResponse::Dht(
-                        DhtRequestToChildResponse::RequestThisPeer(peer_response),
-                    ) = response
-                    {
-                        ud.this_peer = peer_response;
-                    } else {
-                        panic!("bad response to bind: {:?}", response);
-                    }
-                    Ok(())
-                }),
-            )
-            .expect("sync functions should work");
-        gateway.process(&mut self.gateway_user_data).unwrap(); // FIXME unwrap
-        self.gateway_user_data.this_peer.clone()
-    }
-
-    ///
-    pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
-        trace!("engine.get_peer_list_sync() ...");
-        self.network_gateway
-            .request(
-                Lib3hTrace,
-                GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
-                Box::new(|mut ud, response| {
-                    let response = {
-                        match response {
-                            GhostCallbackData::Timeout => panic!("timeout"),
-                            GhostCallbackData::Response(response) => match response {
-                                Err(e) => panic!("{:?}", e),
-                                Ok(response) => response,
-                            },
-                        }
-                    };
-                    if let GatewayRequestToChildResponse::Dht(
-                        DhtRequestToChildResponse::RequestPeerList(peer_list_response),
-                    ) = response
-                    {
-                        ud.peer_list = peer_list_response;
-                    } else {
-                        panic!("bad response to bind: {:?}", response);
-                    }
-                    Ok(())
-                }),
-            )
-            .expect("sync functions should work");
-        self.network_gateway
-            .process(&mut self.gateway_user_data)
-            .unwrap(); // FIXME unwrap
-        self.gateway_user_data.peer_list.clone()
+    pub fn this_space_peer(&mut self, chain_id: ChainId) -> PeerData {
+        trace!("engine.this_space_peer() ...");
+        let space_gateway = self
+            .space_gateway_map
+            .get_mut(&chain_id)
+            .expect("No space at chainId");
+        space_gateway.as_mut().this_peer()
     }
 }
 
@@ -334,7 +261,7 @@ impl<'engine>
 
         /*
                 let outbox: Vec<Lib3hServerProtocol> = Vec::new();
-                let (net_did_work, mut net_outbox) = self.process_network_gateway()?;
+                let (net_did_work, mut net_outbox) = self.process_multiplexer()?;
                 outbox.append(&mut net_outbox);
                 // Process the space layer
                 let mut p2p_output = self.process_space_gateways()?;
@@ -374,7 +301,7 @@ impl<'engine> GhostEngine<'engine> {
         //                }
         //            }
         //        }
-        //        self.network_gateway
+        //        self.multiplexer
         //            .as_transport_mut()
         //            .close_all()
         //            .map_err(|e| {
@@ -391,7 +318,7 @@ impl<'engine> GhostEngine<'engine> {
                 uri: data.peer_uri,
                 payload: Opaque::new(),
             });
-        self.network_gateway.publish(cmd)
+        self.multiplexer.publish(cmd)
     }
 
     /// Process any Client events or requests
@@ -465,17 +392,19 @@ impl<'engine> GhostEngine<'engine> {
         // Create new space gateway for this ChainId
         let uniplex_endpoint = Detach::new(
             self.multiplexer
+                .as_mut()
+                .as_mut()
                 .create_agent_space_route(&space_address, &agent_id)
                 .as_context_endpoint_builder()
-                .build::<GatewayUserData, Lib3hTrace>(),
+                .build::<P2pGateway, Lib3hTrace>(),
         );
-        let new_space_gateway = GatewayParentWrapperDyn::new(
-            Box::new(P2pGateway::new_with_space(
+        let new_space_gateway = GatewayParentWrapper::new(
+            P2pGateway::new_with_space(
                 &space_address,
                 uniplex_endpoint,
                 self.dht_factory,
                 &dht_config,
-            )),
+            ),
             "space_gateway_",
         );
         self.space_gateway_map
@@ -497,7 +426,7 @@ impl<'engine> GhostEngine<'engine> {
             peer.peer_address,
         );
         let _result = self
-            .network_gateway
+            .multiplexer
             .publish(GatewayRequestToChild::SendAll(payload));
         // TODO END
     }
@@ -644,7 +573,7 @@ impl<'engine> GhostEngine<'engine> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
-        let this_peer = self.get_this_peer_sync(Some(chain_id.clone()));
+        let this_peer = self.this_space_peer(chain_id.clone());
         self.broadcast_join(join_msg.space_address.clone(), this_peer.clone());
 
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
@@ -736,10 +665,7 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<()> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
 
-        let this_peer = {
-            // Check if messaging self
-            self.get_this_peer_sync(Some(chain_id.clone()))
-        };
+        let this_peer = self.this_space_peer(chain_id.clone());
 
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if &this_peer.peer_address == &to_agent_id {
@@ -857,7 +783,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         space_address: &Address,
         agent_id: &Address,
-    ) -> Lib3hResult<&mut GatewayParentWrapperDyn<GatewayUserData, Lib3hTrace>> {
+    ) -> Lib3hResult<&mut GatewayParentWrapper<GhostEngine<'engine>, Lib3hTrace, P2pGateway>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
             .ok_or_else(|| {
