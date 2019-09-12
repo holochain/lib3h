@@ -303,8 +303,14 @@ impl MulticastDns {
                         let question_list: Vec<&str> = dmesg
                             .questions
                             .iter()
-                            .map(|q| q.domain_name.as_str())
-                            .collect();
+                            .filter_map(|q| {
+                                // Filter out all the queries that are not INET + CNAME
+                                if q.query_class == 1 && q.query_type == 5 {
+                                    Some(q.domain_name.as_str())
+                                } else {
+                                    None
+                                }
+                            }).collect();
                         if let Some(response) =
                             self.own_map_record.to_dns_response_message(&question_list)
                         {
