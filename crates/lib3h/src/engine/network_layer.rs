@@ -184,37 +184,37 @@ impl RealEngine {
                         DhtRequestToChildResponse::RequestPeerList(peer_list),
                     ) = response
                     {
-                        // TODO #150 - Should do this in next process instead
-                        // Send to other node our Joined Spaces
-                        {
+        // TODO #150 - Should do this in next process instead
+        // Send to other node our Joined Spaces
+        {
                             let space_list = me.get_all_spaces();
-                            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-                            let mut payload = Vec::new();
-                            our_joined_space_list
-                                .serialize(&mut Serializer::new(&mut payload))
-                                .unwrap();
-                            trace!(
-                                "AllJoinedSpaceList: {:?} to {:?}",
-                                our_joined_space_list,
+            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+            let mut payload = Vec::new();
+            our_joined_space_list
+                .serialize(&mut Serializer::new(&mut payload))
+                .unwrap();
+            trace!(
+                "AllJoinedSpaceList: {:?} to {:?}",
+                our_joined_space_list,
                                 uri_copy,
-                            );
-                            // we need a transportId, so search for it in the DHT
+            );
+            // we need a transportId, so search for it in the DHT
                             let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
-                            if let Some(peer_data) = maybe_peer_data {
-                                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+            if let Some(peer_data) = maybe_peer_data {
+                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                                 me.network_gateway
-                                    .publish(GatewayRequestToChild::Transport(
-                                        transport::protocol::RequestToChild::SendMessage {
-                                            uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
-                                            payload: payload.into(),
-                                        },
-                                    ))?;
-                            }
+                    .publish(GatewayRequestToChild::Transport(
+                        transport::protocol::RequestToChild::SendMessage {
+                            uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
+                            payload: payload.into(),
+                        },
+                    ))?;
+            }
                         }
-                        // TODO END
+            // TODO END
                     } else {
                         panic!("bad response to RequestPeerList: {:?}", response);
-                    }
+        }
                     Ok(())
                 }),
             )

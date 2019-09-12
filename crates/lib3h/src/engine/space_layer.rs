@@ -4,9 +4,10 @@ use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
     engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
-    gateway::protocol::*,
+    gateway::{protocol::*, P2pGateway},
 };
 use detach::prelude::*;
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
@@ -38,7 +39,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<&mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>> {
+    ) -> Option<&mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -57,7 +58,7 @@ impl RealEngine {
         let mut space_outbox_map = HashMap::new();
         let mut space_gateway_map: HashMap<
             ChainId,
-            Detach<GatewayParentWrapperDyn<RealEngine, Lib3hTrace>>,
+            Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap

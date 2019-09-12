@@ -331,14 +331,43 @@ impl<
             .build();
         Self { actor, endpoint }
     }
+}
 
+impl<
+        UserData,
+        TraceContext: 'static + CanTrace,
+        RequestToParent: 'static,
+        RequestToParentResponse: 'static,
+        RequestToChild: 'static,
+        RequestToChildResponse: 'static,
+        Error: 'static,
+    >
+    GhostCanTrack<
+        UserData,
+        TraceContext,
+        RequestToChild,
+        RequestToChildResponse,
+        RequestToParent,
+        RequestToParentResponse,
+        Error,
+    >
+    for GhostParentWrapperDyn<
+        UserData,
+        TraceContext,
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        Error,
+    >
+{
     /// see GhostContextEndpoint::publish
-    pub fn publish(&mut self, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(payload)
     }
 
     /// see GhostContextEndpoint::request
-    pub fn request(
+    fn request(
         &mut self,
         trace_context: TraceContext,
         payload: RequestToChild,
@@ -347,7 +376,7 @@ impl<
         self.endpoint.request(trace_context, payload, cb)
     }
 
-    pub fn request_options(
+    fn request_options(
         &mut self,
         trace_context: TraceContext,
         payload: RequestToChild,
@@ -359,14 +388,14 @@ impl<
     }
 
     /// see GhostContextEndpoint::drain_messages
-    pub fn drain_messages(
+    fn drain_messages(
         &mut self,
     ) -> Vec<GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, Error>> {
         self.endpoint.drain_messages()
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    pub fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
         self.actor.process()?;
         self.endpoint.process(user_data)?;
         Ok(())
