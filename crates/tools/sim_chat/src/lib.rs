@@ -12,7 +12,7 @@ extern crate lib3h_tracing;
 
 pub mod simchat;
 mod lib3h_simchat;
-use lib3h_simchat::handle_chat_event;
+use lib3h_simchat::{handle_chat_event, handle_and_convert_lib3h_event};
 pub use simchat::{ChatEvent, SimChat, SimChatMessage};
 
 use lib3h::error::Lib3hError;
@@ -21,7 +21,7 @@ use lib3h_ghost_actor::{
     GhostActor, GhostCanTrack, GhostContextEndpoint,
 };
 use lib3h_protocol::{
-    data_types::{ConnectData, SpaceData, QueryEntryData, QueryEntryResultData},
+    data_types::{ConnectData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
@@ -132,46 +132,9 @@ impl Lib3hSimChat {
                     let direct_chat_events = out_recv.try_iter();
                     let engine_chat_events = engine_chat_events
                         .into_iter()
-                        // process any that should be handled silently (without generating a chat event)
-                        .filter_map(|mut engine_message| {
-                            match engine_message.take_message() {
-                                Some(Lib3hToClient::HandleQueryEntry(QueryEntryData {
-                                    space_address,
-                                    entry_address,
-                                    request_id,
-                                    requester_agent_id,
-                                    query: _,
-                                })) => {
-                                    engine_message.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(QueryEntryResultData {
-                                        request_id,
-                                        entry_address,
-                                        requester_agent_id: requester_agent_id.clone(),
-                                        space_address: space_address.clone(),
-                                        responder_agent_id: requester_agent_id,
-                                        query_result: Vec::new().into(),
-                                    }))).ok();
-                                    None
-                                },
-                                Some(Lib3hToClient::HandleStoreEntryAspect{..}) => {
-                                    None
-                                },
-                                Some(Lib3hToClient::HandleGetAuthoringEntryList{..}) => {
-                                    None
-                                },
-                                Some(Lib3hToClient::HandleGetGossipingEntryList{..}) => {
-                                    None
-                                },
-                                Some(Lib3hToClient::HandleSendDirectMessage(message_data)) => {
-                                    Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
-                                        from_agent: message_data.from_agent_id.to_string(),
-                                        payload: "message from engine".to_string(),
-                                        timestamp: current_timestamp(),
-                                    }))
-                                }
-                                Some(Lib3hToClient::Disconnected(_)) => Some(ChatEvent::Disconnected),
-                                Some(_) => {None}, // event we don't care about
-                                None => {None}, // there was nothing in the message
-                            }
+                        // process lib3h messages and convert to a chat event if required
+                        .filter_map(|engine_message| {
+                            handle_and_convert_lib3h_event(engine_message)
                         });
 
                     // process all the chat events by calling the handler for all events
