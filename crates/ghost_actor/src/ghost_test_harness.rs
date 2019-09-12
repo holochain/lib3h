@@ -5,21 +5,22 @@ use predicates::prelude::*;
 use crate::GhostCallbackData;
 
 /// Represents all useful state after a single call to an ghost_actor's process function
-#[derive(Clone, Debug)]
-pub struct ProcessorResult<UserData, Context, Cb:'static, E:'static> {
+#[derive(Debug)]
+pub struct ProcessorResult<UserData, Cb:'static, E:'static> {
     /// Whether the ghost_actor reported doing work or not
     pub did_work: bool,
     /// All events produced by the last call to process for ghost_actor
-    pub events: Vec<(UserData, Context, GhostCallbackData<Cb, E>)>,
+    pub callback_data : GhostCallbackData<Cb, E>,
     /// All previously processed results
-    pub previous: Vec<ProcessorResult<UserData, Context, Cb, E>>,
+    pub previous: Vec<ProcessorResult<UserData, Cb, E>>,
+    pub user_data : UserData
 }
 
 /// An assertion style processor which provides a
 /// predicate over ProcessorResult (the eval function) and a
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
-pub trait Processor<UserData, Context, Cb:'static, E:'static>: Predicate<ProcessorResult<UserData, Context, Cb, E>> {
+pub trait Processor<UserData, Cb:'static, E:'static>: Predicate<ProcessorResult<UserData, Cb, E>> {
     /// Processor name, for debugging and mapping purposes
     fn name(&self) -> String {
         "default_processor".into()
@@ -27,46 +28,44 @@ pub trait Processor<UserData, Context, Cb:'static, E:'static>: Predicate<Process
 
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
-    fn test(&self, args: &ProcessorResult<UserData, Context, Cb, E>);
+    fn test(&self, args: &ProcessorResult<UserData, Cb, E>);
 }
 
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
-pub trait AssertEquals<UserData, Context, Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> {
+pub trait AssertEquals<UserData, Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> {
     /// User defined function for extracting a collection data of a specific
     /// type from the proessor arguments
-    fn extracted(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> Vec<T>;
+    fn extracted(&self, args: &ProcessorResult<UserData, Cb, E>) -> Option<T>;
 
     /// The expected value to compare to the actual value to
-    fn expected(&self) -> T;
+    fn expected(&self) -> &T;
 }
 
-impl<UserData, Context, Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> std::fmt::Display for dyn AssertEquals<UserData, Context, Cb, E, T> {
+impl<UserData, Cb:'static, E:'static, T: PartialEq + std::fmt::Debug> std::fmt::Display for dyn AssertEquals<UserData, Cb, E, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", "assert_equals")
     }
 }
 
-impl<UserData, Context, Cb:'static, E:'static, T> predicates::reflection::PredicateReflection for dyn AssertEquals<UserData, Context, Cb, E, T> where
+impl<UserData, Cb:'static, E:'static, T> predicates::reflection::PredicateReflection for dyn AssertEquals<UserData, Cb, E, T> where
     T: PartialEq + std::fmt::Debug
 {
 }
 
-impl<UserData, Context, Cb:'static, E:'static, T> Predicate<ProcessorResult<UserData, Context, Cb, E>> for dyn AssertEquals<UserData, Context, Cb, E, T>
+impl<UserData, Cb:'static, E:'static, T> Predicate<ProcessorResult<UserData, Cb, E>> for dyn AssertEquals<UserData, Cb, E, T>
 where
     T: PartialEq + std::fmt::Debug,
 {
-    fn eval(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> bool {
-        let extracted = self.extracted(args);
-        extracted
-            .iter()
-            .find(|actual| **actual == self.expected())
-            .is_some()
+    fn eval(&self, args: &ProcessorResult<UserData, Cb, E>) -> bool {
+        self.extracted(args)
+            .map(|actual| &actual == self.expected())
+            .unwrap_or(false)
     }
 }
 
 /// Asserts some extracted data from ProcessorResult passes a predicate.  
-pub trait Assert<UserData, Context, Cb:'static, E:'static, T> {
-    fn extracted(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> Vec<T>;
+pub trait Assert<UserData, Cb:'static, E:'static, T> {
+    fn extracted(&self, args: &ProcessorResult<UserData, Cb, E>) -> Option<T>;
 
     fn assert_inner(&self, args: &T) -> bool;
 }
@@ -75,33 +74,30 @@ pub trait Assert<UserData, Context, Cb:'static, E:'static, T> {
 #[derive(PartialEq, Debug)]
 pub struct CallbackDataEquals<Cb>(pub Cb);
 
-impl<UserData, Context, Cb, E:'static> predicates::Predicate<ProcessorResult<UserData, Context, Cb, E>> for CallbackDataEquals<Cb>
+impl<UserData, Cb, E:'static> predicates::Predicate<ProcessorResult<UserData, Cb, E>> for CallbackDataEquals<Cb>
 where
     Cb: PartialEq + std::fmt::Debug + 'static
 {
-    fn eval(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> bool {
+    fn eval(&self, args: &ProcessorResult<UserData, Cb, E>) -> bool {
         self.extracted(args)
-            .iter()
-            .find(|actual| **actual == self.expected())
-            .is_some()
+            .map(|actual| &actual == self.expected())
+            .unwrap_or(false)
     }
 }
 
-impl<UserData, Context, Cb, E:'static> AssertEquals<UserData, Context, Cb, E, Cb> for CallbackDataEquals<Cb> 
+impl<UserData, Cb, E:'static> AssertEquals<UserData, Cb, E, Cb> for CallbackDataEquals<Cb> 
 where
     Cb: PartialEq + std::fmt::Debug + 'static
 {
-    fn extracted(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> Vec<Cb> {
-        args.events.iter().filter_map(
-            |(_, _, cb)| { 
-                match cb { 
-                    GhostCallbackData::Timeout => None, 
-                    GhostCallbackData::Response(cb) => Some(cb) 
-                } 
-            }).collect()
+    fn extracted(&self, args: &ProcessorResult<UserData, Cb, E>) -> Option<Cb> {
+        match args.callback_data {
+            GhostCallbackData::Timeout => None, 
+            GhostCallbackData::Response(Err(_err)) => None,
+            GhostCallbackData::Response(Ok(cb)) => Some(cb) 
+        } 
     }
-    fn expected(&self) -> Cb {
-        self.0
+    fn expected(&self) -> &Cb {
+        &self.0
     }
 }
 
@@ -113,12 +109,11 @@ where
     }
 }
 
-impl<UserData, Context, Cb, E:'static> Processor<UserData, Context, Cb, E> 
+impl<UserData, Cb, E:'static> Processor<UserData, Cb, E> 
     for CallbackDataEquals<Cb> where Cb : std::fmt::Debug + 'static + PartialEq {
-    fn test(&self, args: &ProcessorResult<UserData, Context, Cb, E>) {
-        let extracted = self.extracted(args);
-        let actual = extracted.iter().find(|actual| **actual == self.expected());
-        assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
+    fn test(&self, args: &ProcessorResult<UserData, Cb, E>) {
+        let actual = self.extracted(args);
+        assert_eq!(Some(*self.expected()), actual);
     }
 
     fn name(&self) -> String {
@@ -133,9 +128,13 @@ where Cb : std::fmt::Debug + 'static + PartialEq {}
 /// Asserts using an arbitrary predicate over a lib3h server protocol event
 pub struct CallbackDataAssert<Cb>(pub Box<dyn Predicate<Cb>>);
 
-impl<UserData, Context, Cb:'static, E:'static> Assert<UserData, Context, Cb, E, Cb> for CallbackDataAssert<Cb> {
-    fn extracted(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> Vec<Cb> {
-        args.events.iter().map(|(_, _, cb)| cb).collect()
+impl<UserData, Cb:'static, E:'static> Assert<UserData, Cb, E, Cb> for CallbackDataAssert<Cb> {
+    fn extracted(&self, args: &ProcessorResult<UserData, Cb, E>) -> Option<Cb> {
+        match args.callback_data {
+            GhostCallbackData::Timeout => None, 
+            GhostCallbackData::Response(Err(_err)) => None,
+            GhostCallbackData::Response(Ok(cb)) => Some(cb) 
+        } 
     }
 
     fn assert_inner(&self, cb: &Cb) -> bool {
@@ -144,16 +143,12 @@ impl<UserData, Context, Cb:'static, E:'static> Assert<UserData, Context, Cb, E, 
 }
 
 
-impl<UserData, Context, Cb:'static, E:'static> Processor<UserData, Context, Cb, E> for CallbackDataAssert<Cb> {
-    fn test(&self, args: &ProcessorResult<UserData, Context, Cb, E>) {
-        let extracted = self.extracted(args);
-        let actual = extracted
-            .iter()
-            .find(move |actual| self.assert_inner(*actual))
-            .or(extracted.first());
+impl<UserData, Cb:'static, E:'static> Processor<UserData, Cb, E> for CallbackDataAssert<Cb> {
+    fn test(&self, args: &ProcessorResult<UserData, Cb, E>) {
+        let actual = self.extracted(args);
 
         if let Some(actual) = actual {
-            assert!(self.assert_inner(actual));
+            assert!(self.assert_inner(&actual));
         } else {
             assert!(actual.is_some());
         }
@@ -164,13 +159,11 @@ impl<UserData, Context, Cb:'static, E:'static> Processor<UserData, Context, Cb, 
     }
 }
 
-impl<UserData, Context, Cb:'static, E:'static> Predicate<ProcessorResult<UserData, Context, Cb, E>> for CallbackDataAssert<Cb> {
-    fn eval(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> bool {
-        let extracted = self.extracted(args);
-        extracted
-            .iter()
-            .find(|actual| self.assert_inner(*actual))
-            .is_some()
+impl<UserData, Cb:'static, E:'static> Predicate<ProcessorResult<UserData, Cb, E>> for CallbackDataAssert<Cb> {
+    fn eval(&self, args: &ProcessorResult<UserData, Cb, E>) -> bool {
+        self.extracted(args)
+            .map(|actual| self.assert_inner(&actual))
+            .unwrap_or(false)
     }
 }
 
@@ -186,8 +179,8 @@ impl<Cb> predicates::reflection::PredicateReflection for CallbackDataAssert<Cb> 
 #[derive(PartialEq, Debug)]
 pub struct DidWorkAssert;
 
-impl<UserData, Context, Cb:'static, E:'static> Processor<UserData, Context, Cb, E> for DidWorkAssert {
-    fn test(&self, args: &ProcessorResult<UserData, Context, Cb, E>) {
+impl<UserData, Cb:'static, E:'static> Processor<UserData, Cb, E> for DidWorkAssert {
+    fn test(&self, args: &ProcessorResult<UserData, Cb, E>) {
         assert!(args.did_work);
     }
 
@@ -196,8 +189,8 @@ impl<UserData, Context, Cb:'static, E:'static> Processor<UserData, Context, Cb, 
     }
 }
 
-impl<UserData, Context, Cb:'static, E:'static> Predicate<ProcessorResult<UserData, Context, Cb, E>> for DidWorkAssert {
-    fn eval(&self, args: &ProcessorResult<UserData, Context, Cb, E>) -> bool {
+impl<UserData, Cb:'static, E:'static> Predicate<ProcessorResult<UserData, Cb, E>> for DidWorkAssert {
+    fn eval(&self, args: &ProcessorResult<UserData, Cb, E>) -> bool {
         args.did_work
     }
 }
@@ -215,10 +208,11 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 /// passes for a collection of . See assert_processed for
 macro_rules! assert_callback_eq {
     ($ghost_can_track:ident, //: &mumut t Vec<&mut Box<dyn Networkghost_actor>>,
+     $user_data:ident,
      $equal_to:ident,// Box<dyn Processor>,
     ) => {{
         let p = Box::new($crate::ghost_test_harness::CallbackDataEqual($equal_to));
-        assert_callback_processed!($ghost_can_track, p)
+        assert_callback_processed!($ghost_can_track, $user_data, p)
     }};
 }
 
@@ -233,6 +227,7 @@ macro_rules! process_one {
         let did_work = $ghost_can_track
             .process(&mut $user_data)
             .map_err(|err| dbg!(err))
+            .map(|did_work| did_work.into())
             .unwrap_or(false);
         if !did_work {
         } else {
@@ -294,7 +289,7 @@ macro_rules! assert_callback_processed {
                Ok(())
            });
    
-       let context = TestTrace("assert_callback_processed");
+       let context = lib3h_tracing::TestTrace("assert_callback_processed");
 
        $ghost_can_track.request(
            context,
