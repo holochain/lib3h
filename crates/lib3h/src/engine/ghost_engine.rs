@@ -39,33 +39,6 @@ pub type GhostEngineParentWrapper<Core, TraceContext, Engine, EngineError> = Gho
     Engine,
 >;
 
-/*
-// temporary mock gateway...
-struct MockGateway {
-    #[allow(dead_code)]
-    space_address: Address,
-    this_peer: PeerData,
-    dht: DhtEndpointWithContext
-}
-impl MockGateway {
-    fn new((space_address, peer_id): (Address, Address)) -> Self {
-        MockGateway {
-            space_address: space_address.clone(),
-            this_peer: PeerData {
-                peer_address: peer_id.clone().into(),
-                peer_uri: Url::parse(&format!("mock://{}?{}", space_address, peer_id)).unwrap(),
-                timestamp: 0,
-            },
-        }
-    }
-    fn this_peer(&self) -> &PeerData {
-        &self.this_peer
-    }
-    fn as_dht_mut() -> DhtEndpointWithContext {
-
-    }
-}*/
-
 #[allow(dead_code)]
 pub struct GhostEngine<'engine> {
     /// Identifier
@@ -441,7 +414,7 @@ impl<'engine> GhostEngine<'engine> {
         // Create new space gateway for this ChainId
         let uniplex_endpoint = Detach::new(
             self.multiplexer
-                .create_agent_space_route(&space_address, &agent_id.into())
+                .create_agent_space_route(&space_address, &agent_id)
                 .as_context_endpoint_builder()
                 .build::<GatewayUserData, Lib3hTrace>(),
         );
