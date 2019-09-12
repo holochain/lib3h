@@ -15,11 +15,13 @@ pub enum Question {
 /// Query section of a DNS message packet.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuerySection {
+    /// The length of the "domain_name" string we are querying
     pub(crate) dn_len: u16,
+    /// Correspond to the networkId we are querying in our mDNS implementation
     pub(crate) domain_name: String,
-    /// Not used at the moment
+    /// Should be CNAME(5) from the standard
     pub(crate) query_type: u16,
-    /// IN(1) fro the Internet.
+    /// IN(1) for the Internet.
     pub(crate) query_class: u16,
 }
 
@@ -28,7 +30,7 @@ impl QuerySection {
         Self {
             dn_len: name.len() as u16,
             domain_name: name.to_owned(),
-            query_type: 0,
+            query_type: 5,
             query_class: 1,
         }
     }

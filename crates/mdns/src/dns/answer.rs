@@ -15,12 +15,15 @@ pub enum Answer {
 /// Answer section of a DNS message packet.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnswerSection {
+    /// The length of the "domain_name" string
     pub(crate) dn_len: u16,
+    /// Correspond to our networkId in our mDNS implementation
     pub(crate) domain_name: String,
-    // CNAME = 5
+    /// Should be CNAME(5) from the standard
     pub(crate) answer_type: u16,
-    // NET = 1
+    /// IN(1) for the Internet.
     pub(crate) answer_class: u16,
+    /// "Time To Live" value of the node
     pub(crate) ttl: u32,
     pub(crate) data_len: u16,
     pub(crate) data: Target,
