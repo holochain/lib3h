@@ -321,9 +321,5 @@ mod tests {
 
         let to_s: Lib3hClientProtocol = to_c.into();
         assert_eq!(to_s, s);
-
-        //        let c = Lib3hServerProtocol::FailureResult(d.clone());
-        //      let _to_c: ClientToLib3hResponse = c.into();
-        //assert_eq!(to_c,ClientToLib3hResponse::FailureResult(gr.clone()));
     }
 }

@@ -14,6 +14,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate rmp_serde;
+extern crate serde_json;
 #[macro_use]
 extern crate log;
 
@@ -27,7 +28,8 @@ pub mod keystore;
 pub mod time;
 pub mod track;
 pub mod transport;
-pub mod transport_wss;
+// FIXME
+// pub mod transport_wss;
 
 #[cfg(test)]
 pub mod tests {

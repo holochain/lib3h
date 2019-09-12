@@ -1,4 +1,4 @@
-use crate::engine::ghost_engine::{ClientRequestContext, GhostEngineParentWrapper};
+use crate::engine::ghost_engine::GhostEngineParentWrapper;
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -9,6 +9,7 @@ use lib3h_protocol::{
     protocol_server::*,
     DidWork,
 };
+use lib3h_tracing::Lib3hTrace;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -22,28 +23,30 @@ where
         EngineError,
     >,
 {
-    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
+    engine: Detach<
+        GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Lib3hTrace, Engine, EngineError>,
+    >,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
 }
 
-fn server_failure(err: String, context: ClientRequestContext) -> Lib3hServerProtocol {
+fn server_failure(err: String, request_id: String) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
-        request_id: context.get_request_id(),
+        request_id,
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: err.as_bytes().to_vec(),
+        result_info: err.as_bytes().into(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
 
-fn server_success(context: ClientRequestContext) -> Lib3hServerProtocol {
+fn server_success(request_id: String) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
-        request_id: context.get_request_id(),
+        request_id,
         space_address: "space_addr".into(),
         to_agent_id: "to_agent_id".into(),
-        result_info: Vec::new(),
+        result_info: vec![].into(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
@@ -68,32 +71,32 @@ where
         }
     }
 
-    fn make_callback() -> GhostCallback<
-        LegacyLib3h<Engine, EngineError>,
-        ClientRequestContext,
-        ClientToLib3hResponse,
-        EngineError,
-    > {
+    fn make_callback(
+        request_id: String,
+    ) -> GhostCallback<LegacyLib3h<Engine, EngineError>, ClientToLib3hResponse, EngineError> {
         Box::new(
             |me: &mut LegacyLib3h<Engine, EngineError>,
-             context: ClientRequestContext,
              response: GhostCallbackData<ClientToLib3hResponse, EngineError>| {
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
                         let response = match rsp {
-                            ClientToLib3hResponse::JoinSpaceResult => server_success(context),
-                            ClientToLib3hResponse::LeaveSpaceResult => server_success(context),
+                            ClientToLib3hResponse::JoinSpaceResult => {
+                                server_success(request_id.clone())
+                            }
+                            ClientToLib3hResponse::LeaveSpaceResult => {
+                                server_success(request_id.clone())
+                            }
                             _ => rsp.into(),
                         };
                         me.client_request_responses.push(response)
                     }
                     GhostCallbackData::Response(Err(e)) => {
                         me.client_request_responses
-                            .push(server_failure(e.to_string(), context));
+                            .push(server_failure(e.to_string(), request_id.clone()));
                     }
                     GhostCallbackData::Timeout => {
                         me.client_request_responses
-                            .push(server_failure("Request timed out".into(), context));
+                            .push(server_failure("Request timed out".into(), request_id));
                     }
                 };
                 Ok(())
@@ -103,39 +106,32 @@ where
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
-        let ctx = match &client_msg {
-            Lib3hClientProtocol::Connect(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::JoinSpace(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::LeaveSpace(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::SendDirectMessage(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::FetchEntry(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::QueryEntry(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleFetchEntryResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleQueryEntryResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::PublishEntry(_) => ClientRequestContext::new(""),
-            Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
-            _ => panic!("unimplemented"),
-        };
-        let result = if &ctx.get_request_id() == "" {
+        let request_id: String = match &client_msg {
+            Lib3hClientProtocol::Connect(data) => &data.request_id,
+            Lib3hClientProtocol::JoinSpace(data) => &data.request_id,
+            Lib3hClientProtocol::LeaveSpace(data) => &data.request_id,
+            Lib3hClientProtocol::SendDirectMessage(data) => &data.request_id,
+            Lib3hClientProtocol::FetchEntry(data) => &data.request_id,
+            Lib3hClientProtocol::QueryEntry(data) => &data.request_id,
+            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleFetchEntryResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleQueryEntryResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => &data.request_id,
+            Lib3hClientProtocol::PublishEntry(_) => "",
+            Lib3hClientProtocol::HoldEntry(_) => "",
+            _ => unimplemented!(),
+        }
+        .to_string();
+
+        let result = if request_id == "" {
             self.engine.publish(client_msg.into())
         } else {
-            self.engine
-                .request(ctx, client_msg.into(), LegacyLib3h::make_callback())
+            self.engine.request(
+                Lib3hTrace,
+                client_msg.into(),
+                LegacyLib3h::make_callback(request_id.to_string()),
+            )
         };
         result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
     }
@@ -143,7 +139,8 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let _ = detach_run!(&mut self.engine, |lib3h| lib3h.process(self));
+        detach_run!(&mut self.engine, |lib3h| lib3h.process(self))
+            .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
 
         // get any "server" messages that came as responses to the client requests
         let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
@@ -159,6 +156,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use lib3h_protocol::data_types::*;
+    use lib3h_tracing::Lib3hTrace;
+    use url::Url;
+
     type EngineError = String;
 
     pub struct MockGhostEngine {
@@ -174,7 +176,7 @@ mod tests {
         lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
-                String,
+                Lib3hTrace,
                 Lib3hToClient,
                 Lib3hToClientResponse,
                 ClientToLib3h,
@@ -227,7 +229,7 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
-            detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
+            detach_run!(&mut self.lib3h_endpoint, |cs| cs.process(self))?;
             // END BOILER PLATE--------------------------
 
             for msg in self.lib3h_endpoint.as_mut().drain_messages() {
@@ -263,12 +265,9 @@ mod tests {
         }
     }
 
-    use super::*;
-    use lib3h_protocol::data_types::*;
     struct MockCore {
         //    state: String,
     }
-    use url::Url;
 
     #[test]
     fn test_ghost_engine_wrapper() {
@@ -292,7 +291,7 @@ mod tests {
 
         // The mock engine allways returns failure on connect requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: [99, 111, 110, 110, 101, 99, 116, 105, 111, 110, 32, 102, 97, 105, 108, 101, 100, 33] })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: \"connection failed!\" })]))",
             format!("{:?}", result)
         );
 
@@ -307,7 +306,7 @@ mod tests {
 
         // The mock engine allways returns success on Join requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: [] })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: \"\" })]))",
             format!("{:?}", result)
         );
 
