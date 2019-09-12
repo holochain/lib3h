@@ -13,6 +13,7 @@ use crate::{
     track::Tracker,
     transport::TransportMultiplex,
 };
+use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
@@ -20,7 +21,6 @@ use lib3h_protocol::{
 use lib3h_tracing::Lib3hTrace;
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use url::Url;
-use detach::prelude::*;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);

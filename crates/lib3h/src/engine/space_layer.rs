@@ -6,12 +6,12 @@ use crate::{
     engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
     gateway::protocol::*,
 };
+use detach::prelude::*;
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
 use lib3h_tracing::Lib3hTrace;
 use std::collections::HashMap;
-use detach::prelude::*;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
@@ -55,7 +55,10 @@ impl RealEngine {
         // Process all space gateways and collect requests
         let mut outbox = Vec::new();
         let mut space_outbox_map = HashMap::new();
-        let mut space_gateway_map: HashMap<ChainId, Detach<GatewayParentWrapperDyn<RealEngine, Lib3hTrace>>> = self.space_gateway_map.drain().collect();
+        let mut space_gateway_map: HashMap<
+            ChainId,
+            Detach<GatewayParentWrapperDyn<RealEngine, Lib3hTrace>>,
+        > = self.space_gateway_map.drain().collect();
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap
             let request_list = space_gateway.drain_messages();

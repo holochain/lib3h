@@ -18,24 +18,27 @@ impl P2pGateway {
         parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
         // forward to child dht
-        self.inner_dht.request(
-            Lib3hTrace,
-            request,
-            Box::new(|_me, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
-                            return Ok(());
+        self.inner_dht
+            .request(
+                Lib3hTrace,
+                request,
+                Box::new(|_me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => response,
                         }
-                        GhostCallbackData::Response(response) => response,
-                    }
-                };
-                // forward back to parent
-                parent_msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
-                Ok(())
-            }),
-        ).unwrap(); // FIXME unwrap
+                    };
+                    // forward back to parent
+                    parent_msg
+                        .respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
+                    Ok(())
+                }),
+            )
+            .unwrap(); // FIXME unwrap
         Ok(())
     }
 

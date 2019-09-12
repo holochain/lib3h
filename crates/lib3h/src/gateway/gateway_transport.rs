@@ -5,10 +5,7 @@ use crate::{
     engine::p2p_protocol::P2pProtocol,
     error::*,
     gateway::{protocol::*, P2pGateway},
-    transport::{
-        self,
-        error::TransportResult,
-    },
+    transport::{self, error::TransportResult},
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_tracing::Lib3hTrace;
@@ -149,11 +146,12 @@ impl P2pGateway {
                         };
                         if let DhtRequestToChildResponse::RequestPeer(maybe_peer_data) = response {
                             return if let Some(peer_data) = maybe_peer_data {
-                                me.send(&peer_data.peer_uri, &payload, Some(parent_request)).unwrap(); // FIXME unwrap
+                                me.send(&peer_data.peer_uri, &payload, Some(parent_request))
+                                    .unwrap(); // FIXME unwrap
                                 Ok(())
                             } else {
                                 panic!("no peer found");
-                            }
+                            };
                         } else {
                             panic!("bad response to RequestPeer: {:?}", response);
                         }

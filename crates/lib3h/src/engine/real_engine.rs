@@ -200,9 +200,10 @@ impl RealEngine {
     // Pure actor model or have a direct request on the concrete gateway
     pub fn get_this_peer_sync(&mut self, chain_id: ChainId) -> PeerData {
         trace!("engine.get_this_peer_sync() ...");
-        let mut space_gateway = self.space_gateway_map
-                .remove(&chain_id)
-                .expect("No space at chainId");
+        let mut space_gateway = self
+            .space_gateway_map
+            .remove(&chain_id)
+            .expect("No space at chainId");
         space_gateway
             .request(
                 Lib3hTrace,
@@ -229,8 +230,7 @@ impl RealEngine {
                 }),
             )
             .expect("sync functions should work");
-        detach_run!(space_gateway, |g| g.process(self))
-            .expect("space_gateway.process() failed");
+        detach_run!(space_gateway, |g| g.process(self)).expect("space_gateway.process() failed");
         self.space_gateway_map.insert(chain_id, space_gateway);
         self.gateway_user_data.this_peer.clone()
     }
@@ -905,8 +905,7 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>, Lib3hServerProtocol>
-    {
+    ) -> Result<&mut GatewayParentWrapperDyn<RealEngine, Lib3hTrace>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
