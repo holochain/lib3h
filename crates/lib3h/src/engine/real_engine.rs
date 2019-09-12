@@ -237,14 +237,16 @@ impl RealEngine {
         self.gateway_user_data.this_peer.clone()
     }
 
-    // TODO: Find better way to do this:
-    // Pure actor model or have a direct request on the concrete gateway
-    pub fn get_peer_list_sync(&mut self) -> Vec<PeerData> {
-        trace!("engine.get_peer_list_sync() ...");
-        self.network_gateway
+    pub fn after_RequestThisPeer(&mut self, chain_id: ChainId, f: &FnOnce(&mut RealEngine, PeerData)) {
+        trace!("engine.after_get_this_peer() ...");
+        let mut space_gateway = self
+            .space_gateway_map
+            .remove(&chain_id)
+            .expect("No space at chainId");
+        space_gateway
             .request(
                 Lib3hTrace,
-                GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestThisPeer),
                 Box::new(|mut me, response| {
                     let response = {
                         match response {
@@ -256,20 +258,17 @@ impl RealEngine {
                         }
                     };
                     if let GatewayRequestToChildResponse::Dht(
-                        DhtRequestToChildResponse::RequestPeerList(peer_list_response),
+                        DhtRequestToChildResponse::RequestThisPeer(this_peer),
                     ) = response
                     {
-                        me.gateway_user_data.peer_list = peer_list_response;
+                        f(me, this_peer);
                     } else {
-                        panic!("bad response to bind: {:?}", response);
+                        panic!("bad response to RequestThisPeer: {:?}", response);
                     }
                     Ok(())
                 }),
             )
-            .expect("sync functions should work");
-        detach_run!(&mut self.network_gateway, |ng| ng.process(self))
-            .expect("network_gateway.process() failed");
-        self.gateway_user_data.peer_list.clone()
+            .unwrap(); // FIXME
     }
 }
 

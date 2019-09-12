@@ -57,6 +57,15 @@ impl P2pGateway {
             dht_config,
         )
     }
+
+    pub fn this_peer(&self) -> PeerData {
+        // self.inner_dht().as_mut().as_mut()
+        PeerData {
+            peer_address: "FIXME".to_string(),
+            peer_uri: Url::parse("fixme://host:123").unwrap(),
+            timestamp: 0,
+        }
+    }
 }
 //
 //impl P2pGateway {

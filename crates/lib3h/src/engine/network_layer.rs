@@ -10,6 +10,8 @@ use crate::{
     transport,
 };
 
+use lib3h_tracing::Lib3hTrace;
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
@@ -162,38 +164,61 @@ impl RealEngine {
         &mut self,
         net_uri: Url,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        // TODO #150 - Should do this in next process instead
-        let peer_list = self.get_peer_list_sync();
-        trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
-
-        // TODO #150 - Should do this in next process instead
-        // Send to other node our Joined Spaces
-        {
-            let space_list = self.get_all_spaces();
-            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-            let mut payload = Vec::new();
-            our_joined_space_list
-                .serialize(&mut Serializer::new(&mut payload))
-                .unwrap();
-            trace!(
-                "AllJoinedSpaceList: {:?} to {:?}",
-                our_joined_space_list,
-                net_uri,
-            );
-            // we need a transportId, so search for it in the DHT
-            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == net_uri);
-            if let Some(peer_data) = maybe_peer_data {
-                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                self.network_gateway
-                    .publish(GatewayRequestToChild::Transport(
-                        transport::protocol::RequestToChild::SendMessage {
-                            uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
-                            payload: payload.into(),
-                        },
-                    ))?;
-            }
-            // TODO END
-        }
+        // Get list of known peers
+        let uri_copy = net_uri.clone();
+        self.network_gateway
+            .request(
+                Lib3hTrace,
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
+                Box::new(move |me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let GatewayRequestToChildResponse::Dht(
+                        DhtRequestToChildResponse::RequestPeerList(peer_list),
+                    ) = response
+                    {
+                        // TODO #150 - Should do this in next process instead
+                        // Send to other node our Joined Spaces
+                        {
+                            let space_list = me.get_all_spaces();
+                            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+                            let mut payload = Vec::new();
+                            our_joined_space_list
+                                .serialize(&mut Serializer::new(&mut payload))
+                                .unwrap();
+                            trace!(
+                                "AllJoinedSpaceList: {:?} to {:?}",
+                                our_joined_space_list,
+                                uri_copy,
+                            );
+                            // we need a transportId, so search for it in the DHT
+                            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
+                            if let Some(peer_data) = maybe_peer_data {
+                                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                me.network_gateway
+                                    .publish(GatewayRequestToChild::Transport(
+                                        transport::protocol::RequestToChild::SendMessage {
+                                            uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
+                                            payload: payload.into(),
+                                        },
+                                    ))?;
+                            }
+                        }
+                        // TODO END
+                    } else {
+                        panic!("bad response to RequestPeerList: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
 
         // Output a Lib3hServerProtocol::Connected if its the first connection
         let mut outbox = Vec::new();
