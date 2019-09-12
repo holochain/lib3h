@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_protocol::*,
-    gateway::{protocol::*, GatewayUserData},
+    gateway::{protocol::*, GatewayUserData, P2pGateway},
     track::Tracker,
     transport::TransportMultiplex,
 };
@@ -107,7 +107,7 @@ pub struct RealEngine {
     // Should be owned by multiplexer
     // TODO #176: Remove this if we resolve #176 without it.
     /// P2p gateway for the network layer
-    network_gateway: Detach<GatewayParentWrapperDyn<RealEngine, Lib3hTrace>>,
+    network_gateway: Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>,
 
     /// Cached this_peer of the network_gateway
     this_net_peer: PeerData,
@@ -116,7 +116,8 @@ pub struct RealEngine {
     network_connections: HashSet<Url>,
 
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, Detach<GatewayParentWrapperDyn<RealEngine, Lib3hTrace>>>,
+    space_gateway_map:
+        HashMap<ChainId, Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,

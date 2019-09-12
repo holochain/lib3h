@@ -10,6 +10,7 @@ use crate::{
     transport,
 };
 
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
