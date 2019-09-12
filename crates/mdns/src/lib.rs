@@ -80,7 +80,7 @@ const DEFAULT_BIND_ADRESS: &str = "0.0.0.0";
 const DEFAULT_TTL: u32 = 255;
 
 /// Default amount of time between two queries.
-const DEFAULT_EVERY_MS: u128 = 30_000;
+const DEFAULT_QUERY_INTERVAL_MS: u128 = 30_000;
 
 /// an mdns instance that can send and receive dns packets on LAN UDP multicast
 pub struct MulticastDns {
@@ -97,7 +97,7 @@ pub struct MulticastDns {
     /// Determine if we need to query / announce.
     pub(crate) timestamp: Instant,
     /// The amount of time we should wait between two queries.
-    pub(crate) every_ms: u128,
+    pub(crate) query_interval_ms: u128,
     /// The socket used by the mDNS service protocol to send packets
     pub(crate) send_socket: net::UdpSocket,
     /// The socket used to receive mDNS packets
@@ -171,7 +171,7 @@ impl MulticastDns {
 
     /// Returns the amount of time we wait between two queries.
     pub fn every_ms(&self) -> u128 {
-        self.every_ms
+        self.query_interval_ms
     }
 
     /// Insert a new record to our cache.
@@ -410,7 +410,7 @@ impl Discovery for MulticastDns {
 
         // We should query (and announce in the same time because we will anwser to our query in the
         // next iteration) "every amount of time"
-        if self.timestamp.elapsed().as_millis() > self.every_ms {
+        if self.timestamp.elapsed().as_millis() > self.query_interval_ms {
             self.query()?;
             self.timestamp = Instant::now();
         }
@@ -602,6 +602,7 @@ mod tests {
             .map_record
             .get(networkid)
             .expect("Fail to get records from the networkid");
+
         assert_eq!(records.len(), 2);
     }
 

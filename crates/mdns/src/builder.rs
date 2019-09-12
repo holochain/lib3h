@@ -3,7 +3,7 @@
 use crate::{
     error::MulticastDnsError,
     record::{HashMapRecord, MapRecord, Record},
-    Instant, MulticastDns, DEFAULT_BIND_ADRESS, DEFAULT_EVERY_MS, DEFAULT_TTL,
+    Instant, MulticastDns, DEFAULT_BIND_ADRESS, DEFAULT_QUERY_INTERVAL_MS, DEFAULT_TTL,
     MDNS_MULCAST_IPV4_ADRESS, READ_BUF_SIZE, SERVICE_LISTENER_PORT,
 };
 
@@ -23,7 +23,7 @@ pub struct MulticastDnsBuilder {
     /// Multicast address used by the mDNS protocol: `224.0.0.251`
     pub(crate) multicast_address: String,
     /// The amount of time we should wait between two queries.
-    pub(crate) every_ms: u128,
+    pub(crate) query_interval_ms: u128,
     pub(crate) own_map_record: MapRecord,
 }
 
@@ -73,7 +73,7 @@ impl MulticastDnsBuilder {
 
     /// Sets the amount of time between two queries originating from ourself.
     pub fn every_ms(&mut self, every_ms: u128) -> &mut Self {
-        self.every_ms = every_ms;
+        self.query_interval_ms = every_ms;
         self
     }
 
@@ -108,7 +108,7 @@ impl MulticastDnsBuilder {
             multicast_ttl: self.multicast_ttl,
             multicast_address: self.multicast_address.to_owned(),
             timestamp: Instant::now(),
-            every_ms: self.every_ms,
+            query_interval_ms: self.query_interval_ms,
             send_socket,
             recv_socket,
             buffer: [0; READ_BUF_SIZE],
@@ -127,7 +127,7 @@ impl Default for MulticastDnsBuilder {
             multicast_loop: true,
             multicast_ttl: DEFAULT_TTL,
             multicast_address: String::from(MDNS_MULCAST_IPV4_ADRESS),
-            every_ms: DEFAULT_EVERY_MS,
+            query_interval_ms: DEFAULT_QUERY_INTERVAL_MS,
             own_map_record: MapRecord::new(),
         }
     }
