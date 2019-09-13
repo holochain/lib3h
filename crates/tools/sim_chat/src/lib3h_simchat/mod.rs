@@ -35,17 +35,17 @@ impl Store {
         Self(HashMap::new())
     }
 
-    pub fn get(
-        &self,
-        space_address: &Address,
-        base_address: &Address,
-        message_address: &Address,
-    ) -> Option<&SimChatMessage> {
-        self.0
-            .get(&space_address)?
-            .get(&base_address)?
-            .get(&message_address)
-    }
+    // pub fn get(
+    //     &self,
+    //     space_address: &Address,
+    //     base_address: &Address,
+    //     message_address: &Address,
+    // ) -> Option<&SimChatMessage> {
+    //     self.0
+    //         .get(&space_address)?
+    //         .get(&base_address)?
+    //         .get(&message_address)
+    // }
 
     pub fn get_all_messages(
         &self,
@@ -69,8 +69,8 @@ impl Store {
         message_address: &Address,
         message: SimChatMessage,
     ) {
-        let mut space = self.0.get(space_address).unwrap_or(&HashMap::new());
-        let mut base = space.get(base_address).unwrap_or(&HashMap::new());
+        let mut space = self.0.get(space_address).map(|hm| hm.clone()).unwrap_or(HashMap::new());
+        let mut base = space.get(base_address).map(|hm| hm.clone()).unwrap_or(HashMap::new());
 
         base.insert(message_address.clone(), message);
         space.insert(base_address.clone(), base.clone());
@@ -90,8 +90,8 @@ pub struct Lib3hSimChatState {
     current_space: Option<SpaceData>,
     spaces: HashMap<Address, SpaceData>,
     store: Store,
-    author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
-    gossip_list: HashMap<Address, Vec<Address>>, // same
+    // author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
+    // gossip_list: HashMap<Address, Vec<Address>>, // same
 }
 
 impl Lib3hSimChatState {
@@ -100,8 +100,8 @@ impl Lib3hSimChatState {
             current_space: None,
             spaces: HashMap::new(),
             store: Store::new(),
-            author_list: HashMap::new(),
-            gossip_list: HashMap::new(),
+            // author_list: HashMap::new(),
+            // gossip_list: HashMap::new(),
         }
     }
 }

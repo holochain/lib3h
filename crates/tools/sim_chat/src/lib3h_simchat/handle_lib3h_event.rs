@@ -58,7 +58,7 @@ pub fn handle_and_convert_lib3h_event(
             space_address,
             ..
         })) => {
-            // store some data in the CAS at the given address
+            // store a new message on a possibly existing time anchor entry
             state.store.insert(
                 &space_address,
                 &entry_address,
@@ -70,40 +70,40 @@ pub fn handle_and_convert_lib3h_event(
                 .ok();
             None
         }
-        Some(Lib3hToClient::HandleGetAuthoringEntryList(GetListData {
-            request_id,
-            space_address,
-            provider_agent_id,
-        })) => {
-            engine_message
-                .respond(Ok(
-                    Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
-                        request_id,
-                        space_address,
-                        provider_agent_id,
-                        address_map: state.author_list.clone(),
-                    }),
-                ))
-                .ok();
-            None
-        }
-        Some(Lib3hToClient::HandleGetGossipingEntryList(GetListData {
-            request_id,
-            space_address,
-            provider_agent_id,
-        })) => {
-            engine_message
-                .respond(Ok(
-                    Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
-                        request_id,
-                        space_address,
-                        provider_agent_id,
-                        address_map: state.gossip_list.clone(),
-                    }),
-                ))
-                .ok();
-            None
-        }
+        // Some(Lib3hToClient::HandleGetAuthoringEntryList(GetListData {
+        //     request_id,
+        //     space_address,
+        //     provider_agent_id,
+        // })) => {
+        //     engine_message
+        //         .respond(Ok(
+        //             Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
+        //                 request_id,
+        //                 space_address,
+        //                 provider_agent_id,
+        //                 address_map: state.author_list.clone(),
+        //             }),
+        //         ))
+        //         .ok();
+        //     None
+        // }
+        // Some(Lib3hToClient::HandleGetGossipingEntryList(GetListData {
+        //     request_id,
+        //     space_address,
+        //     provider_agent_id,
+        // })) => {
+        //     engine_message
+        //         .respond(Ok(
+        //             Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
+        //                 request_id,
+        //                 space_address,
+        //                 provider_agent_id,
+        //                 address_map: state.gossip_list.clone(),
+        //             }),
+        //         ))
+        //         .ok();
+        //     None
+        // }
         Some(Lib3hToClient::HandleSendDirectMessage(message_data)) => {
             Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
                 from_agent: message_data.from_agent_id.to_string(),

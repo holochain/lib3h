@@ -3,7 +3,6 @@ extern crate crossbeam_channel;
 extern crate lib3h_tracing;
 extern crate serde;
 extern crate url;
-#[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 

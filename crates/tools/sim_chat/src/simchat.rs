@@ -1,5 +1,6 @@
 use lib3h_protocol::data_types::{Opaque, SpaceData};
 use serde_json::{from_slice, to_vec};
+use serde_derive::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SimChatMessage {
@@ -14,18 +15,18 @@ impl SimChatMessage {
         from_slice(&o.as_bytes()).unwrap()
     }
 
-    pub fn to_opaque(self) -> Opaque {
-        to_vec(&self).expect("Could not serialize message").into()
-    }
+    // pub fn to_opaque(self) -> Opaque {
+    //     to_vec(&self).expect("Could not serialize message").into()
+    // }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MessageList(pub Vec<SimChatMessage>);
 
 impl MessageList {
-    pub fn from_opaque(o: Opaque) -> Self {
-        from_slice(&o.as_bytes()).unwrap()
-    }
+    // pub fn from_opaque(o: Opaque) -> Self {
+    //     from_slice(&o.as_bytes()).unwrap()
+    // }
 
     pub fn to_opaque(self) -> Opaque {
         to_vec(&self)
