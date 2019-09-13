@@ -300,10 +300,10 @@ macro_rules! assert_callback_processed {
             Ok(())
         });
 
-        let context = lib3h_tracing::TestTrace("assert_callback_processed".into());
+        let span = $crate::lib3h_tracing::test_span("assert_callback_processed!");
 
         $ghost_can_track
-            .request(context, $request_to_child, cb)
+            .request(span, $request_to_child, cb)
             .expect("request to ghost_can_track");
 
         //       for p in vec![$processor] {

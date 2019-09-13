@@ -2,37 +2,22 @@ use crate::{
     GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
     RequestId, WorkWasDone,
 };
-use lib3h_tracing::CanTrace;
+use lib3h_tracing::Lib3hSpan;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
+        // span: Lib3hSpan,
     },
     Response {
         request_id: RequestId,
         payload: Result<Response, Error>,
+        // span: Lib3hSpan,
     },
-}
-
-/// A GhostMessage with only the data, i.e. minus the Sender
-/// This is so that it is more easily cloneable
-#[derive(Debug, Clone)]
-pub struct GhostMessageData<T: 'static + Clone> {
-    pub request_id: Option<RequestId>,
-    pub message: Option<T>,
-}
-
-impl<T: 'static + Clone> GhostMessageData<T> {
-    pub fn with_message<A, B, C>(msg: &GhostMessage<T, A, B, C>) -> Self {
-        GhostMessageData {
-            request_id: msg.request_id.clone(),
-            message: msg.message.clone(),
-        }
-    }
 }
 
 /// GhostContextEndpoints allow you to drain these incoming `GhostMessage`s
@@ -115,6 +100,7 @@ impl<
     }
 
     /// send a response back to the origin of this request
+    /// TODO: add span
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
             self.sender.send(GhostEndpointMessage::Response {
@@ -178,8 +164,6 @@ impl<
     }
 
     /// expand a raw endpoint into something usable.
-    /// <TraceContext> let's you store data with individual `request` calls
-    /// that will be available again when the callback is invoked.
     /// Feel free to use `as_context_endpoint_builder::<()>("prefix")` if you
     /// don't need any context.
     /// request_id_prefix is a debugging hint... the request_ids generated
@@ -232,11 +216,10 @@ impl<
         Error,
     >
 {
-    pub fn build<UserData, TraceContext: 'static + CanTrace>(
+    pub fn build<UserData>(
         self,
     ) -> GhostContextEndpoint<
         UserData,
-        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -283,7 +266,6 @@ impl GhostTrackRequestOptions {
 /// indicates this type is able to make callback requests && respond to requests
 pub trait GhostCanTrack<
     UserData,
-    TraceContext: 'static + CanTrace,
     RequestToOther: 'static,
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
@@ -292,13 +274,13 @@ pub trait GhostCanTrack<
 >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, payload: RequestToOther) -> GhostResult<()>;
+    fn publish(&mut self, span: Lib3hSpan, payload: RequestToOther) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
     fn request(
         &mut self,
-        trace_context: TraceContext,
+        span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()>;
@@ -307,7 +289,7 @@ pub trait GhostCanTrack<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        trace_context: TraceContext,
+        span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -326,7 +308,6 @@ pub trait GhostCanTrack<
 /// see `GhostEndpoint::as_context_endpoint_builder` for additional details
 pub struct GhostContextEndpoint<
     UserData,
-    TraceContext: 'static + CanTrace,
     RequestToOther: 'static,
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
@@ -339,14 +320,13 @@ pub struct GhostContextEndpoint<
     receiver: crossbeam_channel::Receiver<
         GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
     >,
-    pending_responses_tracker: GhostTracker<UserData, TraceContext, RequestToOtherResponse, Error>,
+    pending_responses_tracker: GhostTracker<UserData, RequestToOtherResponse, Error>,
     outbox_messages_to_self:
         Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>,
 }
 
 impl<
         UserData,
-        TraceContext: 'static + CanTrace,
         RequestToOther: 'static,
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
@@ -355,7 +335,6 @@ impl<
     >
     GhostContextEndpoint<
         UserData,
-        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -365,16 +344,16 @@ impl<
 {
     fn priv_request(
         &mut self,
-        trace_context: TraceContext,
+        span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        trace!("GhostChannel::priv_request");
+        let child = span.child_span("bookmark");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(trace_context, cb),
+            None => self.pending_responses_tracker.bookmark(child, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                trace_context,
+                child,
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
@@ -383,6 +362,7 @@ impl<
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
+            // span: span.child("request", |o| o.start()).into(),
         })?;
         Ok(())
     }
@@ -390,7 +370,6 @@ impl<
 
 impl<
         UserData,
-        TraceContext: 'static + CanTrace,
         RequestToOther: 'static,
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
@@ -399,7 +378,6 @@ impl<
     >
     GhostCanTrack<
         UserData,
-        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -408,7 +386,6 @@ impl<
     >
     for GhostContextEndpoint<
         UserData,
-        TraceContext,
         RequestToOther,
         RequestToOtherResponse,
         RequestToSelf,
@@ -417,7 +394,8 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, payload: RequestToOther) -> GhostResult<()> {
+    fn publish(&mut self, mut span: Lib3hSpan, payload: RequestToOther) -> GhostResult<()> {
+        span.event("GhostChannel::publish");
         self.sender.send(GhostEndpointMessage::Request {
             request_id: None,
             payload,
@@ -429,29 +407,25 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        trace_context: TraceContext,
+        mut span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
-        trace!("GhostChannel::request");
-        self.priv_request(
-            trace_context,
-            payload,
-            cb,
-            GhostTrackRequestOptions::default(),
-        )
+        span.event("GhostChannel::request");
+        self.priv_request(span, payload, cb, GhostTrackRequestOptions::default())
     }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        trace_context: TraceContext,
+        mut span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        self.priv_request(trace_context, payload, cb, options)
+        span.event("GhostChannel::request_options");
+        self.priv_request(span, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -547,7 +521,7 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib3h_tracing::TestTrace;
+    use lib3h_tracing::test_span;
     type TestError = String;
 
     #[derive(Debug)]
@@ -648,7 +622,10 @@ mod tests {
         let mut endpoint = child_side.as_context_endpoint_builder().build();
 
         endpoint
-            .publish(TestMsgOut("event to my parent".into()))
+            .publish(
+                test_span("context data"),
+                TestMsgOut("event to my parent".into()),
+            )
             .unwrap();
         // check to see if the event was sent to the parent
         let msg = parent_side.receiver.recv();
@@ -668,7 +645,7 @@ mod tests {
 
         endpoint
             .request(
-                TestTrace("context data".into()),
+                test_span("context data"),
                 TestMsgOut("request to my parent".into()),
                 cb_factory(),
             )
@@ -709,7 +686,7 @@ mod tests {
         // Now we'll send a request that should timeout
         endpoint
             .request_options(
-                TestTrace("context data".into()),
+                test_span("context data"),
                 TestMsgOut("another request to my parent".into()),
                 cb_factory(),
                 GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),

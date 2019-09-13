@@ -1,65 +1,44 @@
-use crate::{
-    lib3h_protocol::data_types::Opaque,
-    transport::{error::TransportError, ConnectionId},
-};
+use crate::transport::error::TransportError;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::Opaque;
 use url::Url;
-/// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
-#[derive(Debug, PartialEq, Clone)]
-pub enum TransportCommand {
-    Connect(Url, /*request_id*/ String),
-    Send(Vec<ConnectionId>, Opaque),
-    SendAll(Opaque),
-    Close(ConnectionId),
-    CloseAll,
-    Bind(Url),
-}
-
-/// Events that can be generated during a `process()`
-#[derive(Debug, PartialEq, Clone)]
-pub enum TransportEvent {
-    /// Notify that some TransportError occured
-    ErrorOccured(ConnectionId, TransportError),
-    /// an outgoing connection has been established
-    ConnectResult(ConnectionId, /*request_id*/ String),
-    /// we have received an incoming connection
-    IncomingConnectionEstablished(ConnectionId),
-    /// We have received data from a connection
-    ReceivedData(ConnectionId, Opaque),
-    /// A connection closed for whatever reason
-    ConnectionClosed(ConnectionId),
-}
-
-/// Transport protocol enums for use with GhostActor implementation
-#[derive(Debug, Clone)]
-pub enum RequestToChild {
-    Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { address: Url, payload: Opaque },
-}
 
 #[derive(Debug, Clone)]
 pub struct BindResultData {
     pub bound_url: Url,
 }
 
+/// Transport protocol enums for use with GhostActor implementation
+#[derive(Debug, Clone)]
+pub enum RequestToChild {
+    Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    SendMessage { uri: Url, payload: Opaque },
+}
+
 #[derive(Debug, Clone)]
 pub enum RequestToChildResponse {
     Bind(BindResultData),
-    SendMessage,
+    SendMessageSuccess,
 }
 
 #[derive(Debug, Clone)]
 pub enum RequestToParent {
-    IncomingConnection { address: Url },
-    ReceivedData { address: Url, payload: Opaque },
-    TransportError { error: TransportError },
+    // TODO remove `uri` field once we have refactored how we handle Connection/Disconnection
+    ErrorOccured { uri: Url, error: TransportError },
+    IncomingConnection { uri: Url },
+    ReceivedData { uri: Url, payload: Opaque },
 }
 
 #[derive(Debug, Clone)]
 pub enum RequestToParentResponse {
-    Allowed,    // just for testing
-    Disallowed, // just for testing
+    // N/A
 }
+
+pub type ToChildMessage =
+    GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
+
+pub type ToParentMessage =
+    GhostMessage<RequestToParent, RequestToChild, RequestToParentResponse, TransportError>;
 
 pub type DynTransportActor = Box<
     dyn GhostActor<
@@ -78,18 +57,26 @@ pub type TransportActorParentEndpoint = GhostEndpoint<
     RequestToParentResponse,
     TransportError,
 >;
-pub type TransportActorSelfEndpoint<UserData, TraceContext> = GhostContextEndpoint<
+
+pub type TransportActorParentContextEndpoint<UserData> = GhostContextEndpoint<
     UserData,
-    TraceContext,
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
+pub type TransportActorSelfEndpoint<UserData> = GhostContextEndpoint<
+    UserData,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
     RequestToChildResponse,
     TransportError,
 >;
-pub type TransportActorParentWrapper<UserData, TraceContext, Actor> = GhostParentWrapper<
+pub type TransportActorParentWrapper<UserData, Actor> = GhostParentWrapper<
     UserData,
-    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -97,9 +84,8 @@ pub type TransportActorParentWrapper<UserData, TraceContext, Actor> = GhostParen
     TransportError,
     Actor,
 >;
-pub type TransportActorParentWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
+pub type TransportActorParentWrapperDyn<UserData> = GhostParentWrapperDyn<
     UserData,
-    TraceContext,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,

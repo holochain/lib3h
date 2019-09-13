@@ -71,7 +71,7 @@ pub use ghost_tracker::{
 mod ghost_channel;
 pub use ghost_channel::{
     create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
-    GhostMessageData, GhostTrackRequestOptions,
+    GhostTrackRequestOptions,
 };
 
 #[macro_use]
@@ -83,9 +83,9 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 pub mod prelude {
     pub use super::{
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostMessageData,
-        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
-        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
+        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
+        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
+        GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -93,7 +93,7 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::TestTrace;
+    use lib3h_tracing::test_span;
 
     type FakeError = String;
 
@@ -134,7 +134,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 RrDht,
-                TestTrace,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -246,18 +245,6 @@ mod tests {
 
     use transport_protocol::*;
 
-    #[derive(Debug)]
-    enum _GwDht {
-        ResolveAddressForId {
-            msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, FakeError>,
-        },
-    }
-
-    #[derive(Debug)]
-    enum _RequestToParentContext {
-        IncomingConnection { address: String },
-    }
-
     struct GatewayTransport {
         endpoint_parent: Option<
             GhostEndpoint<
@@ -271,7 +258,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 GatewayTransport,
-                TestTrace,
                 RequestToParent,
                 RequestToParentResponse,
                 RequestToChild,
@@ -282,7 +268,6 @@ mod tests {
         dht: Detach<
             GhostParentWrapper<
                 GatewayTransport,
-                TestTrace,
                 dht_protocol::RequestToParent,
                 dht_protocol::RequestToParentResponse,
                 dht_protocol::RequestToChild,
@@ -336,7 +321,7 @@ mod tests {
         #[allow(irrefutable_let_patterns)]
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             self.endpoint_self.as_mut().request(
-                TestTrace::new(),
+                test_span(""),
                 RequestToParent::IncomingConnection {
                     address: "test".to_string(),
                 },
@@ -367,7 +352,7 @@ mod tests {
                     } => {
                         // let _request = GwDht::ResolveAddressForId { msg };
                         self.dht.as_mut().request(
-                            TestTrace("test1".to_string()),
+                            test_span("test1"),
                             dht_protocol::RequestToChild::ResolveAddressForId { id: address },
                             Box::new(move |_m:&mut GatewayTransport, response| {
 
@@ -441,7 +426,7 @@ mod tests {
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .build::<(), TestTrace>();
+            .build::<()>();
 
         // allow the actor to run this actor always creates a simulated incoming
         // connection each time it processes
@@ -468,7 +453,7 @@ mod tests {
         // here we simply watch that we got a response back as expected
         t_actor_endpoint
             .request(
-                TestTrace("42".to_string()),
+                test_span("42"),
                 RequestToChild::Bind {
                     spec: "address_to_bind_to".to_string(),
                 },
@@ -484,9 +469,9 @@ mod tests {
 
         t_actor_endpoint
             .request(
-                TestTrace("42".to_string()),
+                test_span("42"),
                 RequestToChild::SendMessage {
-                    address: "agent_id_1".to_string(),
+                    address: "agentId:agent_id_1".to_string(),
                     payload: b"some content".to_vec(),
                 },
                 Box::new(|_: &mut (), r| {

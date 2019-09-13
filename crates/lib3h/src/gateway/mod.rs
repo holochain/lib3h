@@ -1,78 +1,28 @@
+#[allow(non_snake_case)]
+pub mod gateway_actor;
+pub mod gateway_dht;
 pub mod gateway_transport;
 pub mod p2p_gateway;
-pub mod wrapper;
+pub mod protocol;
 
-use crate::{
-    dht::dht_protocol::*,
-    transport::{protocol::*, transport_trait::Transport, ConnectionId, TransportWrapper},
-};
-use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::protocol_server::Lib3hServerProtocol;
-use lib3h_tracing::Lib3hTrace;
-use std::collections::{HashMap, VecDeque};
-use url::Url;
-/// describes a super construct of a Transport and a Dht allowing
-/// Transport access via peer discovery handled by the Dht
-pub trait Gateway: Transport {
-    fn identifier(&self) -> &str;
-    fn transport_inject_event(&mut self, evt: TransportEvent);
-    fn get_connection_id(&mut self, peer_address: &str) -> Option<String>;
+use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
+use detach::prelude::*;
 
-    fn process_dht(&mut self) -> GhostResult<()>;
-    fn as_dht_mut(&mut self) -> &mut ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>;
-
-    /// temp HACK. Waiting for gateway actor
-    fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol>;
-
-    // TODO - remove this hack
-    fn hold_peer(&mut self, peer_data: PeerData);
-
-    // sync actor requests
-    fn get_peer_list_sync(&mut self) -> Vec<PeerData>;
-    fn get_this_peer_sync(&mut self) -> PeerData;
-    fn get_peer_sync(&mut self, peer_address: &str) -> Option<PeerData>;
-}
-
-/// Gateway to a P2P network.
-/// Combines a transport and a DHT.
+/// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
-/// P2pGateway should not `post() & process()` its inner transport but call it synchrounously.
-pub struct P2pGateway<'gateway> {
+pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
-    /// Map holding the reversed mapping between connection url and connectionId response
-    connection_map: HashMap<Url, ConnectionId>,
-    /// Own inbox for TransportCommands which is processed during Transport::process()
-    inner_transport: TransportWrapper<'gateway>,
-    transport_inbox: VecDeque<TransportCommand>,
-    transport_inject_events: Vec<TransportEvent>,
+
+    /// Transport
+    child_transport_endpoint:
+        Detach<transport::protocol::TransportActorParentContextEndpoint<P2pGateway>>,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>,
-    // Cache
-    this_peer: PeerData,
-    // user data for ghost callback
-    user_data: GatewayUserData,
-}
+    inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
 
-// user data for ghost callback
-pub struct GatewayUserData {
+    /// self ghost actor
+    endpoint_parent: Option<GatewayParentEndpoint>,
+    endpoint_self: Detach<GatewaySelfEndpoint<()>>,
+    /// cached data from inner dht
     this_peer: PeerData,
-    maybe_peer: Option<PeerData>,
-    peer_list: Vec<PeerData>,
-    pub lib3h_outbox: Vec<Lib3hServerProtocol>,
-}
-
-impl GatewayUserData {
-    pub fn new() -> Self {
-        GatewayUserData {
-            this_peer: PeerData {
-                peer_address: "FIXME".to_string(),
-                peer_uri: Url::parse("fixme://host:123").unwrap(),
-                timestamp: 0,
-            },
-            maybe_peer: None,
-            peer_list: Vec::new(),
-            lib3h_outbox: Vec::new(),
-        }
-    }
 }

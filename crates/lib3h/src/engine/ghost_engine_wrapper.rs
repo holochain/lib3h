@@ -9,19 +9,7 @@ use lib3h_protocol::{
     protocol_server::*,
     DidWork,
 };
-use lib3h_tracing::Lib3hTrace;
-
-/// the context when making a request from core
-/// this is always the request_id
-pub struct ClientRequestContext(String);
-impl ClientRequestContext {
-    pub fn new(id: &str) -> Self {
-        Self(id.to_string())
-    }
-    pub fn get_request_id(&self) -> String {
-        self.0.clone()
-    }
-}
+use lib3h_tracing::Lib3hSpan;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -35,9 +23,7 @@ where
         EngineError,
     >,
 {
-    engine: Detach<
-        GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Lib3hTrace, Engine, EngineError>,
-    >,
+    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
@@ -118,42 +104,31 @@ where
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
-        let ctx = match &client_msg {
-            Lib3hClientProtocol::Connect(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::JoinSpace(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::LeaveSpace(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::SendDirectMessage(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::FetchEntry(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::QueryEntry(data) => ClientRequestContext::new(&data.request_id),
-            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleFetchEntryResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleQueryEntryResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => {
-                ClientRequestContext::new(&data.request_id)
-            }
-            Lib3hClientProtocol::PublishEntry(_) => ClientRequestContext::new(""),
-            Lib3hClientProtocol::HoldEntry(_) => ClientRequestContext::new(""),
+        let request_id: String = match &client_msg {
+            Lib3hClientProtocol::Connect(data) => &data.request_id,
+            Lib3hClientProtocol::JoinSpace(data) => &data.request_id,
+            Lib3hClientProtocol::LeaveSpace(data) => &data.request_id,
+            Lib3hClientProtocol::SendDirectMessage(data) => &data.request_id,
+            Lib3hClientProtocol::FetchEntry(data) => &data.request_id,
+            Lib3hClientProtocol::QueryEntry(data) => &data.request_id,
+            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleFetchEntryResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleQueryEntryResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => &data.request_id,
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => &data.request_id,
+            Lib3hClientProtocol::PublishEntry(_) => "",
+            Lib3hClientProtocol::HoldEntry(_) => "",
             _ => unimplemented!(),
-        };
-        let request_id = ctx.get_request_id();
-        let result = if &request_id == "" {
-            self.engine.publish(client_msg.into())
+        }
+        .to_string();
+
+        let result = if request_id == "" {
+            self.engine.publish(Lib3hSpan::todo(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 client_msg.into(),
-                LegacyLib3h::make_callback(request_id),
+                LegacyLib3h::make_callback(request_id.to_string()),
             )
         };
         result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
@@ -181,7 +156,7 @@ where
 mod tests {
     use super::*;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::Lib3hTrace;
+    use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
     type EngineError = String;
@@ -199,7 +174,6 @@ mod tests {
         lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
-                Lib3hTrace,
                 Lib3hToClient,
                 Lib3hToClientResponse,
                 ClientToLib3h,
@@ -284,7 +258,7 @@ mod tests {
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            let _ = self.lib3h_endpoint.publish(msg);
+            let _ = self.lib3h_endpoint.publish(Lib3hSpan::todo(), msg);
         }
     }
 

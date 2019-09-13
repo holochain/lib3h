@@ -7,7 +7,6 @@ use url::Url;
 
 use crate::{dht::dht_config::DhtConfig, error::*};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::*;
 
 pub type FromPeerAddress = PeerAddress;
 
@@ -20,9 +19,8 @@ pub type DhtActor = dyn GhostActor<
     DhtRequestToChildResponse,
     Lib3hError,
 >;
-pub type DhtEndpointWithContext<UserData, TraceContext> = GhostContextEndpoint<
+pub type DhtEndpointWithContext<UserData> = GhostContextEndpoint<
     UserData,
-    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -36,9 +34,8 @@ pub type DhtEndpoint = GhostEndpoint<
     DhtRequestToParentResponse,
     Lib3hError,
 >;
-pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
+pub type ChildDhtWrapperDyn<UserData> = GhostParentWrapperDyn<
     UserData,
-    TraceContext,
     DhtRequestToParent,
     DhtRequestToParentResponse,
     DhtRequestToChild,
@@ -48,26 +45,11 @@ pub type ChildDhtWrapperDyn<UserData, TraceContext> = GhostParentWrapperDyn<
 
 pub type DhtToChildMessage =
     GhostMessage<DhtRequestToChild, DhtRequestToParent, DhtRequestToChildResponse, Lib3hError>;
-pub type DhtToChildMessageData = GhostMessageData<DhtRequestToChild>;
 
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
-pub type DhtToParentMessageData = GhostMessageData<DhtRequestToParent>;
 
-#[derive(Debug, Clone)]
-pub enum DhtContext {
-    NoOp,
-    RequestAspectsOf {
-        entry_address: Address,
-        aspect_address_list: Vec<Address>,
-        msg: EntryListData,
-        request_id: String,
-    },
-    RequestEntry(DhtToChildMessageData),
-    QueryEntry(QueryEntryData),
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.
