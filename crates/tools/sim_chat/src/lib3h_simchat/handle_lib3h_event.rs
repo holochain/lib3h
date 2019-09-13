@@ -116,3 +116,114 @@ pub fn handle_and_convert_lib3h_event(
         None => None,    // there was nothing in the message
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use crate::simchat::{SimChatMessage, MessageList};
+    use super::*;
+    use std::collections::hash_map::DefaultHasher;
+    use std::collections::HashSet;
+    use std::hash::{Hash, Hasher};
+    use std::iter::FromIterator;
+    use lib3h_protocol::{
+        Address,
+    };    
+
+    fn send_message_event(message: &SimChatMessage) -> Lib3hToClient {
+        let mut hasher = DefaultHasher::new();
+        message.hash(&mut hasher);
+        Lib3hToClient::HandleStoreEntryAspect(
+            StoreEntryAspectData {
+                space_address: Address::from("some_space"),
+                entry_address: Address::from("some_entry"),
+                request_id: String::from("0"),
+                provider_agent_id: Address::from("some_agent"),
+                entry_aspect: EntryAspectData {
+                    aspect: message.to_opaque(),
+                    aspect_address: Address::from(hasher.finish().to_string()),
+                    type_hint: String::from(""),
+                    publish_ts: 0,
+                }
+            }
+        )
+    }
+
+    #[test]
+    fn handle_store_entry_mutates_state() {
+        let mut state = Lib3hSimChatState::new();
+        let message = SimChatMessage {
+            from_agent: String::from("some_agent"),
+            payload: String::from("hi"),
+            timestamp: 0,
+        };
+        let (s,_r) = crossbeam_channel::unbounded();
+        let ghost_message = GhostMessage::new(None, send_message_event(&message), s);
+        let response = handle_and_convert_lib3h_event(ghost_message, &mut state);
+
+        assert_eq!(response, None); // this does not produce a chat event
+        assert_eq!(
+            state.store.get_all_messages(&Address::from("some_space"), &Address::from("some_entry")).expect("no messages"),
+            MessageList(vec![message])
+        )
+    }
+
+    #[test]
+    fn messages_stack_in_store() {
+        let mut state = Lib3hSimChatState::new();
+        let messages = vec![
+            SimChatMessage {
+                from_agent: String::from("some_agent"),
+                payload: String::from("hi"),
+                timestamp: 0,
+            },
+            SimChatMessage {
+                from_agent: String::from("some_agent"),
+                payload: String::from("hi2"),
+                timestamp: 1,
+            }
+        ];
+
+        let (s,_r) = crossbeam_channel::unbounded();
+        for message in &messages {
+            let ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
+            handle_and_convert_lib3h_event(ghost_message, &mut state);
+        }
+
+        let stored_messages: Vec<SimChatMessage> = state.store.get_all_messages(&Address::from("some_space"), &Address::from("some_entry")).expect("no messages").0;
+
+        assert_eq!(
+            HashSet::<SimChatMessage>::from_iter(stored_messages.into_iter()), 
+            HashSet::from_iter(messages.into_iter())
+        )
+    }
+
+    #[test]
+    fn messages_dedup_in_store() {
+        let mut state = Lib3hSimChatState::new();
+        let messages = vec![
+            SimChatMessage {
+                from_agent: String::from("some_agent"),
+                payload: String::from("hi"),
+                timestamp: 0,
+            },
+            SimChatMessage {
+                from_agent: String::from("some_agent"),
+                payload: String::from("hi"),
+                timestamp: 0,
+            }
+        ];
+
+        let (s,_r) = crossbeam_channel::unbounded();
+        for message in &messages {
+            let ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
+            handle_and_convert_lib3h_event(ghost_message, &mut state);
+        }
+
+        let stored_messages: Vec<SimChatMessage> = state.store.get_all_messages(&Address::from("some_space"), &Address::from("some_entry")).expect("no messages").0;
+
+        assert_eq!(
+            stored_messages, 
+            vec![messages[0].clone()]
+        )
+    }
+}

@@ -22,7 +22,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{SystemTime, UNIX_EPOCH},
 };
 use url::Url;
 
@@ -257,10 +256,7 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
 }
 
 pub fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
+    0
 }
 
 #[cfg(test)]
