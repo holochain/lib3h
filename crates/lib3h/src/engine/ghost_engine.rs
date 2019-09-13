@@ -118,13 +118,14 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<Self> {
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
 
-        let mut transport = TransportEncoding::new(
+        let transport = TransportEncoding::new(
             crypto.box_clone(),
             transport_keys.transport_id.clone(),
             Box::new(KeystoreStub::new()),
             transport,
         );
 
+        /*
         let network_endpoint = Detach::new(
             transport
                 .take_parent_endpoint()
@@ -133,6 +134,7 @@ impl<'engine> GhostEngine<'engine> {
                 .request_id_prefix("tmem_to_child_")
                 .build::<P2pGateway>(),
         );
+        */
 
         /*
         // Bind & create this_net_peer
@@ -176,7 +178,7 @@ impl<'engine> GhostEngine<'engine> {
         let multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
-                network_endpoint,
+                Box::new(transport),
                 dht_factory,
                 &dht_config,
             )),
@@ -399,18 +401,22 @@ impl<'engine> GhostEngine<'engine> {
         );
 
         // Create new space gateway for this ChainId
-        let uniplex_endpoint = Detach::new(
+        let uniplex = TransportEndpointAsActor::new(
             self.multiplexer
                 .as_mut()
                 .as_mut()
-                .create_agent_space_route(&space_address, &agent_id)
-                .as_context_endpoint_builder()
-                .build::<P2pGateway>(),
+                .create_agent_space_route(&space_address, &agent_id),
+        );
+        let uniplex = TransportEncoding::new(
+            self.crypto.box_clone(),
+            agent_id.to_string(),
+            Box::new(KeystoreStub::new()),
+            Box::new(uniplex),
         );
         let new_space_gateway = GatewayParentWrapper::new(
             P2pGateway::new_with_space(
                 &space_address,
-                uniplex_endpoint,
+                Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,
             ),
