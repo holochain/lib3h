@@ -127,7 +127,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         // Create DhtConfig
         let dht_config =
-            DhtConfig::with_real_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
+            DhtConfig::with_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         let multiplexer = Detach::new(GatewayParentWrapper::new(
@@ -349,7 +349,7 @@ impl<'engine> GhostEngine<'engine> {
             Url::parse(format!("transportId:{}", self.this_net_peer.peer_address).as_str())
                 .expect("can parse url")
         };
-        let dht_config = DhtConfig::with_real_engine_config(
+        let dht_config = DhtConfig::with_engine_config(
             &agent_id.to_string(),
             &this_peer_transport_id_as_uri,
             &self.config,

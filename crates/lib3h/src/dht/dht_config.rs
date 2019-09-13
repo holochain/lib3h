@@ -25,7 +25,7 @@ impl DhtConfig {
         }
     }
 
-    pub fn with_real_engine_config(
+    pub fn with_engine_config(
         peer_address: &str,
         peer_uri: &Url,
         config: &crate::engine::EngineConfig,
