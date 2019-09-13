@@ -106,11 +106,11 @@ pub struct GhostEngine<'engine> {
     name: String,
     /// Config settings
     config: RealEngineConfig,
-    /// Factory for building DHT's of type D
+    /// Factory for building the DHTs used by the gateways
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
-    /// P2p gateway for the network layer
+    /// Multiplexer holding the network gateway
     multiplexer: Detach<GatewayParentWrapper<GhostEngine<'engine>, TransportMultiplex<P2pGateway>>>,
     /// Cached this_peer of the multiplexer
     this_net_peer: PeerData,

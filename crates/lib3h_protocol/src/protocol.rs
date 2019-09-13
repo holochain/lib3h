@@ -153,6 +153,9 @@ impl From<Lib3hClientProtocol> for Lib3hToClientResponse {
 impl From<Lib3hServerProtocol> for Lib3hToClient {
     fn from(c: Lib3hServerProtocol) -> Self {
         match c {
+            Lib3hServerProtocol::Connected(connected_data) => {
+                Lib3hToClient::Connected(connected_data)
+            }
             Lib3hServerProtocol::Disconnected(disconnected_data) => {
                 Lib3hToClient::Disconnected(disconnected_data)
             }
