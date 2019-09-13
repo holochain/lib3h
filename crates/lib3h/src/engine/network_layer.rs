@@ -32,11 +32,6 @@ impl<'engine> GhostEngine<'engine> {
                 }
             }
         }
-
-        //        // FIXME: DHT magic
-        //        let mut temp = self.multiplexer.drain_dht_outbox();
-        //        self.temp_outbox.append(&mut temp);
-
         // Done
         Ok(true /* fixme */)
     }
@@ -102,7 +97,7 @@ impl<'engine> GhostEngine<'engine> {
             transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
                 self.network_connections.remove(uri);
                 error!("{} Network error from {} : {:?}", self.name, uri, error);
-                // Output a Lib3hServerProtocol::Disconnected if it was the connection
+                // Output a Lib3hToClient::Disconnected if it was the connection
                 if self.network_connections.is_empty() {
                     let data = DisconnectedData {
                         network_id: "FIXME".to_string(), // TODO #172
@@ -116,12 +111,12 @@ impl<'engine> GhostEngine<'engine> {
             }
             //            TransportEvent::ConnectionClosed(id) => {
             //                self.network_connections.remove(id);
-            //                // Output a Lib3hServerProtocol::Disconnected if it was the last connection
+            //                // Output a Lib3hToClient::Disconnected if it was the last connection
             //                if self.network_connections.is_empty() {
             //                    let data = DisconnectedData {
             //                        network_id: "FIXME".to_string(), // TODO #172
             //                    };
-            //                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+            //                    outbox.push(Lib3hToClient::Disconnected(data));
             //                }
             //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
@@ -201,7 +196,7 @@ impl<'engine> GhostEngine<'engine> {
             )
             .expect("sync functions should work");
 
-        // Output a Lib3hServerProtocol::Connected if its the first connection
+        // Output a Lib3hToClient::Connected if its the first connection
         if self.network_connections.is_empty() {
             let data = ConnectedData {
                 request_id: "fixme".to_string(),
@@ -215,7 +210,6 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Serve a P2pProtocol sent to us by the network.
-    /// Return a list of Lib3hServerProtocol to send to Core.
     /// TODO #150
     #[allow(non_snake_case)]
     fn serve_P2pProtocol(&mut self, _from: &Url, p2p_msg: &P2pProtocol) -> Lib3hResult<()> {
@@ -253,7 +247,7 @@ impl<'engine> GhostEngine<'engine> {
                     dm_data.to_agent_id.to_owned(),
                 ));
                 if let Some(_) = maybe_space_gateway {
-                    // Change into Lib3hServerProtocol
+                    // Change into Lib3hToClient
                     let lib3_msg = Lib3hToClient::HandleSendDirectMessage(dm_data.clone());
                     self.lib3h_endpoint.publish(Lib3hSpan::todo(), lib3_msg)?;
                 } else {

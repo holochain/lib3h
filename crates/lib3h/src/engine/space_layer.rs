@@ -54,13 +54,10 @@ impl<'engine> GhostEngine<'engine> {
             Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
-            detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap
+            detach_run!(space_gateway, |g| g.process(self))?;
             let request_list = space_gateway.drain_messages();
             space_outbox_map.insert(chain_id.clone(), request_list);
             self.space_gateway_map.insert(chain_id, space_gateway);
-            //            // FIXME: DHT magic
-            //            let mut temp = space_gateway.drain_dht_outbox();
-            //            self.temp_outbox.append(&mut temp);
         }
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
@@ -142,7 +139,7 @@ impl<'engine> GhostEngine<'engine> {
                     DhtRequestToParent::EntryPruned(_address) => {
                         // TODO #174
                     }
-                    // EntryDataRequested: Change it into a Lib3hServerProtocol::HandleFetchEntry.
+                    // EntryDataRequested: Change it into a Lib3hToClient::HandleFetchEntry.
                     DhtRequestToParent::RequestEntry(entry_address) => {
                         let msg_data = FetchEntryData {
                             space_address: chain_id.0.clone(),

@@ -58,10 +58,6 @@ impl<'engine>
         // Process the space layer
         self.process_space_gateways()?;
 
-        //        // Hack
-        //        let (ugly_did_work, mut ugly_outbox) = self.process_ugly();
-        //        outbox.append(&mut ugly_outbox);
-
         // Done
         Ok(true.into())
     }
