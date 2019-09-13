@@ -22,6 +22,7 @@ use lib3h_protocol::{
     protocol_server::Lib3hServerProtocol,
 };
 use lib3h_sodium::SodiumCryptoSystem;
+use std::path::PathBuf;
 use url::Url;
 use utils::{
     constants::*,
@@ -71,7 +72,7 @@ fn basic_setup_mock(name: &str) -> RealEngine<MirrorDht> {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
         dht_gossip_interval: 100,
@@ -98,7 +99,7 @@ fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
         tls_config: TlsConfig::Unencrypted,
         socket_type: "ws".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
         dht_gossip_interval: 200,
