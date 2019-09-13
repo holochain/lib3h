@@ -124,18 +124,21 @@ impl Lib3hSimChat {
 
                     // gather all the ChatEvents
                     // Receive directly from the crossbeam channel
-                    // and convert relevent N3H protocol messages to chat events 
+                    // and convert relevent N3H protocol messages to chat events and handle
                     let direct_chat_events = out_recv.try_iter();
-                    let engine_chat_events = engine_chat_events
+                    let _engine_chat_events = engine_chat_events
                         .into_iter()
                         // process lib3h messages and convert to a chat event if required
-                        .filter_map(|engine_message| {
-                            handle_and_convert_lib3h_event(engine_message, &mut state)
+                        .for_each(|engine_message| {
+                            if let Some(chat_event) = handle_and_convert_lib3h_event(engine_message, &mut state) {
+                            	handler(&chat_event);
+                        		handle_chat_event(chat_event, &mut state, &mut parent_endpoint, internal_sender.clone());
+                            }
                         });
 
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
-                    for chat_event in direct_chat_events.chain(engine_chat_events) {
+                    for chat_event in direct_chat_events {
 
                         // every chat event call the handler that was passed
                         handler(&chat_event);
