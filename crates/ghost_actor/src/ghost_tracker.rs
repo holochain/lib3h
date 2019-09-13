@@ -267,7 +267,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1));
         detach_run!(&mut actor.tracker, |tracker| {
             let result = tracker.process(&mut actor);
-            assert_eq!("Ok(())", format!("{:?}", result));
+            assert_eq!("Ok(WorkWasDone(true))", format!("{:?}", result));
         });
         assert_eq!(actor.state, "timed_out");
         assert_eq!(actor.tracker.pending.len(), 0);

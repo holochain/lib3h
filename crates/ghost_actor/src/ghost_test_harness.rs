@@ -339,19 +339,20 @@ macro_rules! wait_did_work {
     ) => {{
         let mut did_work = false;
         for i in 0..20 {
-            let did_work = $ghost_actor
+            did_work = $ghost_actor
                 .process()
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
                 .map(|work_was_done| work_was_done.into())
-                .unwrap_or(false);
+                .unwrap_or(did_work);
             if did_work {
                 break;
             }
+            trace!("[{}] wait_did_work", i)
         }
-        if should_abort {
+        if $should_abort {
             assert!(did_work);
         }
-        return false;
+        did_work
     }};
     ($ghost_actor:ident) => {
         wait_did_work!($ghost_actor, true)
@@ -374,4 +375,26 @@ macro_rules! wait_until_no_work {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    use crate::{GhostResult, WorkWasDone};
+
+    #[derive(Debug, Clone, PartialEq)]
+    struct DidWorkActor(u8, u8);
+
+    impl DidWorkActor {
+    
+        pub fn process(&mut self) -> GhostResult<WorkWasDone> {
+            self.0 += 1;
+            Ok((self.0 >= self.1).into())
+        }
+    }
+
+    #[test]
+    fn test_wait_did_work() {
+        let actor = &mut DidWorkActor(0, 2);
+        
+        wait_did_work!(actor);
+    }
+
+}

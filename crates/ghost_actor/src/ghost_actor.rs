@@ -386,12 +386,12 @@ impl<
 mod tests {
     use super::*;
     use crate::{
-        ghost_channel::create_ghost_channel, ghost_test_harness::Processor,
+        ghost_channel::create_ghost_channel,
         ghost_tracker::GhostCallbackData,
     };
     use detach::prelude::*;
     use lib3h_tracing::test_span;
-    use predicates::prelude::*;
+//    use predicates::prelude::*;
     type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
@@ -455,6 +455,7 @@ mod tests {
 
         // for this test actor what we do
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            println!("process_concrete!");
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
             detach_run!(&mut self.endpoint_as_child, |cs| cs.process(self))?;
@@ -464,6 +465,7 @@ mod tests {
             // add them to our internal state.
             let mut did_work = false;
             for mut msg in self.endpoint_as_child.as_mut().drain_messages() {
+                println!("process_concrete, got msg");
                 let payload = match msg.take_message().expect("exists") {
                     TestMsgIn(payload) => payload,
                 };
@@ -576,41 +578,18 @@ mod tests {
         )
     }
 
+/*
     #[test]
-    fn test_ghost_actor_parent_wrapper2() {
-        // much of the previous test is the parent creating instances of the actor
-        // and taking control of the parent endpoint.  Parent wrapper implements
-        // much of this work as a convenience
+    fn test_wait_did_work() {
+        let actor = &mut TestActor::new();
+        
+        actor.endpoint_for_parent.unwrap()
+            .send(crate::GhostEndpointMessage::Request {
+                request_id: None,
+                payload: TestMsgIn("event from a parent".into()),
+            })
+            .expect("should send");
 
-        let mut fake_parent = FakeParent {
-            state: "".to_string(),
-        };
-
-        // create the wrapper
-        let mut wrapped_child: GhostParentWrapper<
-            FakeParent,
-            TestMsgOut,
-            TestMsgOutResponse,
-            TestMsgIn,
-            TestMsgInResponse,
-            TestError,
-            TestActor,
-        > = GhostParentWrapper::new(TestActor::new(), "parent");
-
-        let span = test_span("test_ghost_actor");
-
-        // use it to publish an event via the wrapper
-        wrapped_child
-            .publish(span, TestMsgIn("event from parent".into()))
-            .unwrap();
-
-        // process via the wrapper
-        assert!(wrapped_child.process(&mut fake_parent).is_ok());
-
-        let response = TestMsgInResponse("event from parent".into());
-        let request = TestMsgIn("event from parent".into());
-
-        assert_callback_eq!(wrapped_child, fake_parent, request, response, TestError)
-    }
-
+        wait_did_work!(actor);
+    }*/
 }
