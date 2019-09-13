@@ -456,10 +456,10 @@ mod tests {
     fn it_should_loop_question() {
         let mut mdns = MulticastDnsBuilder::new()
             .bind_address("0.0.0.0")
-            .bind_port(55055)
+            .multicast_address("224.0.0.247")
+            .bind_port(55247)
             .multicast_loop(true)
             .multicast_ttl(255)
-            .multicast_address("224.0.0.247")
             .build()
             .expect("build fail");
 
