@@ -27,10 +27,7 @@ impl RealEngine {
             .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((
-                space_address,
-                self.get_this_peer_sync(chainId.clone()).clone(),
-            ));
+            result.push((space_address, self.this_space_peer(chainId.clone()).clone()));
         }
         result
     }
@@ -92,7 +89,7 @@ impl RealEngine {
             self.name, chain_id, request,
         );
         let mut outbox = Vec::new();
-        let mut space_gateway = self
+        let space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
@@ -102,8 +99,12 @@ impl RealEngine {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossipTo(&chain_id.0.to_string(), &mut space_gateway, gossip_data)
-                            .expect("Failed to gossip with space_gateway");
+                        handle_gossipTo(
+                            &chain_id.0.to_string(),
+                            space_gateway.as_mut(),
+                            gossip_data,
+                        )
+                        .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
                         // n/a - should have been handled by gateway
