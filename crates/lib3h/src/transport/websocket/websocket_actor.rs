@@ -149,7 +149,7 @@ GhostActor<
 
         println!("Processing for: {}", my_addr);
 
-        let (did_work, transport_events) = self.process()?;
+        let (did_work, transport_events) = self.process_inner()?;
         for event in transport_events {
             match event {
                 TransportEvent::ErrorOccured(connection_id, error) => {
@@ -175,6 +175,7 @@ GhostActor<
                     std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 },
                 TransportEvent::ReceivedData(connection_id, payload) => {
+                    //println!("DATA RECEIVED!!! {:?}", String::from_utf8(payload.clone()));
                     let uri = self.connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
@@ -199,7 +200,10 @@ GhostActor<
 #[cfg(test)]
 mod tests {
 
-    //use super::*;
+    use super::*;
+    use crate::transport::websocket::TlsConfig;
+    use url::Url;
+    use regex::Regex;
     //use protocol::RequestToChildResponse;
     //    use lib3h_ghost_actor::GhostCallbackData;
 
@@ -227,55 +231,55 @@ mod tests {
             Box::new(GhostTransportMemory::new()));
              */
 
-        /*
-        let mut transport1 = GhostTransportMemory::new();
-        let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
+
+        let mut transport1 = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
+        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .request_id_prefix("tmem_to_child1")
+            .request_id_prefix("twss_to_child1")
             .build::<(), Lib3hTrace>();
 
-        let mut transport2 = GhostTransportMemory::new();
+        let mut transport2 = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);;
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .request_id_prefix("tmem_to_child2")
+            .request_id_prefix("twss_to_child2")
             .build::<(), Lib3hTrace>();
 
         // create two memory bindings so that we have addresses
-        assert_eq!(transport1.maybe_my_address, None);
-        assert_eq!(transport2.maybe_my_address, None);
+        assert_eq!(transport1.bound_url, None);
+        assert_eq!(transport2.bound_url, None);
 
-        let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
+        let expected_transport1_address = Url::parse("wss://0.0.0.0:22888").unwrap();
         t1_endpoint
             .request(
                 Lib3hTrace,
                 RequestToChild::Bind {
-                    spec: Url::parse("mem://_").unwrap(),
+                    spec: expected_transport1_address.clone(),
                 },
                 Box::new(|_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
+                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://0.0.0.0:22888/\" })))",
                         &format!("{:?}", r)
                     );
                     Ok(())
                 }),
             )
             .unwrap();
-        let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
+        let expected_transport2_address = Url::parse("wss://0.0.0.0:22889").unwrap();
         t2_endpoint
             .request(
                 Lib3hTrace,
                 RequestToChild::Bind {
-                    spec: Url::parse("mem://_").unwrap(),
+                    spec: expected_transport2_address.clone(),
                 },
                 Box::new(|_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
+                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://0.0.0.0:22889/\" })))",
                         &format!("{:?}", r)
                     );
                     Ok(())
@@ -290,12 +294,12 @@ mod tests {
         let _ = t2_endpoint.process(&mut ());
 
         assert_eq!(
-            transport1.maybe_my_address,
-            Some(expected_transport1_address)
+            transport1.bound_url(),
+            Some(expected_transport1_address.clone())
         );
         assert_eq!(
-            transport2.maybe_my_address,
-            Some(expected_transport2_address)
+            transport2.bound_url(),
+            Some(expected_transport2_address.clone())
         );
 
         // now send a message from transport1 to transport2 over the bound addresses
@@ -303,12 +307,12 @@ mod tests {
             .request(
                 Lib3hTrace,
                 RequestToChild::SendMessage {
-                    uri: Url::parse("mem://addr_2").unwrap(),
+                    uri: expected_transport2_address.clone(),
                     payload: b"test message".to_vec().into(),
                 },
                 Box::new(|_: &mut (), r| {
                     // parent should see that the send request was OK
-                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                    assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
                     Ok(())
                 }),
             )
@@ -320,16 +324,34 @@ mod tests {
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut ());
 
+
         let mut requests = t2_endpoint.drain_messages();
-        assert_eq!(2, requests.len());
-        assert_eq!(
-            "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
-            format!("{:?}", requests[0].take_message())
+        //assert_eq!(2, requests.len());
+        assert!(
+            format!("{:?}", requests[0].take_message()).starts_with(
+                "Some(IncomingConnection { uri: \"wss://127.0.0.1"
+            )
         );
-        assert_eq!(
-            "Some(ReceivedData { uri: \"mem://addr_1/\", payload: \"test message\" })",
-            format!("{:?}", requests[1].take_message())
+
+        transport1.process().unwrap();
+        transport1.process().unwrap();
+
+        let _ = t1_endpoint.process(&mut ());
+
+        transport2.process().unwrap();
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut ());
+
+        let mut requests = t2_endpoint.drain_messages();
+        let message_string = format!("{:?}", requests[0].take_message());
+        println!("{}", message_string);
+        assert!(
+            Regex::new(
+                "Some\\(ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}\\)",
+            ).unwrap()
+            .is_match(&message_string)
         );
-        */
+
+
     }
 }
