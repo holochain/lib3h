@@ -16,11 +16,9 @@ extern crate log;
 pub struct WorkWasDone(pub bool);
 
 impl WorkWasDone {
-
-    fn or(&self, w:WorkWasDone) -> WorkWasDone {
+    fn or(&self, w: WorkWasDone) -> WorkWasDone {
         WorkWasDone(w.0 || self.0)
     }
-
 }
 
 impl From<bool> for WorkWasDone {

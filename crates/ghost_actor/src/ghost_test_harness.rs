@@ -53,7 +53,8 @@ where
 {
 }
 
-impl<'a, Cb: 'static, E: 'static, T> Predicate<ProcessorResult<'a, Cb, E>> for dyn AssertEquals<Cb, E, T>
+impl<'a, Cb: 'static, E: 'static, T> Predicate<ProcessorResult<'a, Cb, E>>
+    for dyn AssertEquals<Cb, E, T>
 where
     T: PartialEq + std::fmt::Debug,
 {
@@ -75,7 +76,8 @@ pub trait Assert<Cb: 'static, E: 'static, T> {
 #[derive(PartialEq, Debug)]
 pub struct CallbackDataEquals<Cb, E>(pub Cb, pub std::marker::PhantomData<E>);
 
-impl<'a, Cb, E: 'static> predicates::Predicate<ProcessorResult<'a, Cb, E>> for CallbackDataEquals<Cb, E>
+impl<'a, Cb, E: 'static> predicates::Predicate<ProcessorResult<'a, Cb, E>>
+    for CallbackDataEquals<Cb, E>
 where
     Cb: PartialEq + std::fmt::Debug + 'static,
 {
@@ -161,7 +163,9 @@ impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for CallbackDataAssert<Cb
     }
 }
 
-impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<'a, Cb, E>> for CallbackDataAssert<Cb, E> {
+impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<'a, Cb, E>>
+    for CallbackDataAssert<Cb, E>
+{
     fn eval(&self, args: &ProcessorResult<'a, Cb, E>) -> bool {
         self.extracted(args)
             .map(|actual| self.assert_inner(&actual))
@@ -209,7 +213,7 @@ impl<Cb: 'static, E: 'static> predicates::reflection::PredicateReflection for Di
 /// Convenience function that asserts only one particular equality predicate
 /// passes for a collection of . See assert_processed for
 macro_rules! assert_callback_eq {
-    ($ghost_can_track: ident, 
+    ($ghost_can_track: ident,
      $user_data: ident,
      $request_to_child: ident,
      $equal_to: ident,
@@ -217,10 +221,15 @@ macro_rules! assert_callback_eq {
     ) => {{
         let processor = Box::new($crate::ghost_test_harness::CallbackDataEquals(
             $equal_to,
-            std::marker::PhantomData
+            std::marker::PhantomData,
         ));
-        assert_callback_processed!($ghost_can_track, 
-            $user_data, $request_to_child, $e_type, processor)
+        assert_callback_processed!(
+            $ghost_can_track,
+            $user_data,
+            $request_to_child,
+            $e_type,
+            processor
+        )
     }};
 }
 
@@ -238,11 +247,11 @@ macro_rules! process_one {
             .unwrap_or(false);
         if !did_work {
         } else {
-            let processor_result : $crate::ghost_test_harness::ProcessorResult<_,_> = 
+            let processor_result: $crate::ghost_test_harness::ProcessorResult<_, _> =
                 $crate::ghost_test_harness::ProcessorResult {
-                did_work,
-                callback_data : $callback_data //.as_ref(),
-            };
+                    did_work,
+                    callback_data: $callback_data, //.as_ref(),
+                };
             let mut failed = Vec::new();
 
             for (processor, _orig_processor_result) in $errors.drain(..) {
@@ -279,55 +288,49 @@ macro_rules! assert_callback_processed {
      $request_to_child:ident,
      $e_type:tt,
      $processor:ident
- ) => {
-     {
+ ) => {{
         let mut errors /*: Vec<(
-            Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
-            Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
-        )> */ = Vec::new();
+                    Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
+                    Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
+                )> */ = Vec::new();
 
-       let mut callback_data = Box::new(None);
-       let cb:
-           $crate::ghost_actor::GhostCallback<_, _, _> =
-           Box::new(|_user_data, cb| {
-               *callback_data = Some(&cb);
-               Ok(())
-           });
+        let mut callback_data = Box::new(None);
+        let cb: $crate::ghost_actor::GhostCallback<_, _, _> = Box::new(|_user_data, cb| {
+            *callback_data = Some(&cb);
+            Ok(())
+        });
 
-       let context = lib3h_tracing::TestTrace("assert_callback_processed".into());
+        let context = lib3h_tracing::TestTrace("assert_callback_processed".into());
 
-       $ghost_can_track.request(
-           context,
-           $request_to_child,
-           cb
-       ).expect("request to ghost_can_track");
+        $ghost_can_track
+            .request(context, $request_to_child, cb)
+            .expect("request to ghost_can_track");
 
-//       for p in vec![$processor] {
-       errors.push(($processor, None));
-  //     }
+        //       for p in vec![$processor] {
+        errors.push(($processor, None));
+        //     }
 
         for epoch in 0..20 {
             trace!("[{:?}]", epoch);
 
             let callback_data = *callback_data;
-            process_one!($ghost_can_track, $user_data,
-                callback_data, errors);
+            process_one!($ghost_can_track, $user_data, callback_data, errors);
             if errors.is_empty() {
                 break;
             }
         }
 
-           for (p, args) in errors {
-               if let Some(args) = args {
-                   p.test(&args)
-               } else {
-                   // Make degenerate result which should fail
-                   p.test(&$crate::ghost_test_harness::ProcessorResult {
-                       callback_data: None,
-                       did_work: false,
-                   })
-               }
-           }
+        for (p, args) in errors {
+            if let Some(args) = args {
+                p.test(&args)
+            } else {
+                // Make degenerate result which should fail
+                p.test(&$crate::ghost_test_harness::ProcessorResult {
+                    callback_data: None,
+                    did_work: false,
+                })
+            }
+        }
     }};
 }
 

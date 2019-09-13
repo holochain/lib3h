@@ -364,9 +364,8 @@ impl<
 mod tests {
     use super::*;
     use crate::{
-        ghost_channel::create_ghost_channel, 
+        ghost_channel::create_ghost_channel, ghost_test_harness::Processor,
         ghost_tracker::GhostCallbackData,
-        ghost_test_harness::Processor
     };
     use detach::prelude::*;
     use lib3h_tracing::TestTrace;
@@ -588,14 +587,8 @@ mod tests {
 
         let response = TestMsgInResponse("event from parent".into());
         let request = TestMsgIn("event from parent".into());
- 
-        assert_callback_eq!(
-            wrapped_child,
-            fake_parent,
-            request,
-            response,
-            TestError
-        )
+
+        assert_callback_eq!(wrapped_child, fake_parent, request, response, TestError)
     }
 
 }

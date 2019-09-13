@@ -1,7 +1,7 @@
 use lib3h_tracing::CanTrace;
 use std::collections::HashMap;
 
-use crate::{WorkWasDone, ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
+use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
 
