@@ -287,9 +287,9 @@ macro_rules! assert_callback_processed {
      $processor:ident
  ) => {{
         let mut errors /*: Vec<(
-                        Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
-                        Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
-                    )> */ = Vec::new();
+                            Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
+                            Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
+                        )> */ = Vec::new();
 
         let mut callback_data = None; // = Box::new(None);
         let cb: $crate::ghost_actor::GhostCallback<_, _, _> = Box::new(|_user_data, cb| {
@@ -383,7 +383,6 @@ mod tests {
     struct DidWorkActor(u8, u8);
 
     impl DidWorkActor {
-    
         pub fn process(&mut self) -> GhostResult<WorkWasDone> {
             self.0 += 1;
             Ok((self.0 >= self.1).into())
@@ -393,7 +392,7 @@ mod tests {
     #[test]
     fn test_wait_did_work() {
         let actor = &mut DidWorkActor(0, 2);
-        
+
         wait_did_work!(actor);
     }
 

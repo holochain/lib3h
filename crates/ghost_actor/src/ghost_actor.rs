@@ -385,13 +385,10 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ghost_channel::create_ghost_channel,
-        ghost_tracker::GhostCallbackData,
-    };
+    use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
     use lib3h_tracing::test_span;
-//    use predicates::prelude::*;
+    //    use predicates::prelude::*;
     type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
@@ -578,11 +575,11 @@ mod tests {
         )
     }
 
-/*
+    /*
     #[test]
     fn test_wait_did_work() {
         let actor = &mut TestActor::new();
-        
+
         actor.endpoint_for_parent.unwrap()
             .send(crate::GhostEndpointMessage::Request {
                 request_id: None,
