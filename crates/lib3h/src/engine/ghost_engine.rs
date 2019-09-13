@@ -170,11 +170,20 @@ impl<'engine> GhostEngine<'engine> {
     fn priv_connect_bootstraps(&mut self) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
-            self.handle_connect(ConnectData {
+            let data = ConnectData {
                 request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
                 peer_uri: bs,
                 network_id: "".to_string(), // unimplemented
-            })?;
+            };
+
+            // can't use handle_connect() because it assumes a message to respond to
+            let cmd = GatewayRequestToChild::Transport(
+                transport::protocol::RequestToChild::SendMessage {
+                    uri: data.peer_uri,
+                    payload: Opaque::new(),
+                },
+            );
+            self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
         }
         Ok(())
     }
@@ -279,14 +288,38 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Process connect events by sending them to the multiplexer
-    fn handle_connect(&mut self, data: ConnectData) -> GhostResult<()> {
+    fn handle_connect(&mut self, msg: ClientToLib3hMessage, data: ConnectData) -> GhostResult<()> {
         let cmd =
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: data.peer_uri,
+                uri: data.peer_uri.clone(),
                 payload: Opaque::new(),
             });
-        // TODO: #339 convert to request and respond with ConnectedData
-        self.multiplexer.publish(Lib3hSpan::todo(), cmd)
+        self.multiplexer.request(
+            Lib3hSpan::todo(),
+            cmd,
+            Box::new(move |_me, response| {
+                match response {
+                    GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
+                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                    ))) => {
+                        // TODO where do we get this from?
+                        let response_data = ConnectedData {
+                            request_id: data.request_id,
+                            uri: data.peer_uri,
+                        };
+                        msg.respond(Ok(ClientToLib3hResponse::ConnectResult(response_data)))?
+                    }
+                    GhostCallbackData::Response(Err(e)) => {
+                        error!("Got error from connect to gateway: {:?} ", e);
+                    }
+                    GhostCallbackData::Timeout => {
+                        error!("Got timeout on connect to gateway");
+                    }
+                    _ => panic!("bad response type"),
+                }
+                Ok(())
+            }),
+        )
     }
 
     /// Process any Client events or requests
@@ -294,7 +327,7 @@ impl<'engine> GhostEngine<'engine> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(data) => {
                 trace!("ClientToLib3h::Connect: {:?}", &data);
-                self.handle_connect(data)
+                self.handle_connect(msg, data)
             }
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
