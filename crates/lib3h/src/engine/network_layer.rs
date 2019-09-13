@@ -20,19 +20,19 @@ use url::Url;
 /// Network layer related private methods
 impl RealEngine {
     /// Process whatever the network has in for us.
-    pub(crate) fn process_network_gateway(
+    pub(crate) fn process_multiplexer(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         let mut outbox = Vec::new();
         // Process the network gateway
-        detach_run!(&mut self.network_gateway, |ng| ng.process(self))?;
-        for mut request in self.network_gateway.drain_messages() {
+        detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
+        for mut request in self.multiplexer.drain_messages() {
             let payload = request.take_message().expect("exists");
             let mut output = self.handle_network_request(payload)?;
             outbox.append(&mut output);
         }
         //        // FIXME: DHT magic
-        //        let mut temp = self.network_gateway.drain_dht_outbox();
+        //        let mut temp = self.multiplexer.drain_dht_outbox();
         //        self.temp_outbox.append(&mut temp);
         // Done
         Ok((true /* fixme */, outbox))
@@ -64,8 +64,8 @@ impl RealEngine {
         let outbox = Vec::new();
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(NETWORK_GATEWAY_ID, &mut self.network_gateway, gossip_data)
-                    .expect("Failed to gossip with network_gateway");
+                handle_gossipTo(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
+                    .expect("Failed to gossip with multiplexer");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
@@ -83,7 +83,7 @@ impl RealEngine {
                         payload: Opaque::new(),
                     },
                 );
-                self.network_gateway.publish(Lib3hSpan::todo(), cmd)?;
+                self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
@@ -164,40 +164,65 @@ impl RealEngine {
         &mut self,
         net_uri: Url,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        // TODO #150 - Should do this in next process instead
-        let peer_list = self.get_peer_list_sync();
-        trace!("AllJoinedSpaceList: get_peer_list = {:?}", peer_list);
-
-        // TODO #150 - Should do this in next process instead
-        // Send to other node our Joined Spaces
-        {
-            let space_list = self.get_all_spaces();
-            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
-            let mut payload = Vec::new();
-            our_joined_space_list
-                .serialize(&mut Serializer::new(&mut payload))
-                .unwrap();
-            trace!(
-                "AllJoinedSpaceList: {:?} to {:?}",
-                our_joined_space_list,
-                net_uri,
-            );
-            // we need a transportId, so search for it in the DHT
-            let maybe_peer_data = peer_list.iter().find(|pd| pd.peer_uri == net_uri);
-            if let Some(peer_data) = maybe_peer_data {
-                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                self.network_gateway.publish(
-                    Lib3hSpan::todo(),
-                    GatewayRequestToChild::Transport(
-                        transport::protocol::RequestToChild::SendMessage {
-                            uri: Url::parse(&peer_data.peer_address).expect("invalid url format"),
-                            payload: payload.into(),
-                        },
-                    ),
-                )?;
-            }
-            // TODO END
-        }
+        // Get list of known peers
+        let uri_copy = net_uri.clone();
+        self.multiplexer
+            .request(
+                Lib3hSpan::todo(),
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
+                Box::new(move |me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let GatewayRequestToChildResponse::Dht(
+                        DhtRequestToChildResponse::RequestPeerList(peer_list),
+                    ) = response
+                    {
+                        // TODO #150 - Should do this in next process instead
+                        // Send to other node our Joined Spaces
+                        {
+                            let space_list = me.get_all_spaces();
+                            let our_joined_space_list = P2pProtocol::AllJoinedSpaceList(space_list);
+                            let mut payload = Vec::new();
+                            our_joined_space_list
+                                .serialize(&mut Serializer::new(&mut payload))
+                                .unwrap();
+                            trace!(
+                                "AllJoinedSpaceList: {:?} to {:?}",
+                                our_joined_space_list,
+                                uri_copy,
+                            );
+                            // we need a transportId, so search for it in the DHT
+                            let maybe_peer_data =
+                                peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
+                            if let Some(peer_data) = maybe_peer_data {
+                                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                me.multiplexer.publish(
+                                    Lib3hSpan::todo(),
+                                    GatewayRequestToChild::Transport(
+                                        transport::protocol::RequestToChild::SendMessage {
+                                            uri: Url::parse(&peer_data.peer_address)
+                                                .expect("invalid url format"),
+                                            payload: payload.into(),
+                                        },
+                                    ),
+                                )?;
+                            }
+                        }
+                    // TODO END
+                    } else {
+                        panic!("bad response to RequestPeerList: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
 
         // Output a Lib3hServerProtocol::Connected if its the first connection
         let mut outbox = Vec::new();
@@ -228,9 +253,9 @@ impl RealEngine {
                     from_peer_address: msg.from_peer_address.clone().into(),
                     bundle: msg.bundle.clone(),
                 };
-                // Check if its for the network_gateway
+                // Check if its for the multiplexer
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    let _ = self.network_gateway.publish(
+                    let _ = self.multiplexer.publish(
                         Lib3hSpan::todo(),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                     );

@@ -17,24 +17,45 @@ use url::Url;
 impl P2pGateway {
     /// Handle IncomingConnection event from child transport
     fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
-        // Send to other node our PeerAddress
-        let this_peer = self.get_this_peer_sync().clone();
-        let our_peer_address = P2pProtocol::PeerAddress(
-            self.identifier.to_string(),
-            this_peer.peer_address,
-            this_peer.timestamp,
-        );
-        let mut buf = Vec::new();
-        our_peer_address
-            .serialize(&mut Serializer::new(&mut buf))
-            .unwrap();
-        trace!(
-            "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
-            self.identifier,
-            our_peer_address,
-            uri,
-        );
-        let _res = self.send(&uri, &buf, None);
+        self.inner_dht
+            .request(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::RequestThisPeer,
+                Box::new(move |me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
+                        // Send to other node our PeerAddress
+                        let our_peer_address = P2pProtocol::PeerAddress(
+                            me.identifier.to_string(),
+                            this_peer.peer_address,
+                            this_peer.timestamp,
+                        );
+                        let mut buf = Vec::new();
+                        our_peer_address
+                            .serialize(&mut Serializer::new(&mut buf))
+                            .unwrap();
+                        trace!(
+                            "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
+                            me.identifier,
+                            our_peer_address,
+                            uri,
+                        );
+                        me.send(&uri, &buf, None).unwrap(); // FIXME
+                    } else {
+                        panic!("bad response to RequestThisPeer: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )
+            .expect("sync functions should work");
         Ok(())
     }
 

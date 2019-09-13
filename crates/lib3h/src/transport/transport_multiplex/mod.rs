@@ -24,23 +24,23 @@ pub use mplex::TransportMultiplex;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::{error::*, protocol::*};
+    use crate::{error::Lib3hError, gateway::protocol::*, transport::protocol::*};
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::data_types::Opaque;
     use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
-    pub struct TransportMock {
-        endpoint_parent: Option<TransportActorParentEndpoint>,
+    pub struct GatewayMock {
+        endpoint_parent: Option<GatewayParentEndpoint>,
         endpoint_self: Detach<
             GhostContextEndpoint<
-                TransportMock,
-                RequestToParent,
-                RequestToParentResponse,
-                RequestToChild,
-                RequestToChildResponse,
-                TransportError,
+                GatewayMock,
+                GatewayRequestToParent,
+                GatewayRequestToParentResponse,
+                GatewayRequestToChild,
+                GatewayRequestToChildResponse,
+                Lib3hError,
             >,
         >,
         bound_url: Url,
@@ -48,7 +48,7 @@ mod tests {
         mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
     }
 
-    impl TransportMock {
+    impl GatewayMock {
         pub fn new(
             mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
             mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
@@ -73,14 +73,14 @@ mod tests {
 
     impl
         GhostActor<
-            RequestToParent,
-            RequestToParentResponse,
-            RequestToChild,
-            RequestToChildResponse,
-            TransportError,
-        > for TransportMock
+            GatewayRequestToParent,
+            GatewayRequestToParentResponse,
+            GatewayRequestToChild,
+            GatewayRequestToChildResponse,
+            Lib3hError,
+        > for GatewayMock
     {
-        fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
+        fn take_parent_endpoint(&mut self) -> Option<GatewayParentEndpoint> {
             std::mem::replace(&mut self.endpoint_parent, None)
         }
 
@@ -89,28 +89,42 @@ mod tests {
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
                 let span = Lib3hSpan::todo();
                 match msg.take_message().expect("exists") {
-                    RequestToChild::Bind { mut spec } => {
-                        spec.set_path("bound");
-                        self.bound_url = spec.clone();
-                        msg.respond(
-                            span,
-                            Ok(RequestToChildResponse::Bind(BindResultData {
-                                bound_url: spec,
-                            })),
-                        )?;
-                    }
-                    RequestToChild::SendMessage { uri, payload } => {
-                        self.mock_sender.send((uri, payload))?;
-                        msg.respond(span, Ok(RequestToChildResponse::SendMessageSuccess))?;
-                    }
+                    GatewayRequestToChild::Transport(req) => match req {
+                        RequestToChild::Bind { mut spec } => {
+                            spec.set_path("bound");
+                            self.bound_url = spec.clone();
+                            msg.respond(
+                                span,
+                                Ok(GatewayRequestToChildResponse::Transport(
+                                    RequestToChildResponse::Bind(BindResultData {
+                                        bound_url: spec,
+                                    }),
+                                )),
+                            )?;
+                        }
+                        RequestToChild::SendMessage { uri, payload } => {
+                            self.mock_sender.send((uri, payload))?;
+                            msg.respond(
+                                span,
+                                Ok(GatewayRequestToChildResponse::Transport(
+                                    RequestToChildResponse::SendMessageSuccess,
+                                )),
+                            )?;
+                        }
+                    },
+                    _ => unimplemented!(),
                 }
             }
             loop {
+                let span = Lib3hSpan::todo();
                 match self.mock_receiver.try_recv() {
                     Ok((uri, payload)) => {
                         self.endpoint_self.publish(
-                            Lib3hSpan::todo(),
-                            RequestToParent::ReceivedData { uri, payload },
+                            span,
+                            GatewayRequestToParent::Transport(RequestToParent::ReceivedData {
+                                uri,
+                                payload,
+                            }),
                         )?;
                     }
                     Err(_) => break,
@@ -127,9 +141,9 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: TransportActorParentWrapper<(), TransportMultiplex> =
+        let mut mplex: GatewayParentWrapper<(), TransportMultiplex<GatewayMock>> =
             GhostParentWrapper::new(
-                TransportMultiplex::new(Box::new(TransportMock::new(s_out, r_in))),
+                TransportMultiplex::new(GatewayMock::new(s_out, r_in)),
                 "test_mplex_",
             );
 
@@ -180,7 +194,9 @@ mod tests {
         assert_eq!(1, msgs.len());
 
         let msg = msgs.remove(0).take_message().unwrap();
-        if let RequestToParent::ReceivedData { uri, payload } = msg {
+        if let GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }) =
+            msg
+        {
             assert_eq!(&addr_none, &uri);
             let expected: Opaque = "hello-to-b".into();
             assert_eq!(&expected, &payload);
