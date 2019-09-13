@@ -7,7 +7,7 @@ use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
         p2p_protocol::{GossipData, P2pProtocol},
-        ChainId, EngineConfig, GhostEngine, TransportKeys, NETWORK_GATEWAY_ID,
+        CanAdvertise, ChainId, EngineConfig, GhostEngine, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
@@ -52,11 +52,13 @@ impl TransportKeys {
     }
 }
 
-impl<'engine> GhostEngine<'engine> {
-    pub fn advertise(&self) -> Url {
+impl<'engine> CanAdvertise for GhostEngine<'engine> {
+    fn advertise(&self) -> Url {
         self.this_net_peer.peer_uri.to_owned()
     }
+}
 
+impl<'engine> GhostEngine<'engine> {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,

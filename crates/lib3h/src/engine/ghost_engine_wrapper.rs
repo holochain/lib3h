@@ -1,5 +1,5 @@
 use crate::{
-    engine::{ghost_engine::GhostEngineParentWrapper, GhostEngine},
+    engine::{ghost_engine::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
     error::Lib3hError,
 };
 use detach::Detach;
@@ -58,12 +58,12 @@ fn server_success(request_id: String) -> Lib3hServerProtocol {
 impl<Engine: 'static, EngineError: 'static> LegacyLib3h<Engine, EngineError>
 where
     Engine: GhostActor<
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        EngineError,
-    >,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            EngineError,
+        > + CanAdvertise,
     EngineError: ToString,
 {
     pub fn new(name: &str, engine: Engine) -> Self {
@@ -157,7 +157,7 @@ where
     }
 
     pub fn advertise(&self) -> Url {
-        Url::parse("mem://fixme").unwrap()
+        self.engine.as_ref().as_ref().advertise()
     }
 
     pub fn name(&self) -> String {
@@ -194,6 +194,12 @@ mod tests {
                 EngineError,
             >,
         >,
+    }
+
+    impl CanAdvertise for MockGhostEngine {
+        fn advertise(&self) -> Url {
+            Url::parse("mem://fixme").unwrap()
+        }
     }
 
     impl MockGhostEngine {

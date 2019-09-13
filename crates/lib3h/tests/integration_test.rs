@@ -61,12 +61,13 @@ fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrapp
         MirrorDht::new_with_config,
     )
     .unwrap();
+    let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
     println!(
         "construct_mock_engine(): test engine for {}, advertise: {}",
         name, p2p_binding
     );
-    Ok(WrappedGhostLib3h::new(name, engine))
+    Ok(engine)
 }
 
 //--------------------------------------------------------------------------------------------------

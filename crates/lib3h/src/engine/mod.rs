@@ -88,6 +88,10 @@ pub struct TransportKeys {
     pub transport_secret_key: Box<dyn Buffer>,
 }
 
+pub trait CanAdvertise {
+    fn advertise(&self) -> Url;
+}
+
 #[allow(dead_code)]
 pub struct GhostEngine<'engine> {
     /// Identifier

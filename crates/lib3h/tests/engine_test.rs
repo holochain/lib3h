@@ -82,12 +82,13 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         MirrorDht::new_with_config,
     )
     .unwrap();
+    let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
     println!(
         "basic_setup_mock(): test engine for {}, advertise: {}",
         name, p2p_binding
     );
-    WrappedGhostLib3h::new(name, engine)
+    engine
 }
 
 fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
