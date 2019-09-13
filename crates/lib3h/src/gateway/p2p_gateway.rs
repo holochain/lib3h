@@ -6,7 +6,6 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
-use lib3h_tracing::Lib3hTrace;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -19,7 +18,7 @@ impl P2pGateway {
     pub fn new(
         identifier: &str,
         child_transport_endpoint: Detach<
-            transport::protocol::TransportActorParentContextEndpoint<P2pGateway, Lib3hTrace>,
+            transport::protocol::TransportActorParentContextEndpoint<P2pGateway>,
         >,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
@@ -49,7 +48,7 @@ impl P2pGateway {
     pub fn new_with_space(
         space_address: &Address,
         child_transport_endpoint: Detach<
-            transport::protocol::TransportActorParentContextEndpoint<P2pGateway, Lib3hTrace>,
+            transport::protocol::TransportActorParentContextEndpoint<P2pGateway>,
         >,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,

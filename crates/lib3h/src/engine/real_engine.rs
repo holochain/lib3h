@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::{HashMap, HashSet, VecDeque};
 use url::Url;
 
@@ -106,7 +106,7 @@ impl RealEngine {
                 .expect("exists")
                 .as_context_endpoint_builder()
                 .request_id_prefix("tmem_to_child_")
-                .build::<P2pGateway, Lib3hTrace>(),
+                .build::<P2pGateway>(),
         );
 
         //        // Bind & create this_net_peer
@@ -310,6 +310,7 @@ impl RealEngine {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+        let span = Lib3hSpan::todo();
         debug!("{} serving: {:?}", self.name, client_msg);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
@@ -333,7 +334,7 @@ impl RealEngine {
                     },
                 );
                 // TODO: Figure out how we want to handle Connect and ConnectResult with GhostEngine
-                self.multiplexer.publish(cmd)?;
+                self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
                 //                // Convert into TransportCommand & post to network gateway
                 //                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
                 //                self.multiplexer.as_transport_mut().post(cmd)?;
@@ -387,7 +388,8 @@ impl RealEngine {
                         } else {
                             DhtRequestToChild::HoldEntryAspectAddress(msg.entry)
                         };
-                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(dht_request));
+                        let _ =
+                            space_gateway.publish(span, GatewayRequestToChild::Dht(dht_request));
                     }
                 }
             }
@@ -417,9 +419,12 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
-                            DhtRequestToChild::BroadcastEntry(msg.entry),
-                        ));
+                        let _ = space_gateway.publish(
+                            span,
+                            GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(
+                                msg.entry,
+                            )),
+                        );
                     }
                 }
             }
@@ -434,9 +439,12 @@ impl RealEngine {
                 match maybe_space {
                     Err(res) => outbox.push(res),
                     Ok(space_gateway) => {
-                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
-                            DhtRequestToChild::HoldEntryAspectAddress(msg.entry),
-                        ));
+                        let _ = space_gateway.publish(
+                            span,
+                            GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
+                                msg.entry,
+                            )),
+                        );
                     }
                 }
             }
@@ -682,7 +690,7 @@ impl RealEngine {
                 .as_mut()
                 .create_agent_space_route(&join_msg.space_address, &agent_id.into())
                 .as_context_endpoint_builder()
-                .build::<P2pGateway, Lib3hTrace>(),
+                .build::<P2pGateway>(),
         );
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new_with_space(
@@ -709,7 +717,7 @@ impl RealEngine {
             peer.peer_address,
         );
         self.multiplexer
-            .publish(GatewayRequestToChild::SendAll(payload))?;
+            .publish(Lib3hSpan::todo(), GatewayRequestToChild::SendAll(payload))?;
         // TODO END
 
         // Add it to space map
@@ -719,9 +727,10 @@ impl RealEngine {
         // Have DHT broadcast our PeerData
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = peer.clone(); // FIXME
-        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
-            this_peer,
-        )))?;
+        space_gateway.publish(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)),
+        )?;
 
         // Send Get*Lists requests
         let mut list_data = GetListData {
@@ -792,13 +801,14 @@ impl RealEngine {
             .unwrap();
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
-        let _res = space_gateway.publish(GatewayRequestToChild::Transport(
-            transport::protocol::RequestToChild::SendMessage {
+        let _res = space_gateway.publish(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
                 uri: Url::parse(&("agentId:".to_string() + &peer_address))
                     .expect("invalid url format"),
                 payload: payload.into(),
-            },
-        ));
+            }),
+        );
         Lib3hServerProtocol::SuccessResult(response)
     }
 
@@ -836,8 +846,7 @@ impl RealEngine {
         agent_id: &Address,
         request_id: &str,
         maybe_sender_agent_id: Option<&Address>,
-    ) -> Result<&mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>, Lib3hServerProtocol>
-    {
+    ) -> Result<&mut GatewayParentWrapper<RealEngine, P2pGateway>, Lib3hServerProtocol> {
         let maybe_space = self
             .space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()));
@@ -871,7 +880,7 @@ pub fn handle_gossipTo<
     >,
 >(
     gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapper<RealEngine, Lib3hTrace, G>,
+    gateway: &mut GatewayParentWrapper<RealEngine, G>,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
@@ -905,7 +914,7 @@ pub fn handle_gossipTo<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Lib3hSpan::todo(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }

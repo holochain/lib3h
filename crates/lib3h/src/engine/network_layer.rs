@@ -12,7 +12,7 @@ use crate::{
 
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -83,7 +83,7 @@ impl RealEngine {
                         payload: Opaque::new(),
                     },
                 );
-                self.multiplexer.publish(cmd)?;
+                self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
@@ -168,7 +168,7 @@ impl RealEngine {
         let uri_copy = net_uri.clone();
         self.multiplexer
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
                 Box::new(move |me, response| {
                     let response = {
@@ -203,13 +203,16 @@ impl RealEngine {
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                                me.multiplexer.publish(GatewayRequestToChild::Transport(
-                                    transport::protocol::RequestToChild::SendMessage {
-                                        uri: Url::parse(&peer_data.peer_address)
-                                            .expect("invalid url format"),
-                                        payload: payload.into(),
-                                    },
-                                ))?;
+                                me.multiplexer.publish(
+                                    Lib3hSpan::todo(),
+                                    GatewayRequestToChild::Transport(
+                                        transport::protocol::RequestToChild::SendMessage {
+                                            uri: Url::parse(&peer_data.peer_address)
+                                                .expect("invalid url format"),
+                                            payload: payload.into(),
+                                        },
+                                    ),
+                                )?;
                             }
                         }
                     // TODO END
@@ -252,18 +255,20 @@ impl RealEngine {
                 };
                 // Check if its for the multiplexer
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
-                    let _ = self.multiplexer.publish(GatewayRequestToChild::Dht(
-                        DhtRequestToChild::HandleGossip(gossip),
-                    ));
+                    let _ = self.multiplexer.publish(
+                        Lib3hSpan::todo(),
+                        GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
+                    );
                 } else {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self
                         .space_gateway_map
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
-                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
-                            DhtRequestToChild::HandleGossip(gossip),
-                        ));
+                        let _ = space_gateway.publish(
+                            Lib3hSpan::todo(),
+                            GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
+                        );
                     } else {
                         warn!("received gossip for unjoined space: {}", msg.space_address);
                     }
@@ -306,9 +311,10 @@ impl RealEngine {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    let _ = space_gateway.publish(GatewayRequestToChild::Dht(
-                        DhtRequestToChild::HoldPeer(peer_data.clone()),
-                    ));
+                    let _ = space_gateway.publish(
+                        Lib3hSpan::todo(),
+                        GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data.clone())),
+                    );
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -316,9 +322,12 @@ impl RealEngine {
                 for (space_address, peer_data) in join_list {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
-                        let _ = space_gateway.publish(GatewayRequestToChild::Dht(
-                            DhtRequestToChild::HoldPeer(peer_data.clone()),
-                        ));
+                        let _ = space_gateway.publish(
+                            Lib3hSpan::todo(),
+                            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
+                                peer_data.clone(),
+                            )),
+                        );
                     }
                 }
             }

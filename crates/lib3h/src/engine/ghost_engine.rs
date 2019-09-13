@@ -15,7 +15,7 @@ use crate::{
     transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
 };
 use lib3h_crypto_api::CryptoSystem;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
@@ -28,9 +28,8 @@ pub type Lib3hToClientMessage =
 
 /// this is a generic parent wrapper for a GhostEngine.  This allows us to have
 /// a mock GhostEngine for proving out the LegacyLib3h wrapper
-pub type GhostEngineParentWrapper<Core, TraceContext, Engine, EngineError> = GhostParentWrapper<
+pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
     Core,
-    TraceContext,
     Lib3hToClient,
     Lib3hToClientResponse,
     ClientToLib3h,
@@ -50,17 +49,14 @@ pub struct GhostEngine<'engine> {
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
     /// P2p gateway for the network layer
-    multiplexer: Detach<
-        GatewayParentWrapper<GhostEngine<'engine>, Lib3hTrace, TransportMultiplex<P2pGateway>>,
-    >,
+    multiplexer: Detach<GatewayParentWrapper<GhostEngine<'engine>, TransportMultiplex<P2pGateway>>>,
     /// Cached this_peer of the multiplexer
     this_net_peer: PeerData,
 
     /// Store active connections?
     network_connections: HashSet<Url>,
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map:
-        HashMap<ChainId, GatewayParentWrapper<GhostEngine<'engine>, Lib3hTrace, P2pGateway>>,
+    space_gateway_map: HashMap<ChainId, GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
@@ -82,7 +78,6 @@ pub struct GhostEngine<'engine> {
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
             GhostEngine<'engine>,
-            Lib3hTrace,
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,
@@ -123,7 +118,7 @@ impl<'engine> GhostEngine<'engine> {
                 .expect("exists")
                 .as_context_endpoint_builder()
                 .request_id_prefix("tmem_to_child_")
-                .build::<P2pGateway, Lib3hTrace>(),
+                .build::<P2pGateway>(),
         );
 
         /*
@@ -318,7 +313,7 @@ impl<'engine> GhostEngine<'engine> {
                 uri: data.peer_uri,
                 payload: Opaque::new(),
             });
-        self.multiplexer.publish(cmd)
+        self.multiplexer.publish(Lib3hSpan::todo(), cmd)
     }
 
     /// Process any Client events or requests
@@ -396,7 +391,7 @@ impl<'engine> GhostEngine<'engine> {
                 .as_mut()
                 .create_agent_space_route(&space_address, &agent_id)
                 .as_context_endpoint_builder()
-                .build::<P2pGateway, Lib3hTrace>(),
+                .build::<P2pGateway>(),
         );
         let new_space_gateway = GatewayParentWrapper::new(
             P2pGateway::new_with_space(
@@ -427,7 +422,7 @@ impl<'engine> GhostEngine<'engine> {
         );
         let _result = self
             .multiplexer
-            .publish(GatewayRequestToChild::SendAll(payload));
+            .publish(Lib3hSpan::todo(), GatewayRequestToChild::SendAll(payload));
         // TODO END
     }
 
@@ -579,9 +574,10 @@ impl<'engine> GhostEngine<'engine> {
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
 
         // Have DHT broadcast our PeerData
-        space_gateway.publish(GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
-            this_peer,
-        )))?;
+        space_gateway.publish(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)),
+        )?;
 
         // Send Get*Lists requests
         let mut list_data = GetListData {
@@ -589,8 +585,9 @@ impl<'engine> GhostEngine<'engine> {
             provider_agent_id: join_msg.agent_id.clone(),
             request_id: self.request_track.reserve(),
         };
+
         self.lib3h_endpoint.request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
             Box::new(|me, response| {
                 match response {
@@ -619,7 +616,7 @@ impl<'engine> GhostEngine<'engine> {
         list_data.request_id = self.request_track.reserve();
         self.lib3h_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
                 Box::new(|me, response| {
                     match response {
@@ -693,13 +690,16 @@ impl<'engine> GhostEngine<'engine> {
             .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
         space_gateway
-            .publish(GatewayRequestToChild::Transport(
-                transport::protocol::RequestToChild::SendMessage {
-                    uri: Url::parse(&("agentId:".to_string() + &peer_address))
-                        .expect("invalid url format"),
-                    payload: payload.into(),
-                },
-            ))
+            .publish(
+                Lib3hSpan::todo(),
+                GatewayRequestToChild::Transport(
+                    transport::protocol::RequestToChild::SendMessage {
+                        uri: Url::parse(&("agentId:".to_string() + &peer_address))
+                            .expect("invalid url format"),
+                        payload: payload.into(),
+                    },
+                ),
+            )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
@@ -714,7 +714,7 @@ impl<'engine> GhostEngine<'engine> {
             };
 
             self.lib3h_endpoint.request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 Lib3hToClient::HandleStoreEntryAspect(data),
                 Box::new(move |_me, response| {
                     // should just be OK
@@ -731,9 +731,10 @@ impl<'engine> GhostEngine<'engine> {
             &msg.provider_agent_id.to_owned(),
         )?;
         space_gateway
-            .publish(GatewayRequestToChild::Dht(
-                DhtRequestToChild::BroadcastEntry(msg.entry.clone()),
-            ))
+            .publish(
+                Lib3hSpan::todo(),
+                GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(msg.entry.clone())),
+            )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
@@ -743,9 +744,12 @@ impl<'engine> GhostEngine<'engine> {
             &msg.provider_agent_id.to_owned(),
         )?;
         space_gateway
-            .publish(GatewayRequestToChild::Dht(
-                DhtRequestToChild::HoldEntryAspectAddress(msg.entry.clone()),
-            ))
+            .publish(
+                Lib3hSpan::todo(),
+                GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
+                    msg.entry.clone(),
+                )),
+            )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
@@ -756,7 +760,7 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<()> {
         self.lib3h_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 Lib3hToClient::HandleQueryEntry(data.clone()),
                 Box::new(move |_me, response| {
                     match response {
@@ -783,7 +787,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         space_address: &Address,
         agent_id: &Address,
-    ) -> Lib3hResult<&mut GatewayParentWrapper<GhostEngine<'engine>, Lib3hTrace, P2pGateway>> {
+    ) -> Lib3hResult<&mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
             .ok_or_else(|| {
@@ -831,9 +835,9 @@ mod tests {
     }
 
     fn make_test_engine_wrapper(
-    ) -> GhostEngineParentWrapper<MockCore, Lib3hTrace, GhostEngine<'static>, Lib3hError> {
+    ) -> GhostEngineParentWrapper<MockCore, GhostEngine<'static>, Lib3hError> {
         let engine = make_test_engine();
-        let lib3h: GhostEngineParentWrapper<MockCore, Lib3hTrace, GhostEngine, Lib3hError> =
+        let lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_engine");
         lib3h
     }
@@ -1056,7 +1060,7 @@ mod tests {
         let query = make_test_query(req_data.space_address.clone());
 
         let _result = lib3h.request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             ClientToLib3h::QueryEntry(query),
             Box::new(move |_me, _response| {
                 panic!("BANG");

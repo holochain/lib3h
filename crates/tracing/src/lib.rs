@@ -1,33 +1,51 @@
 extern crate crossbeam_channel;
 extern crate rustracing;
 extern crate rustracing_jaeger;
+#[macro_use]
+extern crate shrinkwraprs;
+
+use rustracing::sampler::AllSampler;
+use std::borrow::Cow;
 
 pub type Span = rustracing_jaeger::Span;
+pub type Tracer = rustracing_jaeger::Tracer;
 
-/// Trait which enables a generic notion of tracing context, which is probably not necessary,
-/// but was easy to do by hijacking the old TraceContext type parameter
-pub trait CanTrace {
-    fn get_span(&self) -> Span;
-}
+#[derive(Debug, Shrinkwrap)]
+#[shrinkwrap(mutable)]
+pub struct Lib3hSpan(pub Span);
 
-pub struct Lib3hTrace;
-impl CanTrace for Lib3hTrace {
-    fn get_span(&self) -> Span {
-        unimplemented!()
+impl From<Span> for Lib3hSpan {
+    fn from(span: Span) -> Lib3hSpan {
+        Lib3hSpan(span)
     }
 }
 
-#[derive(Debug)]
-pub struct TestTrace(pub String);
+impl Lib3hSpan {
+    pub fn event<S: Into<Cow<'static, str>>>(&mut self, msg: S) {
+        self.log(|l| {
+            l.std().event(msg);
+        })
+    }
 
-impl CanTrace for TestTrace {
-    fn get_span(&self) -> Span {
-        unimplemented!()
+    pub fn error<S: Into<Cow<'static, str>>>(&mut self, kind: S, msg: S) {
+        self.log(|l| {
+            l.error().kind(kind).message(msg);
+        })
+    }
+
+    pub fn child_span<S: Into<Cow<'static, str>>>(&self, operation_name: S) -> Self {
+        self.child(operation_name, |o| o.start()).into()
+    }
+
+    pub fn todo() -> Self {
+        test_span("TODO Span")
     }
 }
 
-impl TestTrace {
-    pub fn new() -> Self {
-        Self("Unnamed TestTrace".into())
-    }
+pub fn test_span(name: &str) -> Lib3hSpan {
+    Tracer::new(AllSampler)
+        .0
+        .span(name.to_owned())
+        .start()
+        .into()
 }

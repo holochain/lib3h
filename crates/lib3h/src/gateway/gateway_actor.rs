@@ -4,7 +4,7 @@ use crate::{
     gateway::{protocol::*, P2pGateway},
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 
 impl
     GhostActor<
@@ -37,7 +37,7 @@ impl
 
         // Update this_peer cache
         self.inner_dht.request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {

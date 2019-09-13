@@ -11,7 +11,7 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
 };
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 
 /// Space layer related private methods
@@ -36,7 +36,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<&mut GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>> {
+    ) -> Option<&mut GatewayParentWrapper<RealEngine, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -55,7 +55,7 @@ impl RealEngine {
         let mut space_outbox_map = HashMap::new();
         let mut space_gateway_map: HashMap<
             ChainId,
-            Detach<GatewayParentWrapper<RealEngine, Lib3hTrace, P2pGateway>>,
+            Detach<GatewayParentWrapper<RealEngine, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap
@@ -116,9 +116,10 @@ impl RealEngine {
                             self.name, chain_id.0, peer_data,
                         );
                         // For now accept all request
-                        let _res = space_gateway.publish(GatewayRequestToChild::Dht(
-                            DhtRequestToChild::HoldPeer(peer_data),
-                        ));
+                        let _res = space_gateway.publish(
+                            Lib3hSpan::todo(),
+                            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)),
+                        );
                     }
                     DhtRequestToParent::PeerTimedOut(_peer_address) => {
                         // no-op

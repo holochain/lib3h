@@ -8,7 +8,7 @@ use crate::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
@@ -20,7 +20,7 @@ impl P2pGateway {
         // forward to child dht
         self.inner_dht
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 request,
                 Box::new(|_me, response| {
                     let response = {
@@ -64,6 +64,7 @@ impl P2pGateway {
                 );
                 // Send phony SendMessage request so we connect to it
                 let _res = self.child_transport_endpoint.publish(
+                    Lib3hSpan::todo(),
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Opaque::new(),
