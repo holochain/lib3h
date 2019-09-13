@@ -1,7 +1,7 @@
 use crate::{
     dht::dht_protocol::*,
     engine::{
-        ghost_engine::handle_gossipTo, p2p_protocol::P2pProtocol, GhostEngine, NETWORK_GATEWAY_ID,
+        ghost_engine::handle_gossip_to, p2p_protocol::P2pProtocol, GhostEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
@@ -24,14 +24,14 @@ impl<'engine> GhostEngine<'engine> {
         for mut request in self.multiplexer.drain_messages() {
             let payload = request.take_message().expect("exists");
             match payload {
-                GatewayRequestToParent::Dht(dht_request) => {
+            GatewayRequestToParent::Dht(dht_request) => {
                     self.handle_network_dht_request(dht_request)?;
-                }
-                GatewayRequestToParent::Transport(transport_request) => {
+            }
+            GatewayRequestToParent::Transport(transport_request) => {
                     self.handle_network_transport_request(&transport_request)?;
-                }
             }
         }
+    }
         // Done
         Ok(true /* fixme */)
     }
@@ -41,7 +41,7 @@ impl<'engine> GhostEngine<'engine> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
+                handle_gossip_to(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
                     .expect("Failed to gossip with multiplexer");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
-        engine_actor::*, p2p_protocol::*, ChainId, GhostEngine, RealEngineConfig, TransportKeys,
+        engine_actor::*, p2p_protocol::*, ChainId, GhostEngine, RealEngineConfig, TransportKeys, CanAdvertise,
         NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
@@ -14,7 +14,7 @@ use crate::{
     track::Tracker,
     transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
 };
-use lib3h_crypto_api::CryptoSystem;
+use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_tracing::Lib3hSpan;
 use rmp_serde::Serializer;
 use serde::Serialize;
@@ -71,11 +71,16 @@ pub fn handle_gossipTo<
     Ok(())
 }
 
+impl<'engine> CanAdvertise for GhostEngine<'engine> {
+    fn advertise(&self) -> Url {
+        self.this_net_peer.peer_uri.to_owned()
+    }
+
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
-        config: RealEngineConfig,
+        config: EngineConfig,
         name: &str,
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
@@ -91,7 +96,7 @@ impl<'engine> GhostEngine<'engine> {
 
     pub fn with_transport(
         crypto: Box<dyn CryptoSystem>,
-        config: RealEngineConfig,
+        config: EngineConfig,
         name: &str,
         dht_factory: DhtFactory,
         mut transport: GhostTransportMemory, // FIXME: TEMPORARY hardcoded to memory
@@ -142,7 +147,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         // Create DhtConfig
         let dht_config =
-            DhtConfig::with_real_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
+            DhtConfig::with_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
         debug!("New MOCK GhostEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         let multiplexer = Detach::new(GatewayParentWrapper::new(
@@ -314,7 +319,7 @@ impl<'engine> GhostEngine<'engine> {
             Url::parse(format!("transportId:{}", self.this_net_peer.peer_address).as_str())
                 .expect("can parse url")
         };
-        let dht_config = DhtConfig::with_real_engine_config(
+        let dht_config = DhtConfig::with_engine_config(
             &agent_id.to_string(),
             &this_peer_transport_id_as_uri,
             &self.config,
@@ -339,7 +344,7 @@ impl<'engine> GhostEngine<'engine> {
             "space_gateway_",
         ));
         self.space_gateway_map
-            .insert(chain_id.clone(), new_space_gateway);
+            .insert(chain_id.clone(), Detach::new(new_space_gateway));
         Ok(chain_id)
     }
 
@@ -743,6 +748,54 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     set_b.is_subset(&set_a)
 }
 
+pub fn handle_gossip_to<
+    G: GhostActor<
+        GatewayRequestToParent,
+        GatewayRequestToParentResponse,
+        GatewayRequestToChild,
+        GatewayRequestToChildResponse,
+        Lib3hError,
+    >,
+>(
+    gateway_identifier: &str,
+    gateway: &mut GatewayParentWrapper<GhostEngine, G>,
+    gossip_data: GossipToData,
+) -> Lib3hResult<()> {
+    debug!(
+        "({}) handle_gossip_to: {:?}",
+        gateway_identifier, gossip_data,
+    );
+
+    for to_peer_address in gossip_data.peer_address_list {
+        // FIXME
+        //            // TODO #150 - should not gossip to self in the first place
+        //            let me = self.get_this_peer_sync(&mut gateway).peer_address;
+        //            if to_peer_address == me {
+        //                continue;
+        //            }
+        //            // TODO END
+
+        // Convert DHT Gossip to P2P Gossip
+        let p2p_gossip = P2pProtocol::Gossip(GossipData {
+            space_address: gateway_identifier.into(),
+            to_peer_address: to_peer_address.clone().into(),
+            from_peer_address: "FIXME".into(), // FIXME
+            bundle: gossip_data.bundle.clone(),
+        });
+        let mut payload = Vec::new();
+        p2p_gossip
+            .serialize(&mut Serializer::new(&mut payload))
+            .expect("P2pProtocol::Gossip serialization failed");
+        // Forward gossip to the inner_transport
+        // FIXME peer_address to Url convert
+        let msg = transport::protocol::RequestToChild::SendMessage {
+            uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
+            payload: payload.into(),
+        };
+        gateway.publish(Lib3hSpan::todo(), GatewayRequestToChild::Transport(msg))?;
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -756,7 +809,7 @@ mod tests {
 
     fn make_test_engine() -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
-        let config = RealEngineConfig {
+        let config = EngineConfig {
             socket_type: "mem".into(),
             bootstrap_nodes: vec![],
             work_dir: String::new(),

@@ -12,7 +12,7 @@ use crate::{
     track::Tracker,
     transport::TransportMultiplex,
 };
-use detach::prelude::*;
+use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol::*, Address};
@@ -51,6 +51,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 enum RealEngineTrackerData {
     /// track the actual HandleGetGossipingEntryList request
     GetGossipingEntryList,
@@ -65,7 +66,7 @@ enum RealEngineTrackerData {
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RealEngineConfig {
+pub struct EngineConfig {
     //pub tls_config: TlsConfig,
     pub socket_type: String,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
@@ -101,11 +102,15 @@ impl TransportKeys {
     }
 }
 
+pub trait CanAdvertise {
+    fn advertise(&self) -> Url;
+}
+
 pub struct GhostEngine<'engine> {
     /// Identifier
     name: String,
     /// Config settings
-    config: RealEngineConfig,
+    config: EngineConfig,
     /// Factory for building the DHTs used by the gateways
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core

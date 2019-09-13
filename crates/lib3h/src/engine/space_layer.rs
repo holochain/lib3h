@@ -3,7 +3,7 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{ghost_engine::handle_gossipTo, p2p_protocol::SpaceAddress, ChainId, GhostEngine},
+    engine::{ghost_engine::handle_gossip_to, p2p_protocol::SpaceAddress, ChainId, GhostEngine},
     error::*,
     gateway::{protocol::*, P2pGateway},
 };
@@ -90,8 +90,8 @@ impl<'engine> GhostEngine<'engine> {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossipTo(&chain_id.0.to_string(), space_gateway, gossip_data)
-                            .expect("Failed to gossip with space_gateway");
+                        handle_gossip_to(&chain_id.0.to_string(), space_gateway, gossip_data)
+                        .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
                         // n/a - should have been handled by gateway
