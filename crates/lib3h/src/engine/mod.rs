@@ -2,23 +2,21 @@ pub mod ghost_engine;
 pub mod ghost_engine_wrapper;
 mod network_layer;
 pub mod p2p_protocol;
-pub mod real_engine;
 mod space_layer;
-
-use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     dht::dht_protocol::*,
+    error::Lib3hError,
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
     transport::TransportMultiplex,
 };
-use detach::prelude::*;
+use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
-use lib3h_protocol::{
-    protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol, Address,
-};
+use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::{protocol::*, Address};
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
+use std::collections::{HashMap, HashSet};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
@@ -52,6 +50,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 enum RealEngineTrackerData {
     /// track the actual HandleGetGossipingEntryList request
     GetGossipingEntryList,
@@ -66,7 +65,7 @@ enum RealEngineTrackerData {
 
 /// Struct holding all config settings for the RealEngine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RealEngineConfig {
+pub struct EngineConfig {
     //pub tls_config: TlsConfig,
     pub socket_type: String,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
@@ -89,30 +88,26 @@ pub struct TransportKeys {
     pub transport_secret_key: Box<dyn Buffer>,
 }
 
-/// Lib3h's 'real mode' as a NetworkEngine
-pub struct RealEngine {
+#[allow(dead_code)]
+pub struct GhostEngine<'engine> {
     /// Identifier
     name: String,
-    /// Config settings
-    config: RealEngineConfig,
-    /// FIFO of Lib3hClientProtocol messages received from Core
-    inbox: VecDeque<Lib3hClientProtocol>,
-    /// Factory for building the DHTs used by the gateways
+    /// Config setting
+    config: EngineConfig,
+    /// Factory for building DHT's of type D
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
-
-    /// holds our network gateway and allows connecting routes to space gateways
-    multiplexer: Detach<GatewayParentWrapper<RealEngine, TransportMultiplex<P2pGateway>>>,
-
-    /// Cached this_peer of the network_gateway
+    /// P2p gateway for the network layer
+    multiplexer: Detach<GatewayParentWrapper<GhostEngine<'engine>, TransportMultiplex<P2pGateway>>>,
+    /// Cached this_peer of the multiplexer
     this_net_peer: PeerData,
 
     /// Store active connections?
     network_connections: HashSet<Url>,
-
     /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, Detach<GatewayParentWrapper<RealEngine, P2pGateway>>>,
+    space_gateway_map:
+        HashMap<ChainId, Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>>,
     #[allow(dead_code)]
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
@@ -121,7 +116,24 @@ pub struct RealEngine {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
-    /// dht ghost user_data
-    /// temp HACK. Waiting for gateway actor
-    temp_outbox: Vec<Lib3hServerProtocol>,
+
+    client_endpoint: Option<
+        GhostEndpoint<
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            Lib3hError,
+        >,
+    >,
+    lib3h_endpoint: Detach<
+        GhostContextEndpoint<
+            GhostEngine<'engine>,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hError,
+        >,
+    >,
 }

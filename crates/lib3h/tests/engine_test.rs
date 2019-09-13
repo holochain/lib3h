@@ -12,7 +12,7 @@ use predicates::prelude::*;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{RealEngine, RealEngineConfig},
+    engine::{EngineConfig, GhostEngine},
 };
 use lib3h_protocol::{
     data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
@@ -60,12 +60,12 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine {
+fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> GhostEngine {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
     };
-    let config = RealEngineConfig {
+    let config = EngineConfig {
         // tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes,
@@ -76,7 +76,7 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine {
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],
     };
-    let engine = RealEngine::new_mock(
+    let engine = GhostEngine::new_mock(
         Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),
@@ -91,13 +91,13 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine {
     engine
 }
 
-fn basic_setup_mock(name: &str) -> RealEngine {
+fn basic_setup_mock(name: &str) -> GhostEngine {
     basic_setup_mock_bootstrap(name, None)
 }
 
 // FIXME
-//fn basic_setup_wss() -> RealEngine {
-//    let config = RealEngineConfig {
+//fn basic_setup_wss() -> GhostEngine {
+//    let config = EngineConfig {
 //        // tls_config: TlsConfig::Unencrypted,
 //        socket_type: "ws".into(),
 //        bootstrap_nodes: vec![],
@@ -108,7 +108,7 @@ fn basic_setup_mock(name: &str) -> RealEngine {
 //        dht_timeout_threshold: 2000,
 //        dht_custom_config: vec![],
 //    };
-//    let engine = RealEngine::new(
+//    let engine = GhostEngine::new(
 //        Box::new(SodiumCryptoSystem::new()),
 //        config,
 //        "test_engine_wss".into(),

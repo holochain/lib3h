@@ -3,7 +3,7 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
-use lib3h::{engine::RealEngineConfig, error::Lib3hResult};
+use lib3h::{engine::EngineConfig, error::Lib3hResult};
 use lib3h_protocol::{
     network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address,
 };
@@ -13,7 +13,7 @@ use url::Url;
 static TIMEOUT_MS: usize = 5000;
 
 pub type EngineFactory =
-    fn(config: &RealEngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>>;
+    fn(config: &EngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>>;
 
 /// Mock of a node handling one agent with multiple Spaces
 /// i.e. a conductor mock
@@ -24,7 +24,7 @@ pub struct NodeMock {
     /// The Node's networking engine
     pub engine: Box<dyn NetworkEngine>,
     /// Config used by the engine
-    pub config: RealEngineConfig,
+    pub config: EngineConfig,
     /// Factory used to create the engine
     engine_factory: EngineFactory,
     /// The node's simulated agentId
@@ -56,7 +56,7 @@ impl NodeMock {
     pub fn new_with_config(
         name: &str,
         agent_id_arg: Address,
-        config: RealEngineConfig,
+        config: EngineConfig,
         engine_factory: EngineFactory,
         //_maybe_temp_dir: Option<tempfile::TempDir>,
     ) -> Self {
@@ -65,7 +65,7 @@ impl NodeMock {
             agent_id_arg, config,
         );
 
-        let engine = engine_factory(&config, name).expect("Failed to create RealEngine");
+        let engine = engine_factory(&config, name).expect("Failed to create Engine");
         let my_advertise = engine.advertise();
         NodeMock {
             // _maybe_temp_dir,

@@ -17,7 +17,7 @@ mod test_suites;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{RealEngine, RealEngineConfig},
+    engine::{EngineConfig, GhostEngine},
     error::Lib3hResult,
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address};
@@ -53,11 +53,8 @@ fn enable_logging_for_test(enable: bool) {
 // Engine factories
 //--------------------------------------------------------------------------------------------------
 
-fn construct_mock_engine(
-    config: &RealEngineConfig,
-    name: &str,
-) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine = RealEngine::new_mock(
+fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>> {
+    let engine: GhostEngine = GhostEngine::new_mock(
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -80,7 +77,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
-    let config = RealEngineConfig {
+    let config = EngineConfig {
         //tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
@@ -110,7 +107,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
 //    let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
 //        .expect("invalid web socket url");
 //
-//    let config = RealEngineConfig {
+//    let config = EngineConfig {
 //        tls_config: tls_config,
 //        socket_type: protocol.into(),
 //        bootstrap_nodes: vec![],
