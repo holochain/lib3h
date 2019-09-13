@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
-        engine_actor::*, p2p_protocol::*, CanAdvertise, ChainId, GhostEngine, RealEngineConfig,
+        engine_actor::*, p2p_protocol::*, CanAdvertise, ChainId, GhostEngine, EngineConfig,
         TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
@@ -14,7 +14,7 @@ use crate::{
     track::Tracker,
     transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
 };
-use lib3h_crypto_api::{Buffer, CryptoSystem};
+use lib3h_crypto_api::CryptoSystem;
 use lib3h_tracing::Lib3hSpan;
 use rmp_serde::Serializer;
 use serde::Serialize;
@@ -344,7 +344,7 @@ impl<'engine> GhostEngine<'engine> {
             "space_gateway_",
         ));
         self.space_gateway_map
-            .insert(chain_id.clone(), Detach::new(new_space_gateway));
+            .insert(chain_id.clone(), new_space_gateway);
         Ok(chain_id)
     }
 

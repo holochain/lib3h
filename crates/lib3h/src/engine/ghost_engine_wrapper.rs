@@ -1,4 +1,7 @@
-use crate::engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise};
+use crate::{
+    error::*,
+    engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise, GhostEngine}
+};
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
