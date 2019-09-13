@@ -25,7 +25,7 @@ use lib3h_protocol::{
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
-use lib3h_tracing::TestTrace;
+use lib3h_tracing::Lib3hSpan;
 
 use std::{
     collections::HashMap,
@@ -99,13 +99,12 @@ impl Lib3hSimChat {
                 // and is responsible for calling process
                 // and handling messages
                 let mut engine = engine_builder();
-                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> =
-                    engine
-                        .take_parent_endpoint()
-                        .unwrap()
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("parent")
-                        .build();
+                let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> = engine
+                    .take_parent_endpoint()
+                    .unwrap()
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("parent")
+                    .build();
 
                 // also keep track of things like the spaces and current space in this scope
                 let mut current_space: Option<SpaceData> = None;
@@ -155,7 +154,7 @@ impl Lib3hSimChat {
                                 };
                                 parent_endpoint
                                     .request(
-                                        TestTrace::new(),
+                                        Lib3hSpan::todo(),
                                         ClientToLib3h::JoinSpace(space_data.clone()),
                                         Box::new(move |_, callback_data| {
                                             println!(
@@ -192,7 +191,7 @@ impl Lib3hSimChat {
                                 if let Some(space_data) = current_space.clone() {
                                     parent_endpoint
                                         .request(
-                                            TestTrace::new(),
+                                            Lib3hSpan::todo(),
                                             ClientToLib3h::LeaveSpace(space_data.to_owned()),
                                             Box::new(move |_, callback_data| {
                                                 println!(
@@ -238,7 +237,7 @@ impl Lib3hSimChat {
                                     };
                                     parent_endpoint
                                         .request(
-                                            TestTrace::new(),
+                                            Lib3hSpan::todo(),
                                             ClientToLib3h::SendDirectMessage(direct_message_data),
                                             Box::new(|_, callback_data| {
                                                 println!(
@@ -282,7 +281,6 @@ impl Lib3hSimChat {
     fn connect(
         endpoint: &mut GhostContextEndpoint<
             (),
-            TestTrace,
             ClientToLib3h,
             ClientToLib3hResponse,
             Lib3hToClient,
@@ -298,7 +296,7 @@ impl Lib3hSimChat {
         });
         endpoint
             .request(
-                TestTrace::new(),
+                Lib3hSpan::todo(),
                 connect_message,
                 Box::new(|_, callback_data| {
                     println!("chat received response from engine: {:?}", callback_data);
