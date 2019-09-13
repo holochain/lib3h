@@ -4,7 +4,7 @@ use crate::transport::{
     protocol::*,
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::HashSet;
 use url::Url;
 
@@ -20,7 +20,6 @@ type GhostTransportMemoryEndpoint = GhostEndpoint<
 
 type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
     UserData,
-    Lib3hTrace,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -29,8 +28,7 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
 >;
 
 pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
-    (),
-    Lib3hTrace,
+    Url,
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -191,6 +189,7 @@ impl
                         to_connect_list.push(in_cid.clone());
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
+                            Lib3hSpan::todo(),
                             RequestToParent::IncomingConnection {
                                 uri: in_cid.clone(),
                             },
@@ -222,6 +221,7 @@ impl
                         println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
+                            Lib3hSpan::todo(),
                             RequestToParent::ReceivedData {
                                 uri: from_addr,
                                 payload,
@@ -276,7 +276,7 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child1")
-            .build::<(), Lib3hTrace>();
+            .build::<Url>();
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_endpoint = transport2
@@ -284,71 +284,73 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child2")
-            .build::<(), Lib3hTrace>();
+            .build::<Url>();
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
         assert_eq!(transport2.maybe_my_address, None);
 
-        let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
+        let mut bound_transport1_address = Url::parse("mem://addr_1").unwrap();
         t1_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
-                Box::new(|_: &mut (), r| {
-                    // parent should see the bind event
-                    assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
-                        &format!("{:?}", r)
-                    );
+                Box::new(|ud: &mut Url, r| {
+                    match r {
+                        GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
+                            BindResultData { bound_url },
+                        ))) => *ud = bound_url,
+                        _ => assert!(false),
+                    };
                     Ok(())
                 }),
             )
             .unwrap();
-        let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
+        let mut bound_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
-                Box::new(|_: &mut (), r| {
-                    // parent should see the bind event
-                    assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
-                        &format!("{:?}", r)
-                    );
+                Box::new(|ud: &mut Url, r| {
+                    match r {
+                        GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
+                            BindResultData { bound_url },
+                        ))) => *ud = bound_url,
+                        _ => assert!(false),
+                    };
                     Ok(())
                 }),
             )
             .unwrap();
 
         transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut ());
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
 
         transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut ());
+        let _ = t2_endpoint.process(&mut bound_transport2_address);
 
         assert_eq!(
             transport1.maybe_my_address,
-            Some(expected_transport1_address)
+            Some(bound_transport1_address.clone())
         );
         assert_eq!(
             transport2.maybe_my_address,
-            Some(expected_transport2_address)
+            Some(bound_transport2_address.clone())
         );
 
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::SendMessage {
                     uri: Url::parse("mem://addr_2").unwrap(),
                     payload: b"test message".to_vec().into(),
                 },
-                Box::new(|_: &mut (), r| {
+                Box::new(|_: &mut Url, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
                     Ok(())
@@ -357,10 +359,10 @@ mod tests {
             .unwrap();
 
         transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut ());
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
 
         transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut ());
+        let _ = t2_endpoint.process(&mut bound_transport2_address);
 
         let mut requests = t2_endpoint.drain_messages();
         assert_eq!(2, requests.len());

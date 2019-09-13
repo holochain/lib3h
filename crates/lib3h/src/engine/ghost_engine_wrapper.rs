@@ -9,7 +9,7 @@ use lib3h_protocol::{
     protocol_server::*,
     DidWork,
 };
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
@@ -23,9 +23,7 @@ where
         EngineError,
     >,
 {
-    engine: Detach<
-        GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Lib3hTrace, Engine, EngineError>,
-    >,
+    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
@@ -125,10 +123,10 @@ where
         .to_string();
 
         let result = if request_id == "" {
-            self.engine.publish(client_msg.into())
+            self.engine.publish(Lib3hSpan::todo(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string()),
             )
@@ -158,7 +156,7 @@ where
 mod tests {
     use super::*;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::Lib3hTrace;
+    use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
     type EngineError = String;
@@ -176,7 +174,6 @@ mod tests {
         lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
-                Lib3hTrace,
                 Lib3hToClient,
                 Lib3hToClientResponse,
                 ClientToLib3h,
@@ -261,7 +258,7 @@ mod tests {
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            let _ = self.lib3h_endpoint.publish(msg);
+            let _ = self.lib3h_endpoint.publish(Lib3hSpan::todo(), msg);
         }
     }
 

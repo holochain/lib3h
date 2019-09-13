@@ -66,18 +66,16 @@ pub type GatewayParentEndpoint = GhostEndpoint<
     GatewayRequestToParentResponse,
     Lib3hError,
 >;
-pub type GatewaySelfEndpoint<UserData, Context> = GhostContextEndpoint<
+pub type GatewaySelfEndpoint<UserData> = GhostContextEndpoint<
     UserData,
-    Context,
     GatewayRequestToParent,
     GatewayRequestToParentResponse,
     GatewayRequestToChild,
     GatewayRequestToChildResponse,
     Lib3hError,
 >;
-pub type GatewayParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
+pub type GatewayParentWrapper<UserData, Actor> = GhostParentWrapper<
     UserData,
-    Context,
     GatewayRequestToParent,
     GatewayRequestToParentResponse,
     GatewayRequestToChild,
@@ -85,9 +83,8 @@ pub type GatewayParentWrapper<UserData, Context, Actor> = GhostParentWrapper<
     Lib3hError,
     Actor,
 >;
-pub type GatewayParentWrapperDyn<UserData, Context> = GhostParentWrapperDyn<
+pub type GatewayParentWrapperDyn<UserData> = GhostParentWrapperDyn<
     UserData,
-    Context,
     GatewayRequestToParent,
     GatewayRequestToParentResponse,
     GatewayRequestToChild,
