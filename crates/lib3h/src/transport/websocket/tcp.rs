@@ -3,7 +3,7 @@
 
 use crate::{
     transport::error::TransportResult,
-    transport_wss::{
+    transport::websocket::{
         Acceptor, Bind, ConnectionIdFactory, IdGenerator, TlsConfig, TransportWss, WssInfo,
     },
 };
