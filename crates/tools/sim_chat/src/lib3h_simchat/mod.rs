@@ -1,6 +1,7 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 
+use lib3h_tracing::test_span;
 use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
@@ -14,7 +15,6 @@ use lib3h_protocol::{
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
-use lib3h_tracing::TestTrace;
 
 use std::{
     collections::HashMap,
@@ -144,7 +144,7 @@ impl Lib3hSimChat {
                 // and handling messages
                 let mut engine = engine_builder();
 
-                let mut parent_endpoint: GhostContextEndpoint<(), TestTrace, _, _, _, _, _> =
+                let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> =
                     engine
                         .take_parent_endpoint()
                         .unwrap()
@@ -215,7 +215,6 @@ impl Lib3hSimChat {
     fn connect(
         endpoint: &mut GhostContextEndpoint<
             (),
-            TestTrace,
             ClientToLib3h,
             ClientToLib3hResponse,
             Lib3hToClient,
@@ -231,7 +230,7 @@ impl Lib3hSimChat {
         });
         endpoint
             .request(
-                TestTrace::new(),
+                test_span(""),
                 connect_message,
                 Box::new(|_, callback_data| {
                     println!("chat received response from engine: {:?}", callback_data);

@@ -8,7 +8,7 @@ use crate::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
@@ -18,25 +18,27 @@ impl P2pGateway {
         parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
         // forward to child dht
-        let _ = self.inner_dht.request(
-            Lib3hTrace,
-            request,
-            Box::new(|_me, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
-                            return Ok(());
+        self.inner_dht
+            .request(
+                Lib3hSpan::todo(),
+                request,
+                Box::new(|_me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => response,
                         }
-                        GhostCallbackData::Response(response) => response,
-                    }
-                };
-                // forward back to parent
-                parent_msg.respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
-                Ok(())
-            }),
-        );
-        // Done
+                    };
+                    // forward back to parent
+                    parent_msg
+                        .respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
+                    Ok(())
+                }),
+            )
+            .unwrap(); // FIXME unwrap
         Ok(())
     }
 
@@ -62,6 +64,7 @@ impl P2pGateway {
                 );
                 // Send phony SendMessage request so we connect to it
                 let _res = self.child_transport_endpoint.publish(
+                    Lib3hSpan::todo(),
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Opaque::new(),

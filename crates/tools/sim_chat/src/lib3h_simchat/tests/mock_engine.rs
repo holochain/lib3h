@@ -8,7 +8,6 @@ use lib3h_protocol::{
     data_types::ConnectedData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
 };
-use lib3h_tracing::TestTrace;
 
 /**
  *  This is an engine that exists purely for testing the SimChat actor.
@@ -22,7 +21,6 @@ pub struct MockEngine<'engine> {
     lib3h_endpoint: Detach<
         GhostContextEndpoint<
             MockEngine<'engine>,
-            TestTrace,
             Lib3hToClient,
             Lib3hToClientResponse,
             ClientToLib3h,

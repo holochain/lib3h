@@ -7,14 +7,13 @@ use lib3h_protocol::{
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
-use lib3h_tracing::TestTrace;
+use lib3h_tracing::test_span;
 
 pub fn handle_chat_event(
     chat_event: ChatEvent,
     state: &mut Lib3hSimChatState,
     parent_endpoint: &mut GhostContextEndpoint<
         (),
-        TestTrace,
         ClientToLib3h,
         ClientToLib3hResponse,
         Lib3hToClient,
@@ -36,7 +35,7 @@ pub fn handle_chat_event(
             };
             parent_endpoint
                 .request(
-                    TestTrace::new(),
+                    test_span(""),
                     ClientToLib3h::JoinSpace(space_data.clone()),
                     Box::new(move |_, callback_data| {
                         println!("chat received response from engine: {:?}", callback_data);
@@ -73,7 +72,7 @@ pub fn handle_chat_event(
             if let Some(space_data) = state.current_space.clone() {
                 parent_endpoint
                     .request(
-                        TestTrace::new(),
+                        test_span(""),
                         ClientToLib3h::LeaveSpace(space_data.to_owned()),
                         Box::new(move |_, callback_data| {
                             println!("chat received response from engine: {:?}", callback_data);
@@ -110,7 +109,7 @@ pub fn handle_chat_event(
                 };
                 parent_endpoint
                     .request(
-                        TestTrace::new(),
+                        test_span(""),
                         ClientToLib3h::SendDirectMessage(direct_message_data),
                         Box::new(|_, callback_data| {
                             println!("chat received response from engine: {:?}", callback_data);

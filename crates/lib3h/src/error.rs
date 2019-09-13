@@ -106,9 +106,27 @@ impl fmt::Display for Lib3hError {
     }
 }
 
+impl From<String> for Lib3hError {
+    fn from(s: String) -> Self {
+        Lib3hError::new(ErrorKind::Other(s))
+    }
+}
+
+impl From<&str> for Lib3hError {
+    fn from(s: &str) -> Self {
+        s.to_string().into()
+    }
+}
+
 impl From<GhostError> for Lib3hError {
     fn from(err: GhostError) -> Self {
         Lib3hError::new(ErrorKind::GhostError(err))
+    }
+}
+
+impl From<Lib3hError> for GhostError {
+    fn from(err: Lib3hError) -> Self {
+        format!("{:?}", err).into()
     }
 }
 
@@ -121,6 +139,12 @@ impl From<io::Error> for Lib3hError {
 impl From<TransportError> for Lib3hError {
     fn from(err: TransportError) -> Self {
         Lib3hError::new(ErrorKind::TransportError(err))
+    }
+}
+
+impl From<Lib3hError> for TransportError {
+    fn from(err: Lib3hError) -> Self {
+        format!("{:?}", err).into()
     }
 }
 

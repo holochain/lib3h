@@ -1,8 +1,12 @@
-use crate::transport::{error::*, protocol::*};
+use crate::{
+    error::{Lib3hError, Lib3hResult},
+    gateway::protocol::*,
+    transport::{error::*, protocol::*},
+};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, Address};
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 use url::Url;
 
@@ -12,23 +16,38 @@ struct LocalRouteSpec {
     pub local_agent_id: Address,
 }
 
-pub struct TransportMultiplex {
+pub struct TransportMultiplex<
+    G: GhostActor<
+        GatewayRequestToParent,
+        GatewayRequestToParentResponse,
+        GatewayRequestToChild,
+        GatewayRequestToChildResponse,
+        Lib3hError,
+    >,
+> {
     // our parent channel endpoint
-    endpoint_parent: Option<TransportActorParentEndpoint>,
+    endpoint_parent: Option<GatewayParentEndpoint>,
     // our self channel endpoint
-    endpoint_self: Detach<TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>,
-    // ref to our inner transport
-    inner_transport: Detach<TransportActorParentWrapperDyn<TransportMultiplex, Lib3hTrace>>,
+    endpoint_self: Detach<GatewaySelfEndpoint<TransportMultiplex<G>>>,
+    // ref to our inner gateway
+    inner_gateway: Detach<GatewayParentWrapper<TransportMultiplex<G>, G>>,
     // our map of endpoints connecting us to our Routes
     route_endpoints:
-        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex, Lib3hTrace>>>,
-    // cached binding
-    maybe_bind: Option<Url>,
+        Detach<HashMap<LocalRouteSpec, TransportActorSelfEndpoint<TransportMultiplex<G>>>>,
 }
 
-impl TransportMultiplex {
+impl<
+        G: GhostActor<
+            GatewayRequestToParent,
+            GatewayRequestToParentResponse,
+            GatewayRequestToChild,
+            GatewayRequestToChildResponse,
+            Lib3hError,
+        >,
+    > TransportMultiplex<G>
+{
     /// create a new TransportMultiplex Instance
-    pub fn new(inner_transport: DynTransportActor) -> Self {
+    pub fn new(inner_gateway: G) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(
@@ -37,16 +56,13 @@ impl TransportMultiplex {
                 .request_id_prefix("mplex_to_parent_")
                 .build(),
         );
-        let inner_transport = Detach::new(GhostParentWrapperDyn::new(
-            inner_transport,
-            "mplex_to_inner_",
-        ));
+        let inner_gateway =
+            Detach::new(GatewayParentWrapper::new(inner_gateway, "mplex_to_inner_"));
         Self {
             endpoint_parent,
             endpoint_self,
-            inner_transport,
+            inner_gateway,
             route_endpoints: Detach::new(HashMap::new()),
-            maybe_bind: None,
         }
     }
 
@@ -92,7 +108,7 @@ impl TransportMultiplex {
         remote_agent_id: &Address,
         remote_machine_id: &Address,
         unpacked_payload: Opaque,
-    ) -> TransportResult<()> {
+    ) -> Lib3hResult<()> {
         let route_spec = LocalRouteSpec {
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
@@ -105,10 +121,13 @@ impl TransportMultiplex {
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {
-                ep.publish(RequestToParent::ReceivedData {
-                    uri: path,
-                    payload: unpacked_payload,
-                })?;
+                ep.publish(
+                    Lib3hSpan::todo(),
+                    RequestToParent::ReceivedData {
+                        uri: path,
+                        payload: unpacked_payload,
+                    },
+                )?;
             }
         }
         Ok(())
@@ -118,42 +137,46 @@ impl TransportMultiplex {
     fn handle_msg_from_inner(
         &mut self,
         mut msg: GhostMessage<
-            RequestToParent,
-            RequestToChild,
-            RequestToParentResponse,
-            TransportError,
+            GatewayRequestToParent,
+            GatewayRequestToChild,
+            GatewayRequestToParentResponse,
+            Lib3hError,
         >,
-    ) -> TransportResult<()> {
-        match msg.take_message().expect("exists") {
-            RequestToParent::IncomingConnection { uri } => self.handle_incoming_connection(uri),
-            RequestToParent::ReceivedData { uri, payload } => {
-                self.handle_received_data(uri, payload)
-            }
-            RequestToParent::ErrorOccured { uri, error } => self.handle_transport_error(uri, error),
+    ) -> Lib3hResult<()> {
+        let data = msg.take_message().expect("exists");
+        if let GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }) =
+            data
+        {
+            self.handle_received_data(uri, payload)?;
+            Ok(())
+        } else {
+            self.endpoint_self.request(
+                Lib3hSpan::todo(),
+                data,
+                Box::new(move |_, response| {
+                    match response {
+                        GhostCallbackData::Timeout => {
+                            msg.respond(Err("timeout".into()))?;
+                            return Ok(());
+                        }
+                        GhostCallbackData::Response(response) => {
+                            msg.respond(response)?;
+                        }
+                    };
+                    Ok(())
+                }),
+            )?;
+            Ok(())
         }
     }
 
-    /// private handler for inner transport IncomingConnection events
-    fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
-        // forward
-        self.endpoint_self
-            .publish(RequestToParent::IncomingConnection { uri })?;
-        Ok(())
-    }
-
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> TransportResult<()> {
+    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> Lib3hResult<()> {
         // forward
-        self.endpoint_self
-            .publish(RequestToParent::ReceivedData { uri, payload })?;
-        Ok(())
-    }
-
-    /// private handler for inner transport TransportError events
-    fn handle_transport_error(&mut self, uri: Url, error: TransportError) -> TransportResult<()> {
-        // forward
-        self.endpoint_self
-            .publish(RequestToParent::ErrorOccured { uri, error })?;
+        self.endpoint_self.publish(
+            Lib3hSpan::todo(),
+            GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }),
+        )?;
         Ok(())
     }
 
@@ -166,7 +189,7 @@ impl TransportMultiplex {
             RequestToChildResponse,
             TransportError,
         >,
-    ) -> TransportResult<()> {
+    ) -> Lib3hResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
             RequestToChild::SendMessage { uri, payload } => {
@@ -180,11 +203,11 @@ impl TransportMultiplex {
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         spec: Url,
-    ) -> TransportResult<()> {
-        // forward the bind to our inner_transport
-        self.inner_transport.as_mut().request(
-            Lib3hTrace,
-            RequestToChild::Bind { spec },
+    ) -> Lib3hResult<()> {
+        // forward the bind to our inner_gateway
+        self.inner_gateway.as_mut().request(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Transport(RequestToChild::Bind { spec }),
             Box::new(|_, response| {
                 let response = {
                     match response {
@@ -192,7 +215,19 @@ impl TransportMultiplex {
                             msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
-                        GhostCallbackData::Response(response) => response,
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => {
+                                msg.respond(Err(format!("{:?}", e).into()))?;
+                                return Ok(());
+                            }
+                            Ok(r) => match r {
+                                GatewayRequestToChildResponse::Transport(r) => Ok(r),
+                                _ => {
+                                    msg.respond(Err(format!("bad type: {:?}", r).into()))?;
+                                    return Ok(());
+                                }
+                            },
+                        },
                     }
                 };
                 msg.respond(response)?;
@@ -208,11 +243,11 @@ impl TransportMultiplex {
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         uri: Url,
         payload: Opaque,
-    ) -> TransportResult<()> {
-        // forward the request to our inner_transport
-        self.inner_transport.as_mut().request(
-            Lib3hTrace,
-            RequestToChild::SendMessage { uri, payload },
+    ) -> Lib3hResult<()> {
+        // forward the request to our inner_gateway
+        self.inner_gateway.as_mut().request(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Transport(RequestToChild::SendMessage { uri, payload }),
             Box::new(|_, response| {
                 let response = {
                     match response {
@@ -220,7 +255,19 @@ impl TransportMultiplex {
                             msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
-                        GhostCallbackData::Response(response) => response,
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => {
+                                msg.respond(Err(format!("{:?}", e).into()))?;
+                                return Ok(());
+                            }
+                            Ok(r) => match r {
+                                GatewayRequestToChildResponse::Transport(r) => Ok(r),
+                                _ => {
+                                    msg.respond(Err(format!("bad type: {:?}", r).into()))?;
+                                    return Ok(());
+                                }
+                            },
+                        },
                     }
                 };
                 msg.respond(response)?;
@@ -234,31 +281,17 @@ impl TransportMultiplex {
     fn handle_msg_from_parent(
         &mut self,
         mut msg: GhostMessage<
-            RequestToChild,
-            RequestToParent,
-            RequestToChildResponse,
-            TransportError,
+            GatewayRequestToChild,
+            GatewayRequestToParent,
+            GatewayRequestToChildResponse,
+            Lib3hError,
         >,
-    ) -> TransportResult<()> {
-        match msg.take_message().expect("exists") {
-            RequestToChild::Bind { spec } => self.handle_bind(msg, spec),
-            RequestToChild::SendMessage { uri, payload } => {
-                self.handle_send_message(msg, uri, payload)
-            }
-        }
-    }
-
-    /// private handler for Bind requests from our parent
-    fn handle_bind(
-        &mut self,
-        msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        spec: Url,
-    ) -> TransportResult<()> {
-        // forward the bind to our inner_transport
-        self.inner_transport.as_mut().request(
-            Lib3hTrace,
-            RequestToChild::Bind { spec },
-            Box::new(|_, response| {
+    ) -> Lib3hResult<()> {
+        let data = msg.take_message().expect("exists");
+        self.inner_gateway.as_mut().request(
+            Lib3hSpan::todo(),
+            data,
+            Box::new(move |_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
@@ -273,74 +306,27 @@ impl TransportMultiplex {
             }),
         )?;
         Ok(())
-    }
-
-    /// private handler for SendMessage requests from our parent
-    fn handle_send_message(
-        &mut self,
-        msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        uri: Url,
-        payload: Opaque,
-    ) -> TransportResult<()> {
-        // forward the request to our inner_transport
-        self.inner_transport.as_mut().request(
-            Lib3hTrace,
-            RequestToChild::SendMessage { uri, payload },
-            Box::new(|_, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
-                        }
-                        GhostCallbackData::Response(response) => response,
-                    }
-                };
-                msg.respond(response)?;
-                Ok(())
-            }),
-        )?;
-        Ok(())
-    }
-
-    pub fn boot(&mut self, spec: Url) -> TransportResult<Option<Url>> {
-        // Bind & create this_net_peer
-        let _res = self.inner_transport.request(
-            Lib3hTrace,
-            RequestToChild::Bind { spec },
-            Box::new(|mut me, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
-                    }
-                };
-                if let RequestToChildResponse::Bind(bind_data) = response {
-                    me.maybe_bind = Some(bind_data.bound_url);
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        );
-        detach_run!(&mut self.inner_transport, |t| { t.process(self) })?;
-        Ok(self.maybe_bind.clone())
     }
 }
 
-impl
+impl<
+        G: GhostActor<
+            GatewayRequestToParent,
+            GatewayRequestToParentResponse,
+            GatewayRequestToChild,
+            GatewayRequestToChildResponse,
+            Lib3hError,
+        >,
+    >
     GhostActor<
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        TransportError,
-    > for TransportMultiplex
+        GatewayRequestToParent,
+        GatewayRequestToParentResponse,
+        GatewayRequestToChild,
+        GatewayRequestToChildResponse,
+        Lib3hError,
+    > for TransportMultiplex<G>
 {
-    fn take_parent_endpoint(&mut self) -> Option<TransportActorParentEndpoint> {
+    fn take_parent_endpoint(&mut self) -> Option<GatewayParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
@@ -349,8 +335,8 @@ impl
         for msg in self.endpoint_self.as_mut().drain_messages() {
             self.handle_msg_from_parent(msg)?;
         }
-        detach_run!(&mut self.inner_transport, |it| it.process(self))?;
-        for msg in self.inner_transport.as_mut().drain_messages() {
+        detach_run!(&mut self.inner_gateway, |it| it.process(self))?;
+        for msg in self.inner_gateway.as_mut().drain_messages() {
             self.handle_msg_from_inner(msg)?;
         }
         detach_run!(&mut self.route_endpoints, |re| {
@@ -360,7 +346,7 @@ impl
                 }
                 for msg in endpoint.drain_messages() {
                     if let Err(e) = self.handle_msg_from_route(msg) {
-                        return Err(e);
+                        return Err(e.into());
                     }
                 }
             }
