@@ -1,0 +1,335 @@
+use crate::transport::{
+    error::TransportError,
+    protocol::*,
+};
+use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::Opaque;
+use lib3h_tracing::Lib3hTrace;
+use crate::transport::websocket::{TransportWss, TransportEvent};
+
+pub type UserData = TransportWss<std::net::TcpStream>;
+
+pub type GhostTransportWebsocketEndpoint = GhostEndpoint<
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
+pub type GhostTransportWebsocketEndpointContext = GhostContextEndpoint<
+    UserData,
+    Lib3hTrace,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    TransportError,
+>;
+
+pub type GhostTransportWebsocketEndpointContextParent = GhostContextEndpoint<
+    (),
+    Lib3hTrace,
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
+impl
+GhostActor<
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    TransportError,
+> for TransportWss<std::net::TcpStream>
+{
+    // BOILERPLATE START----------------------------------
+
+    fn take_parent_endpoint(&mut self) -> Option<GhostTransportWebsocketEndpoint> {
+        std::mem::replace(&mut self.endpoint_parent, None)
+    }
+
+    // BOILERPLATE END----------------------------------
+
+    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // process the self endpoint
+        let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+        endpoint_self.as_mut().expect("exists").process(self)?;
+        std::mem::replace(&mut self.endpoint_self, endpoint_self);
+
+        for mut msg in self
+            .endpoint_self
+            .as_mut()
+            .expect("exists")
+            .drain_messages()
+            {
+                match msg.take_message().expect("exist") {
+                    RequestToChild::Bind { spec: url } => {
+                        msg.respond(
+                            self.bind(&url)
+                                .map(|url| RequestToChildResponse::Bind(BindResultData {
+                                    bound_url: url,
+                                }))
+                        )?;
+
+                        /*
+                        let bind_result = (self.bind)(&url.clone())
+                        if let Ok(acceptor) = bind_result {
+                            self.acceptor = Ok(acceptor);
+                            // respond to our parent
+                            msg.respond(Ok()?;
+                        } else {
+                            msg.respond(
+                                bind_result.err().expect("Must be an error in else case")
+                            )?;
+                        }*/
+                    }
+                    RequestToChild::SendMessage { uri, payload } => {
+                        // make sure we have bound and got our address
+                        match self.bound_url.clone() {
+                            None => {
+                                msg.respond(Err(TransportError::new(
+                                    "Transport must be bound before sending".to_string(),
+                                )))?;
+                            }
+                            Some(my_addr) => {
+                                // Trying to find established connection for URI:
+                                let mut maybe_connection_id = self.url_to_connection_id(&uri);
+
+                                // If there is none, try to connect:
+                                if maybe_connection_id.is_none() {
+                                    trace!(
+                                        "No open connection to {} found when sending data. Trying to connect...",
+                                        uri,
+                                    );
+                                    match self.connect(&uri) {
+                                        Ok(connection_id) => {
+                                            maybe_connection_id = Some(connection_id);
+                                            trace!("New connection to {} established", uri.to_string());
+                                        },
+                                        Err(error) => {
+                                            trace!("Could not connect to {}! Transport error: {:?}", uri.to_string(), error);
+                                        }
+                                    }
+                                }
+
+                                // If we have a connection now, send payload:
+                                if let Some(connection_id) = maybe_connection_id {
+                                    trace!(
+                                        "(GhostTransportWebsocket).SendMessage from {} to  {} | {:?}",
+                                        my_addr,
+                                        uri,
+                                        payload
+                                    );
+                                    // Send it data from us
+                                    match self.send(&[&connection_id], &payload.as_bytes()) {
+                                        Ok(()) => msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?,
+                                        Err(error) => msg.respond(Err(error))?
+                                    }
+                                } else {
+                                    msg.respond(Err(TransportError::new(format!(
+                                        "Unable to acquire connection. Can't send to {}",
+                                        uri,
+                                    ))))?;
+                                }
+                            }
+                        };
+                    }
+                }
+            }
+
+        // make sure we have bound and get our address if so
+        let my_addr = match &self.bound_url {
+            Some(my_addr) => my_addr.clone(),
+            None => return Ok(false.into()),
+        };
+
+        println!("Processing for: {}", my_addr);
+
+        let (did_work, transport_events) = self.process()?;
+        for event in transport_events {
+            match event {
+                TransportEvent::ErrorOccured(connection_id, error) => {
+                    let uri = self.connection_id_to_url(connection_id)
+                        .expect("There must be a URL for any existing connection ID");
+                    let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+                    endpoint_self
+                        .as_mut()
+                        .expect("exists")
+                        .publish(RequestToParent::ErrorOccured {uri, error})?;
+                    std::mem::replace(&mut self.endpoint_self, endpoint_self);
+                },
+                TransportEvent::ConnectResult(_connection_id, _) => {
+                },
+                TransportEvent::IncomingConnectionEstablished(connection_id) => {
+                    let uri = self.connection_id_to_url(connection_id)
+                        .expect("There must be a URL for any existing connection ID");
+                    let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+                    endpoint_self
+                        .as_mut()
+                        .expect("exists")
+                        .publish(RequestToParent::IncomingConnection {uri})?;
+                    std::mem::replace(&mut self.endpoint_self, endpoint_self);
+                },
+                TransportEvent::ReceivedData(connection_id, payload) => {
+                    let uri = self.connection_id_to_url(connection_id)
+                        .expect("There must be a URL for any existing connection ID");
+                    let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
+                    endpoint_self
+                        .as_mut()
+                        .expect("exists")
+                        .publish(RequestToParent::ReceivedData {
+                            uri,
+                            payload: Opaque::from(payload)
+                        })?;
+                    std::mem::replace(&mut self.endpoint_self, endpoint_self);
+                },
+                TransportEvent::ConnectionClosed(_connection_id) => {
+                }
+            }
+        }
+
+        Ok(did_work.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    //use super::*;
+    //use protocol::RequestToChildResponse;
+    //    use lib3h_ghost_actor::GhostCallbackData;
+
+    #[test]
+    fn test_ghost_websocket_transport() {
+        /* Possible other ways we might think of setting up
+               constructors for actor/parent_context_endpoint pairs:
+
+            let (transport1_endpoint, child) = ghost_create_endpoint();
+            let transport1_engine = GhostTransportMemoryEngine::new(child);
+
+            enum TestContex {
+        }
+
+            let mut transport1_actor = GhostLocalActor::new::<TestTrace>(
+            transport1_engine, transport1_endpoint);
+             */
+
+        /*
+            let mut transport1 = GhostParentContextEndpoint::with_cb(|child| {
+            GhostTransportMemory::new(child)
+        });
+
+            let mut transport1 = GhostParentContextEndpoint::new(
+            Box::new(GhostTransportMemory::new()));
+             */
+
+        /*
+        let mut transport1 = GhostTransportMemory::new();
+        let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("tmem_to_child1")
+            .build::<(), Lib3hTrace>();
+
+        let mut transport2 = GhostTransportMemory::new();
+        let mut t2_endpoint = transport2
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("tmem_to_child2")
+            .build::<(), Lib3hTrace>();
+
+        // create two memory bindings so that we have addresses
+        assert_eq!(transport1.maybe_my_address, None);
+        assert_eq!(transport2.maybe_my_address, None);
+
+        let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
+        t1_endpoint
+            .request(
+                Lib3hTrace,
+                RequestToChild::Bind {
+                    spec: Url::parse("mem://_").unwrap(),
+                },
+                Box::new(|_: &mut (), r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_1/\" })))",
+                        &format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
+        let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
+        t2_endpoint
+            .request(
+                Lib3hTrace,
+                RequestToChild::Bind {
+                    spec: Url::parse("mem://_").unwrap(),
+                },
+                Box::new(|_: &mut (), r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        "Response(Ok(Bind(BindResultData { bound_url: \"mem://addr_2/\" })))",
+                        &format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut ());
+
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut ());
+
+        assert_eq!(
+            transport1.maybe_my_address,
+            Some(expected_transport1_address)
+        );
+        assert_eq!(
+            transport2.maybe_my_address,
+            Some(expected_transport2_address)
+        );
+
+        // now send a message from transport1 to transport2 over the bound addresses
+        t1_endpoint
+            .request(
+                Lib3hTrace,
+                RequestToChild::SendMessage {
+                    uri: Url::parse("mem://addr_2").unwrap(),
+                    payload: b"test message".to_vec().into(),
+                },
+                Box::new(|_: &mut (), r| {
+                    // parent should see that the send request was OK
+                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut ());
+
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut ());
+
+        let mut requests = t2_endpoint.drain_messages();
+        assert_eq!(2, requests.len());
+        assert_eq!(
+            "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
+            format!("{:?}", requests[0].take_message())
+        );
+        assert_eq!(
+            "Some(ReceivedData { uri: \"mem://addr_1/\", payload: \"test message\" })",
+            format!("{:?}", requests[1].take_message())
+        );
+        */
+    }
+}

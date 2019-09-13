@@ -1,13 +1,12 @@
 //! abstraction for working with Websocket connections
 //! based on any rust io Read/Write Stream
 
+pub mod websocket_actor;
 mod tcp;
 
 use crate::transport::{
     error::{TransportError, TransportResult},
-    protocol::{TransportCommand, TransportEvent},
-    transport_trait::Transport,
-    ConnectionId, ConnectionIdRef,
+    websocket::websocket_actor::{GhostTransportWebsocketEndpoint, GhostTransportWebsocketEndpointContext}
 };
 use lib3h_protocol::DidWork;
 use std::{
@@ -17,6 +16,39 @@ use std::{
 };
 
 use url::Url;
+use lib3h_ghost_actor::create_ghost_channel;
+
+/// a connection identifier
+pub type ConnectionId = String;
+pub type ConnectionIdRef = str;
+
+/// Commands that can be sent to an implementor of the Transport trait and handled during `process()`
+#[derive(Debug, PartialEq, Clone)]
+pub enum TransportCommand {
+    Connect(Url, String),
+    Send(Vec<ConnectionId>, Vec<u8>),
+    SendAll(Vec<u8>),
+    Close(ConnectionId),
+    CloseAll,
+    Bind(Url),
+}
+
+/// Events that can be generated during a `process()`
+#[derive(Debug, PartialEq, Clone)]
+pub enum TransportEvent {
+    /// Notify that some TransportError occured
+    ErrorOccured(ConnectionId, TransportError),
+    /// an outgoing connection has been established
+    ConnectResult(ConnectionId, String),
+    /// we have received an incoming connection
+    IncomingConnectionEstablished(ConnectionId),
+    /// We have received data from a connection
+    ReceivedData(ConnectionId, Vec<u8>),
+    /// A connection closed for whatever reason
+    ConnectionClosed(ConnectionId),
+}
+
+
 
 static FAKE_PKCS12: &'static [u8] = include_bytes!("fake_key.p12");
 static FAKE_PASS: &'static str = "hello";
@@ -189,6 +221,8 @@ pub type Bind<T> = Box<dyn FnMut(&Url) -> TransportResult<Acceptor<T>>>;
 /// A "Transport" implementation based off the websocket protocol
 /// any rust io Read/Write stream should be able to serve as the base
 pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
+    endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
+    endpoint_self: Option<GhostTransportWebsocketEndpointContext>,
     tls_config: TlsConfig,
     stream_factory: StreamFactory<T>,
     stream_sockets: SocketMap<T>,
@@ -197,9 +231,10 @@ pub struct TransportWss<T: Read + Write + std::fmt::Debug> {
     inbox: VecDeque<TransportCommand>,
     bind: Bind<T>,
     acceptor: TransportResult<Acceptor<T>>,
+    bound_url: Option<Url>,
 }
 
-impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
+impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     /// connect to a remote websocket service
     fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
         let host_port = format!(
@@ -248,7 +283,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
             Err(errors.into())
         }
     }
-
+/*
     /// get a list of all open transport ids
     fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
         Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
@@ -264,7 +299,7 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         self.inbox.push_back(command);
         Ok(())
     }
-
+*/
     /// this should be called frequently on the event loop
     /// looks for incoming messages or processes ping/pong/close events etc
     fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
@@ -305,14 +340,21 @@ impl<T: Read + Write + std::fmt::Debug> Transport for TransportWss<T> {
         let acceptor = (self.bind)(&url.clone());
         acceptor.map(|acceptor| {
             self.acceptor = Ok(acceptor);
+            self.bound_url = Some(url.clone());
             url.clone()
         })
     }
-}
 
-impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
     pub fn new(stream_factory: StreamFactory<T>, bind: Bind<T>, tls_config: TlsConfig) -> Self {
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
         TransportWss {
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self: Some(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("twss_to_parent")
+                    .build()
+            ),
             tls_config,
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
@@ -321,7 +363,22 @@ impl<T: Read + Write + std::fmt::Debug + std::marker::Sized> TransportWss<T> {
             inbox: VecDeque::new(),
             bind,
             acceptor: Err(TransportError("acceptor not initialized".into())),
+            bound_url: None,
         }
+    }
+
+    pub fn url_to_connection_id(&self, url: &Url) -> Option<ConnectionId> {
+        for (connection_id, wss_info) in self.stream_sockets.iter() {
+            if wss_info.url == *url {
+                return Some(connection_id.clone())
+            }
+        }
+        None
+    }
+
+    pub fn connection_id_to_url(&self, connection_id: ConnectionId) -> Option<Url> {
+        self.stream_sockets.get(&connection_id)
+            .map(|wss_info| wss_info.url.clone())
     }
 
     // -- private -- //
