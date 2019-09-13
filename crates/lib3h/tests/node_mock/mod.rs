@@ -65,7 +65,7 @@ impl NodeMock {
             agent_id_arg, config,
         );
 
-        let engine = engine_factory(&config, name).expect("Failed to create RealEngine");
+        let engine = engine_factory(&config, name).expect("Failed to create GhostEngine");
         let my_advertise = engine.advertise();
         NodeMock {
             // _maybe_temp_dir,

@@ -1,4 +1,4 @@
-use crate::engine::ghost_engine::GhostEngineParentWrapper;
+use crate::engine::engine_actor::GhostEngineParentWrapper;
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{

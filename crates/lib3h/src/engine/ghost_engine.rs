@@ -3,11 +3,11 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, Address};
 use std::collections::{HashMap, HashSet};
 
-use super::RealEngineTrackerData;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
-        p2p_protocol::P2pProtocol, ChainId, RealEngineConfig, TransportKeys, NETWORK_GATEWAY_ID,
+        engine_actor::*, p2p_protocol::*, ChainId, GhostEngine, RealEngineConfig, TransportKeys,
+        NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
@@ -20,71 +20,55 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
 
-pub type ClientToLib3hMessage =
-    GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>;
-
-pub type Lib3hToClientMessage =
-    GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>;
-
-/// this is a generic parent wrapper for a GhostEngine.  This allows us to have
-/// a mock GhostEngine for proving out the LegacyLib3h wrapper
-pub type GhostEngineParentWrapper<Core, Engine, EngineError> = GhostParentWrapper<
-    Core,
-    Lib3hToClient,
-    Lib3hToClientResponse,
-    ClientToLib3h,
-    ClientToLib3hResponse,
-    EngineError,
-    Engine,
->;
-
-#[allow(dead_code)]
-pub struct GhostEngine<'engine> {
-    /// Identifier
-    name: String,
-    /// Config settings
-    config: RealEngineConfig,
-    /// Factory for building DHT's of type D
-    dht_factory: DhtFactory,
-    /// Tracking request_id's sent to core
-    request_track: Tracker<RealEngineTrackerData>,
-    /// P2p gateway for the network layer
-    multiplexer: Detach<GatewayParentWrapper<GhostEngine<'engine>, TransportMultiplex<P2pGateway>>>,
-    /// Cached this_peer of the multiplexer
-    this_net_peer: PeerData,
-
-    /// Store active connections?
-    network_connections: HashSet<Url>,
-    /// Map of P2p gateway per Space+Agent
-    space_gateway_map: HashMap<ChainId, GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
-    #[allow(dead_code)]
-    /// crypto system to use
-    crypto: Box<dyn CryptoSystem>,
-    #[allow(dead_code)]
-    /// transport_id data, public/private keys, etc
-    transport_keys: TransportKeys,
-    /// debug: count number of calls to process()
-    process_count: u64,
-
-    client_endpoint: Option<
-        GhostEndpoint<
-            ClientToLib3h,
-            ClientToLib3hResponse,
-            Lib3hToClient,
-            Lib3hToClientResponse,
-            Lib3hError,
-        >,
+#[allow(non_snake_case)]
+pub fn handle_gossipTo<
+    'engine,
+    G: GhostActor<
+        GatewayRequestToParent,
+        GatewayRequestToParentResponse,
+        GatewayRequestToChild,
+        GatewayRequestToChildResponse,
+        Lib3hError,
     >,
-    lib3h_endpoint: Detach<
-        GhostContextEndpoint<
-            GhostEngine<'engine>,
-            Lib3hToClient,
-            Lib3hToClientResponse,
-            ClientToLib3h,
-            ClientToLib3hResponse,
-            Lib3hError,
-        >,
-    >,
+>(
+    gateway_identifier: &str,
+    gateway: &mut GatewayParentWrapper<GhostEngine<'engine>, G>,
+    gossip_data: GossipToData,
+) -> Lib3hResult<()> {
+    debug!(
+        "({}) handle_gossipTo: {:?}",
+        gateway_identifier, gossip_data,
+    );
+
+    for to_peer_address in gossip_data.peer_address_list {
+        // FIXME
+        //            // TODO #150 - should not gossip to self in the first place
+        //            let me = self.get_this_peer_sync(&mut gateway).peer_address;
+        //            if to_peer_address == me {
+        //                continue;
+        //            }
+        //            // TODO END
+
+        // Convert DHT Gossip to P2P Gossip
+        let p2p_gossip = P2pProtocol::Gossip(GossipData {
+            space_address: gateway_identifier.into(),
+            to_peer_address: to_peer_address.clone().into(),
+            from_peer_address: "FIXME".into(), // FIXME
+            bundle: gossip_data.bundle.clone(),
+        });
+        let mut payload = Vec::new();
+        p2p_gossip
+            .serialize(&mut Serializer::new(&mut payload))
+            .expect("P2pProtocol::Gossip serialization failed");
+        // Forward gossip to the inner_transport
+        // FIXME peer_address to Url convert
+        let msg = transport::protocol::RequestToChild::SendMessage {
+            uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
+            payload: payload.into(),
+        };
+        gateway.publish(Lib3hSpan::todo(), GatewayRequestToChild::Transport(msg))?;
+    }
+    Ok(())
 }
 
 impl<'engine> GhostEngine<'engine> {
@@ -159,7 +143,7 @@ impl<'engine> GhostEngine<'engine> {
         // Create DhtConfig
         let dht_config =
             DhtConfig::with_real_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
-        debug!("New MOCK RealEngine {} -> {:?}", name, this_net_peer);
+        debug!("New MOCK GhostEngine {} -> {:?}", name, this_net_peer);
         let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         let multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
@@ -182,7 +166,6 @@ impl<'engine> GhostEngine<'engine> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
-            process_count: 0,
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -214,59 +197,7 @@ impl<'engine> GhostEngine<'engine> {
             .space_gateway_map
             .get_mut(&chain_id)
             .expect("No space at chainId");
-        space_gateway.as_mut().this_peer()
-    }
-}
-
-impl<'engine>
-    GhostActor<
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        Lib3hError,
-    > for GhostEngine<'engine>
-{
-    // START BOILER PLATE--------------------------
-    fn take_parent_endpoint(
-        &mut self,
-    ) -> Option<
-        GhostEndpoint<
-            ClientToLib3h,
-            ClientToLib3hResponse,
-            Lib3hToClient,
-            Lib3hToClientResponse,
-            Lib3hError,
-        >,
-    > {
-        std::mem::replace(&mut self.client_endpoint, None)
-    }
-    // END BOILER PLATE--------------------------
-
-    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        // START BOILER PLATE--------------------------
-        // always run the endpoint process loop
-        detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
-        // END BOILER PLATE--------------------------
-
-        // process any messages from the client to us
-        for msg in self.lib3h_endpoint.as_mut().drain_messages() {
-            self.handle_msg_from_client(msg)?;
-        }
-
-        /* TODO: #324
-                let outbox: Vec<Lib3hServerProtocol> = Vec::new();
-                let (net_did_work, mut net_outbox) = self.process_multiplexer()?;
-                outbox.append(&mut net_outbox);
-                // Process the space layer
-                let mut p2p_output = self.process_space_gateways()?;
-                outbox.append(&mut p2p_output);
-                // Hack
-                let (ugly_did_work, mut ugly_outbox) = self.process_ugly();
-                outbox.append(&mut ugly_outbox);
-        */
-
-        Ok(true.into())
+        space_gateway.as_mut().as_mut().this_peer()
     }
 }
 
@@ -319,7 +250,10 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Process any Client events or requests
-    fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> GhostResult<()> {
+    pub(crate) fn handle_msg_from_client(
+        &mut self,
+        mut msg: ClientToLib3hMessage,
+    ) -> GhostResult<()> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(data) => {
                 trace!("ClientToLib3h::Connect: {:?}", &data);
@@ -395,7 +329,7 @@ impl<'engine> GhostEngine<'engine> {
                 .as_context_endpoint_builder()
                 .build::<P2pGateway>(),
         );
-        let new_space_gateway = GatewayParentWrapper::new(
+        let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new_with_space(
                 &space_address,
                 uniplex_endpoint,
@@ -403,7 +337,7 @@ impl<'engine> GhostEngine<'engine> {
                 &dht_config,
             ),
             "space_gateway_",
-        );
+        ));
         self.space_gateway_map
             .insert(chain_id.clone(), new_space_gateway);
         Ok(chain_id)
@@ -645,8 +579,6 @@ impl<'engine> GhostEngine<'engine> {
                 }),
             )
             .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))
-        // Done
-        //Ok(())
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
@@ -794,7 +726,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         space_address: &Address,
         agent_id: &Address,
-    ) -> Lib3hResult<&mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>> {
+    ) -> Lib3hResult<&mut Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
             .ok_or_else(|| {
@@ -836,8 +768,7 @@ mod tests {
         };
         let dht_factory = MirrorDht::new_with_config;
 
-        let engine: GhostEngine =
-            GhostEngine::new_mock(crypto, config, "test_engine", dht_factory).unwrap();
+        let engine = GhostEngine::new_mock(crypto, config, "test_engine", dht_factory).unwrap();
         engine
     }
 

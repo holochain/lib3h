@@ -17,7 +17,7 @@ mod test_suites;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{RealEngine, RealEngineConfig},
+    engine::{GhostEngine, RealEngineConfig},
     error::Lib3hResult,
 };
 use lib3h_protocol::{network_engine::NetworkEngine, Address};
@@ -57,7 +57,7 @@ fn construct_mock_engine(
     config: &RealEngineConfig,
     name: &str,
 ) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine = RealEngine::new_mock(
+    let engine = GhostEngine::new_mock(
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),

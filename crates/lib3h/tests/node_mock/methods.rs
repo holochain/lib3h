@@ -56,9 +56,9 @@ impl NodeMock {
         dummy_config.bind_url =
             Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
         self.engine = (self.engine_factory)(&dummy_config, "__dummy")
-            .expect("Failed to create dummy RealEngine");
+            .expect("Failed to create dummy GhostEngine");
         self.engine = (self.engine_factory)(&self.config, &self.name)
-            .expect("Failed to re-create RealEngine");
+            .expect("Failed to re-create GhostEngine");
         self.my_advertise = self.engine.advertise();
     }
 

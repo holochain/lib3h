@@ -1,9 +1,7 @@
-#![allow(non_snake_case)]
-
 use crate::{
     dht::dht_protocol::*,
     engine::{
-        p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
+        ghost_engine::handle_gossipTo, p2p_protocol::P2pProtocol, GhostEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
@@ -11,57 +9,41 @@ use crate::{
 };
 
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, DidWork};
+use lib3h_protocol::{data_types::*, protocol::*, DidWork};
 use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Network layer related private methods
-impl RealEngine {
+impl<'engine> GhostEngine<'engine> {
     /// Process whatever the network has in for us.
-    pub(crate) fn process_multiplexer(
-        &mut self,
-    ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        let mut outbox = Vec::new();
+    pub(crate) fn process_multiplexer(&mut self) -> Lib3hResult<DidWork> {
         // Process the network gateway
         detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
         for mut request in self.multiplexer.drain_messages() {
             let payload = request.take_message().expect("exists");
-            let mut output = self.handle_network_request(payload)?;
-            outbox.append(&mut output);
+            match payload {
+                GatewayRequestToParent::Dht(dht_request) => {
+                    self.handle_network_dht_request(dht_request)?;
+                }
+                GatewayRequestToParent::Transport(transport_request) => {
+                    self.handle_network_transport_request(&transport_request)?;
+                }
+            }
         }
+
         //        // FIXME: DHT magic
         //        let mut temp = self.multiplexer.drain_dht_outbox();
         //        self.temp_outbox.append(&mut temp);
-        // Done
-        Ok((true /* fixme */, outbox))
-    }
 
-    /// Handle a GatewayRequestToParent sent to us by our network gateway
-    fn handle_network_request(
-        &mut self,
-        request: GatewayRequestToParent,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        debug!("{} << handle_network_request: [{:?}]", self.name, request,);
-        //let parent_request = request.clone();
-        match request {
-            GatewayRequestToParent::Dht(dht_request) => {
-                self.handle_network_dht_request(dht_request)
-            }
-            GatewayRequestToParent::Transport(transport_request) => {
-                self.handle_network_transport_request(&transport_request)
-            }
-        }
+        // Done
+        Ok(true /* fixme */)
     }
 
     /// Handle a DhtRequestToParent sent to us by our network gateway
-    fn handle_network_dht_request(
-        &mut self,
-        request: DhtRequestToParent,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_network_dht_request(&mut self, request: DhtRequestToParent) -> Lib3hResult<()> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
-        let outbox = Vec::new();
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
                 handle_gossipTo(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
@@ -103,19 +85,18 @@ impl RealEngine {
                 unreachable!();
             }
         }
-        Ok(outbox)
+        Ok(())
     }
 
     /// Handle a TransportRequestToParent sent to us by our network gateway
     fn handle_network_transport_request(
         &mut self,
         request: &transport::protocol::RequestToParent,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    ) -> Lib3hResult<()> {
         debug!(
             "{} << handle_network_transport_request: {:?}",
             self.name, request
         );
-        let mut outbox = Vec::new();
         // Note: use same order as the enum
         match request {
             transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
@@ -126,12 +107,12 @@ impl RealEngine {
                     let data = DisconnectedData {
                         network_id: "FIXME".to_string(), // TODO #172
                     };
-                    outbox.push(Lib3hServerProtocol::Disconnected(data));
+                    self.lib3h_endpoint
+                        .publish(Lib3hSpan::todo(), Lib3hToClient::Disconnected(data))?;
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
-                let mut output = self.handle_incoming_connection(uri.clone())?;
-                outbox.append(&mut output);
+                self.handle_incoming_connection(uri.clone())?;
             }
             //            TransportEvent::ConnectionClosed(id) => {
             //                self.network_connections.remove(id);
@@ -153,17 +134,13 @@ impl RealEngine {
                     return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                 }
                 let p2p_msg = maybe_msg.unwrap();
-                let mut output = self.serve_P2pProtocol(uri, &p2p_msg)?;
-                outbox.append(&mut output);
+                self.serve_P2pProtocol(uri, &p2p_msg)?;
             }
         };
-        Ok(outbox)
+        Ok(())
     }
 
-    fn handle_incoming_connection(
-        &mut self,
-        net_uri: Url,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
+    fn handle_incoming_connection(&mut self, net_uri: Url) -> Lib3hResult<()> {
         // Get list of known peers
         let uri_copy = net_uri.clone();
         self.multiplexer
@@ -225,27 +202,23 @@ impl RealEngine {
             .expect("sync functions should work");
 
         // Output a Lib3hServerProtocol::Connected if its the first connection
-        let mut outbox = Vec::new();
         if self.network_connections.is_empty() {
             let data = ConnectedData {
                 request_id: "fixme".to_string(),
                 uri: net_uri.clone(),
             };
-            outbox.push(Lib3hServerProtocol::Connected(data));
+            self.lib3h_endpoint
+                .publish(Lib3hSpan::todo(), Lib3hToClient::Connected(data))?;
         }
         let _ = self.network_connections.insert(net_uri.to_owned());
-        Ok(outbox)
+        Ok(())
     }
 
     /// Serve a P2pProtocol sent to us by the network.
     /// Return a list of Lib3hServerProtocol to send to Core.
     /// TODO #150
-    fn serve_P2pProtocol(
-        &mut self,
-        _from: &Url,
-        p2p_msg: &P2pProtocol,
-    ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let mut outbox = Vec::new();
+    #[allow(non_snake_case)]
+    fn serve_P2pProtocol(&mut self, _from: &Url, p2p_msg: &P2pProtocol) -> Lib3hResult<()> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
@@ -281,8 +254,8 @@ impl RealEngine {
                 ));
                 if let Some(_) = maybe_space_gateway {
                     // Change into Lib3hServerProtocol
-                    let lib3_msg = Lib3hServerProtocol::HandleSendDirectMessage(dm_data.clone());
-                    outbox.push(lib3_msg);
+                    let lib3_msg = Lib3hToClient::HandleSendDirectMessage(dm_data.clone());
+                    self.lib3h_endpoint.publish(Lib3hSpan::todo(), lib3_msg)?;
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
@@ -296,8 +269,8 @@ impl RealEngine {
                     dm_data.to_agent_id.to_owned(),
                 ));
                 if let Some(_) = maybe_space_gateway {
-                    let lib3_msg = Lib3hServerProtocol::SendDirectMessageResult(dm_data.clone());
-                    outbox.push(lib3_msg);
+                    let lib3_msg = Lib3hToClient::SendDirectMessageResult(dm_data.clone());
+                    self.lib3h_endpoint.publish(Lib3hSpan::todo(), lib3_msg)?;
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
@@ -311,10 +284,10 @@ impl RealEngine {
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
-                    let _ = space_gateway.publish(
+                    space_gateway.publish(
                         Lib3hSpan::todo(),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data.clone())),
-                    );
+                    )?;
                 }
             }
             P2pProtocol::AllJoinedSpaceList(join_list) => {
@@ -327,11 +300,11 @@ impl RealEngine {
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
                                 peer_data.clone(),
                             )),
-                        );
+                        )?;
                     }
                 }
             }
         };
-        Ok(outbox)
+        Ok(())
     }
 }

@@ -58,10 +58,14 @@ pub enum ClientToLib3hResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Lib3hToClient {
     // -- Connection -- //
+    /// Notification of successful connection to a network
+    Connected(ConnectedData),
     /// Notification of disconnection from a network
     Disconnected(DisconnectedData),
 
     // -- Direct Messaging -- //
+    /// the response received from a previous `SendDirectMessage`
+    SendDirectMessageResult(DirectMessageData),
     /// Request to handle a direct message another agent has sent us.
     HandleSendDirectMessage(DirectMessageData),
 
@@ -151,6 +155,9 @@ impl From<Lib3hServerProtocol> for Lib3hToClient {
         match c {
             Lib3hServerProtocol::Disconnected(disconnected_data) => {
                 Lib3hToClient::Disconnected(disconnected_data)
+            }
+            Lib3hServerProtocol::SendDirectMessageResult(direct_message_data) => {
+                Lib3hToClient::SendDirectMessageResult(direct_message_data)
             }
             Lib3hServerProtocol::HandleSendDirectMessage(direct_message_data) => {
                 Lib3hToClient::HandleSendDirectMessage(direct_message_data)
@@ -250,9 +257,15 @@ impl From<Lib3hToClientResponse> for Lib3hClientProtocol {
 impl From<Lib3hToClient> for Lib3hServerProtocol {
     fn from(c: Lib3hToClient) -> Self {
         match c {
+            Lib3hToClient::Connected(connected_data) => {
+                Lib3hServerProtocol::Connected(connected_data)
+            }
             Lib3hToClient::Disconnected(disconnected_data) => {
                 Lib3hServerProtocol::Disconnected(disconnected_data)
             }
+            Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
+                Lib3hServerProtocol::SendDirectMessageResult(direct_message_data)
+            },
             Lib3hToClient::HandleSendDirectMessage(direct_message_data) => {
                 Lib3hServerProtocol::HandleSendDirectMessage(direct_message_data)
             }
