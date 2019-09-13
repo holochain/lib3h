@@ -53,6 +53,10 @@ impl TransportKeys {
 }
 
 impl<'engine> GhostEngine<'engine> {
+    pub fn advertise(&self) -> Url {
+        self.this_net_peer.peer_uri.to_owned()
+    }
+
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,

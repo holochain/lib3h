@@ -17,10 +17,10 @@ mod test_suites;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{EngineConfig, GhostEngine},
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine},
     error::Lib3hResult,
 };
-use lib3h_protocol::{network_engine::NetworkEngine, Address};
+use lib3h_protocol::Address;
 use node_mock::NodeMock;
 use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
@@ -53,7 +53,7 @@ fn enable_logging_for_test(enable: bool) {
 // Engine factories
 //--------------------------------------------------------------------------------------------------
 
-fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>> {
+fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new_mock(
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
@@ -66,7 +66,7 @@ fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Box<d
         "construct_mock_engine(): test engine for {}, advertise: {}",
         name, p2p_binding
     );
-    Ok(Box::new(engine))
+    Ok(WrappedGhostLib3h::new(name, engine))
 }
 
 //--------------------------------------------------------------------------------------------------

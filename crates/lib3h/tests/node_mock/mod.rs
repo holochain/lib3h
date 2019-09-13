@@ -3,17 +3,17 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
-use lib3h::{engine::EngineConfig, error::Lib3hResult};
-use lib3h_protocol::{
-    network_engine::NetworkEngine, protocol_server::Lib3hServerProtocol, Address,
+use lib3h::{
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
+    error::Lib3hResult,
 };
+use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
 use std::collections::{HashMap, HashSet};
 use url::Url;
 
 static TIMEOUT_MS: usize = 5000;
 
-pub type EngineFactory =
-    fn(config: &EngineConfig, name: &str) -> Lib3hResult<Box<dyn NetworkEngine>>;
+pub type EngineFactory = fn(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h>;
 
 /// Mock of a node handling one agent with multiple Spaces
 /// i.e. a conductor mock
@@ -22,7 +22,7 @@ pub struct NodeMock {
     /// Need to hold the tempdir to keep it alive, otherwise we will get a dir error.
     //_maybe_temp_dir: Option<tempfile::TempDir>,
     /// The Node's networking engine
-    pub engine: Box<dyn NetworkEngine>,
+    pub engine: WrappedGhostLib3h,
     /// Config used by the engine
     pub config: EngineConfig,
     /// Factory used to create the engine
