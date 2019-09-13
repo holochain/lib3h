@@ -625,8 +625,9 @@ mod tests {
 
         // This is the one from which we want to see another node disapearing from its cache
         let mut mdns = MulticastDnsBuilder::new()
-            .multicast_address("224.0.0.252")
             .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+            .multicast_address("224.0.0.252")
+            .bind_port(8552)
             .build()
             .expect("Fail to build mDNS.");
 
@@ -635,6 +636,7 @@ mod tests {
         let mut mdns_other = MulticastDnsBuilder::new()
             .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
             .multicast_address("224.0.0.252")
+            .bind_port(8552)
             .build()
             .expect("Fail to build mDNS.");
 
