@@ -82,8 +82,7 @@ impl P2pGateway {
                 // check for timeout
                 if let GhostCallbackData::Timeout = response {
                     if let Some(parent_msg) = maybe_parent_msg {
-                        parent_msg
-                            .respond(Lib3hSpan::todo(), Err(Lib3hError::new_other("timeout")))?;
+                        parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
                         return Ok(());
                     }
                 }
@@ -98,10 +97,7 @@ impl P2pGateway {
                 // Check if response is an error
                 if let Err(e) = response {
                     if let Some(parent_msg) = maybe_parent_msg {
-                        parent_msg.respond(
-                            Lib3hSpan::todo(),
-                            Err(Lib3hError::new(ErrorKind::TransportError(e))),
-                        )?;
+                        parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?;
                     }
                     return Ok(());
                 };
@@ -114,10 +110,7 @@ impl P2pGateway {
                 println!("yay? {:?}", response);
                 // Act on response: forward to parent
                 if let Some(parent_msg) = maybe_parent_msg {
-                    parent_msg.respond(
-                        Lib3hSpan::todo(),
-                        Ok(GatewayRequestToChildResponse::Transport(response)),
-                    )?;
+                    parent_msg.respond(Ok(GatewayRequestToChildResponse::Transport(response)))?;
                 }
                 // Done
                 Ok(())
@@ -141,20 +134,17 @@ impl P2pGateway {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => {
-                                    parent_request.respond(
-                                        Lib3hSpan::todo(),
-                                        Err(Lib3hError::new_other("timeout")),
-                                    )?;
+                                    parent_request
+                                        .respond(Err(Lib3hError::new_other("timeout")))?;
                                     return Ok(());
                                 }
                                 GhostCallbackData::Response(response) => response,
                             }
                         };
                         // forward back to parent
-                        parent_request.respond(
-                            Lib3hSpan::todo(),
-                            Ok(GatewayRequestToChildResponse::Transport(response.unwrap())),
-                        )?;
+                        parent_request.respond(Ok(GatewayRequestToChildResponse::Transport(
+                            response.unwrap(),
+                        )))?;
                         Ok(())
                     }),
                 );

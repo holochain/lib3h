@@ -21,23 +21,21 @@ impl P2pGateway {
         // forward to child dht
         self.inner_dht
             .request(
-                Lib3hSpan::todo(),
+                span,
                 request,
                 Box::new(|_me, response| {
                     let response = {
                         match response {
                             GhostCallbackData::Timeout => {
-                                parent_msg.respond(span, Err(Lib3hError::new_other("timeout")))?;
+                                parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
                                 return Ok(());
                             }
                             GhostCallbackData::Response(response) => response,
                         }
                     };
                     // forward back to parent
-                    parent_msg.respond(
-                        span,
-                        Ok(GatewayRequestToChildResponse::Dht(response.unwrap())),
-                    )?;
+                    parent_msg
+                        .respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
                     Ok(())
                 }),
             )

@@ -7,7 +7,6 @@ use crate::{
 
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_tracing::Lib3hSpan;
 
 pub mod keystore_protocol {
     #[derive(Debug)]
@@ -109,14 +108,10 @@ impl KeystoreStub {
         _id: String,
         _payload: Vec<u8>,
     ) -> Lib3hResult<()> {
-        let span = Lib3hSpan::todo();
         // THIS IS A STUB, just responding with empty signature
-        msg.respond(
-            span,
-            Ok(RequestToChildResponse::Sign {
-                signature: b"".to_vec(),
-            }),
-        )?;
+        msg.respond(Ok(RequestToChildResponse::Sign {
+            signature: b"".to_vec(),
+        }))?;
         Ok(())
     }
 }

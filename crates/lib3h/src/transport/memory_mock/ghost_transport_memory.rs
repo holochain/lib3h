@@ -99,7 +99,6 @@ impl
             .expect("exists")
             .drain_messages()
         {
-            let span = Lib3hSpan::todo();
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
@@ -108,12 +107,9 @@ impl
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
-                    msg.respond(
-                        span,
-                        Ok(RequestToChildResponse::Bind(BindResultData {
-                            bound_url: bound_url,
-                        })),
-                    )?;
+                    msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                        bound_url: bound_url,
+                    })))?;
                 }
                 RequestToChild::SendMessage { uri, payload } => {
                     // make sure we have bound and get our address if so
@@ -122,25 +118,19 @@ impl
                     // make sure we have bound and get our address if so
                     match &self.maybe_my_address {
                         None => {
-                            msg.respond(
-                                span,
-                                Err(TransportError::new(
-                                    "Transport must be bound before sending".to_string(),
-                                )),
-                            )?;
+                            msg.respond(Err(TransportError::new(
+                                "Transport must be bound before sending".to_string(),
+                            )))?;
                         }
                         Some(my_addr) => {
                             // get destinations server
                             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
                             let maybe_server = server_map.get(&uri);
                             if let None = maybe_server {
-                                msg.respond(
-                                    span,
-                                    Err(TransportError::new(format!(
-                                        "No Memory server at this uri: {}",
-                                        my_addr
-                                    ))),
-                                )?;
+                                msg.respond(Err(TransportError::new(format!(
+                                    "No Memory server at this uri: {}",
+                                    my_addr
+                                ))))?;
                                 continue;
                             }
                             let mut server = maybe_server.unwrap().lock().unwrap();
@@ -149,7 +139,7 @@ impl
                             if self.connections.get(&uri).is_none() {
                                 match server.request_connect(&my_addr) {
                                     Err(err) => {
-                                        msg.respond(span, Err(err))?;
+                                        msg.respond(Err(err))?;
                                         continue;
                                     }
                                     Ok(()) => self.connections.insert(uri.clone()),

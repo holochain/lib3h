@@ -34,6 +34,7 @@ pub struct GhostMessage<
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<MessageToOther, MessageToSelfResponse, Error>,
     >,
+    span: Lib3hSpan,
 }
 
 impl<
@@ -62,11 +63,13 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
+        span: Lib3hSpan,
     ) -> Self {
         Self {
             request_id,
             message: Some(message),
             sender,
+            span,
         }
     }
 
@@ -78,8 +81,9 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
+        span: Lib3hSpan,
     ) -> Self {
-        GhostMessage::new(Some(request_id), message, sender)
+        GhostMessage::new(Some(request_id), message, sender, span)
     }
 
     /// create an event message
@@ -89,8 +93,9 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
+        span: Lib3hSpan,
     ) -> Self {
-        GhostMessage::new(None, message, sender)
+        GhostMessage::new(None, message, sender, span)
     }
 
     /// most often you will want to consume the contents of the request
@@ -100,16 +105,12 @@ impl<
     }
 
     /// send a response back to the origin of this request
-    pub fn respond(
-        self,
-        span: Lib3hSpan,
-        payload: Result<RequestToSelfResponse, Error>,
-    ) -> GhostResult<()> {
+    pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
             self.sender.send(GhostEndpointMessage::Response {
                 request_id: request_id.clone(),
                 payload,
-                span,
+                span: self.span,
             })?;
         }
         Ok(())
@@ -117,6 +118,10 @@ impl<
 
     pub fn is_request(&self) -> bool {
         self.request_id.is_some()
+    }
+
+    pub fn span(&self) -> &Lib3hSpan {
+        &self.span
     }
 }
 
@@ -460,19 +465,21 @@ impl<
                     GhostEndpointMessage::Request {
                         request_id,
                         payload,
-                        span: _,
+                        span,
                     } => {
                         self.outbox_messages_to_self.push(GhostMessage::new(
                             request_id,
                             payload,
                             self.sender.clone(),
+                            span,
                         ));
                     }
                     GhostEndpointMessage::Response {
                         request_id,
                         payload,
-                        span: _,
+                        mut span,
                     } => {
+                        span.event("process response");
                         self.pending_responses_tracker
                             .handle(request_id, user_data, payload)?;
                     }
@@ -554,6 +561,7 @@ mod tests {
             GhostMessage::new_event(
                 TestMsgIn("this is an event message from an internal child".into()),
                 child_send,
+                Lib3hSpan::todo(),
             );
         assert_eq!("GhostMessage {request_id: None, ..}", format!("{:?}", msg));
         let payload = msg.take_message().unwrap();
@@ -562,12 +570,9 @@ mod tests {
             format!("{:?}", payload)
         );
 
-        msg.respond(
-            Lib3hSpan::todo(),
-            Ok(TestMsgInResponse(
-                "response back to child which should fail because no request id".into(),
-            )),
-        )
+        msg.respond(Ok(TestMsgInResponse(
+            "response back to child which should fail because no request id".into(),
+        )))
         .unwrap();
         // check to see if the message was sent
         let response = child_as_parent_recv.recv();
@@ -585,12 +590,10 @@ mod tests {
                 request_id.clone(),
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
+                Lib3hSpan::todo(),
             );
-        msg.respond(
-            Lib3hSpan::todo(),
-            Ok(TestMsgInResponse("response back to child".into())),
-        )
-        .unwrap();
+        msg.respond(Ok(TestMsgInResponse("response back to child".into())))
+            .unwrap();
 
         // check to see if the response was sent
         let response = child_as_parent_recv.recv();

@@ -87,29 +87,20 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                let span = Lib3hSpan::todo();
                 match msg.take_message().expect("exists") {
                     GatewayRequestToChild::Transport(req) => match req {
                         RequestToChild::Bind { mut spec } => {
                             spec.set_path("bound");
                             self.bound_url = spec.clone();
-                            msg.respond(
-                                span,
-                                Ok(GatewayRequestToChildResponse::Transport(
-                                    RequestToChildResponse::Bind(BindResultData {
-                                        bound_url: spec,
-                                    }),
-                                )),
-                            )?;
+                            msg.respond(Ok(GatewayRequestToChildResponse::Transport(
+                                RequestToChildResponse::Bind(BindResultData { bound_url: spec }),
+                            )))?;
                         }
                         RequestToChild::SendMessage { uri, payload } => {
                             self.mock_sender.send((uri, payload))?;
-                            msg.respond(
-                                span,
-                                Ok(GatewayRequestToChildResponse::Transport(
-                                    RequestToChildResponse::SendMessageSuccess,
-                                )),
-                            )?;
+                            msg.respond(Ok(GatewayRequestToChildResponse::Transport(
+                                RequestToChildResponse::SendMessageSuccess,
+                            )))?;
                         }
                     },
                     _ => unimplemented!(),

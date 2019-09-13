@@ -156,11 +156,11 @@ impl<
                 Box::new(move |_, response| {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Lib3hSpan::todo(), Err("timeout".into()))?;
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => {
-                            msg.respond(Lib3hSpan::todo(), response)?;
+                            msg.respond(response)?;
                         }
                     };
                     Ok(())
@@ -212,28 +212,25 @@ impl<
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(Lib3hSpan::todo(), Err("timeout".into()))?;
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => {
-                                msg.respond(Lib3hSpan::todo(), Err(format!("{:?}", e).into()))?;
+                                msg.respond(Err(format!("{:?}", e).into()))?;
                                 return Ok(());
                             }
                             Ok(r) => match r {
                                 GatewayRequestToChildResponse::Transport(r) => Ok(r),
                                 _ => {
-                                    msg.respond(
-                                        Lib3hSpan::todo(),
-                                        Err(format!("bad type: {:?}", r).into()),
-                                    )?;
+                                    msg.respond(Err(format!("bad type: {:?}", r).into()))?;
                                     return Ok(());
                                 }
                             },
                         },
                     }
                 };
-                msg.respond(Lib3hSpan::todo(), response)?;
+                msg.respond(response)?;
                 Ok(())
             }),
         )?;
@@ -247,7 +244,6 @@ impl<
         uri: Url,
         payload: Opaque,
     ) -> Lib3hResult<()> {
-        let span = Lib3hSpan::todo();
         // forward the request to our inner_gateway
         self.inner_gateway.as_mut().request(
             Lib3hSpan::todo(),
@@ -256,25 +252,25 @@ impl<
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(span, Err("timeout".into()))?;
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => {
-                                msg.respond(span, Err(format!("{:?}", e).into()))?;
+                                msg.respond(Err(format!("{:?}", e).into()))?;
                                 return Ok(());
                             }
                             Ok(r) => match r {
                                 GatewayRequestToChildResponse::Transport(r) => Ok(r),
                                 _ => {
-                                    msg.respond(span, Err(format!("bad type: {:?}", r).into()))?;
+                                    msg.respond(Err(format!("bad type: {:?}", r).into()))?;
                                     return Ok(());
                                 }
                             },
                         },
                     }
                 };
-                msg.respond(span, response)?;
+                msg.respond(response)?;
                 Ok(())
             }),
         )?;
@@ -292,21 +288,21 @@ impl<
         >,
     ) -> Lib3hResult<()> {
         let data = msg.take_message().expect("exists");
-        let span = Lib3hSpan::todo();
         self.inner_gateway.as_mut().request(
-            span.child("request"),
+            msg.span()
+                .follower("TODO follower of message in handle_msg_from_parent"),
             data,
             Box::new(move |_, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => {
-                            msg.respond(span.follower("timeout"), Err("timeout".into()))?;
+                            msg.respond(Err("timeout".into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(span, response)?;
+                msg.respond(response)?;
                 Ok(())
             }),
         )?;

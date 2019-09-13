@@ -176,18 +176,18 @@ mod tests {
             detach_run!(&mut self.endpoint_self, |cs| cs.process(self))?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                let span = Lib3hSpan::todo();
+                let mut span = Lib3hSpan::todo();
                 match msg.take_message().expect("exists") {
                     dht_protocol::RequestToChild::ResolveAddressForId { id } => {
                         println!("dht got ResolveAddressForId {}", id);
-                        msg.respond(
-                            span,
-                            Ok(dht_protocol::RequestToChildResponse::ResolveAddressForId(
+                        span.event(format!("dht got ResolveAddressForId {}", id));
+                        msg.respond(Ok(
+                            dht_protocol::RequestToChildResponse::ResolveAddressForId(
                                 dht_protocol::ResolveAddressForIdData {
                                     address: "wss://yada".to_string(),
                                 },
-                            )),
-                        )?;
+                            ),
+                        ))?;
                     }
                 }
             }
@@ -328,19 +328,15 @@ mod tests {
                 .process(self))?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                let span = test_span("");
                 match msg.take_message().expect("exists") {
                     RequestToChild::Bind { spec: _ } => {
                         // do some internal bind
                         // we get a bound_url
                         let bound_url = "bound_url".to_string();
                         // respond to our parent
-                        msg.respond(
-                            span,
-                            Ok(RequestToChildResponse::Bind(BindResultData {
-                                bound_url: bound_url,
-                            })),
-                        )?;
+                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                            bound_url: bound_url,
+                        })))?;
                     }
                     RequestToChild::Bootstrap { address: _ } => {}
                     RequestToChild::SendMessage {
@@ -355,7 +351,7 @@ mod tests {
 
                                 // got a timeout error
                                 if let GhostCallbackData::Timeout = response {
-                                    msg.respond(span, Err("Timeout".into()))?;
+                                    msg.respond(Err("Timeout".into()))?;
                                     return Ok(());
                                 }
 
@@ -369,7 +365,7 @@ mod tests {
 
                                 let response = match response {
                                     Err(e) => {
-                                        msg.respond(span, Err(e))?;
+                                        msg.respond(Err(e))?;
                                         return Ok(());
                                     }
                                     Ok(response) => response,
@@ -388,7 +384,7 @@ mod tests {
 
                                 println!("yay? {:?}", response);
 
-                                msg.respond(span, Ok(RequestToChildResponse::SendMessage))?;
+                                msg.respond(Ok(RequestToChildResponse::SendMessage))?;
 
                                 Ok(())
                             }),
@@ -438,7 +434,7 @@ mod tests {
 
             // we might allow or disallow connections for example
             let response = RequestToParentResponse::Allowed;
-            msg.respond(test_span(""), Ok(response)).unwrap();
+            msg.respond(Ok(response)).unwrap();
         }
 
         t_actor.process().unwrap();

@@ -257,7 +257,6 @@ impl TransportEncoding {
         // remove any agent id from the spec
         // i.e. wss://1.2.3.4:55888?a=HcMyada -> wss://1.2.3.4:55888
         spec.set_query(None);
-        let span = Lib3hSpan::todo();
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
@@ -280,7 +279,7 @@ impl TransportEncoding {
                         .query_pairs_mut()
                         .append_pair("a", &m.this_id);
                     info!("got bind response: {:?}", data.bound_url);
-                    msg.respond(span, Ok(RequestToChildResponse::Bind(data)))?;
+                    msg.respond(Ok(RequestToChildResponse::Bind(data)))?;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
@@ -299,10 +298,8 @@ impl TransportEncoding {
         uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
-        let span = Lib3hSpan::todo();
-        let follower = span.follower("fwd_send_message_result");
         self.inner_transport.as_mut().request(
-            span,
+            msg.span().follower("TODO follower from message"),
             RequestToChild::SendMessage { uri, payload },
             Box::new(|_: &mut TransportEncoding, response| {
                 let response = {
@@ -311,7 +308,7 @@ impl TransportEncoding {
                         GhostCallbackData::Response(response) => response,
                     }
                 };
-                msg.respond(follower, response)?;
+                msg.respond(response)?;
                 Ok(())
             }),
         )?;
@@ -448,21 +445,17 @@ mod tests {
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
             detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                let span = Lib3hSpan::todo();
                 match msg.take_message().expect("exists") {
                     RequestToChild::Bind { mut spec } => {
                         spec.set_path("bound");
                         self.bound_url = spec.clone();
-                        msg.respond(
-                            span,
-                            Ok(RequestToChildResponse::Bind(BindResultData {
-                                bound_url: spec,
-                            })),
-                        )?;
+                        msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
+                            bound_url: spec,
+                        })))?;
                     }
                     RequestToChild::SendMessage { uri, payload } => {
                         self.mock_sender.send((uri, payload)).unwrap();
-                        msg.respond(span, Ok(RequestToChildResponse::SendMessageSuccess))?;
+                        msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?;
                     }
                 }
             }
