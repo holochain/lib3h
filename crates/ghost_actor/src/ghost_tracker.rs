@@ -8,7 +8,7 @@ const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure
 /// such as a timeout
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GhostCallbackData<CbData: 'static, E: 'static> {
     Response(Result<CbData, E>),
     Timeout,

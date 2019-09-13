@@ -390,8 +390,8 @@ mod tests {
         ghost_tracker::GhostCallbackData,
     };
     use detach::prelude::*;
-    use predicates::prelude::*;
     use lib3h_tracing::test_span;
+    use predicates::prelude::*;
     type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
@@ -403,7 +403,7 @@ mod tests {
     struct TestMsgOutResponse(String);
     #[derive(Debug)]
     struct TestMsgIn(String);
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     struct TestMsgInResponse(String);
 
     struct TestActor {

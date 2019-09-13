@@ -6,18 +6,18 @@ use predicates::prelude::*;
 
 /// Represents all useful state after a single call to an ghost_actor's process function
 #[derive(Debug, Clone)]
-pub struct ProcessorResult<'a, Cb: 'static, E: 'static> {
+pub struct ProcessorResult<Cb: 'static, E: 'static> {
     /// Whether the ghost_actor reported doing work or not
     pub did_work: bool,
     /// All events produced by the last call to process for ghost_actor
-    pub callback_data: Option<&'a GhostCallbackData<Cb, E>>,
+    pub callback_data: Option<GhostCallbackData<Cb, E>>,
 }
 
 /// An assertion style processor which provides a
 /// predicate over ProcessorResult (the eval function) and a
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
-pub trait Processor<'a, Cb: 'static, E: 'static>: Predicate<ProcessorResult<'a, Cb, E>> {
+pub trait Processor<'a, Cb: 'static, E: 'static>: Predicate<ProcessorResult<Cb, E>> {
     /// Processor name, for debugging and mapping purposes
     fn name(&self) -> String {
         "default_processor".into()
@@ -25,7 +25,7 @@ pub trait Processor<'a, Cb: 'static, E: 'static>: Predicate<ProcessorResult<'a, 
 
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
-    fn test(&self, args: &'a ProcessorResult<'a, Cb, E>);
+    fn test(&self, args: &'a ProcessorResult<Cb, E>);
 }
 
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
@@ -53,7 +53,7 @@ where
 {
 }
 
-impl<'a, Cb: 'static, E: 'static, T> Predicate<ProcessorResult<'a, Cb, E>>
+impl<'a, Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>>
     for dyn AssertEquals<Cb, E, T>
 where
     T: PartialEq + std::fmt::Debug,
@@ -76,12 +76,11 @@ pub trait Assert<Cb: 'static, E: 'static, T> {
 #[derive(PartialEq, Debug)]
 pub struct CallbackDataEquals<Cb, E>(pub Cb, pub std::marker::PhantomData<E>);
 
-impl<'a, Cb, E: 'static> predicates::Predicate<ProcessorResult<'a, Cb, E>>
-    for CallbackDataEquals<Cb, E>
+impl<'a, Cb, E: 'static> predicates::Predicate<ProcessorResult<Cb, E>> for CallbackDataEquals<Cb, E>
 where
     Cb: PartialEq + std::fmt::Debug + 'static,
 {
-    fn eval(&self, args: &ProcessorResult<'a, Cb, E>) -> bool {
+    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         self.extracted(args)
             .map(|actual| actual == self.expected())
             .unwrap_or(false)
@@ -116,7 +115,7 @@ impl<'a, Cb, E: 'static> Processor<'a, Cb, E> for CallbackDataEquals<Cb, E>
 where
     Cb: std::fmt::Debug + 'static + PartialEq,
 {
-    fn test(&self, args: &'a ProcessorResult<'a, Cb, E>) {
+    fn test(&self, args: &'a ProcessorResult<Cb, E>) {
         let actual = self.extracted(args);
         assert_eq!(Some(self.expected()), actual);
     }
@@ -163,10 +162,8 @@ impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for CallbackDataAssert<Cb
     }
 }
 
-impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<'a, Cb, E>>
-    for CallbackDataAssert<Cb, E>
-{
-    fn eval(&self, args: &ProcessorResult<'a, Cb, E>) -> bool {
+impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAssert<Cb, E> {
+    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         self.extracted(args)
             .map(|actual| self.assert_inner(&actual))
             .unwrap_or(false)
@@ -186,7 +183,7 @@ impl<Cb, E: 'static> predicates::reflection::PredicateReflection for CallbackDat
 pub struct DidWorkAssert<Cb, E>(std::marker::PhantomData<Cb>, std::marker::PhantomData<E>);
 
 impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for DidWorkAssert<Cb, E> {
-    fn test(&self, args: &'a ProcessorResult<'a, Cb, E>) {
+    fn test(&self, args: &'a ProcessorResult<Cb, E>) {
         assert!(args.did_work);
     }
 
@@ -195,8 +192,8 @@ impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for DidWorkAssert<Cb, E> 
     }
 }
 
-impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<'a, Cb, E>> for DidWorkAssert<Cb, E> {
-    fn eval(&self, args: &ProcessorResult<'a, Cb, E>) -> bool {
+impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for DidWorkAssert<Cb, E> {
+    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         args.did_work
     }
 }
@@ -250,7 +247,7 @@ macro_rules! process_one {
             let processor_result: $crate::ghost_test_harness::ProcessorResult<_, _> =
                 $crate::ghost_test_harness::ProcessorResult {
                     did_work,
-                    callback_data: $callback_data, //.as_ref(),
+                    callback_data: $callback_data.clone(), //.as_ref(),
                 };
             let mut failed = Vec::new();
 
@@ -258,12 +255,12 @@ macro_rules! process_one {
                 let result = processor.eval(&processor_result);
                 if result {
                     // Simulate the succesful assertion behavior
-                    processor.test(&processor_result);
+                    processor.test(&processor_result.clone());
                 // processor passed!
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing
-                    failed.push((processor, Some(&processor_result)));
+                    failed.push((processor, Some(processor_result.clone())));
                 }
             }
             $errors.append(&mut failed);
@@ -290,13 +287,13 @@ macro_rules! assert_callback_processed {
      $processor:ident
  ) => {{
         let mut errors /*: Vec<(
-                    Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
-                    Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
-                )> */ = Vec::new();
+                        Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
+                        Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
+                    )> */ = Vec::new();
 
-        let mut callback_data = Box::new(None);
+        let mut callback_data = None; // = Box::new(None);
         let cb: $crate::ghost_actor::GhostCallback<_, _, _> = Box::new(|_user_data, cb| {
-            *callback_data = Some(&cb);
+            callback_data = Some(cb.clone());
             Ok(())
         });
 
@@ -313,7 +310,6 @@ macro_rules! assert_callback_processed {
         for epoch in 0..20 {
             trace!("[{:?}]", epoch);
 
-            let callback_data = *callback_data;
             process_one!($ghost_can_track, $user_data, callback_data, errors);
             if errors.is_empty() {
                 break;
