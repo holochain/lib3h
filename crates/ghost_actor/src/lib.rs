@@ -15,6 +15,14 @@ extern crate log;
 #[shrinkwrap(mutable)]
 pub struct WorkWasDone(pub bool);
 
+impl WorkWasDone {
+
+    fn or(&self, w:WorkWasDone) -> WorkWasDone {
+        WorkWasDone(w.0 || self.0)
+    }
+
+}
+
 impl From<bool> for WorkWasDone {
     fn from(b: bool) -> Self {
         WorkWasDone(b)
@@ -68,11 +76,11 @@ pub use ghost_channel::{
     GhostMessageData, GhostTrackRequestOptions,
 };
 
-mod ghost_actor;
-pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
-
 #[macro_use]
 pub mod ghost_test_harness;
+
+mod ghost_actor;
+pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{

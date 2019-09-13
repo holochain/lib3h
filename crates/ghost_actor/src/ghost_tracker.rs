@@ -1,7 +1,7 @@
 use lib3h_tracing::CanTrace;
 use std::collections::HashMap;
 
-use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
+use crate::{WorkWasDone, ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
 
@@ -99,11 +99,12 @@ impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
 {
     /// trigger any periodic or delayed callbacks
     /// also check / cleanup any timeouts
-    pub fn process(&mut self, ga: &mut UserData) -> GhostResult<()> {
+    pub fn process(&mut self, ga: &mut UserData) -> GhostResult<WorkWasDone> {
         let mut expired = Vec::new();
 
         let now = std::time::SystemTime::now();
 
+        let did_work = !self.pending.is_empty();
         for (request_id, entry) in self.pending.iter() {
             if now > entry.expires {
                 expired.push(request_id.clone())
@@ -119,7 +120,7 @@ impl<UserData, TraceContext: 'static + CanTrace, CbData: 'static, E: 'static>
             }
         }
 
-        Ok(())
+        Ok(did_work.into())
     }
 
     /// register a callback

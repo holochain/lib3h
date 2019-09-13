@@ -142,10 +142,10 @@ impl<
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
-        self.actor.process()?;
-        self.endpoint.process(user_data)?;
-        Ok(())
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone> {
+        let mut work_was_done = self.actor.process()?;
+        work_was_done = work_was_done.or(self.endpoint.process(user_data)?);
+        Ok(work_was_done)
     }
 }
 
@@ -364,12 +364,13 @@ impl<
 mod tests {
     use super::*;
     use crate::{
-        ghost_channel::create_ghost_channel, ghost_test_harness::*,
+        ghost_channel::create_ghost_channel, 
         ghost_tracker::GhostCallbackData,
+        ghost_test_harness::Processor
     };
     use detach::prelude::*;
     use lib3h_tracing::TestTrace;
-
+    use predicates::prelude::*;
     type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
@@ -377,11 +378,11 @@ mod tests {
     // either self-generated or (presumeably) from children
     #[derive(Debug)]
     struct TestMsgOut(String);
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     struct TestMsgOutResponse(String);
     #[derive(Debug)]
     struct TestMsgIn(String);
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     struct TestMsgInResponse(String);
 
     struct TestActor {
@@ -585,11 +586,15 @@ mod tests {
         // process via the wrapper
         assert!(wrapped_child.process(&mut fake_parent).is_ok());
 
+        let response = TestMsgInResponse("event from parent".into());
+        let request = TestMsgIn("event from parent".into());
+ 
         assert_callback_eq!(
             wrapped_child,
             fake_parent,
-            context,
-            TestMsgInResponse("event from parent"),
+            request,
+            response,
+            TestError
         )
     }
 
