@@ -19,7 +19,7 @@ pub mod tests {
         data_types::{EntryAspectData, EntryData},
         Address,
     };
-    use lib3h_tracing::TestTrace;
+    use lib3h_tracing::{test_span, Lib3hSpan};
     use url::Url;
 
     lazy_static! {
@@ -122,15 +122,15 @@ pub mod tests {
     fn new_dht_wrapper(
         _is_mirror: bool,
         peer_address: &PeerAddressRef,
-    ) -> Detach<ChildDhtWrapperDyn<DhtData, TestTrace>> {
+    ) -> Detach<ChildDhtWrapperDyn<DhtData>> {
         let dht = new_dht(true, peer_address);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
-    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> PeerData {
+    fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> PeerData {
         let mut ud = DhtData::new();
         dht.request(
-            TestTrace::new(),
+            test_span(""),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut ud, response| {
                 let response = {
@@ -156,13 +156,10 @@ pub mod tests {
         ud.this_peer
     }
 
-    fn get_peer(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
-        address: &str,
-    ) -> Option<PeerData> {
+    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>, address: &str) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            TestTrace::new(),
+            test_span(""),
             DhtRequestToChild::RequestPeer(address.to_string()),
             Box::new(|mut ud, response| {
                 let response = {
@@ -188,10 +185,10 @@ pub mod tests {
         ud.maybe_peer
     }
 
-    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>) -> Vec<PeerData> {
+    fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            TestTrace::new(),
+            test_span(""),
             DhtRequestToChild::RequestPeerList,
             Box::new(|mut ud, response| {
                 let response = {
@@ -217,12 +214,10 @@ pub mod tests {
         ud.peer_list
     }
 
-    fn get_entry_address_list(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
-    ) -> Vec<Address> {
+    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<Address> {
         let mut ud = DhtData::new();
         dht.request(
-            TestTrace::new(),
+            test_span(""),
             DhtRequestToChild::RequestEntryAddressList,
             Box::new(|mut ud, response| {
                 let response = {
@@ -250,12 +245,12 @@ pub mod tests {
     }
 
     fn get_aspects_of(
-        dht: &mut Detach<ChildDhtWrapperDyn<DhtData, TestTrace>>,
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
         entry_address: &Address,
     ) -> Option<Vec<Address>> {
         let mut ud = DhtData::new();
         dht.request(
-            TestTrace::new(),
+            test_span(""),
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
             Box::new(|mut ud, response| {
                 let response = {
@@ -300,8 +295,11 @@ pub mod tests {
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 0);
         // Add a peer
-        dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)))
-            .unwrap();
+        dht.publish(
+            Lib3hSpan::todo(),
+            DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)),
+        )
+        .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -310,8 +308,11 @@ pub mod tests {
         assert_eq!(peer_list.len(), 1);
         assert_eq!(peer_list[0].peer_address, PEER_B);
         // Add a peer again
-        dht.publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_C)))
-            .unwrap();
+        dht.publish(
+            Lib3hSpan::todo(),
+            DhtRequestToChild::HoldPeer(create_PeerData(PEER_C)),
+        )
+        .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -331,8 +332,11 @@ pub mod tests {
         // Add a data item
         let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         println!("dht.process(HoldEntryAspectAddress)...");
-        dht.publish(DhtRequestToChild::HoldEntryAspectAddress(entry.clone()))
-            .unwrap();
+        dht.publish(
+            Lib3hSpan::todo(),
+            DhtRequestToChild::HoldEntryAspectAddress(entry.clone()),
+        )
+        .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let entry_address_list = get_entry_address_list(&mut dht);
@@ -346,7 +350,7 @@ pub mod tests {
         // Fetch it
         // ========
         dht.request(
-            TestTrace::new(),
+            test_span(""),
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
             Box::new(|_ud, response| {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");
@@ -405,8 +409,11 @@ pub mod tests {
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
         let mut peer_b_data = create_PeerData(PEER_B);
-        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()))
-            .unwrap();
+        dht.publish(
+            Lib3hSpan::todo(),
+            DhtRequestToChild::HoldPeer(peer_b_data.clone()),
+        )
+        .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -414,8 +421,11 @@ pub mod tests {
         // Add older peer info
         let ref_time = peer_b_data.timestamp;
         peer_b_data.timestamp -= 1;
-        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()))
-            .unwrap();
+        dht.publish(
+            Lib3hSpan::todo(),
+            DhtRequestToChild::HoldPeer(peer_b_data.clone()),
+        )
+        .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
         let peer = get_peer(&mut dht, PEER_B).unwrap();
@@ -425,7 +435,7 @@ pub mod tests {
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
         peer_b_data.timestamp = ref_time + 1;
-        dht.publish(DhtRequestToChild::HoldPeer(peer_b_data))
+        dht.publish(Lib3hSpan::todo(), DhtRequestToChild::HoldPeer(peer_b_data))
             .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
@@ -441,7 +451,10 @@ pub mod tests {
         let mut ud = DhtData::new();
         // Add a peer
         dht_a
-            .publish(DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)),
+            )
             .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Flush any pending requests from child
@@ -450,7 +463,10 @@ pub mod tests {
         // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a
-            .publish(DhtRequestToChild::BroadcastEntry(entry_data.clone()))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::BroadcastEntry(entry_data.clone()),
+            )
             .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Should return a gossipTo
@@ -477,7 +493,10 @@ pub mod tests {
             bundle,
         };
         dht_b
-            .publish(DhtRequestToChild::HandleGossip(remote_gossip))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HandleGossip(remote_gossip),
+            )
             .unwrap();
         dht_b.process(&mut ud).unwrap();
         // Should receive a HoldRequested
@@ -494,7 +513,10 @@ pub mod tests {
         }
         // Tell DHT B to hold it
         dht_b
-            .publish(DhtRequestToChild::HoldEntryAspectAddress(entry_data))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HoldEntryAspectAddress(entry_data),
+            )
             .unwrap();
         dht_b.process(&mut ud).unwrap();
         // DHT B should have the entry
@@ -512,7 +534,10 @@ pub mod tests {
         let peer_b_data = get_this_peer(&mut dht_b);
         assert_eq!(peer_b_data.peer_address, PEER_B);
         dht_a
-            .publish(DhtRequestToChild::HoldPeer(peer_b_data.clone()))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HoldPeer(peer_b_data.clone()),
+            )
             .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Flush any pending requests from child
@@ -521,7 +546,10 @@ pub mod tests {
         // Tell A to hold C
         let peer_c_data = create_PeerData(PEER_C);
         dht_a
-            .publish(DhtRequestToChild::HoldPeer(peer_c_data.clone()))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HoldPeer(peer_c_data.clone()),
+            )
             .unwrap();
         dht_a.process(&mut ud).unwrap();
         // Should return gossipTos of C to B
@@ -553,7 +581,10 @@ pub mod tests {
             bundle,
         };
         dht_b
-            .publish(DhtRequestToChild::HandleGossip(remote_gossip))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HandleGossip(remote_gossip),
+            )
             .unwrap();
         dht_b.process(&mut ud).unwrap();
         // Should return gossipTos
@@ -575,7 +606,10 @@ pub mod tests {
         }
         // Accept HoldPeerRequested
         dht_b
-            .publish(DhtRequestToChild::HoldPeer(peer_to_hold.clone()))
+            .publish(
+                Lib3hSpan::todo(),
+                DhtRequestToChild::HoldPeer(peer_to_hold.clone()),
+            )
             .unwrap();
         dht_b.process(&mut ud).unwrap();
         // B should have C
