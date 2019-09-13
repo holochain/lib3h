@@ -1,12 +1,12 @@
 //! SimChat Command Line Utility / Manual Testing CLI
 
-mod simchat;
 mod lib3h_simchat;
+mod simchat;
 
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use crate::simchat::{SimChat, ChatEvent, SimChatMessage};
+use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use regex::Regex;
 use url::Url;
 
@@ -55,12 +55,13 @@ fn main() {
                     rl_t.set_prompt("SimChat> ")
                         .expect("failed to set linefeed prompt");
                 }
-                ChatEvent::ReceiveDirectMessage(SimChatMessage{
+                ChatEvent::ReceiveDirectMessage(SimChatMessage {
                     from_agent,
                     payload,
                     timestamp,
                 }) => {
-                    writeln!(rl_t, "[{}] | *{}* {}", timestamp, from_agent, payload).expect("write fail");
+                    writeln!(rl_t, "[{}] | *{}* {}", timestamp, from_agent, payload)
+                        .expect("write fail");
                 }
                 _ => {}
             }

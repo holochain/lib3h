@@ -1,10 +1,14 @@
 extern crate base64;
 extern crate crossbeam_channel;
-extern crate url;
 extern crate lib3h_tracing;
+extern crate serde;
+extern crate url;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 #[cfg(test)]
 extern crate detach;
 
-pub mod simchat;
 pub mod lib3h_simchat;
+pub mod simchat;

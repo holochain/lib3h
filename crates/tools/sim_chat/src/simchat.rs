@@ -1,10 +1,37 @@
-use lib3h_protocol::data_types::SpaceData;
+use lib3h_protocol::data_types::{Opaque, SpaceData};
+use serde_json::{from_slice, to_vec};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SimChatMessage {
     pub from_agent: String,
     pub payload: String,
     pub timestamp: u64,
+}
+
+// TODO - dedup this
+impl SimChatMessage {
+    pub fn from_opaque(o: Opaque) -> Self {
+        from_slice(&o.as_bytes()).unwrap()
+    }
+
+    pub fn to_opaque(self) -> Opaque {
+        to_vec(&self).expect("Could not serialize message").into()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MessageList(pub Vec<SimChatMessage>);
+
+impl MessageList {
+    pub fn from_opaque(o: Opaque) -> Self {
+        from_slice(&o.as_bytes()).unwrap()
+    }
+
+    pub fn to_opaque(self) -> Opaque {
+        to_vec(&self)
+            .expect("Could not serialize message list")
+            .into()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

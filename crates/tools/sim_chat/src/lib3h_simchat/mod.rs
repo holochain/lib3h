@@ -1,16 +1,13 @@
-
 mod handle_chat_event;
 mod handle_lib3h_event;
 
+use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
-use crate::simchat::{ChatEvent, SimChat};
 
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
-use lib3h_ghost_actor::{
-    GhostActor, GhostCanTrack, GhostContextEndpoint,
-};
+use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
     data_types::{ConnectData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
@@ -25,12 +22,61 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::{SystemTime, UNIX_EPOCH},
 };
-use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
-pub type CAS = HashMap<Address, String>; // space_address -> anchor_addres -> message_address
+
+pub struct Store(HashMap<Address, HashMap<Address, HashMap<Address, SimChatMessage>>>); // space_address -> anchor_addres -> message_address
+
+impl Store {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn get(
+        &self,
+        space_address: &Address,
+        base_address: &Address,
+        message_address: &Address,
+    ) -> Option<&SimChatMessage> {
+        self.0
+            .get(&space_address)?
+            .get(&base_address)?
+            .get(&message_address)
+    }
+
+    pub fn get_all_messages(
+        &self,
+        space_address: &Address,
+        base_address: &Address,
+    ) -> Option<MessageList> {
+        Some(MessageList(
+            self.0
+                .get(&space_address)?
+                .get(&base_address)?
+                .values()
+                .map(|s| s.clone())
+                .collect(),
+        ))
+    }
+
+    pub fn insert(
+        &mut self,
+        space_address: &Address,
+        base_address: &Address,
+        message_address: &Address,
+        message: SimChatMessage,
+    ) {
+        let mut space = self.0.get(space_address).unwrap_or(&HashMap::new());
+        let mut base = space.get(base_address).unwrap_or(&HashMap::new());
+
+        base.insert(message_address.clone(), message);
+        space.insert(base_address.clone(), base.clone());
+        self.0.insert(space_address.clone(), space.clone());
+    }
+}
 
 pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
 
@@ -43,7 +89,7 @@ pub struct Lib3hSimChat {
 pub struct Lib3hSimChatState {
     current_space: Option<SpaceData>,
     spaces: HashMap<Address, SpaceData>,
-    cas: CAS,
+    store: Store,
     author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
     gossip_list: HashMap<Address, Vec<Address>>, // same
 }
@@ -53,7 +99,7 @@ impl Lib3hSimChatState {
         Self {
             current_space: None,
             spaces: HashMap::new(),
-            cas: HashMap::new(),
+            store: Store::new(),
             author_list: HashMap::new(),
             gossip_list: HashMap::new(),
         }
@@ -119,8 +165,7 @@ impl Lib3hSimChat {
                     engine.process().unwrap();
 
                     // grab any new events from lib3h
-                    let engine_chat_events = parent_endpoint
-                        .drain_messages();
+                    let engine_chat_events = parent_endpoint.drain_messages();
 
                     // gather all the ChatEvents
                     // Receive directly from the crossbeam channel
@@ -130,22 +175,33 @@ impl Lib3hSimChat {
                         .into_iter()
                         // process lib3h messages and convert to a chat event if required
                         .for_each(|engine_message| {
-                            if let Some(chat_event) = handle_and_convert_lib3h_event(engine_message, &mut state) {
-                            	handler(&chat_event);
-                        		handle_chat_event(chat_event, &mut state, &mut parent_endpoint, internal_sender.clone());
+                            if let Some(chat_event) =
+                                handle_and_convert_lib3h_event(engine_message, &mut state)
+                            {
+                                handler(&chat_event);
+                                handle_chat_event(
+                                    chat_event,
+                                    &mut state,
+                                    &mut parent_endpoint,
+                                    internal_sender.clone(),
+                                );
                             }
                         });
 
                     // process all the chat events by calling the handler for all events
                     // and dispatching new n3h actions where required
                     for chat_event in direct_chat_events {
-
                         // every chat event call the handler that was passed
                         handler(&chat_event);
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
-                        handle_chat_event(chat_event, &mut state, &mut parent_endpoint, internal_sender.clone());
+                        handle_chat_event(
+                            chat_event,
+                            &mut state,
+                            &mut parent_endpoint,
+                            internal_sender.clone(),
+                        );
                     }
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -202,15 +258,18 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
 }
 
 pub fn current_timestamp() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 #[cfg(test)]
 mod tests {
-	pub mod mock_engine;
+    pub mod mock_engine;
 
+    use super::*;
     use crate::simchat::SimChatMessage;
-	use super::*;
 
     fn new_sim_chat_mock_engine(callback: HandleEvent) -> Lib3hSimChat {
         Lib3hSimChat::new(
@@ -230,7 +289,7 @@ mod tests {
     }
 
     fn receive_sys_message(payload: String) -> ChatEvent {
-        ChatEvent::ReceiveDirectMessage(SimChatMessage{
+        ChatEvent::ReceiveDirectMessage(SimChatMessage {
             from_agent: String::from("sys"),
             payload,
             timestamp: current_timestamp(),
@@ -388,4 +447,3 @@ mod tests {
         )
     }
 }
-
