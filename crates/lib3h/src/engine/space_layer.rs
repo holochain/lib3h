@@ -91,7 +91,7 @@ impl<'engine> GhostEngine<'engine> {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
                         handle_gossip_to(&chain_id.0.to_string(), space_gateway, gossip_data)
-                        .expect("Failed to gossip with space_gateway");
+                            .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
                         // n/a - should have been handled by gateway

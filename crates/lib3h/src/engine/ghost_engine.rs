@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
-        engine_actor::*, p2p_protocol::*, ChainId, GhostEngine, RealEngineConfig, TransportKeys, CanAdvertise,
-        NETWORK_GATEWAY_ID,
+        engine_actor::*, p2p_protocol::*, CanAdvertise, ChainId, GhostEngine, RealEngineConfig,
+        TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
@@ -75,7 +75,7 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
     fn advertise(&self) -> Url {
         self.this_net_peer.peer_uri.to_owned()
     }
-
+}
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with TransportMemory
     pub fn new_mock(

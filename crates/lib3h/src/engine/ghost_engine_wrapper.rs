@@ -1,4 +1,4 @@
-use crate::engine::{CanAdvertise, engine_actor::GhostEngineParentWrapper};
+use crate::engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise};
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -55,11 +55,11 @@ fn server_success(request_id: String) -> Lib3hServerProtocol {
 impl<Engine: 'static, EngineError: 'static> LegacyLib3h<Engine, EngineError>
 where
     Engine: GhostActor<
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        EngineError,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            EngineError,
         > + CanAdvertise,
     EngineError: ToString,
 {

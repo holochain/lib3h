@@ -24,14 +24,14 @@ impl<'engine> GhostEngine<'engine> {
         for mut request in self.multiplexer.drain_messages() {
             let payload = request.take_message().expect("exists");
             match payload {
-            GatewayRequestToParent::Dht(dht_request) => {
+                GatewayRequestToParent::Dht(dht_request) => {
                     self.handle_network_dht_request(dht_request)?;
-            }
-            GatewayRequestToParent::Transport(transport_request) => {
+                }
+                GatewayRequestToParent::Transport(transport_request) => {
                     self.handle_network_transport_request(&transport_request)?;
+                }
             }
         }
-    }
         // Done
         Ok(true /* fixme */)
     }
