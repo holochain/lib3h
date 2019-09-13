@@ -24,9 +24,9 @@ impl SimChatMessage {
 pub struct MessageList(pub Vec<SimChatMessage>);
 
 impl MessageList {
-    // pub fn from_opaque(o: Opaque) -> Self {
-    //     from_slice(&o.as_bytes()).unwrap()
-    // }
+    pub fn from_opaque(o: Opaque) -> Self {
+        from_slice(&o.as_bytes()).unwrap()
+    }
 
     pub fn to_opaque(&self) -> Opaque {
         to_vec(self)

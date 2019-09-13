@@ -7,7 +7,7 @@ use lib3h_tracing::Lib3hSpan;
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
 #[derive(Debug)]
-enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
+pub enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
@@ -56,7 +56,7 @@ impl<
         Error: 'static,
     > GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
-    fn new(
+    pub fn new(
         request_id: Option<RequestId>,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<

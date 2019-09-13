@@ -11,14 +11,14 @@ use lib3h_protocol::{
 };
 
 pub fn handle_and_convert_lib3h_event(
-    mut engine_message: GhostMessage<
+    engine_message: &mut GhostMessage<
         Lib3hToClient,
         ClientToLib3h,
         Lib3hToClientResponse,
         Lib3hError,
     >,
     state: &mut Lib3hSimChatState,
-) -> Option<ChatEvent> {
+) -> (Option<ChatEvent>, Option<Result<Lib3hToClientResponse, Lib3hError>> ){
     match engine_message.take_message() {
         Some(Lib3hToClient::HandleQueryEntry(QueryEntryData {
             // currently only one query which returns all messages for a time anchor
@@ -29,11 +29,10 @@ pub fn handle_and_convert_lib3h_event(
             query: _,
         })) => {
             // respond with your ID in this space
-            let responder_agent_id = state.spaces.get(&space_address).unwrap().agent_id.clone();
+            let responder_agent_id = state.spaces.get(&space_address).expect("This agent does not track this space").agent_id.clone();
             if let Some(entry) = state.store.get_all_messages(&space_address, &entry_address) {
-                // load and return data from the CAS
-                engine_message
-                    .respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(
+                (None, 
+                Some(Ok(Lib3hToClientResponse::HandleQueryEntryResult(
                         QueryEntryResultData {
                             request_id,
                             entry_address,
@@ -42,15 +41,11 @@ pub fn handle_and_convert_lib3h_event(
                             responder_agent_id,
                             query_result: entry.to_opaque(),
                         },
-                    )))
-                    .ok();
+                ))))
             } else {
                 // is this the correct way to respond to a missing entry?
-                engine_message
-                    .respond(Err(Lib3hError::new_other("Entry not found")))
-                    .ok();
+                (None, Some(Err(Lib3hError::new_other("Entry not found"))))
             }
-            None
         }
         Some(Lib3hToClient::HandleStoreEntryAspect(StoreEntryAspectData {
             entry_address,
@@ -65,10 +60,7 @@ pub fn handle_and_convert_lib3h_event(
                 &entry_aspect.aspect_address,
                 SimChatMessage::from_opaque(entry_aspect.aspect),
             );
-            engine_message
-                .respond(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult))
-                .ok();
-            None
+            (None, Some(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult)))
         }
         // Some(Lib3hToClient::HandleGetAuthoringEntryList(GetListData {
         //     request_id,
@@ -105,15 +97,15 @@ pub fn handle_and_convert_lib3h_event(
         //     None
         // }
         Some(Lib3hToClient::HandleSendDirectMessage(message_data)) => {
-            Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
+            (Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
                 from_agent: message_data.from_agent_id.to_string(),
                 payload: "message from engine".to_string(),
                 timestamp: current_timestamp(),
-            }))
+            })), None)
         }
-        Some(Lib3hToClient::Disconnected(_)) => Some(ChatEvent::Disconnected),
-        Some(_) => None, // event we don't care about
-        None => None,    // there was nothing in the message
+        Some(Lib3hToClient::Disconnected(_)) => (Some(ChatEvent::Disconnected), None),
+        Some(_) => (None, None), // event we don't care about
+        None => (None, None),    // there was nothing in the message
     }
 }
 
@@ -125,6 +117,7 @@ pub mod test {
     use std::collections::HashSet;
     use std::hash::{Hash, Hasher};
     use std::iter::FromIterator;
+    
     use lib3h_protocol::{
         Address,
     };    
@@ -148,6 +141,21 @@ pub mod test {
         )
     }
 
+    fn retrieve_messages_event(space_address: &Address, base_address: &Address) -> Lib3hToClient {
+        Lib3hToClient::HandleQueryEntry(
+            QueryEntryData {
+                space_address: space_address.clone(),
+                entry_address: base_address.clone(),
+                request_id: String::from("0"),
+                query: Opaque::new(),
+                requester_agent_id: Address::from("some_agent"),
+            }
+        )
+    }
+
+    /*----------  Storing messages  ----------*/
+    
+
     #[test]
     fn handle_store_entry_mutates_state() {
         let mut state = Lib3hSimChatState::new();
@@ -157,10 +165,10 @@ pub mod test {
             timestamp: 0,
         };
         let (s,_r) = crossbeam_channel::unbounded();
-        let ghost_message = GhostMessage::new(None, send_message_event(&message), s);
-        let response = handle_and_convert_lib3h_event(ghost_message, &mut state);
+        let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s);
+        let response = handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
 
-        assert_eq!(response, None); // this does not produce a chat event
+        assert_eq!(response.0, None); // this does not produce a chat event
         assert_eq!(
             state.store.get_all_messages(&Address::from("some_space"), &Address::from("some_entry")).expect("no messages"),
             MessageList(vec![message])
@@ -185,8 +193,8 @@ pub mod test {
 
         let (s,_r) = crossbeam_channel::unbounded();
         for message in &messages {
-            let ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
-            handle_and_convert_lib3h_event(ghost_message, &mut state);
+            let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
+            handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
         }
 
         let stored_messages: Vec<SimChatMessage> = state.store.get_all_messages(&Address::from("some_space"), &Address::from("some_entry")).expect("no messages").0;
@@ -215,8 +223,8 @@ pub mod test {
 
         let (s,_r) = crossbeam_channel::unbounded();
         for message in &messages {
-            let ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
-            handle_and_convert_lib3h_event(ghost_message, &mut state);
+            let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
+            handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
         }
 
         let stored_messages: Vec<SimChatMessage> = state.store.get_all_messages(&Address::from("some_space"), &Address::from("some_entry")).expect("no messages").0;
@@ -226,4 +234,45 @@ pub mod test {
             vec![messages[0].clone()]
         )
     }
+
+    /*----------  retrieving messages  ----------*/
+
+    #[test]
+    fn can_query_and_get_message() {
+        let mut state = Lib3hSimChatState::new();
+        let message = SimChatMessage {
+            from_agent: String::from("some_agent"),
+            payload: String::from("hi"),
+            timestamp: 0,
+        };
+        // must actually be tracking the space the entry is requested from 
+        state.spaces.insert(Address::from("some_space"), SpaceData{
+            agent_id: Address::from("holder_agent"),
+            request_id: String::from("0"),
+            space_address: Address::from("some_space"),
+        });
+        state.store.insert(&Address::from("some_space"), &Address::from("some_entry"), &Address::from("message_address"), message.clone());
+
+        let (s, _r) = crossbeam_channel::unbounded();
+        let mut ghost_message = GhostMessage::new(None, retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")), s.clone());
+        let result = handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
+
+        assert_eq!(result.0, None); // no chat events for this event
+
+
+        let query_result = match result.1.expect("no response from handler").expect("handler returned error") {
+            Lib3hToClientResponse::HandleQueryEntryResult(QueryEntryResultData {
+                query_result, ..
+            }) => {
+                query_result
+            },
+            _ => panic!("wrong response type")
+        };
+
+        assert_eq!(
+            MessageList::from_opaque(query_result),
+            MessageList(vec![message])
+        );
+    }
+    
 }
