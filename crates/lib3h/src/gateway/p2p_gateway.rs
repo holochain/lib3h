@@ -17,7 +17,7 @@ impl P2pGateway {
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: &str,
-        child_transport_endpoint: transport::protocol::DynTransportActor,
+        inner_transport: transport::protocol::DynTransportActor,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
@@ -31,12 +31,10 @@ impl P2pGateway {
         );
         P2pGateway {
             identifier: identifier.to_owned(),
-            child_transport_endpoint: Detach::new(
-                transport::protocol::TransportActorParentWrapperDyn::new(
-                    child_transport_endpoint,
-                    "to_child_transport_",
-                ),
-            ),
+            inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
+                inner_transport,
+                "to_child_transport_",
+            )),
             inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht")),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
@@ -50,17 +48,12 @@ impl P2pGateway {
     /// Helper Ctor
     pub fn new_with_space(
         space_address: &Address,
-        child_transport_endpoint: transport::protocol::DynTransportActor,
+        inner_transport: transport::protocol::DynTransportActor,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
         let identifier: String = space_address.clone().into();
-        P2pGateway::new(
-            &identifier,
-            child_transport_endpoint,
-            dht_factory,
-            dht_config,
-        )
+        P2pGateway::new(&identifier, inner_transport, dht_factory, dht_config)
     }
 
     pub fn this_peer(&self) -> PeerData {

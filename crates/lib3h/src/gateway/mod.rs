@@ -15,7 +15,7 @@ pub struct P2pGateway {
     identifier: String,
 
     /// Transport
-    child_transport_endpoint: Detach<transport::protocol::TransportActorParentWrapperDyn<Self>>,
+    inner_transport: Detach<transport::protocol::TransportActorParentWrapperDyn<Self>>,
     /// DHT
     inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
 
