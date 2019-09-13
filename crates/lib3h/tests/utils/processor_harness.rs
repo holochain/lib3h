@@ -24,6 +24,7 @@ lazy_static! {
         // let seed = [rand::random::<u64>(), rand::random::<u64>()];
         // let seed = [1840432774656682167, 15353179927896983378];
 
+
         println!("seed is: {:?}", &seed);
         let seeded_boolean_prng = SeededBooleanPrng::from(seed);
 
