@@ -1,15 +1,19 @@
 
+use crate::lib3h_simchat::Lib3hSimChatState;
 use super::current_timestamp;
 use crate::simchat::{ChatEvent, SimChatMessage};
 use lib3h_protocol::{
-    data_types::{QueryEntryData, QueryEntryResultData},
+    data_types::*,
     protocol::{ClientToLib3h, Lib3hToClient, Lib3hToClientResponse},
 };
 use lib3h_ghost_actor::GhostMessage;
 use lib3h::error::Lib3hError;
 
-pub fn handle_and_convert_lib3h_event(mut engine_message: GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>) -> Option<ChatEvent> {
-	match engine_message.take_message() {
+pub fn handle_and_convert_lib3h_event(
+	mut engine_message: GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, Lib3hError>,
+	state: &mut Lib3hSimChatState,
+) -> Option<ChatEvent> {
+match engine_message.take_message() {
 	    Some(Lib3hToClient::HandleQueryEntry(QueryEntryData {
 	        space_address,
 	        entry_address,
@@ -17,23 +21,59 @@ pub fn handle_and_convert_lib3h_event(mut engine_message: GhostMessage<Lib3hToCl
 	        requester_agent_id,
 	        query: _,
 	    })) => {
-	        engine_message.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(QueryEntryResultData {
+	        // respond with your ID in this space
+	        let responder_agent_id = state.spaces.get(&space_address).unwrap().agent_id.clone();
+	        if let Some(entry) = state.cas.get(&entry_address) {
+	            // load and return data from the CAS
+	            engine_message.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(QueryEntryResultData {
+	                request_id,
+	                entry_address,
+	                requester_agent_id: requester_agent_id.clone(),
+	                space_address: space_address.clone(),
+	                responder_agent_id,
+	                query_result: entry.into(),
+	            }))).ok();
+	        } else {
+	            // is this the correct way to respond to a missing entry?
+	            engine_message.respond(Err(Lib3hError::new_other("Entry not found"))).ok();
+	        }
+	        None
+	    },
+	    Some(Lib3hToClient::HandleStoreEntryAspect(StoreEntryAspectData {
+	        entry_address,
+	        entry_aspect,
+	        space_address: _,
+	        ..
+	    })) => {
+	        // store some data in the CAS at the given address
+	        state.cas.insert(entry_address, String::from_utf8(entry_aspect.aspect.as_bytes()).unwrap());
+	        engine_message.respond(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult)).ok();
+	        None
+	    },
+	    Some(Lib3hToClient::HandleGetAuthoringEntryList(GetListData {
+	        request_id,
+	        space_address,
+	        provider_agent_id,
+	    })) => {
+	        engine_message.respond(Ok(Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
 	            request_id,
-	            entry_address,
-	            requester_agent_id: requester_agent_id.clone(),
-	            space_address: space_address.clone(),
-	            responder_agent_id: requester_agent_id,
-	            query_result: Vec::new().into(),
+	            space_address,
+	            provider_agent_id,
+	            address_map: state.author_list.clone(),
 	        }))).ok();
 	        None
 	    },
-	    Some(Lib3hToClient::HandleStoreEntryAspect{..}) => {
-	        None
-	    },
-	    Some(Lib3hToClient::HandleGetAuthoringEntryList{..}) => {
-	        None
-	    },
-	    Some(Lib3hToClient::HandleGetGossipingEntryList{..}) => {
+	    Some(Lib3hToClient::HandleGetGossipingEntryList(GetListData {
+	        request_id,
+	        space_address,
+	        provider_agent_id,
+	    })) => {
+	        engine_message.respond(Ok(Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
+	            request_id,
+	            space_address,
+	            provider_agent_id,
+	            address_map: state.gossip_list.clone(),
+	        }))).ok(); 
 	        None
 	    },
 	    Some(Lib3hToClient::HandleSendDirectMessage(message_data)) => {

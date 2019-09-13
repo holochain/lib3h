@@ -30,6 +30,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
+pub type CAS = HashMap<Address, String>; // space_address -> anchor_addres -> message_address
 
 pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
 
@@ -42,7 +43,9 @@ pub struct Lib3hSimChat {
 pub struct Lib3hSimChatState {
     current_space: Option<SpaceData>,
     spaces: HashMap<Address, SpaceData>,
-    // cas: HashMap<Address, HashMap<Address, SimChatMessage>>,
+    cas: CAS,
+    author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
+    gossip_list: HashMap<Address, Vec<Address>>, // same
 }
 
 impl Lib3hSimChatState {
@@ -50,7 +53,9 @@ impl Lib3hSimChatState {
         Self {
             current_space: None,
             spaces: HashMap::new(),
-            // cas: HashMap::new(),
+            cas: HashMap::new(),
+            author_list: HashMap::new(),
+            gossip_list: HashMap::new(),
         }
     }
 }
@@ -119,13 +124,13 @@ impl Lib3hSimChat {
 
                     // gather all the ChatEvents
                     // Receive directly from the crossbeam channel
-                    // and convert relevent N3H protocol messages to chat events
+                    // and convert relevent N3H protocol messages to chat events 
                     let direct_chat_events = out_recv.try_iter();
                     let engine_chat_events = engine_chat_events
                         .into_iter()
                         // process lib3h messages and convert to a chat event if required
                         .filter_map(|engine_message| {
-                            handle_and_convert_lib3h_event(engine_message)
+                            handle_and_convert_lib3h_event(engine_message, &mut state)
                         });
 
                     // process all the chat events by calling the handler for all events
