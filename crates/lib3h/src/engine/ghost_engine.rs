@@ -307,6 +307,7 @@ impl<'engine> GhostEngine<'engine> {
         result
     }
 
+    /// Process connect events by sending them to the multiplexer
     fn handle_connect(&mut self, data: ConnectData) -> GhostResult<()> {
         let cmd =
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
@@ -317,7 +318,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Process any Client events or requests
-    fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
+    fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> GhostResult<()> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(data) => {
                 trace!("ClientToLib3h::Connect: {:?}", &data);
@@ -407,7 +408,7 @@ impl<'engine> GhostEngine<'engine> {
         Ok(chain_id)
     }
 
-    fn broadcast_join(&mut self, space_address: Address, peer: PeerData) {
+    fn broadcast_join(&mut self, space_address: Address, peer: PeerData) -> GhostResult<()> {
         // TODO #150 - Send JoinSpace to all known peers
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone().into(), peer.clone());
@@ -420,9 +421,8 @@ impl<'engine> GhostEngine<'engine> {
             space_address,
             peer.peer_address,
         );
-        let _result = self
-            .multiplexer
-            .publish(Lib3hSpan::todo(), GatewayRequestToChild::SendAll(payload));
+        self.multiplexer
+            .publish(Lib3hSpan::todo(), GatewayRequestToChild::SendAll(payload))
         // TODO END
     }
 
@@ -569,7 +569,7 @@ impl<'engine> GhostEngine<'engine> {
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
         let this_peer = self.this_space_peer(chain_id.clone());
-        self.broadcast_join(join_msg.space_address.clone(), this_peer.clone());
+        self.broadcast_join(join_msg.space_address.clone(), this_peer.clone())?;
 
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
 
