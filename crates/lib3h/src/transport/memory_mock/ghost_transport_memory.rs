@@ -4,7 +4,7 @@ use crate::transport::{
     protocol::*,
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use std::collections::HashSet;
 use url::Url;
 
@@ -20,7 +20,6 @@ type GhostTransportMemoryEndpoint = GhostEndpoint<
 
 type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
     UserData,
-    Lib3hTrace,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -30,7 +29,6 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
 
 pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
     (),
-    Lib3hTrace,
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -191,6 +189,7 @@ impl
                         to_connect_list.push(in_cid.clone());
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
+                            Lib3hSpan::todo(),
                             RequestToParent::IncomingConnection {
                                 uri: in_cid.clone(),
                             },
@@ -222,6 +221,7 @@ impl
                         println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                         let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                         endpoint_self.as_mut().expect("exists").publish(
+                            Lib3hSpan::todo(),
                             RequestToParent::ReceivedData {
                                 uri: from_addr,
                                 payload,
@@ -276,7 +276,7 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child1")
-            .build::<(), Lib3hTrace>();
+            .build::<()>();
 
         let mut transport2 = GhostTransportMemory::new();
         let mut t2_endpoint = transport2
@@ -284,7 +284,7 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("tmem_to_child2")
-            .build::<(), Lib3hTrace>();
+            .build::<()>();
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
@@ -293,7 +293,7 @@ mod tests {
         let expected_transport1_address = Url::parse("mem://addr_1").unwrap();
         t1_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
@@ -310,7 +310,7 @@ mod tests {
         let expected_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
@@ -343,7 +343,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::SendMessage {
                     uri: Url::parse("mem://addr_2").unwrap(),
                     payload: b"test message".to_vec().into(),

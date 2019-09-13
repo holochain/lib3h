@@ -7,7 +7,6 @@ pub mod protocol;
 
 use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
 use detach::prelude::*;
-use lib3h_tracing::Lib3hTrace;
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -17,13 +16,13 @@ pub struct P2pGateway {
 
     /// Transport
     child_transport_endpoint:
-        Detach<transport::protocol::TransportActorParentContextEndpoint<P2pGateway, Lib3hTrace>>,
+        Detach<transport::protocol::TransportActorParentContextEndpoint<P2pGateway>>,
     /// DHT
-    inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway, Lib3hTrace>>,
+    inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,
-    endpoint_self: Detach<GatewaySelfEndpoint<(), Lib3hTrace>>,
+    endpoint_self: Detach<GatewaySelfEndpoint<()>>,
     /// cached data from inner dht
     this_peer: PeerData,
 }

@@ -8,7 +8,7 @@ use crate::{
     transport::{self, error::TransportResult},
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -19,7 +19,7 @@ impl P2pGateway {
     fn handle_incoming_connection(&mut self, uri: Url) -> TransportResult<()> {
         self.inner_dht
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 DhtRequestToChild::RequestThisPeer,
                 Box::new(move |me, response| {
                     let response = {
@@ -71,7 +71,7 @@ impl P2pGateway {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
         self.child_transport_endpoint.request(
-            Lib3hTrace,
+            Lib3hSpan::todo(),
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
                 payload: payload.to_vec().into(),
@@ -128,7 +128,7 @@ impl P2pGateway {
             transport::protocol::RequestToChild::Bind { spec: _ } => {
                 // Forward to child transport
                 let _ = self.child_transport_endpoint.as_mut().request(
-                    Lib3hTrace,
+                    Lib3hSpan::todo(),
                     transport_request,
                     Box::new(|_me, response| {
                         let response = {
@@ -153,7 +153,7 @@ impl P2pGateway {
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
-                    Lib3hTrace,
+                    Lib3hSpan::todo(),
                     DhtRequestToChild::RequestPeer(uri.to_string()),
                     Box::new(move |me, response| {
                         let response = {
@@ -246,7 +246,9 @@ impl P2pGateway {
                                 timestamp,
                             };
                             // HACK
-                            let _ = self.inner_dht.publish(DhtRequestToChild::HoldPeer(peer));
+                            let _ = self
+                                .inner_dht
+                                .publish(Lib3hSpan::todo(), DhtRequestToChild::HoldPeer(peer));
                             // TODO #58
                             // TODO #150 - Should not call process manually
                             self.process().expect("HACK");
@@ -256,10 +258,10 @@ impl P2pGateway {
             }
         };
         // Bubble up to parent
-        let _res = self
-            .endpoint_self
-            .as_mut()
-            .publish(GatewayRequestToParent::Transport(request));
+        let _res = self.endpoint_self.as_mut().publish(
+            Lib3hSpan::todo(),
+            GatewayRequestToParent::Transport(request),
+        );
     }
 
     /// handle response we got from our parent

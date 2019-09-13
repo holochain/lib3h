@@ -28,7 +28,7 @@ mod tests {
     use detach::prelude::*;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::data_types::Opaque;
-    use lib3h_tracing::Lib3hTrace;
+    use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
     pub struct GatewayMock {
@@ -36,7 +36,6 @@ mod tests {
         endpoint_self: Detach<
             GhostContextEndpoint<
                 GatewayMock,
-                Lib3hTrace,
                 GatewayRequestToParent,
                 GatewayRequestToParentResponse,
                 GatewayRequestToChild,
@@ -110,10 +109,13 @@ mod tests {
             loop {
                 match self.mock_receiver.try_recv() {
                     Ok((uri, payload)) => {
-                        self.endpoint_self
-                            .publish(GatewayRequestToParent::Transport(
-                                RequestToParent::ReceivedData { uri, payload },
-                            ))?;
+                        self.endpoint_self.publish(
+                            Lib3hSpan::todo(),
+                            GatewayRequestToParent::Transport(RequestToParent::ReceivedData {
+                                uri,
+                                payload,
+                            }),
+                        )?;
                     }
                     Err(_) => break,
                 }
@@ -129,7 +131,7 @@ mod tests {
 
         let addr_none = Url::parse("none:").expect("can parse url");
 
-        let mut mplex: GatewayParentWrapper<(), Lib3hTrace, TransportMultiplex<GatewayMock>> =
+        let mut mplex: GatewayParentWrapper<(), TransportMultiplex<GatewayMock>> =
             GhostParentWrapper::new(
                 TransportMultiplex::new(GatewayMock::new(s_out, r_in)),
                 "test_mplex_",
@@ -139,18 +141,18 @@ mod tests {
             .as_mut()
             .create_agent_space_route(&"space_a".into(), &"agent_a".into())
             .as_context_endpoint_builder()
-            .build::<(), Lib3hTrace>();
+            .build::<()>();
 
         let mut route_b = mplex
             .as_mut()
             .create_agent_space_route(&"space_b".into(), &"agent_b".into())
             .as_context_endpoint_builder()
-            .build::<(), Lib3hTrace>();
+            .build::<()>();
 
         // send a message from route A
         route_a
             .request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 RequestToChild::SendMessage {
                     uri: addr_none.clone(),
                     payload: "hello-from-a".into(),
