@@ -194,7 +194,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100));
         let resp = mdns.recv().expect("recv fail");
 
-        match resp.unwrap().questions[0] {
+        match resp.expect("mdns response failed").questions[0] {
             Question::Srv(ref q) => {
                 assert_eq!(b"lib3h.test.service".to_vec(), q.name);
             }

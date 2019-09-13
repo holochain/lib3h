@@ -19,9 +19,10 @@ lazy_static! {
         // if you see an error "sometimes" manually paste the seed from the logs in here and
         // hardcode it for debugging
         // e.g. something like
+        let seed = [1, 2];
         // let seed = [12290055440097485507, 11402434335878553749];
         // let seed = [rand::random::<u64>(), rand::random::<u64>()];
-        let seed = [1840432774656682167, 15353179927896983378];
+        // let seed = [1840432774656682167, 15353179927896983378];
 
         println!("seed is: {:?}", &seed);
         let seeded_boolean_prng = SeededBooleanPrng::from(seed);
