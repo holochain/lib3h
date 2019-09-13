@@ -102,14 +102,22 @@ impl Lib3hSpan {
     }
 
     pub fn todo() -> Self {
-        test_span("TODO: no-op, disconnected Span")
+        noop("TODO: no-op, disconnected Span")
+    }
+
+    pub fn noop() -> Self {
+        noop("no-op, intentionally disconnected Span")
     }
 }
 
-pub fn test_span(name: &str) -> Lib3hSpan {
-    Tracer::new(AllSampler)
+fn noop(name: &str) -> Lib3hSpan {
+    Tracer::new(NullSampler)
         .0
         .span(name.to_owned())
         .start()
         .into()
+}
+
+pub fn test_span(name: &str) -> Lib3hSpan {
+    noop(name)
 }

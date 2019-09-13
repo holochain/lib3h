@@ -372,7 +372,7 @@ impl<
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
-            span: span.child("send request"),
+            span: span.follower("send request"),
             // span: span.child("request", |o| o.start()).into(),
         })?;
         Ok(())
@@ -561,7 +561,7 @@ mod tests {
             GhostMessage::new_event(
                 TestMsgIn("this is an event message from an internal child".into()),
                 child_send,
-                Lib3hSpan::todo(),
+                test_span(""),
             );
         assert_eq!("GhostMessage {request_id: None, ..}", format!("{:?}", msg));
         let payload = msg.take_message().unwrap();
@@ -590,7 +590,7 @@ mod tests {
                 request_id.clone(),
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
-                Lib3hSpan::todo(),
+                test_span(""),
             );
         msg.respond(Ok(TestMsgInResponse("response back to child".into())))
             .unwrap();

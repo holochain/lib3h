@@ -77,15 +77,16 @@ impl P2pGateway {
             self.identifier, msg
         );
         // let parent_request = msg.clone();
+        let span = msg.span().child("handle_RequestToChild");
         let request = msg.take_message().expect("exists");
         match request {
             GatewayRequestToChild::Transport(transport_request) => {
                 // Forward to child transport
-                self.handle_transport_RequestToChild(transport_request, msg)
+                self.handle_transport_RequestToChild(span, transport_request, msg)
             }
             GatewayRequestToChild::Dht(dht_request) => {
                 // Forward to child dht
-                self.handle_dht_RequestToChild(dht_request, msg)
+                self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             _ => Ok(()), // FIXME
         }

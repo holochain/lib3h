@@ -70,7 +70,11 @@ impl RealEngine {
         for (chain_id, request_list) in space_outbox_map {
             for mut request in request_list {
                 let payload = request.take_message().expect("exists");
-                let mut output = self.handle_space_request(&chain_id, payload)?;
+                let mut output = self.handle_space_request(
+                    request.span().child("handle_space_request"),
+                    &chain_id,
+                    payload,
+                )?;
                 outbox.append(&mut output);
             }
         }
@@ -81,6 +85,7 @@ impl RealEngine {
     /// Handle a GatewayRequestToParent sent to us by one of our space gateway
     fn handle_space_request(
         &mut self,
+        span: Lib3hSpan,
         chain_id: &ChainId,
         request: GatewayRequestToParent,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
@@ -117,7 +122,7 @@ impl RealEngine {
                         );
                         // For now accept all request
                         let _res = space_gateway.publish(
-                            Lib3hSpan::todo(),
+                            span.follower("DhtRequestToParent::HoldPeerRequested"),
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)),
                         );
                     }

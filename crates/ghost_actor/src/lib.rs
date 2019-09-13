@@ -84,7 +84,7 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::{test_span, Lib3hSpan};
+    use lib3h_tracing::test_span;
 
     type FakeError = String;
 
@@ -176,7 +176,7 @@ mod tests {
             detach_run!(&mut self.endpoint_self, |cs| cs.process(self))?;
 
             for mut msg in self.endpoint_self.as_mut().drain_messages() {
-                let mut span = Lib3hSpan::todo();
+                let mut span = msg.span().child("process_concrete");
                 match msg.take_message().expect("exists") {
                     dht_protocol::RequestToChild::ResolveAddressForId { id } => {
                         println!("dht got ResolveAddressForId {}", id);

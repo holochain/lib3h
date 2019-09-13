@@ -48,7 +48,7 @@ impl P2pGateway {
                             our_peer_address,
                             uri,
                         );
-                        me.send(&uri, &buf, None).unwrap(); // FIXME
+                        me.send(Lib3hSpan::todo(), &uri, &buf, None).unwrap(); // FIXME
                     } else {
                         panic!("bad response to RequestThisPeer: {:?}", response);
                     }
@@ -64,6 +64,7 @@ impl P2pGateway {
     ///   - space   : agentId
     fn send(
         &mut self,
+        span: Lib3hSpan,
         uri: &Url,
         payload: &[u8],
         maybe_parent_msg: Option<GatewayToChildMessage>,
@@ -71,7 +72,7 @@ impl P2pGateway {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
         self.child_transport_endpoint.request(
-            Lib3hSpan::todo(),
+            span,
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
                 payload: payload.to_vec().into(),
@@ -121,6 +122,7 @@ impl P2pGateway {
     /// Handle Transport request sent to use by our parent
     pub(crate) fn handle_transport_RequestToChild(
         &mut self,
+        span: Lib3hSpan,
         transport_request: transport::protocol::RequestToChild,
         parent_request: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
@@ -153,7 +155,7 @@ impl P2pGateway {
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
-                    Lib3hSpan::todo(),
+                    span.child("transport::protocol::RequestToChild::SendMessage"),
                     DhtRequestToChild::RequestPeer(uri.to_string()),
                     Box::new(move |me, response| {
                         let response = {
@@ -167,8 +169,13 @@ impl P2pGateway {
                         };
                         if let DhtRequestToChildResponse::RequestPeer(maybe_peer_data) = response {
                             return if let Some(peer_data) = maybe_peer_data {
-                                me.send(&peer_data.peer_uri, &payload, Some(parent_request))
-                                    .unwrap(); // FIXME unwrap
+                                me.send(
+                                    span.follower("TODO send"),
+                                    &peer_data.peer_uri,
+                                    &payload,
+                                    Some(parent_request),
+                                )
+                                .unwrap(); // FIXME unwrap
                                 Ok(())
                             } else {
                                 panic!("no peer found");
@@ -211,6 +218,7 @@ impl P2pGateway {
             "({}) Serving request from child transport: {:?}",
             self.identifier, msg
         );
+        let span = msg.span().child("handle_transport_RequestToParent");
         let request = msg.take_message().expect("msg doesn't exist");
         match &request {
             transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
@@ -246,9 +254,10 @@ impl P2pGateway {
                                 timestamp,
                             };
                             // HACK
-                            let _ = self
-                                .inner_dht
-                                .publish(Lib3hSpan::todo(), DhtRequestToChild::HoldPeer(peer));
+                            let _ = self.inner_dht.publish(
+                                span.follower("transport::protocol::RequestToParent::ReceivedData"),
+                                DhtRequestToChild::HoldPeer(peer),
+                            );
                             // TODO #58
                             // TODO #150 - Should not call process manually
                             self.process().expect("HACK");
@@ -259,7 +268,7 @@ impl P2pGateway {
         };
         // Bubble up to parent
         let _res = self.endpoint_self.as_mut().publish(
-            Lib3hSpan::todo(),
+            span.follower("bubble up to parent"),
             GatewayRequestToParent::Transport(request),
         );
     }

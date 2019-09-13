@@ -14,14 +14,16 @@ impl P2pGateway {
     /// Handle a request sent to us by our parent
     pub(crate) fn handle_dht_RequestToChild(
         &mut self,
+        _span: Lib3hSpan,
         request: DhtRequestToChild,
         parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
-        let span = Lib3hSpan::todo();
+        // TODO: which span do we actually want?
+        let span_parent = parent_msg.span().child("handle_dht_RequestToChild");
         // forward to child dht
         self.inner_dht
             .request(
-                span,
+                span_parent,
                 request,
                 Box::new(|_me, response| {
                     let response = {
@@ -49,6 +51,7 @@ impl P2pGateway {
             "({}) Serving request from child dht: {:?}",
             self.identifier, request
         );
+        let span = request.span().child("handle_dht_RequestToParent");
         match request.take_message().expect("exists") {
             DhtRequestToParent::GossipTo(_data) => {
                 // no-op
@@ -65,7 +68,7 @@ impl P2pGateway {
                 );
                 // Send phony SendMessage request so we connect to it
                 let _res = self.child_transport_endpoint.publish(
-                    Lib3hSpan::todo(),
+                    span.follower("DhtRequestToParent::HoldPeerRequested"),
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Opaque::new(),

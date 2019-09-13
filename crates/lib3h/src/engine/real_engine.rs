@@ -310,7 +310,7 @@ impl RealEngine {
         &mut self,
         client_msg: Lib3hClientProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
-        let span = Lib3hSpan::todo();
+        let span = Lib3hSpan::noop();
         debug!("{} serving: {:?}", self.name, client_msg);
         let mut outbox = Vec::new();
         // Note: use same order as the enum
@@ -334,7 +334,7 @@ impl RealEngine {
                     },
                 );
                 // TODO: Figure out how we want to handle Connect and ConnectResult with GhostEngine
-                self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
+                self.multiplexer.publish(Lib3hSpan::noop(), cmd)?;
                 //                // Convert into TransportCommand & post to network gateway
                 //                let cmd = TransportCommand::Connect(msg.peer_uri, msg.request_id);
                 //                self.multiplexer.as_transport_mut().post(cmd)?;
@@ -717,7 +717,7 @@ impl RealEngine {
             peer.peer_address,
         );
         self.multiplexer
-            .publish(Lib3hSpan::todo(), GatewayRequestToChild::SendAll(payload))?;
+            .publish(Lib3hSpan::noop(), GatewayRequestToChild::SendAll(payload))?;
         // TODO END
 
         // Add it to space map
@@ -728,7 +728,7 @@ impl RealEngine {
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
         let this_peer = peer.clone(); // FIXME
         space_gateway.publish(
-            Lib3hSpan::todo(),
+            Lib3hSpan::noop(),
             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)),
         )?;
 
@@ -802,7 +802,7 @@ impl RealEngine {
         // Send
         let peer_address: String = msg.to_agent_id.clone().into();
         let _res = space_gateway.publish(
-            Lib3hSpan::todo(),
+            Lib3hSpan::noop(),
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
                 uri: Url::parse(&("agentId:".to_string() + &peer_address))
                     .expect("invalid url format"),
@@ -914,7 +914,7 @@ pub fn handle_gossipTo<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(Lib3hSpan::todo(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Lib3hSpan::noop(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }

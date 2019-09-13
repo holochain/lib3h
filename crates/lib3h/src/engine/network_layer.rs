@@ -27,8 +27,9 @@ impl RealEngine {
         // Process the network gateway
         detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
         for mut request in self.multiplexer.drain_messages() {
+            let span = request.span().child("process_multiplexer");
             let payload = request.take_message().expect("exists");
-            let mut output = self.handle_network_request(payload)?;
+            let mut output = self.handle_network_request(span, payload)?;
             outbox.append(&mut output);
         }
         //        // FIXME: DHT magic
@@ -41,16 +42,17 @@ impl RealEngine {
     /// Handle a GatewayRequestToParent sent to us by our network gateway
     fn handle_network_request(
         &mut self,
+        span: Lib3hSpan,
         request: GatewayRequestToParent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} << handle_network_request: [{:?}]", self.name, request,);
         //let parent_request = request.clone();
         match request {
             GatewayRequestToParent::Dht(dht_request) => {
-                self.handle_network_dht_request(dht_request)
+                self.handle_network_dht_request(span, dht_request)
             }
             GatewayRequestToParent::Transport(transport_request) => {
-                self.handle_network_transport_request(&transport_request)
+                self.handle_network_transport_request(span, &transport_request)
             }
         }
     }
@@ -58,6 +60,7 @@ impl RealEngine {
     /// Handle a DhtRequestToParent sent to us by our network gateway
     fn handle_network_dht_request(
         &mut self,
+        span: Lib3hSpan,
         request: DhtRequestToParent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
@@ -83,7 +86,8 @@ impl RealEngine {
                         payload: Opaque::new(),
                     },
                 );
-                self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
+                self.multiplexer
+                    .publish(span.child("DhtRequestToParent::HoldPeerRequested"), cmd)?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
@@ -109,6 +113,7 @@ impl RealEngine {
     /// Handle a TransportRequestToParent sent to us by our network gateway
     fn handle_network_transport_request(
         &mut self,
+        span: Lib3hSpan,
         request: &transport::protocol::RequestToParent,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         debug!(
@@ -130,7 +135,10 @@ impl RealEngine {
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
-                let mut output = self.handle_incoming_connection(uri.clone())?;
+                let mut output = self.handle_incoming_connection(
+                    span.child("handle_incoming_connection"),
+                    uri.clone(),
+                )?;
                 outbox.append(&mut output);
             }
             //            TransportEvent::ConnectionClosed(id) => {
@@ -153,7 +161,8 @@ impl RealEngine {
                     return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                 }
                 let p2p_msg = maybe_msg.unwrap();
-                let mut output = self.serve_P2pProtocol(uri, &p2p_msg)?;
+                let mut output =
+                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
                 outbox.append(&mut output);
             }
         };
@@ -162,13 +171,14 @@ impl RealEngine {
 
     fn handle_incoming_connection(
         &mut self,
+        span: Lib3hSpan,
         net_uri: Url,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
         // Get list of known peers
         let uri_copy = net_uri.clone();
         self.multiplexer
             .request(
-                Lib3hSpan::todo(),
+                span.child("handle_incoming_connection, .request"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
                 Box::new(move |me, response| {
                     let response = {
@@ -204,7 +214,7 @@ impl RealEngine {
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                                 me.multiplexer.publish(
-                                    Lib3hSpan::todo(),
+                                    span.follower("publish TODO name"),
                                     GatewayRequestToChild::Transport(
                                         transport::protocol::RequestToChild::SendMessage {
                                             uri: Url::parse(&peer_data.peer_address)
@@ -242,6 +252,7 @@ impl RealEngine {
     /// TODO #150
     fn serve_P2pProtocol(
         &mut self,
+        span: Lib3hSpan,
         _from: &Url,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<Vec<Lib3hServerProtocol>> {
@@ -256,7 +267,7 @@ impl RealEngine {
                 // Check if its for the multiplexer
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
                     let _ = self.multiplexer.publish(
-                        Lib3hSpan::todo(),
+                        span.follower("TODO"),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                     );
                 } else {
@@ -266,7 +277,7 @@ impl RealEngine {
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
-                            Lib3hSpan::todo(),
+                            span.follower("TODO"),
                             GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                         );
                     } else {
@@ -312,7 +323,7 @@ impl RealEngine {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     let _ = space_gateway.publish(
-                        Lib3hSpan::todo(),
+                        span.follower("P2pProtocol::BroadcastJoinSpace"),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data.clone())),
                     );
                 }
@@ -323,7 +334,7 @@ impl RealEngine {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
-                            Lib3hSpan::todo(),
+                            span.follower("P2pProtocol::AllJoinedSpaceList"),
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
                                 peer_data.clone(),
                             )),

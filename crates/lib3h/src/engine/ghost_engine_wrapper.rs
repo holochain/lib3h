@@ -156,7 +156,7 @@ where
 mod tests {
     use super::*;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::Lib3hSpan;
+    use lib3h_tracing::test_span;
     use url::Url;
 
     type EngineError = String;
@@ -258,7 +258,9 @@ mod tests {
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            let _ = self.lib3h_endpoint.publish(Lib3hSpan::todo(), msg);
+            let _ = self
+                .lib3h_endpoint
+                .publish(test_span("inject_lib3h_event"), msg);
         }
     }
 
