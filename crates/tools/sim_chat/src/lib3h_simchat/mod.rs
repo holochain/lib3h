@@ -8,7 +8,7 @@ use lib3h_tracing::test_span;
 
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
-use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
+use lib3h_zombie_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
     data_types::{ConnectData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},

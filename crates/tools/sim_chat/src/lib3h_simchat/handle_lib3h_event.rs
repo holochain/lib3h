@@ -4,7 +4,7 @@ use crate::{
     simchat::{ChatEvent, OpaqueConvertable, SimChatMessage},
 };
 use lib3h::error::Lib3hError;
-use lib3h_ghost_actor::GhostMessage;
+use lib3h_zombie_actor::GhostMessage;
 use lib3h_protocol::{
     data_types::*,
     protocol::{ClientToLib3h, Lib3hToClient, Lib3hToClientResponse},

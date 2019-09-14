@@ -14,7 +14,7 @@ use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use chrono::prelude::DateTime;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine::GhostEngine, RealEngineConfig},
+    engine::{EngineConfig, GhostEngine},
 };
 use lib3h_sodium::SodiumCryptoSystem;
 use regex::Regex;
@@ -23,7 +23,7 @@ use url::Url;
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
-    let config = RealEngineConfig {
+    let config = EngineConfig {
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: String::new(),
