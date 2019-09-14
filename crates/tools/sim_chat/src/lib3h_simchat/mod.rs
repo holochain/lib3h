@@ -15,6 +15,7 @@ use lib3h_protocol::{
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
+use lib3h_tracing::Tracer;
 
 use std::{
     collections::HashMap,
@@ -83,6 +84,7 @@ pub struct Lib3hSimChat {
     thread: Option<std::thread::JoinHandle<()>>,
     thread_continue: Arc<AtomicBool>,
     out_send: crossbeam_channel::Sender<ChatEvent>,
+    tracer: Tracer,
 }
 
 pub struct Lib3hSimChatState {
@@ -136,7 +138,7 @@ impl Drop for Lib3hSimChat {
 }
 
 impl Lib3hSimChat {
-    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url) -> Self
+    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url, tracer: Tracer) -> Self
     where
         T: GhostActor<
                 Lib3hToClient,
@@ -234,6 +236,7 @@ impl Lib3hSimChat {
             })),
             thread_continue,
             out_send,
+            tracer,
         }
     }
 
@@ -305,12 +308,15 @@ mod tests {
 
     use super::*;
     use crate::simchat::SimChatMessage;
+    use lib3h_tracing::{Tracer, NullSampler};
 
     fn new_sim_chat_mock_engine(callback: HandleEvent) -> Lib3hSimChat {
+        let (tracer, _) = Tracer::new(NullSampler);
         Lib3hSimChat::new(
             mock_engine::MockEngine::new,
             callback,
             Url::parse("http://test.boostrap").unwrap(),
+            tracer,
         )
     }
 

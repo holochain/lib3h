@@ -1,9 +1,10 @@
-use lib3h_protocol::data_types::{Opaque, SpaceData};
 use serde_json::{from_slice, to_vec};
 use serde_derive::{Serialize, Deserialize};
 use lib3h_protocol::Address;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use lib3h_protocol::data_types::{Opaque, SpaceData};
+use lib3h_tracing::Lib3hSpan;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SimChatMessage {
@@ -43,6 +44,8 @@ impl MessageList {
             .into()
     }
 }
+
+pub type ChatTuple = (ChatEvent, Lib3hSpan);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChatEvent {

@@ -11,6 +11,7 @@ use std::time::UNIX_EPOCH;
 use chrono::prelude::DateTime;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use regex::Regex;
+use std::thread;
 use url::Url;
 use std::time::Duration;
 use lib3h::{
@@ -18,7 +19,7 @@ use lib3h::{
     engine::{ghost_engine::GhostEngine, RealEngineConfig},
 };
 use lib3h_sodium::SodiumCryptoSystem;
-use lib3h_tracing::Lib3hSpan;
+use lib3h_tracing::{Lib3hSpan, Reporter, span::SpanReceiver, Tracer, AllSampler};
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
@@ -43,6 +44,16 @@ fn engine_builder() -> GhostEngine<'static> {
     .unwrap()
 }
 
+/// TODO: include way to break this loop
+fn run_reporter_thread(span_rx: SpanReceiver) {
+    thread::spawn(move || {
+        let reporter = Reporter::new("sim_chat").unwrap();
+        for span in span_rx {
+            reporter.report(&[span]).expect("could not report");
+        }
+    });
+}
+
 fn main() {
     let rl =
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
@@ -50,6 +61,11 @@ fn main() {
     rl.set_report_signal(linefeed::terminal::Signal::Interrupt, true);
     rl.set_prompt("connecting...> ")
         .expect("failed to set linefeed prompt");
+
+    let (span_tx, span_rx) = crossbeam_channel::unbounded();
+    let tracer = Tracer::with_sender(AllSampler, span_tx);
+    
+    run_reporter_thread(span_rx);
 
     let rl_t = rl.clone();
     let mut cli = lib3h_simchat::Lib3hSimChat::new(
@@ -100,6 +116,7 @@ fn main() {
             // writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
         Url::parse("http://bootstrap.holo.host").unwrap(),
+        tracer,
     );
 
     let help_text = || {
