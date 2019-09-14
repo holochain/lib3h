@@ -1,12 +1,18 @@
 //! SimChat Command Line Utility / Manual Testing CLI
 
+mod lib3h_simchat;
+mod simchat;
+
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use lib3h_sim_chat::{simchat::SimChat, ChatEvent};
+extern crate chrono;
+use std::time::UNIX_EPOCH;
+use chrono::prelude::DateTime;
+use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use regex::Regex;
 use url::Url;
-
+use std::time::Duration;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine::GhostEngine, RealEngineConfig},
@@ -42,11 +48,11 @@ fn main() {
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
 
     rl.set_report_signal(linefeed::terminal::Signal::Interrupt, true);
-    rl.set_prompt("SimChat> ")
+    rl.set_prompt("connecting...> ")
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
-    let mut cli = lib3h_sim_chat::Lib3hSimChat::new(
+    let mut cli = lib3h_simchat::Lib3hSimChat::new(
         engine_builder,
         Box::new(move |event| {
             match event {
@@ -58,15 +64,40 @@ fn main() {
                     rl_t.set_prompt("SimChat> ")
                         .expect("failed to set linefeed prompt");
                 }
-                ChatEvent::ReceiveDirectMessage {
+                ChatEvent::ReceiveDirectMessage(SimChatMessage {
                     from_agent,
                     payload,
-                } => {
-                    writeln!(rl_t, "*{}* {}", from_agent, payload).expect("write fail");
+                    timestamp,
+                }) => {
+                    writeln!(rl_t, "[{}] | *{}* {}", 
+                        format_timestamp(timestamp),
+                        from_agent,
+                        payload
+                    ).expect("write fail");
+                },
+                ChatEvent::ReceiveChannelMessage(SimChatMessage {
+                    from_agent,
+                    payload,
+                    timestamp,
+                }) => {
+
+                    writeln!(rl_t, "[{}] | {}: {}",
+                        format_timestamp(timestamp), 
+                        from_agent, 
+                        payload
+                    ).expect("write fail");
+                }
+                ChatEvent::Connected => {
+                    rl_t.set_prompt("SimChat> ")
+                        .expect("failed to set linefeed prompt");
+                }
+                ChatEvent::Disconnected => {
+                     rl_t.set_prompt("connecting...> ")
+                        .expect("failed to set linefeed prompt");                   
                 }
                 _ => {}
             }
-            writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
+            // writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
         Url::parse("http://bootstrap.holo.host").unwrap(),
     );
@@ -92,9 +123,9 @@ lib3h simchat Commands:
     let command_matcher = Regex::new(r"^/([a-z]+)\s?(.*)$").expect("This is a valid regex");
 
     loop {
-        let res = rl.read_line();
+        let res = rl.read_line_step(Some(Duration::from_millis(1000))); 
         match res {
-            Ok(line) => match line {
+            Ok(Some(line)) => match line {
                 linefeed::reader::ReadResult::Input(s) => {
                     if s.starts_with('/') {
                         let caps = command_matcher.captures(&s).expect("capture failed");
@@ -139,8 +170,9 @@ lib3h simchat Commands:
                             }
                         }
                     } else {
-                        writeln!(rl, "UNIMPLEMENTD - Cannot send channel messages yet")
-                            .expect("write fail");
+                        if s.len() > 0 { // no sending empty messages
+                            cli.send(ChatEvent::SendChannelMessage { payload: s });
+                        }
                     }
                 }
                 linefeed::reader::ReadResult::Eof => {
@@ -155,8 +187,16 @@ lib3h simchat Commands:
             Err(e) => {
                 eprintln!("{:?}", e);
                 break;
-            }
+            },
+            Ok(None) => {}, // keep waiting for input
         }
+        cli.send(ChatEvent::QueryChannelMessages{start_time: 0, end_time: 0});
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
+}
+
+fn format_timestamp(timestamp: &u64) -> String {
+    let d = UNIX_EPOCH + Duration::from_secs(*timestamp);
+    let datetime = DateTime::<chrono::Utc>::from(d);
+    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }

@@ -1,4 +1,4 @@
-use detach::Detach;
+use detach::{detach_run, Detach};
 use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
 use lib3h_ghost_actor::{
     create_ghost_channel, prelude::WorkWasDone, GhostActor, GhostCanTrack, GhostContextEndpoint,
@@ -8,6 +8,14 @@ use lib3h_protocol::{
     data_types::ConnectedData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
 };
+
+/**
+ *  This is an engine that exists purely for testing the SimChat actor.
+ *  It responds with success to any ClientToLib3h messages sent to it but does not send a response
+ *  
+ *  To test sending Lib3hToClient messages it can hold a crossbeam receiver and will route any messages
+ *  it receives to SimChat.
+ */
 
 pub struct MockEngine<'engine> {
     lib3h_endpoint: Detach<
@@ -29,6 +37,7 @@ pub struct MockEngine<'engine> {
             Lib3hError,
         >,
     >,
+    // reciever: Option<crossbeam_channel::Receiver<Lib3hToClient>>,
 }
 
 impl
@@ -81,8 +90,16 @@ impl MockEngine<'_> {
                     .request_id_prefix("mock-engine")
                     .build(),
             ),
+            // reciever: None,
         }
     }
+
+    // pub fn new_with_sender() -> (Self, crossbeam_channel::Sender<Lib3hToClient>) {
+    //     let mut engine = MockEngine::new();
+    //     let (s, r)  = crossbeam_channel::unbounded();
+    //     engine.reciever = Some(r);
+    //     (engine, s)
+    // }
 
     /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
