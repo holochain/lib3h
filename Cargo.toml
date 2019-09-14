@@ -11,7 +11,7 @@ members = [
   "crates/lib3h",
   "crates/mdns",
   "crates/detach",
-  "crates/tools/half_busy_chat",
+  "crates/tools/sim_chat",
   "crates/tools/capnp_build",
   "crates/tools/dump_lib3h_protocol_as_json_for_n3h",
   "crates/tracing",

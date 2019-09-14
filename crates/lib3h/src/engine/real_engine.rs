@@ -13,7 +13,7 @@ use crate::{
     error::{Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
-    transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
+    transport::{self, memory_mock::ghost_transport_memory::*, protocol::*, TransportMultiplex},
 };
 use detach::prelude::*;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -99,7 +99,8 @@ impl RealEngine {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
-        let mut memory_transport = GhostTransportMemory::new();
+        let memory_transport = GhostTransportMemory::new();
+        /*
         let memory_network_endpoint = Detach::new(
             memory_transport
                 .take_parent_endpoint()
@@ -108,6 +109,7 @@ impl RealEngine {
                 .request_id_prefix("tmem_to_child_")
                 .build::<P2pGateway>(),
         );
+        */
 
         //        // Bind & create this_net_peer
         //        // TODO: Find better way to do init with GhostEngine
@@ -152,7 +154,7 @@ impl RealEngine {
         let multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
-                memory_network_endpoint,
+                Box::new(memory_transport),
                 dht_factory,
                 &dht_config,
             )),
@@ -684,18 +686,16 @@ impl RealEngine {
             &self.config,
         );
         // Create new space gateway for this ChainId
-        let uniplex_endpoint = Detach::new(
+        let uniplex = TransportEndpointAsActor::new(
             self.multiplexer
                 .as_mut()
                 .as_mut()
-                .create_agent_space_route(&join_msg.space_address, &agent_id.into())
-                .as_context_endpoint_builder()
-                .build::<P2pGateway>(),
+                .create_agent_space_route(&join_msg.space_address, &agent_id.into()),
         );
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new_with_space(
                 &join_msg.space_address,
-                uniplex_endpoint,
+                Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,
             ),
