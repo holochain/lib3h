@@ -1,5 +1,5 @@
 use super::{channel_address_from_string, current_timestamp, current_timeanchor, Lib3hSimChatState};
-use crate::simchat::{ChatEvent, SimChatMessage, MessageList};
+use crate::simchat::{ChatEvent, SimChatMessage, MessageList, OpaqueConvertable};
 use lib3h::error::Lib3hError;
 use lib3h_ghost_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
@@ -38,7 +38,6 @@ pub fn handle_chat_event(
                     test_span(""),
                     ClientToLib3h::JoinSpace(space_data.clone()),
                     Box::new(move |_, callback_data| {
-                        // println!("chat received response from engine: {:?}", callback_data);
                         if let Response(Ok(_payload)) = callback_data {
                             chat_event_sender
                                 .send(ChatEvent::JoinSuccess {
@@ -75,7 +74,6 @@ pub fn handle_chat_event(
                         test_span(""),
                         ClientToLib3h::LeaveSpace(space_data.to_owned()),
                         Box::new(move |_, callback_data| {
-                            // println!("chat received response from engine: {:?}", callback_data);
                             if let Response(Ok(_payload)) = callback_data {
                                 chat_event_sender
                                     .send(ChatEvent::PartSuccess(channel_id.clone()))
@@ -112,7 +110,6 @@ pub fn handle_chat_event(
                         test_span(""),
                         ClientToLib3h::SendDirectMessage(direct_message_data),
                         Box::new(|_, _callback_data| {
-                            // println!("chat received response from engine: {:?}", callback_data);
                             // TODO: Track delivered state of message
                             Ok(())
                         }),
@@ -159,7 +156,6 @@ pub fn handle_chat_event(
                         test_span(""),
                         ClientToLib3h::PublishEntry(provided_entry_data),
                         Box::new(|_, _callback_data| {
-                            // println!("chat received response from engine: {:?}", callback_data);
                             // TODO: Track delivered state of message
                             Ok(())
                         }),

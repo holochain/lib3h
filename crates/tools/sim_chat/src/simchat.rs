@@ -1,3 +1,5 @@
+use serde::de::DeserializeOwned;
+use serde::{Serialize};
 use lib3h_protocol::data_types::{Opaque, SpaceData};
 use serde_json::{from_slice, to_vec};
 use serde_derive::{Serialize, Deserialize};
@@ -12,16 +14,19 @@ pub struct SimChatMessage {
     pub timestamp: u64,
 }
 
-// TODO - dedup this
-impl SimChatMessage {
-    pub fn from_opaque(o: Opaque) -> Self {
+pub trait OpaqueConvertable: Sized + Serialize + DeserializeOwned {
+    fn from_opaque(o: Opaque) -> Self {
         from_slice(&o.as_bytes()).unwrap()
     }
 
-    pub fn to_opaque(&self) -> Opaque {
+    fn to_opaque(&self) -> Opaque {
         to_vec(self).expect("Could not serialize message").into()
     }
+}
 
+impl OpaqueConvertable for SimChatMessage {}
+
+impl SimChatMessage {
     pub fn address(&self) -> Address {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
@@ -32,17 +37,7 @@ impl SimChatMessage {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MessageList(pub Vec<SimChatMessage>);
 
-impl MessageList {
-    pub fn from_opaque(o: Opaque) -> Self {
-        from_slice(&o.as_bytes()).unwrap()
-    }
-
-    pub fn to_opaque(&self) -> Opaque {
-        to_vec(self)
-            .expect("Could not serialize message list")
-            .into()
-    }
-}
+impl OpaqueConvertable for MessageList {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChatEvent {

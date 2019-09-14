@@ -106,9 +106,6 @@ pub struct Lib3hSimChatState {
     /// been triggered for. This ensures that only one ReceiveChannelEvent is
     /// emitted per message per session
     displayed_channel_messages: Vec<Address>,
-
-    // author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
-    // gossip_list: HashMap<Address, Vec<Address>>, // same
 }
 
 impl Lib3hSimChatState {
@@ -119,8 +116,6 @@ impl Lib3hSimChatState {
             spaces: HashMap::new(),
             store: Store::new(),
             displayed_channel_messages: Vec::new(),
-            // author_list: HashMap::new(),
-            // gossip_list: HashMap::new(),
         }
     }
 }
