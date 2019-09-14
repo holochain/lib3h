@@ -101,23 +101,23 @@ impl Lib3hSpan {
         self.0.follower(operation_name, |o| o.start()).into()
     }
 
-    pub fn todo() -> Self {
-        noop("TODO: no-op, disconnected Span")
+    pub fn todo(reason: &'static str) -> Self {
+        noop(format!("TODO: {}", reason))
     }
 
     pub fn noop() -> Self {
-        noop("no-op, intentionally disconnected Span")
+        noop("no-op, intentionally disconnected Span".into())
+    }
+
+    pub fn fixme() -> Self {
+        noop("not yet hooked up".into())
     }
 }
 
-fn noop(name: &str) -> Lib3hSpan {
-    Tracer::new(NullSampler)
-        .0
-        .span(name.to_owned())
-        .start()
-        .into()
+fn noop(name: String) -> Lib3hSpan {
+    Tracer::new(NullSampler).0.span(name).start().into()
 }
 
 pub fn test_span(name: &str) -> Lib3hSpan {
-    noop(name)
+    noop(name.into())
 }

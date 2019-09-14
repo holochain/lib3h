@@ -122,7 +122,7 @@ impl<
             None => panic!("no such route"),
             Some(ep) => {
                 ep.publish(
-                    Lib3hSpan::todo(),
+                    Lib3hSpan::fixme(),
                     RequestToParent::ReceivedData {
                         uri: path,
                         payload: unpacked_payload,
@@ -151,7 +151,7 @@ impl<
             Ok(())
         } else {
             self.endpoint_self.request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 data,
                 Box::new(move |_, response| {
                     match response {
@@ -174,7 +174,7 @@ impl<
     fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> Lib3hResult<()> {
         // forward
         self.endpoint_self.publish(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }),
         )?;
         Ok(())
@@ -206,7 +206,7 @@ impl<
     ) -> Lib3hResult<()> {
         // forward the bind to our inner_gateway
         self.inner_gateway.as_mut().request(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Transport(RequestToChild::Bind { spec }),
             Box::new(|_, response| {
                 let response = {
@@ -246,7 +246,7 @@ impl<
     ) -> Lib3hResult<()> {
         // forward the request to our inner_gateway
         self.inner_gateway.as_mut().request(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Transport(RequestToChild::SendMessage { uri, payload }),
             Box::new(|_, response| {
                 let response = {

@@ -28,7 +28,7 @@ fn engine_builder() -> GhostEngine<'static> {
     };
     let dht_factory = MirrorDht::new_with_config;
     GhostEngine::new_mock(
-        Lib3hSpan::todo(), // TODO: actually hook up real tracer here
+        Lib3hSpan::fixme(), // TODO: actually hook up real tracer here
         crypto,
         config,
         "test_engine",

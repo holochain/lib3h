@@ -310,7 +310,8 @@ impl
         }
         let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
         for command in command_list {
-            self.endpoint_self.publish(Lib3hSpan::noop(), command)?;
+            self.endpoint_self
+                .publish(Lib3hSpan::todo("where does span come from?"), command)?;
         }
         Ok(did_work.into())
     }
@@ -321,7 +322,8 @@ impl MirrorDht {
     fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
         debug!("@MirrorDht@ serving request: {:?}", request);
         let span = request.span().child("handle_request_from_parent");
-        match request.take_message().expect("exists") {
+        let msg = request.take_message().expect("exists");
+        match msg {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {
                 trace!("DhtRequestToChild::HandleGossip: {:?}", msg);
@@ -486,7 +488,7 @@ impl MirrorDht {
             DhtRequestToChild::RequestEntry(entry_address) => {
                 trace!("DhtRequestToChild::RequestEntry: {:?}", entry_address);
                 self.endpoint_self.request(
-                    span.follower("DhtRequestToChild::RequestEntry"),
+                    span.child("DhtRequestToChild::RequestEntry"),
                     DhtRequestToParent::RequestEntry(entry_address),
                     Box::new(|_me, response| {
                         let response = {

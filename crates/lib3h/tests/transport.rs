@@ -255,7 +255,7 @@ impl TestTransport {
         let our_url = self.bound_url.as_ref().unwrap();
         if let Ok(events) = mockernet.process_for(our_url.clone()) {
             for e in events {
-                let span = Lib3hSpan::todo();
+                let span = Lib3hSpan::fixme();
                 match e {
                     MockernetEvent::Message { from, payload } => {
                         self.endpoint_self
