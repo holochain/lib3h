@@ -380,20 +380,26 @@ mod tests {
     use crate::{GhostResult, WorkWasDone};
 
     #[derive(Debug, Clone, PartialEq)]
-    struct DidWorkActor(u8, u8);
+    struct DidWorkActor(u8);
 
     impl DidWorkActor {
         pub fn process(&mut self) -> GhostResult<WorkWasDone> {
-            self.0 += 1;
-            Ok((self.0 >= self.1).into())
+            if self.0 <= 0 {
+                Ok(false.into())
+            } else {
+                self.0 -= 1;
+                Ok(true.into())
+            }
         }
     }
 
     #[test]
     fn test_wait_did_work() {
-        let actor = &mut DidWorkActor(0, 2);
+        let actor = &mut DidWorkActor(1);
 
         wait_did_work!(actor);
-    }
+
+        assert_eq!(false, wait_did_work!(actor, false));
+     }
 
 }
