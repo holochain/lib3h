@@ -86,9 +86,24 @@ pub struct Lib3hSimChat {
 }
 
 pub struct Lib3hSimChatState {
+    /// Stores the space that messages will be posted to by default
+    /// This should also be the space on the prompt if not None
     current_space: Option<SpaceData>,
+
+    /// All spaces that are joined. It is important to keep track of these
+    /// as attempting to rejoin a space causes an error
     spaces: HashMap<Address, SpaceData>,
+
+    /// Replacement for Holochain CAS. This stores messages on time anchors
+    /// It is a multi-level hash table where messages are indexed by
+    /// space-address -> time-anchor-address -> message-address
     store: Store,
+
+    /// These are the messages that a ReceiveChannelMessage event has already
+    /// been triggered for. This ensures that only one ReceiveChannelEvent is
+    /// emitted per message per session
+    displayed_channel_messages: Vec<Address>,
+
     // author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
     // gossip_list: HashMap<Address, Vec<Address>>, // same
 }
@@ -99,6 +114,7 @@ impl Lib3hSimChatState {
             current_space: None,
             spaces: HashMap::new(),
             store: Store::new(),
+            displayed_channel_messages: Vec::new(),
             // author_list: HashMap::new(),
             // gossip_list: HashMap::new(),
         }

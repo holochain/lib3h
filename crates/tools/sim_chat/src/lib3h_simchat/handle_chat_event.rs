@@ -64,7 +64,7 @@ pub fn handle_chat_event(
             state.current_space = Some(space_data);
             send_sys_message(
                 chat_event_sender,
-                &format!("Joined channel: {}", channel_id),
+                &format!("You joined the channel: {}", channel_id),
             );
         }
 
@@ -95,7 +95,7 @@ pub fn handle_chat_event(
             state
                 .spaces
                 .remove(&channel_address_from_string(&channel_id).unwrap());
-            send_sys_message(chat_event_sender, &"Left channel".to_string());
+            send_sys_message(chat_event_sender, &format!("You left the channel: {}", channel_id).to_string());
         }
 
         ChatEvent::SendDirectMessage { to_agent, payload } => {
@@ -174,6 +174,7 @@ pub fn handle_chat_event(
         }
         // TODO: Update to actually check a given time anchor
         ChatEvent::QueryChannelMessages{ .. } => {
+            let displayed_channel_messages = state.displayed_channel_messages.clone();
             if let Some(space_data) = state.current_space.clone() {
                 // calculate which time anchors we need to be looking at
                 let time_anchor_address = current_timeanchor(); // all are the same for now
@@ -191,9 +192,11 @@ pub fn handle_chat_event(
                         Box::new(move |_, callback_data| {
                             if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(query_result))) = callback_data {
                                 let messages = MessageList::from_opaque(query_result.query_result);
-                                // TODO: update this to only retrigger events for unseen messages
                                 for message in messages.0 {
-                                    chat_event_sender.send(ChatEvent::ReceiveChannelMessage(message)).ok();
+                                    // Only emit ReceiveChannelMessage once per time seeing a message
+                                    if !displayed_channel_messages.contains(&message.address()) {
+                                        chat_event_sender.send(ChatEvent::ReceiveChannelMessage(message)).ok();
+                                    }
                                 }
                             }
                             Ok(())
@@ -201,6 +204,10 @@ pub fn handle_chat_event(
                     )
                     .unwrap();
             }
+        }
+
+        ChatEvent::ReceiveChannelMessage(message) => {
+            state.displayed_channel_messages.push(message.address());
         }
 
         _ => {}

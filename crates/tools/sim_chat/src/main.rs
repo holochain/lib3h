@@ -44,7 +44,6 @@ fn main() {
     let mut cli = lib3h_simchat::Lib3hSimChat::new(
         engine_builder,
         Box::new(move |event| {
-            // rl_t.cancel_read_line().expect("Could not cancel readline");
             match event {
                 ChatEvent::JoinSuccess { channel_id, .. } => {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
@@ -98,7 +97,7 @@ lib3h simchat Commands:
     let command_matcher = Regex::new(r"^/([a-z]+)\s?(.*)$").expect("This is a valid regex");
 
     loop {
-        let res = rl.read_line_step(Some(Duration::from_millis(100)));
+        let res = rl.read_line_step(Some(Duration::from_millis(1000)));
         match res {
             Ok(Some(line)) => match line {
                 linefeed::reader::ReadResult::Input(s) => {
