@@ -63,7 +63,7 @@ fn main() {
                     writeln!(
                         rl_t,
                         "[{}] | *{}* {}",
-                        format_timestamp(timestamp),
+                        format_timestamp(*timestamp),
                         from_agent,
                         payload
                     )
@@ -77,7 +77,7 @@ fn main() {
                     writeln!(
                         rl_t,
                         "[{}] | {}: {}",
-                        format_timestamp(timestamp),
+                        format_timestamp(*timestamp),
                         from_agent,
                         payload
                     )
@@ -195,8 +195,8 @@ lib3h simchat Commands:
     }
 }
 
-fn format_timestamp(timestamp: &u64) -> String {
-    let d = UNIX_EPOCH + Duration::from_secs(*timestamp);
+fn format_timestamp(timestamp: u64) -> String {
+    let d = UNIX_EPOCH + Duration::from_secs(timestamp);
     let datetime = DateTime::<chrono::Utc>::from(d);
     datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }
