@@ -108,7 +108,7 @@ fn main() {
 lib3h simchat Commands:
   /help                     - this help text
   /join <space> <handle>    - Join a space assigning yourself a handle
-  /part <space>             - Leave a given space
+  /part                     - Leave a given space
   /msg <agent> <msg>        - Send a direct message to an agent in your space
   /quit                     - exit Sim Chat
 "#
@@ -201,5 +201,5 @@ lib3h simchat Commands:
 fn format_timestamp(timestamp: u64) -> String {
     let d = UNIX_EPOCH + Duration::from_secs(timestamp);
     let datetime = DateTime::<chrono::Utc>::from(d);
-    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+    datetime.format("%H:%M:%S").to_string()
 }
