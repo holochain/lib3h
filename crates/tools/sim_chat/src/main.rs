@@ -4,10 +4,10 @@ mod lib3h_simchat;
 mod simchat;
 
 extern crate chrono;
+extern crate colored;
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-extern crate colored;
 use colored::*;
 
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};

@@ -4,11 +4,11 @@ use crate::{
     simchat::{ChatEvent, OpaqueConvertable, SimChatMessage},
 };
 use lib3h::error::Lib3hError;
-use lib3h_zombie_actor::GhostMessage;
 use lib3h_protocol::{
     data_types::*,
     protocol::{ClientToLib3h, Lib3hToClient, Lib3hToClientResponse},
 };
+use lib3h_zombie_actor::GhostMessage;
 
 pub fn handle_and_convert_lib3h_event(
     engine_message: &mut GhostMessage<

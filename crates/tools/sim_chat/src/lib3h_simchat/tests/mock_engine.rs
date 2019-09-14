@@ -1,13 +1,12 @@
-use lib3h_zombie_actor::WorkWasDone;
 use detach::{detach_run, Detach};
 use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
-use lib3h_zombie_actor::{
-    create_ghost_channel, GhostActor, GhostCanTrack, GhostContextEndpoint,
-    GhostEndpoint, GhostError, GhostResult,
-};
 use lib3h_protocol::{
     data_types::ConnectedData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
+};
+use lib3h_zombie_actor::{
+    create_ghost_channel, GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint,
+    GhostError, GhostResult, WorkWasDone,
 };
 
 /**
