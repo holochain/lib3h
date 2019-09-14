@@ -7,6 +7,9 @@ extern crate chrono;
 extern crate linefeed;
 extern crate regex;
 extern crate url;
+extern crate colored;
+use colored::*;
+
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use chrono::prelude::DateTime;
 use lib3h::{
@@ -63,9 +66,9 @@ fn main() {
                     writeln!(
                         rl_t,
                         "[{}] | *{}* {}",
-                        format_timestamp(*timestamp),
-                        from_agent,
-                        payload
+                        format_timestamp(*timestamp).white().dimmed(),
+                        from_agent.yellow(),
+                        payload.blue()
                     )
                     .expect("write fail");
                 }
@@ -77,9 +80,9 @@ fn main() {
                     writeln!(
                         rl_t,
                         "[{}] | {}: {}",
-                        format_timestamp(*timestamp),
-                        from_agent,
-                        payload
+                        format_timestamp(*timestamp).white().dimmed(),
+                        from_agent.yellow(),
+                        payload.blue()
                     )
                     .expect("write fail");
                 }
