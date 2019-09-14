@@ -146,7 +146,7 @@ impl Lib3hSimChat {
                 let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> =
                     engine
                         .take_parent_endpoint()
-                        .unwrap()
+                        .expect("Could not get parent endpoint")
                         .as_context_endpoint_builder()
                         .request_id_prefix("parent")
                         .build();
@@ -160,8 +160,8 @@ impl Lib3hSimChat {
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
-                    parent_endpoint.process(&mut ()).unwrap();
-                    engine.process().unwrap();
+                    parent_endpoint.process(&mut ()).ok();
+                    engine.process().ok();
 
                     // grab any new events from lib3h
                     let engine_chat_events = parent_endpoint.drain_messages();
@@ -237,8 +237,8 @@ impl Lib3hSimChat {
             .request(
                 test_span(""),
                 connect_message,
-                Box::new(|_, callback_data| {
-                    println!("chat received response from engine: {:?}", callback_data);
+                Box::new(|_, _callback_data| {
+                    // println!("chat received response from engine: {:?}", callback_data);
                     Ok(())
                 }),
             )
@@ -263,6 +263,10 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
 
 pub fn current_timestamp() -> u64 {
     0
+}
+
+pub fn current_timeanchor() -> Address {
+    Address::from("0")
 }
 
 #[cfg(test)]

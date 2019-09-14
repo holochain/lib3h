@@ -9,7 +9,7 @@ extern crate url;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use regex::Regex;
 use url::Url;
-
+use std::time::Duration;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine::GhostEngine, RealEngineConfig},
@@ -44,6 +44,7 @@ fn main() {
     let mut cli = lib3h_simchat::Lib3hSimChat::new(
         engine_builder,
         Box::new(move |event| {
+            // rl_t.cancel_read_line().expect("Could not cancel readline");
             match event {
                 ChatEvent::JoinSuccess { channel_id, .. } => {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
@@ -60,10 +61,18 @@ fn main() {
                 }) => {
                     writeln!(rl_t, "[{}] | *{}* {}", timestamp, from_agent, payload)
                         .expect("write fail");
+                },
+                ChatEvent::ReceiveChannelMessage(SimChatMessage {
+                    from_agent,
+                    payload,
+                    timestamp,
+                }) => {
+                    writeln!(rl_t, "[{}] | {}: {}", timestamp, from_agent, payload)
+                        .expect("write fail");
                 }
                 _ => {}
             }
-            writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
+            // writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
         Url::parse("http://bootstrap.holo.host").unwrap(),
     );
@@ -89,9 +98,9 @@ lib3h simchat Commands:
     let command_matcher = Regex::new(r"^/([a-z]+)\s?(.*)$").expect("This is a valid regex");
 
     loop {
-        let res = rl.read_line();
+        let res = rl.read_line_step(Some(Duration::from_millis(100)));
         match res {
-            Ok(line) => match line {
+            Ok(Some(line)) => match line {
                 linefeed::reader::ReadResult::Input(s) => {
                     if s.starts_with('/') {
                         let caps = command_matcher.captures(&s).expect("capture failed");
@@ -136,8 +145,9 @@ lib3h simchat Commands:
                             }
                         }
                     } else {
-                        writeln!(rl, "UNIMPLEMENTD - Cannot send channel messages yet")
-                            .expect("write fail");
+                        if s.len() > 0 { // no sending empty messages
+                            cli.send(ChatEvent::SendChannelMessage { payload: s });
+                        }
                     }
                 }
                 linefeed::reader::ReadResult::Eof => {
@@ -152,8 +162,10 @@ lib3h simchat Commands:
             Err(e) => {
                 eprintln!("{:?}", e);
                 break;
-            }
+            },
+            Ok(None) => {}, // keep waiting for input
         }
+        cli.send(ChatEvent::QueryChannelMessages{start_time: 0, end_time: 0});
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }

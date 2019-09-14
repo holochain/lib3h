@@ -113,9 +113,7 @@ pub fn handle_and_convert_lib3h_event(
 pub mod test {
     use crate::simchat::{SimChatMessage, MessageList};
     use super::*;
-    use std::collections::hash_map::DefaultHasher;
     use std::collections::HashSet;
-    use std::hash::{Hash, Hasher};
     use std::iter::FromIterator;
     
     use lib3h_protocol::{
@@ -123,8 +121,6 @@ pub mod test {
     };    
 
     fn send_message_event(message: &SimChatMessage) -> Lib3hToClient {
-        let mut hasher = DefaultHasher::new();
-        message.hash(&mut hasher);
         Lib3hToClient::HandleStoreEntryAspect(
             StoreEntryAspectData {
                 space_address: Address::from("some_space"),
@@ -133,7 +129,7 @@ pub mod test {
                 provider_agent_id: Address::from("some_agent"),
                 entry_aspect: EntryAspectData {
                     aspect: message.to_opaque(),
-                    aspect_address: Address::from(hasher.finish().to_string()),
+                    aspect_address: message.address(),
                     type_hint: String::from(""),
                     publish_ts: 0,
                 }

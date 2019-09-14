@@ -1,9 +1,9 @@
-use super::{channel_address_from_string, current_timestamp, Lib3hSimChatState};
-use crate::simchat::{ChatEvent, SimChatMessage};
+use super::{channel_address_from_string, current_timestamp, current_timeanchor, Lib3hSimChatState};
+use crate::simchat::{ChatEvent, SimChatMessage, MessageList};
 use lib3h::error::Lib3hError;
 use lib3h_ghost_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
-    data_types::{DirectMessageData, SpaceData},
+    data_types::*,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
@@ -38,7 +38,7 @@ pub fn handle_chat_event(
                     test_span(""),
                     ClientToLib3h::JoinSpace(space_data.clone()),
                     Box::new(move |_, callback_data| {
-                        println!("chat received response from engine: {:?}", callback_data);
+                        // println!("chat received response from engine: {:?}", callback_data);
                         if let Response(Ok(_payload)) = callback_data {
                             chat_event_sender
                                 .send(ChatEvent::JoinSuccess {
@@ -75,7 +75,7 @@ pub fn handle_chat_event(
                         test_span(""),
                         ClientToLib3h::LeaveSpace(space_data.to_owned()),
                         Box::new(move |_, callback_data| {
-                            println!("chat received response from engine: {:?}", callback_data);
+                            // println!("chat received response from engine: {:?}", callback_data);
                             if let Response(Ok(_payload)) = callback_data {
                                 chat_event_sender
                                     .send(ChatEvent::PartSuccess(channel_id.clone()))
@@ -111,8 +111,55 @@ pub fn handle_chat_event(
                     .request(
                         test_span(""),
                         ClientToLib3h::SendDirectMessage(direct_message_data),
-                        Box::new(|_, callback_data| {
-                            println!("chat received response from engine: {:?}", callback_data);
+                        Box::new(|_, _callback_data| {
+                            // println!("chat received response from engine: {:?}", callback_data);
+                            // TODO: Track delivered state of message
+                            Ok(())
+                        }),
+                    )
+                    .map_err(|e| {
+                        send_sys_message(
+                            chat_event_sender,
+                            &format!("Lib3h returned error: {}", e).to_string(),
+                        );
+                    }).ok();
+            } else {
+                send_sys_message(
+                    chat_event_sender,
+                    &"Must join a channel before sending a message".to_string(),
+                );
+            }
+        }
+
+        ChatEvent::SendChannelMessage{ payload } => {
+            if let Some(space_data) = state.current_space.clone() {
+
+                let message = SimChatMessage {
+                    from_agent: space_data.agent_id.to_string(),
+                    payload,
+                    timestamp: current_timestamp(),
+                };
+
+                let provided_entry_data = ProvidedEntryData {
+                    space_address: space_data.space_address,
+                    provider_agent_id: space_data.agent_id,
+                    entry: EntryData {
+                        entry_address: current_timeanchor(),
+                        aspect_list: vec![EntryAspectData {
+                            type_hint: String::from(""),
+                            aspect: message.to_opaque(),
+                            aspect_address: message.address(),
+                            publish_ts: current_timestamp(),
+                        }],
+                    }
+                };
+
+                parent_endpoint
+                    .request(
+                        test_span(""),
+                        ClientToLib3h::PublishEntry(provided_entry_data),
+                        Box::new(|_, _callback_data| {
+                            // println!("chat received response from engine: {:?}", callback_data);
                             // TODO: Track delivered state of message
                             Ok(())
                         }),
@@ -125,10 +172,37 @@ pub fn handle_chat_event(
                 );
             }
         }
+        // TODO: Update to actually check a given time anchor
+        ChatEvent::QueryChannelMessages{ .. } => {
+            if let Some(space_data) = state.current_space.clone() {
+                // calculate which time anchors we need to be looking at
+                let time_anchor_address = current_timeanchor(); // all are the same for now
+                let query_entry_data = QueryEntryData {
+                    query: Opaque::new(),
+                    entry_address: time_anchor_address,
+                    request_id: String::from(""),
+                    space_address: space_data.space_address,
+                    requester_agent_id: space_data.agent_id,
+                };
+                parent_endpoint
+                    .request(
+                        test_span(""),
+                        ClientToLib3h::QueryEntry(query_entry_data),
+                        Box::new(move |_, callback_data| {
+                            if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(query_result))) = callback_data {
+                                let messages = MessageList::from_opaque(query_result.query_result);
+                                // TODO: update this to only retrigger events for unseen messages
+                                for message in messages.0 {
+                                    chat_event_sender.send(ChatEvent::ReceiveChannelMessage(message)).ok();
+                                }
+                            }
+                            Ok(())
+                        }),
+                    )
+                    .unwrap();
+            }
+        }
 
-        // ChatEvent::SendChannelMessage{..} => {
-
-        // }
         _ => {}
     }
 }
