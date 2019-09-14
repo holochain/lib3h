@@ -575,18 +575,4 @@ mod tests {
         )
     }
 
-    /*
-    #[test]
-    fn test_wait_did_work() {
-        let actor = &mut TestActor::new();
-
-        actor.endpoint_for_parent.unwrap()
-            .send(crate::GhostEndpointMessage::Request {
-                request_id: None,
-                payload: TestMsgIn("event from a parent".into()),
-            })
-            .expect("should send");
-
-        wait_did_work!(actor);
-    }*/
 }

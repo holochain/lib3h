@@ -402,4 +402,14 @@ mod tests {
         assert_eq!(false, wait_did_work!(actor, false));
      }
 
+    #[test]
+    fn test_wait_until_no_work() {
+
+       let actor = &mut DidWorkActor(2);
+
+       wait_until_no_work!(actor);
+
+       assert_eq!(false, wait_did_work!(actor, false));
+     
+    }
 }
