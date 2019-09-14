@@ -287,9 +287,9 @@ macro_rules! assert_callback_processed {
      $processor:ident
  ) => {{
         let mut errors /*: Vec<(
-                                Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
-                                Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
-                            )> */ = Vec::new();
+                                    Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
+                                    Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
+                                )> */ = Vec::new();
 
         let mut callback_data = None; // = Box::new(None);
         let cb: $crate::ghost_actor::GhostCallback<_, _, _> = Box::new(|_user_data, cb| {
@@ -359,6 +359,36 @@ macro_rules! wait_did_work {
     };
 }
 
+#[allow(unused_macros)]
+macro_rules! wait_can_track_did_work {
+    ($ghost_can_track: ident,
+     $user_data: ident
+    ) => {
+        wait_can_track_did_work!($ghost_can_track, $user_data, true)
+    };
+    ($ghost_can_track: ident,
+     $user_data: ident,
+     $should_abort: expr
+    ) => {{
+        let mut did_work = false;
+        for i in 0..20 {
+            did_work = $ghost_can_track
+                .process(&mut $user_data)
+                .map_err(|e| error!("ghost actor processing error: {:?}", e))
+                .map(|work_was_done| work_was_done.into())
+                .unwrap_or(did_work);
+            if did_work {
+                break;
+            }
+            trace!("[{}] wait_did_work", i)
+        }
+        if $should_abort {
+            assert!(did_work);
+        }
+        did_work
+    }};
+}
+
 /// Continues processing the ghost_actor until no work is being done.
 #[allow(unused_macros)]
 macro_rules! wait_until_no_work {
@@ -393,6 +423,13 @@ mod tests {
         }
     }
 
+    struct DidWorkParentWrapper;
+    impl DidWorkParentWrapper {
+        pub fn process(&mut self, user_data: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
+            user_data.process()
+        }
+    }
+
     #[test]
     fn test_wait_did_work() {
         let actor = &mut DidWorkActor(1);
@@ -400,6 +437,15 @@ mod tests {
         wait_did_work!(actor);
 
         assert_eq!(false, wait_did_work!(actor, false));
+    }
+
+    #[test]
+    fn test_wait_can_track_did_work() {
+        let parent = &mut DidWorkParentWrapper;
+        let mut actor = &mut DidWorkActor(1);
+        wait_can_track_did_work!(parent, actor);
+
+        assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
     }
 
     #[test]
