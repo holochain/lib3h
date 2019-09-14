@@ -1,7 +1,6 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 
-use std::time::UNIX_EPOCH;
 use lib3h_tracing::test_span;
 use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
@@ -18,7 +17,6 @@ use lib3h_protocol::{
 use lib3h_sodium::{hash, secbuf::SecBuf};
 
 use std::{
-    time::SystemTime,
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -285,10 +283,16 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
     Ok(Address::from(signature_str))
 }
 
+#[cfg(not(test))]
 pub fn current_timestamp() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH)
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs()
+}
+#[cfg(test)] // make sure time doesn't mess up the tests
+pub fn current_timestamp() -> u64 {
+    0
 }
 
 pub fn current_timeanchor() -> Address {
@@ -318,6 +322,8 @@ mod tests {
             payload: "yo".to_string(),
         }
     }
+
+    fn connected_event() -> ChatEvent { ChatEvent::Connected }
 
     fn receive_sys_message(payload: String) -> ChatEvent {
         ChatEvent::ReceiveDirectMessage(SimChatMessage {
@@ -377,8 +383,8 @@ mod tests {
 
         chat.send(join_event());
 
-        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
-        assert_eq!(chat_messages, vec![join_event(), join_success_event(),],);
+        let chat_messages = r.iter().take(3).collect::<Vec<_>>();
+        assert_eq!(chat_messages, vec![join_event(), connected_event(), join_success_event(),],);
     }
 
     #[test]
@@ -390,12 +396,13 @@ mod tests {
 
         chat.send(part_event());
 
-        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
+        let chat_messages = r.iter().take(3).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
             vec![
                 part_event(),
                 receive_sys_message("No channel to leave".to_string()),
+                connected_event(),
             ],
         );
     }
@@ -411,13 +418,14 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(part_event());
 
-        let chat_messages = r.iter().take(5).collect::<Vec<_>>();
+        let chat_messages = r.iter().take(6).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
             vec![
                 join_event(),
+                connected_event(),
                 join_success_event(),
-                receive_sys_message("Joined channel: test_channel".to_string()),
+                receive_sys_message("You joined the channel: test_channel".to_string()),
                 part_event(),
                 part_success_event(),
             ],
@@ -456,13 +464,14 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(chat_event());
 
-        let chat_messages = r.iter().take(4).collect::<Vec<_>>();
+        let chat_messages = r.iter().take(5).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
             vec![
                 join_event(),
+                connected_event(),
                 join_success_event(),
-                receive_sys_message("Joined channel: test_channel".to_string()),
+                receive_sys_message("You joined the channel: test_channel".to_string()),
                 chat_event(),
             ],
         );
