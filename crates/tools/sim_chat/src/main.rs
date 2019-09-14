@@ -65,7 +65,7 @@ fn main() {
                 }) => {
                     writeln!(
                         rl_t,
-                        "[{}] | *{}* {}",
+                        "{} | *{}* {}",
                         format_timestamp(*timestamp).white().dimmed(),
                         from_agent.yellow(),
                         payload.blue()
@@ -79,7 +79,7 @@ fn main() {
                 }) => {
                     writeln!(
                         rl_t,
-                        "[{}] | {}: {}",
+                        "{} | {}: {}",
                         format_timestamp(*timestamp).white().dimmed(),
                         from_agent.yellow(),
                         payload.blue()
