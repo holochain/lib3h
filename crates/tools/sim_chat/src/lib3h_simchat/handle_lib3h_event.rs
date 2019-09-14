@@ -119,6 +119,7 @@ pub mod test {
     use super::*;
     use std::collections::HashSet;
     use std::iter::FromIterator;
+    use lib3h_tracing::test_span;
     
     use lib3h_protocol::{
         Address,
@@ -165,7 +166,7 @@ pub mod test {
             timestamp: 0,
         };
         let (s,_r) = crossbeam_channel::unbounded();
-        let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s);
+        let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s, test_span(""));
         let response = handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
 
         assert_eq!(response.0, None); // this does not produce a chat event
@@ -193,7 +194,7 @@ pub mod test {
 
         let (s,_r) = crossbeam_channel::unbounded();
         for message in &messages {
-            let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
+            let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone(), test_span(""));
             handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
         }
 
@@ -223,7 +224,7 @@ pub mod test {
 
         let (s,_r) = crossbeam_channel::unbounded();
         for message in &messages {
-            let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone());
+            let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s.clone(), test_span(""));
             handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
         }
 
@@ -254,7 +255,7 @@ pub mod test {
         state.store.insert(&Address::from("some_space"), &Address::from("some_entry"), &Address::from("message_address"), message.clone());
 
         let (s, _r) = crossbeam_channel::unbounded();
-        let mut ghost_message = GhostMessage::new(None, retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")), s.clone());
+        let mut ghost_message = GhostMessage::new(None, retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")), s.clone(), test_span(""));
         let result = handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
 
         assert_eq!(result.0, None); // no chat events for this event
