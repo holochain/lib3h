@@ -1,6 +1,7 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 
+use std::time::UNIX_EPOCH;
 use lib3h_tracing::test_span;
 use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
@@ -17,6 +18,7 @@ use lib3h_protocol::{
 use lib3h_sodium::{hash, secbuf::SecBuf};
 
 use std::{
+    time::SystemTime,
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -284,7 +286,9 @@ pub fn channel_address_from_string(channel_id: &String) -> Result<Address, Crypt
 }
 
 pub fn current_timestamp() -> u64 {
-    0
+    SystemTime::now().duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 pub fn current_timeanchor() -> Address {

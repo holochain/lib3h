@@ -6,6 +6,9 @@ mod simchat;
 extern crate linefeed;
 extern crate regex;
 extern crate url;
+extern crate chrono;
+use std::time::UNIX_EPOCH;
+use chrono::prelude::DateTime;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use regex::Regex;
 use url::Url;
@@ -58,16 +61,23 @@ fn main() {
                     payload,
                     timestamp,
                 }) => {
-                    writeln!(rl_t, "[{}] | *{}* {}", timestamp, from_agent, payload)
-                        .expect("write fail");
+                    writeln!(rl_t, "[{}] | *{}* {}", 
+                        format_timestamp(timestamp),
+                        from_agent,
+                        payload
+                    ).expect("write fail");
                 },
                 ChatEvent::ReceiveChannelMessage(SimChatMessage {
                     from_agent,
                     payload,
                     timestamp,
                 }) => {
-                    writeln!(rl_t, "[{}] | {}: {}", timestamp, from_agent, payload)
-                        .expect("write fail");
+
+                    writeln!(rl_t, "[{}] | {}: {}",
+                        format_timestamp(timestamp), 
+                        from_agent, 
+                        payload
+                    ).expect("write fail");
                 }
                 ChatEvent::Connected => {
                     rl_t.set_prompt("SimChat> ")
@@ -175,4 +185,10 @@ lib3h simchat Commands:
         cli.send(ChatEvent::QueryChannelMessages{start_time: 0, end_time: 0});
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
+}
+
+fn format_timestamp(timestamp: &u64) -> String {
+    let d = UNIX_EPOCH + Duration::from_secs(*timestamp);
+    let datetime = DateTime::<chrono::Utc>::from(d);
+    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }
