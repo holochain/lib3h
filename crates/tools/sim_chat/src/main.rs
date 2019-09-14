@@ -37,7 +37,7 @@ fn main() {
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
 
     rl.set_report_signal(linefeed::terminal::Signal::Interrupt, true);
-    rl.set_prompt("SimChat> ")
+    rl.set_prompt("connecting...> ")
         .expect("failed to set linefeed prompt");
 
     let rl_t = rl.clone();
@@ -69,6 +69,14 @@ fn main() {
                     writeln!(rl_t, "[{}] | {}: {}", timestamp, from_agent, payload)
                         .expect("write fail");
                 }
+                ChatEvent::Connected => {
+                    rl_t.set_prompt("SimChat> ")
+                        .expect("failed to set linefeed prompt");
+                }
+                ChatEvent::Disconnected => {
+                     rl_t.set_prompt("connecting...> ")
+                        .expect("failed to set linefeed prompt");                   
+                }
                 _ => {}
             }
             // writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
@@ -97,7 +105,7 @@ lib3h simchat Commands:
     let command_matcher = Regex::new(r"^/([a-z]+)\s?(.*)$").expect("This is a valid regex");
 
     loop {
-        let res = rl.read_line_step(Some(Duration::from_millis(1000)));
+        let res = rl.read_line_step(Some(Duration::from_millis(1000))); 
         match res {
             Ok(Some(line)) => match line {
                 linefeed::reader::ReadResult::Input(s) => {

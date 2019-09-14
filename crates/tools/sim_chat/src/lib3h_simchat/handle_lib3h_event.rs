@@ -103,7 +103,11 @@ pub fn handle_and_convert_lib3h_event(
                 timestamp: current_timestamp(),
             })), None)
         }
-        Some(Lib3hToClient::Disconnected(_)) => (Some(ChatEvent::Disconnected), None),
+        Some(Lib3hToClient::Disconnected(_)) => {
+            state.connected = false;
+            (Some(ChatEvent::Disconnected), None)
+        },
+
         Some(_) => (None, None), // event we don't care about
         None => (None, None),    // there was nothing in the message
     }

@@ -86,6 +86,9 @@ pub struct Lib3hSimChat {
 }
 
 pub struct Lib3hSimChatState {
+    /// Is the current lib3h engine reporting connected status
+    connected: bool,
+
     /// Stores the space that messages will be posted to by default
     /// This should also be the space on the prompt if not None
     current_space: Option<SpaceData>,
@@ -111,6 +114,7 @@ pub struct Lib3hSimChatState {
 impl Lib3hSimChatState {
     pub fn new() -> Self {
         Self {
+            connected: false,
             current_space: None,
             spaces: HashMap::new(),
             store: Store::new(),
@@ -171,8 +175,8 @@ impl Lib3hSimChat {
                 let mut state = Lib3hSimChatState::new();
 
                 // call connect to start the networking process
-                // (should probably wait for confirmatio before continuing)
-                Self::connect(&mut parent_endpoint, peer_uri);
+                // (should probably wait for confirmation before continuing)
+                Self::connect(&mut parent_endpoint, peer_uri, internal_sender.clone());
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -243,6 +247,7 @@ impl Lib3hSimChat {
             Lib3hError,
         >,
         peer_uri: Url,
+        chat_event_sender: crossbeam_channel::Sender<ChatEvent>,
     ) {
         let connect_message = ClientToLib3h::Connect(ConnectData {
             network_id: String::from(""), // connect to any
@@ -253,7 +258,8 @@ impl Lib3hSimChat {
             .request(
                 test_span(""),
                 connect_message,
-                Box::new(|_, _callback_data| {
+                Box::new(move |_, _callback_data| {
+                    chat_event_sender.send(ChatEvent::Connected).expect("Could not send");
                     // println!("chat received response from engine: {:?}", callback_data);
                     Ok(())
                 }),

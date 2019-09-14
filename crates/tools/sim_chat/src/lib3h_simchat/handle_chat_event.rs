@@ -210,6 +210,10 @@ pub fn handle_chat_event(
             state.displayed_channel_messages.push(message.address());
         }
 
+        ChatEvent::Connected => {
+            state.connected = true;
+        }
+
         _ => {}
     }
 }
