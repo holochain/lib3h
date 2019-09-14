@@ -72,11 +72,11 @@ impl Store {
             .0
             .get(space_address)
             .map(|hm| hm.clone())
-            .unwrap_or(HashMap::new());
+            .unwrap_or_default();
         let mut base = space
             .get(base_address)
             .map(|hm| hm.clone())
-            .unwrap_or(HashMap::new());
+            .unwrap_or_default();
 
         base.insert(message_address.clone(), message);
         space.insert(base_address.clone(), base.clone());
