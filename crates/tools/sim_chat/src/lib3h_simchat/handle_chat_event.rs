@@ -1,5 +1,7 @@
-use super::{channel_address_from_string, current_timestamp, current_timeanchor, Lib3hSimChatState};
-use crate::simchat::{ChatEvent, SimChatMessage, MessageList, OpaqueConvertable};
+use super::{
+    channel_address_from_string, current_timeanchor, current_timestamp, Lib3hSimChatState,
+};
+use crate::simchat::{ChatEvent, MessageList, OpaqueConvertable, SimChatMessage};
 use lib3h::error::Lib3hError;
 use lib3h_ghost_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
@@ -93,7 +95,10 @@ pub fn handle_chat_event(
             state
                 .spaces
                 .remove(&channel_address_from_string(&channel_id).unwrap());
-            send_sys_message(chat_event_sender, &format!("You left the channel: {}", channel_id).to_string());
+            send_sys_message(
+                chat_event_sender,
+                &format!("You left the channel: {}", channel_id).to_string(),
+            );
         }
 
         ChatEvent::SendDirectMessage { to_agent, payload } => {
@@ -119,7 +124,8 @@ pub fn handle_chat_event(
                             chat_event_sender,
                             &format!("Lib3h returned error: {}", e).to_string(),
                         );
-                    }).ok();
+                    })
+                    .ok();
             } else {
                 send_sys_message(
                     chat_event_sender,
@@ -128,9 +134,8 @@ pub fn handle_chat_event(
             }
         }
 
-        ChatEvent::SendChannelMessage{ payload } => {
+        ChatEvent::SendChannelMessage { payload } => {
             if let Some(space_data) = state.current_space.clone() {
-
                 let message = SimChatMessage {
                     from_agent: space_data.agent_id.to_string(),
                     payload,
@@ -148,7 +153,7 @@ pub fn handle_chat_event(
                             aspect_address: message.address(),
                             publish_ts: current_timestamp(),
                         }],
-                    }
+                    },
                 };
 
                 parent_endpoint
@@ -169,7 +174,7 @@ pub fn handle_chat_event(
             }
         }
         // TODO: Update to actually check a given time anchor
-        ChatEvent::QueryChannelMessages{ .. } => {
+        ChatEvent::QueryChannelMessages { .. } => {
             let displayed_channel_messages = state.displayed_channel_messages.clone();
             if let Some(space_data) = state.current_space.clone() {
                 // calculate which time anchors we need to be looking at
@@ -186,12 +191,17 @@ pub fn handle_chat_event(
                         test_span(""),
                         ClientToLib3h::QueryEntry(query_entry_data),
                         Box::new(move |_, callback_data| {
-                            if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(query_result))) = callback_data {
+                            if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(
+                                query_result,
+                            ))) = callback_data
+                            {
                                 let messages = MessageList::from_opaque(query_result.query_result);
                                 for message in messages.0 {
                                     // Only emit ReceiveChannelMessage once per time seeing a message
                                     if !displayed_channel_messages.contains(&message.address()) {
-                                        chat_event_sender.send(ChatEvent::ReceiveChannelMessage(message)).ok();
+                                        chat_event_sender
+                                            .send(ChatEvent::ReceiveChannelMessage(message))
+                                            .ok();
                                     }
                                 }
                             }

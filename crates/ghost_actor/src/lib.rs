@@ -64,8 +64,8 @@ pub use ghost_tracker::{
 
 mod ghost_channel;
 pub use ghost_channel::{
-    create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostMessage,
-    GhostTrackRequestOptions, GhostEndpointMessage,
+    create_ghost_channel, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostEndpointMessage,
+    GhostMessage, GhostTrackRequestOptions,
 };
 
 mod ghost_actor;

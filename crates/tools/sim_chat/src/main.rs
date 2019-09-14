@@ -3,21 +3,20 @@
 mod lib3h_simchat;
 mod simchat;
 
+extern crate chrono;
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-extern crate chrono;
-use std::time::UNIX_EPOCH;
-use chrono::prelude::DateTime;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
-use regex::Regex;
-use url::Url;
-use std::time::Duration;
+use chrono::prelude::DateTime;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine::GhostEngine, RealEngineConfig},
 };
 use lib3h_sodium::SodiumCryptoSystem;
+use regex::Regex;
+use std::time::{Duration, UNIX_EPOCH};
+use url::Url;
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
@@ -61,31 +60,36 @@ fn main() {
                     payload,
                     timestamp,
                 }) => {
-                    writeln!(rl_t, "[{}] | *{}* {}", 
+                    writeln!(
+                        rl_t,
+                        "[{}] | *{}* {}",
                         format_timestamp(timestamp),
                         from_agent,
                         payload
-                    ).expect("write fail");
-                },
+                    )
+                    .expect("write fail");
+                }
                 ChatEvent::ReceiveChannelMessage(SimChatMessage {
                     from_agent,
                     payload,
                     timestamp,
                 }) => {
-
-                    writeln!(rl_t, "[{}] | {}: {}",
-                        format_timestamp(timestamp), 
-                        from_agent, 
+                    writeln!(
+                        rl_t,
+                        "[{}] | {}: {}",
+                        format_timestamp(timestamp),
+                        from_agent,
                         payload
-                    ).expect("write fail");
+                    )
+                    .expect("write fail");
                 }
                 ChatEvent::Connected => {
                     rl_t.set_prompt("SimChat> ")
                         .expect("failed to set linefeed prompt");
                 }
                 ChatEvent::Disconnected => {
-                     rl_t.set_prompt("connecting...> ")
-                        .expect("failed to set linefeed prompt");                   
+                    rl_t.set_prompt("connecting...> ")
+                        .expect("failed to set linefeed prompt");
                 }
                 _ => {}
             }
@@ -115,7 +119,7 @@ lib3h simchat Commands:
     let command_matcher = Regex::new(r"^/([a-z]+)\s?(.*)$").expect("This is a valid regex");
 
     loop {
-        let res = rl.read_line_step(Some(Duration::from_millis(1000))); 
+        let res = rl.read_line_step(Some(Duration::from_millis(1000)));
         match res {
             Ok(Some(line)) => match line {
                 linefeed::reader::ReadResult::Input(s) => {
@@ -162,7 +166,8 @@ lib3h simchat Commands:
                             }
                         }
                     } else {
-                        if s.len() > 0 { // no sending empty messages
+                        if s.len() > 0 {
+                            // no sending empty messages
                             cli.send(ChatEvent::SendChannelMessage { payload: s });
                         }
                     }
@@ -179,10 +184,13 @@ lib3h simchat Commands:
             Err(e) => {
                 eprintln!("{:?}", e);
                 break;
-            },
-            Ok(None) => {}, // keep waiting for input
+            }
+            Ok(None) => {} // keep waiting for input
         }
-        cli.send(ChatEvent::QueryChannelMessages{start_time: 0, end_time: 0});
+        cli.send(ChatEvent::QueryChannelMessages {
+            start_time: 0,
+            end_time: 0,
+        });
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }

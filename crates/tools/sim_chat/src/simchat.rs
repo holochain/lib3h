@@ -1,11 +1,14 @@
-use serde::de::DeserializeOwned;
-use serde::{Serialize};
-use lib3h_protocol::data_types::{Opaque, SpaceData};
+use lib3h_protocol::{
+    data_types::{Opaque, SpaceData},
+    Address,
+};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_slice, to_vec};
-use serde_derive::{Serialize, Deserialize};
-use lib3h_protocol::Address;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SimChatMessage {
@@ -54,7 +57,8 @@ pub enum ChatEvent {
         channel_id: String,
         space_data: SpaceData,
     },
-    QueryChannelMessages { // retrieve any messages found within this time box
+    QueryChannelMessages {
+        // retrieve any messages found within this time box
         start_time: u64,
         end_time: u64,
     },

@@ -1,10 +1,10 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 
-use lib3h_tracing::test_span;
 use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
+use lib3h_tracing::test_span;
 
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
@@ -68,8 +68,15 @@ impl Store {
         message_address: &Address,
         message: SimChatMessage,
     ) {
-        let mut space = self.0.get(space_address).map(|hm| hm.clone()).unwrap_or(HashMap::new());
-        let mut base = space.get(base_address).map(|hm| hm.clone()).unwrap_or(HashMap::new());
+        let mut space = self
+            .0
+            .get(space_address)
+            .map(|hm| hm.clone())
+            .unwrap_or(HashMap::new());
+        let mut base = space
+            .get(base_address)
+            .map(|hm| hm.clone())
+            .unwrap_or(HashMap::new());
 
         base.insert(message_address.clone(), message);
         space.insert(base_address.clone(), base.clone());
@@ -158,13 +165,12 @@ impl Lib3hSimChat {
                 // and handling messages
                 let mut engine = engine_builder();
 
-                let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> =
-                    engine
-                        .take_parent_endpoint()
-                        .expect("Could not get parent endpoint")
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("parent")
-                        .build();
+                let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> = engine
+                    .take_parent_endpoint()
+                    .expect("Could not get parent endpoint")
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("parent")
+                    .build();
 
                 // also keep track of things like the spaces and current space in this scope
                 let mut state = Lib3hSimChatState::new();
@@ -193,11 +199,11 @@ impl Lib3hSimChat {
                                 handle_and_convert_lib3h_event(&mut engine_message, &mut state);
 
                             if let Some(response) = maybe_response {
-                                engine_message.respond(response).expect("Could not send response!");
-                            }  
-                            if let Some(chat_event) =
-                                maybe_chat_event
-                            {
+                                engine_message
+                                    .respond(response)
+                                    .expect("Could not send response!");
+                            }
+                            if let Some(chat_event) = maybe_chat_event {
                                 handler(&chat_event);
                                 handle_chat_event(
                                     chat_event,
@@ -254,7 +260,9 @@ impl Lib3hSimChat {
                 test_span(""),
                 connect_message,
                 Box::new(move |_, _callback_data| {
-                    chat_event_sender.send(ChatEvent::Connected).expect("Could not send");
+                    chat_event_sender
+                        .send(ChatEvent::Connected)
+                        .expect("Could not send");
                     // println!("chat received response from engine: {:?}", callback_data);
                     Ok(())
                 }),
@@ -318,7 +326,9 @@ mod tests {
         }
     }
 
-    fn connected_event() -> ChatEvent { ChatEvent::Connected }
+    fn connected_event() -> ChatEvent {
+        ChatEvent::Connected
+    }
 
     fn receive_sys_message(payload: String) -> ChatEvent {
         ChatEvent::ReceiveDirectMessage(SimChatMessage {
@@ -379,7 +389,10 @@ mod tests {
         chat.send(join_event());
 
         let chat_messages = r.iter().take(3).collect::<Vec<_>>();
-        assert_eq!(chat_messages, vec![join_event(), connected_event(), join_success_event(),],);
+        assert_eq!(
+            chat_messages,
+            vec![join_event(), connected_event(), join_success_event(),],
+        );
     }
 
     #[test]
