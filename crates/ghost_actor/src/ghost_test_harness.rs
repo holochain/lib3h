@@ -287,9 +287,9 @@ macro_rules! assert_callback_processed {
      $processor:ident
  ) => {{
         let mut errors /*: Vec<(
-                            Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
-                            Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
-                        )> */ = Vec::new();
+                                Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
+                                Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
+                            )> */ = Vec::new();
 
         let mut callback_data = None; // = Box::new(None);
         let cb: $crate::ghost_actor::GhostCallback<_, _, _> = Box::new(|_user_data, cb| {
@@ -400,16 +400,14 @@ mod tests {
         wait_did_work!(actor);
 
         assert_eq!(false, wait_did_work!(actor, false));
-     }
+    }
 
     #[test]
     fn test_wait_until_no_work() {
+        let actor = &mut DidWorkActor(2);
 
-       let actor = &mut DidWorkActor(2);
+        wait_until_no_work!(actor);
 
-       wait_until_no_work!(actor);
-
-       assert_eq!(false, wait_did_work!(actor, false));
-     
+        assert_eq!(false, wait_did_work!(actor, false));
     }
 }
