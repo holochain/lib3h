@@ -4,6 +4,7 @@ members = [
   "crates/zombie_actor",
   "crates/ghost_actor",
   "crates/ghost_actor/ghost_actor_derive",
+  "crates/ghost_actor/ghost_actor_build_demo",
   "crates/crypto_api",
   "crates/sodium",
   "crates/lib3h_protocol",

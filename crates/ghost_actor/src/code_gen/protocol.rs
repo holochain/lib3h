@@ -74,7 +74,7 @@ fn build_evt(definition: &mut DefProtocol, x: &syn::Fields, is_actor: bool) {
     let t = if is_actor { "actor" } else { "owner" };
     let tt = if is_actor { "Actor" } else { "Owner" };
     let evt_id = format!("event_to_{}_{}", t, short_name);
-    let evt_name = format!("{}EventTo{}{}", definition.tall_prefix, tt, tall_name);
+    let evt_name = format!("EventTo{}{}", tt, tall_name);
     let event = DefType::Event(DefEvent {
         is_actor,
         short_name,
@@ -98,13 +98,10 @@ fn build_req(definition: &mut DefProtocol, x: &syn::Fields, is_actor: bool) {
     let tt = if is_actor { "Actor" } else { "Owner" };
     let req_type = fields[1].clone();
     let req_id = format!("request_to_{}_{}", t, short_name);
-    let req_name = format!("{}RequestTo{}{}", definition.tall_prefix, tt, tall_name);
+    let req_name = format!("RequestTo{}{}", tt, tall_name);
     let res_type = fields[2].clone();
     let res_id = format!("request_to_{}_{}_response", t, short_name);
-    let res_name = format!(
-        "{}RequestTo{}{}Response",
-        definition.tall_prefix, tt, tall_name
-    );
+    let res_name = format!("RequestTo{}{}Response", tt, tall_name);
     let request = DefType::Request(DefRequest {
         is_actor,
         short_name,
