@@ -47,6 +47,8 @@ struct DefProtocol {
     pub d_list_name: String,
     pub actor_handler_name: String,
     pub owner_handler_name: String,
+    pub actor_target_name: String,
+    pub owner_target_name: String,
     pub items: BTreeMap<String, DefType>,
 }
 
@@ -132,6 +134,8 @@ impl DefProtocol {
             d_list_name: "".to_string(),
             actor_handler_name: "".to_string(),
             owner_handler_name: "".to_string(),
+            actor_target_name: "".to_string(),
+            owner_target_name: "".to_string(),
             items: BTreeMap::new(),
         };
 
@@ -169,6 +173,8 @@ impl DefProtocol {
         definition.d_list_name = format!("{}_D_LIST", &definition.scream_prefix);
         definition.actor_handler_name = format!("{}ActorHandler", &definition.tall_prefix);
         definition.owner_handler_name = format!("{}OwnerHandler", &definition.tall_prefix);
+        definition.actor_target_name = format!("{}ActorTarget", &definition.tall_prefix);
+        definition.owner_target_name = format!("{}OwnerTarget", &definition.tall_prefix);
 
         definition
     }
@@ -428,6 +434,42 @@ fn render_handlers(definition: &DefProtocol) -> TokenStream {
     }
 }
 
+fn render_targets(definition: &DefProtocol) -> TokenStream {
+    let protocol_name = format_ident!("{}", definition.protocol_name);
+    let actor_name = format_ident!("{}", definition.actor_target_name);
+    let owner_name = format_ident!("{}", definition.owner_target_name);
+    let actor_handle_name = format_ident!("{}Handle", definition.actor_target_name);
+    let owner_handle_name = format_ident!("{}Handle", definition.owner_target_name);
+    let actor_handler_name = format_ident!("{}", definition.actor_handler_name);
+    let owner_handler_name = format_ident!("{}", definition.owner_handler_name);
+
+    quote! {
+        ///trait indicating you can send events and requests to this actor target
+        pub trait #actor_name<'lt> {
+            ///implement this to forward messages
+            fn send_protocol(&mut self, request_id: String, message: #protocol_name) -> ::ghost_actor::GhostResult<()>;
+        }
+
+        ///if you hold the owning endpoint, you should also handle incoming messages
+        pub trait #actor_handle_name<'lt>: #actor_name<'lt> {
+            ///call this to handle incoming messages
+            fn handle<'a, H: #actor_handler_name<'a>>(&mut self, handler: &'a mut H) -> ::ghost_actor::GhostResult<()>;
+        }
+
+        ///trait indicating you can send events and requests to this owner target
+        pub trait #owner_name<'lt> {
+            ///implement this to forward messages
+            fn send_protocol(&mut self, request_id: String, message: #protocol_name) -> ::ghost_actor::GhostResult<()>;
+        }
+
+        ///if you hold the owning endpoint, you should also handle incoming messages
+        pub trait #owner_handle_name<'lt>: #owner_name<'lt> {
+            ///call this to handle incoming messages
+            fn handle<'a, H: #owner_handler_name<'a>>(&mut self, handler: &'a mut H) -> ::ghost_actor::GhostResult<()>;
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Protocol {
     definition: DefProtocol,
@@ -444,6 +486,7 @@ impl Protocol {
         let protocol = render_protocol(&definition);
         let ghost_protocol = render_ghost_protocol(&definition);
         let handlers = render_handlers(&definition);
+        let targets = render_targets(&definition);
 
         Self {
             definition,
@@ -453,6 +496,7 @@ impl Protocol {
                 #d_list
                 #ghost_protocol
                 #handlers
+                #targets
             },
         }
     }
