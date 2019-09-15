@@ -9,7 +9,7 @@ extern crate linefeed;
 extern crate regex;
 extern crate url;
 use colored::*;
-
+use structopt::StructOpt;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use chrono::prelude::DateTime;
 use lib3h::{
@@ -20,6 +20,13 @@ use lib3h_sodium::SodiumCryptoSystem;
 use regex::Regex;
 use std::time::{Duration, UNIX_EPOCH};
 use url::Url;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "Lib3h SimChat", about = "A p2p, IRC style chat client")]
+struct Opt {
+    /// URL of a node to bootstrap lib3h
+    bootstrap: Url,
+}
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
@@ -38,6 +45,9 @@ fn engine_builder() -> GhostEngine<'static> {
 }
 
 fn main() {
+
+    let opt = Opt::from_args();
+
     let rl =
         std::sync::Arc::new(linefeed::Interface::new("sim_chat").expect("failed to init linefeed"));
 
@@ -98,7 +108,7 @@ fn main() {
             }
             // writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
-        Url::parse("http://bootstrap.holo.host").unwrap(),
+        opt.bootstrap,
     );
 
     let help_text = || {
