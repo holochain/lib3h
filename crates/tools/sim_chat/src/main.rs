@@ -5,6 +5,7 @@ extern crate regex;
 extern crate url;
 use lib3h_sim_chat::{simchat::SimChat, ChatEvent};
 use regex::Regex;
+use std::path::PathBuf;
 use url::Url;
 
 use lib3h::{
@@ -18,7 +19,7 @@ fn engine_builder() -> GhostEngine<'static> {
     let config = EngineConfig {
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
         dht_gossip_interval: 100,

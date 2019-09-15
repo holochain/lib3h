@@ -16,7 +16,10 @@ use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol::*, Address};
 use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
@@ -70,7 +73,7 @@ pub struct EngineConfig {
     pub socket_type: String,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,
-    pub work_dir: String,
+    pub work_dir: PathBuf,
     pub log_level: char,
     #[serde(with = "url_serde")]
     pub bind_url: Url,
