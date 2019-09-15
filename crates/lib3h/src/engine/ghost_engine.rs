@@ -922,20 +922,21 @@ mod tests {
     fn test_ghost_engine_publish() {
         enable_logging_for_test(true);
 
-        let mut lib3h = make_test_engine_wrapper();
+        let mut engine = make_test_engine_wrapper();
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = engine.as_mut().handle_join(&req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
             //        state: "".to_string(),
         };
 
-        lib3h.process(&mut core).unwrap();
+        let res = engine.process(&mut core);
+        println!("engine.process() -> {:?}", res);
 
         let entry_data = make_test_entry();
 
-        let result = lib3h.as_mut().handle_publish_entry(&entry_data);
+        let result = engine.as_mut().handle_publish_entry(&entry_data);
         assert!(result.is_ok());
 
         /* what should we observe to know that the entry was published?
@@ -981,7 +982,8 @@ mod tests {
             //        state: "".to_string(),
         };
 
-        lib3h.process(&mut core).unwrap();
+        let res = lib3h.process(&mut core);
+        println!("engine.process() -> {:?}", res);
 
         let entry_data = make_test_entry();
 
@@ -1046,7 +1048,8 @@ mod tests {
             //        state: "".to_string(),
         };
 
-        lib3h.process(&mut core).unwrap();
+        let res = lib3h.process(&mut core);
+        println!("engine.process() -> {:?}", res);
 
         let query = make_test_query(req_data.space_address.clone());
 
