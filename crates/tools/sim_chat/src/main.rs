@@ -200,10 +200,14 @@ lib3h simchat Commands:
             }
             Ok(None) => {} // keep waiting for input
         }
+
+        // currently there is no concept of time anchors so this will just poll every message in the space
+        // In future this will calculate the correct time anchors and filter the results by timestamp
         cli.send(ChatEvent::QueryChannelMessages {
             start_time: 0,
             end_time: 0,
         });
+        
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }

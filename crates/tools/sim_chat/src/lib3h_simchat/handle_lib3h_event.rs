@@ -6,31 +6,27 @@ use crate::{
 use lib3h::error::Lib3hError;
 use lib3h_protocol::{
     data_types::*,
-    protocol::{ClientToLib3h, Lib3hToClient, Lib3hToClientResponse},
+    protocol::{Lib3hToClient, Lib3hToClientResponse},
 };
-use lib3h_zombie_actor::GhostMessage;
 
+
+/// 
 pub fn handle_and_convert_lib3h_event(
-    engine_message: &mut GhostMessage<
-        Lib3hToClient,
-        ClientToLib3h,
-        Lib3hToClientResponse,
-        Lib3hError,
-    >,
+    lib3h_message: Lib3hToClient,
     state: &mut Lib3hSimChatState,
 ) -> (
     Option<ChatEvent>,
     Option<Result<Lib3hToClientResponse, Lib3hError>>,
 ) {
-    match engine_message.take_message() {
-        Some(Lib3hToClient::HandleQueryEntry(QueryEntryData {
+    match lib3h_message {
+        Lib3hToClient::HandleQueryEntry(QueryEntryData {
             // currently only one query which returns all messages for a time anchor
             space_address,
             entry_address,
             request_id,
             requester_agent_id,
             query: _,
-        })) => {
+        }) => {
             // respond with your ID in this space
             let responder_agent_id = state
                 .spaces
@@ -57,12 +53,12 @@ pub fn handle_and_convert_lib3h_event(
                 (None, Some(Err(Lib3hError::new_other("Entry not found"))))
             }
         }
-        Some(Lib3hToClient::HandleStoreEntryAspect(StoreEntryAspectData {
+        Lib3hToClient::HandleStoreEntryAspect(StoreEntryAspectData {
             entry_address,
             entry_aspect,
             space_address,
             ..
-        })) => {
+        }) => {
             // store a new message on a possibly existing time anchor entry
             state.store.insert(
                 &space_address,
@@ -75,7 +71,7 @@ pub fn handle_and_convert_lib3h_event(
                 Some(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult)),
             )
         }
-        Some(Lib3hToClient::HandleSendDirectMessage(message_data)) => (
+        Lib3hToClient::HandleSendDirectMessage(message_data) => (
             Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
                 from_agent: message_data.from_agent_id.to_string(),
                 payload: "message from engine".to_string(),
@@ -83,13 +79,12 @@ pub fn handle_and_convert_lib3h_event(
             })),
             None,
         ),
-        Some(Lib3hToClient::Disconnected(_)) => {
+        Lib3hToClient::Disconnected(_) => {
             state.connected = false;
             (Some(ChatEvent::Disconnected), None)
         }
 
-        Some(_) => (None, None), // event we don't care about
-        None => (None, None),    // there was nothing in the message
+        _ => (None, None), // event we don't care about
     }
 }
 
@@ -136,9 +131,7 @@ pub mod test {
             payload: String::from("hi"),
             timestamp: 0,
         };
-        let (s, _r) = crossbeam_channel::unbounded();
-        let mut ghost_message = GhostMessage::new(None, send_message_event(&message), s);
-        let response = handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
+        let response = handle_and_convert_lib3h_event(send_message_event(&message), &mut state);
 
         assert_eq!(response.0, None); // this does not produce a chat event
         assert_eq!(
@@ -166,11 +159,8 @@ pub mod test {
             },
         ];
 
-        let (s, _r) = crossbeam_channel::unbounded();
         for message in &messages {
-            let mut ghost_message =
-                GhostMessage::new(None, send_message_event(&message), s.clone());
-            handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
+            handle_and_convert_lib3h_event(send_message_event(&message), &mut state);
         }
 
         let stored_messages: Vec<SimChatMessage> = state
@@ -201,11 +191,8 @@ pub mod test {
             },
         ];
 
-        let (s, _r) = crossbeam_channel::unbounded();
         for message in &messages {
-            let mut ghost_message =
-                GhostMessage::new(None, send_message_event(&message), s.clone());
-            handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
+            handle_and_convert_lib3h_event(send_message_event(&message), &mut state);
         }
 
         let stored_messages: Vec<SimChatMessage> = state
@@ -243,13 +230,7 @@ pub mod test {
             message.clone(),
         );
 
-        let (s, _r) = crossbeam_channel::unbounded();
-        let mut ghost_message = GhostMessage::new(
-            None,
-            retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")),
-            s.clone(),
-        );
-        let result = handle_and_convert_lib3h_event(&mut ghost_message, &mut state);
+        let result = handle_and_convert_lib3h_event(retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")), &mut state);
 
         assert_eq!(result.0, None); // no chat events for this event
 

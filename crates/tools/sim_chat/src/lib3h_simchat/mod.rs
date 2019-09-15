@@ -195,22 +195,25 @@ impl Lib3hSimChat {
                         .into_iter()
                         // process lib3h messages and convert to a chat event if required
                         .for_each(|mut engine_message| {
-                            let (maybe_chat_event, maybe_response) =
-                                handle_and_convert_lib3h_event(&mut engine_message, &mut state);
+                            if let Some(lib3h_message) = engine_message.take_message() {
+                                let (maybe_chat_event, maybe_response) =
+                                    handle_and_convert_lib3h_event(lib3h_message, &mut state);
 
-                            if let Some(response) = maybe_response {
-                                engine_message
-                                    .respond(response)
-                                    .expect("Could not send response!");
-                            }
-                            if let Some(chat_event) = maybe_chat_event {
-                                handler(&chat_event);
-                                handle_chat_event(
-                                    chat_event,
-                                    &mut state,
-                                    &mut parent_endpoint,
-                                    internal_sender.clone(),
-                                );
+                                if let Some(response) = maybe_response {
+                                    engine_message
+                                        .respond(response)
+                                        .expect("Could not send response!");
+                                }
+                                if let Some(chat_event) = maybe_chat_event {
+                                    handler(&chat_event);
+                                    handle_chat_event(
+                                        chat_event,
+                                        &mut state,
+                                        &mut parent_endpoint,
+                                        internal_sender.clone(),
+                                    );
+                                }
+
                             }
                         });
 
