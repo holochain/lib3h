@@ -45,6 +45,8 @@ struct DefProtocol {
     pub scream_prefix: String,
     pub protocol_name: String,
     pub d_list_name: String,
+    pub actor_handler_name: String,
+    pub owner_handler_name: String,
     pub items: BTreeMap<String, DefType>,
 }
 
@@ -128,6 +130,8 @@ impl DefProtocol {
             scream_prefix: "".to_string(),
             protocol_name: "".to_string(),
             d_list_name: "".to_string(),
+            actor_handler_name: "".to_string(),
+            owner_handler_name: "".to_string(),
             items: BTreeMap::new(),
         };
 
@@ -163,6 +167,8 @@ impl DefProtocol {
 
         definition.protocol_name = format!("{}Protocol", &definition.tall_prefix);
         definition.d_list_name = format!("{}_D_LIST", &definition.scream_prefix);
+        definition.actor_handler_name = format!("{}ActorHandler", &definition.tall_prefix);
+        definition.owner_handler_name = format!("{}OwnerHandler", &definition.tall_prefix);
 
         definition
     }
@@ -311,6 +317,117 @@ fn render_ghost_protocol(definition: &DefProtocol) -> TokenStream {
     }
 }
 
+fn render_handlers(definition: &DefProtocol) -> TokenStream {
+    let actor_name = format_ident!("{}", definition.actor_handler_name);
+    let owner_name = format_ident!("{}", definition.owner_handler_name);
+    let protocol_name = format_ident!("{}", definition.protocol_name);
+
+    let mut actor_handlers = Vec::new();
+    let mut actor_trigger_arms = Vec::new();
+    let mut owner_handlers = Vec::new();
+    let mut owner_trigger_arms = Vec::new();
+
+    for (_, item) in definition.items.iter() {
+        match item {
+            DefType::Event(evt) => {
+                let evt_name = format_ident!("handle_{}", evt.evt_id);
+                let evt_type = &evt.evt_type;
+                let handler = quote! {
+                    fn #evt_name(&mut self, message: #evt_type) -> ::ghost_actor::GhostResult<()>;
+                };
+                let v_name = format_ident!("{}", evt.evt_name);
+                let trigger = quote! {
+                    #protocol_name::#v_name(message) => {
+                        self.#evt_name(message)?;
+                    }
+                };
+                let bad_trigger = quote! {
+                    #protocol_name::#v_name(message) => {
+                        return Err(format!("bad type: {:?}", message).into());
+                    }
+                };
+                if evt.is_actor {
+                    actor_handlers.push(handler);
+                    actor_trigger_arms.push(trigger);
+                    owner_trigger_arms.push(bad_trigger);
+                } else {
+                    owner_handlers.push(handler);
+                    owner_trigger_arms.push(trigger);
+                    actor_trigger_arms.push(bad_trigger);
+                }
+            }
+            DefType::Request(req) => {
+                let req_name = format_ident!("handle_{}", req.req_id);
+                let req_type = &req.req_type;
+                let res_type = &req.res_type;
+                let handler = quote! {
+                    fn #req_name(&mut self, message: #req_type, cb: ::ghost_actor::GhostHandlerCb<'lt, #res_type>) -> ::ghost_actor::GhostResult<()>;
+                };
+                let v_name = format_ident!("{}", req.req_name);
+                let v_name_res = format_ident!("{}", req.res_name);
+                let trigger = quote! {
+                    #protocol_name::#v_name(message) => {
+                        let cb = cb.expect("callback required for request type");
+                        let cb = Box::new(move |resp| {
+                            cb(#protocol_name::#v_name_res(resp))
+                        });
+                        self.#req_name(message, cb)?;
+                    }
+                };
+                let bad_trigger = quote! {
+                    #protocol_name::#v_name(message) => {
+                        return Err(format!("bad type: {:?}", message).into());
+                    }
+                };
+                let trigger_resp = quote! {
+                    #protocol_name::#v_name_res(message) => {
+                        return Err(format!("bad type: {:?}", message).into());
+                    }
+                };
+                actor_trigger_arms.push(trigger_resp.clone());
+                owner_trigger_arms.push(trigger_resp);
+                if req.is_actor {
+                    actor_handlers.push(handler);
+                    actor_trigger_arms.push(trigger);
+                    owner_trigger_arms.push(bad_trigger);
+                } else {
+                    owner_handlers.push(handler);
+                    owner_trigger_arms.push(trigger);
+                    actor_trigger_arms.push(bad_trigger);
+                }
+            }
+        }
+    }
+
+    quote! {
+        ///handler for events and requests sent to actor
+        pub trait #actor_name<'lt> {
+            #(#actor_handlers)*
+
+            ///provided splitter distributes messages
+            fn trigger(&mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostHandlerCb<'lt, #protocol_name>>) -> ::ghost_actor::GhostResult<()> {
+                match message {
+                    #(#actor_trigger_arms)*
+                }
+                Ok(())
+            }
+        }
+
+        ///handler for events and requests sent to owner
+        pub trait #owner_name<'lt> {
+            #(#owner_handlers)*
+
+            ///provided splitter distributes messages
+            fn trigger(&mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostHandlerCb<'lt, #protocol_name>>) -> ::ghost_actor::GhostResult<()> {
+                match message {
+                    #(#owner_trigger_arms)*
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Protocol {
     definition: DefProtocol,
@@ -326,6 +443,7 @@ impl Protocol {
 
         let protocol = render_protocol(&definition);
         let ghost_protocol = render_ghost_protocol(&definition);
+        let handlers = render_handlers(&definition);
 
         Self {
             definition,
@@ -334,6 +452,7 @@ impl Protocol {
                 #protocol
                 #d_list
                 #ghost_protocol
+                #handlers
             },
         }
     }
@@ -358,6 +477,8 @@ mod tests {
             event_to_owner(print, String),
             request_to_owner(add_1, i32, Result<i32, ()>),
         });
+
+        println!("{:#?}", protocol.definition);
 
         //println!("{:#?}", protocol);
         println!(
