@@ -61,9 +61,8 @@ impl<'engine> GhostEngine<'engine> {
         }
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
-            for mut request in request_list {
-                let payload = request.take_message().expect("exists");
-                self.handle_space_request(&chain_id, payload)?;
+            for request in request_list {
+                self.handle_space_request(&chain_id, request)?;
             }
         }
         // Done
@@ -74,7 +73,7 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_space_request(
         &mut self,
         chain_id: &ChainId,
-        request: GatewayRequestToParent,
+        mut request: GatewayToParentMessage,
     ) -> Lib3hResult<DidWork> {
         debug!(
             "{} << handle_space_request: [{:?}] - {:?}",
@@ -84,7 +83,8 @@ impl<'engine> GhostEngine<'engine> {
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
-        match request {
+        let payload = request.take_message().expect("exists");
+        match payload {
             // Handle Space's DHT request
             // ==========================
             GatewayRequestToParent::Dht(dht_request) => {
@@ -128,12 +128,10 @@ impl<'engine> GhostEngine<'engine> {
                                 &lib3h_msg.request_id,
                                 Some(RealEngineTrackerData::HoldEntryRequested),
                             );
-                            self.lib3h_endpoint
-                                .publish(
-                                    Lib3hSpan::todo(),
-                                    Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
-                                )
-                                .unwrap(); // FIXME unwrap
+                            self.lib3h_endpoint.publish(
+                                Lib3hSpan::todo(),
+                                Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
+                            )?;
                         }
                     }
                     DhtRequestToParent::EntryPruned(_address) => {
@@ -141,7 +139,7 @@ impl<'engine> GhostEngine<'engine> {
                     }
                     // EntryDataRequested: Change it into a Lib3hToClient::HandleFetchEntry.
                     DhtRequestToParent::RequestEntry(entry_address) => {
-                        let msg_data = FetchEntryData {
+                        let msg = FetchEntryData {
                             space_address: chain_id.0.clone(),
                             entry_address: entry_address.clone(),
                             request_id: "FIXME".to_string(),
@@ -149,8 +147,57 @@ impl<'engine> GhostEngine<'engine> {
                             aspect_address_list: None,
                         };
                         self.lib3h_endpoint
-                            .publish(Lib3hSpan::todo(), Lib3hToClient::HandleFetchEntry(msg_data))
-                            .unwrap(); // FIXME unwrap
+                            .request(
+                                Lib3hSpan::todo(),
+                                Lib3hToClient::HandleFetchEntry(msg.clone()),
+                                Box::new(move |me, response| {
+                                    let mut is_data_for_author_list = false;
+                                    if me.request_track.has(&msg.request_id) {
+                                        match me.request_track.remove(&msg.request_id) {
+                                            Some(data) => match data {
+                                                RealEngineTrackerData::DataForAuthorEntry => {
+                                                    is_data_for_author_list = true;
+                                                }
+                                                _ => (),
+                                            },
+                                            None => (),
+                                        };
+                                    }
+                                    let maybe_space = me.get_space(
+                                        &msg.space_address,
+                                        &msg.provider_agent_id,
+                                    );
+                                    match maybe_space {
+                                        Err(_res) => {
+                                            debug!("Received response to our HandleFetchEntry for a space we are not part of anymore");
+                                        },
+                                        Ok(space_gateway) => {
+                                            let entry = match response {
+                                                GhostCallbackData::Response(Ok(Lib3hToClientResponse::HandleFetchEntryResult(msg))) => {
+                                                    msg.entry
+                                                }
+                                                GhostCallbackData::Response(Err(e)) => {
+                                                    panic!("Got error on HandleFetchEntry: {:?} ", e);
+                                                }
+                                                GhostCallbackData::Timeout => {
+                                                    panic!("Got timeout on HandleFetchEntry");
+                                                }
+                                                _ => panic!("bad response type"),
+                                            };
+                                            if is_data_for_author_list {
+                                                space_gateway.publish(
+                                                    Lib3hSpan::todo(),
+                                                    GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
+                                            } else {
+                                                request.respond(Ok(
+                                                    GatewayRequestToParentResponse::Dht(DhtRequestToParentResponse::RequestEntry(entry),
+                                                    )))?;
+                                            }
+                                        }
+                                    }
+                                    Ok(())
+                                }))
+                            ?;
                     }
                 }
             }

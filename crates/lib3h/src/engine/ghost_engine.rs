@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
-        engine_actor::*, p2p_protocol::*, CanAdvertise, ChainId, GhostEngine, EngineConfig,
+        engine_actor::*, p2p_protocol::*, CanAdvertise, ChainId, EngineConfig, GhostEngine,
         TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
@@ -727,7 +727,7 @@ impl<'engine> GhostEngine<'engine> {
 
     /// Get a space_gateway for the specified space+agent.
     /// If agent did not join that space, construct error
-    fn get_space(
+    pub fn get_space(
         &mut self,
         space_address: &Address,
         agent_id: &Address,
