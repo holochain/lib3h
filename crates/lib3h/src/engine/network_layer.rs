@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_protocol::*,
     engine::{
-        p2p_protocol::P2pProtocol, real_engine::handle_gossipTo, RealEngine, NETWORK_GATEWAY_ID,
+        ghost_engine::handle_gossip_to, p2p_protocol::P2pProtocol, GhostEngine, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
@@ -18,8 +18,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Network layer related private methods
-impl RealEngine {
+impl GhostEngine<'static> {
     /// Process whatever the network has in for us.
+    #[allow(dead_code)] //FIXME: #324
     pub(crate) fn process_multiplexer(
         &mut self,
     ) -> Lib3hResult<(DidWork, Vec<Lib3hServerProtocol>)> {
@@ -64,7 +65,7 @@ impl RealEngine {
         let outbox = Vec::new();
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossipTo(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
+                handle_gossip_to(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
                     .expect("Failed to gossip with multiplexer");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
