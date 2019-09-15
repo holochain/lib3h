@@ -402,6 +402,16 @@ macro_rules! wait_until_no_work {
         }
         did_work
     }};
+    ($ghost_can_track: ident, $user_data: ident) => {{
+        let mut did_work;
+        loop {
+            did_work = wait_can_track_did_work!($ghost_can_track, $user_data, false);
+            if !did_work {
+                break;
+            }
+        }
+        did_work
+    }};
 }
 
 #[cfg(test)]
@@ -455,5 +465,14 @@ mod tests {
         wait_until_no_work!(actor);
 
         assert_eq!(false, wait_did_work!(actor, false));
+    }
+
+    #[test]
+    fn test_wait_can_track_until_no_work() {
+        let parent = &mut DidWorkParentWrapper;
+        let mut actor = &mut DidWorkActor(2);
+        wait_until_no_work!(parent, actor);
+
+        assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
     }
 }
