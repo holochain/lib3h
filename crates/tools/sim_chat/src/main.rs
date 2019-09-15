@@ -8,10 +8,9 @@ extern crate colored;
 extern crate linefeed;
 extern crate regex;
 extern crate url;
-use colored::*;
-use structopt::StructOpt;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use chrono::prelude::DateTime;
+use colored::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GhostEngine},
@@ -19,6 +18,7 @@ use lib3h::{
 use lib3h_sodium::SodiumCryptoSystem;
 use regex::Regex;
 use std::time::{Duration, UNIX_EPOCH};
+use structopt::StructOpt;
 use url::Url;
 
 #[derive(Debug, StructOpt)]
@@ -45,7 +45,6 @@ fn engine_builder() -> GhostEngine<'static> {
 }
 
 fn main() {
-
     let opt = Opt::from_args();
 
     let rl =
@@ -207,7 +206,7 @@ lib3h simchat Commands:
             start_time: 0,
             end_time: 0,
         });
-        
+
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }

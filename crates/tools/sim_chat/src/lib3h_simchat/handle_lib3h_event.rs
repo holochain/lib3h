@@ -9,8 +9,7 @@ use lib3h_protocol::{
     protocol::{Lib3hToClient, Lib3hToClientResponse},
 };
 
-
-/// 
+///
 pub fn handle_and_convert_lib3h_event(
     lib3h_message: Lib3hToClient,
     state: &mut Lib3hSimChatState,
@@ -53,6 +52,7 @@ pub fn handle_and_convert_lib3h_event(
                 (None, Some(Err(Lib3hError::new_other("Entry not found"))))
             }
         }
+
         Lib3hToClient::HandleStoreEntryAspect(StoreEntryAspectData {
             entry_address,
             entry_aspect,
@@ -71,6 +71,7 @@ pub fn handle_and_convert_lib3h_event(
                 Some(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult)),
             )
         }
+
         Lib3hToClient::HandleSendDirectMessage(message_data) => (
             Some(ChatEvent::ReceiveDirectMessage(SimChatMessage {
                 from_agent: message_data.from_agent_id.to_string(),
@@ -79,10 +80,51 @@ pub fn handle_and_convert_lib3h_event(
             })),
             None,
         ),
+
         Lib3hToClient::Disconnected(_) => {
             state.connected = false;
             (Some(ChatEvent::Disconnected), None)
         }
+
+        Lib3hToClient::HandleGetAuthoringEntryList(GetListData {
+            space_address,
+            request_id,
+            provider_agent_id,
+        }) => (
+            None,
+            Some(Ok(
+                Lib3hToClientResponse::HandleGetAuthoringEntryListResult(EntryListData {
+                    request_id,
+                    space_address: space_address.clone(),
+                    provider_agent_id,
+                    address_map: state
+                        .author_list
+                        .get(&space_address)
+                        .map(|s| s.to_owned())
+                        .unwrap_or_default(),
+                }),
+            )),
+        ),
+
+        Lib3hToClient::HandleGetGossipingEntryList(GetListData {
+            space_address,
+            request_id,
+            provider_agent_id,
+        }) => (
+            None,
+            Some(Ok(
+                Lib3hToClientResponse::HandleGetGossipingEntryListResult(EntryListData {
+                    request_id,
+                    space_address: space_address.clone(),
+                    provider_agent_id,
+                    address_map: state
+                        .gossip_list
+                        .get(&space_address)
+                        .map(|s| s.to_owned())
+                        .unwrap_or_default(),
+                }),
+            )),
+        ),
 
         _ => (None, None), // event we don't care about
     }
@@ -230,7 +272,10 @@ pub mod test {
             message.clone(),
         );
 
-        let result = handle_and_convert_lib3h_event(retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")), &mut state);
+        let result = handle_and_convert_lib3h_event(
+            retrieve_messages_event(&Address::from("some_space"), &Address::from("some_entry")),
+            &mut state,
+        );
 
         assert_eq!(result.0, None); // no chat events for this event
 

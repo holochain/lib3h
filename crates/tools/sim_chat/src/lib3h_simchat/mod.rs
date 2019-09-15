@@ -106,13 +106,21 @@ pub struct Lib3hSimChatState {
 
     /// Replacement for Holochain CAS. This stores messages on time anchors
     /// It is a multi-level hash table where messages are indexed by
-    /// space-address -> time-anchor-address -> message-address
+    /// space-address -> time-anchor-address -> message-address => MessageData
     store: Store,
 
     /// These are the messages that a ReceiveChannelMessage event has already
     /// been triggered for. This ensures that only one ReceiveChannelEvent is
     /// emitted per message per session
     displayed_channel_messages: Vec<Address>,
+
+    /// Maintains a list of the entries and aspects authored by this agent
+    /// space-address -> entry-address => aspect-address
+    author_list: HashMap<Address, HashMap<Address, Vec<Address>>>,
+
+    /// Similarly maintains a list of entries and aspects received via gossip
+    /// Same indexing scheme
+    gossip_list: HashMap<Address, HashMap<Address, Vec<Address>>>,
 }
 
 impl Lib3hSimChatState {
@@ -123,6 +131,8 @@ impl Lib3hSimChatState {
             spaces: HashMap::new(),
             store: Store::new(),
             displayed_channel_messages: Vec::new(),
+            author_list: HashMap::new(),
+            gossip_list: HashMap::new(),
         }
     }
 }
@@ -213,7 +223,6 @@ impl Lib3hSimChat {
                                         internal_sender.clone(),
                                     );
                                 }
-
                             }
                         });
 
