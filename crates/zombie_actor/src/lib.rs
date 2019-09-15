@@ -33,7 +33,6 @@ impl WorkWasDone {
     }
 }
 
-
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct RequestId(pub String);
@@ -86,7 +85,6 @@ pub mod prelude {
         GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
-
 
 pub mod ghost_test_harness;
 
