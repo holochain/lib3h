@@ -134,7 +134,7 @@ pub fn handle_chat_event(
                 };
                 Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::SendDirectMessage(direct_message_data),
-                    Box::new(|_, _| Ok(())),
+                    Box::new(|_, _| Ok(())), // TODO: Add checking that message send was a success
                 ))
             } else {
                 send_sys_message(
@@ -284,6 +284,41 @@ pub mod tests {
         assert_eq!(
             response.unwrap().event, 
             ClientToLib3h::LeaveSpace(space_data)
+        );        
+    }
+
+    #[test]
+    fn responds_to_send_direct_message() {
+        let (s, _r) = crossbeam_channel::unbounded();
+        let mut state = Lib3hSimChatState::new();
+
+        let payload = String::from("a message");
+        let to_agent_id = String::from("receiver");
+        
+        let chat_event = ChatEvent::SendDirectMessage{ 
+            to_agent: to_agent_id.clone(),
+            payload: String::from("a message")
+        };
+
+        // set up the state with a current space with an agent it
+        state.current_space = Some(
+            SpaceData {
+                agent_id: Address::from("sender"),
+                request_id: String::from(""),
+                space_address: Address::from("some-space"),
+            }
+        );
+
+        let response = handle_chat_event(chat_event, &mut state, s);
+        assert_eq!(
+            response.unwrap().event, 
+            ClientToLib3h::SendDirectMessage(DirectMessageData {
+                request_id: String::from(""),
+                content: payload.into(),
+                to_agent_id: Address::from(to_agent_id),
+                from_agent_id: Address::from("sender"),
+                space_address: Address::from("some-space")
+            })
         );        
     }
 }
