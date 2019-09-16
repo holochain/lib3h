@@ -1,10 +1,10 @@
 use crate::GhostCallbackData;
 /// A test harness for ghost actors. Provides specialized assertion functions
-/// to verify predicates have passed, calling the ghost_actor process function as many
+/// to verify predicates have passed, calling the GhostActor or GhostCanTrack process function as many
 /// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
 
-/// Represents all useful state after a single call to an ghost_actor's process function
+/// Represents all useful state after a single call to an ghost_actor' process function
 #[derive(Debug, Clone)]
 pub struct ProcessorResult<Cb: 'static, E: 'static> {
     /// Whether the ghost_actor reported doing work or not
@@ -72,7 +72,7 @@ pub trait Assert<Cb: 'static, E: 'static, T> {
     fn assert_inner(&self, args: &T) -> bool;
 }
 
-/// Asserts that the actual is equal to the given expected
+/// Asserts that the actual callback data is equal to the given expected
 #[derive(PartialEq, Debug)]
 pub struct CallbackDataEquals<Cb, E>(pub Cb, pub std::marker::PhantomData<E>);
 
@@ -268,13 +268,13 @@ macro_rules! process_one {
     }};
 }
 
-/// Asserts that a collection of ghost_actors produce events
+/// Asserts that a collection of GhostCanTrack trait objects produce events
 /// matching a set of predicate functions. For the program
 /// to continue executing all processors must pass.
 ///
 /// Multiple calls to process() will be made as needed for
-/// the passed in processors to pass. It will failure after
-/// MAX_PROCESSING_LOOPS iterations regardless.
+/// the passed in processors to pass. It will fail after
+/// 20 iterations.
 ///
 /// Returns all observed processor results for use by
 /// subsequent tests.
@@ -359,6 +359,7 @@ macro_rules! wait_did_work {
     };
 }
 
+/// Waits until a GhostCanTrack process has been invoked and work was done.
 #[allow(unused_macros)]
 macro_rules! wait_can_track_did_work {
     ($ghost_can_track: ident,
@@ -389,7 +390,7 @@ macro_rules! wait_can_track_did_work {
     }};
 }
 
-/// Continues processing the ghost_actor until no work is being done.
+/// Continues processing the GhostActor trait until no work is being done.
 #[allow(unused_macros)]
 macro_rules! wait_until_no_work {
     ($ghost_actor: ident) => {{
@@ -422,6 +423,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     struct DidWorkActor(u8);
 
+    /// Minimal actor stub that considers work done until counter reaches zero
     impl DidWorkActor {
         pub fn process(&mut self) -> GhostResult<WorkWasDone> {
             if self.0 <= 0 {
