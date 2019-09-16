@@ -268,7 +268,7 @@ impl From<Lib3hToClient> for Lib3hServerProtocol {
             }
             Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
                 Lib3hServerProtocol::SendDirectMessageResult(direct_message_data)
-            },
+            }
             Lib3hToClient::HandleSendDirectMessage(direct_message_data) => {
                 Lib3hServerProtocol::HandleSendDirectMessage(direct_message_data)
             }
