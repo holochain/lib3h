@@ -224,15 +224,11 @@ impl Lib3hSimChat {
                                 }
                                 if let Some(chat_event) = maybe_chat_event {
                                     handler(&chat_event);
-                                    if let Some((to_lib3h_event, callback)) = handle_chat_event(
+                                    handle_chat_event(
                                         chat_event,
                                         &mut state,
                                         internal_sender.clone(),
-                                    ) {
-                                        parent_endpoint
-                                            .request(test_span(""), to_lib3h_event, callback)
-                                            .ok();
-                                    }
+                                    ).map(|lib3h_request| lib3h_request.execute_request(&mut parent_endpoint));
                                 }
                             }
                         });
@@ -245,13 +241,11 @@ impl Lib3hSimChat {
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
-                        if let Some((to_lib3h_event, callback)) =
-                            handle_chat_event(chat_event, &mut state, internal_sender.clone())
-                        {
-                            parent_endpoint
-                                .request(test_span(""), to_lib3h_event, callback)
-                                .ok();
-                        }
+                        handle_chat_event(
+                            chat_event,
+                            &mut state,
+                            internal_sender.clone(),
+                        ).map(|lib3h_request| lib3h_request.execute_request(&mut parent_endpoint));
                     }
 
                     std::thread::sleep(std::time::Duration::from_millis(10));

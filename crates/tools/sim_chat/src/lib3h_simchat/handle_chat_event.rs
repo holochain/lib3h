@@ -1,3 +1,7 @@
+use lib3h_tracing::test_span;
+
+use lib3h_protocol::protocol::Lib3hToClient;
+use lib3h_protocol::protocol::Lib3hToClientResponse;
 use crate::lib3h_simchat::current_timeanchor;
 
 use super::{channel_address_from_string, current_timestamp, Lib3hSimChatState};
@@ -9,16 +13,38 @@ use lib3h_protocol::{
     Address,
 };
 
-use lib3h_zombie_actor::{GhostCallback, GhostCallbackData::Response};
+use lib3h_zombie_actor::{GhostCallback, GhostCallbackData::Response, GhostResult, GhostContextEndpoint, GhostCanTrack};
+
+pub struct Lib3hEventAndCallback {
+    event: ClientToLib3h,
+    callback: GhostCallback<(), ClientToLib3hResponse, Lib3hError>,
+}
+
+impl Lib3hEventAndCallback {
+    pub fn new(event: ClientToLib3h, callback: GhostCallback<(), ClientToLib3hResponse, Lib3hError>) -> Self {
+        Self {
+            event,
+            callback,
+        }
+    }
+
+    pub fn execute_request(self, endpoint: &mut GhostContextEndpoint<
+            (),
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            Lib3hError,
+        >) -> GhostResult<()> {
+        endpoint.request(test_span(""), self.event, self.callback)
+    }
+}
 
 pub fn handle_chat_event(
     chat_event: ChatEvent,
     state: &mut Lib3hSimChatState,
     chat_event_sender: crossbeam_channel::Sender<ChatEvent>,
-) -> Option<(
-    ClientToLib3h,
-    GhostCallback<(), ClientToLib3hResponse, Lib3hError>,
-)> {
+) -> Option<Lib3hEventAndCallback> {
     match chat_event {
         ChatEvent::Join {
             channel_id,
@@ -30,7 +56,7 @@ pub fn handle_chat_event(
                 request_id: "".to_string(),
                 space_address,
             };
-            Some((
+            Some(Lib3hEventAndCallback::new(
                 ClientToLib3h::JoinSpace(space_data.clone()),
                 Box::new(move |_, callback_data| {
                     if let Response(Ok(_payload)) = callback_data {
@@ -64,7 +90,7 @@ pub fn handle_chat_event(
 
         ChatEvent::Part(channel_id) => {
             if let Some(space_data) = state.current_space.clone() {
-                Some((
+                Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::LeaveSpace(space_data.to_owned()),
                     Box::new(move |_, callback_data| {
                         if let Response(Ok(_payload)) = callback_data {
@@ -102,7 +128,7 @@ pub fn handle_chat_event(
                     space_address: space_data.space_address,
                     request_id: String::from(""),
                 };
-                Some((
+                Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::SendDirectMessage(direct_message_data),
                     Box::new(|_, _| Ok(())),
                 ))
@@ -137,7 +163,7 @@ pub fn handle_chat_event(
                     },
                 };
 
-                Some((
+                Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::PublishEntry(provided_entry_data),
                     Box::new(|_, _| Ok(())),
                 ))
@@ -164,7 +190,7 @@ pub fn handle_chat_event(
                     space_address: space_data.space_address,
                     requester_agent_id: space_data.agent_id,
                 };
-                return Some((
+                return Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::QueryEntry(query_entry_data),
                     Box::new(move |_, callback_data| {
                         if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(query_result))) =
