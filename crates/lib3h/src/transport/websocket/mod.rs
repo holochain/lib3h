@@ -5,7 +5,6 @@
 ///
 /// The connection pool implemented abstractly based on any rust io Read/Write Stream.
 /// Module tcp implements a concrete type based on std::net::TcpStream.
-
 pub mod actor;
 mod streams;
 mod tcp;
