@@ -207,6 +207,7 @@ impl<Cb: 'static, E: 'static> std::fmt::Display for DidWorkAssert<Cb, E> {
 impl<Cb: 'static, E: 'static> predicates::reflection::PredicateReflection for DidWorkAssert<Cb, E> {}
 
 #[allow(unused_macros)]
+#[macro_export]
 /// Convenience function that asserts only one particular equality predicate
 /// passes for a GhostCanTrack. See assert_callback_processed for more details.
 macro_rules! assert_callback_eq {
