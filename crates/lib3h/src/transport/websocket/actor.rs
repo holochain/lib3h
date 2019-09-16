@@ -232,6 +232,7 @@ mod tests {
 
     use super::*;
     use crate::transport::websocket::tls::TlsConfig;
+    use lib3h_ghost_actor::{wait_for_message};
     use regex::Regex;
     use url::Url;
     use std::{thread, time};
@@ -324,34 +325,10 @@ mod tests {
             )
             .unwrap();
 
-        let received_regex = Regex::new(
-            "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}",
-        ).unwrap();
-
-        let mut found = false;
-        let mut tries = 0;
-        loop {
-            tries += 1;
-            thread::sleep(time::Duration::from_millis(50));
-            transport1.process().unwrap();
-            let _ = t1_endpoint.process(&mut ());
-            transport2.process().unwrap();
-            let _ = t2_endpoint.process(&mut ());
-            for mut message in t2_endpoint.drain_messages() {
-                message.take_message().map(|message|{
-                    let message_string = &format!("{:?}", message);
-                    println!("{}", message_string);
-                    if received_regex.is_match(message_string) {
-                        found = true;
-                    };
-                });
-            }
-
-            if found || tries > 100 {
-                break
-            }
-        }
-
-        assert!(found);
+        wait_for_message!(
+            vec![transport1, transport2],
+            t2_endpoint,
+            "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
+        );
     }
 }

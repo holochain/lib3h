@@ -418,6 +418,72 @@ macro_rules! wait_until_no_work {
     }};
 }
 
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_until_did_work {
+    ($ghost_actor: ident) => {{
+        let mut did_work;
+        loop {
+            did_work = $crate::wait_did_work!($ghost_actor, false);
+            if did_work {
+                break;
+            }
+        }
+        did_work
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_for_message {
+    ($ghost_actors: expr, $endpoint: ident, $regex: expr) => {{
+        wait_for_message!($ghost_actors, $endpoint, $regex, 5000, true)
+    }};
+    ($ghost_actors: expr, $endpoint: ident, $regex: expr, $timeout_ms: expr) => {{
+        wait_for_message!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
+    }};
+    (
+        $ghost_actors: expr,
+        $endpoint: ident,
+        $regex: expr,
+        $timeout_ms: expr,
+        $should_abort: expr
+    ) => {{
+        let mut found = false;
+        let mut tries = 0;
+        let message_regex = Regex::new($regex).expect("Regex must be syntactically correct");
+        let POLL_INTERVAL = 50;
+        let mut actors = $ghost_actors;
+        loop {
+            tries += 1;
+            thread::sleep(time::Duration::from_millis(POLL_INTERVAL));
+            actors = actors.into_iter()
+                .map(|mut actor| {
+                    let _ = $crate::wait_did_work!(actor, false);
+                    actor
+                })
+                .collect::<Vec<_>>();
+            let _ = $endpoint.process(&mut ());
+            for mut message in $endpoint.drain_messages() {
+                message.take_message().map(|message|{
+                    let message_string = &format!("{:?}", message);
+                    if message_regex.is_match(message_string) {
+                        found = true;
+                    };
+                });
+            }
+
+            if found || tries > $timeout_ms/POLL_INTERVAL {
+                break
+            }
+        }
+        if $should_abort {
+            assert!(found);
+        }
+        found
+    }};
+}
+
 #[cfg(test)]
 mod tests {
 
