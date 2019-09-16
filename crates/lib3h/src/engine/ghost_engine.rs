@@ -510,11 +510,10 @@ impl<'engine> GhostEngine<'engine> {
 
     #[allow(non_snake_case)]
     fn handle_HandleGetGossipingEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
-        let _space_gateway = self.get_space(
+        let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
-        /* TODO: #326
         for (entry_address, aspect_address_list) in msg.address_map {
             let mut aspect_list = Vec::new();
             for aspect_address in aspect_address_list {
@@ -526,16 +525,21 @@ impl<'engine> GhostEngine<'engine> {
                 };
                 aspect_list.push(fake_aspect);
             }
-            // Create "fake" entry, in the sense an entry with no actual content,
+            // Create "shallow" entry, in the sense an entry with no actual aspect content,
             // but valid addresses.
-            let fake_entry = EntryData {
+            let shallow_entry = EntryData {
                 entry_address: entry_address.clone(),
                 aspect_list,
             };
             space_gateway
-                .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry))
+                .publish(
+                    Lib3hSpan::todo(),
+                    GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
+                        shallow_entry,
+                    )),
+                )
                 .map_err(|e| Lib3hError::new_other(&e.to_string()))?;
-        }*/
+        }
         Ok(())
     }
 
