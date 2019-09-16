@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use lib3h_tracing::Lib3hSpan;
-
-//--------------------------------------------------------------------------------------------------
+use lib3h_tracing::Lib3hSpan; //--------------------------------------------------------------------------------------------------
 // GhostParentWrapper
 //---------------------------------------------------------------------------------------------------
 
@@ -388,13 +386,15 @@ mod tests {
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
     use lib3h_tracing::test_span;
-    //    use predicates::prelude::*;
+    use predicates::prelude::*;
+    use crate::ghost_test_harness::*;
+
     type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
     // These are the Out message, and it has messages that come internally
     // either self-generated or (presumeably) from children
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     struct TestMsgOut(String);
     #[derive(Debug, PartialEq)]
     struct TestMsgOutResponse(String);
@@ -575,7 +575,8 @@ mod tests {
         )
     }
 
-    #[test]
+//    #[test]
+//    #[ignore]
     fn test_ghost_actor_parent_wrapper_macro() {
         // much of the previous test is the parent creating instances of the actor
         // and taking control of the parent endpoint.  Parent wrapper implements
@@ -605,5 +606,14 @@ mod tests {
 
     }
 
+
+    #[test]
+    fn test_callback_equals_as_processor_trait() {
+        let callback_equals :
+            CallbackDataEquals<TestMsgOut, _> = CallbackDataEquals(TestMsgOut("abc".into()),
+                                                               std::marker::PhantomData);
+        let _as_processor : Box<dyn Processor<TestMsgOut, String>> =
+            Box::new(callback_equals);
+    }
 
 }

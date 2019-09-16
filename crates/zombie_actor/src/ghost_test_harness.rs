@@ -17,7 +17,7 @@ pub struct ProcessorResult<Cb: 'static, E: 'static> {
 /// predicate over ProcessorResult (the eval function) and a
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
-pub trait Processor<'a, Cb: 'static, E: 'static>: Predicate<ProcessorResult<Cb, E>> {
+pub trait Processor<Cb: 'static, E: 'static>: Predicate<ProcessorResult<Cb, E>> {
     /// Processor name, for debugging and mapping purposes
     fn name(&self) -> String {
         "default_processor".into()
@@ -25,7 +25,7 @@ pub trait Processor<'a, Cb: 'static, E: 'static>: Predicate<ProcessorResult<Cb, 
 
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
-    fn test(&self, args: &'a ProcessorResult<Cb, E>);
+    fn test(&self, args: &ProcessorResult<Cb, E>);
 }
 
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
@@ -53,7 +53,7 @@ where
 {
 }
 
-impl<'a, Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>>
+impl<Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>>
     for dyn AssertEquals<Cb, E, T>
 where
     T: PartialEq + std::fmt::Debug,
@@ -76,7 +76,7 @@ pub trait Assert<Cb: 'static, E: 'static, T> {
 #[derive(PartialEq, Debug)]
 pub struct CallbackDataEquals<Cb, E>(pub Cb, pub std::marker::PhantomData<E>);
 
-impl<'a, Cb, E: 'static> predicates::Predicate<ProcessorResult<Cb, E>> for CallbackDataEquals<Cb, E>
+impl<Cb, E: 'static> predicates::Predicate<ProcessorResult<Cb, E>> for CallbackDataEquals<Cb, E>
 where
     Cb: PartialEq + std::fmt::Debug + 'static,
 {
@@ -111,11 +111,11 @@ where
     }
 }
 
-impl<'a, Cb, E: 'static> Processor<'a, Cb, E> for CallbackDataEquals<Cb, E>
+impl<Cb, E: 'static> Processor<Cb, E> for CallbackDataEquals<Cb, E>
 where
     Cb: std::fmt::Debug + 'static + PartialEq,
 {
-    fn test(&self, args: &'a ProcessorResult<Cb, E>) {
+    fn test(&self, args: &ProcessorResult<Cb, E>) {
         let actual = self.extracted(args);
         assert_eq!(Some(self.expected()), actual);
     }
@@ -146,7 +146,7 @@ impl<Cb: 'static, E: 'static> Assert<Cb, E, Cb> for CallbackDataAssert<Cb, E> {
     }
 }
 
-impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for CallbackDataAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Processor<Cb, E> for CallbackDataAssert<Cb, E> {
     fn test(&self, args: &ProcessorResult<Cb, E>) {
         let actual = self.extracted(args);
 
@@ -162,7 +162,7 @@ impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for CallbackDataAssert<Cb
     }
 }
 
-impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAssert<Cb, E> {
     fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         self.extracted(args)
             .map(|actual| self.assert_inner(&actual))
@@ -182,8 +182,8 @@ impl<Cb, E: 'static> predicates::reflection::PredicateReflection for CallbackDat
 #[derive(PartialEq, Debug)]
 pub struct DidWorkAssert<Cb, E>(std::marker::PhantomData<Cb>, std::marker::PhantomData<E>);
 
-impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for DidWorkAssert<Cb, E> {
-    fn test(&self, args: &'a ProcessorResult<Cb, E>) {
+impl<Cb: 'static, E: 'static> Processor<Cb, E> for DidWorkAssert<Cb, E> {
+    fn test(&self, args: &ProcessorResult<Cb, E>) {
         assert!(args.did_work);
     }
 
@@ -192,7 +192,7 @@ impl<'a, Cb: 'static, E: 'static> Processor<'a, Cb, E> for DidWorkAssert<Cb, E> 
     }
 }
 
-impl<'a, Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for DidWorkAssert<Cb, E> {
+impl<Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for DidWorkAssert<Cb, E> {
     fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
         args.did_work
     }
@@ -419,6 +419,7 @@ macro_rules! wait_until_no_work {
 #[cfg(test)]
 mod tests {
 
+    use super::*;
     use crate::{GhostResult, WorkWasDone};
 
     #[derive(Debug, Clone, PartialEq)]
@@ -477,5 +478,13 @@ mod tests {
         wait_until_no_work!(parent, actor);
 
         assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
+    }
+
+    #[test]
+    fn test_callback_equals_as_processor_trait() {
+        let callback_equals :
+            CallbackDataEquals<String, _> = CallbackDataEquals("abc".into(), std::marker::PhantomData);
+        let _as_processor : Box<dyn Processor<String, String>> =
+            Box::new(callback_equals);
     }
 }
