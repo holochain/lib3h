@@ -1,4 +1,6 @@
 #[macro_use]
+extern crate hexf;
+#[macro_use]
 mod utils;
 #[macro_use]
 extern crate lazy_static;
@@ -12,13 +14,13 @@ use predicates::prelude::*;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{RealEngine, RealEngineConfig},
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine},
 };
 use lib3h_protocol::{
-    data_types::*, network_engine::NetworkEngine, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol,
+    data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
 };
 use lib3h_sodium::SodiumCryptoSystem;
+use std::path::PathBuf;
 use url::Url;
 use utils::{
     constants::*,
@@ -29,7 +31,7 @@ use utils::{
 // Test suites
 //--------------------------------------------------------------------------------------------------
 
-type TwoEnginesTestFn = fn(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>);
+type TwoEnginesTestFn = fn(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h);
 
 lazy_static! {
     pub static ref TWO_ENGINES_BASIC_TEST_FNS: Vec<(TwoEnginesTestFn, bool)> = vec![
@@ -60,29 +62,30 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine {
+fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostLib3h {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
     };
-    let config = RealEngineConfig {
+    let config = EngineConfig {
         // tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes,
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
         dht_gossip_interval: 100,
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],
     };
-    let engine = RealEngine::new_mock(
+    let engine = GhostEngine::new_mock(
         Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),
         MirrorDht::new_with_config,
     )
     .unwrap();
+    let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
     println!(
         "basic_setup_mock(): test engine for {}, advertise: {}",
@@ -91,24 +94,24 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> RealEngine {
     engine
 }
 
-fn basic_setup_mock(name: &str) -> RealEngine {
+fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
     basic_setup_mock_bootstrap(name, None)
 }
 
 // FIXME
-//fn basic_setup_wss() -> RealEngine {
-//    let config = RealEngineConfig {
+//fn basic_setup_wss() -> GhostEngine {
+//    let config = EngineConfig {
 //        // tls_config: TlsConfig::Unencrypted,
 //        socket_type: "ws".into(),
 //        bootstrap_nodes: vec![],
-//        work_dir: String::new(),
+//        work_dir: PathBuf::new(),
 //        log_level: 'd',
 //        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
 //        dht_gossip_interval: 200,
 //        dht_timeout_threshold: 2000,
 //        dht_custom_config: vec![],
 //    };
-//    let engine = RealEngine::new(
+//    let engine = GhostEngine::new(
 //        Box::new(SodiumCryptoSystem::new()),
 //        config,
 //        "test_engine_wss".into(),
@@ -147,10 +150,8 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine_a: Box<dyn NetworkEngine> =
-        Box::new(basic_setup_mock("basic_send_test_mock_node_a"));
-    let mut engine_b: Box<dyn NetworkEngine> =
-        Box::new(basic_setup_mock("basic_send_test_mock_node_b"));
+    let mut engine_a: WrappedGhostLib3h = basic_setup_mock("basic_send_test_mock_node_a");
+    let mut engine_b: WrappedGhostLib3h = basic_setup_mock("basic_send_test_mock_node_b");
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
@@ -194,7 +195,7 @@ fn basic_connect_bootstrap_test_mock() {
 //fn basic_track_test_wss() {
 //    enable_logging_for_test(true);
 //    // Setup
-//    let mut engine: Box<dyn NetworkEngine> = Box::new(basic_setup_wss());
+//    let mut engine: WrappedGhostLib3h = Box::new(basic_setup_wss());
 //    basic_track_test(&mut engine);
 //}
 
@@ -203,11 +204,11 @@ fn basic_connect_bootstrap_test_mock() {
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("basic_track_test_mock"));
+    let mut engine: WrappedGhostLib3h = basic_setup_mock("basic_track_test_mock");
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test(engine: &mut Box<dyn NetworkEngine>) {
+fn basic_track_test(engine: &mut WrappedGhostLib3h) {
     // Test
     let mut track_space = SpaceData {
         request_id: "track_a_1".into(),
@@ -287,8 +288,8 @@ fn launch_two_nodes_test_with_memory_network(
     println!("=======================");
 
     // Setup
-    let mut alex: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("alex"));
-    let mut billy: Box<dyn NetworkEngine> = Box::new(basic_setup_mock("billy"));
+    let mut alex: WrappedGhostLib3h = basic_setup_mock("alex");
+    let mut billy: WrappedGhostLib3h = basic_setup_mock("billy");
     if can_setup {
         basic_two_setup(&mut alex, &mut billy);
     }
@@ -305,12 +306,12 @@ fn launch_two_nodes_test_with_memory_network(
 }
 
 /// Empty function that triggers the test suite
-fn setup_only(_alex: &mut Box<dyn NetworkEngine>, _billy: &mut Box<dyn NetworkEngine>) {
+fn setup_only(_alex: &mut WrappedGhostLib3h, _billy: &mut WrappedGhostLib3h) {
     // n/a
 }
 
 ///
-fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
+fn basic_two_setup(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) {
     // Connect Alex to Billy
     let req_connect = ConnectData {
         // TODO Should be able to specify a non blank string
@@ -349,7 +350,7 @@ fn basic_two_setup(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn Networ
 }
 
 //
-fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
+fn basic_two_send_message(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) {
     // Create message
     let req_dm = DirectMessageData {
         space_address: SPACE_ADDRESS_A.clone(),
@@ -409,7 +410,7 @@ fn basic_two_send_message(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn
 }
 
 //
-fn basic_two_join_first(alex: &mut Box<dyn NetworkEngine>, billy: &mut Box<dyn NetworkEngine>) {
+fn basic_two_join_first(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) {
     // Setup: Track before connecting
 
     // A joins space

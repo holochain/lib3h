@@ -2,12 +2,13 @@
 extern crate detach;
 #[macro_use]
 extern crate lazy_static;
+extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::TestTrace;
+use lib3h_tracing::{test_span, Lib3hSpan};
 use std::{
     collections::{HashMap, HashSet},
     sync::RwLock,
@@ -160,7 +161,6 @@ struct TestTransport {
     endpoint_self: Detach<
         GhostContextEndpoint<
             TestTransport,
-            TestTrace,
             RequestToParent,
             RequestToParentResponse,
             RequestToChild,
@@ -256,20 +256,24 @@ impl TestTransport {
         let our_url = self.bound_url.as_ref().unwrap();
         if let Ok(events) = mockernet.process_for(our_url.clone()) {
             for e in events {
+                let span = Lib3hSpan::todo();
                 match e {
                     MockernetEvent::Message { from, payload } => {
                         self.endpoint_self
-                            .publish(RequestToParent::ReceivedData { uri: from, payload })?;
+                            .publish(span, RequestToParent::ReceivedData { uri: from, payload })?;
                     }
                     MockernetEvent::Connection { from } => {
                         self.endpoint_self
-                            .publish(RequestToParent::IncomingConnection { uri: from })?;
+                            .publish(span, RequestToParent::IncomingConnection { uri: from })?;
                     }
                     MockernetEvent::Error(err) => {
-                        self.endpoint_self.publish(RequestToParent::ErrorOccured {
-                            uri: our_url.clone(),
-                            error: TransportError::new(err),
-                        })?;
+                        self.endpoint_self.publish(
+                            span,
+                            RequestToParent::ErrorOccured {
+                                uri: our_url.clone(),
+                                error: TransportError::new(err),
+                            },
+                        )?;
                     }
                 }
             }
@@ -294,13 +298,13 @@ fn ghost_transport() {
     // create an object that can be used to hold state data in callbacks to the transports
     let mut owner = TestTransportOwner::new();
 
-    let mut t1: TransportActorParentWrapper<TestTransportOwner, TestTrace, TestTransport> =
+    let mut t1: TransportActorParentWrapper<TestTransportOwner, TestTransport> =
         GhostParentWrapper::new(
             TestTransport::new("t1"),
             "t1_requests", // prefix for request ids in the tracker
         );
     assert_eq!(t1.as_ref().name, "t1");
-    let mut t2: TransportActorParentWrapper<TestTransportOwner, TestTrace, TestTransport> =
+    let mut t2: TransportActorParentWrapper<TestTransportOwner, TestTransport> =
         GhostParentWrapper::new(
             TestTransport::new("t2"),
             "t2_requests", // prefix for request ids in the tracker
@@ -309,7 +313,7 @@ fn ghost_transport() {
 
     // bind t1 to the network
     t1.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t1").expect("can parse url"),
         },
@@ -329,7 +333,7 @@ fn ghost_transport() {
     // lets do some things to test out returning of error messages, i.e. sending messages
     // to someone not bount to the network
     t1.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::SendMessage {
             uri: Url::parse("mocknet://t2").expect("can parse url"),
             payload: "won't be received!".into(),
@@ -350,7 +354,7 @@ fn ghost_transport() {
 
     // bind t2 to the network
     t2.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t2").expect("can parse url"),
         },
@@ -368,7 +372,7 @@ fn ghost_transport() {
     );
 
     t1.request(
-        TestTrace::new(),
+        test_span(""),
         RequestToChild::SendMessage {
             uri: Url::parse("mocknet://t2").expect("can parse url"),
             payload: "foo".into(),

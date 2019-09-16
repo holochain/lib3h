@@ -1,4 +1,7 @@
 #[macro_use]
+extern crate hexf;
+
+#[macro_use]
 mod utils;
 #[macro_use]
 extern crate lazy_static;
@@ -17,11 +20,12 @@ mod test_suites;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{RealEngine, RealEngineConfig},
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine},
     error::Lib3hResult,
 };
-use lib3h_protocol::{network_engine::NetworkEngine, Address};
+use lib3h_protocol::Address;
 use node_mock::NodeMock;
+use std::path::PathBuf;
 use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
@@ -53,23 +57,21 @@ fn enable_logging_for_test(enable: bool) {
 // Engine factories
 //--------------------------------------------------------------------------------------------------
 
-fn construct_mock_engine(
-    config: &RealEngineConfig,
-    name: &str,
-) -> Lib3hResult<Box<dyn NetworkEngine>> {
-    let engine: RealEngine = RealEngine::new_mock(
+fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
+    let engine: GhostEngine = GhostEngine::new_mock(
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
         MirrorDht::new_with_config,
     )
     .unwrap();
+    let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
     println!(
         "construct_mock_engine(): test engine for {}, advertise: {}",
         name, p2p_binding
     );
-    Ok(Box::new(engine))
+    Ok(engine)
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -80,11 +82,11 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
-    let config = RealEngineConfig {
+    let config = EngineConfig {
         //tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
         dht_gossip_interval: 500,
@@ -110,11 +112,11 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
 //    let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
 //        .expect("invalid web socket url");
 //
-//    let config = RealEngineConfig {
+//    let config = EngineConfig {
 //        tls_config: tls_config,
 //        socket_type: protocol.into(),
 //        bootstrap_nodes: vec![],
-//        work_dir: String::new(),
+//        work_dir: PathBuf::new(),
 //        log_level: 'd',
 //        bind_url,
 //        dht_gossip_interval: 500,

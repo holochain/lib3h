@@ -1,12 +1,14 @@
 //! abstraction for working with Websocket connections
 //! based on any rust io Read/Write Stream
 
-pub mod websocket_actor;
 mod tcp;
+pub mod websocket_actor;
 
 use crate::transport::{
     error::{TransportError, TransportResult},
-    websocket::websocket_actor::{GhostTransportWebsocketEndpoint, GhostTransportWebsocketEndpointContext}
+    websocket::websocket_actor::{
+        GhostTransportWebsocketEndpoint, GhostTransportWebsocketEndpointContext,
+    },
 };
 use lib3h_protocol::DidWork;
 use std::{
@@ -15,8 +17,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use url::Url;
 use lib3h_ghost_actor::create_ghost_channel;
+use url::Url;
 
 /// a connection identifier
 pub type ConnectionId = String;
@@ -47,8 +49,6 @@ pub enum TransportEvent {
     /// A connection closed for whatever reason
     ConnectionClosed(ConnectionId),
 }
-
-
 
 static FAKE_PKCS12: &'static [u8] = include_bytes!("fake_key.p12");
 static FAKE_PASS: &'static str = "hello";
@@ -243,7 +243,7 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
                 endpoint_self
                     .as_context_endpoint_builder()
                     .request_id_prefix("twss_to_parent")
-                    .build()
+                    .build(),
             ),
             tls_config,
             stream_factory,
@@ -260,14 +260,15 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
     pub fn url_to_connection_id(&self, url: &Url) -> Option<ConnectionId> {
         for (connection_id, wss_info) in self.stream_sockets.iter() {
             if wss_info.url == *url {
-                return Some(connection_id.clone())
+                return Some(connection_id.clone());
             }
         }
         None
     }
 
     pub fn connection_id_to_url(&self, connection_id: ConnectionId) -> Option<Url> {
-        self.stream_sockets.get(&connection_id)
+        self.stream_sockets
+            .get(&connection_id)
             .map(|wss_info| wss_info.url.clone())
     }
 
@@ -322,23 +323,23 @@ impl<T: Read + Write + std::fmt::Debug> TransportWss<T> {
             Err(errors.into())
         }
     }
-/*
-    /// get a list of all open transport ids
-    fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
-        Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
-    }
+    /*
+        /// get a list of all open transport ids
+        fn connection_id_list(&mut self) -> TransportResult<Vec<ConnectionId>> {
+            Ok(self.stream_sockets.keys().map(|k| k.to_string()).collect())
+        }
 
-    /// get uri from a connectionId
-    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-        let res = self.stream_sockets.get(&id.to_string());
-        res.map(|info| info.url.clone())
-    }
+        /// get uri from a connectionId
+        fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
+            let res = self.stream_sockets.get(&id.to_string());
+            res.map(|info| info.url.clone())
+        }
 
-    fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
-        self.inbox.push_back(command);
-        Ok(())
-    }
-*/
+        fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
+            self.inbox.push_back(command);
+            Ok(())
+        }
+    */
     /// this should be called frequently on the event loop
     /// looks for incoming messages or processes ping/pong/close events etc
     fn process_inner(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {

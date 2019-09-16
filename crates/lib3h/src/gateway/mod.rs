@@ -7,52 +7,21 @@ pub mod protocol;
 
 use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
 use detach::prelude::*;
-use lib3h_protocol::protocol_server::Lib3hServerProtocol;
-use lib3h_tracing::Lib3hTrace;
-use url::Url;
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 pub struct P2pGateway {
     /// Used for distinguishing gateways
     identifier: String,
+
     /// Transport
-    child_transport_endpoint: Detach<
-        transport::protocol::TransportActorParentContextEndpoint<GatewayUserData, Lib3hTrace>,
-    >,
+    inner_transport: Detach<transport::protocol::TransportActorParentWrapperDyn<Self>>,
     /// DHT
-    inner_dht: ChildDhtWrapperDyn<GatewayUserData, Lib3hTrace>,
-    // Cache
-    this_peer: PeerData,
-    // user data for ghost callback
-    user_data: GatewayUserData,
+    inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,
-    endpoint_self: Detach<GatewaySelfEndpoint<(), Lib3hTrace>>,
-}
-
-// user data for ghost callback
-pub struct GatewayUserData {
-    pub this_peer: PeerData,
-    pub maybe_peer: Option<PeerData>,
-    pub peer_list: Vec<PeerData>,
-    pub lib3h_outbox: Vec<Lib3hServerProtocol>,
-    pub binding: Url,
-}
-
-impl GatewayUserData {
-    pub fn new() -> Self {
-        GatewayUserData {
-            this_peer: PeerData {
-                peer_address: "FIXME".to_string(),
-                peer_uri: Url::parse("fixme://host:123").unwrap(),
-                timestamp: 0,
-            },
-            maybe_peer: None,
-            peer_list: Vec::new(),
-            lib3h_outbox: Vec::new(),
-            binding: Url::parse("fixme://host:123").unwrap(),
-        }
-    }
+    endpoint_self: Detach<GatewaySelfEndpoint<()>>,
+    /// cached data from inner dht
+    this_peer: PeerData,
 }

@@ -1,4 +1,7 @@
-use crate::engine::ghost_engine::GhostEngineParentWrapper;
+use crate::{
+    engine::{ghost_engine::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
+    error::Lib3hError,
+};
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -9,11 +12,13 @@ use lib3h_protocol::{
     protocol_server::*,
     DidWork,
 };
-use lib3h_tracing::Lib3hTrace;
+use lib3h_tracing::Lib3hSpan;
+use url::Url;
+pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
-struct LegacyLib3h<Engine, EngineError: 'static>
+pub struct LegacyLib3h<Engine, EngineError: 'static>
 where
     Engine: GhostActor<
         Lib3hToClient,
@@ -23,9 +28,7 @@ where
         EngineError,
     >,
 {
-    engine: Detach<
-        GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Lib3hTrace, Engine, EngineError>,
-    >,
+    engine: Detach<GhostEngineParentWrapper<LegacyLib3h<Engine, EngineError>, Engine, EngineError>>,
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
@@ -55,12 +58,12 @@ fn server_success(request_id: String) -> Lib3hServerProtocol {
 impl<Engine: 'static, EngineError: 'static> LegacyLib3h<Engine, EngineError>
 where
     Engine: GhostActor<
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        EngineError,
-    >,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            EngineError,
+        > + CanAdvertise,
     EngineError: ToString,
 {
     pub fn new(name: &str, engine: Engine) -> Self {
@@ -105,7 +108,7 @@ where
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
-    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
+    pub fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         let request_id: String = match &client_msg {
             Lib3hClientProtocol::Connect(data) => &data.request_id,
             Lib3hClientProtocol::JoinSpace(data) => &data.request_id,
@@ -125,10 +128,10 @@ where
         .to_string();
 
         let result = if request_id == "" {
-            self.engine.publish(client_msg.into())
+            self.engine.publish(Lib3hSpan::todo(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hTrace,
+                Lib3hSpan::todo(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string()),
             )
@@ -138,7 +141,7 @@ where
 
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
-    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         detach_run!(&mut self.engine, |lib3h| lib3h.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
 
@@ -152,13 +155,21 @@ where
 
         Ok((responses.len() > 0, responses))
     }
+
+    pub fn advertise(&self) -> Url {
+        self.engine.as_ref().as_ref().advertise()
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::Lib3hTrace;
+    use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
     type EngineError = String;
@@ -176,7 +187,6 @@ mod tests {
         lib3h_endpoint: Detach<
             GhostContextEndpoint<
                 MockGhostEngine,
-                Lib3hTrace,
                 Lib3hToClient,
                 Lib3hToClientResponse,
                 ClientToLib3h,
@@ -184,6 +194,12 @@ mod tests {
                 EngineError,
             >,
         >,
+    }
+
+    impl CanAdvertise for MockGhostEngine {
+        fn advertise(&self) -> Url {
+            Url::parse("mem://fixme").unwrap()
+        }
     }
 
     impl MockGhostEngine {
@@ -261,7 +277,7 @@ mod tests {
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            let _ = self.lib3h_endpoint.publish(msg);
+            let _ = self.lib3h_endpoint.publish(Lib3hSpan::todo(), msg);
         }
     }
 

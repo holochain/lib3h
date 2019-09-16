@@ -1,15 +1,18 @@
 [workspace]
 
 members = [
+  "crates/zombie_actor",
   "crates/ghost_actor",
+  "crates/ghost_actor/ghost_actor_derive",
   "crates/crypto_api",
   "crates/sodium",
   "crates/lib3h_protocol",
   "crates/p2p_protocol",
   "crates/lib3h",
+  "crates/discovery",
   "crates/mdns",
   "crates/detach",
-  "crates/tools/half_busy_chat",
+  "crates/tools/sim_chat",
   "crates/tools/capnp_build",
   "crates/tools/dump_lib3h_protocol_as_json_for_n3h",
   "crates/tracing",

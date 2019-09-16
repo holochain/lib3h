@@ -1,9 +1,9 @@
 //! abstraction for working with Websocket connections
 //! TcpStream specific functions
 
-use crate::{
-    transport::error::TransportResult,
-    transport::websocket::{
+use crate::transport::{
+    error::TransportResult,
+    websocket::{
         Acceptor, Bind, ConnectionIdFactory, IdGenerator, TlsConfig, TransportWss, WssInfo,
     },
 };
