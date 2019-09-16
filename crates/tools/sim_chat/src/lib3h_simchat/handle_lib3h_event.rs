@@ -67,7 +67,12 @@ pub fn handle_and_convert_lib3h_event(
                 SimChatMessage::from_opaque(entry_aspect.aspect),
             );
 
-            // TODO: Update the gossip list
+            // Update the gossip list
+            state.gossip_list.insert(
+                &space_address,
+                &entry_address,
+                &entry_aspect.aspect_address,
+            );
 
             (
                 None,

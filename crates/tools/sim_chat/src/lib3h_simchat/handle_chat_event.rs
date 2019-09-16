@@ -159,11 +159,13 @@ pub fn handle_chat_event(
                     timestamp: current_timestamp(),
                 };
 
+                let entry_address = current_timeanchor();
+
                 let provided_entry_data = ProvidedEntryData {
-                    space_address: space_data.space_address,
+                    space_address: space_data.space_address.clone(),
                     provider_agent_id: space_data.agent_id,
                     entry: EntryData {
-                        entry_address: current_timeanchor(),
+                        entry_address: entry_address.clone(),
                         aspect_list: vec![EntryAspectData {
                             type_hint: String::from(""),
                             aspect: message.to_opaque(),
@@ -173,12 +175,14 @@ pub fn handle_chat_event(
                     },
                 };
 
+                // Update the author list with the message (assume it sends...)
+                state.author_list.insert(&space_data.space_address, &entry_address, &message.address());
+                
                 Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::PublishEntry(provided_entry_data),
                     Box::new(|_, _| Ok(())),
                 ))
 
-            // TODO: Update the author list
             } else {
                 send_sys_message(
                     chat_event_sender,

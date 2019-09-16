@@ -1,7 +1,8 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
-
-use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
+mod store;
+use store::{Store, StoreEntryList};
+use crate::simchat::{ChatEvent, SimChat};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
 use lib3h::{engine::CanAdvertise, error::Lib3hError};
@@ -25,63 +26,6 @@ use std::{
 use url::Url;
 
 type EngineBuilder<T> = fn(Vec<Url>) -> T;
-
-pub struct Store(HashMap<Address, HashMap<Address, HashMap<Address, SimChatMessage>>>); // space_address -> anchor_addres -> message_address
-
-impl Store {
-    pub fn new() -> Self {
-        Self(HashMap::new())
-    }
-
-    // pub fn get(
-    //     &self,
-    //     space_address: &Address,
-    //     base_address: &Address,
-    //     message_address: &Address,
-    // ) -> Option<&SimChatMessage> {
-    //     self.0
-    //         .get(&space_address)?
-    //         .get(&base_address)?
-    //         .get(&message_address)
-    // }
-
-    pub fn get_all_messages(
-        &self,
-        space_address: &Address,
-        base_address: &Address,
-    ) -> Option<MessageList> {
-        Some(MessageList(
-            self.0
-                .get(&space_address)?
-                .get(&base_address)?
-                .values()
-                .map(|s| s.clone())
-                .collect(),
-        ))
-    }
-
-    pub fn insert(
-        &mut self,
-        space_address: &Address,
-        base_address: &Address,
-        message_address: &Address,
-        message: SimChatMessage,
-    ) {
-        let mut space = self
-            .0
-            .get(space_address)
-            .map(|hm| hm.clone())
-            .unwrap_or_default();
-        let mut base = space
-            .get(base_address)
-            .map(|hm| hm.clone())
-            .unwrap_or_default();
-
-        base.insert(message_address.clone(), message);
-        space.insert(base_address.clone(), base.clone());
-        self.0.insert(space_address.clone(), space.clone());
-    }
-}
 
 pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
 
@@ -115,11 +59,11 @@ pub struct Lib3hSimChatState {
 
     /// Maintains a list of the entries and aspects authored by this agent
     /// space-address -> entry-address => aspect-address
-    author_list: HashMap<Address, HashMap<Address, Vec<Address>>>,
+    author_list: StoreEntryList,
 
     /// Similarly maintains a list of entries and aspects received via gossip
     /// Same indexing scheme
-    gossip_list: HashMap<Address, HashMap<Address, Vec<Address>>>,
+    gossip_list: StoreEntryList,
 }
 
 impl Lib3hSimChatState {
@@ -130,8 +74,8 @@ impl Lib3hSimChatState {
             spaces: HashMap::new(),
             store: Store::new(),
             displayed_channel_messages: Vec::new(),
-            author_list: HashMap::new(),
-            gossip_list: HashMap::new(),
+            author_list: StoreEntryList::new(),
+            gossip_list: StoreEntryList::new(),
         }
     }
 }
