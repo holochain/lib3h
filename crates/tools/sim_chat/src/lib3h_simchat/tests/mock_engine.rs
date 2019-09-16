@@ -1,4 +1,3 @@
-use url::Url;
 use detach::{detach_run, Detach};
 use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
 use lib3h_protocol::{
@@ -9,6 +8,7 @@ use lib3h_zombie_actor::{
     create_ghost_channel, GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint,
     GhostError, GhostResult, WorkWasDone,
 };
+use url::Url;
 
 /**
  *  This is an engine that exists purely for testing the SimChat actor.

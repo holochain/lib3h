@@ -148,7 +148,11 @@ impl Drop for Lib3hSimChat {
 }
 
 impl Lib3hSimChat {
-    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, bootstrap_urls: Vec<Url>) -> Self
+    pub fn new<T>(
+        engine_builder: EngineBuilder<T>,
+        mut handler: HandleEvent,
+        bootstrap_urls: Vec<Url>,
+    ) -> Self
     where
         T: GhostActor<
                 Lib3hToClient,
@@ -187,7 +191,11 @@ impl Lib3hSimChat {
 
                 // call connect to start the networking process
                 // (should probably wait for confirmation before continuing)
-                Self::connect(&mut parent_endpoint, Url::parse("ws://wft_is_this").unwrap(), internal_sender.clone());
+                Self::connect(
+                    &mut parent_endpoint,
+                    Url::parse("ws://wft_is_this").unwrap(),
+                    internal_sender.clone(),
+                );
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -216,12 +224,15 @@ impl Lib3hSimChat {
                                 }
                                 if let Some(chat_event) = maybe_chat_event {
                                     handler(&chat_event);
-                                    handle_chat_event(
+                                    if let Some((to_lib3h_event, callback)) = handle_chat_event(
                                         chat_event,
                                         &mut state,
-                                        &mut parent_endpoint,
                                         internal_sender.clone(),
-                                    );
+                                    ) {
+                                        parent_endpoint
+                                            .request(test_span(""), to_lib3h_event, callback)
+                                            .ok();
+                                    }
                                 }
                             }
                         });
@@ -234,12 +245,13 @@ impl Lib3hSimChat {
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
-                        handle_chat_event(
-                            chat_event,
-                            &mut state,
-                            &mut parent_endpoint,
-                            internal_sender.clone(),
-                        );
+                        if let Some((to_lib3h_event, callback)) =
+                            handle_chat_event(chat_event, &mut state, internal_sender.clone())
+                        {
+                            parent_endpoint
+                                .request(test_span(""), to_lib3h_event, callback)
+                                .ok();
+                        }
                     }
 
                     std::thread::sleep(std::time::Duration::from_millis(10));

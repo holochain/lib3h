@@ -1,29 +1,24 @@
-use super::{
-    channel_address_from_string, current_timeanchor, current_timestamp, Lib3hSimChatState,
-};
+use crate::lib3h_simchat::current_timeanchor;
+
+use super::{channel_address_from_string, current_timestamp, Lib3hSimChatState};
 use crate::simchat::{ChatEvent, MessageList, OpaqueConvertable, SimChatMessage};
 use lib3h::error::Lib3hError;
 use lib3h_protocol::{
     data_types::*,
-    protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
+    protocol::{ClientToLib3h, ClientToLib3hResponse},
     Address,
 };
-use lib3h_tracing::test_span;
-use lib3h_zombie_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
+
+use lib3h_zombie_actor::{GhostCallback, GhostCallbackData::Response};
 
 pub fn handle_chat_event(
     chat_event: ChatEvent,
     state: &mut Lib3hSimChatState,
-    parent_endpoint: &mut GhostContextEndpoint<
-        (),
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        Lib3hError,
-    >,
     chat_event_sender: crossbeam_channel::Sender<ChatEvent>,
-) {
+) -> Option<(
+    ClientToLib3h,
+    GhostCallback<(), ClientToLib3hResponse, Lib3hError>,
+)> {
     match chat_event {
         ChatEvent::Join {
             channel_id,
@@ -35,23 +30,20 @@ pub fn handle_chat_event(
                 request_id: "".to_string(),
                 space_address,
             };
-            parent_endpoint
-                .request(
-                    test_span(""),
-                    ClientToLib3h::JoinSpace(space_data.clone()),
-                    Box::new(move |_, callback_data| {
-                        if let Response(Ok(_payload)) = callback_data {
-                            chat_event_sender
-                                .send(ChatEvent::JoinSuccess {
-                                    channel_id: channel_id.clone(),
-                                    space_data: space_data.clone(),
-                                })
-                                .unwrap();
-                        }
-                        Ok(())
-                    }),
-                )
-                .unwrap();
+            Some((
+                ClientToLib3h::JoinSpace(space_data.clone()),
+                Box::new(move |_, callback_data| {
+                    if let Response(Ok(_payload)) = callback_data {
+                        chat_event_sender
+                            .send(ChatEvent::JoinSuccess {
+                                channel_id: channel_id.clone(),
+                                space_data: space_data.clone(),
+                            })
+                            .unwrap();
+                    }
+                    Ok(())
+                }),
+            ))
         }
 
         ChatEvent::JoinSuccess {
@@ -67,26 +59,25 @@ pub fn handle_chat_event(
                 chat_event_sender,
                 &format!("You joined the channel: {}", channel_id),
             );
+            None
         }
 
         ChatEvent::Part(channel_id) => {
             if let Some(space_data) = state.current_space.clone() {
-                parent_endpoint
-                    .request(
-                        test_span(""),
-                        ClientToLib3h::LeaveSpace(space_data.to_owned()),
-                        Box::new(move |_, callback_data| {
-                            if let Response(Ok(_payload)) = callback_data {
-                                chat_event_sender
-                                    .send(ChatEvent::PartSuccess(channel_id.clone()))
-                                    .unwrap();
-                            }
-                            Ok(())
-                        }),
-                    )
-                    .unwrap();
+                Some((
+                    ClientToLib3h::LeaveSpace(space_data.to_owned()),
+                    Box::new(move |_, callback_data| {
+                        if let Response(Ok(_payload)) = callback_data {
+                            chat_event_sender
+                                .send(ChatEvent::PartSuccess(channel_id.clone()))
+                                .unwrap();
+                        }
+                        Ok(())
+                    }),
+                ))
             } else {
                 send_sys_message(chat_event_sender, &"No channel to leave".to_string());
+                None
             }
         }
 
@@ -99,6 +90,7 @@ pub fn handle_chat_event(
                 chat_event_sender,
                 &format!("You left the channel: {}", channel_id).to_string(),
             );
+            None
         }
 
         ChatEvent::SendDirectMessage { to_agent, payload } => {
@@ -110,27 +102,16 @@ pub fn handle_chat_event(
                     space_address: space_data.space_address,
                     request_id: String::from(""),
                 };
-                parent_endpoint
-                    .request(
-                        test_span(""),
-                        ClientToLib3h::SendDirectMessage(direct_message_data),
-                        Box::new(|_, _callback_data| {
-                            // TODO: Track delivered state of message
-                            Ok(())
-                        }),
-                    )
-                    .map_err(|e| {
-                        send_sys_message(
-                            chat_event_sender,
-                            &format!("Lib3h returned error: {}", e).to_string(),
-                        );
-                    })
-                    .ok();
+                Some((
+                    ClientToLib3h::SendDirectMessage(direct_message_data),
+                    Box::new(|_, _| Ok(())),
+                ))
             } else {
                 send_sys_message(
                     chat_event_sender,
                     &"Must join a channel before sending a message".to_string(),
                 );
+                None
             }
         }
 
@@ -156,24 +137,18 @@ pub fn handle_chat_event(
                     },
                 };
 
-                parent_endpoint
-                    .request(
-                        test_span(""),
-                        ClientToLib3h::PublishEntry(provided_entry_data),
-                        Box::new(|_, _callback_data| {
-                            // TODO: Track delivered state of message
-                            Ok(())
-                        }),
-                    )
-                    .unwrap();
-                    
-                // TODO: Update the author list
+                Some((
+                    ClientToLib3h::PublishEntry(provided_entry_data),
+                    Box::new(|_, _| Ok(())),
+                ))
 
+            // TODO: Update the author list
             } else {
                 send_sys_message(
                     chat_event_sender,
                     &"Must join a channel before sending a message".to_string(),
                 );
+                None
             }
         }
         // TODO: Update to actually check a given time anchor
@@ -189,41 +164,41 @@ pub fn handle_chat_event(
                     space_address: space_data.space_address,
                     requester_agent_id: space_data.agent_id,
                 };
-                parent_endpoint
-                    .request(
-                        test_span(""),
-                        ClientToLib3h::QueryEntry(query_entry_data),
-                        Box::new(move |_, callback_data| {
-                            if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(
-                                query_result,
-                            ))) = callback_data
-                            {
-                                let messages = MessageList::from_opaque(query_result.query_result);
-                                for message in messages.0 {
-                                    // Only emit ReceiveChannelMessage once per time seeing a message
-                                    if !displayed_channel_messages.contains(&message.address()) {
-                                        chat_event_sender
-                                            .send(ChatEvent::ReceiveChannelMessage(message))
-                                            .ok();
-                                    }
+                return Some((
+                    ClientToLib3h::QueryEntry(query_entry_data),
+                    Box::new(move |_, callback_data| {
+                        if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(query_result))) =
+                            callback_data
+                        {
+                            let messages = MessageList::from_opaque(query_result.query_result);
+                            for message in messages.0 {
+                                // Only emit ReceiveChannelMessage once per time seeing a message
+                                if !displayed_channel_messages.contains(&message.address()) {
+                                    chat_event_sender
+                                        .send(ChatEvent::ReceiveChannelMessage(message))
+                                        .ok();
                                 }
                             }
-                            Ok(())
-                        }),
-                    )
-                    .unwrap();
+                        }
+                        Ok(())
+                    }),
+                ));
+            } else {
+                None
             }
         }
 
         ChatEvent::ReceiveChannelMessage(message) => {
             state.displayed_channel_messages.push(message.address());
+            None
         }
 
         ChatEvent::Connected => {
             state.connected = true;
+            None
         }
 
-        _ => {}
+        _ => None,
     }
 }
 
@@ -236,3 +211,9 @@ fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) 
         }))
         .expect("send fail");
 }
+
+// #[cfg(test)]
+// pub mod tests {
+//     #[test]
+//     fn
+// }

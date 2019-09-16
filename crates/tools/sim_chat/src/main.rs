@@ -25,7 +25,7 @@ use url::Url;
 #[structopt(name = "Lib3h SimChat", about = "A p2p, IRC style chat client")]
 struct Opt {
     /// URLs of nodes to use as bootstraps
-    #[structopt(short="b", long)]
+    #[structopt(short = "b", long)]
     bootstrap_nodes: Vec<Url>,
 }
 
