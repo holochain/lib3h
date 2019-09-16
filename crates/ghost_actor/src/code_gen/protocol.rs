@@ -443,27 +443,83 @@ fn render_targets(definition: &DefProtocol) -> TokenStream {
     let actor_handler_name = format_ident!("{}", definition.actor_handler_name);
     let owner_handler_name = format_ident!("{}", definition.owner_handler_name);
 
+    let mut actor_fns = Vec::new();
+    let mut owner_fns = Vec::new();
+
+    for (_, item) in definition.items.iter() {
+        match item {
+            DefType::Event(evt) => {
+                let name = format_ident!("{}", evt.evt_id);
+                let evt_type = &evt.evt_type;
+                let enum_name = format_ident!("{}", evt.evt_name);
+                let func = quote! {
+                    fn #name(&mut self, message: #evt_type) -> ::ghost_actor::GhostResult<()> {
+                        self.send_protocol(#protocol_name::#enum_name(message), None)
+                    }
+                };
+                if evt.is_actor {
+                    actor_fns.push(func);
+                } else {
+                    owner_fns.push(func);
+                }
+            }
+            DefType::Request(req) => {
+                let name = format_ident!("{}", req.req_id);
+                let req_type = &req.req_type;
+                let res_type = &req.res_type;
+                let enum_name = format_ident!("{}", req.req_name);
+                let res_enum_name = format_ident!("{}", req.res_name);
+                let func = quote! {
+                    fn #name(&mut self, message: #req_type, cb: ::ghost_actor::GhostResponseCb<'lt, X, #res_type>) -> ::ghost_actor::GhostResult<()> {
+                        let cb: ::ghost_actor::GhostResponseCb<'lt, X, #protocol_name> = Box::new(move |x, res| {
+                            let res = match res {
+                                Ok(res) => {
+                                    match res {
+                                        #protocol_name::#res_enum_name(message) => {
+                                            Ok(message)
+                                        }
+                                        _ => Err(format!("bad type: {:?}", res).into())
+                                    }
+                                }
+                                Err(e) => Err(e),
+                            };
+                            cb(x, res)
+                        });
+                        self.send_protocol(#protocol_name::#enum_name(message), Some(cb))
+                    }
+                };
+                if req.is_actor {
+                    actor_fns.push(func);
+                } else {
+                    owner_fns.push(func);
+                }
+            }
+        }
+    }
+
     quote! {
         ///trait indicating you can send events and requests to this actor target
-        pub trait #actor_name<'lt> {
+        pub trait #actor_name<'lt, X: 'lt> {
+            #(#actor_fns)*
             ///implement this to forward messages
-            fn send_protocol(&mut self, request_id: String, message: #protocol_name) -> ::ghost_actor::GhostResult<()>;
+            fn send_protocol<'a>(&'a mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostResponseCb<'lt, X, #protocol_name>>) -> ::ghost_actor::GhostResult<()>;
         }
 
         ///if you hold the owning endpoint, you should also handle incoming messages
-        pub trait #actor_handle_name<'lt>: #actor_name<'lt> {
+        pub trait #actor_handle_name<'lt, X: 'lt>: #actor_name<'lt, X> {
             ///call this to handle incoming messages
             fn handle<'a, H: #actor_handler_name<'a>>(&mut self, handler: &'a mut H) -> ::ghost_actor::GhostResult<()>;
         }
 
         ///trait indicating you can send events and requests to this owner target
-        pub trait #owner_name<'lt> {
+        pub trait #owner_name<'lt, X: 'lt> {
+            #(#owner_fns)*
             ///implement this to forward messages
-            fn send_protocol(&mut self, request_id: String, message: #protocol_name) -> ::ghost_actor::GhostResult<()>;
+            fn send_protocol<'a>(&'a mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostResponseCb<'lt, X, #protocol_name>>) -> ::ghost_actor::GhostResult<()>;
         }
 
         ///if you hold the owning endpoint, you should also handle incoming messages
-        pub trait #owner_handle_name<'lt>: #owner_name<'lt> {
+        pub trait #owner_handle_name<'lt, X: 'lt>: #owner_name<'lt, X> {
             ///call this to handle incoming messages
             fn handle<'a, H: #owner_handler_name<'a>>(&mut self, handler: &'a mut H) -> ::ghost_actor::GhostResult<()>;
         }
