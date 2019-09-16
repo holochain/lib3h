@@ -2,9 +2,8 @@ use detach::{detach_run, Detach};
 use lib3h::{engine::CanAdvertise, error::Lib3hError};
 
 use lib3h::engine::engine_actor::ClientToLib3hMessage;
-use lib3h_protocol::{
-    data_types::ConnectedData,
-    protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
+use lib3h_protocol::protocol::{
+    ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse,
 };
 use lib3h_zombie_actor::{
     create_ghost_channel, GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint,
@@ -83,7 +82,7 @@ impl
 }
 
 impl MockEngine<'_> {
-    pub fn new(_dummy: Vec<Url>) -> Self {
+    pub fn new() -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {
             client_endpoint: Some(endpoint_parent),
@@ -107,12 +106,7 @@ impl MockEngine<'_> {
     /// Process any Client events or requests
     fn handle_msg_from_client(&mut self, mut msg: ClientToLib3hMessage) -> Result<(), GhostError> {
         match msg.take_message().expect("exists") {
-            ClientToLib3h::Connect(data) => {
-                msg.respond(Ok(ClientToLib3hResponse::ConnectResult(ConnectedData {
-                    request_id: data.request_id,
-                    uri: data.peer_uri,
-                })))
-            }
+            ClientToLib3h::Bootstrap(_) => msg.respond(Ok(ClientToLib3hResponse::BootstrapSuccess)),
             ClientToLib3h::JoinSpace(_data) => {
                 msg.respond(Ok(ClientToLib3hResponse::JoinSpaceResult))
             }

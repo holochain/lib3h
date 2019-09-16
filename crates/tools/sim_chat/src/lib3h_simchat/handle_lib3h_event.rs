@@ -87,6 +87,11 @@ pub fn handle_and_convert_lib3h_event(
             None,
         ),
 
+        Lib3hToClient::Connected(_) => {
+            state.connected = true;
+            (Some(ChatEvent::Connected), None)
+        }
+
         Lib3hToClient::Disconnected(_) => {
             state.connected = false;
             (Some(ChatEvent::Disconnected), None)

@@ -1,6 +1,6 @@
 use lib3h_tracing::test_span;
 
-use crate::lib3h_simchat::current_timeanchor;
+use crate::lib3h_simchat::{current_timeanchor, send_sys_message};
 use lib3h_protocol::protocol::{Lib3hToClient, Lib3hToClientResponse};
 
 use super::{channel_address_from_string, current_timestamp, Lib3hSimChatState};
@@ -251,16 +251,6 @@ pub fn handle_chat_event(
 
         _ => None,
     }
-}
-
-fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
-    sender
-        .send(ChatEvent::ReceiveDirectMessage(SimChatMessage {
-            from_agent: String::from("sys"),
-            payload: String::from(msg),
-            timestamp: current_timestamp(),
-        }))
-        .expect("send fail");
 }
 
 #[cfg(test)]

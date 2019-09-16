@@ -1,19 +1,23 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 mod store;
-use crate::simchat::{ChatEvent, SimChat};
+
+use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
 use lib3h::{engine::CanAdvertise, error::Lib3hError};
 use lib3h_crypto_api::CryptoError;
 use lib3h_protocol::{
-    data_types::{ConnectData, SpaceData},
+    data_types::{BootstrapData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
 use lib3h_tracing::test_span;
-use lib3h_zombie_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
+// use lib3h_tracing::test_span;
+use lib3h_zombie_actor::{
+    GhostActor, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint,
+};
 use store::{Store, StoreEntryList};
 
 use std::{
@@ -25,7 +29,7 @@ use std::{
 };
 use url::Url;
 
-type EngineBuilder<T> = fn(Vec<Url>) -> T;
+type EngineBuilder<T> = fn() -> T;
 
 pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
 
@@ -94,7 +98,7 @@ impl Lib3hSimChat {
     pub fn new<T>(
         engine_builder: EngineBuilder<T>,
         mut handler: HandleEvent,
-        bootstrap_urls: Vec<Url>,
+        bootstrap_uris: Vec<Url>,
     ) -> Self
     where
         T: GhostActor<
@@ -121,7 +125,7 @@ impl Lib3hSimChat {
                 // this thread owns the ghost engine instance
                 // and is responsible for calling process
                 // and handling messages
-                let mut engine = engine_builder(bootstrap_urls);
+                let mut engine = engine_builder();
 
                 println!("Engine initialized with peer URI: {}", engine.advertise());
 
@@ -135,13 +139,10 @@ impl Lib3hSimChat {
                 // also keep track of things like the spaces and current space in this scope
                 let mut state = Lib3hSimChatState::new();
 
-                // call connect to start the networking process
-                // (should probably wait for confirmation before continuing)
-                Self::connect(
-                    &mut parent_endpoint,
-                    Url::parse("ws://wft_is_this").unwrap(),
-                    internal_sender.clone(),
-                );
+                // If any bootstrap nodes were provided try and use them
+                for peer_uri in bootstrap_uris {
+                    Self::bootstrap(peer_uri, internal_sender.clone(), &mut parent_endpoint);
+                }
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -205,8 +206,12 @@ impl Lib3hSimChat {
         }
     }
 
-    fn connect(
-        endpoint: &mut GhostContextEndpoint<
+    /// Uses n3h to try and bootstrap via the given URI
+    /// This will trigger a sys message on dispatch and success
+    fn bootstrap(
+        bootstrap_uri: Url,
+        chat_message_sender: crossbeam_channel::Sender<ChatEvent>,
+        parent_endpoint: &mut GhostContextEndpoint<
             (),
             ClientToLib3h,
             ClientToLib3hResponse,
@@ -214,27 +219,34 @@ impl Lib3hSimChat {
             Lib3hToClientResponse,
             Lib3hError,
         >,
-        peer_uri: Url,
-        chat_event_sender: crossbeam_channel::Sender<ChatEvent>,
     ) {
-        let connect_message = ClientToLib3h::Connect(ConnectData {
-            network_id: String::from(""), // connect to any
-            peer_uri,
-            request_id: String::from("connect-request"),
-        });
-        endpoint
+        let boostrap_data = BootstrapData {
+            bootstrap_uri: bootstrap_uri.clone(),
+            space_address: Address::from(""), // This will have to change eventually
+        };
+
+        let local_sender = chat_message_sender.clone();
+
+        send_sys_message(
+            local_sender.clone(),
+            &format!("Attempting to boostrap via {}", bootstrap_uri),
+        );
+
+        parent_endpoint
             .request(
                 test_span(""),
-                connect_message,
-                Box::new(move |_, _callback_data| {
-                    chat_event_sender
-                        .send(ChatEvent::Connected)
-                        .expect("Could not send");
-                    // println!("chat received response from engine: {:?}", callback_data);
+                ClientToLib3h::Bootstrap(boostrap_data),
+                Box::new(move |_, callback_data| {
+                    if let Response(Ok(ClientToLib3hResponse::BootstrapSuccess)) = callback_data {
+                        send_sys_message(
+                            local_sender,
+                            &format!("Bootstrap success via {}", bootstrap_uri),
+                        );
+                    }
                     Ok(())
                 }),
             )
-            .unwrap();
+            .ok();
     }
 }
 
@@ -242,6 +254,16 @@ impl SimChat for Lib3hSimChat {
     fn send(&mut self, event: ChatEvent) {
         self.out_send.send(event).expect("send fail");
     }
+}
+
+pub fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
+    sender
+        .send(ChatEvent::ReceiveDirectMessage(SimChatMessage {
+            from_agent: String::from("sys"),
+            payload: String::from(msg),
+            timestamp: current_timestamp(),
+        }))
+        .expect("send fail");
 }
 
 pub fn channel_address_from_string(channel_id: &String) -> Result<Address, CryptoError> {
@@ -278,11 +300,7 @@ mod tests {
     use crate::simchat::SimChatMessage;
 
     fn new_sim_chat_mock_engine(callback: HandleEvent) -> Lib3hSimChat {
-        Lib3hSimChat::new(
-            mock_engine::MockEngine::new,
-            callback,
-            vec![Url::parse("http://test.boostrap").unwrap()],
-        )
+        Lib3hSimChat::new(mock_engine::MockEngine::new, callback, vec![])
     }
 
     /*----------  example messages  ----------*/
@@ -292,10 +310,6 @@ mod tests {
             to_agent: "addr".to_string(),
             payload: "yo".to_string(),
         }
-    }
-
-    fn connected_event() -> ChatEvent {
-        ChatEvent::Connected
     }
 
     fn receive_sys_message(payload: String) -> ChatEvent {
@@ -360,11 +374,8 @@ mod tests {
 
         chat.send(join_event());
 
-        let chat_messages = r.iter().take(3).collect::<Vec<_>>();
-        assert_eq!(
-            chat_messages,
-            vec![join_event(), connected_event(), join_success_event(),],
-        );
+        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
+        assert_eq!(chat_messages, vec![join_event(), join_success_event(),],);
     }
 
     #[test]
@@ -376,13 +387,12 @@ mod tests {
 
         chat.send(part_event());
 
-        let chat_messages = r.iter().take(3).collect::<Vec<_>>();
+        let chat_messages = r.iter().take(2).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
             vec![
                 part_event(),
                 receive_sys_message("No channel to leave".to_string()),
-                connected_event(),
             ],
         );
     }
@@ -398,12 +408,11 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(part_event());
 
-        let chat_messages = r.iter().take(6).collect::<Vec<_>>();
+        let chat_messages = r.iter().take(5).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
             vec![
                 join_event(),
-                connected_event(),
                 join_success_event(),
                 receive_sys_message("You joined the channel: test_channel".to_string()),
                 part_event(),
@@ -444,12 +453,11 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(100)); // find a better way
         chat.send(chat_event());
 
-        let chat_messages = r.iter().take(5).collect::<Vec<_>>();
+        let chat_messages = r.iter().take(4).collect::<Vec<_>>();
         assert_eq!(
             chat_messages,
             vec![
                 join_event(),
-                connected_event(),
                 join_success_event(),
                 receive_sys_message("You joined the channel: test_channel".to_string()),
                 chat_event(),

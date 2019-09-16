@@ -32,11 +32,11 @@ struct Opt {
     bootstrap_nodes: Vec<Url>,
 }
 
-fn engine_builder(boostrap_urls: Vec<Url>) -> GhostEngine<'static> {
+fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
         socket_type: "mem".into(),
-        bootstrap_nodes: boostrap_urls,
+        bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
