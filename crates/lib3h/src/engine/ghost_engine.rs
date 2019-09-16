@@ -196,16 +196,10 @@ impl<'engine> GhostEngine<'engine> {
     fn priv_connect_bootstraps(&mut self) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
-            let data = ConnectData {
-                request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
-                peer_uri: bs,
-                network_id: "".to_string(), // unimplemented
-            };
-
-            // can't use handle_connect() because it assumes a message to respond to
+            // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Transport(
                 transport::protocol::RequestToChild::SendMessage {
-                    uri: data.peer_uri,
+                    uri: bs,
                     payload: Opaque::new(),
                 },
             );
@@ -262,26 +256,19 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Process connect events by sending them to the multiplexer
-    fn handle_connect(&mut self, msg: ClientToLib3hMessage, data: ConnectData) -> GhostResult<()> {
-        let cmd =
-            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: data.peer_uri.clone(),
-                payload: Opaque::new(),
-            });
+    fn handle_bootstrap(
+        &mut self,
+        msg: ClientToLib3hMessage,
+        data: BootstrapData,
+    ) -> GhostResult<()> {
         self.multiplexer.request(
             Lib3hSpan::todo(),
-            cmd,
+            GatewayRequestToChild::Bootstrap(data),
             Box::new(move |_me, response| {
                 match response {
-                    GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
-                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
-                    ))) => {
-                        let response_data = ConnectedData {
-                            request_id: data.request_id,
-                            uri: data.peer_uri,
-                        };
-                        msg.respond(Ok(ClientToLib3hResponse::ConnectResult(response_data)))?
-                    }
+                    GhostCallbackData::Response(Ok(
+                        GatewayRequestToChildResponse::BootstrapSuccess,
+                    )) => msg.respond(Ok(ClientToLib3hResponse::BootstrapSuccess))?,
                     GhostCallbackData::Response(Err(e)) => {
                         error!("Got error from connect to gateway: {:?} ", e);
                     }
@@ -301,9 +288,9 @@ impl<'engine> GhostEngine<'engine> {
         mut msg: ClientToLib3hMessage,
     ) -> GhostResult<()> {
         match msg.take_message().expect("exists") {
-            ClientToLib3h::Connect(data) => {
+            ClientToLib3h::Bootstrap(data) => {
                 trace!("ClientToLib3h::Connect: {:?}", &data);
-                self.handle_connect(msg, data)
+                self.handle_bootstrap(msg, data)
             }
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);

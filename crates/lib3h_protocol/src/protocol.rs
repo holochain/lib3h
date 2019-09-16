@@ -1,6 +1,8 @@
 use crate::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
 };
+use url::Url;
+
 /// Enum holding the message types describe the lib3h protocol.
 /// There are 4 categories of messages:
 ///  - ClientToLib3h: A request or event sent from the user/client of lib3h
@@ -14,8 +16,8 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ClientToLib3h {
     // -- Connection -- //
-    /// Connect to the specified multiaddr
-    Connect(ConnectData),
+    /// create an explicit connection to a remote peer
+    Bootstrap(BootstrapData),
 
     // -- Space -- //
     /// Order the engine to be part of the network of the specified space.
@@ -40,6 +42,9 @@ pub enum ClientToLib3h {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ClientToLib3hResponse {
+    /// we were able to bootstrap to the remote
+    BootstrapSuccess,
+
     /// the response received from a previous `SendDirectMessage`
     SendDirectMessageResult(DirectMessageData),
 
@@ -47,9 +52,6 @@ pub enum ClientToLib3hResponse {
     FetchEntryResult(FetchEntryResultData),
     /// Response to a `QueryEntry` request
     QueryEntryResult(QueryEntryResultData),
-
-    /// Notification of successful connection to a network
-    ConnectResult(ConnectedData), // response to the ClientToLib3h::Connect() request
 
     JoinSpaceResult,  // response to the ClientToLib3h::JoinSpace() request, Ok or Err
     LeaveSpaceResult, // response to the ClientToLib3h::LeaveSpace() request, Ok or Err
@@ -103,7 +105,10 @@ pub enum Lib3hToClientResponse {
 impl From<Lib3hClientProtocol> for ClientToLib3h {
     fn from(c: Lib3hClientProtocol) -> Self {
         match c {
-            Lib3hClientProtocol::Connect(connect_data) => ClientToLib3h::Connect(connect_data),
+            Lib3hClientProtocol::Connect(connect_data) => ClientToLib3h::Bootstrap(BootstrapData {
+                space_address: connect_data.network_id.into(),
+                bootstrap_uri: connect_data.peer_uri,
+            }),
             Lib3hClientProtocol::JoinSpace(space_data) => ClientToLib3h::JoinSpace(space_data),
             Lib3hClientProtocol::LeaveSpace(space_data) => ClientToLib3h::LeaveSpace(space_data),
             Lib3hClientProtocol::SendDirectMessage(direct_message_data) => {
@@ -201,8 +206,8 @@ impl From<Lib3hServerProtocol> for ClientToLib3hResponse {
             Lib3hServerProtocol::QueryEntryResult(query_entry_result_data) => {
                 ClientToLib3hResponse::QueryEntryResult(query_entry_result_data)
             }
-            Lib3hServerProtocol::Connected(connected_data) => {
-                ClientToLib3hResponse::ConnectResult(connected_data)
+            Lib3hServerProtocol::Connected(_connected_data) => {
+                ClientToLib3hResponse::BootstrapSuccess
             }
             variant => panic!("{:?} can't convert to ClientToLib3hResponse", variant),
         }
@@ -212,7 +217,11 @@ impl From<Lib3hServerProtocol> for ClientToLib3hResponse {
 impl From<ClientToLib3h> for Lib3hClientProtocol {
     fn from(c: ClientToLib3h) -> Self {
         match c {
-            ClientToLib3h::Connect(connect_data) => Lib3hClientProtocol::Connect(connect_data),
+            ClientToLib3h::Bootstrap(bootstrap_data) => Lib3hClientProtocol::Connect(ConnectData {
+                request_id: "".to_string(),
+                peer_uri: bootstrap_data.bootstrap_uri,
+                network_id: bootstrap_data.space_address.into(),
+            }),
             ClientToLib3h::JoinSpace(space_data) => Lib3hClientProtocol::JoinSpace(space_data),
             ClientToLib3h::LeaveSpace(space_data) => Lib3hClientProtocol::LeaveSpace(space_data),
             ClientToLib3h::SendDirectMessage(direct_message_data) => {
@@ -307,8 +316,11 @@ impl From<ClientToLib3hResponse> for Lib3hServerProtocol {
             ClientToLib3hResponse::QueryEntryResult(query_entry_result_data) => {
                 Lib3hServerProtocol::QueryEntryResult(query_entry_result_data)
             }
-            ClientToLib3hResponse::ConnectResult(connected_data) => {
-                Lib3hServerProtocol::Connected(connected_data)
+            ClientToLib3hResponse::BootstrapSuccess => {
+                Lib3hServerProtocol::Connected(ConnectedData {
+                    request_id: "".to_string(),
+                    uri: Url::parse("none:").unwrap(),
+                })
             }
             variant => panic!("{:?} can't convert to Lib3hServerProtocol", variant),
         }

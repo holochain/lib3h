@@ -262,7 +262,7 @@ mod tests {
             mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
         ) -> Result<(), EngineError> {
             let result = match msg.take_message().expect("exists") {
-                ClientToLib3h::Connect(_data) => {
+                ClientToLib3h::Bootstrap(_data) => {
                     // pretend the connection request failed
                     msg.respond(Err("connection failed!".to_string()))
                 }

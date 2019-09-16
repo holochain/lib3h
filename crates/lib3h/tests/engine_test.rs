@@ -146,7 +146,6 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 //--------------------------------------------------------------------------------------------------
 
 #[test]
-#[ignore]
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
