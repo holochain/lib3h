@@ -534,7 +534,10 @@ impl<'engine> GhostEngine<'engine> {
             space_gateway
                 .publish(
                     Lib3hSpan::todo(),
-                    GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(shallow_entry)))
+                    GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
+                        shallow_entry,
+                    )),
+                )
                 .map_err(|e| Lib3hError::new_other(&e.to_string()))?;
         }
         Ok(())
