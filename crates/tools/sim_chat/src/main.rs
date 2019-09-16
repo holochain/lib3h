@@ -45,7 +45,6 @@ fn engine_builder() -> GhostEngine<'static> {
     .unwrap()
 }
 
-/// TODO: include way to break this loop
 fn run_reporter_thread(span_rx: SpanReceiver) {
     thread::spawn(move || {
         let reporter = Reporter::new("sim_chat").unwrap();
@@ -142,7 +141,7 @@ lib3h simchat Commands:
 
     help_text();
 
-    // matches commands beginnign with / and captures the command name and the args
+    // matches commands beginning with / and captures the command name and the args
     let command_matcher = Regex::new(r"^/([a-z]+)\s?(.*)$").expect("This is a valid regex");
 
     loop {
