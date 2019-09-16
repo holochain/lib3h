@@ -23,6 +23,9 @@ pub type GhostResponseCb<'lt, X, T> =
 mod ghost_protocol;
 pub use ghost_protocol::*;
 
+mod ghost_system;
+pub use ghost_system::*;
+
 pub mod code_gen;
 
 pub mod prelude {
