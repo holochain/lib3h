@@ -363,7 +363,8 @@ macro_rules! wait_did_work {
             if elapsed > $timeout {
                 break;
             }
-            trace!("[{}] wait_did_work", i)
+            trace!("[{}] wait_did_work", i);
+            std::thread::sleep(std::time::Duration::from_millis(1))
         }
         if $should_abort {
             assert!(did_work);
