@@ -76,3 +76,9 @@ impl<T> From<crossbeam_channel::SendError<T>> for GhostError {
         GhostError::new(ErrorKind::Other(format!("{:?}", e)))
     }
 }
+
+impl From<crossbeam_channel::TryRecvError> for GhostError {
+    fn from(e: crossbeam_channel::TryRecvError) -> Self {
+        GhostError::new(ErrorKind::Other(format!("{:?}", e)))
+    }
+}
