@@ -180,10 +180,13 @@ impl
         for event in stream_events {
             match event {
                 StreamEvent::ErrorOccured(connection_id, error) => {
-                    let uri = self.streams.connection_id_to_url(connection_id).unwrap_or(
-                        Url::from_str("wss://0.0.0.0")
-                            .expect("URL literal is syntactically correct"),
-                    );
+                    let uri = self
+                        .streams
+                        .connection_id_to_url(connection_id)
+                        .unwrap_or_else(|| {
+                            Url::from_str("wss://0.0.0.0")
+                                .expect("URL literal is syntactically correct")
+                        });
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                     endpoint_self.as_mut().expect("exists").publish(
                         Lib3hSpan::todo(),
