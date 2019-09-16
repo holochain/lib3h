@@ -333,6 +333,7 @@ macro_rules! assert_callback_processed {
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort
 /// is true
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_did_work {
     ($ghost_actor: ident,
      $should_abort: expr

@@ -11,6 +11,9 @@ extern crate shrinkwraprs;
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+pub mod ghost_test_harness;
+
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct WorkWasDone(pub bool);
@@ -85,8 +88,6 @@ pub mod prelude {
         GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
-
-pub mod ghost_test_harness;
 
 #[cfg(test)]
 mod tests {
