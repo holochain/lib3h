@@ -14,7 +14,6 @@ extern crate log;
 #[macro_use]
 pub mod ghost_test_harness;
 
-
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct WorkWasDone(pub bool);

@@ -53,8 +53,7 @@ where
 {
 }
 
-impl<Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>>
-    for dyn AssertEquals<Cb, E, T>
+impl<Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>> for dyn AssertEquals<Cb, E, T>
 where
     T: PartialEq + std::fmt::Debug,
 {
@@ -257,7 +256,7 @@ macro_rules! process_one {
                 if result {
                     // Simulate the succesful assertion behavior
                     processor.test(&processor_result.clone());
-                    // processor passed!
+                // processor passed!
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing
@@ -338,7 +337,19 @@ macro_rules! wait_did_work {
     ($ghost_actor: ident,
      $should_abort: expr
     ) => {{
+        let timeout = std::time::Duration::from_millis(2000);
+        wait_did_work!($ghost_actor, $should_abort, timeout)
+    }};
+    ($ghost_actor:ident) => {
+        wait_did_work!($ghost_actor, true)
+    };
+    ($ghost_actor: ident,
+     $should_abort: expr,
+     $timeout : expr
+      ) => {{
         let mut did_work = false;
+        let clock = std::time::SystemTime::now();
+
         for i in 0..20 {
             did_work = $ghost_actor
                 .process()
@@ -348,6 +359,10 @@ macro_rules! wait_did_work {
             if did_work {
                 break;
             }
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > $timeout {
+                break;
+            }
             trace!("[{}] wait_did_work", i)
         }
         if $should_abort {
@@ -355,9 +370,6 @@ macro_rules! wait_did_work {
         }
         did_work
     }};
-    ($ghost_actor:ident) => {
-        wait_did_work!($ghost_actor, true)
-    };
 }
 
 /// Waits until a GhostCanTrack process has been invoked and work was done.
@@ -423,16 +435,19 @@ mod tests {
     use crate::{GhostResult, WorkWasDone};
 
     #[derive(Debug, Clone, PartialEq)]
-    struct DidWorkActor(u8);
+    struct DidWorkActor(i8);
 
     /// Minimal actor stub that considers work done until counter reaches zero
     impl DidWorkActor {
         pub fn process(&mut self) -> GhostResult<WorkWasDone> {
-            if self.0 <= 0 {
+            if self.0 == 0 {
                 Ok(false.into())
-            } else {
+            } else if self.0 > 0 {
                 self.0 -= 1;
                 Ok(true.into())
+            } else {
+                self.0 += 1;
+                Ok(false.into())
             }
         }
     }
@@ -451,6 +466,15 @@ mod tests {
         wait_did_work!(actor);
 
         assert_eq!(false, wait_did_work!(actor, false));
+    }
+
+    #[test]
+    fn test_wait_did_work_timeout() {
+        let actor = &mut DidWorkActor(-1);
+
+        let timeout = std::time::Duration::from_millis(0);
+        let did_work: bool = wait_did_work!(actor, false, timeout);
+        assert_eq!(false, did_work);
     }
 
     #[test]
@@ -482,9 +506,8 @@ mod tests {
 
     #[test]
     fn test_callback_equals_as_processor_trait() {
-        let callback_equals :
-            CallbackDataEquals<String, _> = CallbackDataEquals("abc".into(), std::marker::PhantomData);
-        let _as_processor : Box<dyn Processor<String, String>> =
-            Box::new(callback_equals);
+        let callback_equals: CallbackDataEquals<String, _> =
+            CallbackDataEquals("abc".into(), std::marker::PhantomData);
+        let _as_processor: Box<dyn Processor<String, String>> = Box::new(callback_equals);
     }
 }
