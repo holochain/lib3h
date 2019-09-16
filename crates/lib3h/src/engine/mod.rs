@@ -1,3 +1,4 @@
+pub mod engine_actor;
 pub mod ghost_engine;
 pub mod ghost_engine_wrapper;
 mod network_layer;
@@ -6,7 +7,7 @@ mod space_layer;
 
 use crate::{
     dht::dht_protocol::*,
-    error::Lib3hError,
+    error::*,
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
     transport::TransportMultiplex,
@@ -90,22 +91,34 @@ pub struct TransportKeys {
     /// The TransportId secret key
     pub transport_secret_key: Box<dyn Buffer>,
 }
+impl TransportKeys {
+    pub fn new(crypto: &dyn CryptoSystem) -> Lib3hResult<Self> {
+        let hcm0 = hcid::HcidEncoding::with_kind("hcm0")?;
+        let mut public_key: Box<dyn Buffer> = Box::new(vec![0; crypto.sign_public_key_bytes()]);
+        let mut secret_key = crypto.buf_new_secure(crypto.sign_secret_key_bytes());
+        crypto.sign_keypair(&mut public_key, &mut secret_key)?;
+        Ok(Self {
+            transport_id: hcm0.encode(&public_key)?,
+            transport_public_key: public_key,
+            transport_secret_key: secret_key,
+        })
+    }
+}
 
 pub trait CanAdvertise {
     fn advertise(&self) -> Url;
 }
 
-#[allow(dead_code)]
 pub struct GhostEngine<'engine> {
     /// Identifier
     name: String,
-    /// Config setting
+    /// Config settings
     config: EngineConfig,
-    /// Factory for building DHT's of type D
+    /// Factory for building the DHTs used by the gateways
     dht_factory: DhtFactory,
     /// Tracking request_id's sent to core
     request_track: Tracker<RealEngineTrackerData>,
-    /// P2p gateway for the network layer
+    /// Multiplexer holding the network gateway
     multiplexer: Detach<GatewayParentWrapper<GhostEngine<'engine>, TransportMultiplex<P2pGateway>>>,
     /// Cached this_peer of the multiplexer
     this_net_peer: PeerData,
@@ -121,8 +134,6 @@ pub struct GhostEngine<'engine> {
     #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
     transport_keys: TransportKeys,
-    /// debug: count number of calls to process()
-    process_count: u64,
 
     client_endpoint: Option<
         GhostEndpoint<

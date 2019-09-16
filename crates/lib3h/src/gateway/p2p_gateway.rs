@@ -61,10 +61,3 @@ impl P2pGateway {
         self.this_peer.clone()
     }
 }
-//
-//impl P2pGateway {
-//    // FIXME
-//    pub fn drain_dht_outbox(&mut self) -> Vec<Lib3hServerProtocol> {
-//        self.user_data.lib3h_outbox.drain(0..).collect()
-//    }
-//}

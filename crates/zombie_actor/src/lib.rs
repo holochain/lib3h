@@ -27,6 +27,12 @@ impl From<WorkWasDone> for bool {
     }
 }
 
+impl WorkWasDone {
+    pub fn or(&self, w: WorkWasDone) -> WorkWasDone {
+        WorkWasDone(w.0 || self.0)
+    }
+}
+
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct RequestId(pub String);
@@ -79,6 +85,8 @@ pub mod prelude {
         GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
+
+pub mod ghost_test_harness;
 
 #[cfg(test)]
 mod tests {
