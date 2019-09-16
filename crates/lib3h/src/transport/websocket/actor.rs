@@ -235,10 +235,21 @@ mod tests {
     use lib3h_ghost_actor::{wait_for_message};
     use regex::Regex;
     use url::Url;
-    use std::{thread, time};
+    use std::{net::TcpListener, thread, time};
+
+    fn port_is_available(port: u16) -> bool {
+        match TcpListener::bind(("127.0.0.1", port)) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+
+    fn get_available_port() -> Option<u16> {
+        (1025..65535).find(|port| port_is_available(*port))
+    }
 
     #[test]
-    fn test_ghost_websocket_transport() {
+    fn test_websocket_transport() {
         let mut transport1 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
@@ -259,34 +270,43 @@ mod tests {
         assert_eq!(transport1.bound_url, None);
         assert_eq!(transport2.bound_url, None);
 
-        let expected_transport1_address = Url::parse("wss://127.0.0.1:22888").unwrap();
+        let port1 = get_available_port().expect("Must be able to find free port");
+        let expected_transport1_address = Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
                 Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
-                Box::new(|_: &mut (), r| {
+                Box::new(move |_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://127.0.0.1:22888/\" })))",
-                        &format!("{:?}", r)
+                        format!(
+                            "Response(Ok(Bind(BindResultData {{ bound_url: \"wss://127.0.0.1:{}/\" }})))",
+                            port1.clone(),
+                        ),
+                        format!("{:?}", r)
                     );
                     Ok(())
                 }),
             )
             .unwrap();
-        let expected_transport2_address = Url::parse("wss://127.0.0.1:22889").unwrap();
+
+        let port2 = get_available_port().expect("Must be able to find free port");
+        let expected_transport2_address = Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
             .request(
                 Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: expected_transport2_address.clone(),
                 },
-                Box::new(|_: &mut (), r| {
+                Box::new(move |_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://127.0.0.1:22889/\" })))",
+                        &format!(
+                            "Response(Ok(Bind(BindResultData {{ bound_url: \"wss://127.0.0.1:{}/\" }})))",
+                            port2.clone(),
+                        ),
                         &format!("{:?}", r)
                     );
                     Ok(())
