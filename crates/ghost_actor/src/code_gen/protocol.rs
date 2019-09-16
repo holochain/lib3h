@@ -4,7 +4,7 @@ use quote::ToTokens;
 
 use std::collections::BTreeMap;
 
-use crate::prelude::*;
+use crate::*;
 
 #[derive(Debug)]
 struct DefEvent {
@@ -40,6 +40,7 @@ enum DefType {
 
 #[derive(Debug)]
 struct DefProtocol {
+    pub root: TokenStream,
     pub short_prefix: String,
     pub tall_prefix: String,
     pub scream_prefix: String,
@@ -127,6 +128,7 @@ fn build_req(definition: &mut DefProtocol, x: &syn::Fields, is_actor: bool) {
 impl DefProtocol {
     pub fn new(tokens: TokenStream) -> Self {
         let mut definition = Self {
+            root: quote!(::ghost_actor),
             short_prefix: "".to_string(),
             tall_prefix: "".to_string(),
             scream_prefix: "".to_string(),
@@ -143,6 +145,11 @@ impl DefProtocol {
 
         for v in &parsed.variants {
             match v.ident.to_string().as_str() {
+                "root" => {
+                    let fields = tx_fields(&v.fields);
+                    assert_eq!(1, fields.len());
+                    definition.root = fields[0].clone();
+                }
                 "prefix" => {
                     let fields = tx_fields(&v.fields);
                     assert_eq!(1, fields.len());
@@ -211,21 +218,22 @@ fn render_protocol(definition: &DefProtocol) -> TokenStream {
     }
 }
 
-fn proto_dest(is_actor: bool) -> TokenStream {
+fn proto_dest(root: &TokenStream, is_actor: bool) -> TokenStream {
     let dest = if is_actor {
         format_ident!("Actor")
     } else {
         format_ident!("Owner")
     };
-    quote!(::ghost_actor::GhostProtocolDestination::#dest)
+    quote!(#root::GhostProtocolDestination::#dest)
 }
 
-fn proto_v_type(v_type: &str) -> TokenStream {
+fn proto_v_type(root: &TokenStream, v_type: &str) -> TokenStream {
     let v_type = format_ident!("{}", v_type);
-    quote!(::ghost_actor::GhostProtocolVariantType::#v_type)
+    quote!(#root::GhostProtocolVariantType::#v_type)
 }
 
 fn render_d_list(definition: &mut DefProtocol) -> TokenStream {
+    let root = &definition.root;
     let mut d_list = Vec::new();
 
     let mut next_index = 0_usize;
@@ -234,12 +242,12 @@ fn render_d_list(definition: &mut DefProtocol) -> TokenStream {
         match item {
             DefType::Event(evt) => {
                 let id = &evt.evt_id;
-                let dest = proto_dest(evt.is_actor);
-                let v_type = proto_v_type("Event");
+                let dest = proto_dest(root, evt.is_actor);
+                let v_type = proto_v_type(root, "Event");
                 evt.evt_d_list_idx = next_index;
                 next_index += 1;
                 d_list.push(quote! {
-                    ::ghost_actor::GhostProtocolDiscriminant {
+                    #root::GhostProtocolDiscriminant {
                         id: #id,
                         destination: #dest,
                         variant_type: #v_type,
@@ -248,24 +256,24 @@ fn render_d_list(definition: &mut DefProtocol) -> TokenStream {
             }
             DefType::Request(req) => {
                 let id = &req.req_id;
-                let dest = proto_dest(req.is_actor);
-                let v_type = proto_v_type("Request");
+                let dest = proto_dest(root, req.is_actor);
+                let v_type = proto_v_type(root, "Request");
                 req.req_d_list_idx = next_index;
                 next_index += 1;
                 d_list.push(quote! {
-                    ::ghost_actor::GhostProtocolDiscriminant {
+                    #root::GhostProtocolDiscriminant {
                         id: #id,
                         destination: #dest,
                         variant_type: #v_type,
                     }
                 });
                 let id = &req.res_id;
-                let dest = proto_dest(!req.is_actor);
-                let v_type = proto_v_type("Response");
+                let dest = proto_dest(root, !req.is_actor);
+                let v_type = proto_v_type(root, "Response");
                 req.res_d_list_idx = next_index;
                 next_index += 1;
                 d_list.push(quote! {
-                    ::ghost_actor::GhostProtocolDiscriminant {
+                    #root::GhostProtocolDiscriminant {
                         id: #id,
                         destination: #dest,
                         variant_type: #v_type,
@@ -278,13 +286,14 @@ fn render_d_list(definition: &mut DefProtocol) -> TokenStream {
     let name = format_ident!("{}", definition.d_list_name);
     quote! {
         ///discriminant list meta data about this protocol
-        static #name: &'static [::ghost_actor::GhostProtocolDiscriminant] = &[
+        static #name: &'static [#root::GhostProtocolDiscriminant] = &[
             #(#d_list),*
         ];
     }
 }
 
 fn render_ghost_protocol(definition: &DefProtocol) -> TokenStream {
+    let root = &definition.root;
     let protocol_name = format_ident!("{}", definition.protocol_name);
     let d_list_name = format_ident!("{}", definition.d_list_name);
 
@@ -309,12 +318,12 @@ fn render_ghost_protocol(definition: &DefProtocol) -> TokenStream {
     }
 
     quote! {
-        impl ::ghost_actor::GhostProtocol for #protocol_name {
-            fn discriminant_list() -> &'static [::ghost_actor::GhostProtocolDiscriminant] {
+        impl #root::GhostProtocol for #protocol_name {
+            fn discriminant_list() -> &'static [#root::GhostProtocolDiscriminant] {
                 #d_list_name
             }
 
-            fn discriminant(&self) -> &::ghost_actor::GhostProtocolDiscriminant {
+            fn discriminant(&self) -> &#root::GhostProtocolDiscriminant {
                 match self {
                     #(#arms),*
                 }
@@ -324,6 +333,7 @@ fn render_ghost_protocol(definition: &DefProtocol) -> TokenStream {
 }
 
 fn render_handlers(definition: &DefProtocol) -> TokenStream {
+    let root = &definition.root;
     let actor_name = format_ident!("{}", definition.actor_handler_name);
     let owner_name = format_ident!("{}", definition.owner_handler_name);
     let protocol_name = format_ident!("{}", definition.protocol_name);
@@ -339,7 +349,7 @@ fn render_handlers(definition: &DefProtocol) -> TokenStream {
                 let evt_name = format_ident!("handle_{}", evt.evt_id);
                 let evt_type = &evt.evt_type;
                 let handler = quote! {
-                    fn #evt_name(&mut self, message: #evt_type) -> ::ghost_actor::GhostResult<()>;
+                    fn #evt_name(&mut self, message: #evt_type) -> #root::GhostResult<()>;
                 };
                 let v_name = format_ident!("{}", evt.evt_name);
                 let trigger = quote! {
@@ -367,7 +377,7 @@ fn render_handlers(definition: &DefProtocol) -> TokenStream {
                 let req_type = &req.req_type;
                 let res_type = &req.res_type;
                 let handler = quote! {
-                    fn #req_name(&mut self, message: #req_type, cb: ::ghost_actor::GhostHandlerCb<'lt, #res_type>) -> ::ghost_actor::GhostResult<()>;
+                    fn #req_name(&mut self, message: #req_type, cb: #root::GhostHandlerCb<'lt, #res_type>) -> #root::GhostResult<()>;
                 };
                 let v_name = format_ident!("{}", req.req_name);
                 let v_name_res = format_ident!("{}", req.res_name);
@@ -411,7 +421,7 @@ fn render_handlers(definition: &DefProtocol) -> TokenStream {
             #(#actor_handlers)*
 
             ///provided splitter distributes messages
-            fn trigger(&mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostHandlerCb<'lt, #protocol_name>>) -> ::ghost_actor::GhostResult<()> {
+            fn trigger(&mut self, message: #protocol_name, cb: ::std::option::Option<#root::GhostHandlerCb<'lt, #protocol_name>>) -> #root::GhostResult<()> {
                 match message {
                     #(#actor_trigger_arms)*
                 }
@@ -424,7 +434,7 @@ fn render_handlers(definition: &DefProtocol) -> TokenStream {
             #(#owner_handlers)*
 
             ///provided splitter distributes messages
-            fn trigger(&mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostHandlerCb<'lt, #protocol_name>>) -> ::ghost_actor::GhostResult<()> {
+            fn trigger(&mut self, message: #protocol_name, cb: ::std::option::Option<#root::GhostHandlerCb<'lt, #protocol_name>>) -> #root::GhostResult<()> {
                 match message {
                     #(#owner_trigger_arms)*
                 }
@@ -435,6 +445,7 @@ fn render_handlers(definition: &DefProtocol) -> TokenStream {
 }
 
 fn render_targets(definition: &DefProtocol) -> TokenStream {
+    let root = &definition.root;
     let protocol_name = format_ident!("{}", definition.protocol_name);
     let actor_name = format_ident!("{}", definition.actor_target_name);
     let owner_name = format_ident!("{}", definition.owner_target_name);
@@ -453,7 +464,7 @@ fn render_targets(definition: &DefProtocol) -> TokenStream {
                 let evt_type = &evt.evt_type;
                 let enum_name = format_ident!("{}", evt.evt_name);
                 let func = quote! {
-                    fn #name(&mut self, message: #evt_type) -> ::ghost_actor::GhostResult<()> {
+                    fn #name(&mut self, message: #evt_type) -> #root::GhostResult<()> {
                         self.send_protocol(#protocol_name::#enum_name(message), None)
                     }
                 };
@@ -470,8 +481,8 @@ fn render_targets(definition: &DefProtocol) -> TokenStream {
                 let enum_name = format_ident!("{}", req.req_name);
                 let res_enum_name = format_ident!("{}", req.res_name);
                 let func = quote! {
-                    fn #name(&mut self, message: #req_type, cb: ::ghost_actor::GhostResponseCb<'lt, X, #res_type>) -> ::ghost_actor::GhostResult<()> {
-                        let cb: ::ghost_actor::GhostResponseCb<'lt, X, #protocol_name> = Box::new(move |x, res| {
+                    fn #name(&mut self, message: #req_type, cb: #root::GhostResponseCb<'lt, X, #res_type>) -> #root::GhostResult<()> {
+                        let cb: #root::GhostResponseCb<'lt, X, #protocol_name> = Box::new(move |x, res| {
                             let res = match res {
                                 Ok(res) => {
                                     match res {
@@ -502,26 +513,26 @@ fn render_targets(definition: &DefProtocol) -> TokenStream {
         pub trait #actor_name<'lt, X: 'lt> {
             #(#actor_fns)*
             ///implement this to forward messages
-            fn send_protocol<'a>(&'a mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostResponseCb<'lt, X, #protocol_name>>) -> ::ghost_actor::GhostResult<()>;
+            fn send_protocol<'a>(&'a mut self, message: #protocol_name, cb: ::std::option::Option<#root::GhostResponseCb<'lt, X, #protocol_name>>) -> #root::GhostResult<()>;
         }
 
         ///if you hold the owning endpoint, you should also handle incoming messages
         pub trait #actor_handle_name<'lt, X: 'lt>: #actor_name<'lt, X> {
             ///call this to handle incoming messages
-            fn handle<'a, H: #actor_handler_name<'a>>(&mut self, handler: &'a mut H) -> ::ghost_actor::GhostResult<()>;
+            fn handle<'a, H: #actor_handler_name<'a>>(&mut self, handler: &'a mut H) -> #root::GhostResult<()>;
         }
 
         ///trait indicating you can send events and requests to this owner target
         pub trait #owner_name<'lt, X: 'lt> {
             #(#owner_fns)*
             ///implement this to forward messages
-            fn send_protocol<'a>(&'a mut self, message: #protocol_name, cb: ::std::option::Option<::ghost_actor::GhostResponseCb<'lt, X, #protocol_name>>) -> ::ghost_actor::GhostResult<()>;
+            fn send_protocol<'a>(&'a mut self, message: #protocol_name, cb: ::std::option::Option<#root::GhostResponseCb<'lt, X, #protocol_name>>) -> #root::GhostResult<()>;
         }
 
         ///if you hold the owning endpoint, you should also handle incoming messages
         pub trait #owner_handle_name<'lt, X: 'lt>: #owner_name<'lt, X> {
             ///call this to handle incoming messages
-            fn handle<'a, H: #owner_handler_name<'a>>(&mut self, handler: &'a mut H) -> ::ghost_actor::GhostResult<()>;
+            fn handle<'a, H: #owner_handler_name<'a>>(&mut self, handler: &'a mut H) -> #root::GhostResult<()>;
         }
     }
 }

@@ -23,8 +23,17 @@ pub type GhostResponseCb<'lt, X, T> =
 mod ghost_protocol;
 pub use ghost_protocol::*;
 
+#[allow(dead_code)]
+#[cfg(test)]
+mod test_proto {
+    include!(concat!(env!("OUT_DIR"), "/test_proto.rs"));
+}
+
 mod ghost_system;
 pub use ghost_system::*;
+
+mod ghost_actor;
+//pub use crate::ghost_actor::*;
 
 pub mod code_gen;
 
