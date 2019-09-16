@@ -17,7 +17,7 @@ use crate::{
         self,
         memory_mock::ghost_transport_memory::*,
         protocol::*,
-        websocket::{tls::TlsConfig, actor::GhostTransportWebsocket},
+        websocket::{actor::GhostTransportWebsocket, tls::TlsConfig},
         TransportEncoding, TransportMultiplex,
     },
 };

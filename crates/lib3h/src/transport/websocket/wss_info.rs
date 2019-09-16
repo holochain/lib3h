@@ -1,7 +1,6 @@
 use crate::transport::websocket::{
-    BaseStream,
-    streams::{WebsocketStreamState, ConnectionId},
-    TransportResult,
+    streams::{ConnectionId, WebsocketStreamState},
+    BaseStream, TransportResult,
 };
 
 /// Represents an individual connection

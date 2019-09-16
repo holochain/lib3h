@@ -19,9 +19,9 @@ pub struct GhostTransportWebsocket {
 }
 
 impl GhostTransportWebsocket {
-    pub fn new(tls_config: TlsConfig) -> GhostTransportWebsocket{
+    pub fn new(tls_config: TlsConfig) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
-        GhostTransportWebsocket{
+        GhostTransportWebsocket {
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Some(
                 endpoint_self
@@ -179,7 +179,8 @@ impl
         for event in stream_events {
             match event {
                 StreamEvent::ErrorOccured(connection_id, error) => {
-                    let uri = self.streams
+                    let uri = self
+                        .streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
@@ -191,7 +192,8 @@ impl
                 }
                 StreamEvent::ConnectResult(_connection_id, _) => {}
                 StreamEvent::IncomingConnectionEstablished(connection_id) => {
-                    let uri = self.streams
+                    let uri = self
+                        .streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
@@ -203,7 +205,8 @@ impl
                 }
                 StreamEvent::ReceivedData(connection_id, payload) => {
                     //println!("DATA RECEIVED!!! {:?}", String::from_utf8(payload.clone()));
-                    let uri = self.streams
+                    let uri = self
+                        .streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);

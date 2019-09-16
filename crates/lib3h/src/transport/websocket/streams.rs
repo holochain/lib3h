@@ -1,10 +1,10 @@
 use crate::transport::{
     error::{TransportError, TransportResult},
     websocket::{
-        BaseStream, tls::TlsConfig, TlsMidHandshake, TlsSrvMidHandshake, TlsStream,
-        wss_info::WssInfo, WsMidHandshake, WssMidHandshake, WsSrvMidHandshake, WssSrvMidHandshake,
-        WsStream, SocketMap, WssStream, FAKE_PKCS12, FAKE_PASS, TlsConnectResult, WsConnectResult,
-        WssConnectResult, WsSrvAcceptResult, WssSrvAcceptResult
+        tls::TlsConfig, wss_info::WssInfo, BaseStream, SocketMap, TlsConnectResult,
+        TlsMidHandshake, TlsSrvMidHandshake, TlsStream, WsConnectResult, WsMidHandshake,
+        WsSrvAcceptResult, WsSrvMidHandshake, WsStream, WssConnectResult, WssMidHandshake,
+        WssSrvAcceptResult, WssSrvMidHandshake, WssStream, FAKE_PASS, FAKE_PKCS12,
     },
 };
 use lib3h_protocol::DidWork;
@@ -25,7 +25,6 @@ pub const DEFAULT_HEARTBEAT_WAIT_MS: usize = 5000;
 pub type ConnectionId = String;
 pub type ConnectionIdRef = str;
 
-
 // an internal state sequence for stream building
 #[derive(Debug)]
 pub enum WebsocketStreamState<T: Read + Write + std::fmt::Debug> {
@@ -44,7 +43,6 @@ pub enum WebsocketStreamState<T: Read + Write + std::fmt::Debug> {
     ReadyWs(Box<WsStream<T>>),
     ReadyWss(Box<WssStream<T>>),
 }
-
 
 /// Events that can be generated during a `process()`
 #[derive(Debug, PartialEq, Clone)]

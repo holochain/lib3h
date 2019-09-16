@@ -4,10 +4,9 @@
 use crate::transport::{
     error::TransportResult,
     websocket::{
-        streams::{
-            Acceptor, Bind, ConnectionIdFactory, IdGenerator, StreamManager,
-        },
-        tls::TlsConfig, wss_info::WssInfo,
+        streams::{Acceptor, Bind, ConnectionIdFactory, IdGenerator, StreamManager},
+        tls::TlsConfig,
+        wss_info::WssInfo,
     },
 };
 
