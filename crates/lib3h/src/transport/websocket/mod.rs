@@ -1,5 +1,10 @@
-//! abstraction for working with Websocket connections
-//! based on any rust io Read/Write Stream
+/// Transport implementation that enables communication via websockets.
+/// The interface and Ghost actor implementation in actor::GhostTransportWebsocket wraps
+/// all internals, especially streams::StreamManager (former TransportWss) which implements
+/// a connection pool.
+///
+/// The connection pool implemented abstractly based on any rust io Read/Write Stream.
+/// Module tcp implements a concrete type based on std::net::TcpStream.
 
 pub mod actor;
 mod streams;

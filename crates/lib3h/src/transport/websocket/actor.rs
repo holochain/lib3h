@@ -234,33 +234,9 @@ mod tests {
     use crate::transport::websocket::tls::TlsConfig;
     use regex::Regex;
     use url::Url;
-    //use protocol::RequestToChildResponse;
-    //    use lib3h_ghost_actor::GhostCallbackData;
 
     #[test]
     fn test_ghost_websocket_transport() {
-        /* Possible other ways we might think of setting up
-               constructors for actor/parent_context_endpoint pairs:
-
-            let (transport1_endpoint, child) = ghost_create_endpoint();
-            let transport1_engine = GhostTransportMemoryEngine::new(child);
-
-            enum TestContex {
-        }
-
-            let mut transport1_actor = GhostLocalActor::new::<TestTrace>(
-            transport1_engine, transport1_endpoint);
-             */
-
-        /*
-            let mut transport1 = GhostParentContextEndpoint::with_cb(|child| {
-            GhostTransportMemory::new(child)
-        });
-
-            let mut transport1 = GhostParentContextEndpoint::new(
-            Box::new(GhostTransportMemory::new()));
-             */
-
         let mut transport1 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
