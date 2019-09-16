@@ -14,8 +14,11 @@ use crate::{
     keystore::KeystoreStub,
     track::Tracker,
     transport::{
-        self, memory_mock::ghost_transport_memory::*, protocol::*, TransportEncoding,
-        TransportMultiplex,
+        self,
+        memory_mock::ghost_transport_memory::*,
+        protocol::*,
+        websocket::{TlsConfig, TransportWss},
+        TransportEncoding, TransportMultiplex,
     },
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -63,6 +66,22 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
 }
 
 impl<'engine> GhostEngine<'engine> {
+    /// Constructor with WebsocketTransport
+    pub fn new(
+        crypto: Box<dyn CryptoSystem>,
+        config: EngineConfig,
+        name: &str,
+        dht_factory: DhtFactory,
+    ) -> Lib3hResult<Self> {
+        Self::with_transport(
+            crypto,
+            config,
+            name,
+            dht_factory,
+            Box::new(TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted)),
+        )
+    }
+
     /// Constructor with TransportMemory
     pub fn new_mock(
         crypto: Box<dyn CryptoSystem>,
