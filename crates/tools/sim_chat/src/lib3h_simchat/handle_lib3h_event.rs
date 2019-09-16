@@ -146,7 +146,7 @@ pub mod test {
 
     use lib3h_protocol::Address;
 
-    fn send_message_event(message: &SimChatMessage) -> Lib3hToClient {
+    fn store_message_event(message: &SimChatMessage) -> Lib3hToClient {
         Lib3hToClient::HandleStoreEntryAspect(StoreEntryAspectData {
             space_address: Address::from("some_space"),
             entry_address: Address::from("some_entry"),
@@ -181,16 +181,20 @@ pub mod test {
             payload: String::from("hi"),
             timestamp: 0,
         };
-        let response = handle_and_convert_lib3h_event(send_message_event(&message), &mut state);
+        let response = handle_and_convert_lib3h_event(store_message_event(&message), &mut state);
 
         assert_eq!(response.0, None); // this does not produce a chat event
-        assert_eq!(
+        assert_eq!( // state has been updated
             state
                 .store
                 .get_all_messages(&Address::from("some_space"), &Address::from("some_entry"))
                 .expect("no messages"),
-            MessageList(vec![message])
-        )
+            MessageList(vec![message.clone()])
+        );
+        assert_eq!( // also updates gossip list
+            state.gossip_list.get(&Address::from("some_space")).expect("Could not get space hashmap").get(&Address::from("some_entry")),
+            Some(&vec![message.address()]),
+        );
     }
 
     #[test]
@@ -210,7 +214,7 @@ pub mod test {
         ];
 
         for message in &messages {
-            handle_and_convert_lib3h_event(send_message_event(&message), &mut state);
+            handle_and_convert_lib3h_event(store_message_event(&message), &mut state);
         }
 
         let stored_messages: Vec<SimChatMessage> = state
@@ -242,7 +246,7 @@ pub mod test {
         ];
 
         for message in &messages {
-            handle_and_convert_lib3h_event(send_message_event(&message), &mut state);
+            handle_and_convert_lib3h_event(store_message_event(&message), &mut state);
         }
 
         let stored_messages: Vec<SimChatMessage> = state
