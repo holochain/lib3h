@@ -4,6 +4,7 @@ use lib3h_protocol::{
     data_types::ConnectedData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
 };
+use lib3h::engine::CanAdvertise;
 use lib3h_zombie_actor::{
     create_ghost_channel, GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint,
     GhostError, GhostResult, WorkWasDone,
@@ -123,5 +124,11 @@ impl MockEngine<'_> {
             ClientToLib3h::QueryEntry(_data) => Ok(()),
             _ => panic!("{:?} not implemented", msg),
         }
+    }
+}
+
+impl CanAdvertise for MockEngine<'_> {
+    fn advertise(&self) -> Url {
+        Url::parse("ws://mock_peer_url").unwrap()
     }
 }

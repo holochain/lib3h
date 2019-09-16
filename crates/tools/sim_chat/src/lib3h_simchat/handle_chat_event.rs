@@ -238,8 +238,27 @@ fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) 
         .expect("send fail");
 }
 
-// #[cfg(test)]
-// pub mod tests {
-//     #[test]
-//     fn
-// }
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    fn responds_to_join_event() {
+        let (s, _r) = crossbeam_channel::unbounded();
+        let mut state = Lib3hSimChatState::new();
+        let chat_event = ChatEvent::Join {
+            channel_id: String::from("some-channel-id"),
+            agent_id: String::from("some-agent-id")
+        };
+
+        let response = handle_chat_event(chat_event, &mut state, s);
+        assert_eq!(
+            response.unwrap().event, 
+            ClientToLib3h::JoinSpace(SpaceData {
+                space_address: channel_address_from_string(&String::from("some-channel-id")).unwrap(),
+                agent_id: Address::from("some-agent-id"),
+                request_id: String::from("")
+            })
+        );
+    }
+}

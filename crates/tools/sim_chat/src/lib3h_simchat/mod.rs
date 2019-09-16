@@ -5,7 +5,7 @@ use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
 use lib3h_tracing::test_span;
-
+use lib3h::engine::CanAdvertise;
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
 use lib3h_protocol::{
@@ -160,7 +160,7 @@ impl Lib3hSimChat {
                 ClientToLib3h,
                 ClientToLib3hResponse,
                 Lib3hError,
-            > + 'static,
+            > + CanAdvertise + 'static,
     {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
@@ -178,6 +178,8 @@ impl Lib3hSimChat {
                 // and is responsible for calling process
                 // and handling messages
                 let mut engine = engine_builder(bootstrap_urls);
+
+                println!("Engine initialized with peer URI: {}", engine.advertise());
 
                 let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> = engine
                     .take_parent_endpoint()
