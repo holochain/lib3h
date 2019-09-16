@@ -232,9 +232,9 @@ mod tests {
 
     use super::*;
     use crate::transport::websocket::tls::TlsConfig;
-    use lib3h_ghost_actor::wait_until_no_work;
     use regex::Regex;
     use url::Url;
+    use std::{thread, time};
 
     #[test]
     fn test_ghost_websocket_transport() {
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(transport1.bound_url, None);
         assert_eq!(transport2.bound_url, None);
 
-        let expected_transport1_address = Url::parse("wss://0.0.0.0:22888").unwrap();
+        let expected_transport1_address = Url::parse("wss://127.0.0.1:22888").unwrap();
         t1_endpoint
             .request(
                 Lib3hSpan::todo(),
@@ -268,14 +268,14 @@ mod tests {
                 Box::new(|_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://0.0.0.0:22888/\" })))",
+                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://127.0.0.1:22888/\" })))",
                         &format!("{:?}", r)
                     );
                     Ok(())
                 }),
             )
             .unwrap();
-        let expected_transport2_address = Url::parse("wss://0.0.0.0:22889").unwrap();
+        let expected_transport2_address = Url::parse("wss://127.0.0.1:22889").unwrap();
         t2_endpoint
             .request(
                 Lib3hSpan::todo(),
@@ -285,7 +285,7 @@ mod tests {
                 Box::new(|_: &mut (), r| {
                     // parent should see the bind event
                     assert_eq!(
-                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://0.0.0.0:22889/\" })))",
+                        "Response(Ok(Bind(BindResultData { bound_url: \"wss://127.0.0.1:22889/\" })))",
                         &format!("{:?}", r)
                     );
                     Ok(())
@@ -324,33 +324,34 @@ mod tests {
             )
             .unwrap();
 
-        transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut ());
+        let received_regex = Regex::new(
+            "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}",
+        ).unwrap();
 
-        transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut ());
+        let mut found = false;
+        let mut tries = 0;
+        loop {
+            tries += 1;
+            thread::sleep(time::Duration::from_millis(50));
+            transport1.process().unwrap();
+            let _ = t1_endpoint.process(&mut ());
+            transport2.process().unwrap();
+            let _ = t2_endpoint.process(&mut ());
+            for mut message in t2_endpoint.drain_messages() {
+                message.take_message().map(|message|{
+                    let message_string = &format!("{:?}", message);
+                    println!("{}", message_string);
+                    if received_regex.is_match(message_string) {
+                        found = true;
+                    };
+                });
+            }
 
-        let mut requests = t2_endpoint.drain_messages();
-        //assert_eq!(2, requests.len());
-        assert!(format!("{:?}", requests[0].take_message())
-            .starts_with("Some(IncomingConnection { uri: \"wss://127.0.0.1"));
+            if found || tries > 100 {
+                break
+            }
+        }
 
-        wait_until_no_work!(transport1);
-
-        let _ = t1_endpoint.process(&mut ());
-
-        transport2.process().unwrap();
-        transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut ());
-
-        let mut requests = t2_endpoint.drain_messages();
-        let message_string = format!("{:?}", requests[0].take_message());
-        println!("{}", message_string);
-        assert!(
-            Regex::new(
-                "Some\\(ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}\\)",
-            ).unwrap()
-            .is_match(&message_string)
-        );
+        assert!(found);
     }
 }
