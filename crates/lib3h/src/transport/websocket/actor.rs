@@ -1,13 +1,45 @@
 use crate::transport::{
     error::TransportError,
     protocol::*,
-    websocket::{TransportEvent, TransportWss},
+    websocket::{
+        streams::{StreamEvent, StreamManager},
+        tls::TlsConfig,
+    },
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
 use lib3h_tracing::Lib3hSpan;
+use url::Url;
 
-pub type UserData = TransportWss<std::net::TcpStream>;
+pub struct GhostTransportWebsocket {
+    endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
+    endpoint_self: Option<GhostTransportWebsocketEndpointContext>,
+    streams: StreamManager<std::net::TcpStream>,
+    bound_url: Option<Url>,
+}
+
+impl GhostTransportWebsocket {
+    pub fn new(tls_config: TlsConfig) -> GhostTransportWebsocket{
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        GhostTransportWebsocket{
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self: Some(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("twss_to_parent")
+                    .build(),
+            ),
+            streams: StreamManager::with_std_tcp_stream(tls_config),
+            bound_url: None,
+        }
+    }
+
+    pub fn bound_url(&self) -> Option<Url> {
+        self.bound_url.clone()
+    }
+}
+
+pub type UserData = GhostTransportWebsocket;
 
 pub type GhostTransportWebsocketEndpoint = GhostEndpoint<
     RequestToChild,
@@ -42,7 +74,7 @@ impl
         RequestToChild,
         RequestToChildResponse,
         TransportError,
-    > for TransportWss<std::net::TcpStream>
+    > for GhostTransportWebsocket
 {
     // BOILERPLATE START----------------------------------
 
@@ -66,21 +98,14 @@ impl
         {
             match msg.take_message().expect("exist") {
                 RequestToChild::Bind { spec: url } => {
-                    msg.respond(self.bind(&url).map(|url| {
+                    let maybe_bound_url = self.streams.bind(&url);
+                    msg.respond(maybe_bound_url.clone().map(|url| {
                         RequestToChildResponse::Bind(BindResultData { bound_url: url })
                     }))?;
 
-                    /*
-                    let bind_result = (self.bind)(&url.clone())
-                    if let Ok(acceptor) = bind_result {
-                        self.acceptor = Ok(acceptor);
-                        // respond to our parent
-                        msg.respond(Ok()?;
-                    } else {
-                        msg.respond(
-                            bind_result.err().expect("Must be an error in else case")
-                        )?;
-                    }*/
+                    if let Ok(url) = maybe_bound_url {
+                        self.bound_url = Some(url.clone());
+                    }
                 }
                 RequestToChild::SendMessage { uri, payload } => {
                     // make sure we have bound and got our address
@@ -92,7 +117,7 @@ impl
                         }
                         Some(my_addr) => {
                             // Trying to find established connection for URI:
-                            let mut maybe_connection_id = self.url_to_connection_id(&uri);
+                            let mut maybe_connection_id = self.streams.url_to_connection_id(&uri);
 
                             // If there is none, try to connect:
                             if maybe_connection_id.is_none() {
@@ -100,7 +125,7 @@ impl
                                         "No open connection to {} found when sending data. Trying to connect...",
                                         uri,
                                     );
-                                match self.connect(&uri) {
+                                match self.streams.connect(&uri) {
                                     Ok(connection_id) => {
                                         maybe_connection_id = Some(connection_id);
                                         trace!("New connection to {} established", uri.to_string());
@@ -124,7 +149,7 @@ impl
                                     payload
                                 );
                                 // Send it data from us
-                                match self.send(&[&connection_id], &payload.as_bytes()) {
+                                match self.streams.send(&[&connection_id], &payload.as_bytes()) {
                                     Ok(()) => {
                                         msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?
                                     }
@@ -150,11 +175,11 @@ impl
 
         println!("Processing for: {}", my_addr);
 
-        let (did_work, transport_events) = self.process_inner()?;
-        for event in transport_events {
+        let (did_work, stream_events) = self.streams.process()?;
+        for event in stream_events {
             match event {
-                TransportEvent::ErrorOccured(connection_id, error) => {
-                    let uri = self
+                StreamEvent::ErrorOccured(connection_id, error) => {
+                    let uri = self.streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
@@ -164,9 +189,9 @@ impl
                     )?;
                     std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 }
-                TransportEvent::ConnectResult(_connection_id, _) => {}
-                TransportEvent::IncomingConnectionEstablished(connection_id) => {
-                    let uri = self
+                StreamEvent::ConnectResult(_connection_id, _) => {}
+                StreamEvent::IncomingConnectionEstablished(connection_id) => {
+                    let uri = self.streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
@@ -176,9 +201,9 @@ impl
                     )?;
                     std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 }
-                TransportEvent::ReceivedData(connection_id, payload) => {
+                StreamEvent::ReceivedData(connection_id, payload) => {
                     //println!("DATA RECEIVED!!! {:?}", String::from_utf8(payload.clone()));
-                    let uri = self
+                    let uri = self.streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
@@ -191,7 +216,7 @@ impl
                     )?;
                     std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 }
-                TransportEvent::ConnectionClosed(_connection_id) => {}
+                StreamEvent::ConnectionClosed(_connection_id) => {}
             }
         }
 
@@ -203,7 +228,7 @@ impl
 mod tests {
 
     use super::*;
-    use crate::transport::websocket::TlsConfig;
+    use crate::transport::websocket::tls::TlsConfig;
     use regex::Regex;
     use url::Url;
     //use protocol::RequestToChildResponse;
@@ -233,7 +258,7 @@ mod tests {
             Box::new(GhostTransportMemory::new()));
              */
 
-        let mut transport1 = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);
+        let mut transport1 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -241,7 +266,7 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        let mut transport2 = TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted);;
+        let mut transport2 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);;
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")

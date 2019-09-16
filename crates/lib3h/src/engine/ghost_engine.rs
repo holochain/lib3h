@@ -17,7 +17,7 @@ use crate::{
         self,
         memory_mock::ghost_transport_memory::*,
         protocol::*,
-        websocket::{TlsConfig, TransportWss},
+        websocket::{tls::TlsConfig, actor::GhostTransportWebsocket},
         TransportEncoding, TransportMultiplex,
     },
 };
@@ -78,7 +78,7 @@ impl<'engine> GhostEngine<'engine> {
             config,
             name,
             dht_factory,
-            Box::new(TransportWss::with_std_tcp_stream(TlsConfig::Unencrypted)),
+            Box::new(GhostTransportWebsocket::new(TlsConfig::Unencrypted)),
         )
     }
 

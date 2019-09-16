@@ -4,18 +4,21 @@
 use crate::transport::{
     error::TransportResult,
     websocket::{
-        Acceptor, Bind, ConnectionIdFactory, IdGenerator, TlsConfig, TransportWss, WssInfo,
+        streams::{
+            Acceptor, Bind, ConnectionIdFactory, IdGenerator, StreamManager,
+        },
+        tls::TlsConfig, wss_info::WssInfo,
     },
 };
 
 use std::net::{TcpListener, TcpStream};
 
-impl TransportWss<std::net::TcpStream> {
+impl StreamManager<std::net::TcpStream> {
     /// convenience constructor for creating a websocket "Transport"
     /// instance that is based of the rust std TcpStream
     pub fn with_std_tcp_stream(tls_config: TlsConfig) -> Self {
         let bind: Bind<TcpStream> = Box::new(move |url| Self::tcp_bind(url));
-        TransportWss::new(
+        StreamManager::new(
             |uri| {
                 let socket = std::net::TcpStream::connect(uri)?;
                 socket.set_nonblocking(true)?;
