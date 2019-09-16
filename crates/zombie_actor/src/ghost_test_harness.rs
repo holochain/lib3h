@@ -377,15 +377,24 @@ macro_rules! wait_did_work {
 #[allow(unused_macros)]
 macro_rules! wait_can_track_did_work {
     ($ghost_can_track: ident,
+     $user_data: ident,
+     $should_abort: expr
+    ) => {{
+        let duration = std::time::Duration::from_millis(2000);
+        wait_can_track_did_work!($ghost_can_track, $user_data, $should_abort, duration)
+    }};
+    ($ghost_can_track: ident,
      $user_data: ident
     ) => {
         wait_can_track_did_work!($ghost_can_track, $user_data, true)
     };
     ($ghost_can_track: ident,
      $user_data: ident,
-     $should_abort: expr
+     $should_abort: expr,
+     $timeout: expr
     ) => {{
         let mut did_work = false;
+        let clock = std::time::SystemTime::now();
         for i in 0..20 {
             did_work = $ghost_can_track
                 .process(&mut $user_data)
@@ -395,7 +404,12 @@ macro_rules! wait_can_track_did_work {
             if did_work {
                 break;
             }
-            trace!("[{}] wait_did_work", i)
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > $timeout {
+                break;
+            }
+            trace!("[{}] wait_did_work", i);
+            std::thread::sleep(std::time::Duration::from_millis(1))
         }
         if $should_abort {
             assert!(did_work);
@@ -475,6 +489,16 @@ mod tests {
 
         let timeout = std::time::Duration::from_millis(0);
         let did_work: bool = wait_did_work!(actor, false, timeout);
+        assert_eq!(false, did_work);
+    }
+
+    #[test]
+    fn test_wait_can_track_did_work_timeout() {
+        let parent = &mut DidWorkParentWrapper;
+        let mut actor = &mut DidWorkActor(-1);
+
+        let timeout = std::time::Duration::from_millis(0);
+        let did_work: bool = wait_can_track_did_work!(parent, actor, false, timeout);
         assert_eq!(false, did_work);
     }
 
