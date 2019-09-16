@@ -5,7 +5,7 @@ use crate::{
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
-    data_types::{GenericResultData, Opaque},
+    data_types::{ConnectedData, GenericResultData, Opaque},
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol::*,
     protocol_client::*,
@@ -94,6 +94,12 @@ where
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
                         let response = match rsp {
+                            ClientToLib3hResponse::BootstrapSuccess => {
+                                Lib3hServerProtocol::Connected(ConnectedData {
+                                    request_id,
+                                    uri: Url::parse("none:").unwrap(), // client should have this allready deprecated
+                                })
+                            }
                             ClientToLib3hResponse::JoinSpaceResult => {
                                 server_success(request_id.clone(), space_addr, agent)
                             }
