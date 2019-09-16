@@ -139,10 +139,10 @@ impl<
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
-        self.actor.process()?;
-        self.endpoint.process(user_data)?;
-        Ok(())
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone> {
+        let mut work_was_done = self.actor.process()?;
+        work_was_done = work_was_done.or(self.endpoint.process(user_data)?);
+        Ok(work_was_done)
     }
 }
 
@@ -375,10 +375,10 @@ impl<
     }
 
     /// see GhostContextEndpoint::process and GhostActor::process
-    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
-        self.actor.process()?;
-        self.endpoint.process(user_data)?;
-        Ok(())
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone> {
+        let mut work_was_done = self.actor.process()?;
+        work_was_done = work_was_done.or(self.endpoint.process(user_data)?);
+        Ok(work_was_done)
     }
 }
 
@@ -388,7 +388,7 @@ mod tests {
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
     use lib3h_tracing::test_span;
-
+    //    use predicates::prelude::*;
     type TestError = String;
 
     // Any actor has messages that it exchanges with it's parent
@@ -396,11 +396,11 @@ mod tests {
     // either self-generated or (presumeably) from children
     #[derive(Debug)]
     struct TestMsgOut(String);
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     struct TestMsgOutResponse(String);
     #[derive(Debug)]
     struct TestMsgIn(String);
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Clone)]
     struct TestMsgInResponse(String);
 
     struct TestActor {
@@ -452,6 +452,7 @@ mod tests {
 
         // for this test actor what we do
         fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+            println!("process_concrete!");
             // START BOILER PLATE--------------------------
             // always run the endpoint process loop
             detach_run!(&mut self.endpoint_as_child, |cs| cs.process(self))?;
@@ -459,7 +460,9 @@ mod tests {
 
             // In this test actor we simply take all the messages we get and
             // add them to our internal state.
+            let mut did_work = false;
             for mut msg in self.endpoint_as_child.as_mut().drain_messages() {
+                println!("process_concrete, got msg");
                 let payload = match msg.take_message().expect("exists") {
                     TestMsgIn(payload) => payload,
                 };
@@ -467,8 +470,9 @@ mod tests {
                 if msg.is_request() {
                     msg.respond(Ok(TestMsgInResponse(format!("we got: {}", payload))))?;
                 };
+                did_work |= true;
             }
-            Ok(false.into())
+            Ok(did_work.into())
         }
     }
 
