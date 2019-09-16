@@ -98,30 +98,30 @@ fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
     basic_setup_mock_bootstrap(name, None)
 }
 
-//fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
-//    let config = EngineConfig {
-//        socket_type: "ws".into(),
-//        bootstrap_nodes: vec![],
-//        work_dir: PathBuf::new(),
-//        log_level: 'd',
-//        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
-//        dht_gossip_interval: 200,
-//        dht_timeout_threshold: 2000,
-//        dht_custom_config: vec![],
-//    };
-//    let engine = GhostEngine::new(
-//        Box::new(SodiumCryptoSystem::new()),
-//        config,
-//        "test_engine_wss".into(),
-//        MirrorDht::new_with_config,
-//    )
-//    .unwrap();
-//    let engine = WrappedGhostLib3h::new(name, engine);
-//    let p2p_binding = engine.advertise();
-//
-//    println!("test_engine advertise: {}", p2p_binding);
-//    engine
-//}
+fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
+    let config = EngineConfig {
+        socket_type: "ws".into(),
+        bootstrap_nodes: vec![],
+        work_dir: PathBuf::new(),
+        log_level: 'd',
+        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
+        dht_gossip_interval: 200,
+        dht_timeout_threshold: 2000,
+        dht_custom_config: vec![],
+    };
+    let engine = GhostEngine::new(
+        Box::new(SodiumCryptoSystem::new()),
+        config,
+        "test_engine_wss".into(),
+        MirrorDht::new_with_config,
+    )
+    .unwrap();
+    let engine = WrappedGhostLib3h::new(name, engine);
+    let p2p_binding = engine.advertise();
+
+    println!("test_engine advertise: {}", p2p_binding);
+    engine
+}
 
 //--------------------------------------------------------------------------------------------------
 // Utils
@@ -190,14 +190,13 @@ fn basic_connect_bootstrap_test_mock() {
     assert!(did_work);
 }
 
-// FIXME
-//#[test]
-//fn basic_track_test_wss() {
-//    enable_logging_for_test(true);
-//    // Setup
-//    let mut engine: WrappedGhostLib3h = basic_setup_wss("wss_test_node");
-//    basic_track_test(&mut engine);
-//}
+#[test]
+fn basic_track_test_wss() {
+    enable_logging_for_test(true);
+    // Setup
+    let mut engine: WrappedGhostLib3h = basic_setup_wss("wss_test_node");
+    basic_track_test(&mut engine);
+}
 
 #[test]
 fn basic_track_test_mock() {
