@@ -175,6 +175,9 @@ pub fn handle_chat_event(
                     },
                 };
 
+                // update the local store (be sure this is actually needed..)
+                state.store.insert(&space_data.space_address, &entry_address, &message.address(), message.clone());
+
                 // Update the author list with the message (assume it sends...)
                 state.author_list.insert(&space_data.space_address, &entry_address, &message.address());
                 
@@ -333,17 +336,60 @@ pub mod tests {
         );
     }
 
-    // #[test]
-    // fn responds_to_send_channel_message() {
-    //     let (s, _r) = crossbeam_channel::unbounded();
-    //     let mut state = Lib3hSimChatState::new();
+    #[test]
+    fn responds_to_send_channel_message() {
+        let (s, _r) = crossbeam_channel::unbounded();
+        let mut state = Lib3hSimChatState::new();
 
-    //     let payload = String::from("a message");
-    //     let to_agent_id = String::from("receiver");
+        let agent_id = Address::from("author");
+        let payload = String::from("a message");
 
-    //     let chat_event = ChatEvent::SendDirectMessage {
-    //         to_agent: to_agent_id.clone(),
-    //         payload: String::from("a message"),
-    //     };
-    // }
+        let space_data = SpaceData {
+            agent_id: agent_id.clone(),
+            request_id: String::from(""),
+            space_address: Address::from("a-space"),
+        };
+
+        state.current_space = Some(space_data.clone());
+
+        let chat_event = ChatEvent::SendChannelMessage {payload: payload.clone()};
+
+        let message = SimChatMessage {
+            from_agent: agent_id.clone().to_string(),
+            payload,
+            timestamp: current_timestamp(),
+        };
+
+        let response = handle_chat_event(chat_event, &mut state, s);
+
+        let provided_entry_data = ProvidedEntryData {
+            space_address: space_data.space_address.clone(),
+            provider_agent_id: space_data.agent_id,
+            entry: EntryData {
+                entry_address: current_timeanchor(),
+                aspect_list: vec![EntryAspectData {
+                    type_hint: String::from(""),
+                    aspect: message.to_opaque(),
+                    aspect_address: message.address(),
+                    publish_ts: current_timestamp(),
+                }],
+            },
+        };
+
+        // correct entry is returned
+        assert_eq!(
+            response.unwrap().event,
+            ClientToLib3h::PublishEntry(provided_entry_data),
+        );
+        // state is updated
+        assert_eq!(
+            state.store.get_all_messages(&space_data.space_address, &current_timeanchor()),
+            Some(MessageList(vec![message.clone()])),
+        );
+        // author list is updated
+        assert_eq!(
+            state.author_list.get(&space_data.space_address).unwrap().get(&current_timeanchor()).unwrap(),
+            &vec![message.address()]
+        )
+    }
 }
