@@ -247,6 +247,7 @@ mod tests {
     //    use lib3h_ghost_actor::GhostCallbackData;
 
     #[test]
+    #[ignore] // This test works if run alone, but not with all tests because of the namespace issue #330
     fn test_gmem_transport() {
         /* Possible other ways we might think of setting up
                constructors for actor/parent_context_endpoint pairs:

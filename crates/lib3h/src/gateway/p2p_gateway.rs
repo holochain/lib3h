@@ -6,6 +6,7 @@ use crate::{
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
+use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -40,7 +41,7 @@ impl P2pGateway {
             endpoint_self,
             this_peer: PeerData {
                 peer_address: dht_config.this_peer_address(),
-                peer_uri: dht_config.this_peer_uri(),
+                peer_uri: Url::parse("none:").unwrap(),
                 timestamp: 0, // FIXME
             },
         }

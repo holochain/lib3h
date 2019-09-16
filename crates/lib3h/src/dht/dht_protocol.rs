@@ -64,6 +64,9 @@ pub enum DhtRequestToChild {
     /// Parent notifies us that is is not holding an entry anymore.
     DropEntryAddress(Address),
 
+    /// Parent notifies us that the binding changed
+    UpdateAdvertise(Url),
+
     /// Requests
     /// Parent wants PeerData for a specific Peer
     RequestPeer(String),
