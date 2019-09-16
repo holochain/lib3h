@@ -175,6 +175,7 @@ impl<'engine> GhostEngine<'engine> {
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                /* TODO: #777
                                 me.multiplexer.publish(
                                     Lib3hSpan::todo(),
                                     GatewayRequestToChild::Transport(
@@ -184,7 +185,7 @@ impl<'engine> GhostEngine<'engine> {
                                             payload: payload.into(),
                                         },
                                     ),
-                                )?;
+                                )?;*/
                             }
                         }
                     // TODO END
@@ -199,7 +200,7 @@ impl<'engine> GhostEngine<'engine> {
         // Output a Lib3hToClient::Connected if its the first connection
         if self.network_connections.is_empty() {
             let data = ConnectedData {
-                request_id: "fixme".to_string(),
+                request_id: "".to_string(),
                 uri: net_uri.clone(),
             };
             self.lib3h_endpoint
