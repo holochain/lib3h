@@ -345,7 +345,13 @@ mod tests {
         let d = connect_data();
         let s = Lib3hClientProtocol::Connect(d.clone());
         let to_c: ClientToLib3h = s.clone().into();
-        assert_eq!(to_c, ClientToLib3h::Connect(d.clone()));
+        assert_eq!(
+            to_c,
+            ClientToLib3h::Bootstrap(BootstrapData {
+                bootstrap_uri: Url::parse("wss://192.168.0.102:58081/").unwrap(),
+                space_address: "network_id".to_string().into(),
+            })
+        );
 
         let to_s: Lib3hClientProtocol = to_c.into();
         assert_eq!(to_s, s);
