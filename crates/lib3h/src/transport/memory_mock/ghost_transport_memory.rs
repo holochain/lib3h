@@ -91,7 +91,7 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // make sure we have bound and get our address if so
         if let Some(my_addr) = &self.maybe_my_address {
-            println!("Processing for: {}", my_addr);
+            trace!("Processing for: {}", my_addr);
 
             // get our own server
             let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
@@ -123,7 +123,7 @@ impl
 
                 // Connect back to received connections if not already connected to them
                 for remote_addr in to_connect_list {
-                    println!(
+                    debug!(
                         "(GhostTransportMemory)connecting {} <- {:?}",
                         remote_addr, my_addr
                     );
@@ -153,7 +153,7 @@ impl
                 for event in non_connect_events {
                     match event {
                         MemoryEvent::ReceivedData(from_addr, payload) => {
-                            println!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
+                            trace!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                             self.endpoint_self.publish(
                                 Lib3hSpan::todo(),
                                 RequestToParent::ReceivedData {
