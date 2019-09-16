@@ -62,7 +62,7 @@ impl P2pGateway {
     /// uri =
     ///   - Network : transportId
     ///   - space   : agentId
-    fn send(
+    pub(crate) fn send(
         &mut self,
         uri: &Url,
         payload: &[u8],

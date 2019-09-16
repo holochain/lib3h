@@ -1,11 +1,13 @@
 use crate::{dht::dht_protocol::*, error::*, transport};
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::*;
 
 /// Gateway protocol enums for use with GhostActor implementation
 #[derive(Debug)]
 pub enum GatewayRequestToChild {
     Transport(transport::protocol::RequestToChild),
     Dht(DhtRequestToChild),
+    Bootstrap(BootstrapData),
     SendAll(Vec<u8>),
 }
 
@@ -13,6 +15,7 @@ pub enum GatewayRequestToChild {
 pub enum GatewayRequestToChildResponse {
     Transport(transport::protocol::RequestToChildResponse),
     Dht(DhtRequestToChildResponse),
+    BootstrapSuccess,
 }
 
 #[derive(Debug)]
