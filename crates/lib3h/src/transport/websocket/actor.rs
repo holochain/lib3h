@@ -232,9 +232,9 @@ mod tests {
 
     use super::*;
     use crate::transport::websocket::tls::TlsConfig;
+    use lib3h_ghost_actor::wait_until_no_work;
     use regex::Regex;
     use url::Url;
-    use lib3h_ghost_actor::{wait_until_no_work};
 
     #[test]
     fn test_ghost_websocket_transport() {
