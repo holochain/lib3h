@@ -1,4 +1,7 @@
 #[macro_use]
+extern crate hexf;
+
+#[macro_use]
 mod utils;
 #[macro_use]
 extern crate lazy_static;
@@ -22,6 +25,7 @@ use lib3h::{
 };
 use lib3h_protocol::Address;
 use node_mock::NodeMock;
+use std::path::PathBuf;
 use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
@@ -82,7 +86,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         //tls_config: TlsConfig::Unencrypted,
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
         dht_gossip_interval: 500,
@@ -112,7 +116,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
 //        tls_config: tls_config,
 //        socket_type: protocol.into(),
 //        bootstrap_nodes: vec![],
-//        work_dir: String::new(),
+//        work_dir: PathBuf::new(),
 //        log_level: 'd',
 //        bind_url,
 //        dht_gossip_interval: 500,

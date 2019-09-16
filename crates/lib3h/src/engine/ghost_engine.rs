@@ -818,6 +818,7 @@ mod tests {
     use super::*;
     use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
     use lib3h_sodium::SodiumCryptoSystem;
+    use std::path::PathBuf;
     use url::Url;
 
     struct MockCore {
@@ -829,7 +830,7 @@ mod tests {
         let config = EngineConfig {
             socket_type: "mem".into(),
             bootstrap_nodes: vec![],
-            work_dir: String::new(),
+            work_dir: PathBuf::new(),
             log_level: 'd',
             bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
             dht_gossip_interval: 100,
