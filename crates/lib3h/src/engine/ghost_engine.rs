@@ -95,46 +95,6 @@ impl<'engine> GhostEngine<'engine> {
             transport,
         );
 
-        /*
-        let network_endpoint = Detach::new(
-            transport
-                .take_parent_endpoint()
-                .expect("exists")
-                .as_context_endpoint_builder()
-                .request_id_prefix("tmem_to_child_")
-                .build::<P2pGateway>(),
-        );
-        */
-
-        /*
-        // Bind & create this_net_peer
-        // TODO: Find better way to do init with GhostEngine
-        network_endpoint.request(
-            Lib3hTrace,
-            transport::protocol::RequestToChild::Bind {
-                spec: config.bind_url.clone(),
-            },
-            Box::new(|mut ud, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
-                        GhostCallbackData::Response(response) => match response {
-                            Err(e) => panic!("{:?}", e),
-                            Ok(response) => response,
-                        },
-                    }
-                };
-                if let transport::protocol::RequestToChildResponse::Bind(bind_data) = response {
-                    ud.binding = bind_data.bound_url;
-                } else {
-                    panic!("bad response to bind: {:?}", response);
-                }
-                Ok(())
-            }),
-        )?;
-        transport.process()?;
-        network_endpoint.process(&mut gateway_ud)?;
-        */
         let fixme_binding = Url::parse("fixme::host:123").unwrap();
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
@@ -145,7 +105,7 @@ impl<'engine> GhostEngine<'engine> {
         let dht_config =
             DhtConfig::with_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
-        let multiplexer = Detach::new(GatewayParentWrapper::new(
+        let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
                 Box::new(transport),
@@ -154,6 +114,36 @@ impl<'engine> GhostEngine<'engine> {
             )),
             "to_multiplexer_",
         ));
+
+        // Bind & create this_net_peer
+        // TODO: Find better way to do init with GhostEngine
+        multiplexer.as_mut().request(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Transport(RequestToChild::Bind {
+                spec: config.bind_url.clone(),
+            }),
+            Box::new(|me: &mut GhostEngine<'engine>, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let GatewayRequestToChildResponse::Transport(RequestToChildResponse::Bind(
+                    bind_data,
+                )) = response
+                {
+                    me.binding = bind_data.bound_url;
+                } else {
+                    panic!("bad response to bind: {:?}", response);
+                }
+                Ok(())
+            }),
+        )?;
+
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let mut engine = GhostEngine {
             crypto,
@@ -167,6 +157,7 @@ impl<'engine> GhostEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             process_count: 0,
+            binding: Url::parse("none:").unwrap(),
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -175,6 +166,7 @@ impl<'engine> GhostEngine<'engine> {
                     .build(),
             ),
         };
+        detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
 
         engine.priv_connect_bootstraps()?;
         Ok(engine)
@@ -315,7 +307,6 @@ impl<'engine> GhostEngine<'engine> {
                     GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
                         transport::protocol::RequestToChildResponse::SendMessageSuccess,
                     ))) => {
-                        // TODO where do we get this from?
                         let response_data = ConnectedData {
                             request_id: data.request_id,
                             uri: data.peer_uri,

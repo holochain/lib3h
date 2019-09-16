@@ -123,6 +123,7 @@ pub struct GhostEngine<'engine> {
     transport_keys: TransportKeys,
     /// debug: count number of calls to process()
     process_count: u64,
+    binding: Url,
 
     client_endpoint: Option<
         GhostEndpoint<
