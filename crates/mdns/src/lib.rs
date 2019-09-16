@@ -520,6 +520,7 @@ mod tests {
         }
     }
 
+    // FIXME: This test is currently flaky on macOS.
     #[test]
     fn release_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
@@ -576,6 +577,7 @@ mod tests {
         }
     }
 
+    // FIXME: This test is currently flaky on macOS.
     #[test]
     fn query_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
@@ -620,6 +622,7 @@ mod tests {
         assert_eq!(records[1].url, "wss://192.168.0.88:88088?a=hc0");
     }
 
+    // FIXME: This test is currently flaky on macOS.
     #[test]
     fn advertise_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
