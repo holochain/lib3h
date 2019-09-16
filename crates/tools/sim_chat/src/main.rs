@@ -8,18 +8,22 @@ extern crate colored;
 extern crate linefeed;
 extern crate regex;
 extern crate url;
+
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use chrono::prelude::DateTime;
 use colored::*;
+use regex::Regex;
+use std::path::PathBuf;
+use url::Url;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GhostEngine},
 };
 use lib3h_sodium::SodiumCryptoSystem;
-use regex::Regex;
+
 use std::time::{Duration, UNIX_EPOCH};
 use structopt::StructOpt;
-use url::Url;
+
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Lib3h SimChat", about = "A p2p, IRC style chat client")]
@@ -34,7 +38,7 @@ fn engine_builder(boostrap_urls: Vec<Url>) -> GhostEngine<'static> {
     let config = EngineConfig {
         socket_type: "mem".into(),
         bootstrap_nodes: boostrap_urls,
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
         dht_gossip_interval: 100,

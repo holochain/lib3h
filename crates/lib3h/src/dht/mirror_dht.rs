@@ -46,10 +46,9 @@ pub struct MirrorDht {
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Box<DhtActor> {
-        let dht_config = DhtConfig::new(this_peer_address, this_peer_uri);
+    pub fn new(this_peer_address: &PeerAddressRef) -> Box<DhtActor> {
+        let dht_config = DhtConfig::new(this_peer_address);
         let dht = Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht");
-        // Box::new(dht)
         dht
     }
 
@@ -62,8 +61,9 @@ impl MirrorDht {
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
+                // maybe this will go away
                 peer_address: config.this_peer_address().to_owned(),
-                peer_uri: config.this_peer_uri().clone(),
+                peer_uri: Url::parse("none:").unwrap(),
                 timestamp,
             },
             last_gossip_of_self: timestamp,
@@ -440,6 +440,11 @@ impl MirrorDht {
 
             // N/A. Do nothing since this is a monotonic fullsync dht
             DhtRequestToChild::DropEntryAddress(_) => (),
+
+            DhtRequestToChild::UpdateAdvertise(peer_uri) => {
+                trace!("DhtRequestToChild::UpdateAdvertise: {:?}", peer_uri);
+                self.this_peer.peer_uri = peer_uri;
+            }
 
             DhtRequestToChild::RequestPeer(peer_address) => {
                 trace!("DhtRequestToChild::RequestPeer: {:?}", peer_address);

@@ -332,4 +332,18 @@ pub mod tests {
             })
         );
     }
+
+    // #[test]
+    // fn responds_to_send_channel_message() {
+    //     let (s, _r) = crossbeam_channel::unbounded();
+    //     let mut state = Lib3hSimChatState::new();
+
+    //     let payload = String::from("a message");
+    //     let to_agent_id = String::from("receiver");
+
+    //     let chat_event = ChatEvent::SendDirectMessage {
+    //         to_agent: to_agent_id.clone(),
+    //         payload: String::from("a message"),
+    //     };
+    // }
 }

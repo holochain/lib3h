@@ -1,8 +1,10 @@
 use detach::{detach_run, Detach};
 use lib3h::{
-    engine::{ghost_engine::ClientToLib3hMessage, CanAdvertise},
+    engine::{CanAdvertise},
     error::Lib3hError,
 };
+
+use lib3h::{engine::engine_actor::ClientToLib3hMessage};
 use lib3h_protocol::{
     data_types::ConnectedData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
