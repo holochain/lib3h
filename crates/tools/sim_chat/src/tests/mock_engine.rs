@@ -1,5 +1,5 @@
 use detach::Detach;
-use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
+use lib3h::{engine::engine_actor::ClientToLib3hMessage, error::Lib3hError};
 use lib3h_ghost_actor::{
     create_ghost_channel, prelude::WorkWasDone, GhostActor, GhostCanTrack, GhostContextEndpoint,
     GhostEndpoint, GhostError, GhostResult,
