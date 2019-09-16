@@ -25,7 +25,7 @@ use std::{
 };
 use url::Url;
 
-type EngineBuilder<T> = fn() -> T;
+type EngineBuilder<T> = fn(Vec<Url>) -> T;
 
 pub struct Store(HashMap<Address, HashMap<Address, HashMap<Address, SimChatMessage>>>); // space_address -> anchor_addres -> message_address
 
@@ -148,7 +148,7 @@ impl Drop for Lib3hSimChat {
 }
 
 impl Lib3hSimChat {
-    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url) -> Self
+    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, bootstrap_urls: Vec<Url>) -> Self
     where
         T: GhostActor<
                 Lib3hToClient,
@@ -173,7 +173,7 @@ impl Lib3hSimChat {
                 // this thread owns the ghost engine instance
                 // and is responsible for calling process
                 // and handling messages
-                let mut engine = engine_builder();
+                let mut engine = engine_builder(bootstrap_urls);
 
                 let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> = engine
                     .take_parent_endpoint()
@@ -187,7 +187,7 @@ impl Lib3hSimChat {
 
                 // call connect to start the networking process
                 // (should probably wait for confirmation before continuing)
-                Self::connect(&mut parent_endpoint, peer_uri, internal_sender.clone());
+                Self::connect(&mut parent_endpoint, Url::parse("ws://wft_is_this").unwrap(), internal_sender.clone());
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -325,7 +325,7 @@ mod tests {
         Lib3hSimChat::new(
             mock_engine::MockEngine::new,
             callback,
-            Url::parse("http://test.boostrap").unwrap(),
+            vec![Url::parse("http://test.boostrap").unwrap()],
         )
     }
 

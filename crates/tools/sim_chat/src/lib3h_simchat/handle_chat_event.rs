@@ -166,6 +166,9 @@ pub fn handle_chat_event(
                         }),
                     )
                     .unwrap();
+                    
+                // TODO: Update the author list
+
             } else {
                 send_sys_message(
                     chat_event_sender,

@@ -24,15 +24,16 @@ use url::Url;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Lib3h SimChat", about = "A p2p, IRC style chat client")]
 struct Opt {
-    /// URL of a node to bootstrap lib3h
-    bootstrap: Url,
+    /// URLs of nodes to use as bootstraps
+    #[structopt(short="b", long)]
+    bootstrap_nodes: Vec<Url>,
 }
 
-fn engine_builder() -> GhostEngine<'static> {
+fn engine_builder(boostrap_urls: Vec<Url>) -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
         socket_type: "mem".into(),
-        bootstrap_nodes: vec![],
+        bootstrap_nodes: boostrap_urls,
         work_dir: String::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
@@ -107,7 +108,7 @@ fn main() {
             }
             // writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
-        opt.bootstrap,
+        opt.bootstrap_nodes,
     );
 
     let help_text = || {

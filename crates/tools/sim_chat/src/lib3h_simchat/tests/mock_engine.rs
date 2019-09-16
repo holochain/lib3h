@@ -1,3 +1,4 @@
+use url::Url;
 use detach::{detach_run, Detach};
 use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
 use lib3h_protocol::{
@@ -80,7 +81,7 @@ impl
 }
 
 impl MockEngine<'_> {
-    pub fn new() -> Self {
+    pub fn new(_dummy: Vec<Url>) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {
             client_endpoint: Some(endpoint_parent),

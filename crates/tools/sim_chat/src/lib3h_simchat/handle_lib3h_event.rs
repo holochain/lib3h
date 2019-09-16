@@ -66,6 +66,9 @@ pub fn handle_and_convert_lib3h_event(
                 &entry_aspect.aspect_address,
                 SimChatMessage::from_opaque(entry_aspect.aspect),
             );
+
+            // TODO: Update the gossip list
+
             (
                 None,
                 Some(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult)),
