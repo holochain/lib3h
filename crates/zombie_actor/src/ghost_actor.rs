@@ -383,11 +383,13 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
+    use crate::{
+        ghost_channel::create_ghost_channel, ghost_test_harness::*,
+        ghost_tracker::GhostCallbackData,
+    };
     use detach::prelude::*;
     use lib3h_tracing::test_span;
     use predicates::prelude::*;
-    use crate::ghost_test_harness::*;
 
     type TestError = String;
 
@@ -602,7 +604,13 @@ mod tests {
         let test_msg_in_response = TestMsgInResponse("event from parent".into());
         //let test_msg_out = TestMsgOut("event from parent".into());
 
-        assert_callback_eq!(wrapped_child, fake_parent, test_msg_in, test_msg_in_response, String);
+        assert_callback_eq!(
+            wrapped_child,
+            fake_parent,
+            test_msg_in,
+            test_msg_in_response,
+            String
+        );
     }
 
     #[test]
