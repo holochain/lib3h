@@ -65,7 +65,7 @@ where
     }
 }
 
-/// Asserts some extracted data from ProcessorResult passes a predicate.  
+/// Asserts some extracted data from ProcessorResult passes a predicate.
 pub trait Assert<Cb: 'static, E: 'static, T> {
     fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a T>;
 
@@ -208,7 +208,7 @@ impl<Cb: 'static, E: 'static> predicates::reflection::PredicateReflection for Di
 
 #[allow(unused_macros)]
 /// Convenience function that asserts only one particular equality predicate
-/// passes for a collection of . See assert_processed for
+/// passes for a GhostCanTrack. See assert_callback_processed for more details.
 macro_rules! assert_callback_eq {
     ($ghost_can_track: ident,
      $user_data: ident,
@@ -256,7 +256,7 @@ macro_rules! process_one {
                 if result {
                     // Simulate the succesful assertion behavior
                     processor.test(&processor_result.clone());
-                // processor passed!
+                    // processor passed!
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing

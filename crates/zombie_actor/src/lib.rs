@@ -86,6 +86,7 @@ pub mod prelude {
     };
 }
 
+#[macro_use]
 pub mod ghost_test_harness;
 
 #[cfg(test)]

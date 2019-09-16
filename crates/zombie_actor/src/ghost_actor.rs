@@ -575,4 +575,35 @@ mod tests {
         )
     }
 
+    #[test]
+    fn test_ghost_actor_parent_wrapper_macro() {
+        // much of the previous test is the parent creating instances of the actor
+        // and taking control of the parent endpoint.  Parent wrapper implements
+        // much of this work as a convenience
+
+        let mut fake_parent = FakeParent {
+            state: "".to_string(),
+        };
+
+        // create the wrapper
+        let mut wrapped_child: GhostParentWrapper<
+            FakeParent,
+            TestMsgOut,
+            TestMsgOutResponse,
+            TestMsgIn,
+            TestMsgInResponse,
+            TestError,
+            TestActor,
+        > = GhostParentWrapper::new(TestActor::new(), "parent");
+
+        // use it to publish an event via the wrapper
+        let test_msg_in = TestMsgIn("event from parent".into());
+
+        let test_msg_out = TestMsgOut("event from parent".into());
+
+        assert_callback_eq!(wrapped_child, fake_parent, test_msg_in, test_msg_out, String);
+
+    }
+
+
 }
