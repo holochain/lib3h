@@ -289,7 +289,7 @@ impl<'engine> GhostEngine<'engine> {
     ) -> GhostResult<()> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Bootstrap(data) => {
-                trace!("ClientToLib3h::Connect: {:?}", &data);
+                trace!("ClientToLib3h::Bootstrap: {:?}", &data);
                 self.handle_bootstrap(msg, data)
             }
             ClientToLib3h::JoinSpace(data) => {
