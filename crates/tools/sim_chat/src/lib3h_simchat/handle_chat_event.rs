@@ -176,16 +176,24 @@ pub fn handle_chat_event(
                 };
 
                 // update the local store (be sure this is actually needed..)
-                state.store.insert(&space_data.space_address, &entry_address, &message.address(), message.clone());
+                state.store.insert(
+                    &space_data.space_address,
+                    &entry_address,
+                    &message.address(),
+                    message.clone(),
+                );
 
                 // Update the author list with the message (assume it sends...)
-                state.author_list.insert(&space_data.space_address, &entry_address, &message.address());
-                
+                state.author_list.insert(
+                    &space_data.space_address,
+                    &entry_address,
+                    &message.address(),
+                );
+
                 Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::PublishEntry(provided_entry_data),
                     Box::new(|_, _| Ok(())),
                 ))
-
             } else {
                 send_sys_message(
                     chat_event_sender,
@@ -352,7 +360,9 @@ pub mod tests {
 
         state.current_space = Some(space_data.clone());
 
-        let chat_event = ChatEvent::SendChannelMessage {payload: payload.clone()};
+        let chat_event = ChatEvent::SendChannelMessage {
+            payload: payload.clone(),
+        };
 
         let message = SimChatMessage {
             from_agent: agent_id.clone().to_string(),
@@ -383,12 +393,19 @@ pub mod tests {
         );
         // state is updated
         assert_eq!(
-            state.store.get_all_messages(&space_data.space_address, &current_timeanchor()),
+            state
+                .store
+                .get_all_messages(&space_data.space_address, &current_timeanchor()),
             Some(MessageList(vec![message.clone()])),
         );
         // author list is updated
         assert_eq!(
-            state.author_list.get(&space_data.space_address).unwrap().get(&current_timeanchor()).unwrap(),
+            state
+                .author_list
+                .get(&space_data.space_address)
+                .unwrap()
+                .get(&current_timeanchor())
+                .unwrap(),
             &vec![message.address()]
         )
     }

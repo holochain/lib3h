@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::simchat::{MessageList, SimChatMessage};
 use lib3h_protocol::Address;
+use std::collections::HashMap;
 pub struct Store(HashMap<Address, HashMap<Address, HashMap<Address, SimChatMessage>>>); // space_address -> anchor_addres -> message_address
 
 impl Store {

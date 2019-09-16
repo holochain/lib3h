@@ -1,7 +1,6 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 mod store;
-use store::{Store, StoreEntryList};
 use crate::simchat::{ChatEvent, SimChat};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
@@ -15,6 +14,7 @@ use lib3h_protocol::{
 use lib3h_sodium::{hash, secbuf::SecBuf};
 use lib3h_tracing::test_span;
 use lib3h_zombie_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
+use store::{Store, StoreEntryList};
 
 use std::{
     collections::HashMap,

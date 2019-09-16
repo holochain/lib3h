@@ -12,18 +12,17 @@ extern crate url;
 use crate::simchat::{ChatEvent, SimChat, SimChatMessage};
 use chrono::prelude::DateTime;
 use colored::*;
-use regex::Regex;
-use std::path::PathBuf;
-use url::Url;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GhostEngine},
 };
 use lib3h_sodium::SodiumCryptoSystem;
+use regex::Regex;
+use std::path::PathBuf;
+use url::Url;
 
 use std::time::{Duration, UNIX_EPOCH};
 use structopt::StructOpt;
-
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Lib3h SimChat", about = "A p2p, IRC style chat client")]

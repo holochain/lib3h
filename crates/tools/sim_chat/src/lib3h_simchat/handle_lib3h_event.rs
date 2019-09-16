@@ -68,11 +68,9 @@ pub fn handle_and_convert_lib3h_event(
             );
 
             // Update the gossip list
-            state.gossip_list.insert(
-                &space_address,
-                &entry_address,
-                &entry_aspect.aspect_address,
-            );
+            state
+                .gossip_list
+                .insert(&space_address, &entry_address, &entry_aspect.aspect_address);
 
             (
                 None,
@@ -184,15 +182,21 @@ pub mod test {
         let response = handle_and_convert_lib3h_event(store_message_event(&message), &mut state);
 
         assert_eq!(response.0, None); // this does not produce a chat event
-        assert_eq!( // state has been updated
+        assert_eq!(
+            // state has been updated
             state
                 .store
                 .get_all_messages(&Address::from("some_space"), &Address::from("some_entry"))
                 .expect("no messages"),
             MessageList(vec![message.clone()])
         );
-        assert_eq!( // also updates gossip list
-            state.gossip_list.get(&Address::from("some_space")).expect("Could not get space hashmap").get(&Address::from("some_entry")),
+        assert_eq!(
+            // also updates gossip list
+            state
+                .gossip_list
+                .get(&Address::from("some_space"))
+                .expect("Could not get space hashmap")
+                .get(&Address::from("some_entry")),
             Some(&vec![message.address()]),
         );
     }
