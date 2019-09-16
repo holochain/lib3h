@@ -1,5 +1,7 @@
-use super::{channel_address_from_string, current_timestamp, current_timeanchor, Lib3hSimChatState};
-use crate::simchat::{ChatEvent, SimChatMessage, MessageList};
+use super::{
+    channel_address_from_string, current_timeanchor, current_timestamp, Lib3hSimChatState,
+};
+use crate::simchat::{ChatEvent, ChatSender, ChatTuple, MessageList, SimChatMessage};
 use lib3h::error::Lib3hError;
 use lib3h_ghost_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
@@ -7,10 +9,10 @@ use lib3h_protocol::{
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
-use lib3h_tracing::test_span;
+use lib3h_tracing::{Lib3hSpan, SpanWrap};
 
 pub fn handle_chat_event(
-    chat_event: ChatEvent,
+    chat_tuple: ChatTuple,
     state: &mut Lib3hSimChatState,
     parent_endpoint: &mut GhostContextEndpoint<
         (),
@@ -20,8 +22,9 @@ pub fn handle_chat_event(
         Lib3hToClientResponse,
         Lib3hError,
     >,
-    chat_event_sender: crossbeam_channel::Sender<ChatEvent>,
+    chat_event_sender: ChatSender,
 ) {
+    let SpanWrap(chat_event, span) = chat_tuple;
     match chat_event {
         ChatEvent::Join {
             channel_id,
@@ -35,16 +38,17 @@ pub fn handle_chat_event(
             };
             parent_endpoint
                 .request(
-                    test_span(""),
+                    span.child("ChatEvent::Join"),
                     ClientToLib3h::JoinSpace(space_data.clone()),
                     Box::new(move |_, callback_data| {
                         // println!("chat received response from engine: {:?}", callback_data);
                         if let Response(Ok(_payload)) = callback_data {
+                            let new_event = ChatEvent::JoinSuccess {
+                                channel_id: channel_id.clone(),
+                                space_data: space_data.clone(),
+                            };
                             chat_event_sender
-                                .send(ChatEvent::JoinSuccess {
-                                    channel_id: channel_id.clone(),
-                                    space_data: space_data.clone(),
-                                })
+                                .send(SpanWrap(new_event, span.follower("ChatEvent::Join")))
                                 .unwrap();
                         }
                         Ok(())
@@ -65,6 +69,7 @@ pub fn handle_chat_event(
             send_sys_message(
                 chat_event_sender,
                 &format!("You joined the channel: {}", channel_id),
+                span.child("send_sys_message"),
             );
         }
 
@@ -72,13 +77,16 @@ pub fn handle_chat_event(
             if let Some(space_data) = state.current_space.clone() {
                 parent_endpoint
                     .request(
-                        test_span(""),
+                        span.child("ChatEvent::Part"),
                         ClientToLib3h::LeaveSpace(space_data.to_owned()),
                         Box::new(move |_, callback_data| {
                             // println!("chat received response from engine: {:?}", callback_data);
                             if let Response(Ok(_payload)) = callback_data {
                                 chat_event_sender
-                                    .send(ChatEvent::PartSuccess(channel_id.clone()))
+                                    .send(SpanWrap(
+                                        ChatEvent::PartSuccess(channel_id.clone()),
+                                        span.follower("ChatEvent::Part"),
+                                    ))
                                     .unwrap();
                             }
                             Ok(())
@@ -86,7 +94,11 @@ pub fn handle_chat_event(
                     )
                     .unwrap();
             } else {
-                send_sys_message(chat_event_sender, &"No channel to leave".to_string());
+                send_sys_message(
+                    chat_event_sender,
+                    &"No channel to leave".to_string(),
+                    span.child("send_sys_message"),
+                );
             }
         }
 
@@ -95,7 +107,11 @@ pub fn handle_chat_event(
             state
                 .spaces
                 .remove(&channel_address_from_string(&channel_id).unwrap());
-            send_sys_message(chat_event_sender, &format!("You left the channel: {}", channel_id).to_string());
+            send_sys_message(
+                chat_event_sender,
+                &format!("You left the channel: {}", channel_id).to_string(),
+                span.child("send_sys_message"),
+            );
         }
 
         ChatEvent::SendDirectMessage { to_agent, payload } => {
@@ -109,7 +125,7 @@ pub fn handle_chat_event(
                 };
                 parent_endpoint
                     .request(
-                        test_span(""),
+                        span.child("ChatEvent::SendDirectMessage"),
                         ClientToLib3h::SendDirectMessage(direct_message_data),
                         Box::new(|_, _callback_data| {
                             // println!("chat received response from engine: {:?}", callback_data);
@@ -121,19 +137,21 @@ pub fn handle_chat_event(
                         send_sys_message(
                             chat_event_sender,
                             &format!("Lib3h returned error: {}", e).to_string(),
+                            span.child("send_sys_message"),
                         );
-                    }).ok();
+                    })
+                    .ok();
             } else {
                 send_sys_message(
                     chat_event_sender,
                     &"Must join a channel before sending a message".to_string(),
+                    span.child("send_sys_message"),
                 );
             }
         }
 
-        ChatEvent::SendChannelMessage{ payload } => {
+        ChatEvent::SendChannelMessage { payload } => {
             if let Some(space_data) = state.current_space.clone() {
-
                 let message = SimChatMessage {
                     from_agent: space_data.agent_id.to_string(),
                     payload,
@@ -151,12 +169,12 @@ pub fn handle_chat_event(
                             aspect_address: message.address(),
                             publish_ts: current_timestamp(),
                         }],
-                    }
+                    },
                 };
 
                 parent_endpoint
                     .request(
-                        test_span(""),
+                        span.child("ChatEvent::SendChannelMessage"),
                         ClientToLib3h::PublishEntry(provided_entry_data),
                         Box::new(|_, _callback_data| {
                             // println!("chat received response from engine: {:?}", callback_data);
@@ -169,11 +187,12 @@ pub fn handle_chat_event(
                 send_sys_message(
                     chat_event_sender,
                     &"Must join a channel before sending a message".to_string(),
+                    span.child("send_sys_message"),
                 );
             }
         }
         // TODO: Update to actually check a given time anchor
-        ChatEvent::QueryChannelMessages{ .. } => {
+        ChatEvent::QueryChannelMessages { .. } => {
             let displayed_channel_messages = state.displayed_channel_messages.clone();
             if let Some(space_data) = state.current_space.clone() {
                 // calculate which time anchors we need to be looking at
@@ -187,15 +206,25 @@ pub fn handle_chat_event(
                 };
                 parent_endpoint
                     .request(
-                        test_span(""),
+                        span.child("ChatEvent::QueryChannelMessages"),
                         ClientToLib3h::QueryEntry(query_entry_data),
                         Box::new(move |_, callback_data| {
-                            if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(query_result))) = callback_data {
+                            if let Response(Ok(ClientToLib3hResponse::QueryEntryResult(
+                                query_result,
+                            ))) = callback_data
+                            {
                                 let messages = MessageList::from_opaque(query_result.query_result);
                                 for message in messages.0 {
                                     // Only emit ReceiveChannelMessage once per time seeing a message
                                     if !displayed_channel_messages.contains(&message.address()) {
-                                        chat_event_sender.send(ChatEvent::ReceiveChannelMessage(message)).ok();
+                                        chat_event_sender
+                                            .send(SpanWrap(
+                                                ChatEvent::ReceiveChannelMessage(message),
+                                                span.follower(
+                                                    "send: ChatEvent::ReceiveChannelMessage",
+                                                ),
+                                            ))
+                                            .ok();
                                     }
                                 }
                             }
@@ -218,12 +247,11 @@ pub fn handle_chat_event(
     }
 }
 
-fn send_sys_message(sender: crossbeam_channel::Sender<ChatEvent>, msg: &String) {
-    sender
-        .send(ChatEvent::ReceiveDirectMessage(SimChatMessage {
-            from_agent: String::from("sys"),
-            payload: String::from(msg),
-            timestamp: current_timestamp(),
-        }))
-        .expect("send fail");
+fn send_sys_message(sender: ChatSender, msg: &String, span: Lib3hSpan) {
+    let event = ChatEvent::ReceiveDirectMessage(SimChatMessage {
+        from_agent: String::from("sys"),
+        payload: String::from(msg),
+        timestamp: current_timestamp(),
+    });
+    sender.send(SpanWrap(event, span)).expect("send fail");
 }

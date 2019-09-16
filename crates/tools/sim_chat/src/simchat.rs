@@ -1,10 +1,14 @@
+use lib3h_protocol::{
+    data_types::{Opaque, SpaceData},
+    Address,
+};
+use lib3h_tracing::SpanWrap;
+use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_slice, to_vec};
-use serde_derive::{Serialize, Deserialize};
-use lib3h_protocol::Address;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use lib3h_protocol::data_types::{Opaque, SpaceData};
-use lib3h_tracing::Lib3hSpan;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SimChatMessage {
@@ -45,7 +49,9 @@ impl MessageList {
     }
 }
 
-pub type ChatTuple = (ChatEvent, Lib3hSpan);
+pub type ChatSender = crossbeam_channel::Sender<ChatTuple>;
+
+pub type ChatTuple = SpanWrap<ChatEvent>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChatEvent {
@@ -62,7 +68,8 @@ pub enum ChatEvent {
         channel_id: String,
         space_data: SpaceData,
     },
-    QueryChannelMessages { // retrieve any messages found within this time box
+    QueryChannelMessages {
+        // retrieve any messages found within this time box
         start_time: u64,
         end_time: u64,
     },

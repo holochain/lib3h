@@ -20,6 +20,12 @@ pub type SpanContext = rustracing_jaeger::span::SpanContext;
 pub type Tracer = rustracing_jaeger::Tracer;
 pub type Reporter = rustracing_jaeger::reporter::JaegerCompactReporter;
 
+// #[shrinkwrap(mutable)]
+// pub struct SpanWrapper<T> {
+//     pub data: T,
+//     span: Lib3hSpan,
+// }
+
 #[derive(Debug, Shrinkwrap)]
 #[shrinkwrap(mutable)]
 pub struct Lib3hSpan(pub Span);
@@ -29,6 +35,16 @@ impl From<Span> for Lib3hSpan {
         Lib3hSpan(span)
     }
 }
+
+#[derive(Shrinkwrap)]
+#[shrinkwrap(mutable)]
+pub struct SpanWrap<T>(#[shrinkwrap(main_field)] pub T, pub Lib3hSpan);
+
+// impl<T> SpanWrap<T> {
+//     pub fn ref_data(&self) -> SpanWrap<&T> {
+//         SpanWrap(&self.0, self.1)
+//     }
+// }
 
 /// Binary representation is exactly 37 bytes, so ideally
 /// we would use a [u8; 37], but this is easier...

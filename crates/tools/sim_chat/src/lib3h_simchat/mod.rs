@@ -1,10 +1,10 @@
 mod handle_chat_event;
 mod handle_lib3h_event;
 
-use lib3h_tracing::test_span;
-use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
+use crate::simchat::{ChatEvent, ChatSender, ChatTuple, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
+use lib3h_tracing::{Lib3hSpan, SpanWrap};
 
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
@@ -69,8 +69,15 @@ impl Store {
         message_address: &Address,
         message: SimChatMessage,
     ) {
-        let mut space = self.0.get(space_address).map(|hm| hm.clone()).unwrap_or(HashMap::new());
-        let mut base = space.get(base_address).map(|hm| hm.clone()).unwrap_or(HashMap::new());
+        let mut space = self
+            .0
+            .get(space_address)
+            .map(|hm| hm.clone())
+            .unwrap_or(HashMap::new());
+        let mut base = space
+            .get(base_address)
+            .map(|hm| hm.clone())
+            .unwrap_or(HashMap::new());
 
         base.insert(message_address.clone(), message);
         space.insert(base_address.clone(), base.clone());
@@ -78,17 +85,17 @@ impl Store {
     }
 }
 
-pub type HandleEvent = Box<dyn FnMut(&ChatEvent) + Send>;
+pub type HandleEvent = Box<dyn FnMut(SpanWrap<&ChatEvent>) + Send>;
 
 pub struct Lib3hSimChat {
     thread: Option<std::thread::JoinHandle<()>>,
     thread_continue: Arc<AtomicBool>,
-    out_send: crossbeam_channel::Sender<ChatEvent>,
+    out_send: crossbeam_channel::Sender<ChatTuple>,
     tracer: Tracer,
 }
 
 pub struct Lib3hSimChatState {
-    /// Is the current lib3h engine reporting connected status
+    /// Is the cu::<ChatTuple>rrent lib3h engine reporting connected status
     connected: bool,
 
     /// Stores the space that messages will be posted to by default
@@ -108,7 +115,6 @@ pub struct Lib3hSimChatState {
     /// been triggered for. This ensures that only one ReceiveChannelEvent is
     /// emitted per message per session
     displayed_channel_messages: Vec<Address>,
-
     // author_list: HashMap<Address, Vec<Address>>, // Aspect addresses per entry,
     // gossip_list: HashMap<Address, Vec<Address>>, // same
 }
@@ -138,7 +144,12 @@ impl Drop for Lib3hSimChat {
 }
 
 impl Lib3hSimChat {
-    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url, tracer: Tracer) -> Self
+    pub fn new<T>(
+        engine_builder: EngineBuilder<T>,
+        mut handler: HandleEvent,
+        peer_uri: Url,
+        tracer: Tracer,
+    ) -> Self
     where
         T: GhostActor<
                 Lib3hToClient,
@@ -150,12 +161,10 @@ impl Lib3hSimChat {
     {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
-        let (out_send, out_recv): (
-            crossbeam_channel::Sender<_>,
-            crossbeam_channel::Receiver<ChatEvent>,
-        ) = crossbeam_channel::unbounded();
+        let (out_send, out_recv) = crossbeam_channel::unbounded::<ChatTuple>();
 
         let internal_sender = out_send.clone();
+        let internal_tracer = tracer.clone();
 
         let thread_continue_inner = thread_continue.clone();
         Self {
@@ -165,20 +174,24 @@ impl Lib3hSimChat {
                 // and handling messages
                 let mut engine = engine_builder();
 
-                let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> =
-                    engine
-                        .take_parent_endpoint()
-                        .expect("Could not get parent endpoint")
-                        .as_context_endpoint_builder()
-                        .request_id_prefix("parent")
-                        .build();
+                let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> = engine
+                    .take_parent_endpoint()
+                    .expect("Could not get parent endpoint")
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("parent")
+                    .build();
 
                 // also keep track of things like the spaces and current space in this scope
                 let mut state = Lib3hSimChatState::new();
 
                 // call connect to start the networking process
                 // (should probably wait for confirmation before continuing)
-                Self::connect(&mut parent_endpoint, peer_uri, internal_sender.clone());
+                Self::connect(
+                    internal_tracer.clone().span("connect").start().into(),
+                    &mut parent_endpoint,
+                    peer_uri,
+                    internal_sender.clone(),
+                );
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -192,22 +205,25 @@ impl Lib3hSimChat {
                     // Receive directly from the crossbeam channel
                     // and convert relevent N3H protocol messages to chat events and handle
                     let direct_chat_events = out_recv.try_iter();
-                    let _engine_chat_events = engine_chat_events
+                    engine_chat_events
                         .into_iter()
                         // process lib3h messages and convert to a chat event if required
                         .for_each(|mut engine_message| {
+                            let _engine_message_span =
+                                engine_message.span().child("engine_chat_events processing");
                             let (maybe_chat_event, maybe_response) =
                                 handle_and_convert_lib3h_event(&mut engine_message, &mut state);
 
                             if let Some(response) = maybe_response {
-                                engine_message.respond(response).expect("Could not send response!");
-                            }  
-                            if let Some(chat_event) =
-                                maybe_chat_event
-                            {
-                                handler(&chat_event);
+                                engine_message
+                                    .respond(response)
+                                    .expect("Could not send response!");
+                            }
+                            if let Some(chat_event) = maybe_chat_event {
+                                let span: Lib3hSpan = internal_tracer.span("todo").start().into();
+                                handler(SpanWrap(&chat_event, span.child("handler")));
                                 handle_chat_event(
-                                    chat_event,
+                                    SpanWrap(chat_event, span.child("handle")),
                                     &mut state,
                                     &mut parent_endpoint,
                                     internal_sender.clone(),
@@ -219,12 +235,15 @@ impl Lib3hSimChat {
                     // and dispatching new n3h actions where required
                     for chat_event in direct_chat_events {
                         // every chat event call the handler that was passed
-                        handler(&chat_event);
+
+                        // TODO: write helper fn for transforming to referenced data
+                        let SpanWrap(event, span) = chat_event;
+                        handler(SpanWrap(&event, span.child("todo child")));
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
                         handle_chat_event(
-                            chat_event,
+                            SpanWrap(event, span.child("todo child 2")),
                             &mut state,
                             &mut parent_endpoint,
                             internal_sender.clone(),
@@ -241,6 +260,7 @@ impl Lib3hSimChat {
     }
 
     fn connect(
+        span: Lib3hSpan,
         endpoint: &mut GhostContextEndpoint<
             (),
             ClientToLib3h,
@@ -250,7 +270,7 @@ impl Lib3hSimChat {
             Lib3hError,
         >,
         peer_uri: Url,
-        chat_event_sender: crossbeam_channel::Sender<ChatEvent>,
+        chat_event_sender: ChatSender,
     ) {
         let connect_message = ClientToLib3h::Connect(ConnectData {
             network_id: String::from(""), // connect to any
@@ -259,10 +279,15 @@ impl Lib3hSimChat {
         });
         endpoint
             .request(
-                test_span(""),
+                span.child("request child"),
                 connect_message,
                 Box::new(move |_, _callback_data| {
-                    chat_event_sender.send(ChatEvent::Connected).expect("Could not send");
+                    chat_event_sender
+                        .send(SpanWrap(
+                            ChatEvent::Connected,
+                            span.follower("chat event sender"),
+                        ))
+                        .expect("Could not send");
                     // println!("chat received response from engine: {:?}", callback_data);
                     Ok(())
                 }),
@@ -273,7 +298,10 @@ impl Lib3hSimChat {
 
 impl SimChat for Lib3hSimChat {
     fn send(&mut self, event: ChatEvent) {
-        self.out_send.send(event).expect("send fail");
+        let span = self.tracer.span("send").start().into();
+        self.out_send
+            .send(SpanWrap(event, span))
+            .expect("send fail");
     }
 }
 
@@ -308,7 +336,7 @@ mod tests {
 
     use super::*;
     use crate::simchat::SimChatMessage;
-    use lib3h_tracing::{Tracer, NullSampler};
+    use lib3h_tracing::{NullSampler, Tracer};
 
     fn new_sim_chat_mock_engine(callback: HandleEvent) -> Lib3hSimChat {
         let (tracer, _) = Tracer::new(NullSampler);
@@ -329,7 +357,9 @@ mod tests {
         }
     }
 
-    fn connected_event() -> ChatEvent { ChatEvent::Connected }
+    fn connected_event() -> ChatEvent {
+        ChatEvent::Connected
+    }
 
     fn receive_sys_message(payload: String) -> ChatEvent {
         ChatEvent::ReceiveDirectMessage(SimChatMessage {
@@ -390,7 +420,10 @@ mod tests {
         chat.send(join_event());
 
         let chat_messages = r.iter().take(3).collect::<Vec<_>>();
-        assert_eq!(chat_messages, vec![join_event(), connected_event(), join_success_event(),],);
+        assert_eq!(
+            chat_messages,
+            vec![join_event(), connected_event(), join_success_event(),],
+        );
     }
 
     #[test]
