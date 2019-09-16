@@ -430,9 +430,9 @@ impl<'engine> GhostEngine<'engine> {
                 Box::new(move |me, response| {
                     let response = {
                         match response {
-                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Timeout => return Err("timeout".into()),
                             GhostCallbackData::Response(response) => match response {
-                                Err(e) => panic!("{:?}", e),
+                                Err(e) => return Err(e.into()),
                                 Ok(response) => response,
                             },
                         }
@@ -457,11 +457,7 @@ impl<'engine> GhostEngine<'engine> {
                                 aspect_address_list: None,
                             };
 
-                            /*                              let _context = RequestContext {
-                                space_address: msg.space_address.to_owned(),
-                                agent_id: msg.provider_agent_id.to_owned(),
-                            };*/
-                            let _ = me.lib3h_endpoint.request(
+                            me.lib3h_endpoint.request(
                                 Lib3hSpan::todo(),
                                 Lib3hToClient::HandleFetchEntry(msg_data),
                                 Box::new(move |me, response| {
@@ -474,27 +470,20 @@ impl<'engine> GhostEngine<'engine> {
                                     match response {
                                         GhostCallbackData::Response(Ok(
                                             Lib3hToClientResponse::HandleFetchEntryResult(msg),
-                                        )) => {
-                                            space_gateway.publish(
-                                                Lib3hSpan::todo(),
-                                                GatewayRequestToChild::Dht(
-                                                    DhtRequestToChild::BroadcastEntry(
-                                                        msg.entry.clone(),
-                                                    ),
+                                        )) => space_gateway.publish(
+                                            Lib3hSpan::todo(),
+                                            GatewayRequestToChild::Dht(
+                                                DhtRequestToChild::BroadcastEntry(
+                                                    msg.entry.clone(),
                                                 ),
-                                            )?;
-                                        }
-                                        GhostCallbackData::Response(Err(e)) => {
-                                            error!("Got error on HandleFetchEntryResult: {:?} ", e);
-                                        }
-                                        GhostCallbackData::Timeout => {
-                                            error!("Got timeout on HandleFetchEntryResult");
-                                        }
-                                        _ => panic!("bad response type"),
+                                            ),
+                                        ),
+                                        GhostCallbackData::Response(Err(e)) => Err(e.into()),
+                                        GhostCallbackData::Timeout => Err("timeout".into()),
+                                        _ => Err("bad response type".into()),
                                     }
-                                    Ok(())
                                 }),
-                            );
+                            )?;
                         }
                     } else {
                         panic!("bad response to RequestAspectsOf: {:?}", response);
@@ -568,27 +557,13 @@ impl<'engine> GhostEngine<'engine> {
         self.lib3h_endpoint.request(
             Lib3hSpan::todo(),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
-            Box::new(|me, response| {
-                match response {
-                    GhostCallbackData::Response(Ok(
-                        Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
-                    )) => {
-                        if let Err(err) = me.handle_HandleGetGossipingEntryListResult(msg) {
-                            error!(
-                                "Got error when handling HandleGetGossipingEntryListResult: {:?} ",
-                                err
-                            );
-                        };
-                    }
-                    GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error from HandleGetGossipingEntryListResult: {:?} ", e);
-                    }
-                    GhostCallbackData::Timeout => {
-                        error!("Got timeout on HandleGetGossipingEntryListResult");
-                    }
-                    _ => panic!("bad response type"),
-                }
-                Ok(())
+            Box::new(|me, response| match response {
+                GhostCallbackData::Response(Ok(
+                    Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
+                )) => Ok(me.handle_HandleGetGossipingEntryListResult(msg)?),
+                GhostCallbackData::Response(Err(e)) => Err(e.into()),
+                GhostCallbackData::Timeout => Err("timeout".into()),
+                _ => Err("bad response type".into()),
             }),
         )?;
 
@@ -597,27 +572,13 @@ impl<'engine> GhostEngine<'engine> {
             .request(
                 Lib3hSpan::todo(),
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-                Box::new(|me, response| {
-                    match response {
-                        GhostCallbackData::Response(Ok(
-                            Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
-                        )) => {
-                            if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
-                                error!(
-                                "Got error when handling HandleGetAuthoringEntryListResult: {:?} ",
-                                err
-                            );
-                            };
-                        }
-                        GhostCallbackData::Response(Err(e)) => {
-                            error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
-                        }
-                        GhostCallbackData::Timeout => {
-                            error!("Got timeout on HandleGetAuthoringEntryListResult");
-                        }
-                        _ => panic!("bad response type"),
-                    }
-                    Ok(())
+                Box::new(|me, response| match response {
+                    GhostCallbackData::Response(Ok(
+                        Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
+                    )) => Ok(me.handle_HandleGetAuthoringEntryListResult(msg)?),
+                    GhostCallbackData::Response(Err(e)) => Err(e.into()),
+                    GhostCallbackData::Timeout => Err("timeout".into()),
+                    _ => Err("bad response type".into()),
                 }),
             )
             .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))
