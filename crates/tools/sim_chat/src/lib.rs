@@ -21,7 +21,7 @@ use lib3h_ghost_actor::{
     GhostActor, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint,
 };
 use lib3h_protocol::{
-    data_types::{ConnectData, DirectMessageData, SpaceData},
+    data_types::{BootstrapData, DirectMessageData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
@@ -290,10 +290,10 @@ impl Lib3hSimChat {
         >,
         peer_uri: Url,
     ) {
-        let connect_message = ClientToLib3h::Connect(ConnectData {
-            network_id: String::from(""), // connect to any
-            peer_uri,
-            request_id: String::from("connect-request"),
+        let connect_message = ClientToLib3h::Bootstrap(BootstrapData {
+            space_address: String::from("").into(), // connect to any
+            bootstrap_uri: peer_uri,
+            //request_id: String::from("connect-request"),
         });
         endpoint
             .request(

@@ -159,6 +159,21 @@ impl std::fmt::Display for Opaque {
 // Connection
 //--------------------------------------------------------------------------------------------------
 
+/// Normally we do peer discovery using the dht
+/// but when we're first starting out, we might need explicit info
+/// or on auto-discovery, such as mDNS
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BootstrapData {
+    /// either the network layer network_id, or the dna hash
+    // this needs a more accurate name which represents that this is the gateway id
+    pub space_address: Address,
+    /// connection uri, such as
+    ///   `wss://1.2.3.4:55888?a=HcMyada`
+    ///   `transportid:HcMyada?a=HcSagent`
+    #[serde(with = "url_serde")]
+    pub bootstrap_uri: Url,
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConnectData {
     /// Identifier of this request
