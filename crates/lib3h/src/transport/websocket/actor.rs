@@ -250,8 +250,8 @@ mod tests {
         }
     }
 
-    fn get_available_port() -> Option<u16> {
-        (1025..65535).find(|port| port_is_available(*port))
+    fn get_available_port(start: u16) -> Option<u16> {
+        (start..65535).find(|port| port_is_available(*port))
     }
 
     #[test]
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(transport1.bound_url, None);
         assert_eq!(transport2.bound_url, None);
 
-        let port1 = get_available_port().expect("Must be able to find free port");
+        let port1 = get_available_port(1025).expect("Must be able to find free port");
         let expected_transport1_address =
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
@@ -299,7 +299,7 @@ mod tests {
             )
             .unwrap();
 
-        let port2 = get_available_port().expect("Must be able to find free port");
+        let port2 = get_available_port(1026).expect("Must be able to find free port");
         let expected_transport2_address =
             Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
@@ -370,7 +370,7 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        let port1 = get_available_port().expect("Must be able to find free port");
+        let port1 = get_available_port(2025).expect("Must be able to find free port");
         let expected_transport1_address =
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
@@ -391,7 +391,7 @@ mod tests {
             Some(expected_transport1_address.clone())
         );
 
-        let port2 = get_available_port().expect("Must be able to find free port");
+        let port2 = get_available_port(2026).expect("Must be able to find free port");
 
         for index in &[1, 2, 3, 4] {
             transport1.process().unwrap();
