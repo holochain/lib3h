@@ -180,12 +180,10 @@ impl
         for event in stream_events {
             match event {
                 StreamEvent::ErrorOccured(connection_id, error) => {
-                    let uri = self
-                        .streams
-                        .connection_id_to_url(connection_id)
-                        .unwrap_or(Url::from_str("wss://0.0.0.0")
-                            .expect("URL literal is syntactically correct")
-                        );
+                    let uri = self.streams.connection_id_to_url(connection_id).unwrap_or(
+                        Url::from_str("wss://0.0.0.0")
+                            .expect("URL literal is syntactically correct"),
+                    );
                     let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
                     endpoint_self.as_mut().expect("exists").publish(
                         Lib3hSpan::todo(),
@@ -237,10 +235,10 @@ mod tests {
 
     use super::*;
     use crate::transport::websocket::tls::TlsConfig;
-    use lib3h_ghost_actor::{wait_for_message};
+    use lib3h_ghost_actor::wait_for_message;
     use regex::Regex;
-    use url::Url;
     use std::{net::TcpListener, thread, time};
+    use url::Url;
 
     fn port_is_available(port: u16) -> bool {
         match TcpListener::bind(("127.0.0.1", port)) {
@@ -276,7 +274,8 @@ mod tests {
         assert_eq!(transport2.bound_url, None);
 
         let port1 = get_available_port().expect("Must be able to find free port");
-        let expected_transport1_address = Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
+        let expected_transport1_address =
+            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
                 Lib3hSpan::todo(),
@@ -298,7 +297,8 @@ mod tests {
             .unwrap();
 
         let port2 = get_available_port().expect("Must be able to find free port");
-        let expected_transport2_address = Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
+        let expected_transport2_address =
+            Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
             .request(
                 Lib3hSpan::todo(),
@@ -368,19 +368,17 @@ mod tests {
             .build::<()>();
 
         let port1 = get_available_port().expect("Must be able to find free port");
-        let expected_transport1_address = Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
+        let expected_transport1_address =
+            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
                 Lib3hSpan::todo(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
-                Box::new(|_: &mut (), _| {
-                    Ok(())
-                }),
+                Box::new(|_: &mut (), _| Ok(())),
             )
             .unwrap();
-
 
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut ());
@@ -392,7 +390,7 @@ mod tests {
 
         let port2 = get_available_port().expect("Must be able to find free port");
 
-        for index in &[1,2,3,4] {
+        for index in &[1, 2, 3, 4] {
             transport1.process().unwrap();
             {
                 let mut transport2 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);;
@@ -403,17 +401,15 @@ mod tests {
                     .request_id_prefix("twss_to_child2")
                     .build::<()>();
 
-
-                let expected_transport2_address = Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
+                let expected_transport2_address =
+                    Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
                 t2_endpoint
                     .request(
                         Lib3hSpan::todo(),
                         RequestToChild::Bind {
                             spec: expected_transport2_address.clone(),
                         },
-                        Box::new(|_: &mut (), _| {
-                            Ok(())
-                        }),
+                        Box::new(|_: &mut (), _| Ok(())),
                     )
                     .unwrap();
                 transport2.process().unwrap();

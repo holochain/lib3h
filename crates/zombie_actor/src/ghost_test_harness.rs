@@ -457,7 +457,8 @@ macro_rules! wait_for_message {
         loop {
             tries += 1;
             thread::sleep(time::Duration::from_millis(POLL_INTERVAL));
-            actors = actors.into_iter()
+            actors = actors
+                .into_iter()
                 .map(|mut actor| {
                     let _ = $crate::wait_did_work!(actor, false);
                     actor
@@ -465,7 +466,7 @@ macro_rules! wait_for_message {
                 .collect::<Vec<_>>();
             let _ = $endpoint.process(&mut ());
             for mut message in $endpoint.drain_messages() {
-                message.take_message().map(|message|{
+                message.take_message().map(|message| {
                     let message_string = &format!("{:?}", message);
                     if message_regex.is_match(message_string) {
                         found = true;
@@ -473,8 +474,8 @@ macro_rules! wait_for_message {
                 });
             }
 
-            if found || tries > $timeout_ms/POLL_INTERVAL {
-                break
+            if found || tries > $timeout_ms / POLL_INTERVAL {
+                break;
             }
         }
         if $should_abort {
