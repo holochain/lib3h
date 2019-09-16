@@ -362,6 +362,7 @@ macro_rules! wait_did_work {
 
 /// Waits until a GhostCanTrack process has been invoked and work was done.
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_can_track_did_work {
     ($ghost_can_track: ident,
      $user_data: ident
@@ -393,11 +394,12 @@ macro_rules! wait_can_track_did_work {
 
 /// Continues processing the GhostActor trait until no work is being done.
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_until_no_work {
     ($ghost_actor: ident) => {{
         let mut did_work;
         loop {
-            did_work = wait_did_work!($ghost_actor, false);
+            did_work = $crate::wait_did_work!($ghost_actor, false);
             if !did_work {
                 break;
             }

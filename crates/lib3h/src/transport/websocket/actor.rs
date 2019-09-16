@@ -234,7 +234,7 @@ mod tests {
     use crate::transport::websocket::tls::TlsConfig;
     use regex::Regex;
     use url::Url;
-    use lib3h_ghost_actor::wait_did_work;
+    use lib3h_ghost_actor::{wait_until_no_work};
 
     #[test]
     fn test_ghost_websocket_transport() {
@@ -335,7 +335,7 @@ mod tests {
         assert!(format!("{:?}", requests[0].take_message())
             .starts_with("Some(IncomingConnection { uri: \"wss://127.0.0.1"));
 
-        wait_did_work!(transport1);
+        wait_until_no_work!(transport1);
 
         let _ = t1_endpoint.process(&mut ());
 
