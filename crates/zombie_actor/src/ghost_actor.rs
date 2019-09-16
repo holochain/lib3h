@@ -386,7 +386,7 @@ mod tests {
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
     use lib3h_tracing::test_span;
-    //    use predicates::prelude::*;
+    use predicates::prelude::*;
     use crate::ghost_test_harness::*;
 
     type TestError = String;
@@ -582,12 +582,12 @@ mod tests {
         // and taking control of the parent endpoint.  Parent wrapper implements
         // much of this work as a convenience
 
-        let mut _fake_parent = FakeParent {
+        let mut fake_parent = FakeParent {
             state: "".to_string(),
         };
 
         // create the wrapper
-        let mut _wrapped_child: GhostParentWrapper<
+        let mut wrapped_child: GhostParentWrapper<
             FakeParent,
             TestMsgOut,
             TestMsgOutResponse,
@@ -598,11 +598,11 @@ mod tests {
         > = GhostParentWrapper::new(TestActor::new(), "parent");
 
         // use it to publish an event via the wrapper
-        let _test_msg_in = TestMsgIn("event from parent".into());
+        let test_msg_in = TestMsgIn("event from parent".into());
+        let test_msg_in_response = TestMsgInResponse("event from parent".into());
+        //let test_msg_out = TestMsgOut("event from parent".into());
 
-        let _test_msg_out = TestMsgOut("event from parent".into());
-
-        //        assert_callback_eq!(wrapped_child, fake_parent, test_msg_in, test_msg_out, String);
+        assert_callback_eq!(wrapped_child, fake_parent, test_msg_in, test_msg_in_response, String);
     }
 
     #[test]
