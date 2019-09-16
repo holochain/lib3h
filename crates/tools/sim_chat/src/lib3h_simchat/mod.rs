@@ -8,16 +8,13 @@ use handle_lib3h_event::handle_and_convert_lib3h_event;
 use lib3h::{engine::CanAdvertise, error::Lib3hError};
 use lib3h_crypto_api::CryptoError;
 use lib3h_protocol::{
-    data_types::{BootstrapData, SpaceData},
+    data_types::SpaceData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
-use lib3h_tracing::test_span;
 // use lib3h_tracing::test_span;
-use lib3h_zombie_actor::{
-    GhostActor, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint,
-};
+use lib3h_zombie_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use store::{Store, StoreEntryList};
 
 use std::{
@@ -141,7 +138,7 @@ impl Lib3hSimChat {
 
                 // If any bootstrap nodes were provided try and use them
                 for peer_uri in bootstrap_uris {
-                    Self::bootstrap(peer_uri, internal_sender.clone(), &mut parent_endpoint);
+                    Self::bootstrap(peer_uri, internal_sender.clone());
                 }
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
@@ -208,44 +205,13 @@ impl Lib3hSimChat {
 
     /// Uses n3h to try and bootstrap via the given URI
     /// This will trigger a sys message on dispatch and success
-    fn bootstrap(
-        bootstrap_uri: Url,
-        chat_message_sender: crossbeam_channel::Sender<ChatEvent>,
-        parent_endpoint: &mut GhostContextEndpoint<
-            (),
-            ClientToLib3h,
-            ClientToLib3hResponse,
-            Lib3hToClient,
-            Lib3hToClientResponse,
-            Lib3hError,
-        >,
-    ) {
-        let boostrap_data = BootstrapData {
-            bootstrap_uri: bootstrap_uri.clone(),
-            space_address: Address::from(""), // This will have to change eventually
-        };
-
-        let local_sender = chat_message_sender.clone();
-
+    fn bootstrap(bootstrap_uri: Url, chat_message_sender: crossbeam_channel::Sender<ChatEvent>) {
         send_sys_message(
-            local_sender.clone(),
+            chat_message_sender.clone(),
             &format!("Attempting to boostrap via {}", bootstrap_uri),
         );
-
-        parent_endpoint
-            .request(
-                test_span(""),
-                ClientToLib3h::Bootstrap(boostrap_data),
-                Box::new(move |_, callback_data| {
-                    if let Response(Ok(ClientToLib3hResponse::BootstrapSuccess)) = callback_data {
-                        send_sys_message(
-                            local_sender,
-                            &format!("Bootstrap success via {}", bootstrap_uri),
-                        );
-                    }
-                    Ok(())
-                }),
-            )
+        chat_message_sender
+            .send(ChatEvent::Bootstrap(bootstrap_uri))
             .ok();
     }
 }

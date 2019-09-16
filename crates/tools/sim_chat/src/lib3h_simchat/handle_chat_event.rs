@@ -249,6 +249,26 @@ pub fn handle_chat_event(
             None
         }
 
+        ChatEvent::Bootstrap(peer_uri) => {
+            let boostrap_data = BootstrapData {
+                bootstrap_uri: peer_uri.clone(),
+                space_address: Address::from(""), // This will have to change eventually
+            };
+            // Lib3hSimChat::bootstrap(peer_uri, chat_event_sender);
+            Some(Lib3hEventAndCallback::new(
+                ClientToLib3h::Bootstrap(boostrap_data),
+                Box::new(move |_, callback_data| {
+                    if let Response(Ok(ClientToLib3hResponse::BootstrapSuccess)) = callback_data {
+                        send_sys_message(
+                            chat_event_sender,
+                            &format!("Bootstrap success via {}", peer_uri),
+                        );
+                    }
+                    Ok(())
+                }),
+            ))
+        }
+
         _ => None,
     }
 }

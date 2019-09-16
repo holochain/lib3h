@@ -123,6 +123,7 @@ lib3h simchat Commands:
   /join <space> <handle>    - Join a space assigning yourself a handle
   /part <space>             - Leave a given space
   /msg <agent> <msg>        - Send a direct message to an agent in your space
+  /bootstrap <peer_uri>     - Attempt to bootstrap onto the network via a given peer uri
   /quit                     - exit Sim Chat
 "#
         )
@@ -137,66 +138,77 @@ lib3h simchat Commands:
     loop {
         let res = rl.read_line_step(Some(Duration::from_millis(1000)));
         match res {
-            Ok(Some(line)) => match line {
-                linefeed::reader::ReadResult::Input(s) => {
-                    if s.starts_with('/') {
-                        let caps = command_matcher.captures(&s).expect("capture failed");
-                        let command = caps.get(1).map(|s| s.as_str());
-                        let args = caps.get(2).map(|s| s.as_str());
-                        match (command, args) {
-                            (Some("quit"), _) => {
-                                writeln!(rl, "QUIT").expect("write fail");
-                                return;
-                            }
-                            (Some("help"), _) => {
-                                help_text();
-                            }
-                            (Some("join"), Some(rest)) => {
-                                let mut words = rest.split(' ');
-                                let channel_id = words.next();
-                                let agent_id = words.next();
-                                if let (Some(channel_id), Some(agent_id)) = (channel_id, agent_id) {
-                                    cli.send(ChatEvent::Join {
-                                        channel_id: channel_id.to_string(),
-                                        agent_id: agent_id.to_string(),
-                                    })
-                                } else {
-                                    writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
+            Ok(Some(line)) => {
+                match line {
+                    linefeed::reader::ReadResult::Input(s) => {
+                        if s.starts_with('/') {
+                            let caps = command_matcher.captures(&s).expect("capture failed");
+                            let command = caps.get(1).map(|s| s.as_str());
+                            let args = caps.get(2).map(|s| s.as_str());
+                            match (command, args) {
+                                (Some("quit"), _) => {
+                                    writeln!(rl, "QUIT").expect("write fail");
+                                    return;
+                                }
+                                (Some("help"), _) => {
+                                    help_text();
+                                }
+                                (Some("join"), Some(rest)) => {
+                                    let mut words = rest.split(' ');
+                                    let channel_id = words.next();
+                                    let agent_id = words.next();
+                                    if let (Some(channel_id), Some(agent_id)) =
+                                        (channel_id, agent_id)
+                                    {
+                                        cli.send(ChatEvent::Join {
+                                            channel_id: channel_id.to_string(),
+                                            agent_id: agent_id.to_string(),
+                                        })
+                                    } else {
+                                        writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
+                                    }
+                                }
+                                (Some("part"), Some(channel_id)) => cli.send(ChatEvent::Part {
+                                    channel_id: channel_id.to_string(),
+                                }),
+                                (Some("msg"), Some(rest)) => {
+                                    let mut words = rest.split(' ');
+                                    let to_agent: String = words.next().unwrap().to_string();
+                                    let payload: String = words.collect();
+                                    cli.send(ChatEvent::SendDirectMessage { to_agent, payload });
+                                }
+                                (Some("bootstrap"), Some(uri_str)) => {
+                                    if let Ok(uri) = Url::parse(uri_str) {
+                                        cli.send(ChatEvent::Bootstrap(uri));
+                                    } else {
+                                        writeln!(rl, "/bootstrap must be called with a valid URI as a parameter").expect("write fail");
+                                    }
+                                }
+                                _ => {
+                                    writeln!(
+                                        rl,
+                                        "Unrecognised command or arguments not correctly given"
+                                    )
+                                    .expect("write fail");
                                 }
                             }
-                            (Some("part"), Some(channel_id)) => cli.send(ChatEvent::Part {
-                                channel_id: channel_id.to_string(),
-                            }),
-                            (Some("msg"), Some(rest)) => {
-                                let mut words = rest.split(' ');
-                                let to_agent: String = words.next().unwrap().to_string();
-                                let payload: String = words.collect();
-                                cli.send(ChatEvent::SendDirectMessage { to_agent, payload });
+                        } else {
+                            if s.len() > 0 {
+                                // no sending empty messages
+                                cli.send(ChatEvent::SendChannelMessage { payload: s });
                             }
-                            _ => {
-                                writeln!(
-                                    rl,
-                                    "Unrecognised command or arguments not correctly given"
-                                )
-                                .expect("write fail");
-                            }
-                        }
-                    } else {
-                        if s.len() > 0 {
-                            // no sending empty messages
-                            cli.send(ChatEvent::SendChannelMessage { payload: s });
                         }
                     }
+                    linefeed::reader::ReadResult::Eof => {
+                        eprintln!("\nEof");
+                        break;
+                    }
+                    linefeed::reader::ReadResult::Signal(s) => {
+                        eprintln!("\nSignal: {:?}", s);
+                        break;
+                    }
                 }
-                linefeed::reader::ReadResult::Eof => {
-                    eprintln!("\nEof");
-                    break;
-                }
-                linefeed::reader::ReadResult::Signal(s) => {
-                    eprintln!("\nSignal: {:?}", s);
-                    break;
-                }
-            },
+            }
             Err(e) => {
                 eprintln!("{:?}", e);
                 break;

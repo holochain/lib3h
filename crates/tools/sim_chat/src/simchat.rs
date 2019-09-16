@@ -9,6 +9,7 @@ use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
 };
+use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SimChatMessage {
@@ -72,6 +73,7 @@ pub enum ChatEvent {
     PartSuccess {
         channel_id: String,
     },
+    Bootstrap(Url),
     Connected,
     Disconnected,
 }
