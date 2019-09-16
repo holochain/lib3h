@@ -380,11 +380,11 @@ mod tests {
     }
 
     fn part_event() -> ChatEvent {
-        ChatEvent::Part("test_channel".to_string())
+        ChatEvent::Part{ channel_id: "test_channel".to_string()}
     }
 
     fn part_success_event() -> ChatEvent {
-        ChatEvent::PartSuccess("test_channel".to_string())
+        ChatEvent::PartSuccess{ channel_id: "test_channel".to_string()}
     }
 
     #[test]

@@ -88,14 +88,15 @@ pub fn handle_chat_event(
             None
         }
 
-        ChatEvent::Part(channel_id) => {
-            if let Some(space_data) = state.current_space.clone() {
+        ChatEvent::Part{channel_id} => {
+            let space_address = channel_address_from_string(&channel_id).unwrap();
+            if let Some(space_data) = state.spaces.get(&space_address) {
                 Some(Lib3hEventAndCallback::new(
                     ClientToLib3h::LeaveSpace(space_data.to_owned()),
                     Box::new(move |_, callback_data| {
                         if let Response(Ok(_payload)) = callback_data {
                             chat_event_sender
-                                .send(ChatEvent::PartSuccess(channel_id.clone()))
+                                .send(ChatEvent::PartSuccess{channel_id: channel_id.clone()})
                                 .unwrap();
                         }
                         Ok(())
@@ -107,11 +108,14 @@ pub fn handle_chat_event(
             }
         }
 
-        ChatEvent::PartSuccess(channel_id) => {
-            state.current_space = None;
-            state
+        ChatEvent::PartSuccess{channel_id} => {
+            let space_data = state
                 .spaces
                 .remove(&channel_address_from_string(&channel_id).unwrap());
+            // if you just left the current space set it to None
+            if state.current_space == space_data {
+                state.current_space = None;
+            }
             send_sys_message(
                 chat_event_sender,
                 &format!("You left the channel: {}", channel_id).to_string(),
@@ -260,5 +264,26 @@ pub mod tests {
                 request_id: String::from("")
             })
         );
+    }
+
+    #[test]
+    fn responds_to_part_event() {
+        let (s, _r) = crossbeam_channel::unbounded();
+        let mut state = Lib3hSimChatState::new();
+        let space_address = channel_address_from_string(&String::from("some-channel-id")).unwrap();
+        let space_data = SpaceData {
+            space_address: space_address.clone(),
+            agent_id: Address::from("some-agent-id"),
+            request_id: String::from(""),
+        };
+        // insert the space to part in the state
+        state.spaces.insert(space_address, space_data.clone());
+        let chat_event = ChatEvent::Part{ channel_id: String::from("some-channel-id")};
+
+        let response = handle_chat_event(chat_event, &mut state, s);
+        assert_eq!(
+            response.unwrap().event, 
+            ClientToLib3h::LeaveSpace(space_data)
+        );        
     }
 }
