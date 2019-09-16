@@ -19,7 +19,6 @@ jobs:
        . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
        # same as linux from here
        nix-shell --run echo
-       ./test/nix-env.sh
        nix-shell --run l3h-test
 
 workflows:
