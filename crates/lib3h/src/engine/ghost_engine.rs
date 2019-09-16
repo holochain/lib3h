@@ -184,7 +184,9 @@ impl<'engine> GhostEngine<'engine> {
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.multiplexer.as_mut().publish(
             Lib3hSpan::todo(),
-            GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(engine.this_net_peer.peer_uri.clone())),
+            GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
+                engine.this_net_peer.peer_uri.clone(),
+            )),
         )?;
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.priv_connect_bootstraps()?;
