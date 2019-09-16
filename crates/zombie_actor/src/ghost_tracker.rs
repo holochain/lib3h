@@ -1,14 +1,14 @@
 use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 
-use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId};
+use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
 
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure
 /// such as a timeout
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GhostCallbackData<CbData: 'static, E: 'static> {
     Response(Result<CbData, E>),
     Timeout,
@@ -94,11 +94,12 @@ impl GhostTrackerBookmarkOptions {
 impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
     /// trigger any periodic or delayed callbacks
     /// also check / cleanup any timeouts
-    pub fn process(&mut self, ga: &mut UserData) -> GhostResult<()> {
+    pub fn process(&mut self, ga: &mut UserData) -> GhostResult<WorkWasDone> {
         let mut expired = Vec::new();
 
         let now = std::time::SystemTime::now();
 
+        let did_work = !self.pending.is_empty();
         for (request_id, entry) in self.pending.iter() {
             if now > entry.expires {
                 expired.push(request_id.clone())
@@ -114,7 +115,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
             }
         }
 
-        Ok(())
+        Ok(did_work.into())
     }
 
     /// register a callback
@@ -266,7 +267,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1));
         detach_run!(&mut actor.tracker, |tracker| {
             let result = tracker.process(&mut actor);
-            assert_eq!("Ok(())", format!("{:?}", result));
+            assert_eq!("Ok(WorkWasDone(true))", format!("{:?}", result));
         });
         assert_eq!(actor.state, "timed_out");
         assert_eq!(actor.tracker.pending.len(), 0);
