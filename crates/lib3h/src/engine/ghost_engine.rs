@@ -11,8 +11,12 @@ use crate::{
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
+    keystore::KeystoreStub,
     track::Tracker,
-    transport::{self, memory_mock::ghost_transport_memory::*, TransportMultiplex},
+    transport::{
+        self, memory_mock::ghost_transport_memory::*, protocol::*, TransportEncoding,
+        TransportMultiplex,
+    },
 };
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_tracing::Lib3hSpan;
@@ -72,7 +76,7 @@ impl<'engine> GhostEngine<'engine> {
             config,
             name,
             dht_factory,
-            GhostTransportMemory::new(),
+            Box::new(GhostTransportMemory::new()),
         )
     }
 
@@ -81,9 +85,18 @@ impl<'engine> GhostEngine<'engine> {
         config: EngineConfig,
         name: &str,
         dht_factory: DhtFactory,
-        mut transport: GhostTransportMemory, // FIXME: TEMPORARY hardcoded to memory
+        transport: DynTransportActor,
     ) -> Lib3hResult<Self> {
-        let memory_network_endpoint = Detach::new(
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+        let transport = TransportEncoding::new(
+            crypto.box_clone(),
+            transport_keys.transport_id.clone(),
+            Box::new(KeystoreStub::new()),
+            transport,
+        );
+
+        /*
+        let network_endpoint = Detach::new(
             transport
                 .take_parent_endpoint()
                 .expect("exists")
@@ -91,11 +104,12 @@ impl<'engine> GhostEngine<'engine> {
                 .request_id_prefix("tmem_to_child_")
                 .build::<P2pGateway>(),
         );
+        */
 
         /*
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
-        memory_network_endpoint.request(
+        network_endpoint.request(
             Lib3hTrace,
             transport::protocol::RequestToChild::Bind {
                 spec: config.bind_url.clone(),
@@ -119,7 +133,7 @@ impl<'engine> GhostEngine<'engine> {
             }),
         )?;
         transport.process()?;
-        memory_network_endpoint.process(&mut gateway_ud)?;
+        network_endpoint.process(&mut gateway_ud)?;
         */
         let fixme_binding = Url::parse("fixme::host:123").unwrap();
         let this_net_peer = PeerData {
@@ -131,11 +145,10 @@ impl<'engine> GhostEngine<'engine> {
         let dht_config =
             DhtConfig::with_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
         let multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 NETWORK_GATEWAY_ID,
-                memory_network_endpoint,
+                Box::new(transport),
                 dht_factory,
                 &dht_config,
             )),
@@ -391,18 +404,22 @@ impl<'engine> GhostEngine<'engine> {
         );
 
         // Create new space gateway for this ChainId
-        let uniplex_endpoint = Detach::new(
+        let uniplex = TransportEndpointAsActor::new(
             self.multiplexer
                 .as_mut()
                 .as_mut()
-                .create_agent_space_route(&space_address, &agent_id)
-                .as_context_endpoint_builder()
-                .build::<P2pGateway>(),
+                .create_agent_space_route(&space_address, &agent_id),
+        );
+        let uniplex = TransportEncoding::new(
+            self.crypto.box_clone(),
+            agent_id.to_string(),
+            Box::new(KeystoreStub::new()),
+            Box::new(uniplex),
         );
         let new_space_gateway = GatewayParentWrapper::new(
             P2pGateway::new_with_space(
                 &space_address,
-                uniplex_endpoint,
+                Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,
             ),
@@ -868,6 +885,7 @@ mod tests {
     use super::*;
     use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
     use lib3h_sodium::SodiumCryptoSystem;
+    use std::path::PathBuf;
     use url::Url;
 
     struct MockCore {
@@ -879,7 +897,7 @@ mod tests {
         let config = EngineConfig {
             socket_type: "mem".into(),
             bootstrap_nodes: vec![],
-            work_dir: String::new(),
+            work_dir: PathBuf::new(),
             log_level: 'd',
             bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
             dht_gossip_interval: 100,
