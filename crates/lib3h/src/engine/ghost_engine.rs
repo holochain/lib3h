@@ -402,109 +402,107 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     #[allow(non_snake_case)]
-    fn handle_HandleGetAuthoringEntryListResult(&mut self, _msg: EntryListData) -> Lib3hResult<()> {
-        /* TODO: #327
-
+    fn handle_HandleGetAuthoringEntryListResult(
+        &mut self,
+        entry_list: EntryListData,
+    ) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
-              &msg.space_address.to_owned(),
-              &msg.provider_agent_id.to_owned(),
-          )?;
+            &entry_list.space_address.to_owned(),
+            &entry_list.provider_agent_id.to_owned(),
+        )?;
 
-          for (entry_address, aspect_address_list) in msg.address_map.clone() {
-              // Check aspects and only request entry with new aspects
-              space_gateway.as_mut().as_dht_mut().request(
-                  DhtContext::RequestAspectsOf {
-                      entry_address: entry_address.clone(),
-                      aspect_address_list,
-                      msg: msg.clone(),
-                      request_id: self.request_track.reserve(),
-                  },
-                  DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                  Box::new(|ud, context, response| {
-                      let (entry_address, aspect_address_list, msg, request_id) = {
-                          if let DhtContext::RequestAspectsOf {
-                              entry_address,
-                              aspect_address_list,
-                              msg,
-                              request_id,
-                          } = context
-                          {
-                              (entry_address, aspect_address_list, msg, request_id)
-                          } else {
-                              panic!("bad context type");
-                          }
-                      };
-                      let response = {
-                          match response {
-                              GhostCallbackData::Timeout => panic!("timeout"),
-                              GhostCallbackData::Response(response) => match response {
-                                  Err(e) => panic!("{:?}", e),
-                                  Ok(response) => response,
-                              },
-                          }
-                      };
-                      if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
-                          response
-                      {
-                          let can_fetch = match maybe_known_aspects {
-                              None => true,
-                              Some(known_aspects) => {
-                                  let can = !includes(&known_aspects, &aspect_address_list);
-                                  can
-                              }
-                          };
-                          if can_fetch {
-                              let _msg_data = FetchEntryData {
-                                  space_address: msg.space_address.clone(),
-                                  entry_address: entry_address.clone(),
-                                  request_id,
-                                  provider_agent_id: msg.provider_agent_id.clone(),
-                                  aspect_address_list: None,
-                              };
+        /*let x =                   DhtContext::RequestAspectsOf {
+            entry_address: entry_address.clone(),
+            aspect_address_list,
+            msg: msg.clone(),
+            request_id: self.request_track.reserve(),
+        };*/
 
-                              let _context = RequestContext {
-                                  space_address: msg.space_address.to_owned(),
-                                  agent_id: msg.provider_agent_id.to_owned(),
-                              };
-                              let _ = self.lib3h_endpoint.request(
-                                  context.clone(),
-                                  Lib3hToClient::HandleFetchEntry(msg_data),
-                                  Box::new(|me, context, response| {
-                                      let space_gateway = me
-                                          .get_space(
-                                              &context.space_address.to_owned(),
-                                              &context.agent_id.to_owned(),
-                                          )
-                                          .map_err(|e| GhostError::from(e.to_string()))?;
-                                      match response {
-                                          GhostCallbackData::Response(Ok(
-                                              Lib3hToClientResponse::HandleFetchEntryResult(msg),
-                                          )) => {
-                                              space_gateway.as_mut().as_dht_mut().publish(
-                                                  DhtRequestToChild::BroadcastEntry(
-                                                      msg.entry.clone(),
-                                                  ),
-                                              )?;
-                                          }
-                                          GhostCallbackData::Response(Err(e)) => {
-                                              error!("Got error on HandleFetchEntryResult: {:?} ", e);
-                                          }
-                                          GhostCallbackData::Timeout => {
-                                              error!("Got timeout on HandleFetchEntryResult");
-                                          }
-                                          _ => panic!("bad response type"),
-                                      }
-                                      Ok(())
-                                  }),
-                              );
-                          }
-                      } else {
-                          panic!("bad response to RequestAspectsOf: {:?}", response);
-                      }
-                      Ok(())
-                  }),
-              )?;
-          }*/
+        for (entry_address, aspect_address_list) in entry_list.address_map.clone() {
+            let space_address = entry_list.space_address.clone();
+            let provider_agent_id = entry_list.provider_agent_id.clone();
+            // Check aspects and only request entry with new aspects
+            space_gateway.request(
+                Lib3hSpan::todo(),
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
+                    entry_address.clone(),
+                )),
+                Box::new(move |me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("timeout"),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => panic!("{:?}", e),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let GatewayRequestToChildResponse::Dht(
+                        DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects),
+                    ) = response
+                    {
+                        let can_fetch = match maybe_known_aspects {
+                            None => true,
+                            Some(known_aspects) => {
+                                let can = !includes(&known_aspects, &aspect_address_list);
+                                can
+                            }
+                        };
+                        if can_fetch {
+                            let msg_data = FetchEntryData {
+                                space_address: space_address.clone(),
+                                entry_address: entry_address.clone(),
+                                request_id: me.request_track.reserve(),
+                                provider_agent_id: provider_agent_id.clone(),
+                                aspect_address_list: None,
+                            };
+
+                            /*                              let _context = RequestContext {
+                                space_address: msg.space_address.to_owned(),
+                                agent_id: msg.provider_agent_id.to_owned(),
+                            };*/
+                            let _ = me.lib3h_endpoint.request(
+                                Lib3hSpan::todo(),
+                                Lib3hToClient::HandleFetchEntry(msg_data),
+                                Box::new(move |me, response| {
+                                    let space_gateway = me
+                                        .get_space(
+                                            &space_address.to_owned(),
+                                            &provider_agent_id.to_owned(),
+                                        )
+                                        .map_err(|e| GhostError::from(e.to_string()))?;
+                                    match response {
+                                        GhostCallbackData::Response(Ok(
+                                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
+                                        )) => {
+                                            space_gateway.publish(
+                                                Lib3hSpan::todo(),
+                                                GatewayRequestToChild::Dht(
+                                                    DhtRequestToChild::BroadcastEntry(
+                                                        msg.entry.clone(),
+                                                    ),
+                                                ),
+                                            )?;
+                                        }
+                                        GhostCallbackData::Response(Err(e)) => {
+                                            error!("Got error on HandleFetchEntryResult: {:?} ", e);
+                                        }
+                                        GhostCallbackData::Timeout => {
+                                            error!("Got timeout on HandleFetchEntryResult");
+                                        }
+                                        _ => panic!("bad response type"),
+                                    }
+                                    Ok(())
+                                }),
+                            );
+                        }
+                    } else {
+                        panic!("bad response to RequestAspectsOf: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )?;
+        }
         Ok(())
     }
 
