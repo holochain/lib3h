@@ -132,26 +132,33 @@ impl<'engine> GhostEngine<'engine> {
             transport,
         );
 
-        /*
-        let network_endpoint = Detach::new(
-            transport
-                .take_parent_endpoint()
-                .expect("exists")
-                .as_context_endpoint_builder()
-                .request_id_prefix("tmem_to_child_")
-                .build::<P2pGateway>(),
-        );
-        */
+        let prebound_binding = Url::parse("none:").unwrap();
+        let this_net_peer = PeerData {
+            peer_address: format!("{}_tId", name),
+            peer_uri: prebound_binding,
+            timestamp: 0, // TODO #166
+        };
+        // Create DhtConfig
+        let dht_config = DhtConfig::with_engine_config(&format!("{}_tId", name), &config);
+        debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
+        let mut multiplexer = Detach::new(GatewayParentWrapper::new(
+            TransportMultiplex::new(P2pGateway::new(
+                NETWORK_GATEWAY_ID,
+                Box::new(transport),
+                dht_factory,
+                &dht_config,
+            )),
+            "to_multiplexer_",
+        ));
 
-        /*
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
-        network_endpoint.request(
-            Lib3hTrace,
-            transport::protocol::RequestToChild::Bind {
+        multiplexer.as_mut().request(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Transport(RequestToChild::Bind {
                 spec: config.bind_url.clone(),
-            },
-            Box::new(|mut ud, response| {
+            }),
+            Box::new(|me: &mut GhostEngine<'engine>, response| {
                 let response = {
                     match response {
                         GhostCallbackData::Timeout => panic!("timeout"),
@@ -161,36 +168,18 @@ impl<'engine> GhostEngine<'engine> {
                         },
                     }
                 };
-                if let transport::protocol::RequestToChildResponse::Bind(bind_data) = response {
-                    ud.binding = bind_data.bound_url;
+                if let GatewayRequestToChildResponse::Transport(RequestToChildResponse::Bind(
+                    bind_data,
+                )) = response
+                {
+                    me.this_net_peer.peer_uri = bind_data.bound_url;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
                 Ok(())
             }),
         )?;
-        transport.process()?;
-        network_endpoint.process(&mut gateway_ud)?;
-        */
-        let fixme_binding = Url::parse("fixme::host:123").unwrap();
-        let this_net_peer = PeerData {
-            peer_address: format!("{}_tId", name),
-            peer_uri: fixme_binding.clone(),
-            timestamp: 0, // TODO #166
-        };
-        // Create DhtConfig
-        let dht_config =
-            DhtConfig::with_engine_config(&format!("{}_tId", name), &fixme_binding, &config);
-        debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
-        let multiplexer = Detach::new(GatewayParentWrapper::new(
-            TransportMultiplex::new(P2pGateway::new(
-                NETWORK_GATEWAY_ID,
-                Box::new(transport),
-                dht_factory,
-                &dht_config,
-            )),
-            "to_multiplexer_",
-        ));
+
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let mut engine = GhostEngine {
             crypto,
@@ -211,7 +200,14 @@ impl<'engine> GhostEngine<'engine> {
                     .build(),
             ),
         };
-
+        detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
+        engine.multiplexer.as_mut().publish(
+            Lib3hSpan::todo(),
+            GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
+                engine.this_net_peer.peer_uri.clone(),
+            )),
+        )?;
+        detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.priv_connect_bootstraps()?;
         Ok(engine)
     }
@@ -219,11 +215,20 @@ impl<'engine> GhostEngine<'engine> {
     fn priv_connect_bootstraps(&mut self) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
-            self.handle_connect(ConnectData {
+            let data = ConnectData {
                 request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
                 peer_uri: bs,
                 network_id: "".to_string(), // unimplemented
-            })?;
+            };
+
+            // can't use handle_connect() because it assumes a message to respond to
+            let cmd = GatewayRequestToChild::Transport(
+                transport::protocol::RequestToChild::SendMessage {
+                    uri: data.peer_uri,
+                    payload: Opaque::new(),
+                },
+            );
+            self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
         }
         Ok(())
     }
@@ -276,14 +281,37 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Process connect events by sending them to the multiplexer
-    fn handle_connect(&mut self, data: ConnectData) -> GhostResult<()> {
+    fn handle_connect(&mut self, msg: ClientToLib3hMessage, data: ConnectData) -> GhostResult<()> {
         let cmd =
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: data.peer_uri,
+                uri: data.peer_uri.clone(),
                 payload: Opaque::new(),
             });
-        // TODO: #339 convert to request and respond with ConnectedData
-        self.multiplexer.publish(Lib3hSpan::todo(), cmd)
+        self.multiplexer.request(
+            Lib3hSpan::todo(),
+            cmd,
+            Box::new(move |_me, response| {
+                match response {
+                    GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
+                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                    ))) => {
+                        let response_data = ConnectedData {
+                            request_id: data.request_id,
+                            uri: data.peer_uri,
+                        };
+                        msg.respond(Ok(ClientToLib3hResponse::ConnectResult(response_data)))?
+                    }
+                    GhostCallbackData::Response(Err(e)) => {
+                        error!("Got error from connect to gateway: {:?} ", e);
+                    }
+                    GhostCallbackData::Timeout => {
+                        error!("Got timeout on connect to gateway");
+                    }
+                    _ => panic!("bad response type"),
+                }
+                Ok(())
+            }),
+        )
     }
 
     /// Process any Client events or requests
@@ -294,7 +322,7 @@ impl<'engine> GhostEngine<'engine> {
         match msg.take_message().expect("exists") {
             ClientToLib3h::Connect(data) => {
                 trace!("ClientToLib3h::Connect: {:?}", &data);
-                self.handle_connect(data)
+                self.handle_connect(msg, data)
             }
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
@@ -345,17 +373,7 @@ impl<'engine> GhostEngine<'engine> {
             return Err(Lib3hError::new_other("Already joined space"));
         }
 
-        // First create DhtConfig for space gateway
-        let this_peer_transport_id_as_uri = {
-            // TODO #175 - encapsulate this conversion logic
-            Url::parse(format!("transportId:{}", self.this_net_peer.peer_address).as_str())
-                .expect("can parse url")
-        };
-        let dht_config = DhtConfig::with_engine_config(
-            &agent_id.to_string(),
-            &this_peer_transport_id_as_uri,
-            &self.config,
-        );
+        let dht_config = DhtConfig::with_engine_config(&agent_id.to_string(), &self.config);
 
         // Create new space gateway for this ChainId
         let uniplex = TransportEndpointAsActor::new(

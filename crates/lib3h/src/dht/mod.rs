@@ -114,7 +114,7 @@ pub mod tests {
 
     fn new_dht(_is_mirror: bool, peer_address: &PeerAddressRef) -> Box<DhtActor> {
         //if is_mirror {
-        return MirrorDht::new(peer_address, &create_test_uri(peer_address));
+        return MirrorDht::new(peer_address);
         //}
         //Box::new(RrDht::new())
     }
