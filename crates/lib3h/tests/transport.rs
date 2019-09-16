@@ -2,6 +2,7 @@
 extern crate detach;
 #[macro_use]
 extern crate lazy_static;
+extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 use detach::prelude::*;
 use lib3h::transport::{error::*, protocol::*};

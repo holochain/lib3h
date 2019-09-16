@@ -3,13 +3,13 @@ use super::{
 };
 use crate::simchat::{ChatEvent, ChatSender, ChatTuple, MessageList, SimChatMessage};
 use lib3h::error::Lib3hError;
-use lib3h_ghost_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
     data_types::*,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
     Address,
 };
 use lib3h_tracing::{Lib3hSpan, SpanWrap};
+use lib3h_zombie_actor::{GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint};
 
 pub fn handle_chat_event(
     chat_tuple: ChatTuple,

@@ -20,7 +20,7 @@ lib3h_protocol = { "path" = "../../lib3h_protocol" }
 lib3h_sodium = { "path" = "../../sodium" }
 lib3h_crypto_api = { "path" = "../../crypto_api" }
 lib3h = { "path" = "../../lib3h" }
-lib3h_ghost_actor = { "path" = "../../ghost_actor" }
+lib3h_zombie_actor = { "path" = "../../zombie_actor" }
 lib3h_tracing = { "path" = "../../tracing" }
 detach = { "path" = "../../detach" }
 url = "=1.7.2"

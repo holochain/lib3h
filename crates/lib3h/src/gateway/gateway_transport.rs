@@ -71,7 +71,7 @@ impl P2pGateway {
     ) -> GhostResult<()> {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
-        self.child_transport_endpoint.request(
+        self.inner_transport.request(
             span,
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
@@ -129,7 +129,7 @@ impl P2pGateway {
         match transport_request {
             transport::protocol::RequestToChild::Bind { spec: _ } => {
                 // Forward to child transport
-                let _ = self.child_transport_endpoint.as_mut().request(
+                let _ = self.inner_transport.as_mut().request(
                     span.child("handle_transport_RequestToChild"),
                     transport_request,
                     Box::new(|_me, response| {

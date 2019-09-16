@@ -1,4 +1,7 @@
-use crate::engine::ghost_engine::GhostEngineParentWrapper;
+use crate::{
+    engine::{ghost_engine::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
+    error::Lib3hError,
+};
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
@@ -10,10 +13,12 @@ use lib3h_protocol::{
     DidWork,
 };
 use lib3h_tracing::Lib3hSpan;
+use url::Url;
+pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
-struct LegacyLib3h<Engine, EngineError: 'static>
+pub struct LegacyLib3h<Engine, EngineError: 'static>
 where
     Engine: GhostActor<
         Lib3hToClient,
@@ -53,12 +58,12 @@ fn server_success(request_id: String) -> Lib3hServerProtocol {
 impl<Engine: 'static, EngineError: 'static> LegacyLib3h<Engine, EngineError>
 where
     Engine: GhostActor<
-        Lib3hToClient,
-        Lib3hToClientResponse,
-        ClientToLib3h,
-        ClientToLib3hResponse,
-        EngineError,
-    >,
+            Lib3hToClient,
+            Lib3hToClientResponse,
+            ClientToLib3h,
+            ClientToLib3hResponse,
+            EngineError,
+        > + CanAdvertise,
     EngineError: ToString,
 {
     pub fn new(name: &str, engine: Engine) -> Self {
@@ -103,7 +108,7 @@ where
     }
 
     /// Add incoming Lib3hClientProtocol message in FIFO
-    fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
+    pub fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
         let request_id: String = match &client_msg {
             Lib3hClientProtocol::Connect(data) => &data.request_id,
             Lib3hClientProtocol::JoinSpace(data) => &data.request_id,
@@ -136,7 +141,7 @@ where
 
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
-    fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+    pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         detach_run!(&mut self.engine, |lib3h| lib3h.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
 
@@ -149,6 +154,14 @@ where
         }
 
         Ok((responses.len() > 0, responses))
+    }
+
+    pub fn advertise(&self) -> Url {
+        self.engine.as_ref().as_ref().advertise()
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
     }
 }
 
@@ -181,6 +194,12 @@ mod tests {
                 EngineError,
             >,
         >,
+    }
+
+    impl CanAdvertise for MockGhostEngine {
+        fn advertise(&self) -> Url {
+            Url::parse("mem://fixme").unwrap()
+        }
     }
 
     impl MockGhostEngine {

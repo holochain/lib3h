@@ -8,7 +8,6 @@ use lib3h_tracing::{Lib3hSpan, SpanWrap};
 
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
-use lib3h_ghost_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 use lib3h_protocol::{
     data_types::{ConnectData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
@@ -16,6 +15,7 @@ use lib3h_protocol::{
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
 use lib3h_tracing::Tracer;
+use lib3h_zombie_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 
 use std::{
     collections::HashMap,

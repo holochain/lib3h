@@ -1,18 +1,18 @@
 use detach::{detach_run, Detach};
 use lib3h::{engine::ghost_engine::ClientToLib3hMessage, error::Lib3hError};
-use lib3h_ghost_actor::{
-    create_ghost_channel, prelude::WorkWasDone, GhostActor, GhostCanTrack, GhostContextEndpoint,
-    GhostEndpoint, GhostError, GhostResult,
-};
 use lib3h_protocol::{
     data_types::ConnectedData,
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
+};
+use lib3h_zombie_actor::{
+    create_ghost_channel, prelude::WorkWasDone, GhostActor, GhostCanTrack, GhostContextEndpoint,
+    GhostEndpoint, GhostError, GhostResult,
 };
 
 /**
  *  This is an engine that exists purely for testing the SimChat actor.
  *  It responds with success to any ClientToLib3h messages sent to it but does not send a response
- *  
+ *
  *  To test sending Lib3hToClient messages it can hold a crossbeam receiver and will route any messages
  *  it receives to SimChat.
  */
