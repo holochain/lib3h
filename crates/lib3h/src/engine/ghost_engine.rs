@@ -269,13 +269,9 @@ impl<'engine> GhostEngine<'engine> {
                     GhostCallbackData::Response(Ok(
                         GatewayRequestToChildResponse::BootstrapSuccess,
                     )) => msg.respond(Ok(ClientToLib3hResponse::BootstrapSuccess))?,
-                    GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error from connect to gateway: {:?} ", e);
-                    }
-                    GhostCallbackData::Timeout => {
-                        error!("Got timeout on connect to gateway");
-                    }
-                    _ => panic!("bad response type"),
+                    GhostCallbackData::Response(Err(e)) => msg.respond(Err(e))?,
+                    GhostCallbackData::Timeout => msg.respond(Err("timeout".into()))?,
+                    _ => msg.respond(Err(format!("bad response: {:?}", response).into()))?,
                 }
                 Ok(())
             }),
