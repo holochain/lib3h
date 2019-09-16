@@ -67,10 +67,10 @@ pub enum ChatEvent {
     },
     ReceiveChannelMessage(SimChatMessage),
     Part {
-        channel_id: String
+        channel_id: String,
     },
     PartSuccess {
-        channel_id: String
+        channel_id: String,
     },
     Connected,
     Disconnected,

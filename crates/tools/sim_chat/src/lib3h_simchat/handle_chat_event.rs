@@ -1,8 +1,7 @@
 use lib3h_tracing::test_span;
 
-use lib3h_protocol::protocol::Lib3hToClient;
-use lib3h_protocol::protocol::Lib3hToClientResponse;
 use crate::lib3h_simchat::current_timeanchor;
+use lib3h_protocol::protocol::{Lib3hToClient, Lib3hToClientResponse};
 
 use super::{channel_address_from_string, current_timestamp, Lib3hSimChatState};
 use crate::simchat::{ChatEvent, MessageList, OpaqueConvertable, SimChatMessage};
@@ -13,7 +12,9 @@ use lib3h_protocol::{
     Address,
 };
 
-use lib3h_zombie_actor::{GhostCallback, GhostCallbackData::Response, GhostResult, GhostContextEndpoint, GhostCanTrack};
+use lib3h_zombie_actor::{
+    GhostCallback, GhostCallbackData::Response, GhostCanTrack, GhostContextEndpoint, GhostResult,
+};
 
 pub struct Lib3hEventAndCallback {
     event: ClientToLib3h,
@@ -21,21 +22,24 @@ pub struct Lib3hEventAndCallback {
 }
 
 impl Lib3hEventAndCallback {
-    pub fn new(event: ClientToLib3h, callback: GhostCallback<(), ClientToLib3hResponse, Lib3hError>) -> Self {
-        Self {
-            event,
-            callback,
-        }
+    pub fn new(
+        event: ClientToLib3h,
+        callback: GhostCallback<(), ClientToLib3hResponse, Lib3hError>,
+    ) -> Self {
+        Self { event, callback }
     }
 
-    pub fn execute_request(self, endpoint: &mut GhostContextEndpoint<
+    pub fn execute_request(
+        self,
+        endpoint: &mut GhostContextEndpoint<
             (),
             ClientToLib3h,
             ClientToLib3hResponse,
             Lib3hToClient,
             Lib3hToClientResponse,
             Lib3hError,
-        >) -> GhostResult<()> {
+        >,
+    ) -> GhostResult<()> {
         endpoint.request(test_span(""), self.event, self.callback)
     }
 }
@@ -88,7 +92,7 @@ pub fn handle_chat_event(
             None
         }
 
-        ChatEvent::Part{channel_id} => {
+        ChatEvent::Part { channel_id } => {
             let space_address = channel_address_from_string(&channel_id).unwrap();
             if let Some(space_data) = state.spaces.get(&space_address) {
                 Some(Lib3hEventAndCallback::new(
@@ -96,7 +100,9 @@ pub fn handle_chat_event(
                     Box::new(move |_, callback_data| {
                         if let Response(Ok(_payload)) = callback_data {
                             chat_event_sender
-                                .send(ChatEvent::PartSuccess{channel_id: channel_id.clone()})
+                                .send(ChatEvent::PartSuccess {
+                                    channel_id: channel_id.clone(),
+                                })
                                 .unwrap();
                         }
                         Ok(())
@@ -108,7 +114,7 @@ pub fn handle_chat_event(
             }
         }
 
-        ChatEvent::PartSuccess{channel_id} => {
+        ChatEvent::PartSuccess { channel_id } => {
             let space_data = state
                 .spaces
                 .remove(&channel_address_from_string(&channel_id).unwrap());
@@ -252,14 +258,15 @@ pub mod tests {
         let mut state = Lib3hSimChatState::new();
         let chat_event = ChatEvent::Join {
             channel_id: String::from("some-channel-id"),
-            agent_id: String::from("some-agent-id")
+            agent_id: String::from("some-agent-id"),
         };
 
         let response = handle_chat_event(chat_event, &mut state, s);
         assert_eq!(
-            response.unwrap().event, 
+            response.unwrap().event,
             ClientToLib3h::JoinSpace(SpaceData {
-                space_address: channel_address_from_string(&String::from("some-channel-id")).unwrap(),
+                space_address: channel_address_from_string(&String::from("some-channel-id"))
+                    .unwrap(),
                 agent_id: Address::from("some-agent-id"),
                 request_id: String::from("")
             })
@@ -278,13 +285,15 @@ pub mod tests {
         };
         // insert the space to part in the state
         state.spaces.insert(space_address, space_data.clone());
-        let chat_event = ChatEvent::Part{ channel_id: String::from("some-channel-id")};
+        let chat_event = ChatEvent::Part {
+            channel_id: String::from("some-channel-id"),
+        };
 
         let response = handle_chat_event(chat_event, &mut state, s);
         assert_eq!(
-            response.unwrap().event, 
+            response.unwrap().event,
             ClientToLib3h::LeaveSpace(space_data)
-        );        
+        );
     }
 
     #[test]
@@ -294,24 +303,22 @@ pub mod tests {
 
         let payload = String::from("a message");
         let to_agent_id = String::from("receiver");
-        
-        let chat_event = ChatEvent::SendDirectMessage{ 
+
+        let chat_event = ChatEvent::SendDirectMessage {
             to_agent: to_agent_id.clone(),
-            payload: String::from("a message")
+            payload: String::from("a message"),
         };
 
         // set up the state with a current space with an agent it
-        state.current_space = Some(
-            SpaceData {
-                agent_id: Address::from("sender"),
-                request_id: String::from(""),
-                space_address: Address::from("some-space"),
-            }
-        );
+        state.current_space = Some(SpaceData {
+            agent_id: Address::from("sender"),
+            request_id: String::from(""),
+            space_address: Address::from("some-space"),
+        });
 
         let response = handle_chat_event(chat_event, &mut state, s);
         assert_eq!(
-            response.unwrap().event, 
+            response.unwrap().event,
             ClientToLib3h::SendDirectMessage(DirectMessageData {
                 request_id: String::from(""),
                 content: payload.into(),
@@ -319,6 +326,6 @@ pub mod tests {
                 from_agent_id: Address::from("sender"),
                 space_address: Address::from("some-space")
             })
-        );        
+        );
     }
 }

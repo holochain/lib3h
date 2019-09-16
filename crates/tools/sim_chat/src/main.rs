@@ -64,7 +64,7 @@ fn main() {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
                         .expect("failed to set linefeed prompt");
                 }
-                ChatEvent::PartSuccess{..} => {
+                ChatEvent::PartSuccess { .. } => {
                     rl_t.set_prompt("SimChat> ")
                         .expect("failed to set linefeed prompt");
                 }
@@ -161,9 +161,9 @@ lib3h simchat Commands:
                                     writeln!(rl, "/join must be called with two args, a channel_id and an agent_id").expect("write fail");
                                 }
                             }
-                            (Some("part"), Some(channel_id)) => {
-                                cli.send(ChatEvent::Part{channel_id: channel_id.to_string()})
-                            }
+                            (Some("part"), Some(channel_id)) => cli.send(ChatEvent::Part {
+                                channel_id: channel_id.to_string(),
+                            }),
                             (Some("msg"), Some(rest)) => {
                                 let mut words = rest.split(' ');
                                 let to_agent: String = words.next().unwrap().to_string();

@@ -4,9 +4,7 @@ mod handle_lib3h_event;
 use crate::simchat::{ChatEvent, MessageList, SimChat, SimChatMessage};
 use handle_chat_event::handle_chat_event;
 use handle_lib3h_event::handle_and_convert_lib3h_event;
-use lib3h_tracing::test_span;
-use lib3h::engine::CanAdvertise;
-use lib3h::error::Lib3hError;
+use lib3h::{engine::CanAdvertise, error::Lib3hError};
 use lib3h_crypto_api::CryptoError;
 use lib3h_protocol::{
     data_types::{ConnectData, SpaceData},
@@ -14,6 +12,7 @@ use lib3h_protocol::{
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
+use lib3h_tracing::test_span;
 use lib3h_zombie_actor::{GhostActor, GhostCanTrack, GhostContextEndpoint};
 
 use std::{
@@ -160,7 +159,8 @@ impl Lib3hSimChat {
                 ClientToLib3h,
                 ClientToLib3hResponse,
                 Lib3hError,
-            > + CanAdvertise + 'static,
+            > + CanAdvertise
+            + 'static,
     {
         let thread_continue = Arc::new(AtomicBool::new(true));
 
@@ -225,12 +225,17 @@ impl Lib3hSimChat {
                                         .expect("Could not send response!");
                                 }
                                 if let Some(chat_event) = maybe_chat_event {
+                                    // call the external handler for every resulting event
                                     handler(&chat_event);
+                                    // call the internal handler also
                                     handle_chat_event(
                                         chat_event,
                                         &mut state,
                                         internal_sender.clone(),
-                                    ).map(|lib3h_request| lib3h_request.execute_request(&mut parent_endpoint));
+                                    )
+                                    .map(|lib3h_request| {
+                                        lib3h_request.execute_request(&mut parent_endpoint)
+                                    });
                                 }
                             }
                         });
@@ -243,11 +248,9 @@ impl Lib3hSimChat {
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
-                        handle_chat_event(
-                            chat_event,
-                            &mut state,
-                            internal_sender.clone(),
-                        ).map(|lib3h_request| lib3h_request.execute_request(&mut parent_endpoint));
+                        handle_chat_event(chat_event, &mut state, internal_sender.clone()).map(
+                            |lib3h_request| lib3h_request.execute_request(&mut parent_endpoint),
+                        );
                     }
 
                     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -313,6 +316,7 @@ pub fn current_timestamp() -> u64 {
         .unwrap()
         .as_secs()
 }
+
 #[cfg(test)] // make sure time doesn't mess up the tests
 pub fn current_timestamp() -> u64 {
     0
@@ -380,11 +384,15 @@ mod tests {
     }
 
     fn part_event() -> ChatEvent {
-        ChatEvent::Part{ channel_id: "test_channel".to_string()}
+        ChatEvent::Part {
+            channel_id: "test_channel".to_string(),
+        }
     }
 
     fn part_success_event() -> ChatEvent {
-        ChatEvent::PartSuccess{ channel_id: "test_channel".to_string()}
+        ChatEvent::PartSuccess {
+            channel_id: "test_channel".to_string(),
+        }
     }
 
     #[test]
