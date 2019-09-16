@@ -221,9 +221,9 @@ impl Lib3hSimChat {
                             }
                             if let Some(chat_event) = maybe_chat_event {
                                 let span: Lib3hSpan = internal_tracer.span("todo").start().into();
-                                handler(SpanWrap(&chat_event, span.child("handler")));
+                                handler(span.child("handler").wrap(&chat_event));
                                 handle_chat_event(
-                                    SpanWrap(chat_event, span.child("handle")),
+                                    span.child("handle").wrap(chat_event),
                                     &mut state,
                                     &mut parent_endpoint,
                                     internal_sender.clone(),
@@ -237,13 +237,13 @@ impl Lib3hSimChat {
                         // every chat event call the handler that was passed
 
                         // TODO: write helper fn for transforming to referenced data
-                        let SpanWrap(event, span) = chat_event;
-                        handler(SpanWrap(&event, span.child("todo child")));
+                        let SpanWrap { data: event, span } = chat_event;
+                        handler(span.child("todo child").wrap(&event));
 
                         // also do internal logic for certain events e.g. converting them to lib3h events
                         // and also handling the responses to mutate local state
                         handle_chat_event(
-                            SpanWrap(event, span.child("todo child 2")),
+                            span.child("todo child 2").wrap(event),
                             &mut state,
                             &mut parent_endpoint,
                             internal_sender.clone(),
@@ -283,10 +283,10 @@ impl Lib3hSimChat {
                 connect_message,
                 Box::new(move |_, _callback_data| {
                     chat_event_sender
-                        .send(SpanWrap(
-                            ChatEvent::Connected,
-                            span.follower("chat event sender"),
-                        ))
+                        .send(
+                            span.follower("chat event sender")
+                                .wrap(ChatEvent::Connected),
+                        )
                         .expect("Could not send");
                     // println!("chat received response from engine: {:?}", callback_data);
                     Ok(())
@@ -298,10 +298,8 @@ impl Lib3hSimChat {
 
 impl SimChat for Lib3hSimChat {
     fn send(&mut self, event: ChatEvent) {
-        let span = self.tracer.span("send").start().into();
-        self.out_send
-            .send(SpanWrap(event, span))
-            .expect("send fail");
+        let span: Lib3hSpan = self.tracer.span("send").start().into();
+        self.out_send.send(span.wrap(event)).expect("send fail");
     }
 }
 

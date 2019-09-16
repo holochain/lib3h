@@ -24,7 +24,10 @@ pub fn handle_chat_event(
     >,
     chat_event_sender: ChatSender,
 ) {
-    let SpanWrap(chat_event, span) = chat_tuple;
+    let SpanWrap {
+        data: chat_event,
+        span,
+    } = chat_tuple;
     match chat_event {
         ChatEvent::Join {
             channel_id,
@@ -48,7 +51,7 @@ pub fn handle_chat_event(
                                 space_data: space_data.clone(),
                             };
                             chat_event_sender
-                                .send(SpanWrap(new_event, span.follower("ChatEvent::Join")))
+                                .send(span.follower("ChatEvent::Join").wrap(new_event))
                                 .unwrap();
                         }
                         Ok(())
@@ -83,10 +86,10 @@ pub fn handle_chat_event(
                             // println!("chat received response from engine: {:?}", callback_data);
                             if let Response(Ok(_payload)) = callback_data {
                                 chat_event_sender
-                                    .send(SpanWrap(
-                                        ChatEvent::PartSuccess(channel_id.clone()),
-                                        span.follower("ChatEvent::Part"),
-                                    ))
+                                    .send(
+                                        span.follower("ChatEvent::Part")
+                                            .wrap(ChatEvent::PartSuccess(channel_id.clone())),
+                                    )
                                     .unwrap();
                             }
                             Ok(())
@@ -218,12 +221,12 @@ pub fn handle_chat_event(
                                     // Only emit ReceiveChannelMessage once per time seeing a message
                                     if !displayed_channel_messages.contains(&message.address()) {
                                         chat_event_sender
-                                            .send(SpanWrap(
-                                                ChatEvent::ReceiveChannelMessage(message),
+                                            .send(
                                                 span.follower(
                                                     "send: ChatEvent::ReceiveChannelMessage",
-                                                ),
-                                            ))
+                                                )
+                                                .wrap(ChatEvent::ReceiveChannelMessage(message)),
+                                            )
                                             .ok();
                                     }
                                 }
@@ -253,5 +256,5 @@ fn send_sys_message(sender: ChatSender, msg: &String, span: Lib3hSpan) {
         payload: String::from(msg),
         timestamp: current_timestamp(),
     });
-    sender.send(SpanWrap(event, span)).expect("send fail");
+    sender.send(span.wrap(event)).expect("send fail");
 }

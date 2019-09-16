@@ -72,7 +72,7 @@ fn main() {
     let mut cli = lib3h_simchat::Lib3hSimChat::new(
         engine_builder,
         Box::new(move |event| {
-            match event.0 {
+            match event.data {
                 ChatEvent::JoinSuccess { channel_id, .. } => {
                     rl_t.set_prompt(&format!("#{}> ", channel_id).to_string())
                         .expect("failed to set linefeed prompt");

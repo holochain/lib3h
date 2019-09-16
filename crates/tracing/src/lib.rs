@@ -36,15 +36,24 @@ impl From<Span> for Lib3hSpan {
     }
 }
 
+/// SpanWrap is a simple way to couple some data along with a struct
+/// It is common to send some data on a channel which will be used as arguments
+/// to a function on the receiving side. This struct helps keep that data together
+/// with minimal boilerplate. The use of shrinkwrap allows the entire struct to be used
+/// as if it were a T, but the Span can also be extracted
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
-pub struct SpanWrap<T>(#[shrinkwrap(main_field)] pub T, pub Lib3hSpan);
+pub struct SpanWrap<T> {
+    #[shrinkwrap(main_field)]
+    pub data: T,
+    pub span: Lib3hSpan,
+}
 
-// impl<T> SpanWrap<T> {
-//     pub fn ref_data(&self) -> SpanWrap<&T> {
-//         SpanWrap(&self.0, self.1)
-//     }
-// }
+impl<T> SpanWrap<T> {
+    pub fn new(data: T, span: Lib3hSpan) -> Self {
+        Self { data, span }
+    }
+}
 
 /// Binary representation is exactly 37 bytes, so ideally
 /// we would use a [u8; 37], but this is easier...
@@ -115,6 +124,11 @@ impl Lib3hSpan {
 
     pub fn follower<S: Into<Cow<'static, str>>>(&self, operation_name: S) -> Self {
         self.0.follower(operation_name, |o| o.start()).into()
+    }
+
+    /// Wrap this span in a SpanWrap along with some user data
+    pub fn wrap<T>(self, data: T) -> SpanWrap<T> {
+        SpanWrap::new(data, self)
     }
 
     pub fn todo(reason: &'static str) -> Self {
