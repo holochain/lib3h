@@ -113,10 +113,13 @@ impl<
                 span: self.span,
             })?;
         } else {
-            // TODO XXX - if the user is sending back an error
+            // if the user is sending back an error
             // it could get lost here... we are going to panic
             if let Err(e) = payload {
-                panic!("DISALLOWING ignored errors due to lazy publish: {:?}", e);
+                panic!(
+                    "Unhandled publish error: {:?}. You should convert this to a request.",
+                    e
+                );
             }
         }
         Ok(())
