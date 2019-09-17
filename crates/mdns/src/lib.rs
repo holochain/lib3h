@@ -395,6 +395,8 @@ impl MulticastDns {
             self.broadcast_message(&dmesg)?;
             self.broadcast_message(&dmesg)?;
 
+            // This is needed because of the way macOS (and potentially windows) network stack is
+            // working to avoid failing tests (release, query and advertise).
             if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
                 self.broadcast_message(&dmesg)?;
                 self.broadcast_message(&dmesg)?;
@@ -442,6 +444,14 @@ impl Discovery for MulticastDns {
         let net_ids = self.own_networkids();
         if let Some(release_dmesg) = self.own_map_record.to_dns_response_message(&net_ids) {
             self.broadcast_message(&release_dmesg)?;
+            self.broadcast_message(&release_dmesg)?;
+
+            // This is needed because of the way macOS (and potentially windows) network stack is
+            // working to avoid failing tests (release, query and advertise).
+            if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
+                self.broadcast_message(&release_dmesg)?;
+                self.broadcast_message(&release_dmesg)?;
+            }
         }
 
         Ok(())
