@@ -36,7 +36,7 @@ impl
 
         // Update this_peer cache
         self.inner_dht.request(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {
@@ -76,18 +76,19 @@ impl P2pGateway {
             self.identifier, msg
         );
         // let parent_request = msg.clone();
+        let span = msg.span().child("handle_RequestToChild");
         let request = msg.take_message().expect("exists");
         match request {
             GatewayRequestToChild::Transport(transport_request) => {
                 // Forward to child transport
-                self.handle_transport_RequestToChild(transport_request, msg)
+                self.handle_transport_RequestToChild(span, transport_request, msg)
             }
             GatewayRequestToChild::Dht(dht_request) => {
                 // Forward to child dht
-                self.handle_dht_RequestToChild(dht_request, msg)
+                self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
-                self.send(&data.bootstrap_uri, &Opaque::new(), Some(msg))?;
+                self.send(span, &data.bootstrap_uri, &Opaque::new(), Some(msg))?;
                 Ok(())
             }
             GatewayRequestToChild::SendAll(_) => {

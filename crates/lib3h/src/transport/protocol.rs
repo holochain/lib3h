@@ -2,7 +2,7 @@ use crate::transport::error::TransportError;
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hSpan;
+
 use url::Url;
 
 #[derive(Debug, Clone)]
@@ -102,9 +102,12 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for mut msg in self.endpoint_self.as_mut().drain_messages() {
+            let span = msg
+                .span()
+                .child("TransportEndpointAsActor::process_concrete, self");
             let data = msg.take_message().expect("exists");
             self.endpoint_inner.request(
-                Lib3hSpan::todo(),
+                span,
                 data,
                 Box::new(move |_, response| {
                     msg.respond(match response {
@@ -117,8 +120,11 @@ impl
         }
         detach_run!(&mut self.endpoint_inner, |it| it.process(self))?;
         for mut msg in self.endpoint_inner.as_mut().drain_messages() {
+            let span = msg
+                .span()
+                .child("TransportEndpointAsActor::process_concrete, self");
             let data = msg.take_message().expect("exists");
-            self.endpoint_self.publish(Lib3hSpan::todo(), data)?;
+            self.endpoint_self.publish(span, data)?;
         }
         Ok(false.into())
     }

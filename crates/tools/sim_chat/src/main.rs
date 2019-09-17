@@ -13,6 +13,7 @@ use lib3h::{
     engine::{EngineConfig, GhostEngine},
 };
 use lib3h_sodium::SodiumCryptoSystem;
+use lib3h_tracing::Lib3hSpan;
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
@@ -27,7 +28,14 @@ fn engine_builder() -> GhostEngine<'static> {
         dht_custom_config: vec![],
     };
     let dht_factory = MirrorDht::new_with_config;
-    GhostEngine::new_mock(crypto, config, "test_engine", dht_factory).unwrap()
+    GhostEngine::new_mock(
+        Lib3hSpan::fixme(), // TODO: actually hook up real tracer here
+        crypto,
+        config,
+        "test_engine",
+        dht_factory,
+    )
+    .unwrap()
 }
 
 fn main() {
