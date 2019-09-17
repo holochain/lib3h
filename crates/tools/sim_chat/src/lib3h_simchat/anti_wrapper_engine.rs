@@ -15,6 +15,7 @@ use lib3h_protocol::{
     data_types::*,
 };
 use lib3h_zombie_actor::{
+    create_ghost_channel,
     GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostResult, WorkWasDone, GhostMessage, RequestId, GhostCallbackData::Response,
 };
 use url::Url;
@@ -45,6 +46,23 @@ pub struct AntiWrapperEngine<'engine, T: 'static + NetworkEngine> {
     >,
     pending_requests_to_client: HashMap<RequestId, GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>>,
     network_engine: T,
+}
+
+impl<'engine, T: 'static + NetworkEngine> AntiWrapperEngine<'engine, T> {
+    pub fn new(network_engine: T) -> Self {
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        Self {
+            client_endpoint: Some(endpoint_parent),
+            lib3h_endpoint: Detach::new(
+                endpoint_self
+                    .as_context_endpoint_builder()
+                    .request_id_prefix("mock-engine")
+                    .build(),
+            ),
+            network_engine,
+            pending_requests_to_client: HashMap::new(),
+        }
+    }
 }
 
 impl<T: NetworkEngine>
@@ -158,3 +176,56 @@ impl RequestIdGetable for Lib3hServerProtocol {
         }
     }
 }
+
+// #[cfg(test)]
+// pub mod tests {
+
+//     use lib3h_protocol::{
+//         error::Lib3hProtocolResult,
+//         DidWork,
+//     };
+    
+//     use super::*;
+
+//     struct MockNetworkEngine{}
+
+//     impl NetworkEngine for MockNetworkEngine {
+
+//         fn post(&mut self, _data: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
+//             Ok(())
+//         }
+
+//         fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+//             Ok((true, Vec::new()))
+//         }
+
+//         fn advertise(&self) -> Url {
+//             Url::parse("ws://test").unwrap()
+//         }
+
+//         fn name(&self) -> String {
+//             String::from("mock-engine")
+//         }
+//     }
+
+//     #[test]
+//     fn test_round_trip_from_client() {
+//         let network_engine = MockNetworkEngine{};
+//         let anti_wrapper = AntiWrapperEngine::new(network_engine);
+
+//         let mut parent_endpoint: GhostContextEndpoint<(), _, _, _, _, _> = anti_wrapper
+//             .take_parent_endpoint()
+//             .expect("Could not get parent endpoint")
+//             .as_context_endpoint_builder()
+//             .request_id_prefix("parent")
+//             .build();
+
+//         let test_message = ClientToLib3h::JoinSpace(SpaceData {
+//             agent_id: Address::from(""),
+//             space_address: Address::from(""),
+//             request_id: String::from("0"),
+//         });
+
+//         parent_endpoint.publish(test_span(""), test_message.expect("Could not publish a message to the wrapper")
+//     }
+// }

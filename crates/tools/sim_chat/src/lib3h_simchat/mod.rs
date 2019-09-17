@@ -287,7 +287,7 @@ mod tests {
         })
     }
 
-    fn join_event() -> ChatEvent {
+    pub fn join_event() -> ChatEvent {
         ChatEvent::Join {
             agent_id: "test_agent".to_string(),
             channel_id: "test_channel".to_string(),
