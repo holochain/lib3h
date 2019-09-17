@@ -22,6 +22,7 @@ impl<'engine> GhostEngine<'engine> {
         // Process the network gateway
         detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
         for mut request in self.multiplexer.drain_messages() {
+            // this should probably be changed so each arm has a different name span
             let span = request.span().child("process_multiplexer");
             let payload = request.take_message().expect("exists");
             match payload {

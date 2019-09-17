@@ -101,6 +101,7 @@ impl TransportEncoding {
             TransportError,
         >,
     ) -> TransportResult<()> {
+        // different name span for each arm?
         let span = msg.span().child("handle_msg_from_inner");
         match msg.take_message().expect("exists") {
             RequestToParent::IncomingConnection { uri } => {
