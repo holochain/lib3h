@@ -20,7 +20,7 @@ mod test_suites;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine},
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
     error::Lib3hResult,
     transport::websocket::tls::TlsConfig,
 };
@@ -60,7 +60,7 @@ fn enable_logging_for_test(enable: bool) {
 //--------------------------------------------------------------------------------------------------
 
 fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
-    let engine: GhostEngine = GhostEngine::new_mock(
+    let engine: GhostEngine = GhostEngine::new(
         Lib3hSpan::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
@@ -79,6 +79,7 @@ fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrapp
 
 fn construct_wss_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
+        Lib3hSpan::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -103,8 +104,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
-        //tls_config: TlsConfig::Unencrypted,
-        socket_type: "mem".into(),
+        transport_configs: vec![TransportConfig::Memory],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -132,7 +132,7 @@ fn setup_wss_node(
         .expect("invalid web socket url");
 
     let config = EngineConfig {
-        socket_type: protocol.into(),
+        transport_configs: vec![TransportConfig::Websocket(tls_config)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
