@@ -25,10 +25,10 @@ impl DhtConfig {
         }
     }
 
-    pub fn with_real_engine_config(
+    pub fn with_engine_config(
         peer_address: &str,
         peer_uri: &Url,
-        config: &crate::engine::RealEngineConfig,
+        config: &crate::engine::EngineConfig,
     ) -> Self {
         Self {
             this_peer_address: peer_address.to_owned(),

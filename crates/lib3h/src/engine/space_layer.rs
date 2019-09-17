@@ -3,7 +3,7 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
+    engine::{ghost_engine::handle_gossip_to, p2p_protocol::SpaceAddress, ChainId, GhostEngine},
     gateway::{protocol::*, P2pGateway},
 };
 use detach::prelude::*;
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl RealEngine {
+impl<'engine> GhostEngine<'engine> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&mut self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
@@ -36,7 +36,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<&mut GatewayParentWrapper<RealEngine, P2pGateway>> {
+    ) -> Option<&mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -47,6 +47,7 @@ impl RealEngine {
     }
 
     /// Process all space gateways
+    #[allow(dead_code)] //FIXME #324
     pub(crate) fn process_space_gateways(
         &mut self,
     ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
@@ -55,7 +56,7 @@ impl RealEngine {
         let mut space_outbox_map = HashMap::new();
         let mut space_gateway_map: HashMap<
             ChainId,
-            Detach<GatewayParentWrapper<RealEngine, P2pGateway>>,
+            Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap
@@ -104,7 +105,7 @@ impl RealEngine {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossipTo(
+                        handle_gossip_to(
                             &chain_id.0.to_string(),
                             space_gateway.as_mut(),
                             gossip_data,
