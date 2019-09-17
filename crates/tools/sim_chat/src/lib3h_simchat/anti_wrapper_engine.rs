@@ -1,5 +1,6 @@
 
 
+use lib3h_tracing::test_span;
 use detach::{detach_run, Detach};
 use lib3h::{engine::CanAdvertise, error::Lib3hError};
 
@@ -12,8 +13,7 @@ use lib3h_protocol::{
     network_engine::NetworkEngine,
 };
 use lib3h_zombie_actor::{
-    GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostResult, WorkWasDone, GhostMessage,
-    GhostError, RequestId,
+    GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostResult, WorkWasDone, GhostMessage, RequestId, GhostCallbackData::Response,
 };
 use url::Url;
 use std::convert::TryFrom;
@@ -41,7 +41,7 @@ pub struct AntiWrapperEngine<'engine, T: NetworkEngine> {
             Lib3hError,
         >,
     >,
-    pending_requests_to_client: HashMap<RequestId, GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, GhostError>>,
+    pending_requests_to_client: HashMap<RequestId, GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, Lib3hError>>,
     network_engine: T,
 }
 
@@ -82,18 +82,25 @@ impl<T: NetworkEngine>
         // convert these to the Lib3hToClient or ClientToLib3hResponse and send over the client endpoint
         if let Ok((true, from_engine_messages)) = self.network_engine.process() {
             for msg_from_engine in from_engine_messages {
-                if let Ok(_request) = Lib3hToClient::try_from(msg_from_engine.clone()) {
+                if let Ok(request) = Lib3hToClient::try_from(msg_from_engine.clone()) {
                     // send the request to  the client
-                    // let request_ghost_message = 
-                    // hold on to the request so we can send back a response later
+                    self.lib3h_endpoint.request(test_span(""), request, Box::new(|_, callback_data| {
+                        // send the client response back to the engine if it was a success
+                        if let Response(Ok(_success_message)) = callback_data {
+                            // self.network_engine.post(success_message.into());
+                        }
+                        Ok(())
+                    })).ok();
 
-                } else if let Ok(response) = ClientToLib3hResponse::try_from(msg_from_engine) {
-                    // see if this is the response to a pending request and send it back to that
-                    // let request_id = 
-                    if let Some(ghost_request) = self.pending_requests_to_client.remove(&RequestId("".into())) {
-                        ghost_request.respond(Ok(response)).ok();
-                    }
-                } else {
+                } 
+                // else if let Ok(response) = ClientToLib3hResponse::try_from(msg_from_engine) {
+                //     // see if this is the response to a pending request and send it back to that
+                //     // let request_id = 
+                //     if let Some(ghost_request) = self.pending_requests_to_client.remove(&RequestId("".into())) {
+                //         ghost_request.respond(Ok(response)).ok();
+                //     }
+                // } 
+                else {
                     panic!("anti-wrapper engine received a message from engine that could not be translated")
                 }
             }
@@ -103,10 +110,11 @@ impl<T: NetworkEngine>
         // Convert these to Lib3hClientProtocol and send over the sender 
         for mut msg in self.lib3h_endpoint.as_mut().drain_messages() {
             let msg_to_engine = Lib3hClientProtocol::from(msg.take_message().expect("exists"));
-            if self.network_engine.post(msg_to_engine).is_ok() {
-                // manually send any responses back to the client after post success
-                // let msg_to_engine_response = Lib3hClientProtocol::
-                // self.network_engine.post(msg_to_engine_response).ok();
+            // send the converted message onward to the network engine
+            self.network_engine.post(msg_to_engine.clone()).ok();
+            // register this locally to repond to it later (if it has a request id)
+            if let Some(request_id) = msg.request_id() {
+                self.pending_requests_to_client.insert(request_id, msg);
             }
         }
 
