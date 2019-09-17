@@ -10,6 +10,32 @@ use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 use url::Url;
 
+/// temporary protocol enum for wire encoding
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum InterimEncodingProtocol {
+    Error {
+        message: String,
+    },
+    Handshake {
+        magic: u16,
+        network_id: String,
+        id: String,
+    },
+    Payload {
+        payload: Opaque,
+    },
+}
+
+impl InterimEncodingProtocol {
+    fn to_vec(&self) -> Opaque {
+        serde_json::to_vec_pretty(self).unwrap().into()
+    }
+
+    fn from_slice(v: &[u8]) -> Self {
+        serde_json::from_slice(v).unwrap()
+    }
+}
+
 /// Wraps a lower-level transport in either Open or Encrypted communication
 /// Also adds a concept of MachineId and AgentId
 /// This is currently a stub, only the Id concept is in place.
@@ -18,6 +44,8 @@ pub struct TransportEncoding {
     crypto: Box<dyn CryptoSystem>,
     // the machine_id or agent_id of this encoding instance
     this_id: String,
+    // the current network_id
+    this_network_id: String,
     // the keystore to use for getting signatures for `this_id`
     keystore: Detach<KeystoreActorParentWrapperDyn>,
     // our parent channel endpoint
@@ -63,6 +91,7 @@ impl TransportEncoding {
     pub fn new(
         crypto: Box<dyn CryptoSystem>,
         this_id: String,
+        this_network_id: String,
         keystore: DynKeystoreActor,
         inner_transport: DynTransportActor,
     ) -> Self {
@@ -80,6 +109,7 @@ impl TransportEncoding {
         Self {
             crypto,
             this_id,
+            this_network_id,
             keystore,
             endpoint_parent,
             endpoint_self,
@@ -108,7 +138,18 @@ impl TransportEncoding {
                 self.handle_incoming_connection(span, uri)
             }
             RequestToParent::ReceivedData { uri, payload } => {
-                self.handle_received_data(span, uri, payload)
+                match self.handle_received_data(span, uri.clone(), payload) {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        match self.connections_no_id_to_id.remove(&uri) {
+                            Some(r) => {
+                                self.connections_id_to_no_id.remove(&r);
+                            }
+                            _ => (),
+                        };
+                        Err(e)
+                    }
+                }
             }
             RequestToParent::ErrorOccured { uri, error } => {
                 self.handle_transport_error(span, uri, error)
@@ -118,13 +159,35 @@ impl TransportEncoding {
 
     /// private send a handshake to a remote address
     fn send_handshake(&mut self, span: Lib3hSpan, uri: &Url) -> GhostResult<()> {
+        let payload = InterimEncodingProtocol::Handshake {
+            magic: 0x1f6c,
+            network_id: self.this_network_id.clone(),
+            id: self.this_id.clone(),
+        }
+        .to_vec();
         self.inner_transport.publish(
             span,
             RequestToChild::SendMessage {
                 uri: uri.clone(),
-                payload: self.this_id.clone().into(),
+                payload,
             },
         )
+    }
+
+    /// send an error
+    fn send_error(&mut self, span: Lib3hSpan, uri: &Url, message: String) -> TransportResult<()> {
+        let payload = InterimEncodingProtocol::Error {
+            message: message.clone(),
+        }
+        .to_vec();
+        self.inner_transport.publish(
+            span,
+            RequestToChild::SendMessage {
+                uri: uri.clone(),
+                payload,
+            },
+        )?;
+        Err(message.into())
     }
 
     /// private handler for inner transport IncomingConnection events
@@ -149,6 +212,54 @@ impl TransportEncoding {
         Ok(())
     }
 
+    /// private handler received handshake from remote
+    fn handle_received_remote_handshake(
+        &mut self,
+        span: Lib3hSpan,
+        uri: &Url,
+        remote_id: String,
+    ) -> TransportResult<()> {
+        // build a higher-level id address
+        let mut remote_url = uri.clone();
+        remote_url.query_pairs_mut().append_pair("a", &remote_id);
+
+        // set up low->high and high->low mappings
+        self.connections_no_id_to_id
+            .insert(uri.clone(), remote_url.clone());
+        self.connections_id_to_no_id
+            .insert(remote_url.clone(), uri.clone());
+
+        // forward an IncomingConnection event to our parent
+        self.endpoint_self.publish(
+            span.follower("TODO name"),
+            RequestToParent::IncomingConnection {
+                uri: remote_url.clone(),
+            },
+        )?;
+
+        // if we have any pending received data, send it up
+        if let Some(items) = self.pending_received_data.remove(&uri) {
+            for payload in items {
+                self.endpoint_self.publish(
+                    span.follower("TODO name"),
+                    RequestToParent::ReceivedData {
+                        uri: remote_url.clone(),
+                        payload,
+                    },
+                )?;
+            }
+        }
+
+        // if we have any pending send data, send it down
+        if let Some(items) = self.pending_send_data.remove(&uri) {
+            for (payload, msg) in items {
+                self.fwd_send_message_result(msg, uri.clone(), payload)?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// private handler for inner transport ReceivedData events
     fn handle_received_data(
         &mut self,
@@ -156,75 +267,51 @@ impl TransportEncoding {
         uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
-        trace!("got {:?} {}", &uri, payload);
-        match self.connections_no_id_to_id.get(&uri) {
-            Some(remote_addr) => {
-                // if we've seen this connection before, just forward it
-                self.endpoint_self.publish(
-                    span,
-                    RequestToParent::ReceivedData {
-                        uri: remote_addr.clone(),
-                        payload,
-                    },
-                )?;
+        match InterimEncodingProtocol::from_slice(&payload) {
+            InterimEncodingProtocol::Error { message } => {
+                return Err(message.into());
             }
-            None => {
-                // never seen this connection before
-                // check if this is a handshake message
-                // note, this is a bit of a hack right now
-                // use capnproto encoding messages
-                if payload.len() == 63 && payload[0] == b'H' && payload[1] == b'c' {
-                    // decode the remote id
-                    let remote_id = String::from_utf8_lossy(&payload);
+            InterimEncodingProtocol::Handshake {
+                magic,
+                network_id,
+                id,
+            } => {
+                if magic != 0x1f6c {
+                    return self.send_error(span, &uri, format!("bad magic: {:?}", magic));
+                }
+                if &network_id != &self.this_network_id {
+                    return self.send_error(
+                        span,
+                        &uri,
+                        format!("bad network_id: {:?}", network_id),
+                    );
+                }
 
-                    // build a higher-level id address
-                    let mut remote_url = uri.clone();
-                    remote_url.query_pairs_mut().append_pair("a", &remote_id);
-
-                    // set up low->high and high->low mappings
-                    self.connections_no_id_to_id
-                        .insert(uri.clone(), remote_url.clone());
-                    self.connections_id_to_no_id
-                        .insert(remote_url.clone(), uri.clone());
-
-                    // forward an IncomingConnection event to our parent
-                    self.endpoint_self.publish(
-                        span.follower("TODO name"),
-                        RequestToParent::IncomingConnection {
-                            uri: remote_url.clone(),
-                        },
-                    )?;
-
-                    // if we have any pending received data, send it up
-                    if let Some(items) = self.pending_received_data.remove(&uri) {
-                        for payload in items {
-                            self.endpoint_self.publish(
-                                span.follower("TODO name"),
-                                RequestToParent::ReceivedData {
-                                    uri: remote_url.clone(),
-                                    payload,
-                                },
-                            )?;
-                        }
+                self.handle_received_remote_handshake(span, &uri, id)?;
+            }
+            InterimEncodingProtocol::Payload { payload } => {
+                match self.connections_no_id_to_id.get(&uri) {
+                    Some(remote_addr) => {
+                        self.endpoint_self.publish(
+                            span,
+                            RequestToParent::ReceivedData {
+                                uri: remote_addr.clone(),
+                                payload,
+                            },
+                        )?;
                     }
+                    None => {
+                        // for some reason, the remote is sending us data
+                        // without handshaking, let's try to handshake back?
+                        self.send_handshake(span, &uri)?;
 
-                    // if we have any pending send data, send it down
-                    if let Some(items) = self.pending_send_data.remove(&uri) {
-                        for (payload, msg) in items {
-                            self.fwd_send_message_result(msg, uri.clone(), payload)?;
-                        }
+                        // store this msg to forward after we handshake
+                        let e = self
+                            .pending_received_data
+                            .entry(uri)
+                            .or_insert_with(|| vec![]);
+                        e.push(payload);
                     }
-                } else {
-                    // for some reason, the remote is sending us data
-                    // without handshaking, let's try to handshake back?
-                    self.send_handshake(span.follower("send_handshake anyway"), &uri)?;
-
-                    // store this msg to forward after we handshake
-                    let e = self
-                        .pending_received_data
-                        .entry(uri)
-                        .or_insert_with(|| vec![]);
-                    e.push(payload);
                 }
             }
         }
@@ -274,7 +361,7 @@ impl TransportEncoding {
 
         // forward the bind to our inner_transport
         self.inner_transport.as_mut().request(
-            Lib3hSpan::fixme(),
+            msg.span().follower("TODO follower from message"),
             RequestToChild::Bind { spec },
             Box::new(|m: &mut TransportEncoding, response| {
                 let response = {
@@ -312,6 +399,7 @@ impl TransportEncoding {
         uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
+        let payload = InterimEncodingProtocol::Payload { payload }.to_vec();
         self.inner_transport.as_mut().request(
             msg.span().follower("TODO follower from message"),
             RequestToChild::SendMessage { uri, payload },
@@ -352,7 +440,7 @@ impl TransportEncoding {
                 sub_address.set_query(None);
 
                 // send along a handshake message
-                self.send_handshake(msg.span().child("send_handshake"), &sub_address)?;
+                self.send_handshake(msg.span().follower("TODO follow from msg"), &sub_address)?;
 
                 // store this send_data so we can forward it after handshake
                 // (see handle_received_data for where this is done)
@@ -400,6 +488,7 @@ mod tests {
     use lib3h_sodium::SodiumCryptoSystem;
     use lib3h_tracing::test_span;
 
+    const N_ID: &'static str = "HcNCjjt9OTf7Fk3wc3qH3bHsEKkcwb7gzY8SudxIvWxedi4iThtj4jE9fn8cpvz";
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
     const ID_2: &'static str = "HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r";
 
@@ -516,6 +605,7 @@ mod tests {
             TransportEncoding::new(
                 crypto.box_clone(),
                 ID_1.to_string(),
+                N_ID.to_string(),
                 Box::new(KeystoreStub::new()),
                 Box::new(TransportMock::new(s1out, r1in)),
             ),
@@ -549,6 +639,7 @@ mod tests {
             TransportEncoding::new(
                 crypto.box_clone(),
                 ID_2.to_string(),
+                N_ID.to_string(),
                 Box::new(KeystoreStub::new()),
                 Box::new(TransportMock::new(s2out, r2in)),
             ),
@@ -599,7 +690,17 @@ mod tests {
         // we get a handshake that needs to be forwarded to #2
         let (address, payload) = r1out.recv().unwrap();
         assert_eq!(&addr2, &address);
-        assert_eq!(ID_1, &String::from_utf8_lossy(&payload));
+        assert_eq!(
+            &Opaque::from(
+                InterimEncodingProtocol::Handshake {
+                    magic: 0x1f6c,
+                    network_id: N_ID.to_string(),
+                    id: ID_1.to_string(),
+                }
+                .to_vec()
+            ),
+            &payload,
+        );
         s2in.send((addr1.clone(), payload)).unwrap();
 
         t2.process(&mut ()).unwrap();
@@ -609,7 +710,17 @@ mod tests {
         // we get a handshake that needs to be forwarded to #1
         let (address, payload) = r2out.recv().unwrap();
         assert_eq!(&addr1, &address);
-        assert_eq!(ID_2, &String::from_utf8_lossy(&payload));
+        assert_eq!(
+            &Opaque::from(
+                InterimEncodingProtocol::Handshake {
+                    magic: 0x1f6c,
+                    network_id: N_ID.to_string(),
+                    id: ID_2.to_string(),
+                }
+                .to_vec()
+            ),
+            &payload,
+        );
         s1in.send((addr2.clone(), payload)).unwrap();
 
         t1.process(&mut t1_got_success_resp).unwrap();
@@ -628,7 +739,11 @@ mod tests {
         // we get the actual payload that needs to be forwarded to #2
         let (address, payload) = r1out.recv().unwrap();
         assert_eq!(&addr2, &address);
-        let expected: Opaque = "hello".into();
+        let expected: Opaque = InterimEncodingProtocol::Payload {
+            payload: "hello".into(),
+        }
+        .to_vec()
+        .into();
         assert_eq!(&expected, &payload);
         s2in.send((addr1.clone(), payload)).unwrap();
 
@@ -639,7 +754,7 @@ mod tests {
         let msg = msg_list.get_mut(2).unwrap().take_message();
         if let Some(RequestToParent::ReceivedData { uri, payload }) = msg {
             assert_eq!(&uri, &addr1full);
-            assert_eq!(&expected, &payload);
+            assert_eq!(&Opaque::from(b"hello".to_vec()), &payload);
         } else {
             panic!("bad type {:?}", msg);
         }
