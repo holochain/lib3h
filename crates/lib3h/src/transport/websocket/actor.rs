@@ -218,27 +218,6 @@ impl
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
-                    let mut temp = Vec::new();
-                    while let Some(mut msg) = self.pending.pop() {
-                        trace!("Processing pending message...");
-                        let inner_msg = msg.take_message().expect("exists");
-                        if let RequestToChild::SendMessage {uri, payload} = inner_msg {
-                            if uri == uri_connnected {
-                                trace!("Sending pending message to: {:?}", uri);
-                                msg.put_message(RequestToChild::SendMessage {uri, payload});
-                                if let Err(msg) = self.handle_send_message(msg) {
-                                    trace!("Error while sending message, putting it back in pending list");
-                                    temp.push(msg);
-                                }
-                            } else {
-                                msg.put_message(RequestToChild::SendMessage {uri, payload});
-                                temp.push(msg);
-                            }
-                        } else {
-                            panic!("Found a non-SendMessage message in GhostWebsocketTransport::pending!");
-                        }
-                    }
-                    self.pending = temp;
                 }
                 StreamEvent::IncomingConnectionEstablished(uri) => {
                     trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
