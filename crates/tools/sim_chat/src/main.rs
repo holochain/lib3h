@@ -5,21 +5,22 @@ extern crate regex;
 extern crate url;
 use lib3h_sim_chat::{simchat::SimChat, ChatEvent};
 use regex::Regex;
+use std::path::PathBuf;
 use url::Url;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine::GhostEngine, RealEngineConfig},
+    engine::{EngineConfig, GhostEngine},
 };
 use lib3h_sodium::SodiumCryptoSystem;
 use lib3h_tracing::Lib3hSpan;
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
-    let config = RealEngineConfig {
+    let config = EngineConfig {
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
-        work_dir: String::new(),
+        work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
         dht_gossip_interval: 100,

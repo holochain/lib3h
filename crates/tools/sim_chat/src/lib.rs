@@ -9,6 +9,7 @@ extern crate url;
 #[macro_use]
 extern crate detach;
 extern crate lib3h_tracing;
+extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 pub mod simchat;
 pub use simchat::{ChatEvent, SimChat};
