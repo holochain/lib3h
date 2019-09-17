@@ -264,6 +264,7 @@ impl MulticastDns {
     pub fn query(&mut self) -> MulticastDnsResult<()> {
         if let Some(query_message) = self.build_query_message() {
             self.broadcast_message(&query_message)?;
+            self.broadcast_message(&query_message)?;
         }
 
         Ok(())
@@ -391,6 +392,9 @@ impl MulticastDns {
         {
             // Sends at least 2 time an unsolicited response, up to 8 times maximum (according to
             // the standard https://tools.ietf.org/html/rfc6762#section-8.3)
+            self.broadcast_message(&dmesg)?;
+            self.broadcast_message(&dmesg)?;
+
             self.broadcast_message(&dmesg)?;
             self.broadcast_message(&dmesg)?;
         }
@@ -542,13 +546,15 @@ mod tests {
             .build()
             .expect("Fail to build mDNS.");
 
-        // Make itself known ion the network
+        // Make itself known in the network
         mdns_releaser
             .advertise()
             .expect("Fail to advertise my existence during release test.");
 
-        // Discovering the soon leaving participant
+        // Discovering the soon-to-be-leaving participant
         mdns.discover().expect("Fail to discover.");
+
+        // std::thread::sleep(std::time::Duration::from_millis(100));
 
         println!("mdns = {:#?}", &mdns.map_record);
         // Let's check that we discovered the soon-to-be-released record
