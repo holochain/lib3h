@@ -505,7 +505,7 @@ mod tests {
             }
 
             println!("Try {} successful!", index);
-            //thread::sleep(time::Duration::from_millis(1000));
+            thread::sleep(time::Duration::from_millis(1));
         }
     }
 }
