@@ -5,8 +5,6 @@ extern crate inflector;
 extern crate lazy_static;
 extern crate proc_macro2;
 //#[macro_use]
-extern crate shrinkwraprs;
-//#[macro_use]
 extern crate syn;
 #[allow(unused_imports)]
 #[macro_use]

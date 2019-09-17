@@ -4,6 +4,7 @@ use crate::{
     gateway::{protocol::*, P2pGateway},
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::*;
 use lib3h_tracing::Lib3hSpan;
 
 impl
@@ -86,7 +87,17 @@ impl P2pGateway {
                 // Forward to child dht
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
-            _ => Ok(()), // FIXME
+            GatewayRequestToChild::Bootstrap(data) => {
+                self.send(span, &data.bootstrap_uri, &Opaque::new(), Some(msg))?;
+                Ok(())
+            }
+            GatewayRequestToChild::SendAll(_) => {
+                println!("BADDBADD");
+                error!("BADDBADD");
+                // TODO XXX - fixme
+                //unimplemented!();
+                Ok(())
+            }
         }
     }
 }

@@ -11,6 +11,9 @@ extern crate shrinkwraprs;
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+pub mod ghost_test_harness;
+
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct WorkWasDone(pub bool);
@@ -24,6 +27,12 @@ impl From<bool> for WorkWasDone {
 impl From<WorkWasDone> for bool {
     fn from(d: WorkWasDone) -> Self {
         d.0
+    }
+}
+
+impl WorkWasDone {
+    pub fn or(&self, w: WorkWasDone) -> WorkWasDone {
+        WorkWasDone(w.0 || self.0)
     }
 }
 

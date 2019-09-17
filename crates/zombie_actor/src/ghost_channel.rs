@@ -1,6 +1,6 @@
 use crate::{
     GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
-    RequestId,
+    RequestId, WorkWasDone,
 };
 use lib3h_tracing::Lib3hSpan;
 
@@ -310,7 +310,7 @@ pub trait GhostCanTrack<
     ) -> Vec<GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>>;
 
     /// check for pending responses timeouts or incoming messages
-    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()>;
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone>;
 }
 
 /// an expanded endpoint usable to send/receive requests/responses/events
@@ -453,37 +453,39 @@ impl<
     }
 
     /// check for pending responses timeouts or incoming messages
-    fn process(&mut self, user_data: &mut UserData) -> GhostResult<()> {
-        self.pending_responses_tracker.process(user_data)?;
+    fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone> {
+        let mut work_was_done = self.pending_responses_tracker.process(user_data)?;
         loop {
             let msg: Result<
                 GhostEndpointMessage<RequestToSelf, RequestToOtherResponse, Error>,
                 crossbeam_channel::TryRecvError,
             > = self.receiver.try_recv();
             match msg {
-                Ok(channel_message) => match channel_message {
-                    GhostEndpointMessage::Request {
-                        request_id,
-                        payload,
-                        span,
-                    } => {
-                        self.outbox_messages_to_self.push(GhostMessage::new(
+                Ok(channel_message) => {
+                    match channel_message {
+                        GhostEndpointMessage::Request {
                             request_id,
                             payload,
-                            self.sender.clone(),
                             span,
-                        ));
-                    }
-                    GhostEndpointMessage::Response {
-                        request_id,
-                        payload,
-                        mut span,
-                    } => {
-                        span.event("process response");
-                        self.pending_responses_tracker
-                            .handle(request_id, user_data, payload)?;
-                    }
-                },
+                        } => {
+                            self.outbox_messages_to_self.push(GhostMessage::new(
+                                request_id,
+                                payload,
+                                self.sender.clone(),
+                                span.child("outbox_messages"),
+                            ));
+                        }
+                        GhostEndpointMessage::Response {
+                            request_id,
+                            payload,
+                            span: _,
+                        } => {
+                            self.pending_responses_tracker
+                                .handle(request_id, user_data, payload)?;
+                        }
+                    };
+                    work_was_done = true.into();
+                }
                 Err(e) => match e {
                     crossbeam_channel::TryRecvError::Empty => {
                         break;
@@ -494,7 +496,7 @@ impl<
                 },
             }
         }
-        Ok(())
+        Ok(work_was_done)
     }
 }
 

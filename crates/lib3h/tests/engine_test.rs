@@ -148,7 +148,6 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 //--------------------------------------------------------------------------------------------------
 
 #[test]
-#[ignore]
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
@@ -202,7 +201,6 @@ fn basic_connect_bootstrap_test_mock() {
 //}
 
 #[test]
-#[ignore]
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
@@ -263,7 +261,7 @@ fn basic_track_test(engine: &mut WrappedGhostLib3h) {
             request_id: "track_a_2".to_string(),
             space_address: SPACE_ADDRESS_A.clone(),
             to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: "Already joined space".into(),
+            result_info: "Unknown error encountered: \'Already joined space\'.".into(),
         }),
     ));
 

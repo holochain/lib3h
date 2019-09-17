@@ -1,16 +1,16 @@
 use crate::{
-    engine::{ghost_engine::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
-    error::Lib3hError,
+    engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
+    error::*,
 };
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
-    data_types::GenericResultData,
+    data_types::{ConnectedData, GenericResultData, Opaque},
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol::*,
     protocol_client::*,
     protocol_server::*,
-    DidWork,
+    Address, DidWork,
 };
 use lib3h_tracing::Lib3hSpan;
 use url::Url;
@@ -34,24 +34,33 @@ where
     client_request_responses: Vec<Lib3hServerProtocol>,
 }
 
-fn server_failure(err: String, request_id: String) -> Lib3hServerProtocol {
+fn server_failure(
+    err: String,
+    request_id: String,
+    space_address: Address,
+    to_agent_id: Address,
+) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
         request_id,
-        space_address: "space_addr".into(),
-        to_agent_id: "to_agent_id".into(),
+        space_address,
+        to_agent_id,
         result_info: err.as_bytes().into(),
     };
     Lib3hServerProtocol::FailureResult(failure_data)
 }
 
-fn server_success(request_id: String) -> Lib3hServerProtocol {
-    let failure_data = GenericResultData {
+fn server_success(
+    request_id: String,
+    space_address: Address,
+    to_agent_id: Address,
+) -> Lib3hServerProtocol {
+    let success_data = GenericResultData {
         request_id,
-        space_address: "space_addr".into(),
-        to_agent_id: "to_agent_id".into(),
-        result_info: vec![].into(),
+        space_address,
+        to_agent_id,
+        result_info: Opaque::new(),
     };
-    Lib3hServerProtocol::FailureResult(failure_data)
+    Lib3hServerProtocol::SuccessResult(success_data)
 }
 
 #[allow(dead_code)]
@@ -76,6 +85,8 @@ where
 
     fn make_callback(
         request_id: String,
+        space_addr: Address,
+        agent: Address,
     ) -> GhostCallback<LegacyLib3h<Engine, EngineError>, ClientToLib3hResponse, EngineError> {
         Box::new(
             |me: &mut LegacyLib3h<Engine, EngineError>,
@@ -83,23 +94,37 @@ where
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
                         let response = match rsp {
+                            ClientToLib3hResponse::BootstrapSuccess => {
+                                Lib3hServerProtocol::Connected(ConnectedData {
+                                    request_id,
+                                    uri: Url::parse("none:").unwrap(), // client should have this allready deprecated
+                                })
+                            }
                             ClientToLib3hResponse::JoinSpaceResult => {
-                                server_success(request_id.clone())
+                                server_success(request_id.clone(), space_addr, agent)
                             }
                             ClientToLib3hResponse::LeaveSpaceResult => {
-                                server_success(request_id.clone())
+                                server_success(request_id.clone(), space_addr, agent)
                             }
                             _ => rsp.into(),
                         };
                         me.client_request_responses.push(response)
                     }
                     GhostCallbackData::Response(Err(e)) => {
-                        me.client_request_responses
-                            .push(server_failure(e.to_string(), request_id.clone()));
+                        me.client_request_responses.push(server_failure(
+                            e.to_string(),
+                            request_id.clone(),
+                            space_addr,
+                            agent,
+                        ));
                     }
                     GhostCallbackData::Timeout => {
-                        me.client_request_responses
-                            .push(server_failure("Request timed out".into(), request_id));
+                        me.client_request_responses.push(server_failure(
+                            "Request timed out".into(),
+                            request_id,
+                            space_addr,
+                            agent,
+                        ));
                     }
                 };
                 Ok(())
@@ -109,23 +134,74 @@ where
 
     /// Add incoming Lib3hClientProtocol message in FIFO
     pub fn post(&mut self, client_msg: Lib3hClientProtocol) -> Lib3hProtocolResult<()> {
-        let request_id: String = match &client_msg {
-            Lib3hClientProtocol::Connect(data) => &data.request_id,
-            Lib3hClientProtocol::JoinSpace(data) => &data.request_id,
-            Lib3hClientProtocol::LeaveSpace(data) => &data.request_id,
-            Lib3hClientProtocol::SendDirectMessage(data) => &data.request_id,
-            Lib3hClientProtocol::FetchEntry(data) => &data.request_id,
-            Lib3hClientProtocol::QueryEntry(data) => &data.request_id,
-            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => &data.request_id,
-            Lib3hClientProtocol::HandleFetchEntryResult(data) => &data.request_id,
-            Lib3hClientProtocol::HandleQueryEntryResult(data) => &data.request_id,
-            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => &data.request_id,
-            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => &data.request_id,
-            Lib3hClientProtocol::PublishEntry(_) => "",
-            Lib3hClientProtocol::HoldEntry(_) => "",
+        let (request_id, space_addr, agent_id) = match &client_msg {
+            Lib3hClientProtocol::Connect(data) => (
+                data.request_id.to_string(),
+                "bogus_address".into(),
+                "bogus_agent".into(),
+            ),
+            Lib3hClientProtocol::JoinSpace(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.agent_id.clone(),
+            ),
+            Lib3hClientProtocol::LeaveSpace(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.agent_id.clone(),
+            ),
+            Lib3hClientProtocol::SendDirectMessage(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.to_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::FetchEntry(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.provider_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::QueryEntry(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.requester_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::HandleSendDirectMessageResult(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                "".into(),
+            ), // agent id is deprecated here, client should know.
+            Lib3hClientProtocol::HandleFetchEntryResult(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.provider_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::HandleQueryEntryResult(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                "".into(),
+            ), // agent id is deprecated here, client should know.
+            Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.provider_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::HandleGetGossipingEntryListResult(data) => (
+                data.request_id.to_string(),
+                data.space_address.clone(),
+                data.provider_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::PublishEntry(data) => (
+                "".to_string(),
+                data.space_address.clone(),
+                data.provider_agent_id.clone(),
+            ),
+            Lib3hClientProtocol::HoldEntry(data) => (
+                "".to_string(),
+                data.space_address.clone(),
+                data.provider_agent_id.clone(),
+            ),
             _ => unimplemented!(),
-        }
-        .to_string();
+        };
 
         let result = if request_id == "" {
             self.engine.publish(Lib3hSpan::todo(""), client_msg.into())
@@ -133,7 +209,7 @@ where
             self.engine.request(
                 Lib3hSpan::todo(""),
                 client_msg.into(),
-                LegacyLib3h::make_callback(request_id.to_string()),
+                LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
             )
         };
         result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
@@ -262,7 +338,7 @@ mod tests {
             mut msg: GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, EngineError>,
         ) -> Result<(), EngineError> {
             let result = match msg.take_message().expect("exists") {
-                ClientToLib3h::Connect(_data) => {
+                ClientToLib3h::Bootstrap(_data) => {
                     // pretend the connection request failed
                     msg.respond(Err("connection failed!".to_string()))
                 }
@@ -309,7 +385,7 @@ mod tests {
 
         // The mock engine allways returns failure on connect requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: \"connection failed!\" })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"bogus_address\"), to_agent_id: HashString(\"bogus_agent\"), result_info: \"connection failed!\" })]))",
             format!("{:?}", result)
         );
 
@@ -324,7 +400,7 @@ mod tests {
 
         // The mock engine allways returns success on Join requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"space_addr\"), to_agent_id: HashString(\"to_agent_id\"), result_info: \"\" })]))",
+            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"fake_space_address\"), to_agent_id: HashString(\"fake_id\"), result_info: \"\" })]))",
             format!("{:?}", result)
         );
 
