@@ -163,19 +163,22 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     /// send a message to one or more remote connected nodes
     pub fn send(&mut self, url: &Url, payload: &[u8]) -> TransportResult<()> {
         //println!("send() 1 {:?}", url);
-        let mut info = self.stream_sockets.get_mut(&url)
+        let mut info = self
+            .stream_sockets
+            .get_mut(&url)
             .ok_or(format!("No socket found for URL: {}", url.to_string()))?;
 
         //println!("send() 2 {:?}", url);
-        let mut ws_stream = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
+        let mut ws_stream =
+            std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
         let send_result = match &mut ws_stream {
-            WebsocketStreamState::ReadyWs(socket) =>
-                socket.write_message(tungstenite::Message::Binary(payload.to_vec()))
-                    .map_err(|error| format!("{}", error)),
-            WebsocketStreamState::ReadyWss(socket) =>
-                socket.write_message(tungstenite::Message::Binary(payload.to_vec()))
-                    .map_err(|error| format!("{}", error)),
-            _ => Err(String::from("Websocket not in Ready state"))
+            WebsocketStreamState::ReadyWs(socket) => socket
+                .write_message(tungstenite::Message::Binary(payload.to_vec()))
+                .map_err(|error| format!("{}", error)),
+            WebsocketStreamState::ReadyWss(socket) => socket
+                .write_message(tungstenite::Message::Binary(payload.to_vec()))
+                .map_err(|error| format!("{}", error)),
+            _ => Err(String::from("Websocket not in Ready state")),
         };
         info.stateful_socket = ws_stream;
         //println!("send() 3 {:?}", send_result);
@@ -203,11 +206,14 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     }
 
     pub fn connection_status(&self, url: &Url) -> ConnectionStatus {
-        self.stream_sockets.get(url)
+        self.stream_sockets
+            .get(url)
             .map(|info| match info.stateful_socket {
-                WebsocketStreamState::TlsReady(_) | WebsocketStreamState::TlsSrvReady(_) |
-                WebsocketStreamState::ReadyWs(_) | WebsocketStreamState::ReadyWss(_) => ConnectionStatus::Ready,
-                _ => ConnectionStatus::Initializing
+                WebsocketStreamState::TlsReady(_)
+                | WebsocketStreamState::TlsSrvReady(_)
+                | WebsocketStreamState::ReadyWs(_)
+                | WebsocketStreamState::ReadyWss(_) => ConnectionStatus::Ready,
+                _ => ConnectionStatus::Initializing,
             })
             .unwrap_or(ConnectionStatus::None)
     }
@@ -378,7 +384,8 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 Ok(())
             }
             WebsocketStreamState::WssSrvMidHandshake(socket) => {
-                info.stateful_socket = self.priv_wss_srv_handshake(&info.url, socket.handshake())?;
+                info.stateful_socket =
+                    self.priv_wss_srv_handshake(&info.url, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::ReadyWs(mut socket) => {

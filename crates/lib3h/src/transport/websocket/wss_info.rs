@@ -1,7 +1,4 @@
-use crate::transport::websocket::{
-    streams::WebsocketStreamState,
-    BaseStream, TransportResult,
-};
+use crate::transport::websocket::{streams::WebsocketStreamState, BaseStream, TransportResult};
 
 /// Represents an individual connection
 #[derive(Debug)]

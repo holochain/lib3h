@@ -44,40 +44,39 @@ impl StreamManager<std::net::TcpStream> {
                         err.into()
                     })
                     .map(|()| {
-                        let acceptor: Acceptor<TcpStream> =
-                            Box::new(move || {
-                                listener
-                                    .accept()
-                                    .map_err(|err| {
-                                        error!("transport_wss::tcp accept error: {:?}", err);
-                                        err.into()
-                                    })
-                                    .and_then(|(tcp_stream, socket_address)| {
-                                        tcp_stream.set_nonblocking(true)?;
-                                        let v4_socket_address = format!(
-                                            "wss://{}:{}",
-                                            socket_address.ip(),
-                                            socket_address.port()
-                                        );
+                        let acceptor: Acceptor<TcpStream> = Box::new(move || {
+                            listener
+                                .accept()
+                                .map_err(|err| {
+                                    error!("transport_wss::tcp accept error: {:?}", err);
+                                    err.into()
+                                })
+                                .and_then(|(tcp_stream, socket_address)| {
+                                    tcp_stream.set_nonblocking(true)?;
+                                    let v4_socket_address = format!(
+                                        "wss://{}:{}",
+                                        socket_address.ip(),
+                                        socket_address.port()
+                                    );
 
-                                        debug!(
-                                            "transport_wss::tcp v4 socket_address: {}",
-                                            v4_socket_address
-                                        );
-                                        url::Url::parse(v4_socket_address.as_str())
-                                            .map(|url| {
-                                                error!(
-                                                    "transport_wss::tcp accepted for url {}",
-                                                    url.clone()
-                                                );
-                                                WssInfo::server(url, tcp_stream)
-                                            })
-                                            .map_err(|err| {
-                                                error!("transport_wss::tcp url error: {:?}", err);
-                                                err.into()
-                                            })
-                                    })
-                            });
+                                    debug!(
+                                        "transport_wss::tcp v4 socket_address: {}",
+                                        v4_socket_address
+                                    );
+                                    url::Url::parse(v4_socket_address.as_str())
+                                        .map(|url| {
+                                            error!(
+                                                "transport_wss::tcp accepted for url {}",
+                                                url.clone()
+                                            );
+                                            WssInfo::server(url, tcp_stream)
+                                        })
+                                        .map_err(|err| {
+                                            error!("transport_wss::tcp url error: {:?}", err);
+                                            err.into()
+                                        })
+                                })
+                        });
                         acceptor
                     })
             })

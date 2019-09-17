@@ -12,7 +12,8 @@ use lib3h_protocol::data_types::Opaque;
 use lib3h_tracing::Lib3hSpan;
 use url::Url;
 
-pub type Message = GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
+pub type Message =
+    GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
 
 pub struct GhostTransportWebsocket {
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
@@ -50,7 +51,10 @@ impl GhostTransportWebsocket {
     /// If we encounter an error while sending, it will return an Err with the
     /// message object so it can be put back into the pending list tried again later.
     fn handle_send_message(&mut self, mut msg: Message) -> Result<(), Message> {
-        match msg.take_message().expect("GhostMessage must have inner RequestToChild") {
+        match msg
+            .take_message()
+            .expect("GhostMessage must have inner RequestToChild")
+        {
             RequestToChild::SendMessage { uri, payload } => {
                 match self.bound_url.clone() {
                     None => {
@@ -68,9 +72,7 @@ impl GhostTransportWebsocket {
                         let bytes = payload.as_bytes();
                         // Send it data from us
                         let _ = match self.streams.send(&uri, &bytes) {
-                            Ok(()) => msg.respond(
-                                Ok(RequestToChildResponse::SendMessageSuccess)
-                            ),
+                            Ok(()) => msg.respond(Ok(RequestToChildResponse::SendMessageSuccess)),
                             Err(error) => {
                                 println!("Error during send: {:?}", error);
                                 let payload = Opaque::from(bytes);
@@ -81,7 +83,9 @@ impl GhostTransportWebsocket {
                     }
                 }
             }
-            _ => panic!("GhostTransportWebsocket::handle_send_message called with non-SendMessage message"),
+            _ => panic!(
+                "GhostTransportWebsocket::handle_send_message called with non-SendMessage message"
+            ),
         }
         Ok(())
     }
@@ -165,7 +169,9 @@ impl
                                     uri,
                                 );
                                 match self.streams.connect(&uri) {
-                                    Ok(()) => trace!("New connection to {} initialized", uri.to_string()),
+                                    Ok(()) => {
+                                        trace!("New connection to {} initialized", uri.to_string())
+                                    }
                                     Err(error) => {
                                         trace!(
                                             "Could not connect to {}! Transport error: {:?}",
@@ -178,7 +184,7 @@ impl
                                 // And save message for later:
                                 msg.put_message(RequestToChild::SendMessage { uri, payload });
                                 self.pending.push(msg);
-                            },
+                            }
                             ConnectionStatus::Initializing => {
                                 trace!("Send tried while initializing");
                                 // If the connection is there but not ready yet, save message for later
@@ -189,10 +195,12 @@ impl
                                 trace!("Send via previously established connection");
                                 msg.put_message(RequestToChild::SendMessage { uri, payload });
                                 if let Err(msg) = self.handle_send_message(msg) {
-                                    trace!("Error while sending message, putting it in pending list");
+                                    trace!(
+                                        "Error while sending message, putting it in pending list"
+                                    );
                                     self.pending.push(msg);
                                 }
-                            },
+                            }
                         }
                     };
                 }
@@ -211,7 +219,11 @@ impl
         for event in stream_events {
             match event {
                 StreamEvent::ErrorOccured(uri, error) => {
-                    warn!("Error in GhostWebsocketTransport stream connection to {:?}: {:?}", uri, error);self.endpoint_self.publish(
+                    warn!(
+                        "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
+                        uri, error
+                    );
+                    self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::ErrorOccured { uri, error },
                     )?;
@@ -227,7 +239,10 @@ impl
                     )?;
                 }
                 StreamEvent::ReceivedData(uri, payload) => {
-                    trace!("StreamEvent::ReceivedData: {:?}", String::from_utf8(payload.clone()));
+                    trace!(
+                        "StreamEvent::ReceivedData: {:?}",
+                        String::from_utf8(payload.clone())
+                    );
                     self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::ReceivedData {
@@ -246,16 +261,16 @@ impl
         while let Some(mut msg) = self.pending.pop() {
             trace!("Processing pending message...");
             let inner_msg = msg.take_message().expect("exists");
-            if let RequestToChild::SendMessage {uri, payload} = inner_msg {
+            if let RequestToChild::SendMessage { uri, payload } = inner_msg {
                 if self.streams.connection_status(&uri) == ConnectionStatus::Ready {
                     trace!("Sending pending message to: {:?}", uri);
-                    msg.put_message(RequestToChild::SendMessage {uri, payload});
+                    msg.put_message(RequestToChild::SendMessage { uri, payload });
                     if let Err(msg) = self.handle_send_message(msg) {
                         trace!("Error while sending message, putting it back in pending list");
                         temp.push(msg);
                     }
                 } else {
-                    msg.put_message(RequestToChild::SendMessage {uri, payload});
+                    msg.put_message(RequestToChild::SendMessage { uri, payload });
                     temp.push(msg);
                 }
             } else {
@@ -272,12 +287,11 @@ impl
 mod tests {
 
     use super::*;
-    use crate::transport::websocket::tls::TlsConfig;
+    use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
     use lib3h_ghost_actor::wait_for_message;
     use regex::Regex;
     use std::{net::TcpListener, thread, time};
     use url::Url;
-    use crate::tests::enable_logging_for_test;
 
     fn port_is_available(port: u16) -> bool {
         match TcpListener::bind(("127.0.0.1", port)) {
