@@ -18,7 +18,7 @@ pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
 
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
-pub struct LegacyLib3h<Engine, EngineError: 'static>
+pub struct LegacyLib3h<Engine, EngineError: 'static + std::fmt::Debug>
 where
     Engine: GhostActor<
         Lib3hToClient,
@@ -64,7 +64,7 @@ fn server_success(
 }
 
 #[allow(dead_code)]
-impl<Engine: 'static, EngineError: 'static> LegacyLib3h<Engine, EngineError>
+impl<Engine: 'static, EngineError: 'static + std::fmt::Debug> LegacyLib3h<Engine, EngineError>
 where
     Engine: GhostActor<
             Lib3hToClient,
