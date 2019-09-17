@@ -204,10 +204,10 @@ where
         };
 
         let result = if request_id == "" {
-            self.engine.publish(Lib3hSpan::todo(""), client_msg.into())
+            self.engine.publish(Lib3hSpan::fixme(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hSpan::todo(""),
+                Lib3hSpan::fixme(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
             )

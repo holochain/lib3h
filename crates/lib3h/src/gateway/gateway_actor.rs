@@ -36,7 +36,7 @@ impl
 
         // Update this_peer cache
         self.inner_dht.request(
-            Lib3hSpan::todo(""),
+            Lib3hSpan::fixme(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {
