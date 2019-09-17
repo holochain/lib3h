@@ -1,12 +1,11 @@
 use crate::transport::websocket::{
-    streams::{ConnectionId, WebsocketStreamState},
+    streams::WebsocketStreamState,
     BaseStream, TransportResult,
 };
 
 /// Represents an individual connection
 #[derive(Debug)]
 pub struct WssInfo<T: std::io::Read + std::io::Write + std::fmt::Debug> {
-    pub(in crate::transport::websocket) id: ConnectionId,
     pub(in crate::transport::websocket) request_id: String,
     pub(in crate::transport::websocket) url: url::Url,
     pub(in crate::transport::websocket) last_msg: std::time::Instant,
@@ -24,9 +23,8 @@ impl<T: std::io::Read + std::io::Write + std::fmt::Debug> WssInfo<T> {
         Ok(())
     }
 
-    pub fn new(id: ConnectionId, url: url::Url, socket: BaseStream<T>, is_server: bool) -> Self {
+    pub fn new(url: url::Url, socket: BaseStream<T>, is_server: bool) -> Self {
         WssInfo {
-            id: id.clone(),
             // TODO set a request id
             request_id: "".to_string(),
             url,
@@ -39,11 +37,11 @@ impl<T: std::io::Read + std::io::Write + std::fmt::Debug> WssInfo<T> {
         }
     }
 
-    pub fn client(id: ConnectionId, url: url::Url, socket: BaseStream<T>) -> Self {
-        Self::new(id, url, socket, false)
+    pub fn client(url: url::Url, socket: BaseStream<T>) -> Self {
+        Self::new(url, socket, false)
     }
 
-    pub fn server(id: ConnectionId, url: url::Url, socket: BaseStream<T>) -> Self {
-        Self::new(id, url, socket, true)
+    pub fn server(url: url::Url, socket: BaseStream<T>) -> Self {
+        Self::new(url, socket, true)
     }
 }

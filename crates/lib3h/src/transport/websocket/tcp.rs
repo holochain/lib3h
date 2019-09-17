@@ -4,7 +4,7 @@
 use crate::transport::{
     error::TransportResult,
     websocket::{
-        streams::{Acceptor, Bind, ConnectionIdFactory, IdGenerator, StreamManager},
+        streams::{Acceptor, Bind, StreamManager},
         tls::TlsConfig,
         wss_info::WssInfo,
     },
@@ -45,8 +45,7 @@ impl StreamManager<std::net::TcpStream> {
                     })
                     .map(|()| {
                         let acceptor: Acceptor<TcpStream> =
-                            Box::new(move |mut connection_id_factory: ConnectionIdFactory| {
-                                let connection_id = connection_id_factory.next_id();
+                            Box::new(move || {
                                 listener
                                     .accept()
                                     .map_err(|err| {
@@ -71,7 +70,7 @@ impl StreamManager<std::net::TcpStream> {
                                                     "transport_wss::tcp accepted for url {}",
                                                     url.clone()
                                                 );
-                                                WssInfo::server(connection_id, url, tcp_stream)
+                                                WssInfo::server(url, tcp_stream)
                                             })
                                             .map_err(|err| {
                                                 error!("transport_wss::tcp url error: {:?}", err);

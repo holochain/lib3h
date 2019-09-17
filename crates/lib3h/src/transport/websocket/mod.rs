@@ -12,6 +12,7 @@ pub mod tls;
 mod wss_info;
 
 use crate::transport::{error::TransportResult, websocket::wss_info::WssInfo};
+use url::Url;
 
 static FAKE_PKCS12: &'static [u8] = include_bytes!("fake_key.p12");
 static FAKE_PASS: &'static str = "hello";
@@ -56,4 +57,4 @@ type WssSrvMidHandshake<T> = tungstenite::handshake::MidHandshake<
 type WsStream<T> = tungstenite::protocol::WebSocket<T>;
 type WssStream<T> = tungstenite::protocol::WebSocket<TlsStream<T>>;
 
-type SocketMap<T> = std::collections::HashMap<String, WssInfo<T>>;
+type SocketMap<T> = std::collections::HashMap<Url, WssInfo<T>>;

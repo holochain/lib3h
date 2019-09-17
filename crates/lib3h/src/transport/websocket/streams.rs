@@ -21,10 +21,6 @@ pub const DEFAULT_HEARTBEAT_MS: usize = 2000;
 /// when should we close a connection due to not receiving remote msgs
 pub const DEFAULT_HEARTBEAT_WAIT_MS: usize = 5000;
 
-/// a connection identifier
-pub type ConnectionId = String;
-pub type ConnectionIdRef = str;
-
 // an internal state sequence for stream building
 #[derive(Debug)]
 pub enum WebsocketStreamState<T: Read + Write + std::fmt::Debug> {
@@ -44,57 +40,36 @@ pub enum WebsocketStreamState<T: Read + Write + std::fmt::Debug> {
     ReadyWss(Box<WssStream<T>>),
 }
 
+pub enum ConnectionStatus {
+    None,
+    Initializing,
+    Ready,
+}
+
 /// Events that can be generated during a `process()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum StreamEvent {
     /// Notify that some TransportError occured
-    ErrorOccured(ConnectionId, TransportError),
+    ErrorOccured(Url, TransportError),
     /// an outgoing connection has been established
-    ConnectResult(ConnectionId, String),
+    ConnectResult(Url, String),
     /// we have received an incoming connection
-    IncomingConnectionEstablished(ConnectionId),
+    IncomingConnectionEstablished(Url),
     /// We have received data from a connection
-    ReceivedData(ConnectionId, Vec<u8>),
+    ReceivedData(Url, Vec<u8>),
     /// A connection closed for whatever reason
-    ConnectionClosed(ConnectionId),
+    ConnectionClosed(Url),
 }
 
 /// A factory callback for generating base streams of type T
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
 
-pub trait IdGenerator {
-    fn next_id(&mut self) -> ConnectionId;
-}
-
-#[derive(Clone)]
-/// A ConnectionIdFactory is a tuple of it's own internal id and incremental counter
-/// for each established transport
-pub struct ConnectionIdFactory(u64, Arc<Mutex<u64>>);
-impl IdGenerator for ConnectionIdFactory {
-    fn next_id(&mut self) -> ConnectionId {
-        let self_id = self.0;
-        let mut n_id = self.1.lock().expect("could not lock mutex");
-        let out = format!("ws{}_{}", self_id, *n_id);
-        *n_id += 1;
-        out
-    }
-}
-
 lazy_static! {
     static ref TRANSPORT_COUNT: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
 }
-impl ConnectionIdFactory {
-    pub fn new() -> Self {
-        let mut tc = TRANSPORT_COUNT
-            .lock()
-            .expect("could not lock transport count mutex");
-        *tc += 1;
-        ConnectionIdFactory(*tc, Arc::new(Mutex::new(1)))
-    }
-}
 
 /// A function that produces accepted sockets of type R wrapped in a TransportInfo
-pub type Acceptor<T> = Box<dyn FnMut(ConnectionIdFactory) -> TransportResult<WssInfo<T>>>;
+pub type Acceptor<T> = Box<dyn FnMut() -> TransportResult<WssInfo<T>>>;
 
 /// A function that binds to a url and produces sockt acceptors of type T
 pub type Bind<T> = Box<dyn FnMut(&Url) -> TransportResult<Acceptor<T>>>;
@@ -106,7 +81,6 @@ pub struct StreamManager<T: Read + Write + std::fmt::Debug> {
     stream_factory: StreamFactory<T>,
     stream_sockets: SocketMap<T>,
     event_queue: Vec<StreamEvent>,
-    n_id: ConnectionIdFactory,
     bind: Bind<T>,
     acceptor: TransportResult<Acceptor<T>>,
 }
@@ -118,29 +92,13 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             stream_factory,
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
-            n_id: ConnectionIdFactory::new(),
             bind,
             acceptor: Err(TransportError("acceptor not initialized".into())),
         }
     }
 
-    pub fn url_to_connection_id(&self, url: &Url) -> Option<ConnectionId> {
-        for (connection_id, wss_info) in self.stream_sockets.iter() {
-            if wss_info.url == *url {
-                return Some(connection_id.clone());
-            }
-        }
-        None
-    }
-
-    pub fn connection_id_to_url(&self, connection_id: ConnectionId) -> Option<Url> {
-        self.stream_sockets
-            .get(&connection_id)
-            .map(|wss_info| wss_info.url.clone())
-    }
-
     /// connect to a remote websocket service
-    pub fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
+    pub fn connect(&mut self, uri: &Url) -> TransportResult<()> {
         let host_port = format!(
             "{}:{}",
             uri.host_str()
@@ -149,16 +107,15 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 .ok_or_else(|| TransportError("bad connect port".into()))?,
         );
         let socket = (self.stream_factory)(&host_port)?;
-        let id = self.priv_next_id();
-        let info = WssInfo::client(id.clone(), uri.clone(), socket);
-        self.stream_sockets.insert(id.clone(), info);
-        Ok(id)
+        let info = WssInfo::client(uri.clone(), socket);
+        self.stream_sockets.insert(uri.clone(), info);
+        Ok(())
     }
 
     /// close a currently tracked connection
     #[allow(dead_code)]
-    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        if let Some(mut info) = self.stream_sockets.remove(id) {
+    fn close(&mut self, uri: &Url) -> TransportResult<()> {
+        if let Some(mut info) = self.stream_sockets.remove(uri) {
             info.close()?;
         }
         Ok(())
@@ -175,7 +132,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 .keys()
                 .next()
                 .expect("should not be None")
-                .to_string();
+                .clone();
             if let Some(mut info) = self.stream_sockets.remove(&key) {
                 if let Err(e) = info.close() {
                     errors.push(e);
@@ -203,9 +160,9 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     }
 
     /// send a message to one or more remote connected nodes
-    pub fn send(&mut self, id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        for id in id_list {
-            if let Some(info) = self.stream_sockets.get_mut(&id.to_string()) {
+    pub fn send(&mut self, url_list: &[&Url], payload: &[u8]) -> TransportResult<()> {
+        for url in url_list {
+            if let Some(info) = self.stream_sockets.get_mut(&url) {
                 info.send_queue.push(payload.to_vec());
             }
         }
@@ -230,12 +187,17 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         })
     }
 
-    // -- private -- //
-
-    // generate a unique id for
-    fn priv_next_id(&mut self) -> ConnectionId {
-        self.n_id.next_id()
+    pub fn connection_status(&self, url: &Url) -> ConnectionStatus {
+        self.stream_sockets.get(url)
+            .map(|info| match info.stateful_socket {
+                WebsocketStreamState::TlsReady(_) | WebsocketStreamState::TlsSrvReady(_) |
+                WebsocketStreamState::ReadyWs(_) | WebsocketStreamState::ReadyWss(_) => ConnectionStatus::Ready,
+                _ => ConnectionStatus::Initializing
+            })
+            .unwrap_or(ConnectionStatus::None)
     }
+
+    // -- private -- //
 
     fn priv_process_accept(&mut self) -> DidWork {
         match &mut self.acceptor {
@@ -243,10 +205,9 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 warn!("acceptor in error state: {:?}", err);
                 false
             }
-            Ok(acceptor) => (acceptor)(self.n_id.clone())
+            Ok(acceptor) => (acceptor)()
                 .map(move |wss_info| {
-                    let connection_id = wss_info.id.clone();
-                    let _insert_result = self.stream_sockets.insert(connection_id, wss_info);
+                    let _insert_result = self.stream_sockets.insert(wss_info.url.clone(), wss_info);
                     true
                 })
                 .unwrap_or_else(|err| {
@@ -264,16 +225,16 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         did_work |= self.priv_process_accept();
 
         // take sockets out, so we can mut ref into self and it at same time
-        let sockets: Vec<(String, WssInfo<T>)> = self.stream_sockets.drain().collect();
+        let sockets: Vec<(Url, WssInfo<T>)> = self.stream_sockets.drain().collect();
 
         for (id, mut info) in sockets {
             if let Err(e) = self.priv_process_socket(&mut did_work, &mut info) {
                 self.event_queue
-                    .push(StreamEvent::ErrorOccured(info.id.clone(), e));
+                    .push(StreamEvent::ErrorOccured(info.url.clone(), e));
             }
             if let WebsocketStreamState::None = info.stateful_socket {
                 self.event_queue
-                    .push(StreamEvent::ConnectionClosed(info.id));
+                    .push(StreamEvent::ConnectionClosed(info.url));
                 continue;
             }
             if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_MS {
@@ -285,11 +246,15 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 }
             } else if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_WAIT_MS {
                 self.event_queue
-                    .push(StreamEvent::ConnectionClosed(info.id));
+                    .push(StreamEvent::ConnectionClosed(info.url));
                 info.stateful_socket = WebsocketStreamState::None;
                 continue;
             }
             self.stream_sockets.insert(id, info);
+            //match info.stateful_socket {
+            //    WebsocketStreamState::None => {None},
+            //    _ => self.stream_sockets.insert(id, info),
+            //};
         }
 
         Ok(did_work)
@@ -318,7 +283,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 match &self.tls_config {
                     TlsConfig::Unencrypted => {
                         info.stateful_socket = self.priv_ws_handshake(
-                            &info.id,
+                            &info.url,
                             &info.request_id,
                             tungstenite::client(info.url.clone(), socket),
                         )?;
@@ -340,7 +305,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 *did_work = true;
                 if let &TlsConfig::Unencrypted = &self.tls_config {
                     info.stateful_socket =
-                        self.priv_ws_srv_handshake(&info.id, tungstenite::accept(socket))?;
+                        self.priv_ws_srv_handshake(&info.url, tungstenite::accept(socket))?;
                     return Ok(());
                 }
                 let ident = match &self.tls_config {
@@ -370,7 +335,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
                 info.stateful_socket = self.priv_wss_handshake(
-                    &info.id,
+                    &info.url,
                     &info.request_id,
                     tungstenite::client(info.url.clone(), socket),
                 )?;
@@ -380,25 +345,25 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 info.last_msg = std::time::Instant::now();
                 *did_work = true;
                 info.stateful_socket =
-                    self.priv_wss_srv_handshake(&info.id, tungstenite::accept(socket))?;
+                    self.priv_wss_srv_handshake(&info.url, tungstenite::accept(socket))?;
                 Ok(())
             }
             WebsocketStreamState::WsMidHandshake(socket) => {
                 info.stateful_socket =
-                    self.priv_ws_handshake(&info.id, &info.request_id, socket.handshake())?;
+                    self.priv_ws_handshake(&info.url, &info.request_id, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::WsSrvMidHandshake(socket) => {
-                info.stateful_socket = self.priv_ws_srv_handshake(&info.id, socket.handshake())?;
+                info.stateful_socket = self.priv_ws_srv_handshake(&info.url, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::WssMidHandshake(socket) => {
                 info.stateful_socket =
-                    self.priv_wss_handshake(&info.id, &info.request_id, socket.handshake())?;
+                    self.priv_wss_handshake(&info.url, &info.request_id, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::WssSrvMidHandshake(socket) => {
-                info.stateful_socket = self.priv_wss_srv_handshake(&info.id, socket.handshake())?;
+                info.stateful_socket = self.priv_wss_srv_handshake(&info.url, socket.handshake())?;
                 Ok(())
             }
             WebsocketStreamState::ReadyWs(mut socket) => {
@@ -433,7 +398,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
 
                         if let Some(msg) = qmsg {
                             self.event_queue
-                                .push(StreamEvent::ReceivedData(info.id.clone(), msg));
+                                .push(StreamEvent::ReceivedData(info.url.clone(), msg));
                         }
                         info.stateful_socket = WebsocketStreamState::ReadyWs(socket);
                         Ok(())
@@ -472,7 +437,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
 
                         if let Some(msg) = qmsg {
                             self.event_queue
-                                .push(StreamEvent::ReceivedData(info.id.clone(), msg));
+                                .push(StreamEvent::ReceivedData(info.url.clone(), msg));
                         }
                         info.stateful_socket = WebsocketStreamState::ReadyWss(socket);
                         Ok(())
@@ -514,7 +479,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     // process websocket handshaking
     fn priv_ws_handshake(
         &mut self,
-        id: &ConnectionId,
+        url: &Url,
         request_id: &str,
         res: WsConnectResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
@@ -525,7 +490,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
                 self.event_queue.push(StreamEvent::ConnectResult(
-                    id.clone(),
+                    url.clone(),
                     request_id.to_string(),
                 ));
                 Ok(WebsocketStreamState::ReadyWs(Box::new(socket)))
@@ -536,7 +501,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     // process websocket handshaking
     fn priv_wss_handshake(
         &mut self,
-        id: &ConnectionId,
+        url: &Url,
         request_id: &str,
         res: WssConnectResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
@@ -547,7 +512,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             Err(e) => Err(e.into()),
             Ok((socket, _response)) => {
                 self.event_queue.push(StreamEvent::ConnectResult(
-                    id.clone(),
+                    url.clone(),
                     request_id.to_string(),
                 ));
                 Ok(WebsocketStreamState::ReadyWss(Box::new(socket)))
@@ -558,7 +523,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     // process websocket srv handshaking
     fn priv_ws_srv_handshake(
         &mut self,
-        id: &ConnectionId,
+        url: &Url,
         res: WsSrvAcceptResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
@@ -568,7 +533,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             Err(e) => Err(e.into()),
             Ok(socket) => {
                 self.event_queue
-                    .push(StreamEvent::IncomingConnectionEstablished(id.clone()));
+                    .push(StreamEvent::IncomingConnectionEstablished(url.clone()));
                 Ok(WebsocketStreamState::ReadyWs(Box::new(socket)))
             }
         }
@@ -577,7 +542,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
     // process websocket srv handshaking
     fn priv_wss_srv_handshake(
         &mut self,
-        id: &ConnectionId,
+        url: &Url,
         res: WssSrvAcceptResult<T>,
     ) -> TransportResult<WebsocketStreamState<T>> {
         match res {
@@ -587,7 +552,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             Err(e) => Err(e.into()),
             Ok(socket) => {
                 self.event_queue
-                    .push(StreamEvent::IncomingConnectionEstablished(id.clone()));
+                    .push(StreamEvent::IncomingConnectionEstablished(url.clone()));
                 Ok(WebsocketStreamState::ReadyWss(Box::new(socket)))
             }
         }
