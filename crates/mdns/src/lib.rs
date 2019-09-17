@@ -395,8 +395,10 @@ impl MulticastDns {
             self.broadcast_message(&dmesg)?;
             self.broadcast_message(&dmesg)?;
 
-            self.broadcast_message(&dmesg)?;
-            self.broadcast_message(&dmesg)?;
+            if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
+                self.broadcast_message(&dmesg)?;
+                self.broadcast_message(&dmesg)?;
+            }
         }
         Ok(())
     }
