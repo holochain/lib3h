@@ -6,6 +6,7 @@ use crate::transport::{
         tls::TlsConfig,
     },
 };
+use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
 use lib3h_tracing::Lib3hSpan;
@@ -14,7 +15,7 @@ use url::Url;
 
 pub struct GhostTransportWebsocket {
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
-    endpoint_self: Option<GhostTransportWebsocketEndpointContext>,
+    endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
     bound_url: Option<Url>,
 }
@@ -24,7 +25,7 @@ impl GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
             endpoint_parent: Some(endpoint_parent),
-            endpoint_self: Some(
+            endpoint_self: Detach::new(
                 endpoint_self
                     .as_context_endpoint_builder()
                     .request_id_prefix("twss_to_parent")
@@ -87,16 +88,10 @@ impl
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // process the self endpoint
-        let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-        endpoint_self.as_mut().expect("exists").process(self)?;
-        std::mem::replace(&mut self.endpoint_self, endpoint_self);
+        detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
+            .process(self))?;
 
-        for mut msg in self
-            .endpoint_self
-            .as_mut()
-            .expect("exists")
-            .drain_messages()
-        {
+        for mut msg in self.endpoint_self.drain_messages() {
             match msg.take_message().expect("exist") {
                 RequestToChild::Bind { spec: url } => {
                     let maybe_bound_url = self.streams.bind(&url);
@@ -187,12 +182,10 @@ impl
                             Url::from_str("wss://0.0.0.0")
                                 .expect("URL literal is syntactically correct")
                         });
-                    let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-                    endpoint_self.as_mut().expect("exists").publish(
+                    self.endpoint_self.publish(
                         Lib3hSpan::todo(),
                         RequestToParent::ErrorOccured { uri, error },
                     )?;
-                    std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 }
                 StreamEvent::ConnectResult(_connection_id, _) => {}
                 StreamEvent::IncomingConnectionEstablished(connection_id) => {
@@ -200,12 +193,10 @@ impl
                         .streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
-                    let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-                    endpoint_self.as_mut().expect("exists").publish(
+                    self.endpoint_self.publish(
                         Lib3hSpan::todo(),
                         RequestToParent::IncomingConnection { uri },
                     )?;
-                    std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 }
                 StreamEvent::ReceivedData(connection_id, payload) => {
                     //println!("DATA RECEIVED!!! {:?}", String::from_utf8(payload.clone()));
@@ -213,15 +204,13 @@ impl
                         .streams
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
-                    let mut endpoint_self = std::mem::replace(&mut self.endpoint_self, None);
-                    endpoint_self.as_mut().expect("exists").publish(
+                    self.endpoint_self.publish(
                         Lib3hSpan::todo(),
                         RequestToParent::ReceivedData {
                             uri,
                             payload: Opaque::from(payload),
                         },
                     )?;
-                    std::mem::replace(&mut self.endpoint_self, endpoint_self);
                 }
                 StreamEvent::ConnectionClosed(connection_id) => {
                     println!("Connection closed: {}", connection_id);
