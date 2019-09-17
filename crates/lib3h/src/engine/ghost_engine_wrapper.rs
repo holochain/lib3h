@@ -5,7 +5,7 @@ use crate::{
 use detach::Detach;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
-    data_types::{GenericResultData, Opaque},
+    data_types::{ConnectedData, GenericResultData, Opaque},
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol::*,
     protocol_client::*,
@@ -94,6 +94,12 @@ where
                 match response {
                     GhostCallbackData::Response(Ok(rsp)) => {
                         let response = match rsp {
+                            ClientToLib3hResponse::BootstrapSuccess => {
+                                Lib3hServerProtocol::Connected(ConnectedData {
+                                    request_id,
+                                    uri: Url::parse("none:").unwrap(), // client should have this allready deprecated
+                                })
+                            }
                             ClientToLib3hResponse::JoinSpaceResult => {
                                 server_success(request_id.clone(), space_addr, agent)
                             }
@@ -198,10 +204,10 @@ where
         };
 
         let result = if request_id == "" {
-            self.engine.publish(Lib3hSpan::todo(), client_msg.into())
+            self.engine.publish(Lib3hSpan::fixme(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
             )
@@ -239,7 +245,7 @@ where
 mod tests {
     use super::*;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::Lib3hSpan;
+    use lib3h_tracing::test_span;
     use url::Url;
 
     type EngineError = String;
@@ -347,7 +353,9 @@ mod tests {
 
         /// create a fake lib3h event
         pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
-            let _ = self.lib3h_endpoint.publish(Lib3hSpan::todo(), msg);
+            let _ = self
+                .lib3h_endpoint
+                .publish(test_span("inject_lib3h_event"), msg);
         }
     }
 

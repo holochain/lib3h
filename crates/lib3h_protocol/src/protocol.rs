@@ -334,7 +334,7 @@ mod tests {
 
     fn connect_data() -> ConnectData {
         ConnectData {
-            request_id: "fake_id".to_string(),
+            request_id: "".to_string(),
             peer_uri: Url::parse("wss://192.168.0.102:58081/").unwrap(),
             network_id: "network_id".into(),
         }

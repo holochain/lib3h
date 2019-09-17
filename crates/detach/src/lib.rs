@@ -151,12 +151,12 @@ impl<T> Detach<T> {
 
     /// extract the owned inner instance
     pub fn to_inner(self) -> T {
-        self.0.expect("detach exists")
+        self.0.expect("detach exists-to_inner")
     }
 
     /// take the owned inner instance (without droping the container)
     pub fn take(&mut self) -> T {
-        std::mem::replace(&mut self.0, None).expect("detach exists")
+        std::mem::replace(&mut self.0, None).expect("detach exists-take")
     }
 
     /// replace the owned inner instance
@@ -169,37 +169,37 @@ impl<T> std::ops::Deref for Detach<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.0.as_ref().expect("detach exists")
+        self.0.as_ref().expect("detach exists-deref")
     }
 }
 
 impl<T> std::ops::DerefMut for Detach<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut().expect("detach exists")
+        self.0.as_mut().expect("detach exists-deref-mut")
     }
 }
 
 impl<T> std::borrow::Borrow<T> for Detach<T> {
     fn borrow(&self) -> &T {
-        self.0.as_ref().expect("detach exists")
+        self.0.as_ref().expect("detach exists-borrow")
     }
 }
 
 impl<T> std::borrow::BorrowMut<T> for Detach<T> {
     fn borrow_mut(&mut self) -> &mut T {
-        self.0.as_mut().expect("detach exists")
+        self.0.as_mut().expect("detach exists-borrow-mut")
     }
 }
 
 impl<T> std::convert::AsRef<T> for Detach<T> {
     fn as_ref(&self) -> &T {
-        self.0.as_ref().expect("detach exists")
+        self.0.as_ref().expect("detach exists-as-ref")
     }
 }
 
 impl<T> std::convert::AsMut<T> for Detach<T> {
     fn as_mut(&mut self) -> &mut T {
-        self.0.as_mut().expect("detach exists")
+        self.0.as_mut().expect("detach exists-as-mut")
     }
 }
 

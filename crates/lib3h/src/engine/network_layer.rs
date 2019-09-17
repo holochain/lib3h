@@ -22,13 +22,15 @@ impl<'engine> GhostEngine<'engine> {
         // Process the network gateway
         detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
         for mut request in self.multiplexer.drain_messages() {
+            // this should probably be changed so each arm has a different name span
+            let span = request.span().child("process_multiplexer");
             let payload = request.take_message().expect("exists");
             match payload {
                 GatewayRequestToParent::Dht(dht_request) => {
-                    self.handle_network_dht_request(dht_request)?;
+                    self.handle_network_dht_request(span, dht_request)?;
                 }
                 GatewayRequestToParent::Transport(transport_request) => {
-                    self.handle_network_transport_request(&transport_request)?;
+                    self.handle_network_transport_request(span, &transport_request)?;
                 }
             }
         }
@@ -37,7 +39,11 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Handle a DhtRequestToParent sent to us by our network gateway
-    fn handle_network_dht_request(&mut self, request: DhtRequestToParent) -> Lib3hResult<()> {
+    fn handle_network_dht_request(
+        &mut self,
+        span: Lib3hSpan,
+        request: DhtRequestToParent,
+    ) -> Lib3hResult<()> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
@@ -60,7 +66,8 @@ impl<'engine> GhostEngine<'engine> {
                         payload: Opaque::new(),
                     },
                 );
-                self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
+                self.multiplexer
+                    .publish(span.child("DhtRequestToParent::HoldPeerRequested"), cmd)?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // Disconnect from that peer by calling a Close on it.
@@ -86,6 +93,7 @@ impl<'engine> GhostEngine<'engine> {
     /// Handle a TransportRequestToParent sent to us by our network gateway
     fn handle_network_transport_request(
         &mut self,
+        span: Lib3hSpan,
         request: &transport::protocol::RequestToParent,
     ) -> Lib3hResult<()> {
         debug!(
@@ -103,11 +111,14 @@ impl<'engine> GhostEngine<'engine> {
                         network_id: "FIXME".to_string(), // TODO #172
                     };
                     self.lib3h_endpoint
-                        .publish(Lib3hSpan::todo(), Lib3hToClient::Disconnected(data))?;
+                        .publish(Lib3hSpan::fixme(), Lib3hToClient::Disconnected(data))?;
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
-                self.handle_incoming_connection(uri.clone())?;
+                self.handle_incoming_connection(
+                    span.child("handle_incoming_connection"),
+                    uri.clone(),
+                )?;
             }
             //            TransportEvent::ConnectionClosed(id) => {
             //                self.network_connections.remove(id);
@@ -129,18 +140,18 @@ impl<'engine> GhostEngine<'engine> {
                     return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                 }
                 let p2p_msg = maybe_msg.unwrap();
-                self.serve_P2pProtocol(uri, &p2p_msg)?;
+                self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
             }
         };
         Ok(())
     }
 
-    fn handle_incoming_connection(&mut self, net_uri: Url) -> Lib3hResult<()> {
+    fn handle_incoming_connection(&mut self, span: Lib3hSpan, net_uri: Url) -> Lib3hResult<()> {
         // Get list of known peers
         let uri_copy = net_uri.clone();
         self.multiplexer
             .request(
-                Lib3hSpan::todo(),
+                span.child("handle_incoming_connection, .request"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
                 Box::new(move |me, response| {
                     let response = {
@@ -175,8 +186,9 @@ impl<'engine> GhostEngine<'engine> {
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                /* TODO: #777
                                 me.multiplexer.publish(
-                                    Lib3hSpan::todo(),
+                                    span.follower("publish TODO name"),
                                     GatewayRequestToChild::Transport(
                                         transport::protocol::RequestToChild::SendMessage {
                                             uri: Url::parse(&peer_data.peer_address)
@@ -184,7 +196,7 @@ impl<'engine> GhostEngine<'engine> {
                                             payload: payload.into(),
                                         },
                                     ),
-                                )?;
+                                )?;*/
                             }
                         }
                     // TODO END
@@ -199,11 +211,11 @@ impl<'engine> GhostEngine<'engine> {
         // Output a Lib3hToClient::Connected if its the first connection
         if self.network_connections.is_empty() {
             let data = ConnectedData {
-                request_id: "fixme".to_string(),
+                request_id: "".to_string(),
                 uri: net_uri.clone(),
             };
             self.lib3h_endpoint
-                .publish(Lib3hSpan::todo(), Lib3hToClient::Connected(data))?;
+                .publish(Lib3hSpan::fixme(), Lib3hToClient::Connected(data))?;
         }
         let _ = self.network_connections.insert(net_uri.to_owned());
         Ok(())
@@ -212,7 +224,12 @@ impl<'engine> GhostEngine<'engine> {
     /// Serve a P2pProtocol sent to us by the network.
     /// TODO #150
     #[allow(non_snake_case)]
-    fn serve_P2pProtocol(&mut self, _from: &Url, p2p_msg: &P2pProtocol) -> Lib3hResult<()> {
+    fn serve_P2pProtocol(
+        &mut self,
+        span: Lib3hSpan,
+        _from: &Url,
+        p2p_msg: &P2pProtocol,
+    ) -> Lib3hResult<()> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
@@ -223,7 +240,7 @@ impl<'engine> GhostEngine<'engine> {
                 // Check if its for the multiplexer
                 if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
                     let _ = self.multiplexer.publish(
-                        Lib3hSpan::todo(),
+                        span.follower("TODO"),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                     );
                 } else {
@@ -233,7 +250,7 @@ impl<'engine> GhostEngine<'engine> {
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
-                            Lib3hSpan::todo(),
+                            span.follower("TODO"),
                             GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                         );
                     } else {
@@ -249,7 +266,7 @@ impl<'engine> GhostEngine<'engine> {
                 if let Some(_) = maybe_space_gateway {
                     // Change into Lib3hToClient
                     let lib3_msg = Lib3hToClient::HandleSendDirectMessage(dm_data.clone());
-                    self.lib3h_endpoint.publish(Lib3hSpan::todo(), lib3_msg)?;
+                    self.lib3h_endpoint.publish(Lib3hSpan::fixme(), lib3_msg)?;
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
@@ -264,7 +281,7 @@ impl<'engine> GhostEngine<'engine> {
                 ));
                 if let Some(_) = maybe_space_gateway {
                     let lib3_msg = Lib3hToClient::SendDirectMessageResult(dm_data.clone());
-                    self.lib3h_endpoint.publish(Lib3hSpan::todo(), lib3_msg)?;
+                    self.lib3h_endpoint.publish(Lib3hSpan::fixme(), lib3_msg)?;
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
@@ -279,7 +296,7 @@ impl<'engine> GhostEngine<'engine> {
                 debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.publish(
-                        Lib3hSpan::todo(),
+                        span.follower("P2pProtocol::BroadcastJoinSpace"),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data.clone())),
                     )?;
                 }
@@ -290,7 +307,7 @@ impl<'engine> GhostEngine<'engine> {
                     let maybe_space_gateway = self.get_first_space_mut(space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
-                            Lib3hSpan::todo(),
+                            span.follower("P2pProtocol::AllJoinedSpaceList"),
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(
                                 peer_data.clone(),
                             )),
