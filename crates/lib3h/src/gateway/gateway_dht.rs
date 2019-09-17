@@ -46,7 +46,10 @@ impl P2pGateway {
     }
 
     /// Handle a request sent to us by our child DHT
-    pub(crate) fn handle_dht_RequestToParent(&mut self, mut request: DhtToParentMessage) {
+    pub(crate) fn handle_dht_RequestToParent(
+        &mut self,
+        mut request: DhtToParentMessage,
+    ) -> Lib3hResult<()> {
         debug!(
             "({}) Serving request from child dht: {:?}",
             self.identifier, request
@@ -67,13 +70,13 @@ impl P2pGateway {
                     self.identifier, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
-                let _res = self.inner_transport.publish(
+                self.inner_transport.publish(
                     span.follower("DhtRequestToParent::HoldPeerRequested"),
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Opaque::new(),
                     },
-                );
+                )?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {
                 // TODO
@@ -92,5 +95,6 @@ impl P2pGateway {
                 unreachable!();
             }
         }
+        Ok(())
     }
 }
