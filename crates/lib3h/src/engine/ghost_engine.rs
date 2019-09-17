@@ -109,6 +109,7 @@ impl<'engine> GhostEngine<'engine> {
         let transport = TransportEncoding::new(
             crypto.box_clone(),
             transport_keys.transport_id.clone(),
+            "NETWORK_ID_STUB".to_string(),
             Box::new(KeystoreStub::new()),
             transport,
         );
@@ -349,6 +350,7 @@ impl<'engine> GhostEngine<'engine> {
         let uniplex = TransportEncoding::new(
             self.crypto.box_clone(),
             agent_id.to_string(),
+            space_address.clone().into(),
             Box::new(KeystoreStub::new()),
             Box::new(uniplex),
         );
