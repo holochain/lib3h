@@ -556,7 +556,7 @@ mod tests {
             let records = mdns
                 .map_record
                 .get(networkid)
-                .expect("Fail to get records from the networkid");
+                .expect("Fail to get records from the networkid after 'Advertising'.");
             assert_eq!(records.len(), 2);
         }
 
@@ -573,7 +573,7 @@ mod tests {
             let records = mdns
                 .map_record
                 .get(networkid)
-                .expect("Fail to get records from the networkid");
+                .expect("Fail to get records from the networkid after 'Releasing'.");
             assert_eq!(records.len(), 1);
         }
     }
