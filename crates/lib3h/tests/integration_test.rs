@@ -24,6 +24,7 @@ use lib3h::{
     error::Lib3hResult,
 };
 use lib3h_protocol::Address;
+use lib3h_tracing::Lib3hSpan;
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
@@ -59,6 +60,7 @@ fn enable_logging_for_test(enable: bool) {
 
 fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new_mock(
+        Lib3hSpan::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
