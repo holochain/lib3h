@@ -14,7 +14,8 @@ use predicates::prelude::*;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine},
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
+    transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
@@ -69,8 +70,7 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         None => vec![],
     };
     let config = EngineConfig {
-        // tls_config: TlsConfig::Unencrypted,
-        socket_type: "mem".into(),
+        transport_configs: vec![TransportConfig::Memory],
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -79,7 +79,7 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],
     };
-    let engine = GhostEngine::new_mock(
+    let engine = GhostEngine::new(
         Lib3hSpan::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
@@ -102,7 +102,7 @@ fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
 
 fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
     let config = EngineConfig {
-        socket_type: "ws".into(),
+        transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -112,6 +112,7 @@ fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
+        Lib3hSpan::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         "test_engine_wss".into(),
