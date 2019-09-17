@@ -1,5 +1,6 @@
 
 
+use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 use lib3h_tracing::test_span;
 use detach::{detach_run, Detach};
 use lib3h::{engine::CanAdvertise, error::Lib3hError};
@@ -11,6 +12,7 @@ use lib3h_protocol::protocol::{
 use lib3h_protocol::{
     protocol_client::Lib3hClientProtocol,
     network_engine::NetworkEngine,
+    data_types::*,
 };
 use lib3h_zombie_actor::{
     GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostResult, WorkWasDone, GhostMessage, RequestId, GhostCallbackData::Response,
@@ -21,7 +23,7 @@ use std::collections::HashMap;
 
 
 /// This is a ghost actor engine that wraps non-ghost implementors of NetworkEngine (e.g. old Lib3h, Sim1h)
-pub struct AntiWrapperEngine<'engine, T: NetworkEngine> {
+pub struct AntiWrapperEngine<'engine, T: 'static + NetworkEngine> {
     client_endpoint: Option<
         GhostEndpoint<
             ClientToLib3h,
@@ -52,7 +54,7 @@ impl<T: NetworkEngine>
         ClientToLib3h,
         ClientToLib3hResponse,
         Lib3hError,
-    > for AntiWrapperEngine<'_, T>
+    > for AntiWrapperEngine<'static, T>
 {
     // START BOILER PLATE--------------------------
     fn take_parent_endpoint(
@@ -84,22 +86,23 @@ impl<T: NetworkEngine>
             for msg_from_engine in from_engine_messages {
                 if let Ok(request) = Lib3hToClient::try_from(msg_from_engine.clone()) {
                     // send the request to  the client
-                    self.lib3h_endpoint.request(test_span(""), request, Box::new(|_, callback_data| {
+                    self.lib3h_endpoint.request(test_span(""), request, Box::new(|engine, callback_data| {
                         // send the client response back to the engine if it was a success
-                        if let Response(Ok(_success_message)) = callback_data {
-                            // self.network_engine.post(success_message.into());
+                        if let Response(Ok(success_message)) = callback_data {
+                            engine.network_engine.post(success_message.into()).ok();
                         }
                         Ok(())
                     })).ok();
 
                 } 
-                // else if let Ok(response) = ClientToLib3hResponse::try_from(msg_from_engine) {
-                //     // see if this is the response to a pending request and send it back to that
-                //     // let request_id = 
-                //     if let Some(ghost_request) = self.pending_requests_to_client.remove(&RequestId("".into())) {
-                //         ghost_request.respond(Ok(response)).ok();
-                //     }
-                // } 
+                else if let Ok(response) = ClientToLib3hResponse::try_from(msg_from_engine.clone()) {
+                    // see if this is the response to a pending request and send it back to that
+                    if let Some(request_id) = msg_from_engine.request_id() {
+                        if let Some(ghost_request) = self.pending_requests_to_client.remove(&request_id) {
+                            ghost_request.respond(Ok(response)).ok();
+                        }
+                    }
+                } 
                 else {
                     panic!("anti-wrapper engine received a message from engine that could not be translated")
                 }
@@ -124,6 +127,34 @@ impl<T: NetworkEngine>
 
 impl<T: NetworkEngine> CanAdvertise for AntiWrapperEngine<'_, T> {
     fn advertise(&self) -> Url {
-        Url::parse("ws://mock_peer_url").unwrap()
+        self.network_engine.advertise()
+    }
+}
+
+trait RequestIdGetable {
+    fn request_id(&self) -> Option<RequestId>;
+}
+
+impl RequestIdGetable for Lib3hServerProtocol {
+    fn request_id(&self) -> Option<RequestId> {
+        match self {
+            Lib3hServerProtocol::SuccessResult(GenericResultData{request_id, ..})
+            | Lib3hServerProtocol::FailureResult(GenericResultData{request_id, ..})
+            | Lib3hServerProtocol::Connected(ConnectedData{request_id, ..})
+            | Lib3hServerProtocol::SendDirectMessageResult(DirectMessageData{request_id, ..})
+            | Lib3hServerProtocol::HandleSendDirectMessage(DirectMessageData{request_id, ..})
+            | Lib3hServerProtocol::FetchEntryResult(FetchEntryResultData{request_id, ..})
+            | Lib3hServerProtocol::HandleFetchEntry(FetchEntryData{request_id, ..})
+            | Lib3hServerProtocol::HandleStoreEntryAspect(StoreEntryAspectData{request_id, ..})
+            | Lib3hServerProtocol::HandleDropEntry(DropEntryData{request_id, ..})
+            | Lib3hServerProtocol::HandleQueryEntry(QueryEntryData{request_id, ..})
+            | Lib3hServerProtocol::QueryEntryResult(QueryEntryResultData{request_id, ..})
+            | Lib3hServerProtocol::HandleGetAuthoringEntryList(GetListData{request_id, ..})
+            | Lib3hServerProtocol::HandleGetGossipingEntryList(GetListData{request_id, ..})
+             => {
+                Some(RequestId(request_id.clone()))
+            }
+            _ => None
+        }
     }
 }

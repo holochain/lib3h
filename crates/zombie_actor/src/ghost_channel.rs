@@ -104,6 +104,10 @@ impl<
         std::mem::replace(&mut self.message, None)
     }
 
+    pub fn request_id(&self) -> Option<RequestId> {
+        self.request_id.clone()
+    }
+
     /// send a response back to the origin of this request
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
