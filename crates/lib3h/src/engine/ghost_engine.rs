@@ -215,16 +215,10 @@ impl<'engine> GhostEngine<'engine> {
     fn priv_connect_bootstraps(&mut self) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
-            let data = ConnectData {
-                request_id: format!("bootstrap-connect: {}", bs.clone()).to_string(), // fire-and-forget
-                peer_uri: bs,
-                network_id: "".to_string(), // unimplemented
-            };
-
-            // can't use handle_connect() because it assumes a message to respond to
+            // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Transport(
                 transport::protocol::RequestToChild::SendMessage {
-                    uri: data.peer_uri,
+                    uri: bs,
                     payload: Opaque::new(),
                 },
             );
@@ -281,33 +275,22 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Process connect events by sending them to the multiplexer
-    fn handle_connect(&mut self, msg: ClientToLib3hMessage, data: ConnectData) -> GhostResult<()> {
-        let cmd =
-            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: data.peer_uri.clone(),
-                payload: Opaque::new(),
-            });
+    fn handle_bootstrap(
+        &mut self,
+        msg: ClientToLib3hMessage,
+        data: BootstrapData,
+    ) -> GhostResult<()> {
         self.multiplexer.request(
             Lib3hSpan::todo(),
-            cmd,
+            GatewayRequestToChild::Bootstrap(data),
             Box::new(move |_me, response| {
                 match response {
-                    GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
-                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
-                    ))) => {
-                        let response_data = ConnectedData {
-                            request_id: data.request_id,
-                            uri: data.peer_uri,
-                        };
-                        msg.respond(Ok(ClientToLib3hResponse::ConnectResult(response_data)))?
-                    }
-                    GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error from connect to gateway: {:?} ", e);
-                    }
-                    GhostCallbackData::Timeout => {
-                        error!("Got timeout on connect to gateway");
-                    }
-                    _ => panic!("bad response type"),
+                    GhostCallbackData::Response(Ok(
+                        GatewayRequestToChildResponse::BootstrapSuccess,
+                    )) => msg.respond(Ok(ClientToLib3hResponse::BootstrapSuccess))?,
+                    GhostCallbackData::Response(Err(e)) => msg.respond(Err(e))?,
+                    GhostCallbackData::Timeout => msg.respond(Err("timeout".into()))?,
+                    _ => msg.respond(Err(format!("bad response: {:?}", response).into()))?,
                 }
                 Ok(())
             }),
@@ -320,9 +303,9 @@ impl<'engine> GhostEngine<'engine> {
         mut msg: ClientToLib3hMessage,
     ) -> GhostResult<()> {
         match msg.take_message().expect("exists") {
-            ClientToLib3h::Connect(data) => {
-                trace!("ClientToLib3h::Connect: {:?}", &data);
-                self.handle_connect(msg, data)
+            ClientToLib3h::Bootstrap(data) => {
+                trace!("ClientToLib3h::Bootstrap: {:?}", &data);
+                self.handle_bootstrap(msg, data)
             }
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
@@ -421,119 +404,105 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     #[allow(non_snake_case)]
-    fn handle_HandleGetAuthoringEntryListResult(&mut self, _msg: EntryListData) -> Lib3hResult<()> {
-        /* TODO: #327
-
+    fn handle_HandleGetAuthoringEntryListResult(
+        &mut self,
+        entry_list: EntryListData,
+    ) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
-              &msg.space_address.to_owned(),
-              &msg.provider_agent_id.to_owned(),
-          )?;
+            &entry_list.space_address.to_owned(),
+            &entry_list.provider_agent_id.to_owned(),
+        )?;
 
-          for (entry_address, aspect_address_list) in msg.address_map.clone() {
-              // Check aspects and only request entry with new aspects
-              space_gateway.as_mut().as_dht_mut().request(
-                  DhtContext::RequestAspectsOf {
-                      entry_address: entry_address.clone(),
-                      aspect_address_list,
-                      msg: msg.clone(),
-                      request_id: self.request_track.reserve(),
-                  },
-                  DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
-                  Box::new(|ud, context, response| {
-                      let (entry_address, aspect_address_list, msg, request_id) = {
-                          if let DhtContext::RequestAspectsOf {
-                              entry_address,
-                              aspect_address_list,
-                              msg,
-                              request_id,
-                          } = context
-                          {
-                              (entry_address, aspect_address_list, msg, request_id)
-                          } else {
-                              panic!("bad context type");
-                          }
-                      };
-                      let response = {
-                          match response {
-                              GhostCallbackData::Timeout => panic!("timeout"),
-                              GhostCallbackData::Response(response) => match response {
-                                  Err(e) => panic!("{:?}", e),
-                                  Ok(response) => response,
-                              },
-                          }
-                      };
-                      if let DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects) =
-                          response
-                      {
-                          let can_fetch = match maybe_known_aspects {
-                              None => true,
-                              Some(known_aspects) => {
-                                  let can = !includes(&known_aspects, &aspect_address_list);
-                                  can
-                              }
-                          };
-                          if can_fetch {
-                              let _msg_data = FetchEntryData {
-                                  space_address: msg.space_address.clone(),
-                                  entry_address: entry_address.clone(),
-                                  request_id,
-                                  provider_agent_id: msg.provider_agent_id.clone(),
-                                  aspect_address_list: None,
-                              };
+        /*let x =                   DhtContext::RequestAspectsOf {
+            entry_address: entry_address.clone(),
+            aspect_address_list,
+            msg: msg.clone(),
+            request_id: self.request_track.reserve(),
+        };*/
 
-                              let _context = RequestContext {
-                                  space_address: msg.space_address.to_owned(),
-                                  agent_id: msg.provider_agent_id.to_owned(),
-                              };
-                              let _ = self.lib3h_endpoint.request(
-                                  context.clone(),
-                                  Lib3hToClient::HandleFetchEntry(msg_data),
-                                  Box::new(|me, context, response| {
-                                      let space_gateway = me
-                                          .get_space(
-                                              &context.space_address.to_owned(),
-                                              &context.agent_id.to_owned(),
-                                          )
-                                          .map_err(|e| GhostError::from(e.to_string()))?;
-                                      match response {
-                                          GhostCallbackData::Response(Ok(
-                                              Lib3hToClientResponse::HandleFetchEntryResult(msg),
-                                          )) => {
-                                              space_gateway.as_mut().as_dht_mut().publish(
-                                                  DhtRequestToChild::BroadcastEntry(
-                                                      msg.entry.clone(),
-                                                  ),
-                                              )?;
-                                          }
-                                          GhostCallbackData::Response(Err(e)) => {
-                                              error!("Got error on HandleFetchEntryResult: {:?} ", e);
-                                          }
-                                          GhostCallbackData::Timeout => {
-                                              error!("Got timeout on HandleFetchEntryResult");
-                                          }
-                                          _ => panic!("bad response type"),
-                                      }
-                                      Ok(())
-                                  }),
-                              );
-                          }
-                      } else {
-                          panic!("bad response to RequestAspectsOf: {:?}", response);
-                      }
-                      Ok(())
-                  }),
-              )?;
-          }*/
+        for (entry_address, aspect_address_list) in entry_list.address_map.clone() {
+            let space_address = entry_list.space_address.clone();
+            let provider_agent_id = entry_list.provider_agent_id.clone();
+            // Check aspects and only request entry with new aspects
+            space_gateway.request(
+                Lib3hSpan::todo(),
+                GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
+                    entry_address.clone(),
+                )),
+                Box::new(move |me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => return Err("timeout".into()),
+                            GhostCallbackData::Response(response) => match response {
+                                Err(e) => return Err(e.into()),
+                                Ok(response) => response,
+                            },
+                        }
+                    };
+                    if let GatewayRequestToChildResponse::Dht(
+                        DhtRequestToChildResponse::RequestAspectsOf(maybe_known_aspects),
+                    ) = response
+                    {
+                        let can_fetch = match maybe_known_aspects {
+                            None => true,
+                            Some(known_aspects) => {
+                                let can = !includes(&known_aspects, &aspect_address_list);
+                                can
+                            }
+                        };
+                        if can_fetch {
+                            let msg_data = FetchEntryData {
+                                space_address: space_address.clone(),
+                                entry_address: entry_address.clone(),
+                                request_id: me.request_track.reserve(),
+                                provider_agent_id: provider_agent_id.clone(),
+                                aspect_address_list: None,
+                            };
+
+                            me.lib3h_endpoint.request(
+                                Lib3hSpan::todo(),
+                                Lib3hToClient::HandleFetchEntry(msg_data),
+                                Box::new(move |me, response| {
+                                    let space_gateway = me
+                                        .get_space(
+                                            &space_address.to_owned(),
+                                            &provider_agent_id.to_owned(),
+                                        )
+                                        .map_err(|e| GhostError::from(e.to_string()))?;
+                                    match response {
+                                        GhostCallbackData::Response(Ok(
+                                            Lib3hToClientResponse::HandleFetchEntryResult(msg),
+                                        )) => space_gateway.publish(
+                                            Lib3hSpan::todo(),
+                                            GatewayRequestToChild::Dht(
+                                                DhtRequestToChild::BroadcastEntry(
+                                                    msg.entry.clone(),
+                                                ),
+                                            ),
+                                        ),
+                                        GhostCallbackData::Response(Err(e)) => Err(e.into()),
+                                        GhostCallbackData::Timeout => Err("timeout".into()),
+                                        _ => Err("bad response type".into()),
+                                    }
+                                }),
+                            )?;
+                        }
+                    } else {
+                        panic!("bad response to RequestAspectsOf: {:?}", response);
+                    }
+                    Ok(())
+                }),
+            )?;
+        }
         Ok(())
     }
 
     #[allow(non_snake_case)]
     fn handle_HandleGetGossipingEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
-        let _space_gateway = self.get_space(
+        let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
-        /* TODO: #326
         for (entry_address, aspect_address_list) in msg.address_map {
             let mut aspect_list = Vec::new();
             for aspect_address in aspect_address_list {
@@ -545,16 +514,21 @@ impl<'engine> GhostEngine<'engine> {
                 };
                 aspect_list.push(fake_aspect);
             }
-            // Create "fake" entry, in the sense an entry with no actual content,
+            // Create "shallow" entry, in the sense an entry with no actual aspect content,
             // but valid addresses.
-            let fake_entry = EntryData {
+            let shallow_entry = EntryData {
                 entry_address: entry_address.clone(),
                 aspect_list,
             };
             space_gateway
-                .publish(DhtRequestToChild::HoldEntryAspectAddress(fake_entry))
+                .publish(
+                    Lib3hSpan::todo(),
+                    GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
+                        shallow_entry,
+                    )),
+                )
                 .map_err(|e| Lib3hError::new_other(&e.to_string()))?;
-        }*/
+        }
         Ok(())
     }
 
@@ -585,27 +559,13 @@ impl<'engine> GhostEngine<'engine> {
         self.lib3h_endpoint.request(
             Lib3hSpan::todo(),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
-            Box::new(|me, response| {
-                match response {
-                    GhostCallbackData::Response(Ok(
-                        Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
-                    )) => {
-                        if let Err(err) = me.handle_HandleGetGossipingEntryListResult(msg) {
-                            error!(
-                                "Got error when handling HandleGetGossipingEntryListResult: {:?} ",
-                                err
-                            );
-                        };
-                    }
-                    GhostCallbackData::Response(Err(e)) => {
-                        error!("Got error from HandleGetGossipingEntryListResult: {:?} ", e);
-                    }
-                    GhostCallbackData::Timeout => {
-                        error!("Got timeout on HandleGetGossipingEntryListResult");
-                    }
-                    _ => panic!("bad response type"),
-                }
-                Ok(())
+            Box::new(|me, response| match response {
+                GhostCallbackData::Response(Ok(
+                    Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
+                )) => Ok(me.handle_HandleGetGossipingEntryListResult(msg)?),
+                GhostCallbackData::Response(Err(e)) => Err(e.into()),
+                GhostCallbackData::Timeout => Err("timeout".into()),
+                _ => Err("bad response type".into()),
             }),
         )?;
 
@@ -614,27 +574,13 @@ impl<'engine> GhostEngine<'engine> {
             .request(
                 Lib3hSpan::todo(),
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
-                Box::new(|me, response| {
-                    match response {
-                        GhostCallbackData::Response(Ok(
-                            Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
-                        )) => {
-                            if let Err(err) = me.handle_HandleGetAuthoringEntryListResult(msg) {
-                                error!(
-                                "Got error when handling HandleGetAuthoringEntryListResult: {:?} ",
-                                err
-                            );
-                            };
-                        }
-                        GhostCallbackData::Response(Err(e)) => {
-                            error!("Got error on HandleGetAuthoringEntryListResult: {:?} ", e);
-                        }
-                        GhostCallbackData::Timeout => {
-                            error!("Got timeout on HandleGetAuthoringEntryListResult");
-                        }
-                        _ => panic!("bad response type"),
-                    }
-                    Ok(())
+                Box::new(|me, response| match response {
+                    GhostCallbackData::Response(Ok(
+                        Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
+                    )) => Ok(me.handle_HandleGetAuthoringEntryListResult(msg)?),
+                    GhostCallbackData::Response(Err(e)) => Err(e.into()),
+                    GhostCallbackData::Timeout => Err("timeout".into()),
+                    _ => Err("bad response type".into()),
                 }),
             )
             .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))
