@@ -211,13 +211,13 @@ impl
         for event in stream_events {
             match event {
                 StreamEvent::ErrorOccured(uri, error) => {
-                    self.endpoint_self.publish(
+                    warn!("Error in GhostWebsocketTransport stream connection to {:?}: {:?}", uri, error);self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::ErrorOccured { uri, error },
                     )?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
-                    trace!("Connection to {:?} established", uri_connnected);
+                    trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
                     let mut temp = Vec::new();
                     while let Some(mut msg) = self.pending.pop() {
                         trace!("Processing pending message...");
@@ -241,13 +241,14 @@ impl
                     self.pending = temp;
                 }
                 StreamEvent::IncomingConnectionEstablished(uri) => {
+                    trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
                     self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::IncomingConnection { uri },
                     )?;
                 }
                 StreamEvent::ReceivedData(uri, payload) => {
-                    trace!("ReceivedData {:?}", String::from_utf8(payload.clone()));
+                    trace!("StreamEvent::ReceivedData: {:?}", String::from_utf8(payload.clone()));
                     self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::ReceivedData {
@@ -257,7 +258,7 @@ impl
                     )?;
                 }
                 StreamEvent::ConnectionClosed(uri) => {
-                    trace!("Connection closed: {}", uri);
+                    trace!("StreamEvent::ConnectionClosed: {}", uri);
                 }
             }
         }
