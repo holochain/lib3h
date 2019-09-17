@@ -94,6 +94,55 @@ impl<'lt> GhostSystem<'lt> {
     }
 }
 
+pub trait TmpHandler<T>: TmpHandlerBase<T> {
+    fn handle_a(&mut self, d: T);
+    fn handle_b(&mut self, d: T);
+}
+
+pub trait TmpHandlerBase<T> {
+    fn trigger(&mut self, d: T);
+}
+
+pub struct TmpHandlerConcrete;
+
+impl TmpHandlerBase<String> for TmpHandlerConcrete {
+    fn trigger(&mut self, d: String) {
+        if d.as_bytes()[0] == b'a' {
+            self.handle_a(d);
+        } else {
+            self.handle_b(d);
+        }
+    }
+}
+
+impl TmpHandler<String> for TmpHandlerConcrete {
+    fn handle_a(&mut self, d: String) {
+        println!("got a: {}", d);
+    }
+
+    fn handle_b(&mut self, d: String) {
+        println!("got b: {}", d);
+    }
+}
+
+pub struct GhostDock<'lt, U: 'lt> {
+    _system: GhostSystemRef<'lt>,
+    phantom_lifetime: std::marker::PhantomData<&'lt U>,
+}
+
+impl<'lt, U: 'lt> GhostDock<'lt, U> {
+    pub fn new(system: GhostSystemRef<'lt>) -> Self {
+        Self {
+            _system: system,
+            phantom_lifetime: std::marker::PhantomData,
+        }
+    }
+
+    /// take an endpoint and a handler, and inflate a targetRef for output
+    /// how do you handle owned vs ref dock_ref()?
+    pub fn dock<T, H: TmpHandler<T>>(_handler: H) {}
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,5 +176,15 @@ mod tests {
         // removed - should not increment
         system.process().unwrap();
         assert_eq!(2, *count.read().unwrap());
+    }
+
+    #[test]
+    fn it_can_dock() {
+        struct Z;
+
+        let mut system = GhostSystem::new();
+        let mut _dock: GhostDock<Z> = GhostDock::new(system.create_ref());
+
+        system.process().unwrap();
     }
 }
