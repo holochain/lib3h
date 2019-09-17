@@ -11,12 +11,12 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
         request_id: Option<RequestId>,
         payload: Request,
-        // span: Lib3hSpan,
+        span: Lib3hSpan,
     },
     Response {
         request_id: RequestId,
         payload: Result<Response, Error>,
-        // span: Lib3hSpan,
+        span: Lib3hSpan,
     },
 }
 
@@ -34,6 +34,7 @@ pub struct GhostMessage<
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<MessageToOther, MessageToSelfResponse, Error>,
     >,
+    span: Lib3hSpan,
 }
 
 impl<
@@ -62,11 +63,13 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
+        span: Lib3hSpan,
     ) -> Self {
         Self {
             request_id,
             message: Some(message),
             sender,
+            span,
         }
     }
 
@@ -78,8 +81,9 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
+        span: Lib3hSpan,
     ) -> Self {
-        GhostMessage::new(Some(request_id), message, sender)
+        GhostMessage::new(Some(request_id), message, sender, span)
     }
 
     /// create an event message
@@ -89,8 +93,9 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
+        span: Lib3hSpan,
     ) -> Self {
-        GhostMessage::new(None, message, sender)
+        GhostMessage::new(None, message, sender, span)
     }
 
     /// most often you will want to consume the contents of the request
@@ -100,12 +105,12 @@ impl<
     }
 
     /// send a response back to the origin of this request
-    /// TODO: add span
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
             self.sender.send(GhostEndpointMessage::Response {
                 request_id: request_id.clone(),
                 payload,
+                span: self.span,
             })?;
         }
         Ok(())
@@ -113,6 +118,10 @@ impl<
 
     pub fn is_request(&self) -> bool {
         self.request_id.is_some()
+    }
+
+    pub fn span(&self) -> &Lib3hSpan {
+        &self.span
     }
 }
 
@@ -344,24 +353,26 @@ impl<
 {
     fn priv_request(
         &mut self,
-        span: Lib3hSpan,
+        mut span: Lib3hSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        let child = span.child_span("bookmark");
+        let span_bookmark = span.child("bookmark");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(child, cb),
+            None => self.pending_responses_tracker.bookmark(span_bookmark, cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                child,
+                span_bookmark,
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
         trace!("ghost_channel: send request (id={:?})", request_id);
+        span.event(format!("ghost_channel: send request (id={:?})", request_id));
         self.sender.send(GhostEndpointMessage::Request {
             request_id: Some(request_id),
             payload,
+            span: span.follower("send request"),
             // span: span.child("request", |o| o.start()).into(),
         })?;
         Ok(())
@@ -399,6 +410,7 @@ impl<
         self.sender.send(GhostEndpointMessage::Request {
             request_id: None,
             payload,
+            span,
         })?;
         Ok(())
     }
@@ -412,7 +424,12 @@ impl<
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
         span.event("GhostChannel::request");
-        self.priv_request(span, payload, cb, GhostTrackRequestOptions::default())
+        self.priv_request(
+            span.child("priv_request"),
+            payload,
+            cb,
+            GhostTrackRequestOptions::default(),
+        )
     }
 
     /// make a request of the other side. When a response is sent back to us
@@ -425,7 +442,7 @@ impl<
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
         span.event("GhostChannel::request_options");
-        self.priv_request(span, payload, cb, options)
+        self.priv_request(span.child("priv_request"), payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -449,16 +466,19 @@ impl<
                         GhostEndpointMessage::Request {
                             request_id,
                             payload,
+                            span,
                         } => {
                             self.outbox_messages_to_self.push(GhostMessage::new(
                                 request_id,
                                 payload,
                                 self.sender.clone(),
+                                span.child("outbox_messages"),
                             ));
                         }
                         GhostEndpointMessage::Response {
                             request_id,
                             payload,
+                            span: _,
                         } => {
                             self.pending_responses_tracker
                                 .handle(request_id, user_data, payload)?;
@@ -543,6 +563,7 @@ mod tests {
             GhostMessage::new_event(
                 TestMsgIn("this is an event message from an internal child".into()),
                 child_send,
+                test_span(""),
             );
         assert_eq!("GhostMessage {request_id: None, ..}", format!("{:?}", msg));
         let payload = msg.take_message().unwrap();
@@ -571,6 +592,7 @@ mod tests {
                 request_id.clone(),
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
+                test_span(""),
             );
         msg.respond(Ok(TestMsgInResponse("response back to child".into())))
             .unwrap();
@@ -581,6 +603,7 @@ mod tests {
             Ok(GhostEndpointMessage::Response {
                 request_id: req_id,
                 payload,
+                span: _,
             }) => {
                 assert_eq!(req_id, request_id);
                 assert_eq!(
@@ -633,6 +656,7 @@ mod tests {
             Ok(GhostEndpointMessage::Request {
                 request_id,
                 payload,
+                span: _,
             }) => {
                 assert_eq!(request_id, None);
                 assert_eq!(
@@ -657,6 +681,7 @@ mod tests {
             Ok(GhostEndpointMessage::Request {
                 request_id,
                 payload,
+                span,
             }) => {
                 assert!(request_id.is_some());
                 assert_eq!(
@@ -670,6 +695,7 @@ mod tests {
                     .send(GhostEndpointMessage::Response {
                         request_id: request_id.unwrap(),
                         payload: Ok(TestMsgOutResponse("response from parent".into())),
+                        span,
                     })
                     .expect("should send");
             }
@@ -704,6 +730,7 @@ mod tests {
             .send(GhostEndpointMessage::Request {
                 request_id: None,
                 payload: TestMsgIn("event from a parent".into()),
+                span: test_span(""),
             })
             .expect("should send");
 

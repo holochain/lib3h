@@ -70,7 +70,7 @@ pub fn handle_gossipTo<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(Lib3hSpan::todo(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Lib3hSpan::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }
@@ -83,6 +83,7 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with TransportMemory
     pub fn new_mock(
+        span: Lib3hSpan,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -90,6 +91,7 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<Self> {
         // Create TransportMemory as the network transport
         Self::with_transport(
+            span,
             crypto,
             config,
             name,
@@ -99,6 +101,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     pub fn with_transport(
+        span: Lib3hSpan,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -136,7 +139,7 @@ impl<'engine> GhostEngine<'engine> {
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
         multiplexer.as_mut().request(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Transport(RequestToChild::Bind {
                 spec: config.bind_url.clone(),
             }),
@@ -184,17 +187,17 @@ impl<'engine> GhostEngine<'engine> {
         };
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.multiplexer.as_mut().publish(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
                 engine.this_net_peer.peer_uri.clone(),
             )),
         )?;
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
-        engine.priv_connect_bootstraps()?;
+        engine.priv_connect_bootstraps(span)?;
         Ok(engine)
     }
 
-    fn priv_connect_bootstraps(&mut self) -> GhostResult<()> {
+    fn priv_connect_bootstraps(&mut self, span: Lib3hSpan) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
@@ -204,7 +207,8 @@ impl<'engine> GhostEngine<'engine> {
                     payload: Opaque::new(),
                 },
             );
-            self.multiplexer.publish(Lib3hSpan::todo(), cmd)?;
+            self.multiplexer
+                .publish(span.child("priv_connect_bootstrap TODO extra info"), cmd)?;
         }
         Ok(())
     }
@@ -263,7 +267,7 @@ impl<'engine> GhostEngine<'engine> {
         data: BootstrapData,
     ) -> GhostResult<()> {
         self.multiplexer.request(
-            Lib3hSpan::todo(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Bootstrap(data),
             Box::new(move |_me, response| {
                 match response {
@@ -284,6 +288,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         mut msg: ClientToLib3hMessage,
     ) -> GhostResult<()> {
+        let span = msg.span().child("handle_msg_from_client");
         match msg.take_message().expect("exists") {
             ClientToLib3h::Bootstrap(data) => {
                 trace!("ClientToLib3h::Bootstrap: {:?}", &data);
@@ -292,35 +297,35 @@ impl<'engine> GhostEngine<'engine> {
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
                 let result = self
-                    .handle_join(&data)
+                    .handle_join(span.follower("TODO name"), &data)
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::LeaveSpace(data) => {
                 trace!("ClientToLib3h::LeaveSpace: {:?}", data);
                 let result = self
-                    .handle_leave(&data)
+                    .handle_leave(span.follower("TODO name"), &data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(&data, false)
+                self.handle_direct_message(span.follower("TODO name"), &data, false)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
                 trace!("ClientToLib3h::PublishEntry: {:?}", data);
-                self.handle_publish_entry(&data)
+                self.handle_publish_entry(span.follower("TODO name"), &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::HoldEntry(data) => {
                 trace!("ClientToLib3h::HoldEntry: {:?}", data);
-                self.handle_hold_entry(&data)
+                self.handle_hold_entry(span.follower("TODO name"), &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::QueryEntry(data) => {
                 trace!("ClientToLib3h::QueryEntry: {:?}", data);
-                self.handle_query_entry(msg, data)
+                self.handle_query_entry(span.follower("TODO name"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::FetchEntry(_) => panic!("FetchEntry Deprecated"),
@@ -368,7 +373,12 @@ impl<'engine> GhostEngine<'engine> {
         Ok(chain_id)
     }
 
-    fn broadcast_join(&mut self, space_address: Address, peer: PeerData) -> GhostResult<()> {
+    fn broadcast_join(
+        &mut self,
+        span: Lib3hSpan,
+        space_address: Address,
+        peer: PeerData,
+    ) -> GhostResult<()> {
         // TODO #150 - Send JoinSpace to all known peers
         let mut payload = Vec::new();
         let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone().into(), peer.clone());
@@ -382,7 +392,7 @@ impl<'engine> GhostEngine<'engine> {
             peer.peer_address,
         );
         self.multiplexer
-            .publish(Lib3hSpan::todo(), GatewayRequestToChild::SendAll(payload))
+            .publish(span, GatewayRequestToChild::SendAll(payload))
         // TODO END
     }
 
@@ -408,7 +418,7 @@ impl<'engine> GhostEngine<'engine> {
             let provider_agent_id = entry_list.provider_agent_id.clone();
             // Check aspects and only request entry with new aspects
             space_gateway.request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
                     entry_address.clone(),
                 )),
@@ -443,7 +453,7 @@ impl<'engine> GhostEngine<'engine> {
                             };
 
                             me.lib3h_endpoint.request(
-                                Lib3hSpan::todo(),
+                                Lib3hSpan::fixme(),
                                 Lib3hToClient::HandleFetchEntry(msg_data),
                                 Box::new(move |me, response| {
                                     let space_gateway = me
@@ -456,7 +466,7 @@ impl<'engine> GhostEngine<'engine> {
                                         GhostCallbackData::Response(Ok(
                                             Lib3hToClientResponse::HandleFetchEntryResult(msg),
                                         )) => space_gateway.publish(
-                                            Lib3hSpan::todo(),
+                                            Lib3hSpan::fixme(),
                                             GatewayRequestToChild::Dht(
                                                 DhtRequestToChild::BroadcastEntry(
                                                     msg.entry.clone(),
@@ -505,7 +515,7 @@ impl<'engine> GhostEngine<'engine> {
             };
             space_gateway
                 .publish(
-                    Lib3hSpan::todo(),
+                    Lib3hSpan::fixme(),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
                         shallow_entry,
                     )),
@@ -517,18 +527,22 @@ impl<'engine> GhostEngine<'engine> {
 
     /// Create a gateway for this agent in this space, if not already part of it.
     /// Must not already be part of this space.
-    fn handle_join(&mut self, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_join(&mut self, span: Lib3hSpan, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
         let this_peer = self.this_space_peer(chain_id.clone());
-        self.broadcast_join(join_msg.space_address.clone(), this_peer.clone())?;
+        self.broadcast_join(
+            span.child("broadcast_join"),
+            join_msg.space_address.clone(),
+            this_peer.clone(),
+        )?;
 
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
 
         // Have DHT broadcast our PeerData
         space_gateway.publish(
-            Lib3hSpan::todo(),
+            span.follower("space_gateway.publish"),
             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)),
         )?;
 
@@ -540,7 +554,7 @@ impl<'engine> GhostEngine<'engine> {
         };
 
         self.lib3h_endpoint.request(
-            Lib3hSpan::todo(),
+            span.follower("TODO"),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
             Box::new(|me, response| match response {
                 GhostCallbackData::Response(Ok(
@@ -555,7 +569,7 @@ impl<'engine> GhostEngine<'engine> {
         list_data.request_id = self.request_track.reserve();
         self.lib3h_endpoint
             .request(
-                Lib3hSpan::todo(),
+                span.follower("TODO"),
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
                 Box::new(|me, response| match response {
                     GhostCallbackData::Response(Ok(
@@ -570,7 +584,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
-    fn handle_leave(&mut self, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_leave(&mut self, _span: Lib3hSpan, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         match self.space_gateway_map.remove(&chain_id) {
             Some(_) => Ok(()), //TODO is there shutdown code we need to call
@@ -580,6 +594,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn handle_direct_message(
         &mut self,
+        span: Lib3hSpan,
         msg: &DirectMessageData,
         is_response: bool,
     ) -> Lib3hResult<()> {
@@ -614,7 +629,7 @@ impl<'engine> GhostEngine<'engine> {
 
         space_gateway
             .publish(
-                Lib3hSpan::todo(),
+                span,
                 GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
                         uri: Url::parse(&("agentId:".to_string() + &peer_address))
@@ -626,7 +641,11 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_publish_entry(&mut self, msg: &ProvidedEntryData) -> Lib3hResult<()> {
+    fn handle_publish_entry(
+        &mut self,
+        span: Lib3hSpan,
+        msg: &ProvidedEntryData,
+    ) -> Lib3hResult<()> {
         // MIRROR - reflecting hold for now
         for aspect in &msg.entry.aspect_list {
             let data = StoreEntryAspectData {
@@ -638,7 +657,7 @@ impl<'engine> GhostEngine<'engine> {
             };
 
             self.lib3h_endpoint.request(
-                Lib3hSpan::todo(),
+                span.child("TODO add tags"),
                 Lib3hToClient::HandleStoreEntryAspect(data),
                 Box::new(move |_me, response| {
                     // should just be OK
@@ -656,20 +675,20 @@ impl<'engine> GhostEngine<'engine> {
         )?;
         space_gateway
             .publish(
-                Lib3hSpan::todo(),
+                span,
                 GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(msg.entry.clone())),
             )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_hold_entry(&mut self, msg: &ProvidedEntryData) -> Lib3hResult<()> {
+    fn handle_hold_entry(&mut self, span: Lib3hSpan, msg: &ProvidedEntryData) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
         )?;
         space_gateway
             .publish(
-                Lib3hSpan::todo(),
+                span,
                 GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
                     msg.entry.clone(),
                 )),
@@ -679,6 +698,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn handle_query_entry(
         &mut self,
+        span: Lib3hSpan,
         msg: ClientToLib3hMessage,
         data: QueryEntryData,
     ) -> Lib3hResult<()> {
@@ -687,7 +707,7 @@ impl<'engine> GhostEngine<'engine> {
         // correct neighborhood
         self.lib3h_endpoint
             .request(
-                Lib3hSpan::todo(),
+                span,
                 Lib3hToClient::HandleQueryEntry(data.clone()),
                 Box::new(move |_me, response| {
                     match response {
@@ -775,7 +795,7 @@ pub fn handle_gossip_to<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(Lib3hSpan::todo(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Lib3hSpan::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }
@@ -784,6 +804,7 @@ mod tests {
     use super::*;
     use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
     use lib3h_sodium::SodiumCryptoSystem;
+    use lib3h_tracing::test_span;
     use std::path::PathBuf;
     use url::Url;
 
@@ -805,7 +826,9 @@ mod tests {
         };
         let dht_factory = MirrorDht::new_with_config;
 
-        let engine = GhostEngine::new_mock(crypto, config, "test_engine", dht_factory).unwrap();
+        let engine =
+            GhostEngine::new_mock(test_span(""), crypto, config, "test_engine", dht_factory)
+                .unwrap();
         engine
     }
 
@@ -839,10 +862,10 @@ mod tests {
         let mut lib3h = make_test_engine_wrapper();
 
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 1);
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert_eq!(
             "Err(Lib3hError(Other(\"Already joined space\")))",
             format!("{:?}", result)
@@ -853,11 +876,11 @@ mod tests {
     fn test_ghost_engine_leave() {
         let mut lib3h = make_test_engine_wrapper();
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
-        let result = lib3h.as_mut().handle_leave(&req_data);
+        let result = lib3h.as_mut().handle_leave(test_span(""), &req_data);
         assert!(result.is_ok());
-        let result = lib3h.as_mut().handle_leave(&req_data);
+        let result = lib3h.as_mut().handle_leave(test_span(""), &req_data);
         assert_eq!(
             "Err(Lib3hError(Other(\"Not part of that space\")))",
             format!("{:?}", result)
@@ -868,7 +891,7 @@ mod tests {
     fn test_ghost_engine_dm() {
         let mut lib3h = make_test_engine_wrapper();
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let direct_message = DirectMessageData {
@@ -879,7 +902,9 @@ mod tests {
             content: b"foo content".to_vec().into(),
         };
 
-        let result = lib3h.as_mut().handle_direct_message(&direct_message, false);
+        let result = lib3h
+            .as_mut()
+            .handle_direct_message(test_span(""), &direct_message, false);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 
@@ -908,7 +933,7 @@ mod tests {
 
         let mut engine = make_test_engine_wrapper();
         let req_data = make_test_join_request();
-        let result = engine.as_mut().handle_join(&req_data);
+        let result = engine.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -920,7 +945,9 @@ mod tests {
 
         let entry_data = make_test_entry();
 
-        let result = engine.as_mut().handle_publish_entry(&entry_data);
+        let result = engine
+            .as_mut()
+            .handle_publish_entry(test_span(""), &entry_data);
         assert!(result.is_ok());
 
         /* what should we observe to know that the entry was published?
@@ -959,7 +986,7 @@ mod tests {
 
         let mut lib3h = make_test_engine_wrapper();
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -973,7 +1000,7 @@ mod tests {
 
         println!("Before handle_hold_entry ---------------------------");
 
-        let result = lib3h.as_mut().handle_hold_entry(&entry_data);
+        let result = lib3h.as_mut().handle_hold_entry(test_span(""), &entry_data);
         assert!(result.is_ok());
 
         /* what should we observe to know that the hold was published?
@@ -1025,7 +1052,7 @@ mod tests {
 
         let mut lib3h = make_test_engine_wrapper();
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(&req_data);
+        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -1038,7 +1065,7 @@ mod tests {
         let query = make_test_query(req_data.space_address.clone());
 
         let _result = lib3h.request(
-            Lib3hSpan::todo(),
+            test_span(""),
             ClientToLib3h::QueryEntry(query),
             Box::new(move |_me, _response| {
                 panic!("BANG");

@@ -155,7 +155,7 @@ impl Lib3hSimChat {
                                 };
                                 parent_endpoint
                                     .request(
-                                        Lib3hSpan::todo(),
+                                        Lib3hSpan::fixme(),
                                         ClientToLib3h::JoinSpace(space_data.clone()),
                                         Box::new(move |_, callback_data| {
                                             println!(
@@ -192,7 +192,7 @@ impl Lib3hSimChat {
                                 if let Some(space_data) = current_space.clone() {
                                     parent_endpoint
                                         .request(
-                                            Lib3hSpan::todo(),
+                                            Lib3hSpan::fixme(),
                                             ClientToLib3h::LeaveSpace(space_data.to_owned()),
                                             Box::new(move |_, callback_data| {
                                                 println!(
@@ -238,7 +238,7 @@ impl Lib3hSimChat {
                                     };
                                     parent_endpoint
                                         .request(
-                                            Lib3hSpan::todo(),
+                                            Lib3hSpan::fixme(),
                                             ClientToLib3h::SendDirectMessage(direct_message_data),
                                             Box::new(|_, callback_data| {
                                                 println!(
@@ -297,7 +297,7 @@ impl Lib3hSimChat {
         });
         endpoint
             .request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 connect_message,
                 Box::new(|_, callback_data| {
                     println!("chat received response from engine: {:?}", callback_data);

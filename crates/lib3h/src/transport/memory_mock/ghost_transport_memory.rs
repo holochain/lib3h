@@ -111,7 +111,7 @@ impl
                         MemoryEvent::IncomingConnectionEstablished(in_cid) => {
                             to_connect_list.push(in_cid.clone());
                             self.endpoint_self.publish(
-                                Lib3hSpan::todo(),
+                                Lib3hSpan::fixme(),
                                 RequestToParent::IncomingConnection {
                                     uri: in_cid.clone(),
                                 },
@@ -155,7 +155,7 @@ impl
                         MemoryEvent::ReceivedData(from_addr, payload) => {
                             trace!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                             self.endpoint_self.publish(
-                                Lib3hSpan::todo(),
+                                Lib3hSpan::fixme(),
                                 RequestToParent::ReceivedData {
                                     uri: from_addr,
                                     payload,
@@ -172,6 +172,7 @@ impl
             .process(self))?;
 
         for mut msg in self.endpoint_self.drain_messages() {
+            let _span = msg.span().child("process_concrete");
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
@@ -241,7 +242,7 @@ mod tests {
 
     use super::*;
     //use protocol::RequestToChildResponse;
-    //    use lib3h_ghost_actor::GhostCallbackData;
+    use lib3h_tracing::test_span;
 
     #[test]
     #[ignore] // This test works if run alone, but not with all tests because of the namespace issue #330
@@ -291,7 +292,7 @@ mod tests {
         let mut bound_transport1_address = Url::parse("mem://addr_1").unwrap();
         t1_endpoint
             .request(
-                Lib3hSpan::todo(),
+                test_span(""),
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
@@ -309,7 +310,7 @@ mod tests {
         let mut bound_transport2_address = Url::parse("mem://addr_2").unwrap();
         t2_endpoint
             .request(
-                Lib3hSpan::todo(),
+                test_span(""),
                 RequestToChild::Bind {
                     spec: Url::parse("mem://_").unwrap(),
                 },
@@ -343,7 +344,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                Lib3hSpan::todo(),
+                test_span(""),
                 RequestToChild::SendMessage {
                     uri: Url::parse("mem://addr_2").unwrap(),
                     payload: b"test message".to_vec().into(),
