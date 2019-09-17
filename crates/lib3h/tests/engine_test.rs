@@ -20,6 +20,7 @@ use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
 };
 use lib3h_sodium::SodiumCryptoSystem;
+use lib3h_tracing::Lib3hSpan;
 use std::path::PathBuf;
 use url::Url;
 use utils::{
@@ -79,6 +80,7 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new_mock(
+        Lib3hSpan::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),

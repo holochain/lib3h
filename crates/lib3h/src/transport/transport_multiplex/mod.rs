@@ -107,10 +107,11 @@ mod tests {
                 }
             }
             loop {
+                let span = Lib3hSpan::fixme();
                 match self.mock_receiver.try_recv() {
                     Ok((uri, payload)) => {
                         self.endpoint_self.publish(
-                            Lib3hSpan::todo(),
+                            span,
                             GatewayRequestToParent::Transport(RequestToParent::ReceivedData {
                                 uri,
                                 payload,
@@ -152,7 +153,7 @@ mod tests {
         // send a message from route A
         route_a
             .request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 RequestToChild::SendMessage {
                     uri: addr_none.clone(),
                     payload: "hello-from-a".into(),
