@@ -3,20 +3,19 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{p2p_protocol::SpaceAddress, real_engine::handle_gossipTo, ChainId, RealEngine},
+    engine::{ghost_engine::handle_gossip_to, p2p_protocol::SpaceAddress, ChainId, GhostEngine},
+    error::*,
     gateway::{protocol::*, P2pGateway},
 };
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{
-    data_types::*, error::Lib3hProtocolResult, protocol_server::Lib3hServerProtocol,
-};
+use lib3h_protocol::{data_types::*, protocol::*, DidWork};
 use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
-impl RealEngine {
+impl<'engine> GhostEngine<'engine> {
     /// Return list of space+this_peer for all currently joined Spaces
     pub fn get_all_spaces(&mut self) -> Vec<(SpaceAddress, PeerData)> {
         let mut result = Vec::new();
@@ -36,7 +35,7 @@ impl RealEngine {
     pub fn get_first_space_mut(
         &mut self,
         space_address: &str,
-    ) -> Option<&mut GatewayParentWrapper<RealEngine, P2pGateway>> {
+    ) -> Option<&mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
             let current_space_address: String = chainId.0.clone().into();
             if current_space_address == space_address {
@@ -47,64 +46,52 @@ impl RealEngine {
     }
 
     /// Process all space gateways
-    pub(crate) fn process_space_gateways(
-        &mut self,
-    ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
+    pub(crate) fn process_space_gateways(&mut self) -> Lib3hResult<DidWork> {
         // Process all space gateways and collect requests
-        let mut outbox = Vec::new();
         let mut space_outbox_map = HashMap::new();
         let mut space_gateway_map: HashMap<
             ChainId,
-            Detach<GatewayParentWrapper<RealEngine, P2pGateway>>,
+            Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
-            detach_run!(space_gateway, |g| g.process(self)).unwrap(); // FIXME unwrap
+            detach_run!(space_gateway, |g| g.process(self))?;
             let request_list = space_gateway.drain_messages();
             space_outbox_map.insert(chain_id.clone(), request_list);
             self.space_gateway_map.insert(chain_id, space_gateway);
-            //            // FIXME: DHT magic
-            //            let mut temp = space_gateway.drain_dht_outbox();
-            //            self.temp_outbox.append(&mut temp);
         }
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
-            for mut request in request_list {
-                let payload = request.take_message().expect("exists");
-                let mut output = self.handle_space_request(&chain_id, payload)?;
-                outbox.append(&mut output);
+            for request in request_list {
+                self.handle_space_request(&chain_id, request)?;
             }
         }
         // Done
-        Ok(outbox)
+        Ok(true /* fixme */)
     }
 
     /// Handle a GatewayRequestToParent sent to us by one of our space gateway
     fn handle_space_request(
         &mut self,
         chain_id: &ChainId,
-        request: GatewayRequestToParent,
-    ) -> Lib3hProtocolResult<Vec<Lib3hServerProtocol>> {
+        mut request: GatewayToParentMessage,
+    ) -> Lib3hResult<DidWork> {
         debug!(
             "{} << handle_space_request: [{:?}] - {:?}",
             self.name, chain_id, request,
         );
-        let mut outbox = Vec::new();
         let space_gateway = self
             .space_gateway_map
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
-        match request {
+        let payload = request.take_message().expect("exists");
+        match payload {
             // Handle Space's DHT request
             // ==========================
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossipTo(
-                            &chain_id.0.to_string(),
-                            space_gateway.as_mut(),
-                            gossip_data,
-                        )
-                        .expect("Failed to gossip with space_gateway");
+                        handle_gossip_to(&chain_id.0.to_string(), space_gateway, gossip_data)
+                            .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
                         // n/a - should have been handled by gateway
@@ -141,22 +128,76 @@ impl RealEngine {
                                 &lib3h_msg.request_id,
                                 Some(RealEngineTrackerData::HoldEntryRequested),
                             );
-                            outbox.push(Lib3hServerProtocol::HandleStoreEntryAspect(lib3h_msg))
+                            self.lib3h_endpoint.publish(
+                                Lib3hSpan::todo(),
+                                Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
+                            )?;
                         }
                     }
                     DhtRequestToParent::EntryPruned(_address) => {
                         // TODO #174
                     }
-                    // EntryDataRequested: Change it into a Lib3hServerProtocol::HandleFetchEntry.
+                    // EntryDataRequested: Change it into a Lib3hToClient::HandleFetchEntry.
                     DhtRequestToParent::RequestEntry(entry_address) => {
-                        let msg_data = FetchEntryData {
+                        let msg = FetchEntryData {
                             space_address: chain_id.0.clone(),
                             entry_address: entry_address.clone(),
                             request_id: "FIXME".to_string(),
                             provider_agent_id: chain_id.1.clone(),
                             aspect_address_list: None,
                         };
-                        outbox.push(Lib3hServerProtocol::HandleFetchEntry(msg_data))
+                        self.lib3h_endpoint
+                            .request(
+                                Lib3hSpan::todo(),
+                                Lib3hToClient::HandleFetchEntry(msg.clone()),
+                                Box::new(move |me, response| {
+                                    let mut is_data_for_author_list = false;
+                                    if me.request_track.has(&msg.request_id) {
+                                        match me.request_track.remove(&msg.request_id) {
+                                            Some(data) => match data {
+                                                RealEngineTrackerData::DataForAuthorEntry => {
+                                                    is_data_for_author_list = true;
+                                                }
+                                                _ => (),
+                                            },
+                                            None => (),
+                                        };
+                                    }
+                                    let maybe_space = me.get_space(
+                                        &msg.space_address,
+                                        &msg.provider_agent_id,
+                                    );
+                                    match maybe_space {
+                                        Err(_res) => {
+                                            debug!("Received response to our HandleFetchEntry for a space we are not part of anymore");
+                                        },
+                                        Ok(space_gateway) => {
+                                            let entry = match response {
+                                                GhostCallbackData::Response(Ok(Lib3hToClientResponse::HandleFetchEntryResult(msg))) => {
+                                                    msg.entry
+                                                }
+                                                GhostCallbackData::Response(Err(e)) => {
+                                                    panic!("Got error on HandleFetchEntry: {:?} ", e);
+                                                }
+                                                GhostCallbackData::Timeout => {
+                                                    panic!("Got timeout on HandleFetchEntry");
+                                                }
+                                                _ => panic!("bad response type"),
+                                            };
+                                            if is_data_for_author_list {
+                                                space_gateway.publish(
+                                                    Lib3hSpan::todo(),
+                                                    GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
+                                            } else {
+                                                request.respond(Ok(
+                                                    GatewayRequestToParentResponse::Dht(DhtRequestToParentResponse::RequestEntry(entry),
+                                                    )))?;
+                                            }
+                                        }
+                                    }
+                                    Ok(())
+                                }))
+                            ?;
                     }
                 }
             }
@@ -166,6 +207,6 @@ impl RealEngine {
                 // FIXME
             }
         }
-        Ok(outbox)
+        Ok(true /* fixme */)
     }
 }

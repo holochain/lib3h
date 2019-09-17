@@ -46,10 +46,9 @@ pub struct MirrorDht {
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(this_peer_address: &PeerAddressRef, this_peer_uri: &Url) -> Box<DhtActor> {
-        let dht_config = DhtConfig::new(this_peer_address, this_peer_uri);
+    pub fn new(this_peer_address: &PeerAddressRef) -> Box<DhtActor> {
+        let dht_config = DhtConfig::new(this_peer_address);
         let dht = Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht");
-        // Box::new(dht)
         dht
     }
 
@@ -62,8 +61,9 @@ impl MirrorDht {
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
             this_peer: PeerData {
+                // maybe this will go away
                 peer_address: config.this_peer_address().to_owned(),
-                peer_uri: config.this_peer_uri().clone(),
+                peer_uri: Url::parse("none:").unwrap(),
                 timestamp,
             },
             last_gossip_of_self: timestamp,
@@ -323,7 +323,7 @@ impl MirrorDht {
         match request.take_message().expect("exists") {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {
-                trace!("Deserializer msg.bundle: {:?}", msg.bundle);
+                trace!("DhtRequestToChild::HandleGossip: {:?}", msg);
                 let mut de = Deserializer::new(&msg.bundle[..]);
                 let maybe_gossip: Result<MirrorGossip, rmp_serde::decode::Error> =
                     Deserialize::deserialize(&mut de);
@@ -367,6 +367,7 @@ impl MirrorDht {
 
             // Owner is asking us to hold a peer info
             DhtRequestToChild::HoldPeer(new_peer_data) => {
+                trace!("DhtRequestToChild::HoldPeer: {:?}", new_peer_data);
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let others_list = self.get_other_peer_list();
                 // Store it
@@ -412,7 +413,7 @@ impl MirrorDht {
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
             DhtRequestToChild::HoldEntryAspectAddress(entry) => {
-                println!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
+                trace!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
                 let received_new_content = self.add_entry_aspects(&entry);
                 if !received_new_content {
                     println!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");
@@ -426,6 +427,7 @@ impl MirrorDht {
             // Owner has some entry and wants it stored on the network
             // Bookkeep address and gossip entry to every known peer.
             DhtRequestToChild::BroadcastEntry(entry) => {
+                trace!("@MirrorDht@ BroadcastEntry: {:?}", entry);
                 // Store address
                 let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
@@ -439,7 +441,13 @@ impl MirrorDht {
             // N/A. Do nothing since this is a monotonic fullsync dht
             DhtRequestToChild::DropEntryAddress(_) => (),
 
+            DhtRequestToChild::UpdateAdvertise(peer_uri) => {
+                trace!("DhtRequestToChild::UpdateAdvertise: {:?}", peer_uri);
+                self.this_peer.peer_uri = peer_uri;
+            }
+
             DhtRequestToChild::RequestPeer(peer_address) => {
+                trace!("DhtRequestToChild::RequestPeer: {:?}", peer_address);
                 let maybe_peer = self.get_peer(&peer_address);
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
                 request.respond(payload)?;
@@ -472,6 +480,7 @@ impl MirrorDht {
 
             // Ask owner to respond to self
             DhtRequestToChild::RequestEntry(entry_address) => {
+                trace!("DhtRequestToChild::RequestEntry: {:?}", entry_address);
                 self.endpoint_self.request(
                     Lib3hSpan::todo(),
                     DhtRequestToParent::RequestEntry(entry_address),

@@ -63,7 +63,7 @@ impl P2pGateway {
                     self.identifier, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
-                let _res = self.child_transport_endpoint.publish(
+                let _res = self.inner_transport.publish(
                     Lib3hSpan::todo(),
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,

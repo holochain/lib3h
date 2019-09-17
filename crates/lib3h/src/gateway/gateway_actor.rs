@@ -4,6 +4,7 @@ use crate::{
     gateway::{protocol::*, P2pGateway},
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::*;
 use lib3h_tracing::Lib3hSpan;
 
 impl
@@ -28,10 +29,8 @@ impl
         }
 
         // Process inbox from child transport & handle requests
-        detach_run!(&mut self.child_transport_endpoint, |cte| {
-            cte.process(self)
-        })?;
-        for request in self.child_transport_endpoint.drain_messages() {
+        detach_run!(&mut self.inner_transport, |cte| { cte.process(self) })?;
+        for request in self.inner_transport.drain_messages() {
             self.handle_transport_RequestToParent(request);
         }
 
@@ -87,7 +86,17 @@ impl P2pGateway {
                 // Forward to child dht
                 self.handle_dht_RequestToChild(dht_request, msg)
             }
-            _ => Ok(()), // FIXME
+            GatewayRequestToChild::Bootstrap(data) => {
+                self.send(&data.bootstrap_uri, &Opaque::new(), Some(msg))?;
+                Ok(())
+            }
+            GatewayRequestToChild::SendAll(_) => {
+                println!("BADDBADD");
+                error!("BADDBADD");
+                // TODO XXX - fixme
+                //unimplemented!();
+                Ok(())
+            }
         }
     }
 }
