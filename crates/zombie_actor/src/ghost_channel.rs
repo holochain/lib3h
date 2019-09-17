@@ -54,7 +54,7 @@ impl<
         RequestToSelf: 'static,
         RequestToOther: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     > GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
@@ -116,6 +116,15 @@ impl<
                 payload,
                 span: self.span,
             })?;
+        } else {
+            // if the user is sending back an error
+            // it could get lost here... we are going to panic
+            if let Err(e) = payload {
+                panic!(
+                    "Unhandled publish error: {:?}. You should convert this to a request.",
+                    e
+                );
+            }
         }
         Ok(())
     }
@@ -139,7 +148,7 @@ pub struct GhostEndpoint<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -154,7 +163,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostEndpoint<
         RequestToOther,
@@ -203,7 +212,7 @@ pub struct GhostContextEndpointBuilder<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -219,7 +228,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostContextEndpointBuilder<
         RequestToOther,
@@ -283,7 +292,7 @@ pub trait GhostCanTrack<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 >
 {
     /// publish an event to the remote side, not expecting a response
@@ -325,7 +334,7 @@ pub struct GhostContextEndpoint<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -344,7 +353,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostContextEndpoint<
         UserData,
@@ -389,7 +398,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostCanTrack<
         UserData,
@@ -513,7 +522,7 @@ pub fn create_ghost_channel<
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
     RequestToChildResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 >() -> (
     GhostEndpoint<
         RequestToChild,

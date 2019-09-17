@@ -21,6 +21,12 @@ impl Opaque {
     }
 }
 
+impl From<Opaque> for Vec<u8> {
+    fn from(o: Opaque) -> Self {
+        o.0
+    }
+}
+
 impl From<Vec<u8>> for Opaque {
     fn from(vec: Vec<u8>) -> Self {
         Opaque(vec)
