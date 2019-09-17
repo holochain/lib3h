@@ -62,7 +62,11 @@ impl<'engine> GhostEngine<'engine> {
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
             for request in request_list {
-                self.handle_space_request(&chain_id, request)?;
+                self.handle_space_request(
+                    request.span().child("handle_space_request"),
+                    &chain_id,
+                    request,
+                )?;
             }
         }
         // Done
@@ -72,6 +76,7 @@ impl<'engine> GhostEngine<'engine> {
     /// Handle a GatewayRequestToParent sent to us by one of our space gateway
     fn handle_space_request(
         &mut self,
+        span: Lib3hSpan,
         chain_id: &ChainId,
         mut request: GatewayToParentMessage,
     ) -> Lib3hResult<DidWork> {
@@ -104,7 +109,7 @@ impl<'engine> GhostEngine<'engine> {
                         );
                         // For now accept all request
                         let _res = space_gateway.publish(
-                            Lib3hSpan::todo(),
+                            span.follower("DhtRequestToParent::HoldPeerRequested"),
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)),
                         );
                     }
@@ -129,7 +134,7 @@ impl<'engine> GhostEngine<'engine> {
                                 Some(RealEngineTrackerData::HoldEntryRequested),
                             );
                             self.lib3h_endpoint.publish(
-                                Lib3hSpan::todo(),
+                                Lib3hSpan::fixme(),
                                 Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
                             )?;
                         }
@@ -148,7 +153,7 @@ impl<'engine> GhostEngine<'engine> {
                         };
                         self.lib3h_endpoint
                             .request(
-                                Lib3hSpan::todo(),
+                                Lib3hSpan::fixme(),
                                 Lib3hToClient::HandleFetchEntry(msg.clone()),
                                 Box::new(move |me, response| {
                                     let mut is_data_for_author_list = false;
@@ -186,7 +191,7 @@ impl<'engine> GhostEngine<'engine> {
                                             };
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
-                                                    Lib3hSpan::todo(),
+                                                    Lib3hSpan::fixme(),
                                                     GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
                                             } else {
                                                 request.respond(Ok(
