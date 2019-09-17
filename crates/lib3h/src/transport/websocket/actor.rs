@@ -183,7 +183,7 @@ impl
                                 .expect("URL literal is syntactically correct")
                         });
                     self.endpoint_self.publish(
-                        Lib3hSpan::todo(),
+                        Lib3hSpan::fixme(),
                         RequestToParent::ErrorOccured { uri, error },
                     )?;
                 }
@@ -194,7 +194,7 @@ impl
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     self.endpoint_self.publish(
-                        Lib3hSpan::todo(),
+                        Lib3hSpan::fixme(),
                         RequestToParent::IncomingConnection { uri },
                     )?;
                 }
@@ -205,7 +205,7 @@ impl
                         .connection_id_to_url(connection_id)
                         .expect("There must be a URL for any existing connection ID");
                     self.endpoint_self.publish(
-                        Lib3hSpan::todo(),
+                        Lib3hSpan::fixme(),
                         RequestToParent::ReceivedData {
                             uri,
                             payload: Opaque::from(payload),
@@ -270,7 +270,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -293,7 +293,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
             .request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport2_address.clone(),
                 },
@@ -329,7 +329,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 RequestToChild::SendMessage {
                     uri: expected_transport2_address.clone(),
                     payload: b"test message".to_vec().into(),
@@ -364,7 +364,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
-                Lib3hSpan::todo(),
+                Lib3hSpan::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -397,7 +397,7 @@ mod tests {
                     Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
                 t2_endpoint
                     .request(
-                        Lib3hSpan::todo(),
+                        Lib3hSpan::fixme(),
                         RequestToChild::Bind {
                             spec: expected_transport2_address.clone(),
                         },
@@ -415,7 +415,7 @@ mod tests {
                 // now send a message from transport1 to transport2 over the bound addresses
                 t1_endpoint
                     .request(
-                        Lib3hSpan::todo(),
+                        Lib3hSpan::fixme(),
                         RequestToChild::SendMessage {
                             uri: expected_transport2_address.clone(),
                             payload: b"test message".to_vec().into(),

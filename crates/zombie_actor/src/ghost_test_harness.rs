@@ -339,10 +339,10 @@ macro_rules! wait_did_work {
      $should_abort: expr
     ) => {{
         let timeout = std::time::Duration::from_millis(2000);
-        wait_did_work!($ghost_actor, $should_abort, timeout)
+        $crate::wait_did_work!($ghost_actor, $should_abort, timeout)
     }};
     ($ghost_actor:ident) => {
-        wait_did_work!($ghost_actor, true)
+        $crate::wait_did_work!($ghost_actor, true)
     };
     ($ghost_actor: ident,
      $should_abort: expr,

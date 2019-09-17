@@ -92,6 +92,7 @@ impl<'engine> GhostEngine<'engine> {
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
         Self::with_transport(
+            Lib3hSpan::fixme(),
             crypto,
             config,
             name,
