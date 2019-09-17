@@ -43,7 +43,13 @@ impl GhostTransportWebsocket {
         self.bound_url.clone()
     }
 
-    fn handle_send_message(&mut self, mut msg: Message) {
+    /// Actually sends the message via an existing stream.
+    /// Assumptions:
+    /// * msg is a RequestToChild::SendMessage
+    /// * a connection to the messages target URI is already there and ready
+    /// If we encounter an error while sending, it will return an Err with the
+    /// message object so it can be put back into the pending list tried again later.
+    fn handle_send_message(&mut self, mut msg: Message) -> Result<(), Message> {
         match msg.take_message().expect("GhostMessage must have inner RequestToChild") {
             RequestToChild::SendMessage { uri, payload } => {
                 match self.bound_url.clone() {
@@ -59,18 +65,25 @@ impl GhostTransportWebsocket {
                             uri,
                             payload
                         );
+                        let bytes = payload.as_bytes();
                         // Send it data from us
-                        let _ = match self.streams.send(&[&uri], &payload.as_bytes()) {
+                        let _ = match self.streams.send(&uri, &bytes) {
                             Ok(()) => msg.respond(
                                 Ok(RequestToChildResponse::SendMessageSuccess)
                             ),
-                            Err(error) => msg.respond(Err(error)),
+                            Err(error) => {
+                                println!("Error during send: {:?}", error);
+                                let payload = Opaque::from(bytes);
+                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                return Err(msg);
+                            }
                         };
                     }
                 }
             }
             _ => panic!("GhostTransportWebsocket::handle_send_message called with non-SendMessage message"),
         }
+        Ok(())
     }
 }
 
@@ -152,7 +165,7 @@ impl
                                     uri,
                                 );
                                 match self.streams.connect(&uri) {
-                                    Ok(()) => trace!("New connection to {} established", uri.to_string()),
+                                    Ok(()) => trace!("New connection to {} initialized", uri.to_string()),
                                     Err(error) => {
                                         trace!(
                                             "Could not connect to {}! Transport error: {:?}",
@@ -167,13 +180,18 @@ impl
                                 self.pending.push(msg);
                             },
                             ConnectionStatus::Initializing => {
+                                trace!("Send tried while initializing");
                                 // If the connection is there but not ready yet, save message for later
                                 msg.put_message(RequestToChild::SendMessage { uri, payload });
                                 self.pending.push(msg);
                             }
                             ConnectionStatus::Ready => {
+                                trace!("Send via previously established connection");
                                 msg.put_message(RequestToChild::SendMessage { uri, payload });
-                                self.handle_send_message(msg);
+                                if let Err(msg) = self.handle_send_message(msg) {
+                                    trace!("Error while sending message, putting it in pending list");
+                                    self.pending.push(msg);
+                                }
                             },
                         }
                     };
@@ -202,11 +220,16 @@ impl
                     trace!("Connection to {:?} established", uri_connnected);
                     let mut temp = Vec::new();
                     while let Some(mut msg) = self.pending.pop() {
+                        trace!("Processing pending message...");
                         let inner_msg = msg.take_message().expect("exists");
                         if let RequestToChild::SendMessage {uri, payload} = inner_msg {
                             if uri == uri_connnected {
+                                trace!("Sending pending message to: {:?}", uri);
                                 msg.put_message(RequestToChild::SendMessage {uri, payload});
-                                self.handle_send_message(msg);
+                                if let Err(msg) = self.handle_send_message(msg) {
+                                    trace!("Error while sending message, putting it back in pending list");
+                                    temp.push(msg);
+                                }
                             } else {
                                 msg.put_message(RequestToChild::SendMessage {uri, payload});
                                 temp.push(msg);
@@ -239,6 +262,28 @@ impl
             }
         }
 
+        let mut temp = Vec::new();
+        while let Some(mut msg) = self.pending.pop() {
+            trace!("Processing pending message...");
+            let inner_msg = msg.take_message().expect("exists");
+            if let RequestToChild::SendMessage {uri, payload} = inner_msg {
+                if self.streams.connection_status(&uri) == ConnectionStatus::Ready {
+                    trace!("Sending pending message to: {:?}", uri);
+                    msg.put_message(RequestToChild::SendMessage {uri, payload});
+                    if let Err(msg) = self.handle_send_message(msg) {
+                        trace!("Error while sending message, putting it back in pending list");
+                        temp.push(msg);
+                    }
+                } else {
+                    msg.put_message(RequestToChild::SendMessage {uri, payload});
+                    temp.push(msg);
+                }
+            } else {
+                panic!("Found a non-SendMessage message in GhostWebsocketTransport::pending!");
+            }
+        }
+        self.pending = temp;
+
         Ok(did_work.into())
     }
 }
@@ -252,6 +297,7 @@ mod tests {
     use regex::Regex;
     use std::{net::TcpListener, thread, time};
     use url::Url;
+    use crate::tests::enable_logging_for_test;
 
     fn port_is_available(port: u16) -> bool {
         match TcpListener::bind(("127.0.0.1", port)) {
@@ -372,6 +418,7 @@ mod tests {
 
     #[test]
     fn test_websocket_transport_reconnect() {
+        enable_logging_for_test(true);
         let mut transport1 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
@@ -403,7 +450,7 @@ mod tests {
 
         let port2 = get_available_port(2026).expect("Must be able to find free port");
 
-        for index in &[1, 2, 3, 4] {
+        for index in 1..10 {
             transport1.process().unwrap();
             {
                 let mut transport2 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);;
@@ -456,7 +503,7 @@ mod tests {
                 );
             }
 
-            trace!("Try {} successful!", index);
+            println!("Try {} successful!", index);
             //thread::sleep(time::Duration::from_millis(1000));
         }
     }
