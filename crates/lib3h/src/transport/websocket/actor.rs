@@ -169,7 +169,7 @@ impl
             None => return Ok(false.into()),
         };
 
-        println!("Processing for: {}", my_addr);
+        trace!("Processing for: {}", my_addr);
 
         let (did_work, stream_events) = self.streams.process()?;
         for event in stream_events {
@@ -199,7 +199,7 @@ impl
                     )?;
                 }
                 StreamEvent::ReceivedData(connection_id, payload) => {
-                    //println!("DATA RECEIVED!!! {:?}", String::from_utf8(payload.clone()));
+                    trace!("ReceivedData {:?}", String::from_utf8(payload.clone()));
                     let uri = self
                         .streams
                         .connection_id_to_url(connection_id)
@@ -213,7 +213,7 @@ impl
                     )?;
                 }
                 StreamEvent::ConnectionClosed(connection_id) => {
-                    println!("Connection closed: {}", connection_id);
+                    trace!("Connection closed: {}", connection_id);
                 }
             }
         }
@@ -435,7 +435,7 @@ mod tests {
                 );
             }
 
-            println!("Try {} successful!", index);
+            trace!("Try {} successful!", index);
             thread::sleep(time::Duration::from_millis(1000));
         }
     }
