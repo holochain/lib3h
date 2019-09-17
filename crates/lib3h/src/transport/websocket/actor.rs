@@ -2,7 +2,7 @@ use crate::transport::{
     error::TransportError,
     protocol::*,
     websocket::{
-        streams::{StreamEvent, StreamManager},
+        streams::{ConnectionStatus, StreamEvent, StreamManager},
         tls::TlsConfig,
     },
 };
@@ -10,14 +10,16 @@ use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
 use lib3h_tracing::Lib3hSpan;
-use std::str::FromStr;
 use url::Url;
+
+pub type Message = GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
 
 pub struct GhostTransportWebsocket {
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
     bound_url: Option<Url>,
+    pending: Vec<Message>,
 }
 
 impl GhostTransportWebsocket {
@@ -33,11 +35,42 @@ impl GhostTransportWebsocket {
             ),
             streams: StreamManager::with_std_tcp_stream(tls_config),
             bound_url: None,
+            pending: Vec::new(),
         }
     }
 
     pub fn bound_url(&self) -> Option<Url> {
         self.bound_url.clone()
+    }
+
+    fn handle_send_message(&mut self, mut msg: Message) {
+        match msg.take_message().expect("GhostMessage must have inner RequestToChild") {
+            RequestToChild::SendMessage { uri, payload } => {
+                match self.bound_url.clone() {
+                    None => {
+                        let _ = msg.respond(Err(TransportError::new(
+                            "Transport must be bound before sending".to_string(),
+                        )));
+                    }
+                    Some(my_addr) => {
+                        trace!(
+                            "(GhostTransportWebsocket).SendMessage from {} to  {} | {:?}",
+                            my_addr,
+                            uri,
+                            payload
+                        );
+                        // Send it data from us
+                        let _ = match self.streams.send(&[&uri], &payload.as_bytes()) {
+                            Ok(()) => msg.respond(
+                                Ok(RequestToChildResponse::SendMessageSuccess)
+                            ),
+                            Err(error) => msg.respond(Err(error)),
+                        };
+                    }
+                }
+            }
+            _ => panic!("GhostTransportWebsocket::handle_send_message called with non-SendMessage message"),
+        }
     }
 }
 
@@ -105,27 +138,21 @@ impl
                 }
                 RequestToChild::SendMessage { uri, payload } => {
                     // make sure we have bound and got our address
-                    match self.bound_url.clone() {
-                        None => {
-                            msg.respond(Err(TransportError::new(
-                                "Transport must be bound before sending".to_string(),
-                            )))?;
-                        }
-                        Some(my_addr) => {
-                            // Trying to find established connection for URI:
-                            let mut maybe_connection_id = self.streams.url_to_connection_id(&uri);
-
-                            // If there is none, try to connect:
-                            if maybe_connection_id.is_none() {
+                    if self.bound_url.is_none() {
+                        msg.respond(Err(TransportError::new(
+                            "Transport must be bound before sending".to_string(),
+                        )))?;
+                    } else {
+                        // Trying to find established connection for URI:
+                        match self.streams.connection_status(&uri) {
+                            ConnectionStatus::None => {
+                                // If there is none, try to connect:
                                 trace!(
-                                        "No open connection to {} found when sending data. Trying to connect...",
-                                        uri,
-                                    );
+                                    "No open connection to {} found when sending data. Trying to connect...",
+                                    uri,
+                                );
                                 match self.streams.connect(&uri) {
-                                    Ok(connection_id) => {
-                                        maybe_connection_id = Some(connection_id);
-                                        trace!("New connection to {} established", uri.to_string());
-                                    }
+                                    Ok(()) => trace!("New connection to {} established", uri.to_string()),
                                     Err(error) => {
                                         trace!(
                                             "Could not connect to {}! Transport error: {:?}",
@@ -134,29 +161,20 @@ impl
                                         );
                                     }
                                 }
-                            }
 
-                            // If we have a connection now, send payload:
-                            if let Some(connection_id) = maybe_connection_id {
-                                trace!(
-                                    "(GhostTransportWebsocket).SendMessage from {} to  {} | {:?}",
-                                    my_addr,
-                                    uri,
-                                    payload
-                                );
-                                // Send it data from us
-                                match self.streams.send(&[&connection_id], &payload.as_bytes()) {
-                                    Ok(()) => {
-                                        msg.respond(Ok(RequestToChildResponse::SendMessageSuccess))?
-                                    }
-                                    Err(error) => msg.respond(Err(error))?,
-                                }
-                            } else {
-                                msg.respond(Err(TransportError::new(format!(
-                                    "Unable to acquire connection. Can't send to {}",
-                                    uri,
-                                ))))?;
+                                // And save message for later:
+                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                self.pending.push(msg);
+                            },
+                            ConnectionStatus::Initializing => {
+                                // If the connection is there but not ready yet, save message for later
+                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                self.pending.push(msg);
                             }
+                            ConnectionStatus::Ready => {
+                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                self.handle_send_message(msg);
+                            },
                         }
                     };
                 }
@@ -174,36 +192,39 @@ impl
         let (did_work, stream_events) = self.streams.process()?;
         for event in stream_events {
             match event {
-                StreamEvent::ErrorOccured(connection_id, error) => {
-                    let uri = self
-                        .streams
-                        .connection_id_to_url(connection_id)
-                        .unwrap_or_else(|| {
-                            Url::from_str("wss://0.0.0.0")
-                                .expect("URL literal is syntactically correct")
-                        });
+                StreamEvent::ErrorOccured(uri, error) => {
                     self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::ErrorOccured { uri, error },
                     )?;
                 }
-                StreamEvent::ConnectResult(_connection_id, _) => {}
-                StreamEvent::IncomingConnectionEstablished(connection_id) => {
-                    let uri = self
-                        .streams
-                        .connection_id_to_url(connection_id)
-                        .expect("There must be a URL for any existing connection ID");
+                StreamEvent::ConnectResult(uri_connnected, _) => {
+                    trace!("Connection to {:?} established", uri_connnected);
+                    let mut temp = Vec::new();
+                    while let Some(mut msg) = self.pending.pop() {
+                        let inner_msg = msg.take_message().expect("exists");
+                        if let RequestToChild::SendMessage {uri, payload} = inner_msg {
+                            if uri == uri_connnected {
+                                msg.put_message(RequestToChild::SendMessage {uri, payload});
+                                self.handle_send_message(msg);
+                            } else {
+                                msg.put_message(RequestToChild::SendMessage {uri, payload});
+                                temp.push(msg);
+                            }
+                        } else {
+                            panic!("Found a non-SendMessage message in GhostWebsocketTransport::pending!");
+                        }
+                    }
+                    self.pending = temp;
+                }
+                StreamEvent::IncomingConnectionEstablished(uri) => {
                     self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::IncomingConnection { uri },
                     )?;
                 }
-                StreamEvent::ReceivedData(connection_id, payload) => {
+                StreamEvent::ReceivedData(uri, payload) => {
                     trace!("ReceivedData {:?}", String::from_utf8(payload.clone()));
-                    let uri = self
-                        .streams
-                        .connection_id_to_url(connection_id)
-                        .expect("There must be a URL for any existing connection ID");
                     self.endpoint_self.publish(
                         Lib3hSpan::fixme(),
                         RequestToParent::ReceivedData {
@@ -212,8 +233,8 @@ impl
                         },
                     )?;
                 }
-                StreamEvent::ConnectionClosed(connection_id) => {
-                    trace!("Connection closed: {}", connection_id);
+                StreamEvent::ConnectionClosed(uri) => {
+                    trace!("Connection closed: {}", uri);
                 }
             }
         }
@@ -436,7 +457,7 @@ mod tests {
             }
 
             trace!("Try {} successful!", index);
-            thread::sleep(time::Duration::from_millis(1000));
+            //thread::sleep(time::Duration::from_millis(1000));
         }
     }
 }
