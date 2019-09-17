@@ -12,10 +12,12 @@ use lib3h_protocol::{
     network_engine::NetworkEngine,
 };
 use lib3h_zombie_actor::{
-    GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostResult, WorkWasDone,
+    GhostActor, GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostResult, WorkWasDone, GhostMessage,
+    GhostError, RequestId,
 };
 use url::Url;
 use std::convert::TryFrom;
+use std::collections::HashMap;
 
 
 /// This is a ghost actor engine that wraps non-ghost implementors of NetworkEngine (e.g. old Lib3h, Sim1h)
@@ -39,6 +41,7 @@ pub struct AntiWrapperEngine<'engine, T: NetworkEngine> {
             Lib3hError,
         >,
     >,
+    pending_requests_to_client: HashMap<RequestId, GhostMessage<ClientToLib3h, Lib3hToClient, ClientToLib3hResponse, GhostError>>,
     network_engine: T,
 }
 
@@ -80,9 +83,16 @@ impl<T: NetworkEngine>
         if let Ok((true, from_engine_messages)) = self.network_engine.process() {
             for msg_from_engine in from_engine_messages {
                 if let Ok(_request) = Lib3hToClient::try_from(msg_from_engine.clone()) {
+                    // send the request to  the client
+                    // let request_ghost_message = 
+                    // hold on to the request so we can send back a response later
 
-                } else if let Ok(_response) = ClientToLib3hResponse::try_from(msg_from_engine) {
-
+                } else if let Ok(response) = ClientToLib3hResponse::try_from(msg_from_engine) {
+                    // see if this is the response to a pending request and send it back to that
+                    // let request_id = 
+                    if let Some(ghost_request) = self.pending_requests_to_client.remove(&RequestId("".into())) {
+                        ghost_request.respond(Ok(response)).ok();
+                    }
                 } else {
                     panic!("anti-wrapper engine received a message from engine that could not be translated")
                 }
@@ -93,9 +103,11 @@ impl<T: NetworkEngine>
         // Convert these to Lib3hClientProtocol and send over the sender 
         for mut msg in self.lib3h_endpoint.as_mut().drain_messages() {
             let msg_to_engine = Lib3hClientProtocol::from(msg.take_message().expect("exists"));
-            self.network_engine.post(msg_to_engine).expect("Could not send a message to the engine");
-            // manually send any responses back to the client after post success
-            
+            if self.network_engine.post(msg_to_engine).is_ok() {
+                // manually send any responses back to the client after post success
+                // let msg_to_engine_response = Lib3hClientProtocol::
+                // self.network_engine.post(msg_to_engine_response).ok();
+            }
         }
 
         Ok(true.into())
