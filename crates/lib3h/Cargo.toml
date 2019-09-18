@@ -13,7 +13,7 @@ documentation = "https://docs.rs/lib3h"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-backtrace = "=0.3.26"
+backtrace = "=0.3.27"
 detach = { version = "=0.0.10", path = "../detach" }
 hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.8"
