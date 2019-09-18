@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::TransportError,
+    error::{TransportError, TransportResult},
     protocol::*,
     websocket::{
         streams::{ConnectionStatus, StreamEvent, StreamManager},
@@ -89,58 +89,8 @@ impl GhostTransportWebsocket {
         }
         Ok(())
     }
-}
 
-pub type UserData = GhostTransportWebsocket;
-
-pub type GhostTransportWebsocketEndpoint = GhostEndpoint<
-    RequestToChild,
-    RequestToChildResponse,
-    RequestToParent,
-    RequestToParentResponse,
-    TransportError,
->;
-
-pub type GhostTransportWebsocketEndpointContext = GhostContextEndpoint<
-    UserData,
-    RequestToParent,
-    RequestToParentResponse,
-    RequestToChild,
-    RequestToChildResponse,
-    TransportError,
->;
-
-pub type GhostTransportWebsocketEndpointContextParent = GhostContextEndpoint<
-    (),
-    RequestToChild,
-    RequestToChildResponse,
-    RequestToParent,
-    RequestToParentResponse,
-    TransportError,
->;
-
-impl
-    GhostActor<
-        RequestToParent,
-        RequestToParentResponse,
-        RequestToChild,
-        RequestToChildResponse,
-        TransportError,
-    > for GhostTransportWebsocket
-{
-    // BOILERPLATE START----------------------------------
-
-    fn take_parent_endpoint(&mut self) -> Option<GhostTransportWebsocketEndpoint> {
-        std::mem::replace(&mut self.endpoint_parent, None)
-    }
-
-    // BOILERPLATE END----------------------------------
-
-    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        // process the self endpoint
-        detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
-            .process(self))?;
-
+    fn process_actor_inbox(&mut self) -> TransportResult<()> {
         for mut msg in self.endpoint_self.drain_messages() {
             match msg.take_message().expect("exist") {
                 RequestToChild::Bind { spec: url } => {
@@ -206,16 +156,10 @@ impl
                 }
             }
         }
+        Ok(())
+    }
 
-        // make sure we have bound and get our address if so
-        let my_addr = match &self.bound_url {
-            Some(my_addr) => my_addr.clone(),
-            None => return Ok(false.into()),
-        };
-
-        trace!("Processing for: {}", my_addr);
-
-        let (did_work, stream_events) = self.streams.process()?;
+    fn process_stream_events(&mut self, stream_events: Vec<StreamEvent>) -> TransportResult<()> {
         for event in stream_events {
             match event {
                 StreamEvent::ErrorOccured(uri, error) => {
@@ -256,7 +200,10 @@ impl
                 }
             }
         }
+        Ok(())
+    }
 
+    fn process_pending_messages(&mut self) -> TransportResult<()> {
         let mut temp = Vec::new();
         while let Some(mut msg) = self.pending.pop() {
             trace!("Processing pending message...");
@@ -278,6 +225,73 @@ impl
             }
         }
         self.pending = temp;
+        Ok(())
+    }
+}
+
+pub type UserData = GhostTransportWebsocket;
+
+pub type GhostTransportWebsocketEndpoint = GhostEndpoint<
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
+pub type GhostTransportWebsocketEndpointContext = GhostContextEndpoint<
+    UserData,
+    RequestToParent,
+    RequestToParentResponse,
+    RequestToChild,
+    RequestToChildResponse,
+    TransportError,
+>;
+
+pub type GhostTransportWebsocketEndpointContextParent = GhostContextEndpoint<
+    (),
+    RequestToChild,
+    RequestToChildResponse,
+    RequestToParent,
+    RequestToParentResponse,
+    TransportError,
+>;
+
+impl
+    GhostActor<
+        RequestToParent,
+        RequestToParentResponse,
+        RequestToChild,
+        RequestToChildResponse,
+        TransportError,
+    > for GhostTransportWebsocket
+{
+    // BOILERPLATE START----------------------------------
+
+    fn take_parent_endpoint(&mut self) -> Option<GhostTransportWebsocketEndpoint> {
+        std::mem::replace(&mut self.endpoint_parent, None)
+    }
+
+    // BOILERPLATE END----------------------------------
+
+    fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // process the self endpoint
+        detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
+            .process(self))?;
+
+        self.process_actor_inbox()?;
+
+        // make sure we have bound and get our address if so
+        let my_addr = match &self.bound_url {
+            Some(my_addr) => my_addr.clone(),
+            None => return Ok(false.into()),
+        };
+
+        trace!("Processing for: {}", my_addr);
+
+        let (did_work, stream_events) = self.streams.process()?;
+        self.process_stream_events(stream_events)?;
+        self.process_pending_messages()?;
 
         Ok(did_work.into())
     }

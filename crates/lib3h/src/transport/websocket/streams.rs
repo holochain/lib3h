@@ -166,7 +166,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         let mut info = self
             .stream_sockets
             .get_mut(&url)
-            .ok_or(format!("No socket found for URL: {}", url.to_string()))?;
+            .ok_or_else(|| format!("No socket found for URL: {}", url.to_string()))?;
 
         //println!("send() 2 {:?}", url);
         let mut ws_stream =
