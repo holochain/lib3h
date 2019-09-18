@@ -622,16 +622,16 @@ mod tests {
         mdns.query().expect("Fail to advertise during Query test.");
         mdns_other
             .discover()
-            .expect("Fail to run discovery during Query test.");
+            .expect("Fail to run discovery1 during Query test.");
         mdns.discover()
-            .expect("Fail to run discovery during Query test.");
+            .expect("Fail to run discovery2 during Query test.");
 
         eprintln!("mdns = {:#?}", &mdns.map_record);
 
         let mut records = mdns
             .map_record
             .get(networkid)
-            .expect("Fail to get records from the networkid")
+            .expect("Fail to get records from the networkid during Query test.")
             .to_vec();
 
         // Make the order deterministic
