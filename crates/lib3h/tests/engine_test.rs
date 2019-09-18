@@ -352,8 +352,11 @@ fn basic_two_setup(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) 
 
     // TODO check for join space response messages.
 
-    wait_did_work!(alex, billy);
-    wait_until_no_work!(alex, billy);
+    wait_did_work!(alex);
+    wait_did_work!(billy);
+    wait_until_no_work!(alex);
+    wait_until_no_work!(billy);
+
 
     println!("DONE basic_two_setup DONE \n\n\n");
 }
@@ -456,7 +459,9 @@ fn basic_two_join_first(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLi
 
     println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
 
-    wait_until_no_work!(alex, billy);
+    wait_until_no_work!(alex);
+    wait_until_no_work!(billy);
+
 
     // Do Send DM test
     basic_two_send_message(alex, billy);
