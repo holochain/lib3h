@@ -188,15 +188,6 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         })
     }
 
-    /// send a message to all remote nodes
-    #[allow(dead_code)]
-    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        for info in self.stream_sockets.values_mut() {
-            info.send_queue.push(payload.to_vec());
-        }
-        Ok(())
-    }
-
     pub fn bind(&mut self, url: &Url) -> TransportResult<Url> {
         let acceptor = (self.bind)(&url.clone());
         acceptor.map(|acceptor| {
@@ -389,13 +380,6 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 Ok(())
             }
             WebsocketStreamState::ReadyWs(mut socket) => {
-                // This seems to be wrong. Messages shouldn't be drained.
-                let msgs: Vec<Vec<u8>> = info.send_queue.drain(..).collect();
-                for msg in msgs {
-                    // TODO: fix this line! if there is an error, all the remaining messages will be lost!
-                    socket.write_message(tungstenite::Message::Binary(msg))?;
-                }
-
                 match socket.read_message() {
                     Err(tungstenite::error::Error::Io(e)) => {
                         if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -428,13 +412,6 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 }
             }
             WebsocketStreamState::ReadyWss(mut socket) => {
-                // This seems to be wrong. Messages shouldn't be drained.
-                let msgs: Vec<Vec<u8>> = info.send_queue.drain(..).collect();
-                for msg in msgs {
-                    // TODO: fix this line! if there is an error, all the remaining messages will be lost!
-                    socket.write_message(tungstenite::Message::Binary(msg))?;
-                }
-
                 match socket.read_message() {
                     Err(tungstenite::error::Error::Io(e)) => {
                         if e.kind() == std::io::ErrorKind::WouldBlock {

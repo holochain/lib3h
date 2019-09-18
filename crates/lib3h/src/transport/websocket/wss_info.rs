@@ -6,7 +6,6 @@ pub struct WssInfo<T: std::io::Read + std::io::Write + std::fmt::Debug> {
     pub(in crate::transport::websocket) request_id: String,
     pub(in crate::transport::websocket) url: url::Url,
     pub(in crate::transport::websocket) last_msg: std::time::Instant,
-    pub(in crate::transport::websocket) send_queue: Vec<Vec<u8>>,
     pub(in crate::transport::websocket) stateful_socket: WebsocketStreamState<T>,
 }
 
@@ -26,7 +25,6 @@ impl<T: std::io::Read + std::io::Write + std::fmt::Debug> WssInfo<T> {
             request_id: "".to_string(),
             url,
             last_msg: std::time::Instant::now(),
-            send_queue: Vec::new(),
             stateful_socket: match is_server {
                 false => WebsocketStreamState::Connecting(socket),
                 true => WebsocketStreamState::ConnectingSrv(socket),
