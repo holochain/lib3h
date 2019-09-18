@@ -105,7 +105,7 @@ impl GhostTransportMemory {
             connections: HashSet::new(),
             maybe_my_address: None,
             last_discover: start,
-            discover_interval_ms: interval as u128,
+            discover_interval_ms: u128::from(interval),
         }
     }
 
