@@ -111,6 +111,10 @@ impl<
         std::mem::replace(&mut self.message, None)
     }
 
+    pub fn put_message(&mut self, msg: RequestToSelf) {
+        self.message = Some(msg);
+    }
+
     /// send a response back to the origin of this request
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {

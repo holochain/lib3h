@@ -7,15 +7,15 @@ use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
         engine_actor::*, p2p_protocol::*, CanAdvertise, ChainId, EngineConfig, GhostEngine,
-        TransportKeys, NETWORK_GATEWAY_ID,
+        TransportConfig, TransportKeys, NETWORK_GATEWAY_ID,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
     keystore::KeystoreStub,
     track::Tracker,
     transport::{
-        self, memory_mock::ghost_transport_memory::*, protocol::*, TransportEncoding,
-        TransportMultiplex,
+        self, memory_mock::ghost_transport_memory::*, protocol::*,
+        websocket::actor::GhostTransportWebsocket, TransportEncoding, TransportMultiplex,
     },
 };
 use lib3h_crypto_api::CryptoSystem;
@@ -81,23 +81,37 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
     }
 }
 impl<'engine> GhostEngine<'engine> {
-    /// Constructor with TransportMemory
-    pub fn new_mock(
+    /// Constructor with for GhostEngine
+    pub fn new(
         span: Lib3hSpan,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
-        // Create TransportMemory as the network transport
-        Self::with_transport(
-            span,
-            crypto,
-            config,
-            name,
-            dht_factory,
-            Box::new(GhostTransportMemory::new()),
-        )
+        // This will change when multi-transport is impelmented
+        assert_eq!(config.transport_configs.len(), 1);
+        match &config.transport_configs[0] {
+            TransportConfig::Websocket(tls_config) => {
+                let tls = tls_config.clone();
+                Self::with_transport(
+                    span,
+                    crypto,
+                    config,
+                    name,
+                    dht_factory,
+                    Box::new(GhostTransportWebsocket::new(tls)),
+                )
+            }
+            TransportConfig::Memory => Self::with_transport(
+                span,
+                crypto,
+                config,
+                name,
+                dht_factory,
+                Box::new(GhostTransportMemory::new()),
+            ),
+        }
     }
 
     pub fn with_transport(
@@ -827,7 +841,7 @@ mod tests {
     fn make_test_engine() -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = EngineConfig {
-            socket_type: "mem".into(),
+            transport_configs: vec![TransportConfig::Memory],
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),
             log_level: 'd',
@@ -839,8 +853,7 @@ mod tests {
         let dht_factory = MirrorDht::new_with_config;
 
         let engine =
-            GhostEngine::new_mock(test_span(""), crypto, config, "test_engine", dht_factory)
-                .unwrap();
+            GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap();
         engine
     }
 
