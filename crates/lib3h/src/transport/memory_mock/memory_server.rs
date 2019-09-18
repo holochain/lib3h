@@ -2,7 +2,7 @@ use crate::transport::error::{TransportError, TransportResult};
 use lib3h_protocol::{data_types::Opaque, DidWork};
 use std::{
     collections::{HashMap, VecDeque},
-    sync::{Mutex, RwLock},
+    sync::Mutex,
 };
 use url::Url;
 
@@ -77,7 +77,7 @@ impl MemoryVerse {
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
-    pub static ref MEMORY_VERSE: RwLock<MemoryVerse> = RwLock::new(MemoryVerse::new());
+    pub static ref MEMORY_VERSE: Mutex<MemoryVerse> = Mutex::new(MemoryVerse::new());
 }
 
 //--------------------------------------------------------------------------------------------------

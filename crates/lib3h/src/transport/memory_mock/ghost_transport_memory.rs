@@ -97,7 +97,7 @@ impl
 
             // get our own server
             let (success, event_list) = {
-                let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
+                let mut verse = memory_server::MEMORY_VERSE.lock().unwrap();
                 let maybe_server = verse.get_server(&self.network, &my_addr);
                 if let None = maybe_server {
                     return Err(format!("No Memory server at this uri: {}", my_addr).into());
@@ -135,7 +135,7 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
+                        let mut verse = memory_server::MEMORY_VERSE.lock().unwrap();
                         let maybe_server = verse.get_server(&self.network, &remote_addr);
                         match maybe_server {
                             Some(remote_server) => {
@@ -182,7 +182,7 @@ impl
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
                     let bound_url = memory_server::MEMORY_VERSE
-                        .write()
+                        .lock()
                         .unwrap()
                         .bind(&self.network);
                     self.maybe_my_address = Some(bound_url.clone());
@@ -205,7 +205,7 @@ impl
                         }
                         Some(my_addr) => {
                             // get destinations server
-                            let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
+                            let mut verse = memory_server::MEMORY_VERSE.lock().unwrap();
                             let maybe_server = verse.get_server(&self.network, &uri);
                             if let None = maybe_server {
                                 msg.respond(Err(TransportError::new(format!(
