@@ -61,6 +61,7 @@ impl GhostTransportWebsocket {
                         let _ = msg.respond(Err(TransportError::new(
                             "Transport must be bound before sending".to_string(),
                         )));
+                        Ok(())
                     }
                     Some(my_addr) => {
                         trace!(
@@ -71,23 +72,25 @@ impl GhostTransportWebsocket {
                         );
                         let bytes = payload.as_bytes();
                         // Send it data from us
-                        let _ = match self.streams.send(&uri, &bytes) {
-                            Ok(()) => msg.respond(Ok(RequestToChildResponse::SendMessageSuccess)),
-                            Err(error) => {
-                                println!("Error during send: {:?}", error);
-                                let payload = Opaque::from(bytes);
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
-                                return Err(msg);
-                            }
-                        };
+                        if let Err(error) = self.streams.send(&uri, &bytes) {
+                            trace!("Error during StreamManager::send: {:?}", error);
+                            // In case of an error we reconstruct the GhostMessage and return
+                            // it as error so the calling context can put it back into the pending
+                            // list to try again later.
+                            let payload = Opaque::from(bytes);
+                            msg.put_message(RequestToChild::SendMessage { uri, payload });
+                            Err(msg)
+                        } else {
+                            let _ = msg.respond(Ok(RequestToChildResponse::SendMessageSuccess));
+                            Ok(())
+                        }
                     }
                 }
             }
             _ => panic!(
                 "GhostTransportWebsocket::handle_send_message called with non-SendMessage message"
-            ),
+            )
         }
-        Ok(())
     }
 
     fn process_actor_inbox(&mut self) -> TransportResult<()> {
