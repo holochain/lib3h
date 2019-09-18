@@ -619,10 +619,12 @@ mod tests {
             .build()
             .expect("Fail to build mDNS.");
 
-        mdns.query().expect("Fail to advertise during Query test.");
+        mdns.query().expect("Fail to advertise during Query1 test.");
         mdns_other
             .discover()
             .expect("Fail to run discovery1 during Query test.");
+
+        mdns.query().expect("Fail to advertise during Query2 test.");
         mdns.discover()
             .expect("Fail to run discovery2 during Query test.");
 
