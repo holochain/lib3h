@@ -3,7 +3,7 @@ use crate::{
     error::*,
 };
 use detach::Detach;
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
     data_types::{ConnectedData, GenericResultData, Opaque},
@@ -204,10 +204,10 @@ where
         };
 
         let result = if request_id == "" {
-            self.engine.publish(HSpan::fixme(), client_msg.into())
+            self.engine.publish(Span::fixme(), client_msg.into())
         } else {
             self.engine.request(
-                HSpan::fixme(),
+                Span::fixme(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
             )

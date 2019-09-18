@@ -8,7 +8,7 @@ use regex::Regex;
 use std::path::PathBuf;
 use url::Url;
 
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GhostEngine, TransportConfig},
@@ -29,7 +29,7 @@ fn engine_builder() -> GhostEngine<'static> {
     };
     let dht_factory = MirrorDht::new_with_config;
     GhostEngine::new(
-        HSpan::fixme(), // TODO: actually hook up real tracer here
+        Span::fixme(), // TODO: actually hook up real tracer here
         crypto,
         config,
         "test_engine",

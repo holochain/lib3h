@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 
 //--------------------------------------------------------------------------------------------------
 // GhostParentWrapper
@@ -106,14 +106,14 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, span: HSpan, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, span: Span, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(span, payload)
     }
 
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        span: HSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -123,7 +123,7 @@ impl<
     /// see GhostContextEndpoint::request
     fn request_options(
         &mut self,
-        span: HSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -343,14 +343,14 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, span: HSpan, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, span: Span, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(span, payload)
     }
 
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        span: HSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -359,7 +359,7 @@ impl<
 
     fn request_options(
         &mut self,
-        span: HSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,

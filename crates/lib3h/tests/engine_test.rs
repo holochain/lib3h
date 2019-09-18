@@ -12,7 +12,7 @@ extern crate predicates;
 
 use predicates::prelude::*;
 
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
@@ -80,7 +80,7 @@ fn basic_setup_mock_bootstrap(net: &str, name: &str, bs: Option<Vec<Url>>) -> Wr
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
-        HSpan::fixme(),
+        Span::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),
@@ -112,7 +112,7 @@ fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
-        HSpan::fixme(),
+        Span::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         "test_engine_wss".into(),

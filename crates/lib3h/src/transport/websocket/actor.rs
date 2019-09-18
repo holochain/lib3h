@@ -7,7 +7,7 @@ use crate::transport::{
     },
 };
 use detach::Detach;
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
 use url::Url;
@@ -171,7 +171,7 @@ impl GhostTransportWebsocket {
                         uri, error
                     );
                     self.endpoint_self
-                        .publish(HSpan::fixme(), RequestToParent::ErrorOccured { uri, error })?;
+                        .publish(Span::fixme(), RequestToParent::ErrorOccured { uri, error })?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
@@ -179,7 +179,7 @@ impl GhostTransportWebsocket {
                 StreamEvent::IncomingConnectionEstablished(uri) => {
                     trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
                     self.endpoint_self
-                        .publish(HSpan::fixme(), RequestToParent::IncomingConnection { uri })?;
+                        .publish(Span::fixme(), RequestToParent::IncomingConnection { uri })?;
                 }
                 StreamEvent::ReceivedData(uri, payload) => {
                     trace!(
@@ -187,7 +187,7 @@ impl GhostTransportWebsocket {
                         String::from_utf8(payload.clone())
                     );
                     self.endpoint_self.publish(
-                        HSpan::fixme(),
+                        Span::fixme(),
                         RequestToParent::ReceivedData {
                             uri,
                             payload: Opaque::from(payload),
@@ -344,7 +344,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
-                HSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -367,7 +367,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
             .request(
-                HSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport2_address.clone(),
                 },
@@ -403,7 +403,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                HSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::SendMessage {
                     uri: expected_transport2_address.clone(),
                     payload: b"test message".to_vec().into(),
@@ -439,7 +439,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
-                HSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -472,7 +472,7 @@ mod tests {
                     Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
                 t2_endpoint
                     .request(
-                        HSpan::fixme(),
+                        Span::fixme(),
                         RequestToChild::Bind {
                             spec: expected_transport2_address.clone(),
                         },
@@ -490,7 +490,7 @@ mod tests {
                 // now send a message from transport1 to transport2 over the bound addresses
                 t1_endpoint
                     .request(
-                        HSpan::fixme(),
+                        Span::fixme(),
                         RequestToChild::SendMessage {
                             uri: expected_transport2_address.clone(),
                             payload: b"test message".to_vec().into(),

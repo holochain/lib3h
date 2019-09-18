@@ -8,7 +8,7 @@ use crate::{
     transport,
 };
 
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, DidWork};
 use rmp_serde::{Deserializer, Serializer};
@@ -41,7 +41,7 @@ impl<'engine> GhostEngine<'engine> {
     /// Handle a DhtRequestToParent sent to us by our network gateway
     fn handle_network_dht_request(
         &mut self,
-        span: HSpan,
+        span: Span,
         request: DhtRequestToParent,
     ) -> Lib3hResult<()> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
@@ -93,7 +93,7 @@ impl<'engine> GhostEngine<'engine> {
     /// Handle a TransportRequestToParent sent to us by our network gateway
     fn handle_network_transport_request(
         &mut self,
-        span: HSpan,
+        span: Span,
         request: &transport::protocol::RequestToParent,
     ) -> Lib3hResult<()> {
         debug!(
@@ -111,7 +111,7 @@ impl<'engine> GhostEngine<'engine> {
                         network_id: "FIXME".to_string(), // TODO #172
                     };
                     self.lib3h_endpoint
-                        .publish(HSpan::fixme(), Lib3hToClient::Disconnected(data))?;
+                        .publish(Span::fixme(), Lib3hToClient::Disconnected(data))?;
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
@@ -146,7 +146,7 @@ impl<'engine> GhostEngine<'engine> {
         Ok(())
     }
 
-    fn handle_incoming_connection(&mut self, span: HSpan, net_uri: Url) -> Lib3hResult<()> {
+    fn handle_incoming_connection(&mut self, span: Span, net_uri: Url) -> Lib3hResult<()> {
         // Get list of known peers
         let uri_copy = net_uri.clone();
         self.multiplexer
@@ -215,7 +215,7 @@ impl<'engine> GhostEngine<'engine> {
                 uri: net_uri.clone(),
             };
             self.lib3h_endpoint
-                .publish(HSpan::fixme(), Lib3hToClient::Connected(data))?;
+                .publish(Span::fixme(), Lib3hToClient::Connected(data))?;
         }
         let _ = self.network_connections.insert(net_uri.to_owned());
         Ok(())
@@ -226,7 +226,7 @@ impl<'engine> GhostEngine<'engine> {
     #[allow(non_snake_case)]
     fn serve_P2pProtocol(
         &mut self,
-        span: HSpan,
+        span: Span,
         _from: &Url,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<()> {
@@ -266,7 +266,7 @@ impl<'engine> GhostEngine<'engine> {
                 if let Some(_) = maybe_space_gateway {
                     // Change into Lib3hToClient
                     let lib3_msg = Lib3hToClient::HandleSendDirectMessage(dm_data.clone());
-                    self.lib3h_endpoint.publish(HSpan::fixme(), lib3_msg)?;
+                    self.lib3h_endpoint.publish(Span::fixme(), lib3_msg)?;
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",
@@ -281,7 +281,7 @@ impl<'engine> GhostEngine<'engine> {
                 ));
                 if let Some(_) = maybe_space_gateway {
                     let lib3_msg = Lib3hToClient::SendDirectMessageResult(dm_data.clone());
-                    self.lib3h_endpoint.publish(HSpan::fixme(), lib3_msg)?;
+                    self.lib3h_endpoint.publish(Span::fixme(), lib3_msg)?;
                 } else {
                     warn!(
                         "Received message from unjoined space: {}",

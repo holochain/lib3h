@@ -4,7 +4,7 @@ use crate::transport::{
     protocol::*,
 };
 use detach::Detach;
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use std::collections::HashSet;
 use url::Url;
@@ -115,7 +115,7 @@ impl
                         MemoryEvent::IncomingConnectionEstablished(in_cid) => {
                             to_connect_list.push(in_cid.clone());
                             self.endpoint_self.publish(
-                                HSpan::fixme(),
+                                Span::fixme(),
                                 RequestToParent::IncomingConnection {
                                     uri: in_cid.clone(),
                                 },
@@ -160,7 +160,7 @@ impl
                         MemoryEvent::ReceivedData(from_addr, payload) => {
                             trace!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                             self.endpoint_self.publish(
-                                HSpan::fixme(),
+                                Span::fixme(),
                                 RequestToParent::ReceivedData {
                                     uri: from_addr,
                                     payload,

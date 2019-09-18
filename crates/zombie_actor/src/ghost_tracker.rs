@@ -1,4 +1,4 @@
-use holochain_tracing::HSpan;
+use holochain_tracing::Span;
 use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
@@ -119,14 +119,14 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
     }
 
     /// register a callback
-    pub fn bookmark(&mut self, span: HSpan, cb: GhostCallback<UserData, CbData, E>) -> RequestId {
+    pub fn bookmark(&mut self, span: Span, cb: GhostCallback<UserData, CbData, E>) -> RequestId {
         self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_options(
         &mut self,
-        _span: HSpan,
+        _span: Span,
         cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
