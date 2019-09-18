@@ -8,9 +8,9 @@ use crate::{
     gateway::{protocol::*, P2pGateway},
 };
 use detach::prelude::*;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, DidWork};
-use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 
 /// Space layer related private methods
@@ -76,7 +76,7 @@ impl<'engine> GhostEngine<'engine> {
     /// Handle a GatewayRequestToParent sent to us by one of our space gateway
     fn handle_space_request(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         chain_id: &ChainId,
         mut request: GatewayToParentMessage,
     ) -> Lib3hResult<DidWork> {
@@ -134,7 +134,7 @@ impl<'engine> GhostEngine<'engine> {
                                 Some(RealEngineTrackerData::HoldEntryRequested),
                             );
                             self.lib3h_endpoint.publish(
-                                Lib3hSpan::fixme(),
+                                Span::fixme(),
                                 Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
                             )?;
                         }
@@ -153,7 +153,7 @@ impl<'engine> GhostEngine<'engine> {
                         };
                         self.lib3h_endpoint
                             .request(
-                                Lib3hSpan::fixme(),
+                                Span::fixme(),
                                 Lib3hToClient::HandleFetchEntry(msg.clone()),
                                 Box::new(move |me, response| {
                                     let mut is_data_for_author_list = false;
@@ -191,7 +191,7 @@ impl<'engine> GhostEngine<'engine> {
                                             };
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
-                                                    Lib3hSpan::fixme(),
+                                                    Span::fixme(),
                                                     GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
                                             } else {
                                                 request.respond(Ok(

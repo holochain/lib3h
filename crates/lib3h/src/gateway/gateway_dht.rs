@@ -6,15 +6,15 @@ use crate::{
     gateway::{protocol::*, P2pGateway},
     transport,
 };
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hSpan;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
     pub(crate) fn handle_dht_RequestToChild(
         &mut self,
-        _span: Lib3hSpan,
+        _span: Span,
         request: DhtRequestToChild,
         parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {

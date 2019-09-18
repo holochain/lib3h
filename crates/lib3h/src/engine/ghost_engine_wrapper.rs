@@ -3,6 +3,7 @@ use crate::{
     error::*,
 };
 use detach::Detach;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
     data_types::{ConnectedData, GenericResultData, Opaque},
@@ -12,7 +13,6 @@ use lib3h_protocol::{
     protocol_server::*,
     Address, DidWork,
 };
-use lib3h_tracing::Lib3hSpan;
 use url::Url;
 pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
 
@@ -204,10 +204,10 @@ where
         };
 
         let result = if request_id == "" {
-            self.engine.publish(Lib3hSpan::fixme(), client_msg.into())
+            self.engine.publish(Span::fixme(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
             )
@@ -244,8 +244,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_tracing::test_span;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::test_span;
     use url::Url;
 
     type EngineError = String;
