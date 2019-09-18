@@ -8,13 +8,14 @@ extern crate url;
 #[cfg(test)]
 #[macro_use]
 extern crate detach;
-extern crate lib3h_tracing;
+extern crate holochain_tracing;
 extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 pub mod simchat;
 pub use simchat::{ChatEvent, SimChat};
 
 use core::convert::TryFrom;
+use holochain_tracing::Span;
 use lib3h::error::Lib3hError;
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{
@@ -26,7 +27,6 @@ use lib3h_protocol::{
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
-use lib3h_tracing::Lib3hSpan;
 
 use std::{
     collections::HashMap,
@@ -155,7 +155,7 @@ impl Lib3hSimChat {
                                 };
                                 parent_endpoint
                                     .request(
-                                        Lib3hSpan::fixme(),
+                                        Span::fixme(),
                                         ClientToLib3h::JoinSpace(space_data.clone()),
                                         Box::new(move |_, callback_data| {
                                             println!(
@@ -192,7 +192,7 @@ impl Lib3hSimChat {
                                 if let Some(space_data) = current_space.clone() {
                                     parent_endpoint
                                         .request(
-                                            Lib3hSpan::fixme(),
+                                            Span::fixme(),
                                             ClientToLib3h::LeaveSpace(space_data.to_owned()),
                                             Box::new(move |_, callback_data| {
                                                 println!(
@@ -238,7 +238,7 @@ impl Lib3hSimChat {
                                     };
                                     parent_endpoint
                                         .request(
-                                            Lib3hSpan::fixme(),
+                                            Span::fixme(),
                                             ClientToLib3h::SendDirectMessage(direct_message_data),
                                             Box::new(|_, callback_data| {
                                                 println!(
@@ -297,7 +297,7 @@ impl Lib3hSimChat {
         });
         endpoint
             .request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 connect_message,
                 Box::new(|_, callback_data| {
                     println!("chat received response from engine: {:?}", callback_data);
