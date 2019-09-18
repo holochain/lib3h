@@ -132,15 +132,19 @@ impl<'engine> GhostEngine<'engine> {
             //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
-                let mut de = Deserializer::new(&payload[..]);
-                let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                if let Err(e) = maybe_msg {
-                    error!("Failed deserializing msg: {:?}", e);
-                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                if payload.len() == 0 {
+                    debug!("Implement Ping!");
+                } else {
+                    let mut de = Deserializer::new(&payload[..]);
+                    let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                        Deserialize::deserialize(&mut de);
+                    if let Err(e) = maybe_msg {
+                        error!("Failed deserializing msg: {:?}", e);
+                        return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                    }
+                    let p2p_msg = maybe_msg.unwrap();
+                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
                 }
-                let p2p_msg = maybe_msg.unwrap();
-                self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
             }
         };
         Ok(())

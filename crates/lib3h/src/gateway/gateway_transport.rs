@@ -266,29 +266,33 @@ impl P2pGateway {
                 // TODO
                 debug!("Received message from: {} | size: {}", uri, payload.len());
                 // trace!("Deserialize msg: {:?}", payload);
-                let mut de = Deserializer::new(&payload[..]);
-                let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                if let Ok(p2p_msg) = maybe_p2p_msg {
-                    if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) = p2p_msg {
-                        debug!(
-                            "Received PeerAddress: {} | {} ({})",
-                            peer_address, gateway_id, self.identifier
-                        );
-                        if self.identifier == gateway_id {
-                            let peer = PeerData {
-                                peer_address,
-                                peer_uri: uri.clone(),
-                                timestamp,
-                            };
-                            // HACK
-                            let _ = self.inner_dht.publish(
-                                span.follower("transport::protocol::RequestToParent::ReceivedData"),
-                                DhtRequestToChild::HoldPeer(peer),
+                if payload.len() == 0 {
+                    debug!("Implement Ping!");
+                } else {
+                    let mut de = Deserializer::new(&payload[..]);
+                    let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                        Deserialize::deserialize(&mut de);
+                    if let Ok(p2p_msg) = maybe_p2p_msg {
+                        if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) = p2p_msg {
+                            debug!(
+                                "Received PeerAddress: {} | {} ({})",
+                                peer_address, gateway_id, self.identifier
                             );
-                            // TODO #58
-                            // TODO #150 - Should not call process manually
-                            self.process().expect("HACK");
+                            if self.identifier == gateway_id {
+                                let peer = PeerData {
+                                    peer_address,
+                                    peer_uri: uri.clone(),
+                                    timestamp,
+                                };
+                                // HACK
+                                let _ = self.inner_dht.publish(
+                                    span.follower("transport::protocol::RequestToParent::ReceivedData"),
+                                    DhtRequestToChild::HoldPeer(peer),
+                                );
+                                // TODO #58
+                                // TODO #150 - Should not call process manually
+                                self.process().expect("HACK");
+                            }
                         }
                     }
                 }
