@@ -11,9 +11,9 @@ use crate::{
     transport::{self, error::TransportResult},
 };
 use detach::prelude::*;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::GhostResult;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hSpan;
 use std::boxed::Box;
 use url::Url;
 
@@ -41,7 +41,7 @@ type SendCallback =
     Box<dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static>;
 
 struct PendingOutgoingMessage {
-    span: Lib3hSpan,
+    span: Span,
     uri: Url,
     payload: Opaque,
     cb: SendCallback,
