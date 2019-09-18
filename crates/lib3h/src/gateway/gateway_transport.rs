@@ -13,7 +13,7 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 use lib3h_protocol::data_types::Opaque;
-use crate::gateway::PendingOutgoingMessage;
+use crate::gateway::{PendingOutgoingMessage, SendCallback};
 
 /// Private internals
 impl P2pGateway {
@@ -86,11 +86,11 @@ impl P2pGateway {
         span: Lib3hSpan,
         uri: Url,
         payload: Opaque,
-        parent_msg: GatewayToChildMessage,
+        cb: SendCallback,
     ) -> GhostResult<()> {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
-        println!("GATEWAY SEND");
+        println!("GATEWAY SEND [{:?}]: {:?}", uri, payload);
         //let uri = uri.clone();
         //let payload = payload.to_vec();
         self.inner_transport.request_options(
@@ -108,19 +108,37 @@ impl P2pGateway {
 
                 match response {
                     // Success case:
-                    GhostCallbackData::Response(Ok(transport::protocol::RequestToChildResponse::SendMessageSuccess)) => parent_msg.respond(
-                        Ok(GatewayRequestToChildResponse::Transport(transport::protocol::RequestToChildResponse::SendMessageSuccess))
-                    )?,
+                    GhostCallbackData::Response(Ok(transport::protocol::RequestToChildResponse::SendMessageSuccess)) => {
+                        debug!("Gateway send message successfully");
+                        cb(Ok(GatewayRequestToChildResponse::Transport(
+                            transport::protocol::RequestToChildResponse::SendMessageSuccess)
+                        ))?;
+                    },
                     // No error but something other than SendMessageSuccess:
-                    GhostCallbackData::Response(Ok(_)) => parent_msg.respond(Err(format!("bad response type: {:?}", response).into()))?,
+                    GhostCallbackData::Response(Ok(_)) => {
+                        warn!("Gateway got bad response type from transport: {:?}", response);
+                        cb(Err(format!("bad response type: {:?}", response).into()))?;
+                    }
                     // Transport error:
-                    GhostCallbackData::Response(Err(_error)) => me.pending_outgoing_messages.push(
-                        PendingOutgoingMessage { uri, payload, span: span.follower("pending message"), parent_msg }
-                    ), //parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?,
+                    GhostCallbackData::Response(Err(_error)) => {
+                        debug!("Gateway got error from transport. Adding message to pending");
+                        me.pending_outgoing_messages.push(PendingOutgoingMessage {
+                            uri,
+                            payload,
+                            span: span.follower("pending due to error"),
+                            cb,
+                        });
+                    }, //parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?,
                     // Timeout:
-                    GhostCallbackData::Timeout => me.pending_outgoing_messages.push(
-                        PendingOutgoingMessage { uri, payload, span: span.follower("pending message"), parent_msg }
-                    ),
+                    GhostCallbackData::Timeout => {
+                        debug!("Gateway got timeout from transport. Adding message to pending");
+                        me.pending_outgoing_messages.push(PendingOutgoingMessage {
+                            uri,
+                            payload,
+                            span: span.follower("pending due to timeout"),
+                            cb,
+                        });
+                    }
                 }
                 Ok(())
             }),
@@ -131,7 +149,7 @@ impl P2pGateway {
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
         let pending: Vec<PendingOutgoingMessage> = self.pending_outgoing_messages.drain(..).collect();
         for p in pending {
-            let _ = self.send(p.span, p.uri, p.payload, p.parent_msg);
+            let _ = self.send(p.span, p.uri, p.payload, p.cb);
         }
         Ok(())
     }
@@ -190,7 +208,8 @@ impl P2pGateway {
                                     span.follower("TODO send"),
                                     peer_data.peer_uri.clone(),
                                     payload,
-                                    parent_request,
+                                    Box::new(|response| parent_request.respond(response
+                                        .map_err(|transport_error| transport_error.into()))),
                                 )
                                 .unwrap(); // FIXME unwrap
                             } else {
