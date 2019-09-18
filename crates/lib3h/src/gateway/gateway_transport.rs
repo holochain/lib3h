@@ -56,7 +56,17 @@ impl P2pGateway {
                             payload: buf.into(),
                         },
                         Box::new(|_me, response| {
-                            panic!("TODO - why does this never get called?? {:?}", response);
+                            match response {
+                                GhostCallbackData::Response(Err(e)) => error!(
+                                    "Error exchanging peer info with new connection: {:?}",
+                                    e,
+                                ),
+                                GhostCallbackData::Timeout => error!(
+                                    "Timeout exchanging peer info with new connection"
+                                ),
+                                _ => trace!("Successfully exchanged peer info with new connection"),
+                            };
+                            Ok(())
                         }),
                     )?;
                 } else {
