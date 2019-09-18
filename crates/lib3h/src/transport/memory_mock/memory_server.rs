@@ -66,11 +66,11 @@ impl MemoryVerse {
         let net = self
             .server_maps
             .entry(network.to_string())
-            .or_insert(MemoryNet::new());
+            .or_insert_with(|| MemoryNet::new());
         let binding = net.new_url();
         net.server_map
             .entry(binding.clone())
-            .or_insert(Mutex::new(MemoryServer::new(&binding)));
+            .or_insert_with(|| Mutex::new(MemoryServer::new(&binding)));
         binding
     }
 }
