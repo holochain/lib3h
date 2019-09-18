@@ -5,14 +5,17 @@ pub mod gateway_transport;
 pub mod p2p_gateway;
 pub mod protocol;
 
-use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
+use crate::{
+    dht::dht_protocol::*,
+    gateway::protocol::*,
+    transport::{self, error::TransportResult},
+};
 use detach::prelude::*;
 use lib3h_ghost_actor::GhostResult;
 use lib3h_protocol::data_types::Opaque;
-use url::Url;
 use lib3h_tracing::Lib3hSpan;
-use crate::transport::error::TransportResult;
 use std::boxed::Box;
+use url::Url;
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -34,7 +37,8 @@ pub struct P2pGateway {
     pending_outgoing_messages: Vec<PendingOutgoingMessage>,
 }
 
-type SendCallback = Box<dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static>;
+type SendCallback =
+    Box<dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static>;
 
 struct PendingOutgoingMessage {
     span: Lib3hSpan,

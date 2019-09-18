@@ -89,15 +89,20 @@ impl P2pGateway {
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
-                self.send(span, data.bootstrap_uri.clone(), Opaque::new(), Box::new(move |response| {
-                    if response.is_ok() {
-                        msg.respond(Ok(GatewayRequestToChildResponse::BootstrapSuccess))?;
-                        Ok(())
-                    } else {
-                        msg.respond(Err(response.err().unwrap().into()))?;
-                        Ok(())
-                    }
-                }))?;
+                self.send(
+                    span,
+                    data.bootstrap_uri.clone(),
+                    Opaque::new(),
+                    Box::new(move |response| {
+                        if response.is_ok() {
+                            msg.respond(Ok(GatewayRequestToChildResponse::BootstrapSuccess))?;
+                            Ok(())
+                        } else {
+                            msg.respond(Err(response.err().unwrap().into()))?;
+                            Ok(())
+                        }
+                    }),
+                )?;
                 Ok(())
             }
             GatewayRequestToChild::SendAll(_) => {

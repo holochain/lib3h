@@ -1,14 +1,13 @@
 use crate::transport::{
     error::TransportError,
     memory_mock::memory_server::{self, *},
-    protocol::*,
+    protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
 use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_tracing::Lib3hSpan;
 use std::collections::HashSet;
 use url::Url;
-use crate::transport::protocol::RequestToChildResponse::SendMessageSuccess;
 
 pub type UserData = GhostTransportMemory;
 

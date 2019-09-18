@@ -4,16 +4,15 @@ use crate::{
     dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
     error::*,
-    gateway::{protocol::*, P2pGateway},
+    gateway::{protocol::*, P2pGateway, PendingOutgoingMessage, SendCallback},
     transport::{self, error::TransportResult},
 };
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::Opaque;
 use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
-use lib3h_protocol::data_types::Opaque;
-use crate::gateway::{PendingOutgoingMessage, SendCallback};
 
 /// Private internals
 impl P2pGateway {
@@ -61,9 +60,9 @@ impl P2pGateway {
                                     "Error exchanging peer info with new connection: {:?}",
                                     e,
                                 ),
-                                GhostCallbackData::Timeout => error!(
-                                    "Timeout exchanging peer info with new connection"
-                                ),
+                                GhostCallbackData::Timeout => {
+                                    error!("Timeout exchanging peer info with new connection")
+                                }
                                 _ => trace!("Successfully exchanged peer info with new connection"),
                             };
                             Ok(())
@@ -108,15 +107,20 @@ impl P2pGateway {
 
                 match response {
                     // Success case:
-                    GhostCallbackData::Response(Ok(transport::protocol::RequestToChildResponse::SendMessageSuccess)) => {
+                    GhostCallbackData::Response(Ok(
+                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                    )) => {
                         debug!("Gateway send message successfully");
                         cb(Ok(GatewayRequestToChildResponse::Transport(
-                            transport::protocol::RequestToChildResponse::SendMessageSuccess)
-                        ))?;
-                    },
+                            transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                        )))?;
+                    }
                     // No error but something other than SendMessageSuccess:
                     GhostCallbackData::Response(Ok(_)) => {
-                        warn!("Gateway got bad response type from transport: {:?}", response);
+                        warn!(
+                            "Gateway got bad response type from transport: {:?}",
+                            response
+                        );
                         cb(Err(format!("bad response type: {:?}", response).into()))?;
                     }
                     // Transport error:
@@ -128,7 +132,7 @@ impl P2pGateway {
                             span: span.follower("pending due to error"),
                             cb,
                         });
-                    }, //parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?,
+                    } //parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?,
                     // Timeout:
                     GhostCallbackData::Timeout => {
                         debug!("Gateway got timeout from transport. Adding message to pending");
@@ -142,12 +146,15 @@ impl P2pGateway {
                 }
                 Ok(())
             }),
-            GhostTrackRequestOptions{timeout: Some(std::time::Duration::from_millis(2000))}
+            GhostTrackRequestOptions {
+                timeout: Some(std::time::Duration::from_millis(2000)),
+            },
         )
     }
 
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
-        let pending: Vec<PendingOutgoingMessage> = self.pending_outgoing_messages.drain(..).collect();
+        let pending: Vec<PendingOutgoingMessage> =
+            self.pending_outgoing_messages.drain(..).collect();
         for p in pending {
             let _ = self.send(p.span, p.uri, p.payload, p.cb);
         }
@@ -208,8 +215,12 @@ impl P2pGateway {
                                     span.follower("TODO send"),
                                     peer_data.peer_uri.clone(),
                                     payload,
-                                    Box::new(|response| parent_request.respond(response
-                                        .map_err(|transport_error| transport_error.into()))),
+                                    Box::new(|response| {
+                                        parent_request.respond(
+                                            response
+                                                .map_err(|transport_error| transport_error.into()),
+                                        )
+                                    }),
                                 )
                                 .unwrap(); // FIXME unwrap
                             } else {
@@ -292,7 +303,9 @@ impl P2pGateway {
                     let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
                     if let Ok(p2p_msg) = maybe_p2p_msg {
-                        if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) = p2p_msg {
+                        if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) =
+                            p2p_msg
+                        {
                             debug!(
                                 "Received PeerAddress: {} | {} ({})",
                                 peer_address, gateway_id, self.identifier
@@ -305,7 +318,9 @@ impl P2pGateway {
                                 };
                                 // HACK
                                 let _ = self.inner_dht.publish(
-                                    span.follower("transport::protocol::RequestToParent::ReceivedData"),
+                                    span.follower(
+                                        "transport::protocol::RequestToParent::ReceivedData",
+                                    ),
                                     DhtRequestToChild::HoldPeer(peer),
                                 );
                                 // TODO #58
