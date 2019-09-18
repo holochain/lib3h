@@ -57,7 +57,18 @@ impl MapRecord {
                 cached_records.sort();
 
                 let mut uniq_urls: Vec<String> =
-                    cached_records.iter().map(|rec| rec.url.clone()).collect();
+                    cached_records.iter().map(|rec| {
+                        rec.url.clone()
+                    }).collect();
+                // let mut uniq_urls: Vec<String> =
+                //     cached_records.iter().filter_map(|rec| {
+                //         // Let's not add dead record
+                //         if rec.ttl > 0 {
+                //             Some(rec.url.clone())
+                //         } else {
+                //             None
+                //         }
+                //     }).collect();
 
                 uniq_urls.dedup();
 

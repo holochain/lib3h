@@ -265,6 +265,7 @@ impl MulticastDns {
         if let Some(query_message) = self.build_query_message() {
             self.broadcast_message(&query_message)?;
             self.broadcast_message(&query_message)?;
+            self.broadcast_message(&query_message)?;
         }
 
         Ok(())
@@ -446,13 +447,15 @@ impl Discovery for MulticastDns {
         if let Some(release_dmesg) = self.own_map_record.to_dns_response_message(&net_ids) {
             self.broadcast_message(&release_dmesg)?;
             self.broadcast_message(&release_dmesg)?;
+            self.broadcast_message(&release_dmesg)?;
+            self.broadcast_message(&release_dmesg)?;
 
-            // This is needed because of the way macOS (and potentially windows) network stack is
-            // working to avoid failing tests (release, query and advertise).
-            if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
-                self.broadcast_message(&release_dmesg)?;
-                self.broadcast_message(&release_dmesg)?;
-            }
+            // // This is needed because of the way macOS (and potentially windows) network stack is
+            // // working to avoid failing tests (release, query and advertise).
+            // if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
+            //     self.broadcast_message(&release_dmesg)?;
+            //     self.broadcast_message(&release_dmesg)?;
+            // }
         }
 
         Ok(())
@@ -563,11 +566,11 @@ mod tests {
         mdns_releaser
             .advertise()
             .expect("Fail to advertise my existence during release test.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         // Discovering the soon-to-be-leaving participant
         mdns.discover().expect("Fail to discover.");
-
-        // std::thread::sleep(std::time::Duration::from_millis(100));
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         println!("mdns = {:#?}", &mdns.map_record);
         // Let's check that we discovered the soon-to-be-released record
@@ -583,9 +586,11 @@ mod tests {
         mdns_releaser
             .release()
             .expect("Fail to release myself from the participants on the network.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         // Updating the cache
         mdns.discover().expect("Fail to discover.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         println!("mdns = {:#?}", &mdns.map_record);
         {
@@ -608,6 +613,7 @@ mod tests {
             .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
+            .query_interval_ms(1)
             .build()
             .expect("Fail to build mDNS.");
 
@@ -615,6 +621,7 @@ mod tests {
             .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-actor2"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
+            .query_interval_ms(1)
             .build()
             .expect("Fail to build mDNS.");
 
@@ -622,6 +629,11 @@ mod tests {
 
         // We should not need to advertise, query should be enough
         mdns_actor1.query()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        mdns_actor1.query()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        mdns_actor1.discover()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
         mdns_actor1.discover()?;
         // At this point mdns_actor1 should know about himself
         let records = mdns_actor1
@@ -634,6 +646,7 @@ mod tests {
 
         // Let's do the same for the second actor
         mdns_actor2.query()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
         mdns_actor2.discover()?;
         // At this point mdns_actor2 should know about himself
         let mut records = mdns_actor2
@@ -641,7 +654,6 @@ mod tests {
             .get(networkid)
             .expect("Fail to get records from the networkid during Query test on mdns_actor2")
             .to_vec();
-        assert_eq!(records.len(), 2);
         eprintln!("mdns_actor2 = {:#?}", &mdns_actor2.map_record);
 
         // Make the order deterministic
