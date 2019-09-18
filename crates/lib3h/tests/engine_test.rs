@@ -15,7 +15,7 @@ extern crate regex;
 extern crate log;
 use lib3h_tracing::test_span;
 
-use lib3h_ghost_actor::wait1_for_message;
+use lib3h_ghost_actor::wait1_for_messages;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
@@ -163,47 +163,19 @@ fn basic_track_test<'engine>(engine: &mut GhostEngine<'engine>) {
             ClientToLib3h::JoinSpace(track_space.clone()),
         )
         .unwrap();
-    /*    let handle_get_gossip_entry_list_regex =
-    "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[.]*";*/
-    
     let handle_get_gossip_entry_list_regex =
         "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
-    let _handle_get_authoring_entry_list_regex =
-        "HandleGetAuthoringEntryList(GetListData \\{ space_address: HashString(\"SPACE_A\"), provider_agent_id: HashString(\"alex\"), request_id: \"[.]*\" \\})";
+    let handle_get_authoring_entry_list_regex =
+        "HandleGetAuthoringEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
-    wait1_for_message!(engine, parent_endpoint, handle_get_gossip_entry_list_regex);
+    let regexes = vec![
+        handle_get_authoring_entry_list_regex,
+        handle_get_gossip_entry_list_regex,
+    ];
 
-    /*
-        let is_success_result = Box::new(Lib3hServerProtocolEquals(
-            Lib3hServerProtocol::SuccessResult(GenericResultData {
-                request_id: "track_a_1".into(),
-                space_address: SPACE_ADDRESS_A.clone(),
-                to_agent_id: ALEX_AGENT_ID.clone(),
-                result_info: vec![].into(),
-            }),
-        ));
+    wait1_for_messages!(engine, parent_endpoint, regexes);
 
-        let handle_get_gosip_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
-            predicate::function(|x| match x {
-                Lib3hServerProtocol::HandleGetGossipingEntryList(_) => true,
-                _ => false,
-            }),
-        )));
-        let handle_get_author_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
-            predicate::function(|x| match x {
-                Lib3hServerProtocol::HandleGetAuthoringEntryList(_) => true,
-                _ => false,
-            }),
-        )));
-
-        let processors = vec![
-            is_success_result as Box<dyn Processor>,
-            handle_get_gosip_entry_list as Box<dyn Processor>,
-            handle_get_author_entry_list as Box<dyn Processor>,
-        ];
-        assert_processed!(engine, engine, processors);
-    */
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 

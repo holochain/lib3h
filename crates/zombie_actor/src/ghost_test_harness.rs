@@ -465,7 +465,7 @@ macro_rules! wait_until_did_work {
 #[macro_export]
 macro_rules! wait_for_messages {
     ($ghost_actors: expr, $endpoint: ident, $regexes: expr) => {{
-        $crate::wait_for_messages!($ghost_actors, $endpoint, $regex, 5000, true)
+        $crate::wait_for_messages!($ghost_actors, $endpoint, $regexes, 5000, true)
     }};
     ($ghost_actors: expr, $endpoint: ident, $regexes: expr, $timeout_ms: expr) => {{
         $crate::wait_for_messages!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
@@ -565,6 +565,15 @@ macro_rules! wait1_for_message {
     ($ghost_actor: expr, $endpoint: ident, $regex: expr) => {{
         let actors = vec![$ghost_actor];
         $crate::wait_for_message!(actors, $endpoint, $regex)
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_messages {
+    ($ghost_actor: expr, $endpoint: ident, $regexes: expr) => {{
+        let actors = vec![$ghost_actor];
+        $crate::wait_for_messages!(actors, $endpoint, $regexes)
     }};
 }
 
