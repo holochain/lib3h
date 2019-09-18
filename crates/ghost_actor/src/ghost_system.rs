@@ -180,11 +180,91 @@ mod tests {
 
     #[test]
     fn it_can_dock() {
-        struct Z;
+        struct Z {
+            pub s: String,
+        }
 
         let mut system = GhostSystem::new();
         let mut _dock: GhostDock<Z> = GhostDock::new(system.create_ref());
 
+        // --- demo dock --- ///
+
+        /*
+        struct MyActor;
+
+        impl GhostActor for MyActor {
+            fn actor_init(dock: GhostDock, owner_ref: ??) -> Handler {
+                // TODO - store dock
+                // TODO - store owner_ref
+
+                // dock can spawn sub-actor
+
+                owner_ref.event_to_owner_print("bla".to_string())?;
+                owner_ref.request_to_owner_sub_1(42, |me, message| {
+                    println!("got: {}", message);
+                    Ok(())
+                })?;
+
+                Handler {
+                    handle_event_to_actor_print: |me, message| {
+                        println!("{}", message);
+                        Ok(())
+                    },
+                    handle_request_to_owner_sub_1: |me, message, cb| {
+                        cb(Ok(message + 1))
+                    },
+                }
+            }
+        }
+
+        let actor_ref = dock.spawn(MyActor::new(), Handler {
+            handle_event_to_owner_print: |me, message| {
+                println!("{}", message);
+                Ok(())
+            },
+            handle_request_to_owner_sub_1: |me, message, cb| {
+                cb(Ok(message - 1))
+            },
+        });
+
+        actor_ref.event_to_actor_print("bla".to_string())?;
+        actor_ref.request_to_actor_add_1(42, |me, message| {
+            println!("got: {}", message);
+            Ok(())
+        })?;
+        */
+
+        // --- demo dock --- ///
+
         system.process().unwrap();
+
+        pub struct ZZHandler<F1, F2>
+        where
+            F1: FnMut(String),
+            F2: FnMut(i32),
+        {
+            pub f1: F1,
+            pub f2: F2,
+        }
+
+        impl Z {
+            pub fn go(&mut self) {
+                self.s = "funk".to_string();
+                let mut zz = ZZHandler {
+                    f1: |s| {
+                        println!("str: {} {}", s, self.s);
+                    },
+                    f2: |i| {
+                        println!("int: {} {}", i, self.s);
+                    },
+                };
+
+                (zz.f1)("test".to_string());
+                (zz.f2)(42);
+            }
+        }
+
+        let mut z = Z { s: "".to_string() };
+        z.go();
     }
 }
