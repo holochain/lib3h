@@ -8,6 +8,7 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_tracing::Lib3hSpan;
 use std::collections::HashSet;
 use url::Url;
+use crate::transport::protocol::RequestToChildResponse::SendMessageSuccess;
 
 pub type UserData = GhostTransportMemory;
 
@@ -229,6 +230,7 @@ impl
                                     );
                                     // Send it data from us
                                     server.post(&my_addr, &payload).unwrap();
+                                    msg.respond(Ok(SendMessageSuccess))?;
                                 }
                             }
                         }
