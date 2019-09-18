@@ -48,17 +48,20 @@ impl<'engine>
         detach_run!(&mut self.lib3h_endpoint, |cs| { cs.process(self) })?;
 
         // process any messages from the client to us
+        let mut did_work = false;
         for msg in self.lib3h_endpoint.as_mut().drain_messages() {
             self.handle_msg_from_client(msg)?;
+            did_work = true;
         }
 
         // Process network layer
-        self.process_multiplexer()?;
+        did_work = did_work || self.process_multiplexer()?;
 
         // Process the space layer
-        self.process_space_gateways()?;
+        did_work = did_work || self.process_space_gateways()?;
 
         // Done
-        Ok(true.into())
+        trace!("({}).process_concrete() did_work = {}", self.name, did_work);
+        Ok(did_work.into())
     }
 }
