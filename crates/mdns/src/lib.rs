@@ -422,6 +422,7 @@ impl Discovery for MulticastDns {
         // next iteration) "every amount of time"
         if self.timestamp.elapsed().as_millis() > self.query_interval_ms {
             self.query()?;
+            // self.responder()?;
             self.timestamp = Instant::now();
         }
 
@@ -599,49 +600,58 @@ mod tests {
     // FIXME: This test is currently flaky on macOS.
     /// Tests if we are able to query info to other peer on the network for our NetworkId.
     #[test]
-    fn query_test() {
+    fn query_test() -> MulticastDnsResult<()> {
         // Let's share the same NetworkId, meaning we are on the same network.
         let networkid = "holonaute-query.holo.host";
 
-        let mut mdns = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+        let mut mdns_actor1 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
             .build()
             .expect("Fail to build mDNS.");
 
-        eprintln!("bind addr = {}", mdns.multicast_address());
-
-        let mut mdns_other = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
+        let mut mdns_actor2 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-actor2"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
             .build()
             .expect("Fail to build mDNS.");
 
-        mdns.query().expect("Fail to advertise during Query1 test.");
-        mdns_other
-            .discover()
-            .expect("Fail to run discovery1 during Query test.");
+        // We want to make sure that that client1 can discover himself and client2
 
-        mdns.query().expect("Fail to advertise during Query2 test.");
-        mdns.discover()
-            .expect("Fail to run discovery2 during Query test.");
-
-        eprintln!("mdns = {:#?}", &mdns.map_record);
-
-        let mut records = mdns
+        // We should not need to advertise, query should be enough
+        mdns_actor1.query()?;
+        mdns_actor1.discover()?;
+        // At this point mdns_actor1 should know about himself
+        let records = mdns_actor1
             .map_record
             .get(networkid)
-            .expect("Fail to get records from the networkid during Query test.")
+            .expect("Fail to get records from the networkid during Query test on mdns_actor1")
             .to_vec();
+        assert_eq!(records.len(), 1);
+        eprintln!("mdns_actor1 = {:#?}", &mdns_actor1.map_record);
+
+        // Let's do the same for the second actor
+        mdns_actor2.query()?;
+        mdns_actor2.discover()?;
+        // At this point mdns_actor2 should know about himself
+        let mut records = mdns_actor2
+            .map_record
+            .get(networkid)
+            .expect("Fail to get records from the networkid during Query test on mdns_actor2")
+            .to_vec();
+        assert_eq!(records.len(), 2);
+        eprintln!("mdns_actor2 = {:#?}", &mdns_actor2.map_record);
 
         // Make the order deterministic
         records.sort_by(|a, b| a.url.cmp(&b.url));
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].url, "wss://192.168.0.87:88088?a=hc-other");
-        assert_eq!(records[1].url, "wss://192.168.0.88:88088?a=hc0");
+        assert_eq!(records[0].url, "wss://192.168.0.87:88088?a=hc-actor2");
+        assert_eq!(records[1].url, "wss://192.168.0.88:88088?a=hc-actor1");
+
+        Ok(())
     }
 
     // FIXME: This test is currently flaky on macOS.
