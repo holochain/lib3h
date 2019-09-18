@@ -16,12 +16,12 @@ crossbeam-channel = "=0.3.8"
 linefeed = "=0.6.0"
 base64 = "=0.10.1"
 regex = "=1.1.2"
+holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/holochain-tracing" }
 lib3h_protocol = { "path" = "../../lib3h_protocol" }
 lib3h_sodium = { "path" = "../../sodium" }
 lib3h_crypto_api = { "path" = "../../crypto_api" }
 lib3h = { "path" = "../../lib3h" }
 lib3h_zombie_actor = { "path" = "../../zombie_actor" }
-lib3h_tracing = { "path" = "../../tracing" }
 detach = { "path" = "../../detach" }
 url = "=1.7.2"
 lazy_static = "=1.2.0"

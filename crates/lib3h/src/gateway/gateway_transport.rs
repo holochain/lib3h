@@ -7,6 +7,7 @@ use crate::{
     gateway::{protocol::*, P2pGateway, PendingOutgoingMessage, SendCallback},
     transport::{self, error::TransportResult},
 };
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
 use lib3h_tracing::Lib3hSpan;
@@ -17,7 +18,7 @@ use url::Url;
 /// Private internals
 impl P2pGateway {
     /// Handle IncomingConnection event from child transport
-    fn handle_incoming_connection(&mut self, span: Lib3hSpan, uri: Url) -> TransportResult<()> {
+    fn handle_incoming_connection(&mut self, span: Span, uri: Url) -> TransportResult<()> {
         self.inner_dht.request(
             span.child("handle_incoming_connection"),
             DhtRequestToChild::RequestThisPeer,
@@ -82,7 +83,7 @@ impl P2pGateway {
     ///   - space   : agentId
     pub(crate) fn send(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
@@ -164,7 +165,7 @@ impl P2pGateway {
     /// Handle Transport request sent to use by our parent
     pub(crate) fn handle_transport_RequestToChild(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         transport_request: transport::protocol::RequestToChild,
         parent_request: GatewayToChildMessage,
     ) -> Lib3hResult<()> {

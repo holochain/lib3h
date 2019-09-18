@@ -3,9 +3,9 @@ use crate::{
     error::*,
     gateway::{protocol::*, P2pGateway},
 };
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::*;
-use lib3h_tracing::Lib3hSpan;
 
 impl
     GhostActor<
@@ -37,7 +37,7 @@ impl
 
         // Update this_peer cache
         self.inner_dht.request(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {

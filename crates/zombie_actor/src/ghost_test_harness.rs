@@ -297,7 +297,7 @@ macro_rules! assert_callback_processed {
             Ok(())
         });
 
-        let span = $crate::lib3h_tracing::test_span("assert_callback_processed!");
+        let span = $crate::holochain_tracing::test_span("assert_callback_processed!");
 
         $ghost_can_track
             .request(span, $request_to_child, cb)
