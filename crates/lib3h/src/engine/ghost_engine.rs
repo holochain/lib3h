@@ -89,41 +89,19 @@ impl<'engine> GhostEngine<'engine> {
         name: &str,
         dht_factory: DhtFactory,
     ) -> Lib3hResult<Self> {
+        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
-        match &transport_config {
+        let machine_id = transport_keys.transport_id.clone().into();
+        let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
-                Self::with_transport(
-                    span,
-                    crypto,
-                    config,
-                    name,
-                    dht_factory,
-                    Box::new(GhostTransportWebsocket::new(tls)),
-                )
+                Box::new(GhostTransportWebsocket::new(machine_id, tls))
             }
-            TransportConfig::Memory(net) => Self::with_transport(
-                span,
-                crypto,
-                config,
-                name,
-                dht_factory,
-                Box::new(GhostTransportMemory::new(&net)),
-            ),
-        }
-    }
-
-    pub fn with_transport(
-        span: Lib3hSpan,
-        crypto: Box<dyn CryptoSystem>,
-        config: EngineConfig,
-        name: &str,
-        dht_factory: DhtFactory,
-        transport: DynTransportActor,
-    ) -> Lib3hResult<Self> {
-        let transport_keys = TransportKeys::new(crypto.as_crypto_system())?;
+            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
+        };
         let transport = TransportEncoding::new(
             crypto.box_clone(),
             transport_keys.transport_id.clone(),
@@ -216,12 +194,10 @@ impl<'engine> GhostEngine<'engine> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
-            let cmd = GatewayRequestToChild::Transport(
-                transport::protocol::RequestToChild::SendMessage {
-                    uri: bs,
-                    payload: Opaque::new(),
-                },
-            );
+            let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
+                space_address: "bogus_space".into(),
+                bootstrap_uri: bs,
+            });
             self.multiplexer.request(
                 span.child("priv_connect_bootstrap TODO extra info"),
                 cmd,

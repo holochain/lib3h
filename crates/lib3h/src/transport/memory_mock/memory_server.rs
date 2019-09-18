@@ -1,7 +1,7 @@
 use crate::transport::error::{TransportError, TransportResult};
-use lib3h_protocol::{data_types::Opaque, DidWork};
+use lib3h_protocol::{data_types::Opaque, Address, DidWork};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{Mutex, MutexGuard},
 };
 use url::Url;
@@ -29,6 +29,7 @@ pub enum MemoryEvent {
 pub struct MemoryNet {
     pub server_map: HashMap<Url, MemoryServer>,
     url_count: u32,
+    advertised_machines: HashSet<(Url, Address)>,
 }
 
 impl MemoryNet {
@@ -36,7 +37,14 @@ impl MemoryNet {
         MemoryNet {
             server_map: HashMap::new(),
             url_count: 0,
+            advertised_machines: HashSet::new(),
         }
+    }
+    pub fn advertise(&mut self, uri: Url, machine_id: Address) {
+        let _ = self.advertised_machines.insert((uri, machine_id));
+    }
+    pub fn discover(&mut self) -> Vec<(Url, Address)> {
+        self.advertised_machines.iter().cloned().collect()
     }
     pub fn new_url(&mut self) -> Url {
         self.url_count += 1;

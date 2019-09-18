@@ -7,8 +7,9 @@ use crate::transport::{
     },
 };
 use detach::Detach;
+use lib3h_discovery::{error::DiscoveryResult, Discovery};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_protocol::{data_types::Opaque, Address};
 use lib3h_tracing::Lib3hSpan;
 use url::Url;
 
@@ -16,6 +17,8 @@ pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
 
 pub struct GhostTransportWebsocket {
+    #[allow(dead_code)]
+    machine_id: Address,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
@@ -23,10 +26,28 @@ pub struct GhostTransportWebsocket {
     pending: Vec<Message>,
 }
 
+impl Discovery for GhostTransportWebsocket {
+    fn advertise(&mut self) -> DiscoveryResult<()> {
+        Ok(())
+    }
+    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
+        //        let nodes: Vec<Url> = self.server_map.keys().map(|x| x.clone()).collect();
+        let nodes = Vec::new();
+        Ok(nodes)
+    }
+    fn release(&mut self) -> DiscoveryResult<()> {
+        Ok(())
+    }
+    fn flush(&mut self) -> DiscoveryResult<()> {
+        Ok(())
+    }
+}
+
 impl GhostTransportWebsocket {
-    pub fn new(tls_config: TlsConfig) -> GhostTransportWebsocket {
+    pub fn new(machine_id: Address, tls_config: TlsConfig) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
+            machine_id,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -323,7 +344,8 @@ mod tests {
 
     #[test]
     fn test_websocket_transport() {
-        let mut transport1 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -331,7 +353,8 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        let mut transport2 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);;
+        let machine_id2 = "fake_machine_id2".into();
+        let mut transport2 = GhostTransportWebsocket::new(machine_id2, TlsConfig::Unencrypted);;
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
@@ -430,7 +453,8 @@ mod tests {
     #[test]
     fn test_websocket_transport_reconnect() {
         enable_logging_for_test(true);
-        let mut transport1 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -464,7 +488,9 @@ mod tests {
         for index in 1..10 {
             transport1.process().unwrap();
             {
-                let mut transport2 = GhostTransportWebsocket::new(TlsConfig::Unencrypted);;
+                let machine_id2 = "fake_machine_id2".into();
+                let mut transport2 =
+                    GhostTransportWebsocket::new(machine_id2, TlsConfig::Unencrypted);;
                 let mut t2_endpoint = transport2
                     .take_parent_endpoint()
                     .expect("exists")
