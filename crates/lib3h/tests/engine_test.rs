@@ -16,28 +16,22 @@ use lib3h_tracing::test_span;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{GhostEngine, EngineConfig, TransportConfig},
+    engine::{EngineConfig, GhostEngine, TransportConfig},
     transport::websocket::tls::TlsConfig,
 };
 
 use lib3h_ghost_actor::prelude::*;
 
-use lib3h_protocol::{
-    protocol::*,
-    data_types::*,
-};
+use crate::lib3h::engine::CanAdvertise;
+use lib3h_protocol::{data_types::*, protocol::*};
 use lib3h_sodium::SodiumCryptoSystem;
 use lib3h_tracing::Lib3hSpan;
 use std::path::PathBuf;
 use url::Url;
-use utils::{
-    constants::*,
-};
-use crate::lib3h::engine::CanAdvertise;
+use utils::constants::*;
 //--------------------------------------------------------------------------------------------------
 // Test suites
 //--------------------------------------------------------------------------------------------------
-
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -128,7 +122,6 @@ fn basic_setup_wss(name: &str) -> GhostEngine {
 // Custom tests
 //--------------------------------------------------------------------------------------------------
 
-
 #[test]
 fn basic_track_test_wss() {
     enable_logging_for_test(true);
@@ -161,47 +154,53 @@ fn basic_track_test<'engine>(engine: &mut GhostEngine<'engine>) {
         .request_id_prefix("parent")
         .build::<()>();
 
-     parent_endpoint.publish(test_span("publish join space"),
-        ClientToLib3h::JoinSpace(track_space.clone()))
+    parent_endpoint
+        .publish(
+            test_span("publish join space"),
+            ClientToLib3h::JoinSpace(track_space.clone()),
+        )
         .unwrap();
 
     /*
-    let is_success_result = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::SuccessResult(GenericResultData {
-            request_id: "track_a_1".into(),
-            space_address: SPACE_ADDRESS_A.clone(),
-            to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: vec![].into(),
-        }),
-    ));
+        let is_success_result = Box::new(Lib3hServerProtocolEquals(
+            Lib3hServerProtocol::SuccessResult(GenericResultData {
+                request_id: "track_a_1".into(),
+                space_address: SPACE_ADDRESS_A.clone(),
+                to_agent_id: ALEX_AGENT_ID.clone(),
+                result_info: vec![].into(),
+            }),
+        ));
 
-    let handle_get_gosip_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
-        predicate::function(|x| match x {
-            Lib3hServerProtocol::HandleGetGossipingEntryList(_) => true,
-            _ => false,
-        }),
-    )));
-    let handle_get_author_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
-        predicate::function(|x| match x {
-            Lib3hServerProtocol::HandleGetAuthoringEntryList(_) => true,
-            _ => false,
-        }),
-    )));
+        let handle_get_gosip_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
+            predicate::function(|x| match x {
+                Lib3hServerProtocol::HandleGetGossipingEntryList(_) => true,
+                _ => false,
+            }),
+        )));
+        let handle_get_author_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
+            predicate::function(|x| match x {
+                Lib3hServerProtocol::HandleGetAuthoringEntryList(_) => true,
+                _ => false,
+            }),
+        )));
 
-    let processors = vec![
-        is_success_result as Box<dyn Processor>,
-        handle_get_gosip_entry_list as Box<dyn Processor>,
-        handle_get_author_entry_list as Box<dyn Processor>,
-    ];
-    assert_processed!(engine, engine, processors);
-*/
+        let processors = vec![
+            is_success_result as Box<dyn Processor>,
+            handle_get_gosip_entry_list as Box<dyn Processor>,
+            handle_get_author_entry_list as Box<dyn Processor>,
+        ];
+        assert_processed!(engine, engine, processors);
+    */
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 
-    parent_endpoint.publish(test_span("publish join space again"),
-    ClientToLib3h::JoinSpace(track_space.clone()))
+    parent_endpoint
+        .publish(
+            test_span("publish join space again"),
+            ClientToLib3h::JoinSpace(track_space.clone()),
+        )
         .unwrap();
-/*
+    /*
     let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::FailureResult(GenericResultData {
             request_id: "track_a_2".to_string(),
