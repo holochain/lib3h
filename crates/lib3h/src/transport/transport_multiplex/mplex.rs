@@ -150,22 +150,27 @@ impl<
             self.handle_received_data(uri, payload)?;
             Ok(())
         } else {
-            self.endpoint_self.request(
-                Span::fixme(),
-                data,
-                Box::new(move |_, response| {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
-                        }
-                        GhostCallbackData::Response(response) => {
-                            msg.respond(response)?;
-                        }
-                    };
-                    Ok(())
-                }),
-            )?;
+            if msg.is_request() {
+                self.endpoint_self.request(
+                    Span::fixme(),
+                    data,
+                    Box::new(move |_, response| {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                msg.respond(Err("timeout".into()))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => {
+                                msg.respond(response)?;
+                            }
+                        };
+                        Ok(())
+                    }),
+                )?;
+            } else {
+                self.endpoint_self.publish(Span::fixme(), data)?;
+            }
+
             Ok(())
         }
     }
@@ -288,24 +293,33 @@ impl<
         >,
     ) -> Lib3hResult<()> {
         let data = msg.take_message().expect("exists");
-        self.inner_gateway.as_mut().request(
-            msg.span()
-                .follower("TODO follower of message in handle_msg_from_parent"),
-            data,
-            Box::new(move |_, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
+        if msg.is_request() {
+            self.inner_gateway.as_mut().request(
+                msg.span()
+                    .follower("TODO follower of message in handle_msg_from_parent"),
+                data,
+                Box::new(move |_, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                msg.respond(Err("timeout".into()))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => response,
                         }
-                        GhostCallbackData::Response(response) => response,
-                    }
-                };
-                msg.respond(response)?;
-                Ok(())
-            }),
-        )?;
+                    };
+                    msg.respond(response)?;
+                    Ok(())
+                }),
+            )?;
+        } else {
+            self.inner_gateway.as_mut().publish(
+                msg.span()
+                    .follower("TODO follower of message in handle_msg_from_parent"),
+                data
+            )?;
+        }
+
         Ok(())
     }
 }
