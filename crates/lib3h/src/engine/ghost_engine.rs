@@ -93,10 +93,10 @@ impl<'engine> GhostEngine<'engine> {
         Self::with_transport(
             span,
             crypto,
-            config,
+            config.clone(),
             name,
             dht_factory,
-            Box::new(GhostTransportMemory::new()),
+            Box::new(GhostTransportMemory::new(&config.net)),
         )
     }
 
@@ -824,9 +824,10 @@ mod tests {
         //    state: String,
     }
 
-    fn make_test_engine() -> GhostEngine<'static> {
+    fn make_test_engine(test_net: &str) -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = EngineConfig {
+            net: test_net.into(),
             socket_type: "mem".into(),
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),
@@ -845,8 +846,9 @@ mod tests {
     }
 
     fn make_test_engine_wrapper(
+        net: &str,
     ) -> GhostEngineParentWrapper<MockCore, GhostEngine<'static>, Lib3hError> {
-        let engine = make_test_engine();
+        let engine = make_test_engine(net);
         let lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_engine");
         lib3h
@@ -854,7 +856,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_construct() {
-        let lib3h = make_test_engine_wrapper();
+        let lib3h = make_test_engine_wrapper("test_ghost_engine_construct");
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
 
         // check that bootstrap nodes were connected to
@@ -871,7 +873,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_join() {
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_join");
 
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
@@ -886,7 +888,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_leave() {
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_leave");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -901,7 +903,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_dm() {
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_dm");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -943,7 +945,7 @@ mod tests {
     fn test_ghost_engine_publish() {
         enable_logging_for_test(true);
 
-        let mut engine = make_test_engine_wrapper();
+        let mut engine = make_test_engine_wrapper("test_ghost_engine_publish");
         let req_data = make_test_join_request();
         let result = engine.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -996,7 +998,7 @@ mod tests {
     fn test_ghost_engine_hold() {
         enable_logging_for_test(true);
 
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_hold");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -1062,7 +1064,7 @@ mod tests {
     fn test_ghost_engine_query() {
         enable_logging_for_test(true);
 
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_query");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());

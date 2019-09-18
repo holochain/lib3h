@@ -2,7 +2,7 @@ use crate::transport::error::{TransportError, TransportResult};
 use lib3h_protocol::{data_types::Opaque, DidWork};
 use std::{
     collections::{HashMap, VecDeque},
-    sync::{Arc, Mutex, RwLock},
+    sync::{Mutex, RwLock},
 };
 use url::Url;
 
@@ -26,45 +26,58 @@ pub enum MemoryEvent {
 //--------------------------------------------------------------------------------------------------
 
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
+pub struct MemoryNet {
+    pub server_map: HashMap<Url, Mutex<MemoryServer>>,
+    url_count: u32,
+}
+
+impl MemoryNet {
+    pub fn new() -> Self {
+        MemoryNet {
+            server_map: HashMap::new(),
+            url_count: 0,
+        }
+    }
+    pub fn new_url(&mut self) -> Url {
+        self.url_count += 1;
+        Url::parse(&format!("mem://addr_{}", self.url_count).as_str()).unwrap()
+    }
+}
+
+/// Holds a universe of memory networks so we can run tests in separate universes
+pub struct MemoryVerse {
+    server_maps: HashMap<String, MemoryNet>,
+}
+impl MemoryVerse {
+    pub fn new() -> Self {
+        MemoryVerse {
+            server_maps: HashMap::new(),
+        }
+    }
+    pub fn get_net(&mut self, network: &str) -> Option<&mut MemoryNet> {
+        self.server_maps.get_mut(network)
+    }
+
+    pub fn get_server(&mut self, network: &str, url: &Url) -> Option<&Mutex<MemoryServer>> {
+        self.server_maps.get(network)?.server_map.get(url)
+    }
+
+    pub fn bind(&mut self, network: &str) -> Url {
+        let net = self
+            .server_maps
+            .entry(network.to_string())
+            .or_insert(MemoryNet::new());
+        let binding = net.new_url();
+        net.server_map
+            .entry(binding.clone())
+            .or_insert(Mutex::new(MemoryServer::new(&binding)));
+        binding
+    }
+}
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
-    pub(crate) static ref MEMORY_SERVER_MAP: RwLock<MemoryServerMap> = RwLock::new(HashMap::new());
-    static ref URL_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
-}
-
-pub fn new_url() -> Url {
-    let mut tc = URL_COUNT
-        .lock()
-        .expect("could not lock transport count mutex");
-    *tc += 1;
-    Url::parse(&format!("mem://addr_{}", *tc).as_str()).unwrap()
-}
-
-/// Add new MemoryServer to the global server map
-pub fn set_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::set_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if server_map.contains_key(uri) {
-        return Ok(());
-    }
-    let server = MemoryServer::new(uri);
-    server_map.insert(uri.clone(), Mutex::new(server));
-    Ok(())
-}
-
-/// Remove a MemoryServer from the global server map
-pub fn unset_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::unset_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if !server_map.contains_key(uri) {
-        return Err(TransportError::new("Server doesn't exist".to_string()));
-    }
-    server_map.remove(uri);
-    Ok(())
+    pub static ref MEMORY_VERSE: RwLock<MemoryVerse> = RwLock::new(MemoryVerse::new());
 }
 
 //--------------------------------------------------------------------------------------------------

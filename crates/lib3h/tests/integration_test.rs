@@ -86,6 +86,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
         //tls_config: TlsConfig::Unencrypted,
+        net: fn_name.clone(),
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -205,9 +206,10 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
     println!("========================");
 
+    let fn_name = fn_name(test_fn_ptr);
     // Setup
-    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name);
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name);
     if can_setup {
         setup_two_nodes(&mut alex, &mut billy);
     }

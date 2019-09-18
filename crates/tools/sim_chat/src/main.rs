@@ -18,6 +18,7 @@ use lib3h_tracing::Lib3hSpan;
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
+        net: "test_net".into(),
         socket_type: "mem".into(),
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),

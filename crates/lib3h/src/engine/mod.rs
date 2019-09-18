@@ -71,6 +71,7 @@ enum RealEngineTrackerData {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EngineConfig {
     //pub tls_config: TlsConfig,
+    pub net: String, // network name for memmory transport
     pub socket_type: String,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,
