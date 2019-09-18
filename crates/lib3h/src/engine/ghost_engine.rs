@@ -195,7 +195,7 @@ impl<'engine> GhostEngine<'engine> {
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                space_address: "bogus_space".into(),
+                space_address: "fixme_space_address".into(), // FIXME change to the space address that comes in the config when that gets added
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(

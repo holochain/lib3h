@@ -31,7 +31,6 @@ impl Discovery for GhostTransportWebsocket {
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
-        //        let nodes: Vec<Url> = self.server_map.keys().map(|x| x.clone()).collect();
         let nodes = Vec::new();
         Ok(nodes)
     }

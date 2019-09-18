@@ -41,7 +41,7 @@ impl MemoryNet {
         }
     }
     pub fn advertise(&mut self, uri: Url, machine_id: Address) {
-        let _ = self.advertised_machines.insert((uri, machine_id));
+        self.advertised_machines.insert((uri, machine_id));
     }
     pub fn discover(&mut self) -> Vec<(Url, Address)> {
         self.advertised_machines.iter().cloned().collect()

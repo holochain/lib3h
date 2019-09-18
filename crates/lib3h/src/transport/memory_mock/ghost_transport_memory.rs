@@ -63,7 +63,7 @@ impl Discovery for GhostTransportMemory {
             .clone()
             .ok_or_else(|| DiscoveryError::new_other("must bind before discovering"))?;
         let mut verse = memory_server::get_memory_verse();
-        let _ = verse
+        verse
             .get_net(&self.network)
             .ok_or_else(|| DiscoveryError::new_other("net not found"))?
             .advertise(uri, self.machine_id.clone());
@@ -84,12 +84,13 @@ impl Discovery for GhostTransportMemory {
         Ok(())
     }
 }
+const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
     #[allow(dead_code)]
     pub fn new(machine_id: Address, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
-        let interval = 30000;
+        let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
         let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
         Self {
             machine_id,
@@ -130,18 +131,17 @@ impl GhostTransportMemory {
                                         let _result = remote_server.request_connect(&my_addr);
                                         self.connections.insert(found_uri.clone());
                                         trace!("Discovered {}, we are: {}", &found_uri, &my_addr);
-                                        let _ = self.endpoint_self.publish(
-                                            Lib3hSpan::fixme(),
-                                            RequestToParent::IncomingConnection {
-                                                uri: found_uri.clone(),
-                                            },
-                                        );
+                                        self.endpoint_self
+                                            .publish(
+                                                Lib3hSpan::fixme(),
+                                                RequestToParent::IncomingConnection {
+                                                    uri: found_uri.clone(),
+                                                },
+                                            )
+                                            .expect("should be able to publish");
                                         self.last_discover = None;
                                     }
-                                    None => {
-                                        return;
-                                        // Err( format!("No Memory server at this url address: {}", remote_addr).into(),     )
-                                    }
+                                    None => return,
                                 };
                             }
                         }
@@ -271,7 +271,8 @@ impl
                         verse.bind(&self.network)
                     };
                     self.maybe_my_address = Some(bound_url.clone());
-                    let _ = self.advertise();
+                    self.advertise()
+                        .map_err(|e| GhostError::from(e.to_string()))?;
                     // respond to our parent
                     msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                         bound_url: bound_url,
