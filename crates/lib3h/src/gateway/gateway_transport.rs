@@ -89,22 +89,15 @@ impl P2pGateway {
     ) -> GhostResult<()> {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
-        println!("GATEWAY SEND [{:?}]: {:?}", uri, payload);
-        //let uri = uri.clone();
-        //let payload = payload.to_vec();
         self.inner_transport.request_options(
             span.child("SendMessage"),
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
                 payload: payload.clone(),
             },
-            // Might receive a response back from our message.
-            // Forward it back to parent
             Box::new(move |me, response| {
-                // check for timeout
-                println!("GATEWAY SEND CALLBACK");
-                //let send_success = transport::protocol::RequestToChildResponse::SendMessageSuccess;
-
+                // In case of a transport error or timeout we store the message in the
+                // pending list to retry sending it later
                 match response {
                     // Success case:
                     GhostCallbackData::Response(Ok(
@@ -132,7 +125,7 @@ impl P2pGateway {
                             span: span.follower("pending due to error"),
                             cb,
                         });
-                    } //parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?,
+                    }
                     // Timeout:
                     GhostCallbackData::Timeout => {
                         debug!("Gateway got timeout from transport. Adding message to pending");
