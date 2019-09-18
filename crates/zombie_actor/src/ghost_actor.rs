@@ -15,7 +15,7 @@ pub struct GhostParentWrapper<
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
     RequestToChildResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
     Actor: GhostActor<
         RequestToParent,
         RequestToParentResponse,
@@ -41,7 +41,7 @@ impl<
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
         RequestToChildResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -78,7 +78,7 @@ impl<
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
         RequestToChildResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -152,7 +152,7 @@ impl<
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
         RequestToChildResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -182,7 +182,7 @@ impl<
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
         RequestToChildResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
         Actor: GhostActor<
             RequestToParent,
             RequestToParentResponse,
@@ -215,7 +215,7 @@ pub trait GhostActor<
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
     RequestToChildResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 >
 {
     /// our parent gets a reference to the parent side of our channel
@@ -256,7 +256,7 @@ pub struct GhostParentWrapperDyn<
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
     RequestToChildResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     actor: Box<
         dyn GhostActor<
@@ -283,7 +283,7 @@ impl<
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
         RequestToChildResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostParentWrapperDyn<
         UserData,
@@ -323,7 +323,7 @@ impl<
         RequestToParentResponse: 'static,
         RequestToChild: 'static,
         RequestToChildResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostCanTrack<
         UserData,

@@ -14,7 +14,8 @@ use predicates::prelude::*;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine},
+    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
+    transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
@@ -69,8 +70,7 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         None => vec![],
     };
     let config = EngineConfig {
-        // tls_config: TlsConfig::Unencrypted,
-        socket_type: "mem".into(),
+        transport_configs: vec![TransportConfig::Memory],
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -79,7 +79,7 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],
     };
-    let engine = GhostEngine::new_mock(
+    let engine = GhostEngine::new(
         Lib3hSpan::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
@@ -100,30 +100,31 @@ fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
     basic_setup_mock_bootstrap(name, None)
 }
 
-// FIXME
-//fn basic_setup_wss() -> GhostEngine {
-//    let config = EngineConfig {
-//        // tls_config: TlsConfig::Unencrypted,
-//        socket_type: "ws".into(),
-//        bootstrap_nodes: vec![],
-//        work_dir: PathBuf::new(),
-//        log_level: 'd',
-//        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
-//        dht_gossip_interval: 200,
-//        dht_timeout_threshold: 2000,
-//        dht_custom_config: vec![],
-//    };
-//    let engine = GhostEngine::new(
-//        Box::new(SodiumCryptoSystem::new()),
-//        config,
-//        "test_engine_wss".into(),
-//        MirrorDht::new_with_config,
-//    )
-//    .unwrap();
-//    let p2p_binding = engine.advertise();
-//    println!("test_engine advertise: {}", p2p_binding);
-//    engine
-//}
+fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
+    let config = EngineConfig {
+        transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
+        bootstrap_nodes: vec![],
+        work_dir: PathBuf::new(),
+        log_level: 'd',
+        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
+        dht_gossip_interval: 200,
+        dht_timeout_threshold: 2000,
+        dht_custom_config: vec![],
+    };
+    let engine = GhostEngine::new(
+        Lib3hSpan::fixme(),
+        Box::new(SodiumCryptoSystem::new()),
+        config,
+        "test_engine_wss".into(),
+        MirrorDht::new_with_config,
+    )
+    .unwrap();
+    let engine = WrappedGhostLib3h::new(name, engine);
+    let p2p_binding = engine.advertise();
+
+    println!("test_engine advertise: {}", p2p_binding);
+    engine
+}
 
 //--------------------------------------------------------------------------------------------------
 // Utils
@@ -191,14 +192,13 @@ fn basic_connect_bootstrap_test_mock() {
     assert!(did_work);
 }
 
-// FIXME
-//#[test]
-//fn basic_track_test_wss() {
-//    enable_logging_for_test(true);
-//    // Setup
-//    let mut engine: WrappedGhostLib3h = Box::new(basic_setup_wss());
-//    basic_track_test(&mut engine);
-//}
+#[test]
+fn basic_track_test_wss() {
+    enable_logging_for_test(true);
+    // Setup
+    let mut engine: WrappedGhostLib3h = basic_setup_wss("wss_test_node");
+    basic_track_test(&mut engine);
+}
 
 #[test]
 fn basic_track_test_mock() {

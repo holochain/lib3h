@@ -14,7 +14,7 @@ use chrono::prelude::DateTime;
 use colored::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{EngineConfig, GhostEngine},
+    engine::{EngineConfig, GhostEngine, TransportConfig},
 };
 use lib3h_sodium::SodiumCryptoSystem;
 use regex::Regex;
@@ -36,7 +36,7 @@ use lib3h_tracing::Lib3hSpan;
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
-        socket_type: "mem".into(),
+        transport_configs: vec![TransportConfig::Memory],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -46,7 +46,7 @@ fn engine_builder() -> GhostEngine<'static> {
         dht_custom_config: vec![],
     };
     let dht_factory = MirrorDht::new_with_config;
-    GhostEngine::new_mock(
+    GhostEngine::new(
         Lib3hSpan::fixme(), // TODO: actually hook up real tracer here
         crypto,
         config,

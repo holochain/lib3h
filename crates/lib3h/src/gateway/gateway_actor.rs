@@ -24,14 +24,13 @@ impl
         // process inbox from parent & handle requests
         detach_run!(&mut self.endpoint_self, |es| es.process(&mut ()))?;
         for request in self.endpoint_self.as_mut().drain_messages() {
-            self.handle_RequestToChild(request)
-                .expect("no ghost errors");
+            self.handle_RequestToChild(request)?;
         }
 
         // Process inbox from child transport & handle requests
         detach_run!(&mut self.inner_transport, |cte| { cte.process(self) })?;
         for request in self.inner_transport.drain_messages() {
-            self.handle_transport_RequestToParent(request);
+            self.handle_transport_RequestToParent(request)?;
         }
 
         // Update this_peer cache
@@ -60,7 +59,7 @@ impl
         // Process internal dht & handle requests
         detach_run!(self.inner_dht, |dht| { dht.process(self) })?;
         for request in self.inner_dht.drain_messages() {
-            self.handle_dht_RequestToParent(request);
+            self.handle_dht_RequestToParent(request)?;
         }
 
         // Done
@@ -88,7 +87,7 @@ impl P2pGateway {
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
-                self.send(span, &data.bootstrap_uri, &Opaque::new(), Some(msg))?;
+                self.send(span, &data.bootstrap_uri, &Opaque::new(), msg)?;
                 Ok(())
             }
             GatewayRequestToChild::SendAll(_) => {

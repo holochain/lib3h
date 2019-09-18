@@ -1,4 +1,4 @@
-#![feature(rustc_private)]
+extern crate backtrace;
 extern crate crossbeam_channel;
 #[allow(unused_imports)]
 #[macro_use]

@@ -3,7 +3,7 @@ use crate::{
     lib3h_simchat::Lib3hSimChatState,
     simchat::{ChatEvent, OpaqueConvertable, SimChatMessage},
 };
-use lib3h::error::Lib3hError;
+use lib3h::error::{Lib3hError, Lib3hResult};
 use lib3h_protocol::{
     data_types::*,
     protocol::{Lib3hToClient, Lib3hToClientResponse},
@@ -15,7 +15,7 @@ pub fn handle_and_convert_lib3h_event(
     state: &mut Lib3hSimChatState,
 ) -> (
     Option<ChatEvent>,
-    Option<Result<Lib3hToClientResponse, Lib3hError>>,
+    Option<Lib3hResult<Lib3hToClientResponse>>,
 ) {
     match lib3h_message {
         Lib3hToClient::HandleQueryEntry(QueryEntryData {
