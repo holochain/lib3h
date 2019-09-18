@@ -1,6 +1,14 @@
+extern crate rand;
+extern crate xoroshiro128;
+
 pub mod constants;
 #[macro_use]
 pub mod predicate;
+
+pub mod seeded_prng;
+
+#[macro_use]
+pub mod processor_harness;
 
 #[allow(unused_macros)]
 macro_rules! assert_process_success {

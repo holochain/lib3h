@@ -1,6 +1,7 @@
 use crate::{
-    node_mock::NodeMock,
+    node_mock::*,
     test_suites::two_basic::{test_author_one_aspect, test_send_message, TwoNodesTestFn},
+    utils::processor_harness::*,
 };
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
@@ -65,7 +66,8 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
 }
 
 /// Wait for peer timeout
-fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
+#[allow(dead_code)]
+fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait before peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(1000));
     // Billy should NOT send a PeerTimedOut message
@@ -75,79 +77,48 @@ fn test_two_peer_timeout(_alex: &mut NodeMock, billy: &mut NodeMock) {
     // Wait past peer Timeout threshold
     std::thread::sleep(std::time::Duration::from_millis(2100));
     // Billy SHOULD send a PeerTimedOut message ...
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
-    // ... resulting in a Disconnected on next process loop
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
-        assert_eq!(response.network_id, "FIXME");
-    });
+    let processor = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::Disconnected(lib3h_protocol::data_types::DisconnectedData {
+            network_id: "FIXME".into(), // TODO
+        }),
+    ));
+    assert_one_processed!(alex, billy, processor);
 }
 
 /// Wait for peer timeout than reconnect
-fn test_two_peer_timeout_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
+#[allow(dead_code)]
+fn test_two_peer_timeout_reconnect(
+    /*mut*/ alex: &mut NodeMock,
+    /*mut */ billy: &mut NodeMock,
+) {
     // Wait past peer Timeout threshold
+    // TODO make this timeout much faster or mock time
     std::thread::sleep(std::time::Duration::from_millis(3100));
-    // Billy SHOULD send a PeerTimedOut message ...
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
-    // ... resulting in a Disconnected on next process loop
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
-        assert_eq!(response.network_id, "FIXME");
-    });
+    let disconnect1 = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::Disconnected(lib3h_protocol::data_types::DisconnectedData {
+            network_id: "FIXME".into(), // TODO
+        }),
+    ));
+    let disconnect2 = Box::new(Lib3hServerProtocolEquals(
+        Lib3hServerProtocol::Disconnected(lib3h_protocol::data_types::DisconnectedData {
+            network_id: "FIXME".into(), // TODO
+        }),
+    ));
+    assert_one_processed!(billy, alex, disconnect1);
+    assert_one_processed!(billy, alex, disconnect2);
 
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(!did_work);
-    assert_eq!(srv_msg_list.len(), 0);
-
-    // Alex shows signs of life, but should receive a disconnect from billy
-    println!("\nAlex gossips self \n");
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
-        assert_eq!(response.network_id, "FIXME");
-    });
-    // So alex reconnects
     println!("\n Reconnecting Alex...\n");
-    alex.reconnect().expect("Reconnection failed");
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
+    let connect_data = alex.reconnect().expect("Reconnection failed");
+    wait_connect!(alex, connect_data, billy);
 
-    // Billy should see a reconnect
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!("srv_msg_list = {:?} ({})\n", srv_msg_list, did_work);
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::Connected(response) = msg_1 {
-        assert_eq!(response.uri, alex.advertise());
-    });
-
-    // More process
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-
+    alex.wait_until_no_work();
+    billy.wait_until_no_work();
     test_send_message(alex, billy);
     test_author_one_aspect(alex, billy);
 }
 
 /// Have Alex disconnect and reconnect
+#[allow(dead_code)]
 fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.disconnect();
     let (did_work, srv_msg_list) = alex.process().unwrap();
@@ -167,32 +138,13 @@ fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock) {
     });
 
     println!("\n Reconnecting Alex...\n");
-    alex.reconnect().expect("Reconnection failed");
+    let connect_data = alex.reconnect().expect("Reconnection failed");
 
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    println!(
-        "reconnect srv_msg_list = {:?} ({})\n",
-        srv_msg_list, did_work
-    );
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 4);
+    wait_connect!(billy, connect_data, alex);
 
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    println!(
-        "reconnect srv_msg_list = {:?} ({})\n",
-        srv_msg_list, did_work
-    );
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::Connected(response) = msg_1 {
-        assert_eq!(response.uri, alex.advertise());
-    });
-
-    // More process
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    alex.wait_until_no_work();
+    billy.wait_until_no_work();
+    alex.wait_until_no_work();
 
     test_send_message(alex, billy);
     test_author_one_aspect(alex, billy);
