@@ -5,8 +5,13 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
+use lib3h_discovery::{
+    error::{DiscoveryError, DiscoveryResult},
+    Discovery,
+};
 use lib3h_ghost_actor::prelude::*;
-use std::collections::HashSet;
+use lib3h_protocol::Address;
+use std::{collections::HashSet, time::Instant};
 use url::Url;
 
 pub type UserData = GhostTransportMemory;
@@ -39,6 +44,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
+    machine_id: Address,
     network: String,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
@@ -46,13 +52,48 @@ pub struct GhostTransportMemory {
     maybe_my_address: Option<Url>,
     /// Addresses of connections to remotes
     connections: HashSet<Url>,
+    last_discover: Option<Instant>,
+    discover_interval_ms: u128,
 }
+
+impl Discovery for GhostTransportMemory {
+    fn advertise(&mut self) -> DiscoveryResult<()> {
+        let uri = self
+            .maybe_my_address
+            .clone()
+            .ok_or_else(|| DiscoveryError::new_other("must bind before discovering"))?;
+        let mut verse = memory_server::get_memory_verse();
+        verse
+            .get_net(&self.network)
+            .ok_or_else(|| DiscoveryError::new_other("net not found"))?
+            .advertise(uri, self.machine_id.clone());
+        Ok(())
+    }
+    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
+        let mut verse = memory_server::get_memory_verse();
+        let machines = verse
+            .get_net(&self.network)
+            .ok_or_else(|| DiscoveryError::new_other("net not found"))?
+            .discover();
+        Ok(machines.into_iter().map(|(uri, _)| uri).collect())
+    }
+    fn release(&mut self) -> DiscoveryResult<()> {
+        Ok(())
+    }
+    fn flush(&mut self) -> DiscoveryResult<()> {
+        Ok(())
+    }
+}
+const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
     #[allow(dead_code)]
-    pub fn new(network_name: &str) -> Self {
+    pub fn new(machine_id: Address, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
+        let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
         Self {
+            machine_id,
             network: network_name.to_string(),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
@@ -63,6 +104,51 @@ impl GhostTransportMemory {
             ),
             connections: HashSet::new(),
             maybe_my_address: None,
+            last_discover: start,
+            discover_interval_ms: u128::from(interval),
+        }
+    }
+
+    fn try_discover(&mut self) {
+        if let Some(t) = self.last_discover {
+            if self.maybe_my_address.is_some()
+                && t.elapsed().as_millis() > self.discover_interval_ms
+            {
+                if let Ok(machines) = self.discover() {
+                    if machines.len() > 0 {
+                        let my_addr = self.maybe_my_address.as_ref().expect("should have bound");
+                        let mut verse = memory_server::get_memory_verse();
+                        for found_uri in machines {
+                            if found_uri == *my_addr {
+                                continue;
+                            }
+                            // if not already connected, request a connections
+                            if self.connections.get(&found_uri).is_none() {
+                                // Get other node's server
+                                let maybe_server = verse.get_server(&self.network, &found_uri);
+                                match maybe_server {
+                                    Some(remote_server) => {
+                                        let _result = remote_server.request_connect(&my_addr);
+                                        self.connections.insert(found_uri.clone());
+                                        trace!("Discovered {}, we are: {}", &found_uri, &my_addr);
+                                        self.endpoint_self
+                                            .publish(
+                                                Span::fixme(),
+                                                RequestToParent::IncomingConnection {
+                                                    uri: found_uri.clone(),
+                                                },
+                                            )
+                                            .expect("should be able to publish");
+                                        self.last_discover = None;
+                                    }
+                                    None => return,
+                                };
+                            }
+                        }
+                    }
+                }
+                self.last_discover = Some(Instant::now());
+            }
         }
     }
 }
@@ -91,6 +177,9 @@ impl
     // BOILERPLATE END----------------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // periodic discover
+        self.try_discover();
+
         // make sure we have bound and get our address if so
         if let Some(my_addr) = &self.maybe_my_address {
             trace!("Processing for: {}", my_addr);
@@ -182,7 +271,8 @@ impl
                         verse.bind(&self.network)
                     };
                     self.maybe_my_address = Some(bound_url.clone());
-
+                    self.advertise()
+                        .map_err(|e| GhostError::from(e.to_string()))?;
                     // respond to our parent
                     msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                         bound_url: bound_url,
@@ -249,7 +339,8 @@ mod tests {
 
     #[test]
     fn test_gmem_transport() {
-        let mut transport1 = GhostTransportMemory::new("net1");
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportMemory::new(machine_id1, "net1");
         let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -257,7 +348,8 @@ mod tests {
             .request_id_prefix("tmem_to_child1")
             .build::<Url>();
 
-        let mut transport2 = GhostTransportMemory::new("net1");
+        let machine_id2 = "fake_machine_id2".into();
+        let mut transport2 = GhostTransportMemory::new(machine_id2, "net1");
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
@@ -321,6 +413,17 @@ mod tests {
             Some(bound_transport2_address.clone())
         );
 
+        // check that machine_ids were advertised
+        let found = transport1.discover().unwrap();
+        assert!(
+            &format!("{:?}", found[0]) == "\"mem://addr_1/\""
+                || &format!("{:?}", found[0]) == "\"mem://addr_2/\""
+        );
+        assert!(
+            &format!("{:?}", found[1]) == "\"mem://addr_1/\""
+                || &format!("{:?}", found[1]) == "\"mem://addr_2/\""
+        );
+
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
@@ -344,14 +447,20 @@ mod tests {
         let _ = t2_endpoint.process(&mut bound_transport2_address);
 
         let mut requests = t2_endpoint.drain_messages();
-        assert_eq!(2, requests.len());
+        assert_eq!(3, requests.len());
+        let msg = requests[0].take_message();
+        // which url was discovered is non-deterministic
+        assert!(
+            "Some(IncomingConnection { uri: \"mem://addr_1/\" })" == format!("{:?}", msg)
+                || "Some(IncomingConnection { uri: \"mem://addr_2/\" })" == format!("{:?}", msg)
+        );
         assert_eq!(
             "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
-            format!("{:?}", requests[0].take_message())
+            format!("{:?}", requests[1].take_message())
         );
         assert_eq!(
             "Some(ReceivedData { uri: \"mem://addr_1/\", payload: \"test message\" })",
-            format!("{:?}", requests[1].take_message())
+            format!("{:?}", requests[2].take_message())
         );
     }
 }
