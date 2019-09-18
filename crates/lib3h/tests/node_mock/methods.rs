@@ -672,15 +672,15 @@ impl NodeMock {
     }
 
     /// Waits for work to be done
-    pub fn wait_did_work(&mut self, should_abort: bool) -> Vec<ProcessorResult> {
+    pub fn wait_did_work(&mut self, should_abort: bool) -> bool {
         let me = self;
-        wait_did_work!(me, me, should_abort)
+        wait_did_work!(me, should_abort)
     }
 
     /// Continues processing the engine until no work is being done.
-    pub fn wait_until_no_work(&mut self) -> Vec<ProcessorResult> {
+    pub fn wait_until_no_work(&mut self) -> bool {
         let me = self;
-        wait_until_no_work!(me, me)
+        wait_until_no_work!(me)
     }
 
     pub fn agent_id(&self) -> Address {

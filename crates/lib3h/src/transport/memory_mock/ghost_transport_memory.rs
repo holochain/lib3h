@@ -97,13 +97,11 @@ impl
 
             // get our own server
             let (success, event_list) = {
-                let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
-                let maybe_server = verse.get_server(&self.network, &my_addr);
-                if let None = maybe_server {
-                    return Err(format!("No Memory server at this uri: {}", my_addr).into());
+                let mut verse = memory_server::get_memory_verse();
+                match verse.get_server(&self.network, &my_addr) {
+                    None => return Err(format!("No Memory server at this uri: {}", my_addr).into()),
+                    Some(server) => server.process()?,
                 }
-                let mut server = maybe_server.unwrap().lock().unwrap();
-                server.process()?
             };
             if success {
                 let mut to_connect_list: Vec<(Url)> = Vec::new();
@@ -135,12 +133,10 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
-                        let maybe_server = verse.get_server(&self.network, &remote_addr);
-                        match maybe_server {
-                            Some(remote_server) => {
-                                let _result =
-                                    remote_server.lock().unwrap().request_connect(&my_addr);
+                        let mut verse = memory_server::get_memory_verse();
+                        match verse.get_server(&self.network, &remote_addr) {
+                            Some(server) => {
+                                server.request_connect(&my_addr)?;
                                 self.connections.insert(remote_addr.clone());
                             }
                             None => {
@@ -181,10 +177,10 @@ impl
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
-                    let bound_url = memory_server::MEMORY_VERSE
-                        .write()
-                        .unwrap()
-                        .bind(&self.network);
+                    let bound_url = {
+                        let mut verse = memory_server::get_memory_verse();
+                        verse.bind(&self.network)
+                    };
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
@@ -205,36 +201,36 @@ impl
                         }
                         Some(my_addr) => {
                             // get destinations server
-                            let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
-                            let maybe_server = verse.get_server(&self.network, &uri);
-                            if let None = maybe_server {
-                                msg.respond(Err(TransportError::new(format!(
-                                    "No Memory server at this uri: {}",
-                                    my_addr
-                                ))))?;
-                                continue;
+                            let mut verse = memory_server::get_memory_verse();
+                            match verse.get_server(&self.network, &uri) {
+                                None => {
+                                    msg.respond(Err(TransportError::new(format!(
+                                        "No Memory server at this uri: {}",
+                                        my_addr
+                                    ))))?;
+                                    continue;
+                                }
+                                Some(server) => {
+                                    // if not already connected, request a connections
+                                    if self.connections.get(&uri).is_none() {
+                                        match server.request_connect(&my_addr) {
+                                            Err(err) => {
+                                                msg.respond(Err(err))?;
+                                                continue;
+                                            }
+                                            Ok(()) => self.connections.insert(uri.clone()),
+                                        };
+                                    };
+                                    trace!(
+                                        "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
+                                        my_addr,
+                                        uri,
+                                        payload
+                                    );
+                                    // Send it data from us
+                                    server.post(&my_addr, &payload).unwrap();
+                                }
                             }
-                            let mut server = maybe_server.unwrap().lock().unwrap();
-
-                            // if not already connected, request a connections
-                            if self.connections.get(&uri).is_none() {
-                                match server.request_connect(&my_addr) {
-                                    Err(err) => {
-                                        msg.respond(Err(err))?;
-                                        continue;
-                                    }
-                                    Ok(()) => self.connections.insert(uri.clone()),
-                                };
-                            };
-
-                            trace!(
-                                "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
-                                my_addr,
-                                uri,
-                                payload
-                            );
-                            // Send it data from us
-                            server.post(&my_addr, &payload).unwrap();
                         }
                     };
                 }

@@ -163,7 +163,14 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
         data: Result<CbData, E>,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
-            None => Err(GhostError::new(ErrorKind::RequestIdNotFound)),
+            None => {
+                let msg = format!(
+                    "{:?} in {:?}",
+                    &request_id,
+                    self.pending.keys().collect::<Vec<_>>()
+                );
+                Err(GhostError::new(ErrorKind::RequestIdNotFound(msg)))
+            }
             Some(entry) => (entry.cb)(owner, GhostCallbackData::Response(data)),
         }
     }
@@ -236,8 +243,8 @@ mod tests {
                 Ok(TestCallbackData("here's the data again!".into())),
             );
             assert_eq!(
-                "Err(GhostError(RequestIdNotFound))",
-                format!("{:?}", result)
+                b"Err(GhostError(RequestIdNotFound",
+                &format!("{:?}", result).as_bytes()[..32],
             )
         });
     }
