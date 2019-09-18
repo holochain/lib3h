@@ -95,41 +95,147 @@ pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(T) -> GhostResult<()> + 'lt + S
 pub type GhostResponseCb<'lt, X, T> =
     Box<dyn FnOnce(&mut X, GhostResult<T>) -> GhostResult<()> + 'lt + Send + Sync>;
 
+#[derive(Clone, Debug)]
+pub enum Fake {
+    APrint(String),
+    OPrint(String),
+    AAdd1(i32),
+    AAdd1R(Result<i32, ()>),
+    OSub1(i32),
+    OSub1R(Result<i32, ()>),
+}
+
+impl GhostProtocol for Fake {
+    fn discriminant_list() -> &'static [GhostProtocolDiscriminant] {
+        unimplemented!();
+    }
+
+    fn discriminant(&self) -> &GhostProtocolDiscriminant {
+        unimplemented!();
+    }
+}
+
+pub trait GhostHandler<'lt, X: 'lt, P: GhostProtocol> {
+    fn trigger(
+        &mut self,
+        user_data: X,
+        message: P,
+        cb: Option<GhostHandlerCb<'lt, P>>,
+    ) -> GhostResult<()>;
+}
+
 pub struct TestActorHandler<'lt, X: 'lt> {
     phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_actor_print: Box<dyn FnMut(X, String) -> GhostResult<()> + 'lt>,
-    pub handle_request_to_actor_add_1: Box<dyn FnMut(X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
+    pub handle_request_to_actor_add_1:
+        Box<dyn FnMut(X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
+}
+
+impl<'lt, X: 'lt> GhostHandler<'lt, X, Fake> for TestActorHandler<'lt, X> {
+    fn trigger(
+        &mut self,
+        user_data: X,
+        message: Fake,
+        cb: Option<GhostHandlerCb<'lt, Fake>>,
+    ) -> GhostResult<()> {
+        match message {
+            Fake::APrint(m) => (self.handle_event_to_actor_print)(user_data, m),
+            Fake::AAdd1(m) => {
+                let cb = cb.unwrap();
+                let cb = Box::new(move |resp| cb(Fake::AAdd1R(resp)));
+                (self.handle_request_to_actor_add_1)(user_data, m, cb)
+            }
+            _ => panic!("bad"),
+        }
+    }
 }
 
 pub struct TestOwnerHandler<'lt, X: 'lt> {
     phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_owner_print: Box<dyn FnMut(X, String) -> GhostResult<()> + 'lt>,
-    pub handle_request_to_owner_sub_1: Box<dyn FnMut(X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
+    pub handle_request_to_owner_sub_1:
+        Box<dyn FnMut(X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
 }
 
-pub trait TestActorRef<'lt, X: 'lt> {
+impl<'lt, X: 'lt> GhostHandler<'lt, X, Fake> for TestOwnerHandler<'lt, X> {
+    fn trigger(
+        &mut self,
+        user_data: X,
+        message: Fake,
+        cb: Option<GhostHandlerCb<'lt, Fake>>,
+    ) -> GhostResult<()> {
+        match message {
+            Fake::OPrint(m) => (self.handle_event_to_owner_print)(user_data, m),
+            Fake::OSub1(m) => {
+                let cb = cb.unwrap();
+                let cb = Box::new(move |resp| cb(Fake::OSub1R(resp)));
+                (self.handle_request_to_owner_sub_1)(user_data, m, cb)
+            }
+            _ => panic!("bad"),
+        }
+    }
+}
+
+pub trait GhostEndpoint<'lt, X: 'lt, P: GhostProtocol> {
+    fn send_protocol(
+        &mut self,
+        message: P,
+        cb: Option<GhostResponseCb<'lt, X, P>>,
+    ) -> GhostResult<()>;
+}
+
+pub trait TestActorRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
     fn event_to_actor_print(&mut self, message: String) -> GhostResult<()>;
-    fn request_to_actor_add_1(&mut self, message: i32, cb: GhostResponseCb<'lt, X, Result<i32, ()>>) -> GhostResult<()>;
+    fn request_to_actor_add_1(
+        &mut self,
+        message: i32,
+        cb: GhostResponseCb<'lt, X, Result<i32, ()>>,
+    ) -> GhostResult<()>;
 }
 
-pub trait TestOwnerRef<'lt, X: 'lt> {
+pub trait TestOwnerRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
     fn event_to_owner_print(&mut self, message: String) -> GhostResult<()>;
-    fn request_to_owner_sub_1(&mut self, message: i32, cb: GhostResponseCb<'lt, X, Result<i32, ()>>) -> GhostResult<()>;
+    fn request_to_owner_sub_1(
+        &mut self,
+        message: i32,
+        cb: GhostResponseCb<'lt, X, Result<i32, ()>>,
+    ) -> GhostResult<()>;
 }
 
-pub trait GhostActor<'lt, OwnerRefType: 'lt, ActorHandlerType: 'lt> {
-    fn actor_init(system: GhostSystemRef<'lt>, owner_ref: OwnerRefType) -> GhostResult<ActorHandlerType>;
+pub trait GhostActor<
+    'lt,
+    X: 'lt,
+    P: GhostProtocol,
+    OwnerRefType: 'lt,
+    ActorHandlerType: 'lt + GhostHandler<'lt, X, P>,
+>
+{
+    fn actor_init(
+        &mut self,
+        system: GhostSystemRef<'lt>,
+        owner_ref: OwnerRefType,
+    ) -> GhostResult<ActorHandlerType>;
+    fn process(&mut self) -> GhostResult<()>;
 }
 
 struct TestActor;
 
-impl<'lt, O: 'lt + TestOwnerRef<'lt, TestActor>> GhostActor<'lt, O, TestActorHandler<'lt, TestActor>> for TestActor {
-    fn actor_init(_system: GhostSystemRef<'lt>, mut owner_ref: O) -> GhostResult<TestActorHandler<'lt, TestActor>> {
+impl<'lt, O: 'lt + TestOwnerRef<'lt, TestActor>>
+    GhostActor<'lt, TestActor, Fake, O, TestActorHandler<'lt, TestActor>> for TestActor
+{
+    fn actor_init(
+        &mut self,
+        _system: GhostSystemRef<'lt>,
+        mut owner_ref: O,
+    ) -> GhostResult<TestActorHandler<'lt, TestActor>> {
         owner_ref.event_to_owner_print("message from actor".to_string())?;
-        owner_ref.request_to_owner_sub_1(42, Box::new(|_me, result| {
-            println!("got sub from owner: 42 - 1 = {:?}", result);
-            Ok(())
-        }))?;
+        owner_ref.request_to_owner_sub_1(
+            42,
+            Box::new(|_me, result| {
+                println!("got sub from owner: 42 - 1 = {:?}", result);
+                Ok(())
+            }),
+        )?;
 
         Ok(TestActorHandler {
             phantom: std::marker::PhantomData,
@@ -137,10 +243,12 @@ impl<'lt, O: 'lt + TestOwnerRef<'lt, TestActor>> GhostActor<'lt, O, TestActorHan
                 println!("actor print: {}", message);
                 Ok(())
             }),
-            handle_request_to_actor_add_1: Box::new(|_me, message, cb| {
-                cb(Ok(message + 1))
-            }),
+            handle_request_to_actor_add_1: Box::new(|_me, message, cb| cb(Ok(message + 1))),
         })
+    }
+
+    fn process(&mut self) -> GhostResult<()> {
+        Ok(())
     }
 }
 
@@ -155,7 +263,8 @@ mod tests {
 
         {
             let count = count.clone();
-            system.create_ref()
+            system
+                .create_ref()
                 .enqueue_processor(Box::new(move || {
                     let mut count = count.write().unwrap();
                     *count += 1;
