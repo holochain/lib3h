@@ -39,6 +39,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
+    network: String,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -49,9 +50,10 @@ pub struct GhostTransportMemory {
 
 impl GhostTransportMemory {
     #[allow(dead_code)]
-    pub fn new() -> Self {
+    pub fn new(network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         Self {
+            network: network_name.to_string(),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -94,13 +96,15 @@ impl
             trace!("Processing for: {}", my_addr);
 
             // get our own server
-            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-            let maybe_server = server_map.get(&my_addr);
-            if let None = maybe_server {
-                return Err(format!("No Memory server at this uri: {}", my_addr).into());
-            }
-            let mut server = maybe_server.unwrap().lock().unwrap();
-            let (success, event_list) = server.process()?;
+            let (success, event_list) = {
+                let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
+                let maybe_server = verse.get_server(&self.network, &my_addr);
+                if let None = maybe_server {
+                    return Err(format!("No Memory server at this uri: {}", my_addr).into());
+                }
+                let mut server = maybe_server.unwrap().lock().unwrap();
+                server.process()?
+            };
             if success {
                 let mut to_connect_list: Vec<(Url)> = Vec::new();
                 let mut non_connect_events = Vec::new();
@@ -131,8 +135,9 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                        match server_map.get(&remote_addr) {
+                        let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
+                        let maybe_server = verse.get_server(&self.network, &remote_addr);
+                        match maybe_server {
                             Some(remote_server) => {
                                 let _result =
                                     remote_server.lock().unwrap().request_connect(&my_addr);
@@ -176,8 +181,10 @@ impl
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
-                    let bound_url = memory_server::new_url();
-                    memory_server::set_server(&bound_url).unwrap(); //set_server always returns Ok
+                    let bound_url = memory_server::MEMORY_VERSE
+                        .write()
+                        .unwrap()
+                        .bind(&self.network);
                     self.maybe_my_address = Some(bound_url.clone());
 
                     // respond to our parent
@@ -198,8 +205,8 @@ impl
                         }
                         Some(my_addr) => {
                             // get destinations server
-                            let server_map = memory_server::MEMORY_SERVER_MAP.read().unwrap();
-                            let maybe_server = server_map.get(&uri);
+                            let mut verse = memory_server::MEMORY_VERSE.write().unwrap();
+                            let maybe_server = verse.get_server(&self.network, &uri);
                             if let None = maybe_server {
                                 msg.respond(Err(TransportError::new(format!(
                                     "No Memory server at this uri: {}",
@@ -245,31 +252,8 @@ mod tests {
     use lib3h_tracing::test_span;
 
     #[test]
-    #[ignore] // This test works if run alone, but not with all tests because of the namespace issue #330
     fn test_gmem_transport() {
-        /* Possible other ways we might think of setting up
-               constructors for actor/parent_context_endpoint pairs:
-
-            let (transport1_endpoint, child) = ghost_create_endpoint();
-            let transport1_engine = GhostTransportMemoryEngine::new(child);
-
-            enum TestContex {
-        }
-
-            let mut transport1_actor = GhostLocalActor::new::<TestTrace>(
-            transport1_engine, transport1_endpoint);
-             */
-
-        /*
-            let mut transport1 = GhostParentContextEndpoint::with_cb(|child| {
-            GhostTransportMemory::new(child)
-        });
-
-            let mut transport1 = GhostParentContextEndpoint::new(
-            Box::new(GhostTransportMemory::new()));
-             */
-
-        let mut transport1 = GhostTransportMemory::new();
+        let mut transport1 = GhostTransportMemory::new("net1");
         let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -277,7 +261,7 @@ mod tests {
             .request_id_prefix("tmem_to_child1")
             .build::<Url>();
 
-        let mut transport2 = GhostTransportMemory::new();
+        let mut transport2 = GhostTransportMemory::new("net1");
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")

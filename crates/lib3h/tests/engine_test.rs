@@ -64,13 +64,13 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostLib3h {
+fn basic_setup_mock_bootstrap(net: &str, name: &str, bs: Option<Vec<Url>>) -> WrappedGhostLib3h {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
     };
     let config = EngineConfig {
-        transport_configs: vec![TransportConfig::Memory],
+        transport_configs: vec![TransportConfig::Memory(net.into())],
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -90,14 +90,14 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
     let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
     println!(
-        "basic_setup_mock(): test engine for {}, advertise: {}",
-        name, p2p_binding
+        "basic_setup_mock(): test engine for {}:{}, advertise: {}",
+        net, name, p2p_binding
     );
     engine
 }
 
-fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
-    basic_setup_mock_bootstrap(name, None)
+fn basic_setup_mock(net: &str, name: &str) -> WrappedGhostLib3h {
+    basic_setup_mock_bootstrap(net, name, None)
 }
 
 fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
@@ -152,8 +152,10 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 fn basic_connect_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine_a: WrappedGhostLib3h = basic_setup_mock("basic_send_test_mock_node_a");
-    let mut engine_b: WrappedGhostLib3h = basic_setup_mock("basic_send_test_mock_node_b");
+    let mut engine_a: WrappedGhostLib3h =
+        basic_setup_mock("basic_connect_test_mock_net", "basic_send_test_mock_node_a");
+    let mut engine_b: WrappedGhostLib3h =
+        basic_setup_mock("basic_connect_test_mock_net", "basic_send_test_mock_node_b");
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
@@ -177,14 +179,20 @@ fn basic_connect_test_mock() {
 fn basic_connect_bootstrap_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let engine_b = basic_setup_mock("basic_connect_bootstrap_test_node_b");
+    let engine_b = basic_setup_mock(
+        "basic_connect_bootstrap_test_mock_net",
+        "basic_connect_bootstrap_test_node_b",
+    );
     // Get URL
     let url_b = engine_b.advertise();
     println!("url_b: {}", url_b);
 
     // Create a with b as a bootstrap
-    let mut engine_a =
-        basic_setup_mock_bootstrap("basic_connect_bootstrap_test_node_a", Some(vec![url_b]));
+    let mut engine_a = basic_setup_mock_bootstrap(
+        "basic_connect_bootstrap_test_mock_net",
+        "basic_connect_bootstrap_test_node_a",
+        Some(vec![url_b]),
+    );
 
     println!("\nengine_a.process()...");
     let (did_work, srv_msg_list) = engine_a.process().unwrap();
@@ -204,7 +212,8 @@ fn basic_track_test_wss() {
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine: WrappedGhostLib3h = basic_setup_mock("basic_track_test_mock");
+    let mut engine: WrappedGhostLib3h =
+        basic_setup_mock("basic_track_test_mock", "basic_track_test_mock");
     basic_track_test(&mut engine);
 }
 
@@ -288,8 +297,8 @@ fn launch_two_nodes_test_with_memory_network(
     println!("=======================");
 
     // Setup
-    let mut alex: WrappedGhostLib3h = basic_setup_mock("alex");
-    let mut billy: WrappedGhostLib3h = basic_setup_mock("billy");
+    let mut alex: WrappedGhostLib3h = basic_setup_mock("net", "alex");
+    let mut billy: WrappedGhostLib3h = basic_setup_mock("net", "billy");
     if can_setup {
         basic_two_setup(&mut alex, &mut billy);
     }
