@@ -563,7 +563,7 @@ macro_rules! wait_for_message {
 #[macro_export]
 macro_rules! wait1_for_message {
     ($ghost_actor: expr, $endpoint: ident, $regex: expr) => {{
-        let actors = vec![$ghost_actor];
+        let actors = vec![&mut $ghost_actor];
         $crate::wait_for_message!(actors, $endpoint, $regex)
     }};
 }
@@ -572,7 +572,7 @@ macro_rules! wait1_for_message {
 #[macro_export]
 macro_rules! wait1_for_messages {
     ($ghost_actor: expr, $endpoint: ident, $regexes: expr) => {{
-        let actors = vec![$ghost_actor];
+        let actors = vec![&mut $ghost_actor];
         $crate::wait_for_messages!(actors, $endpoint, $regexes)
     }};
 }
