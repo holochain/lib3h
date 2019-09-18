@@ -427,6 +427,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn calling_join_then_part_succeeds() {
         let (s, r) = crossbeam_channel::unbounded();
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {
@@ -472,6 +473,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn can_join_and_send_direct_message() {
         let (s, r) = crossbeam_channel::unbounded();
         let mut chat = new_sim_chat_mock_engine(Box::new(move |event| {

@@ -207,8 +207,20 @@ impl<'engine> GhostEngine<'engine> {
                     payload: Opaque::new(),
                 },
             );
-            self.multiplexer
-                .publish(span.child("priv_connect_bootstrap TODO extra info"), cmd)?;
+            self.multiplexer.request(
+                span.child("priv_connect_bootstrap TODO extra info"),
+                cmd,
+                Box::new(|_, response| {
+                    let response = match response {
+                        GhostCallbackData::Timeout => panic!("bootstrap timeout"),
+                        GhostCallbackData::Response(r) => r,
+                    };
+                    if let Err(e) = response {
+                        panic!("{:?}", e);
+                    }
+                    Ok(())
+                }),
+            )?;
         }
         Ok(())
     }
