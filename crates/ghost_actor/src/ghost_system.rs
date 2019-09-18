@@ -79,12 +79,6 @@ impl<'lt> GhostSystem<'lt> {
         }
     }
 
-    /// enqueue a new processor function for periodic execution
-    pub fn enqueue_processor(&mut self, cb: GhostProcessCb<'lt>) -> GhostResult<()> {
-        self.process_send.send(cb)?;
-        Ok(())
-    }
-
     /// execute all queued processor functions
     pub fn process(&mut self) -> GhostResult<()> {
         self.system_inner
@@ -92,55 +86,62 @@ impl<'lt> GhostSystem<'lt> {
             .expect("failed to obtain write lock")
             .process()
     }
+
+    //pub fn spawn<X: 'lt,
 }
 
-pub trait TmpHandler<T>: TmpHandlerBase<T> {
-    fn handle_a(&mut self, d: T);
-    fn handle_b(&mut self, d: T);
+pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(T) -> GhostResult<()> + 'lt + Send + Sync>;
+
+pub type GhostResponseCb<'lt, X, T> =
+    Box<dyn FnOnce(&mut X, GhostResult<T>) -> GhostResult<()> + 'lt + Send + Sync>;
+
+pub struct TestActorHandler<'lt, X: 'lt> {
+    phantom: std::marker::PhantomData<&'lt X>,
+    pub handle_event_to_actor_print: Box<dyn FnMut(X, String) -> GhostResult<()> + 'lt>,
+    pub handle_request_to_actor_add_1: Box<dyn FnMut(X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
 }
 
-pub trait TmpHandlerBase<T> {
-    fn trigger(&mut self, d: T);
+pub struct TestOwnerHandler<'lt, X: 'lt> {
+    phantom: std::marker::PhantomData<&'lt X>,
+    pub handle_event_to_owner_print: Box<dyn FnMut(X, String) -> GhostResult<()> + 'lt>,
+    pub handle_request_to_owner_sub_1: Box<dyn FnMut(X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
 }
 
-pub struct TmpHandlerConcrete;
+pub trait TestActorRef<'lt, X: 'lt> {
+    fn event_to_actor_print(&mut self, message: String) -> GhostResult<()>;
+    fn request_to_actor_add_1(&mut self, message: i32, cb: GhostResponseCb<'lt, X, Result<i32, ()>>) -> GhostResult<()>;
+}
 
-impl TmpHandlerBase<String> for TmpHandlerConcrete {
-    fn trigger(&mut self, d: String) {
-        if d.as_bytes()[0] == b'a' {
-            self.handle_a(d);
-        } else {
-            self.handle_b(d);
-        }
+pub trait TestOwnerRef<'lt, X: 'lt> {
+    fn event_to_owner_print(&mut self, message: String) -> GhostResult<()>;
+    fn request_to_owner_sub_1(&mut self, message: i32, cb: GhostResponseCb<'lt, X, Result<i32, ()>>) -> GhostResult<()>;
+}
+
+pub trait GhostActor<'lt, OwnerRefType: 'lt, ActorHandlerType: 'lt> {
+    fn actor_init(system: GhostSystemRef<'lt>, owner_ref: OwnerRefType) -> GhostResult<ActorHandlerType>;
+}
+
+struct TestActor;
+
+impl<'lt, O: 'lt + TestOwnerRef<'lt, TestActor>> GhostActor<'lt, O, TestActorHandler<'lt, TestActor>> for TestActor {
+    fn actor_init(_system: GhostSystemRef<'lt>, mut owner_ref: O) -> GhostResult<TestActorHandler<'lt, TestActor>> {
+        owner_ref.event_to_owner_print("message from actor".to_string())?;
+        owner_ref.request_to_owner_sub_1(42, Box::new(|_me, result| {
+            println!("got sub from owner: 42 - 1 = {:?}", result);
+            Ok(())
+        }))?;
+
+        Ok(TestActorHandler {
+            phantom: std::marker::PhantomData,
+            handle_event_to_actor_print: Box::new(|_me, message| {
+                println!("actor print: {}", message);
+                Ok(())
+            }),
+            handle_request_to_actor_add_1: Box::new(|_me, message, cb| {
+                cb(Ok(message + 1))
+            }),
+        })
     }
-}
-
-impl TmpHandler<String> for TmpHandlerConcrete {
-    fn handle_a(&mut self, d: String) {
-        println!("got a: {}", d);
-    }
-
-    fn handle_b(&mut self, d: String) {
-        println!("got b: {}", d);
-    }
-}
-
-pub struct GhostDock<'lt, U: 'lt> {
-    _system: GhostSystemRef<'lt>,
-    phantom_lifetime: std::marker::PhantomData<&'lt U>,
-}
-
-impl<'lt, U: 'lt> GhostDock<'lt, U> {
-    pub fn new(system: GhostSystemRef<'lt>) -> Self {
-        Self {
-            _system: system,
-            phantom_lifetime: std::marker::PhantomData,
-        }
-    }
-
-    /// take an endpoint and a handler, and inflate a targetRef for output
-    /// how do you handle owned vs ref dock_ref()?
-    pub fn dock<T, H: TmpHandler<T>>(_handler: H) {}
 }
 
 #[cfg(test)]
@@ -154,7 +155,7 @@ mod tests {
 
         {
             let count = count.clone();
-            system
+            system.create_ref()
                 .enqueue_processor(Box::new(move || {
                     let mut count = count.write().unwrap();
                     *count += 1;
@@ -185,7 +186,7 @@ mod tests {
         }
 
         let mut system = GhostSystem::new();
-        let mut _dock: GhostDock<Z> = GhostDock::new(system.create_ref());
+        //let mut _dock: GhostDock<Z> = GhostDock::new(system.create_ref());
 
         // --- demo dock --- ///
 
