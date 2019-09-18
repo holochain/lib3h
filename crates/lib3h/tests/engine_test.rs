@@ -15,7 +15,7 @@ extern crate regex;
 extern crate log;
 use lib3h_tracing::test_span;
 
-use lib3h_ghost_actor::wait1_for_messages;
+use lib3h_ghost_actor::{wait_can_track_did_work, wait1_for_messages};
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
@@ -141,7 +141,7 @@ fn basic_track_test_mock() {
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test<'engine>(engine: &mut GhostEngine<'engine>) {
+fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
     // Test
     let mut track_space = SpaceData {
         request_id: "track_a_1".into(),
@@ -179,12 +179,17 @@ fn basic_track_test<'engine>(engine: &mut GhostEngine<'engine>) {
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 
+    let f : GhostCallback<(), _, _> = Box::new(|&mut _user_data, _cb_data| { Ok(())});
     parent_endpoint
-        .publish(
+        .request(
             test_span("publish join space again"),
             ClientToLib3h::JoinSpace(track_space.clone()),
+            f
         )
         .unwrap();
+
+    wait_can_track_did_work!(engine, user_data);
+
     /*
     let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::FailureResult(GenericResultData {
