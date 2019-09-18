@@ -89,7 +89,7 @@ impl GhostTransportWebsocket {
             }
             _ => panic!(
                 "GhostTransportWebsocket::handle_send_message called with non-SendMessage message"
-            )
+            ),
         }
     }
 
