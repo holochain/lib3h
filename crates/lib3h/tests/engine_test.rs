@@ -9,10 +9,13 @@ extern crate lib3h;
 extern crate lib3h_protocol;
 extern crate lib3h_sodium;
 extern crate lib3h_zombie_actor as lib3h_ghost_actor;
+extern crate regex;
 
 #[macro_use]
 extern crate log;
 use lib3h_tracing::test_span;
+
+use lib3h_ghost_actor::wait1_for_message;
 
 use lib3h::{
     dht::mirror_dht::MirrorDht,
@@ -160,6 +163,16 @@ fn basic_track_test<'engine>(engine: &mut GhostEngine<'engine>) {
             ClientToLib3h::JoinSpace(track_space.clone()),
         )
         .unwrap();
+    /*    let handle_get_gossip_entry_list_regex =
+    "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[.]*";*/
+    
+    let handle_get_gossip_entry_list_regex =
+        "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
+
+    let _handle_get_authoring_entry_list_regex =
+        "HandleGetAuthoringEntryList(GetListData \\{ space_address: HashString(\"SPACE_A\"), provider_agent_id: HashString(\"alex\"), request_id: \"[.]*\" \\})";
+
+    wait1_for_message!(engine, parent_endpoint, handle_get_gossip_entry_list_regex);
 
     /*
         let is_success_result = Box::new(Lib3hServerProtocolEquals(

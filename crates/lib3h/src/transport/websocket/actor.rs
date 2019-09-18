@@ -306,7 +306,6 @@ mod tests {
     use super::*;
     use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
     use lib3h_ghost_actor::wait_for_message;
-    use regex::Regex;
     use std::{net::TcpListener, thread, time};
     use url::Url;
 

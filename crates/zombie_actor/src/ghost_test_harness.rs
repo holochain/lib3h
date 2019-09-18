@@ -465,26 +465,26 @@ macro_rules! wait_until_did_work {
 #[macro_export]
 macro_rules! wait_for_message {
     ($ghost_actors: expr, $endpoint: ident, $regex: expr) => {{
-        wait_for_message!($ghost_actors, $endpoint, $regex, 5000, true)
+        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, 5000, true)
     }};
     ($ghost_actors: expr, $endpoint: ident, $regex: expr, $timeout_ms: expr) => {{
-        wait_for_message!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
+        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
     }};
     (
         $ghost_actors: expr,
         $endpoint: ident,
-        $regex: expr,
+        $expr: expr,
         $timeout_ms: expr,
         $should_abort: expr
     ) => {{
         let mut found = false;
         let mut tries = 0;
-        let message_regex = Regex::new($regex).expect("Regex must be syntactically correct");
-        let POLL_INTERVAL = 50;
+        let message_regex = regex::Regex::new($expr).expect("Regex must be syntactically correct");
+        let POLL_INTERVAL = 2;
         let mut actors = $ghost_actors;
         loop {
             tries += 1;
-            thread::sleep(time::Duration::from_millis(POLL_INTERVAL));
+            std::thread::sleep(std::time::Duration::from_millis(POLL_INTERVAL));
             actors = actors
                 .into_iter()
                 .map(|mut actor| {
@@ -496,6 +496,7 @@ macro_rules! wait_for_message {
             for mut message in $endpoint.drain_messages() {
                 message.take_message().map(|message| {
                     let message_string = &format!("{:?}", message);
+                    trace!("[wait_for_messsage] drained {:?}", message_string);
                     if message_regex.is_match(message_string) {
                         found = true;
                     };
@@ -510,6 +511,15 @@ macro_rules! wait_for_message {
             assert!(found);
         }
         found
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_message {
+    ($ghost_actor: expr, $endpoint: ident, $regex: expr) => {{
+        let actors = vec![$ghost_actor];
+        $crate::wait_for_message!(actors, $endpoint, $regex)
     }};
 }
 
