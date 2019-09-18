@@ -55,7 +55,7 @@ macro_rules! wait_can_track_did_work {
      $should_abort: expr
     ) => {{
         let duration = std::time::Duration::from_millis(2000);
-        wait_can_track_did_work!($ghost_can_track, $user_data, $should_abort, duration)
+        $crate::wait_can_track_did_work!($ghost_can_track, $user_data, $should_abort, duration)
     }};
     ($ghost_can_track: ident,
      $user_data: ident
