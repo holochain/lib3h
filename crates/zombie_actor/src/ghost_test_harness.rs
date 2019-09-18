@@ -463,23 +463,31 @@ macro_rules! wait_until_did_work {
 
 #[allow(unused_macros)]
 #[macro_export]
-macro_rules! wait_for_message {
-    ($ghost_actors: expr, $endpoint: ident, $regex: expr) => {{
-        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, 5000, true)
+macro_rules! wait_for_messages {
+    ($ghost_actors: expr, $endpoint: ident, $regexes: expr) => {{
+        $crate::wait_for_messages!($ghost_actors, $endpoint, $regex, 5000, true)
     }};
-    ($ghost_actors: expr, $endpoint: ident, $regex: expr, $timeout_ms: expr) => {{
-        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
+    ($ghost_actors: expr, $endpoint: ident, $regexes: expr, $timeout_ms: expr) => {{
+        $crate::wait_for_messages!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
     }};
     (
         $ghost_actors: expr,
         $endpoint: ident,
-        $expr: expr,
+        $regexes: expr,
         $timeout_ms: expr,
         $should_abort: expr
     ) => {{
         let mut found = false;
         let mut tries = 0;
-        let message_regex = regex::Regex::new($expr).expect("Regex must be syntactically correct");
+
+        let mut message_regexes: Vec<regex::Regex> = $regexes
+            .into_iter()
+            .map(|re| {
+                regex::Regex::new(re)
+                    .expect(format!("Regex must be syntactically correct: {:?}", re).as_str())
+            })
+            .collect();
+
         let POLL_INTERVAL = 2;
         let mut actors = $ghost_actors;
         loop {
@@ -494,23 +502,60 @@ macro_rules! wait_for_message {
                 .collect::<Vec<_>>();
             let _ = $endpoint.process(&mut ());
             for mut message in $endpoint.drain_messages() {
-                message.take_message().map(|message| {
-                    let message_string = &format!("{:?}", message);
-                    trace!("[wait_for_messsage] drained {:?}", message_string);
-                    if message_regex.is_match(message_string) {
-                        found = true;
-                    };
-                });
+                let message_regexes2 = message_regexes.clone();
+                message_regexes = message
+                    .take_message()
+                    .map(|message| {
+                        let message_string = &format!("{:?}", message);
+                        trace!("[wait_for_messsage] drained {:?}", message_string);
+                        message_regexes
+                            .into_iter()
+                            .filter(|message_regex| !message_regex.is_match(message_string))
+                            .collect()
+                    })
+                    .unwrap_or(message_regexes2);
+                if message_regexes.is_empty() {
+                    break;
+                }
             }
 
-            if found || tries > $timeout_ms / POLL_INTERVAL {
+            if message_regexes.is_empty() || tries > $timeout_ms / POLL_INTERVAL {
                 break;
             }
         }
+        let is_empty = message_regexes.is_empty();
+
         if $should_abort {
-            assert!(found);
+            assert!(is_empty);
         }
-        found
+        is_empty
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_for_message {
+    ($ghost_actors: expr, $endpoint: ident, $regex: expr) => {{
+        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, 5000, true)
+    }};
+    ($ghost_actors: expr, $endpoint: ident, $regexes: expr, $timeout_ms: expr) => {{
+        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
+    }};
+    (
+        $ghost_actors: expr,
+        $endpoint: ident,
+        $regex: expr,
+        $timeout_ms: expr,
+        $should_abort: expr
+    ) => {{
+        let regexes = vec![$regex];
+        $crate::wait_for_messages!(
+            $ghost_actors,
+            $endpoint,
+            regexes,
+            $timeout_ms,
+            $should_abort
+        )
     }};
 }
 
