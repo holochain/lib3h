@@ -2,6 +2,7 @@ use crate::{
     dht::dht_protocol::*,
     error::*,
     gateway::{protocol::*, P2pGateway},
+    transport::protocol::RequestToChild as TransportRequestToChild,
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
@@ -105,11 +106,34 @@ impl P2pGateway {
                 )?;
                 Ok(())
             }
-            GatewayRequestToChild::SendAll(_) => {
-                println!("BADDBADD");
-                error!("BADDBADD");
-                // TODO XXX - fixme
-                //unimplemented!();
+            GatewayRequestToChild::SendAll(payload) => {
+                self.inner_dht.request(
+                    Span::fixme(),
+                    DhtRequestToChild::RequestPeerList,
+                    Box::new(move |me, response| {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("Timeout on RequestPeerList"),
+                            GhostCallbackData::Response(Err(error)) =>
+                                panic!("Error on RequestPeerList: {:?}", error),
+                            GhostCallbackData::Response(Ok(DhtRequestToChildResponse::RequestPeerList(peer_list))) => {
+                                for peer in peer_list {
+                                    me.inner_transport.request(
+                                        Span::fixme(),
+                                        TransportRequestToChild::SendMessage{
+                                            uri: peer.peer_uri.clone(),
+                                            payload: payload.clone().into(),
+                                        },
+                                        Box::new(move |_me, response| {
+                                            debug!("P2pGateway::SendAll to {:?} response: {:?}", peer.peer_uri, response);
+                                            Ok(())
+                                        })
+                                    )?;
+                                }
+                            }
+                            _ => panic!("Whatever")
+                        }
+                        Ok(())
+                    }))?;
                 Ok(())
             }
         }
