@@ -33,6 +33,8 @@ impl
             self.handle_transport_RequestToParent(request)?;
         }
 
+        self.handle_transport_pending_outgoing_messages()?;
+
         // Update this_peer cache
         self.inner_dht.request(
             Lib3hSpan::fixme(),
@@ -87,7 +89,7 @@ impl P2pGateway {
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
-                self.send(span, &data.bootstrap_uri, &Opaque::new(), msg)?;
+                self.send(span, data.bootstrap_uri.clone(), Opaque::new(), msg)?;
                 Ok(())
             }
             GatewayRequestToChild::SendAll(_) => {

@@ -7,6 +7,9 @@ pub mod protocol;
 
 use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
 use detach::prelude::*;
+use lib3h_protocol::data_types::Opaque;
+use url::Url;
+use lib3h_tracing::Lib3hSpan;
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -24,4 +27,13 @@ pub struct P2pGateway {
     endpoint_self: Detach<GatewaySelfEndpoint<()>>,
     /// cached data from inner dht
     this_peer: PeerData,
+
+    pending_outgoing_messages: Vec<PendingOutgoingMessage>,
+}
+
+struct PendingOutgoingMessage {
+    span: Lib3hSpan,
+    uri: Url,
+    payload: Opaque,
+    parent_msg: GatewayToChildMessage,
 }

@@ -44,6 +44,7 @@ impl P2pGateway {
                 peer_uri: Url::parse("none:").unwrap(),
                 timestamp: 0, // FIXME
             },
+            pending_outgoing_messages: Vec::new(),
         }
     }
     /// Helper Ctor

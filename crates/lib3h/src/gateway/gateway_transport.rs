@@ -12,6 +12,8 @@ use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
+use lib3h_protocol::data_types::Opaque;
+use crate::gateway::PendingOutgoingMessage;
 
 /// Private internals
 impl P2pGateway {
@@ -72,48 +74,56 @@ impl P2pGateway {
     pub(crate) fn send(
         &mut self,
         span: Lib3hSpan,
-        uri: &Url,
-        payload: &[u8],
+        uri: Url,
+        payload: Opaque,
         parent_msg: GatewayToChildMessage,
     ) -> GhostResult<()> {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
-        self.inner_transport.request(
-            span,
+        println!("GATEWAY SEND");
+        //let uri = uri.clone();
+        //let payload = payload.to_vec();
+        self.inner_transport.request_options(
+            span.child("SendMessage"),
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
-                payload: payload.to_vec().into(),
+                payload: payload.clone(),
             },
             // Might receive a response back from our message.
             // Forward it back to parent
-            Box::new(|_me, response| {
+            Box::new(move |me, response| {
                 // check for timeout
-                let response = match response {
-                    GhostCallbackData::Timeout => {
-                        parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
-                        return Ok(());
-                    }
-                    GhostCallbackData::Response(response) => response,
-                };
-                // Check if response is an error
-                let response = match response {
-                    Err(e) => {
-                        parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?;
-                        return Ok(());
-                    }
-                    Ok(response) => response,
-                };
-                // Must be a SendMessage response
-                if let transport::protocol::RequestToChildResponse::SendMessageSuccess = response {
-                    parent_msg.respond(Ok(GatewayRequestToChildResponse::Transport(
-                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
-                    )))?;
-                } else {
-                    parent_msg.respond(Err(format!("bad response type: {:?}", response).into()))?;
+                println!("GATEWAY SEND CALLBACK");
+                //let send_success = transport::protocol::RequestToChildResponse::SendMessageSuccess;
+
+                match response {
+                    // Success case:
+                    GhostCallbackData::Response(Ok(transport::protocol::RequestToChildResponse::SendMessageSuccess)) => parent_msg.respond(
+                        Ok(GatewayRequestToChildResponse::Transport(transport::protocol::RequestToChildResponse::SendMessageSuccess))
+                    )?,
+                    // No error but something other than SendMessageSuccess:
+                    GhostCallbackData::Response(Ok(_)) => parent_msg.respond(Err(format!("bad response type: {:?}", response).into()))?,
+                    // Transport error:
+                    GhostCallbackData::Response(Err(_error)) => me.pending_outgoing_messages.push(
+                        PendingOutgoingMessage { uri, payload, span: span.follower("pending message"), parent_msg }
+                    ), //parent_msg.respond(Err(Lib3hError::new(ErrorKind::TransportError(e))))?,
+                    // Timeout:
+                    GhostCallbackData::Timeout => me.pending_outgoing_messages.push(
+                        PendingOutgoingMessage { uri, payload, span: span.follower("pending message"), parent_msg }
+                    ),
                 }
                 Ok(())
             }),
+            GhostTrackRequestOptions{timeout: Some(std::time::Duration::from_millis(2000))}
         )
+    }
+
+    pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
+        let pending: Vec<PendingOutgoingMessage> = self.pending_outgoing_messages.drain(..).collect();
+        for p in pending {
+            let _ = self.send(p.span, p.uri, p.payload, p.parent_msg);
+        }
+        Ok(())
     }
 
     /// Handle Transport request sent to use by our parent
@@ -168,8 +178,8 @@ impl P2pGateway {
                             if let Some(peer_data) = maybe_peer_data {
                                 me.send(
                                     span.follower("TODO send"),
-                                    &peer_data.peer_uri,
-                                    &payload,
+                                    peer_data.peer_uri.clone(),
+                                    payload,
                                     parent_request,
                                 )
                                 .unwrap(); // FIXME unwrap
