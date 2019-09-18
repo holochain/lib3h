@@ -2,7 +2,7 @@ use crate::transport::error::{TransportError, TransportResult};
 use lib3h_protocol::{data_types::Opaque, DidWork};
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Mutex,
+    sync::{Mutex, MutexGuard},
 };
 use url::Url;
 
@@ -27,7 +27,7 @@ pub enum MemoryEvent {
 
 /// Type for holding a map of 'url -> InMemoryServer'
 pub struct MemoryNet {
-    pub server_map: HashMap<Url, Mutex<MemoryServer>>,
+    pub server_map: HashMap<Url, MemoryServer>,
     url_count: u32,
 }
 
@@ -58,8 +58,8 @@ impl MemoryVerse {
         self.server_maps.get_mut(network)
     }
 
-    pub fn get_server(&mut self, network: &str, url: &Url) -> Option<&Mutex<MemoryServer>> {
-        self.server_maps.get(network)?.server_map.get(url)
+    pub fn get_server(&mut self, network: &str, url: &Url) -> Option<&mut MemoryServer> {
+        self.server_maps.get_mut(network)?.server_map.get_mut(url)
     }
 
     pub fn bind(&mut self, network: &str) -> Url {
@@ -70,7 +70,7 @@ impl MemoryVerse {
         let binding = net.new_url();
         net.server_map
             .entry(binding.clone())
-            .or_insert_with(|| Mutex::new(MemoryServer::new(&binding)));
+            .or_insert_with(|| MemoryServer::new(&binding));
         binding
     }
 }
@@ -78,6 +78,16 @@ impl MemoryVerse {
 // this is the actual memory space for our in-memory servers
 lazy_static! {
     pub static ref MEMORY_VERSE: Mutex<MemoryVerse> = Mutex::new(MemoryVerse::new());
+}
+
+pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
+    for _ in 0..10 {
+        match MEMORY_VERSE.try_lock() {
+            Ok(l) => return l,
+            _ => std::thread::sleep(std::time::Duration::from_millis(1)),
+        }
+    }
+    panic!("unable to obtain mutex lock on MEMORY_VERSE");
 }
 
 //--------------------------------------------------------------------------------------------------
