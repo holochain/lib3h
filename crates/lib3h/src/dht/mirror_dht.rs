@@ -4,9 +4,9 @@ use crate::{
     time,
 };
 use detach::prelude::*;
+use holochain_tracing::HSpan;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
-use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -311,7 +311,7 @@ impl
         let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
         for command in command_list {
             self.endpoint_self
-                .publish(Lib3hSpan::todo("where does span come from?"), command)?;
+                .publish(HSpan::todo("where does span come from?"), command)?;
         }
         Ok(did_work.into())
     }

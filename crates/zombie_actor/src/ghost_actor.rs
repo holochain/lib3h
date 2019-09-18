@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use lib3h_tracing::Lib3hSpan;
+use holochain_tracing::HSpan;
 
 //--------------------------------------------------------------------------------------------------
 // GhostParentWrapper
@@ -106,14 +106,14 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, span: Lib3hSpan, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, span: HSpan, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(span, payload)
     }
 
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        span: Lib3hSpan,
+        span: HSpan,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -123,7 +123,7 @@ impl<
     /// see GhostContextEndpoint::request
     fn request_options(
         &mut self,
-        span: Lib3hSpan,
+        span: HSpan,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -343,14 +343,14 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, span: Lib3hSpan, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, span: HSpan, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(span, payload)
     }
 
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        span: Lib3hSpan,
+        span: HSpan,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -359,7 +359,7 @@ impl<
 
     fn request_options(
         &mut self,
-        span: Lib3hSpan,
+        span: HSpan,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -387,7 +387,7 @@ mod tests {
     use super::*;
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
     //    use predicates::prelude::*;
     type TestError = String;
 

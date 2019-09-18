@@ -5,10 +5,10 @@ extern crate lazy_static;
 extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 use detach::prelude::*;
+use holochain_tracing::{test_span, HSpan};
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::{test_span, Lib3hSpan};
 use std::{
     collections::{HashMap, HashSet},
     sync::RwLock,
@@ -256,7 +256,7 @@ impl TestTransport {
         let our_url = self.bound_url.as_ref().unwrap();
         if let Ok(events) = mockernet.process_for(our_url.clone()) {
             for e in events {
-                let span = Lib3hSpan::fixme();
+                let span = HSpan::fixme();
                 match e {
                     MockernetEvent::Message { from, payload } => {
                         self.endpoint_self

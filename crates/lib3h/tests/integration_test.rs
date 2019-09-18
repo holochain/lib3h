@@ -18,6 +18,7 @@ extern crate multihash;
 mod node_mock;
 mod test_suites;
 
+use holochain_tracing::HSpan;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
@@ -25,7 +26,6 @@ use lib3h::{
     transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::Address;
-use lib3h_tracing::Lib3hSpan;
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
@@ -61,7 +61,7 @@ fn enable_logging_for_test(enable: bool) {
 
 fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        HSpan::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -79,7 +79,7 @@ fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrapp
 
 fn construct_wss_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        HSpan::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),

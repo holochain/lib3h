@@ -2,7 +2,7 @@ use crate::{
     GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
     RequestId, WorkWasDone,
 };
-use lib3h_tracing::Lib3hSpan;
+use holochain_tracing::HSpan;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -12,13 +12,13 @@ enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
         requester_bt: backtrace::Backtrace,
         request_id: Option<RequestId>,
         payload: Request,
-        span: Lib3hSpan,
+        span: HSpan,
     },
     Response {
         responder_bt: backtrace::Backtrace,
         request_id: RequestId,
         payload: Result<Response, Error>,
-        span: Lib3hSpan,
+        span: HSpan,
     },
 }
 
@@ -37,7 +37,7 @@ pub struct GhostMessage<
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<MessageToOther, MessageToSelfResponse, Error>,
     >,
-    span: Lib3hSpan,
+    span: HSpan,
 }
 
 impl<
@@ -67,7 +67,7 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
-        span: Lib3hSpan,
+        span: HSpan,
     ) -> Self {
         Self {
             requester_bt,
@@ -87,7 +87,7 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
-        span: Lib3hSpan,
+        span: HSpan,
     ) -> Self {
         GhostMessage::new(requester_bt, Some(request_id), message, sender, span)
     }
@@ -100,7 +100,7 @@ impl<
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
-        span: Lib3hSpan,
+        span: HSpan,
     ) -> Self {
         GhostMessage::new(requester_bt, None, message, sender, span)
     }
@@ -142,7 +142,7 @@ impl<
         self.request_id.is_some()
     }
 
-    pub fn span(&self) -> &Lib3hSpan {
+    pub fn span(&self) -> &HSpan {
         &self.span
     }
 }
@@ -305,13 +305,13 @@ pub trait GhostCanTrack<
 >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, span: Lib3hSpan, payload: RequestToOther) -> GhostResult<()>;
+    fn publish(&mut self, span: HSpan, payload: RequestToOther) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
     fn request(
         &mut self,
-        span: Lib3hSpan,
+        span: HSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()>;
@@ -320,7 +320,7 @@ pub trait GhostCanTrack<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        span: Lib3hSpan,
+        span: HSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -375,7 +375,7 @@ impl<
 {
     fn priv_request(
         &mut self,
-        mut span: Lib3hSpan,
+        mut span: HSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -428,7 +428,7 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, mut span: Lib3hSpan, payload: RequestToOther) -> GhostResult<()> {
+    fn publish(&mut self, mut span: HSpan, payload: RequestToOther) -> GhostResult<()> {
         span.event("GhostChannel::publish");
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: backtrace::Backtrace::new(),
@@ -443,7 +443,7 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        mut span: Lib3hSpan,
+        mut span: HSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
@@ -460,7 +460,7 @@ impl<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        mut span: Lib3hSpan,
+        mut span: HSpan,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -568,7 +568,7 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
     type TestError = String;
 
     #[derive(Debug)]
