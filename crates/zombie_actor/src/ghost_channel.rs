@@ -1,8 +1,6 @@
-use crate::{
-    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
-    RequestId, WorkWasDone,
-};
+use crate::{GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone, GhostError};
 use holochain_tracing::Span;
+use crate::ghost_error::ErrorKind;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -518,7 +516,7 @@ impl<
                         break;
                     }
                     crossbeam_channel::TryRecvError::Disconnected => {
-                        return Err("disconnected GhostActor Endpoint".into());
+                        return Err(GhostError::new(ErrorKind::EndpointDisconnected));
                     }
                 },
             }

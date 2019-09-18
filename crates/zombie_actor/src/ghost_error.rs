@@ -29,6 +29,7 @@ pub enum ErrorKind {
     RequestIdNotFound(String),
     /// Generic stringified errors
     Other(String),
+    EndpointDisconnected,
     /// Hints that destructuring should not be exhaustive.
     ///
     /// This enum may grow additional variants, so this makes sure clients

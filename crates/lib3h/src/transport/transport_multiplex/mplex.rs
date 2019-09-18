@@ -355,9 +355,16 @@ impl<
             self.handle_msg_from_inner(msg)?;
         }
         detach_run!(&mut self.route_endpoints, |re| {
-            for (_route_spec, endpoint) in re.iter_mut() {
+            let mut disconnected_endpoints = Vec::new();
+            for (route_spec, endpoint) in re.iter_mut() {
                 if let Err(e) = endpoint.process(self) {
-                    return Err(TransportError::from(e));
+                    match e.kind() {
+                        ErrorKind::EndpointDisconnected => {
+                            disconnected_endpoints.push(route_spec.clone());
+                            continue
+                        },
+                        _ => return Err(TransportError::from(e)),
+                    }
                 }
                 for msg in endpoint.drain_messages() {
                     if let Err(e) = self.handle_msg_from_route(msg) {
@@ -365,6 +372,7 @@ impl<
                     }
                 }
             }
+            disconnected_endpoints.iter().for_each(|e| {re.remove(e);});
             Ok(())
         })?;
         Ok(false.into())

@@ -85,7 +85,7 @@ pub mod prelude {
         create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
         GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
         GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
-        GhostTrackerBookmarkOptions, WorkWasDone,
+        GhostTrackerBookmarkOptions, WorkWasDone, ghost_error::ErrorKind,
     };
 }
 
