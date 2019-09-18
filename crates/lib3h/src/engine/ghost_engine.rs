@@ -212,7 +212,7 @@ impl<'engine> GhostEngine<'engine> {
                 cmd,
                 Box::new(|_, response| {
                     let response = match response {
-                        GhostCallbackData::Timeout => panic!(),
+                        GhostCallbackData::Timeout => panic!("bootstrap timeout"),
                         GhostCallbackData::Response(r) => r,
                     };
                     if let Err(e) = response {
