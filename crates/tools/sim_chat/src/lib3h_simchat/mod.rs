@@ -203,7 +203,7 @@ impl Lib3hSimChat {
         }
     }
 
-    /// Uses n3h to try and bootstrap via the given URI
+    /// Uses lib3h to try and bootstrap via the given URI
     /// This will trigger a sys message on dispatch and success
     fn bootstrap(bootstrap_uri: Url, chat_message_sender: crossbeam_channel::Sender<ChatEvent>) {
         send_sys_message(
