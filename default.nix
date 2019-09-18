@@ -25,7 +25,8 @@ with holonix.pkgs;
   name = "dev-shell";
 
   buildInputs = [ ]
-   ++ holonix.shell.buildInputs
+   ++ holonix.rust.buildInputs
+   ++ holonix.darwin.buildInputs
 
    # release hooks
    ++ (holonix.pkgs.callPackage ./scripts/nix/release {
