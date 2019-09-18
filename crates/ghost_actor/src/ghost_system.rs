@@ -124,6 +124,7 @@ pub trait GhostHandler<'lt, X: 'lt, P: GhostProtocol> {
     ) -> GhostResult<()>;
 }
 
+#[allow(clippy::complexity)]
 pub struct TestActorHandler<'lt, X: 'lt> {
     phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_actor_print: Box<dyn FnMut(X, String) -> GhostResult<()> + 'lt>,
@@ -150,6 +151,7 @@ impl<'lt, X: 'lt> GhostHandler<'lt, X, Fake> for TestActorHandler<'lt, X> {
     }
 }
 
+#[allow(clippy::complexity)]
 pub struct TestOwnerHandler<'lt, X: 'lt> {
     phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_owner_print: Box<dyn FnMut(X, String) -> GhostResult<()> + 'lt>,
@@ -185,21 +187,53 @@ pub trait GhostEndpoint<'lt, X: 'lt, P: GhostProtocol> {
 }
 
 pub trait TestActorRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
-    fn event_to_actor_print(&mut self, message: String) -> GhostResult<()>;
+    fn event_to_actor_print(&mut self, message: String) -> GhostResult<()> {
+        self.send_protocol(Fake::APrint(message), None)
+    }
     fn request_to_actor_add_1(
         &mut self,
         message: i32,
         cb: GhostResponseCb<'lt, X, Result<i32, ()>>,
-    ) -> GhostResult<()>;
+    ) -> GhostResult<()> {
+        let cb: GhostResponseCb<'lt, X, Fake> = Box::new(move |me, resp| {
+            cb(
+                me,
+                match resp {
+                    Ok(r) => match r {
+                        Fake::AAdd1R(m) => Ok(m),
+                        _ => panic!("bad"),
+                    },
+                    Err(e) => Err(e),
+                },
+            )
+        });
+        self.send_protocol(Fake::AAdd1(message), Some(cb))
+    }
 }
 
 pub trait TestOwnerRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
-    fn event_to_owner_print(&mut self, message: String) -> GhostResult<()>;
+    fn event_to_owner_print(&mut self, message: String) -> GhostResult<()> {
+        self.send_protocol(Fake::OPrint(message), None)
+    }
     fn request_to_owner_sub_1(
         &mut self,
         message: i32,
         cb: GhostResponseCb<'lt, X, Result<i32, ()>>,
-    ) -> GhostResult<()>;
+    ) -> GhostResult<()> {
+        let cb: GhostResponseCb<'lt, X, Fake> = Box::new(move |me, resp| {
+            cb(
+                me,
+                match resp {
+                    Ok(r) => match r {
+                        Fake::OSub1R(m) => Ok(m),
+                        _ => panic!("bad"),
+                    },
+                    Err(e) => Err(e),
+                },
+            )
+        });
+        self.send_protocol(Fake::OSub1(message), Some(cb))
+    }
 }
 
 pub trait GhostActor<
