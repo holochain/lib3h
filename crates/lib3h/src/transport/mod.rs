@@ -3,6 +3,7 @@
 pub mod error;
 pub mod memory_mock;
 pub mod protocol;
+pub mod websocket;
 
 mod transport_encoding;
 pub use transport_encoding::TransportEncoding;

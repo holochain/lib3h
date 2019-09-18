@@ -23,7 +23,6 @@ pub struct NodeMock {
     //_maybe_temp_dir: Option<tempfile::TempDir>,
     /// The Node's networking engine
     pub engine: WrappedGhostLib3h,
-    pub net: String, // NETWORK NAME for in-memory
     /// Config used by the engine
     pub config: EngineConfig,
     /// Factory used to create the engine
@@ -71,7 +70,6 @@ impl NodeMock {
         NodeMock {
             // _maybe_temp_dir,
             engine,
-            net: config.net.to_string(),
             config,
             engine_factory,
             agent_id: agent_id_arg.clone(),

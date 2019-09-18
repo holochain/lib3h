@@ -10,7 +10,7 @@ use crate::{
     error::*,
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
-    transport::TransportMultiplex,
+    transport::{websocket::tls::TlsConfig, TransportMultiplex},
 };
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
@@ -67,12 +67,17 @@ enum RealEngineTrackerData {
     HoldEntryRequested,
 }
 
-/// Struct holding all config settings for the RealEngine
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+/// Transport specific configuration
+pub enum TransportConfig {
+    Websocket(TlsConfig),
+    Memory(String),
+}
+
+/// Struct holding all config settings for the Engine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EngineConfig {
-    //pub tls_config: TlsConfig,
-    pub net: String, // network name for memmory transport
-    pub socket_type: String,
+    pub transport_configs: Vec<TransportConfig>,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,
     pub work_dir: PathBuf,
