@@ -1,4 +1,4 @@
-use lib3h_tracing::Lib3hSpan;
+use holochain_tracing::Span;
 use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
@@ -119,18 +119,14 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
     }
 
     /// register a callback
-    pub fn bookmark(
-        &mut self,
-        span: Lib3hSpan,
-        cb: GhostCallback<UserData, CbData, E>,
-    ) -> RequestId {
+    pub fn bookmark(&mut self, span: Span, cb: GhostCallback<UserData, CbData, E>) -> RequestId {
         self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_options(
         &mut self,
-        _span: Lib3hSpan,
+        _span: Span,
         cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
@@ -163,7 +159,14 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
         data: Result<CbData, E>,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
-            None => Err(GhostError::new(ErrorKind::RequestIdNotFound)),
+            None => {
+                let msg = format!(
+                    "{:?} in {:?}",
+                    &request_id,
+                    self.pending.keys().collect::<Vec<_>>()
+                );
+                Err(GhostError::new(ErrorKind::RequestIdNotFound(msg)))
+            }
             Some(entry) => (entry.cb)(owner, GhostCallbackData::Response(data)),
         }
     }
@@ -173,7 +176,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
 
     type TestError = String;
 
@@ -236,8 +239,8 @@ mod tests {
                 Ok(TestCallbackData("here's the data again!".into())),
             );
             assert_eq!(
-                "Err(GhostError(RequestIdNotFound))",
-                format!("{:?}", result)
+                b"Err(GhostError(RequestIdNotFound",
+                &format!("{:?}", result).as_bytes()[..32],
             )
         });
     }

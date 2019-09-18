@@ -3,10 +3,10 @@ use crate::{
     transport::{error::*, protocol::*},
 };
 use detach::prelude::*;
+use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 use url::Url;
 
@@ -158,7 +158,7 @@ impl TransportEncoding {
     }
 
     /// private send a handshake to a remote address
-    fn send_handshake(&mut self, span: Lib3hSpan, uri: &Url) -> GhostResult<()> {
+    fn send_handshake(&mut self, span: Span, uri: &Url) -> GhostResult<()> {
         let payload = InterimEncodingProtocol::Handshake {
             magic: 0x1f6c,
             network_id: self.this_network_id.clone(),
@@ -175,7 +175,7 @@ impl TransportEncoding {
     }
 
     /// send an error
-    fn send_error(&mut self, span: Lib3hSpan, uri: &Url, message: String) -> TransportResult<()> {
+    fn send_error(&mut self, span: Span, uri: &Url, message: String) -> TransportResult<()> {
         let payload = InterimEncodingProtocol::Error {
             message: message.clone(),
         }
@@ -191,7 +191,7 @@ impl TransportEncoding {
     }
 
     /// private handler for inner transport IncomingConnection events
-    fn handle_incoming_connection(&mut self, span: Lib3hSpan, uri: Url) -> TransportResult<()> {
+    fn handle_incoming_connection(&mut self, span: Span, uri: Url) -> TransportResult<()> {
         match self.connections_no_id_to_id.get(&uri) {
             Some(remote_addr) => {
                 // if we've already seen this connection, just forward it?
@@ -215,7 +215,7 @@ impl TransportEncoding {
     /// private handler received handshake from remote
     fn handle_received_remote_handshake(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         uri: &Url,
         remote_id: String,
     ) -> TransportResult<()> {
@@ -263,7 +263,7 @@ impl TransportEncoding {
     /// private handler for inner transport ReceivedData events
     fn handle_received_data(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         uri: Url,
         payload: Opaque,
     ) -> TransportResult<()> {
@@ -321,7 +321,7 @@ impl TransportEncoding {
     /// private handler for inner transport TransportError events
     fn handle_transport_error(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         uri: Url,
         error: TransportError,
     ) -> TransportResult<()> {
@@ -485,8 +485,8 @@ impl
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_tracing::test_span;
     use lib3h_sodium::SodiumCryptoSystem;
-    use lib3h_tracing::test_span;
 
     const N_ID: &'static str = "HcNCjjt9OTf7Fk3wc3qH3bHsEKkcwb7gzY8SudxIvWxedi4iThtj4jE9fn8cpvz";
     const ID_1: &'static str = "HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz";
@@ -568,11 +568,11 @@ mod tests {
                         // bit of a hack, just always send an incoming connection
                         // in front of all received data messages
                         self.endpoint_self.publish(
-                            Lib3hSpan::fixme(),
+                            Span::fixme(),
                             RequestToParent::IncomingConnection { uri: uri.clone() },
                         )?;
                         self.endpoint_self.publish(
-                            Lib3hSpan::fixme(),
+                            Span::fixme(),
                             RequestToParent::ReceivedData { uri, payload },
                         )?;
                     }

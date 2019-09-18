@@ -3,7 +3,7 @@ extern crate crossbeam_channel;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate detach;
-extern crate lib3h_tracing;
+extern crate holochain_tracing;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -93,7 +93,7 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
 
     type FakeError = String;
 

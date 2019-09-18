@@ -18,6 +18,7 @@ extern crate multihash;
 mod node_mock;
 mod test_suites;
 
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
@@ -25,7 +26,6 @@ use lib3h::{
     transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::Address;
-use lib3h_tracing::Lib3hSpan;
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
@@ -61,7 +61,7 @@ fn enable_logging_for_test(enable: bool) {
 
 fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -79,7 +79,7 @@ fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrapp
 
 fn construct_wss_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -104,7 +104,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
-        transport_configs: vec![TransportConfig::Memory],
+        transport_configs: vec![TransportConfig::Memory(fn_name.clone())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -221,9 +221,10 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
     println!("========================");
 
+    let fn_name = fn_name(test_fn_ptr);
     // Setup
-    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name);
+    let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name);
     if can_setup {
         setup_two_nodes(&mut alex, &mut billy);
     }

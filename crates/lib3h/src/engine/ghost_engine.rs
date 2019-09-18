@@ -18,8 +18,8 @@ use crate::{
         websocket::actor::GhostTransportWebsocket, TransportEncoding, TransportMultiplex,
     },
 };
+use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
-use lib3h_tracing::Lib3hSpan;
 use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
@@ -70,7 +70,7 @@ pub fn handle_gossipTo<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(Lib3hSpan::fixme(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }
@@ -83,7 +83,7 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with for GhostEngine
     pub fn new(
-        span: Lib3hSpan,
+        span: Span,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -91,7 +91,8 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<Self> {
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
-        match &config.transport_configs[0] {
+        let transport_config = config.transport_configs[0].clone();
+        match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
                 Self::with_transport(
@@ -103,19 +104,19 @@ impl<'engine> GhostEngine<'engine> {
                     Box::new(GhostTransportWebsocket::new(tls)),
                 )
             }
-            TransportConfig::Memory => Self::with_transport(
+            TransportConfig::Memory(net) => Self::with_transport(
                 span,
                 crypto,
                 config,
                 name,
                 dht_factory,
-                Box::new(GhostTransportMemory::new()),
+                Box::new(GhostTransportMemory::new(&net)),
             ),
         }
     }
 
     pub fn with_transport(
-        span: Lib3hSpan,
+        span: Span,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -153,7 +154,7 @@ impl<'engine> GhostEngine<'engine> {
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
         multiplexer.as_mut().request(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             GatewayRequestToChild::Transport(RequestToChild::Bind {
                 spec: config.bind_url.clone(),
             }),
@@ -201,7 +202,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.multiplexer.as_mut().publish(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
                 engine.this_net_peer.peer_uri.clone(),
             )),
@@ -211,7 +212,7 @@ impl<'engine> GhostEngine<'engine> {
         Ok(engine)
     }
 
-    fn priv_connect_bootstraps(&mut self, span: Lib3hSpan) -> GhostResult<()> {
+    fn priv_connect_bootstraps(&mut self, span: Span) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
@@ -293,7 +294,7 @@ impl<'engine> GhostEngine<'engine> {
         data: BootstrapData,
     ) -> GhostResult<()> {
         self.multiplexer.request(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             GatewayRequestToChild::Bootstrap(data),
             Box::new(move |_me, response| {
                 match response {
@@ -401,7 +402,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn broadcast_join(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         space_address: Address,
         peer: PeerData,
     ) -> GhostResult<()> {
@@ -444,7 +445,7 @@ impl<'engine> GhostEngine<'engine> {
             let provider_agent_id = entry_list.provider_agent_id.clone();
             // Check aspects and only request entry with new aspects
             space_gateway.request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
                     entry_address.clone(),
                 )),
@@ -479,7 +480,7 @@ impl<'engine> GhostEngine<'engine> {
                             };
 
                             me.lib3h_endpoint.request(
-                                Lib3hSpan::fixme(),
+                                Span::fixme(),
                                 Lib3hToClient::HandleFetchEntry(msg_data),
                                 Box::new(move |me, response| {
                                     let space_gateway = me
@@ -492,7 +493,7 @@ impl<'engine> GhostEngine<'engine> {
                                         GhostCallbackData::Response(Ok(
                                             Lib3hToClientResponse::HandleFetchEntryResult(msg),
                                         )) => space_gateway.publish(
-                                            Lib3hSpan::fixme(),
+                                            Span::fixme(),
                                             GatewayRequestToChild::Dht(
                                                 DhtRequestToChild::BroadcastEntry(
                                                     msg.entry.clone(),
@@ -541,7 +542,7 @@ impl<'engine> GhostEngine<'engine> {
             };
             space_gateway
                 .publish(
-                    Lib3hSpan::fixme(),
+                    Span::fixme(),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
                         shallow_entry,
                     )),
@@ -553,7 +554,7 @@ impl<'engine> GhostEngine<'engine> {
 
     /// Create a gateway for this agent in this space, if not already part of it.
     /// Must not already be part of this space.
-    fn handle_join(&mut self, span: Lib3hSpan, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_join(&mut self, span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
@@ -610,7 +611,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
-    fn handle_leave(&mut self, _span: Lib3hSpan, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_leave(&mut self, _span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         match self.space_gateway_map.remove(&chain_id) {
             Some(_) => Ok(()), //TODO is there shutdown code we need to call
@@ -620,7 +621,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn handle_direct_message(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         msg: &DirectMessageData,
         is_response: bool,
     ) -> Lib3hResult<()> {
@@ -667,11 +668,7 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_publish_entry(
-        &mut self,
-        span: Lib3hSpan,
-        msg: &ProvidedEntryData,
-    ) -> Lib3hResult<()> {
+    fn handle_publish_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
         // MIRROR - reflecting hold for now
         for aspect in &msg.entry.aspect_list {
             let data = StoreEntryAspectData {
@@ -707,7 +704,7 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_hold_entry(&mut self, span: Lib3hSpan, msg: &ProvidedEntryData) -> Lib3hResult<()> {
+    fn handle_hold_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
@@ -724,7 +721,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn handle_query_entry(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         msg: ClientToLib3hMessage,
         data: QueryEntryData,
     ) -> Lib3hResult<()> {
@@ -821,7 +818,7 @@ pub fn handle_gossip_to<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(Lib3hSpan::fixme(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }
@@ -829,8 +826,8 @@ pub fn handle_gossip_to<
 mod tests {
     use super::*;
     use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
+    use holochain_tracing::test_span;
     use lib3h_sodium::SodiumCryptoSystem;
-    use lib3h_tracing::test_span;
     use std::path::PathBuf;
     use url::Url;
 
@@ -838,10 +835,10 @@ mod tests {
         //    state: String,
     }
 
-    fn make_test_engine() -> GhostEngine<'static> {
+    fn make_test_engine(test_net: &str) -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = EngineConfig {
-            transport_configs: vec![TransportConfig::Memory],
+            transport_configs: vec![TransportConfig::Memory(test_net.into())],
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),
             log_level: 'd',
@@ -858,8 +855,9 @@ mod tests {
     }
 
     fn make_test_engine_wrapper(
+        net: &str,
     ) -> GhostEngineParentWrapper<MockCore, GhostEngine<'static>, Lib3hError> {
-        let engine = make_test_engine();
+        let engine = make_test_engine(net);
         let lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_engine");
         lib3h
@@ -867,7 +865,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_construct() {
-        let lib3h = make_test_engine_wrapper();
+        let lib3h = make_test_engine_wrapper("test_ghost_engine_construct");
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
 
         // check that bootstrap nodes were connected to
@@ -884,7 +882,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_join() {
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_join");
 
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
@@ -899,7 +897,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_leave() {
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_leave");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -914,7 +912,7 @@ mod tests {
 
     #[test]
     fn test_ghost_engine_dm() {
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_dm");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -956,7 +954,7 @@ mod tests {
     fn test_ghost_engine_publish() {
         enable_logging_for_test(true);
 
-        let mut engine = make_test_engine_wrapper();
+        let mut engine = make_test_engine_wrapper("test_ghost_engine_publish");
         let req_data = make_test_join_request();
         let result = engine.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -1009,7 +1007,7 @@ mod tests {
     fn test_ghost_engine_hold() {
         enable_logging_for_test(true);
 
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_hold");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -1075,7 +1073,7 @@ mod tests {
     fn test_ghost_engine_query() {
         enable_logging_for_test(true);
 
-        let mut lib3h = make_test_engine_wrapper();
+        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_query");
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());

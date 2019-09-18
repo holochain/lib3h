@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate hexf;
-#[macro_use]
 mod utils;
 #[macro_use]
 extern crate lazy_static;
@@ -13,10 +12,11 @@ extern crate regex;
 
 #[macro_use]
 extern crate log;
-use lib3h_tracing::test_span;
+use holochain_tracing::test_span;
 
-use lib3h_ghost_actor::{wait_can_track_did_work, wait1_for_messages};
+use lib3h_ghost_actor::{wait_did_work, wait1_for_messages};
 
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GhostEngine, TransportConfig},
@@ -28,7 +28,6 @@ use lib3h_ghost_actor::prelude::*;
 use crate::lib3h::engine::CanAdvertise;
 use lib3h_protocol::{data_types::*, protocol::*};
 use lib3h_sodium::SodiumCryptoSystem;
-use lib3h_tracing::Lib3hSpan;
 use std::path::PathBuf;
 use url::Url;
 use utils::constants::*;
@@ -57,13 +56,13 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap<'engine>(name: &str, bs: Option<Vec<Url>>) -> GhostEngine<'engine> {
+fn basic_setup_mock_bootstrap<'engine>(net: &str, name: &str, bs: Option<Vec<Url>>) -> GhostEngine<'engine> {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
     };
     let config = EngineConfig {
-        transport_configs: vec![TransportConfig::Memory],
+        transport_configs: vec![TransportConfig::Memory(net.into())],
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -73,7 +72,7 @@ fn basic_setup_mock_bootstrap<'engine>(name: &str, bs: Option<Vec<Url>>) -> Ghos
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),
@@ -88,11 +87,11 @@ fn basic_setup_mock_bootstrap<'engine>(name: &str, bs: Option<Vec<Url>>) -> Ghos
     engine
 }
 
-fn basic_setup_mock<'engine>(name: &str) -> GhostEngine<'engine> {
-    basic_setup_mock_bootstrap(name, None)
+fn basic_setup_mock<'engine>(net: &str, name: &str) -> GhostEngine<'engine> {
+    basic_setup_mock_bootstrap(net, name, None)
 }
 
-fn basic_setup_wss(name: &str) -> GhostEngine {
+fn basic_setup_wss<'engine>(name: &str) -> GhostEngine<'engine> {
     let config = EngineConfig {
         transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
         bootstrap_nodes: vec![],
@@ -104,7 +103,7 @@ fn basic_setup_wss(name: &str) -> GhostEngine {
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         name,
@@ -137,7 +136,7 @@ fn basic_track_test_wss() {
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine: GhostEngine = basic_setup_mock("basic_track_test_mock");
+    let mut engine: GhostEngine = basic_setup_mock("alex", "basic_track_test_mock");
     basic_track_test(&mut engine);
 }
 
@@ -179,7 +178,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 
-    let f : GhostCallback<(), _, _> = Box::new(|&mut _user_data, _cb_data| { Ok(())});
+    let f : GhostCallback<(), _, _> = Box::new(|&mut _user_data, _cb_data| { Ok(()) });
     parent_endpoint
         .request(
             test_span("publish join space again"),
@@ -188,7 +187,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
         )
         .unwrap();
 
-    wait_can_track_did_work!(engine, user_data);
+    wait_did_work!(engine);
 
     /*
     let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
@@ -198,9 +197,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
             to_agent_id: ALEX_AGENT_ID.clone(),
             result_info: "Unknown error encountered: \'Already joined space\'.".into(),
         }),
-    ));
+    ));*/
 
-    assert_one_processed!(engine, engine, handle_failure_result);
-
-    */
 }
+

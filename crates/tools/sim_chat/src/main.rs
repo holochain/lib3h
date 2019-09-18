@@ -8,17 +8,17 @@ use regex::Regex;
 use std::path::PathBuf;
 use url::Url;
 
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GhostEngine, TransportConfig},
 };
 use lib3h_sodium::SodiumCryptoSystem;
-use lib3h_tracing::Lib3hSpan;
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
-        transport_configs: vec![TransportConfig::Memory],
+        transport_configs: vec![TransportConfig::Memory("test_net".into())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -29,7 +29,7 @@ fn engine_builder() -> GhostEngine<'static> {
     };
     let dht_factory = MirrorDht::new_with_config;
     GhostEngine::new(
-        Lib3hSpan::fixme(), // TODO: actually hook up real tracer here
+        Span::fixme(), // TODO: actually hook up real tracer here
         crypto,
         config,
         "test_engine",

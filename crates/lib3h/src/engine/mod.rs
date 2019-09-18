@@ -71,7 +71,7 @@ enum RealEngineTrackerData {
 /// Transport specific configuration
 pub enum TransportConfig {
     Websocket(TlsConfig),
-    Memory,
+    Memory(String),
 }
 
 /// Struct holding all config settings for the Engine

@@ -7,9 +7,9 @@ use crate::transport::{
     },
 };
 use detach::Detach;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::Lib3hSpan;
 use url::Url;
 
 pub type Message =
@@ -170,20 +170,16 @@ impl GhostTransportWebsocket {
                         "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
                         uri, error
                     );
-                    self.endpoint_self.publish(
-                        Lib3hSpan::fixme(),
-                        RequestToParent::ErrorOccured { uri, error },
-                    )?;
+                    self.endpoint_self
+                        .publish(Span::fixme(), RequestToParent::ErrorOccured { uri, error })?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
                 }
                 StreamEvent::IncomingConnectionEstablished(uri) => {
                     trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
-                    self.endpoint_self.publish(
-                        Lib3hSpan::fixme(),
-                        RequestToParent::IncomingConnection { uri },
-                    )?;
+                    self.endpoint_self
+                        .publish(Span::fixme(), RequestToParent::IncomingConnection { uri })?;
                 }
                 StreamEvent::ReceivedData(uri, payload) => {
                     trace!(
@@ -191,7 +187,7 @@ impl GhostTransportWebsocket {
                         String::from_utf8(payload.clone())
                     );
                     self.endpoint_self.publish(
-                        Lib3hSpan::fixme(),
+                        Span::fixme(),
                         RequestToParent::ReceivedData {
                             uri,
                             payload: Opaque::from(payload),
@@ -347,7 +343,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -370,7 +366,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
             .request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport2_address.clone(),
                 },
@@ -406,7 +402,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::SendMessage {
                     uri: expected_transport2_address.clone(),
                     payload: b"test message".to_vec().into(),
@@ -442,7 +438,7 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
             .request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -475,7 +471,7 @@ mod tests {
                     Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
                 t2_endpoint
                     .request(
-                        Lib3hSpan::fixme(),
+                        Span::fixme(),
                         RequestToChild::Bind {
                             spec: expected_transport2_address.clone(),
                         },
@@ -493,7 +489,7 @@ mod tests {
                 // now send a message from transport1 to transport2 over the bound addresses
                 t1_endpoint
                     .request(
-                        Lib3hSpan::fixme(),
+                        Span::fixme(),
                         RequestToChild::SendMessage {
                             uri: expected_transport2_address.clone(),
                             payload: b"test message".to_vec().into(),
