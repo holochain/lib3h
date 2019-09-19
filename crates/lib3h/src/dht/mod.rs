@@ -460,11 +460,11 @@ pub mod tests {
         // Flush any pending requests from child
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
-                for mut request in request_list {
+        for mut request in request_list {
             let payload = request.take_message().expect("exists");
             println!(" - {:?}", payload);
-            }
-            
+        }
+
         // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a

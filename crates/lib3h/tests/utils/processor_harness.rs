@@ -271,7 +271,7 @@ macro_rules! process_one {
             .process()
             .map_err(|err| dbg!(err))
             .unwrap_or((false, vec![]));
-            println!("process_one!: did_work = {}", did_work);
+        println!("process_one!: did_work = {}", did_work);
         if events.is_empty() {
         } else {
             let events = dbg!(events);
@@ -414,8 +414,6 @@ macro_rules! wait_connect {
     }};
 }
 
-
-
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort
 /// is true
 #[allow(unused_macros)]
@@ -459,7 +457,6 @@ macro_rules! wait_did_work {
         did_work
     }};
 }
-
 
 /// Continues processing the GhostActor trait until no work is being done.
 #[allow(unused_macros)]
