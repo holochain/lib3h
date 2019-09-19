@@ -48,8 +48,8 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send a message from Billy to Alex
     // =================================
     println!("\n Billy trying to send DirectMessage...\n");
-    let req_id = billy.send_direct_message(&ALEX_AGENT_ID, ASPECT_CONTENT_1.clone());
-    assert_process_success!(billy, req_id);
+    let _req_id = billy.send_direct_message(&ALEX_AGENT_ID, ASPECT_CONTENT_1.clone());
+    wait_did_work!(billy, billy);
     // Alex should not receive it.
     let res = alex.wait_with_timeout(
         Box::new(one_is!(Lib3hServerProtocol::HandleSendDirectMessage(_))),
