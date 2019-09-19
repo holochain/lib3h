@@ -271,7 +271,6 @@ macro_rules! process_one {
             .process()
             .map_err(|err| dbg!(err))
             .unwrap_or((false, vec![]));
-        println!("process_one!: did_work = {}", did_work);
         if events.is_empty() {
         } else {
             let events = dbg!(events);

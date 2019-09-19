@@ -134,6 +134,7 @@ impl<'engine> GhostEngine<'engine> {
             //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
+                // zero len() means its just a ping, no need to deserialize and handle
                 if payload.len() > 0 {
                     let mut de = Deserializer::new(&payload[..]);
                     let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
