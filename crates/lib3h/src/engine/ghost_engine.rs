@@ -927,9 +927,16 @@ mod tests {
             content: b"foo content".to_vec().into(),
         };
 
+        let msg = GhostMessage::test_constructor();
+
         let result = lib3h
             .as_mut()
-            .handle_direct_message(test_span(""), &direct_message, false);
+            .handle_direct_message(
+                test_span(""),
+                msg,
+                &direct_message,
+                false
+            );
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 
