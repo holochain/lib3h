@@ -9,6 +9,7 @@ use crate::utils::seeded_prng::SeededBooleanPrng;
 
 use std::sync::Mutex;
 
+#[allow(dead_code)]
 pub const MAX_PROCESSING_LOOPS: usize = 100;
 
 lazy_static! {
