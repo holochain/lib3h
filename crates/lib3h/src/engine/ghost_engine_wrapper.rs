@@ -1,8 +1,10 @@
 use crate::{
     engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
     error::*,
-    track::Tracker
+    track::Tracker,
 };
+
+use std::convert::TryInto;
 
 use detach::Detach;
 use holochain_tracing::Span;
@@ -34,7 +36,8 @@ where
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
-    tracker : Tracker<ClientToLib3hResponse>
+    tracker:
+        Tracker<GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, EngineError>>,
 }
 
 fn server_failure(
@@ -83,7 +86,7 @@ where
             engine: Detach::new(GhostParentWrapper::new(engine, name)),
             name: name.into(),
             client_request_responses: Vec::new(),
-            tracker: Tracker::new("client_to_lib3_response".into(), 2000)
+            tracker: Tracker::new("client_to_lib3_response".into(), 2000),
         }
     }
 
@@ -207,16 +210,29 @@ where
             _ => unimplemented!(),
         };
 
-        let result = if request_id == "" {
-            self.engine.publish(Span::fixme(), client_msg.into())
+        let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();
+        if let Ok(client_to_lib3h) = maybe_client_to_lib3h {
+            let result = if request_id == "" {
+                self.engine.publish(Span::fixme(), client_to_lib3h)
+            } else {
+                self.engine.request(
+                    Span::fixme(),
+                    client_to_lib3h,
+                    LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
+                )
+            };
+            result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         } else {
-            self.engine.request(
-                Span::fixme(),
-                client_msg.into(),
-                LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
-            )
-        };
-        result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
+            // TODO Handle errors better here!
+            let lib3h_to_client_response: Lib3hToClientResponse =
+                client_msg.clone().try_into().unwrap();
+            // TODO Handle optional value better here!
+            let ghost_message: GhostMessage<_, _, Lib3hToClientResponse, _> =
+                self.tracker.remove(request_id.as_str()).unwrap();
+            // TODO Handle errors better here!
+            let _result = ghost_message.respond(Ok(lib3h_to_client_response));
+            Ok(())
+        }
     }
 
     /// Process Lib3hClientProtocol message inbox and
@@ -225,19 +241,18 @@ where
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
         // get any "server" messages that came as responses to the client requests
-        let mut responses: Vec<Lib3hServerProtocol> = self.client_request_responses.drain(0..).collect();
+        let mut responses: Vec<Lib3hServerProtocol> =
+            self.client_request_responses.drain(0..).collect();
 
         for mut msg in self.engine.as_mut().drain_messages() {
-            let lib3h_to_client_msg : Lib3hToClient = msg.take_message().expect("exists");
+            let request_id = self.tracker.reserve();
 
-            if let Some(client_to_lib3h_response) = maybe_client_to_lib3h(lib3h_to_client_msg) {
-                let req_id = self.tracker.reserve();
-                let tracked : Lib3hToClientResponse = lib3h_to_client_msg.into();
-                self.tracker.set(&req_id, Some(tracked));
-            } else {
-                let lib3h_server_protocol_msg : Lib3hServerProtocol = lib3h_to_client_msg.into();
-                responses.push(lib3h_server_protocol_msg);
-            }
+            let lib3h_to_client_msg: Lib3hToClient = msg.take_message().expect("exists");
+
+            self.tracker.set(request_id.as_str(), Some(msg));
+
+            let lib3h_server_protocol_msg: Lib3hServerProtocol = lib3h_to_client_msg.into();
+            responses.push(lib3h_server_protocol_msg);
         }
 
         Ok((*did_work, responses))
