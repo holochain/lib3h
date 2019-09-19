@@ -63,7 +63,7 @@ impl Discovery for GhostTransportMemory {
         let uri = self
             .maybe_my_address
             .clone()
-            .ok_or_else(|| DiscoveryError::new_other("must bind before discovering"))?;
+            .ok_or_else(|| DiscoveryError::new_other("must bind before advertising"))?;
         self.network.lock().unwrap()
             .advertise(uri, self.machine_id.clone());
         Ok(())
@@ -408,6 +408,7 @@ mod tests {
 
         // check that machine_ids were advertised
         let found = transport1.discover().unwrap();
+        println!("FOUND: {:?}", found);
         assert!(
             &format!("{:?}", found[0]) == "\"mem://addr_1/\""
                 || &format!("{:?}", found[0]) == "\"mem://addr_2/\""

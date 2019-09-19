@@ -27,14 +27,16 @@ pub enum MemoryEvent {
 
 /// Type for holding a map of 'url -> InMemoryServer'
 pub struct MemoryNet {
+    name: String,
     pub server_map: HashMap<Url, MemoryServer>,
     url_count: u32,
     advertised_machines: HashSet<(Url, Address)>,
 }
 
 impl MemoryNet {
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         MemoryNet {
+            name: name.into(),
             server_map: HashMap::new(),
             url_count: 0,
             advertised_machines: HashSet::new(),
@@ -55,6 +57,7 @@ impl MemoryNet {
     }
     pub fn bind(&mut self) -> Url {
         let binding = self.new_url();
+        trace!("In Memory bind for {}, url:{}",self.name,binding);
         self.server_map
             .entry(binding.clone())
             .or_insert_with(|| MemoryServer::new(&binding));
@@ -73,13 +76,11 @@ impl MemoryVerse {
             server_maps: HashMap::new(),
         }
     }
-    pub fn get_network(&mut self, network: &str) -> Arc<Mutex<MemoryNet>> {
-        let net = Arc::new(Mutex::new(MemoryNet::new()));
+    pub fn get_network(&mut self, network_name: &str) -> Arc<Mutex<MemoryNet>> {
         self
             .server_maps
-            .entry(network.to_string())
-            .or_insert_with(|| net.clone());
-        net
+            .entry(network_name.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(MemoryNet::new(network_name)))).clone()
     }
 }
 
@@ -89,7 +90,7 @@ lazy_static! {
 }
 
 pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
-    for _ in 0..1 {
+    for _ in 0..10 {
         match MEMORY_VERSE.try_lock() {
             Ok(l) => return l,
             _ => std::thread::sleep(std::time::Duration::from_millis(1)),
