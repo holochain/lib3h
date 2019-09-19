@@ -200,6 +200,13 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                let payload_wrapped = payload.clone(); // not really wrapped
+
+                // TODO - XXX - We need to wrap this so we know how / where
+                //              to put this message (which gateway) on the
+                //              remote side
+
+                /*
                 let to_agent_id = uri.path();
                 trace!(
                     "try-send {:?} {} {} bytes",
@@ -224,6 +231,7 @@ impl P2pGateway {
                     .serialize(&mut Serializer::new(&mut payload_wrapped))
                     .unwrap();
                 let payload_wrapped = Opaque::from(payload_wrapped);
+                */
 
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
