@@ -477,7 +477,7 @@ pub mod tests {
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
         trace!("request_list len: {}", request_list.len());
-        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
+        let mut bundle_list = Vec::new();
         for mut request in request_list {
             let payload = request.take_message().expect("exists");
             trace!(" - {:?}", payload);
@@ -485,7 +485,7 @@ pub mod tests {
                 DhtRequestToParent::GossipTo(gossip_data) => {
                     assert_eq!(gossip_data.peer_address_list.len(), 1);
                     assert_eq!(gossip_data.peer_address_list[0], PEER_B);
-                    bundle = gossip_data.bundle.clone();
+                    bundle_list.push(gossip_data.bundle.clone());
                 }
                 _ => panic!("Expecting a different request type"),
             }
@@ -494,6 +494,7 @@ pub mod tests {
         // Flush any pending requests from child
         let request_list = dht_b.drain_messages();
         println!("dht_b.drain_messages(): {}", request_list.len());
+        for bundle in bundle_list {
         // Post a remoteGossipTo
         let remote_gossip = RemoteGossipBundleData {
             from_peer_address: PEER_A.to_owned(),
@@ -505,19 +506,21 @@ pub mod tests {
                 DhtRequestToChild::HandleGossip(remote_gossip),
             )
             .unwrap();
+            }
         dht_b.process(&mut ud).unwrap();
         // Should receive a HoldRequested
         let request_list = dht_b.drain_messages();
-        assert_eq!(request_list.len(), 1);
+        let mut did_get_hold_entry = false;
         for mut request in request_list {
-            match request.take_message().expect("exists") {
-                DhtRequestToParent::HoldEntryRequested { from_peer, entry } => {
-                    assert_eq!(from_peer, PEER_B.clone());
-                    assert_eq!(entry, entry_data.clone());
-                }
-                _ => panic!("Expecting a different request type"),
+            let payload = request.take_message().expect("exists");
+            trace!(" - {:?}", payload);
+            if let DhtRequestToParent::HoldEntryRequested { from_peer, entry } = payload {
+                assert_eq!(from_peer, PEER_B.clone());
+                assert_eq!(entry, entry_data.clone());
+                did_get_hold_entry = true;
             }
         }
+        assert!(did_get_hold_entry);
         // Tell DHT B to hold it
         dht_b
             .publish(
@@ -561,28 +564,25 @@ pub mod tests {
         dht_a.process(&mut ud).unwrap();
         // Should return gossipTos of C to B
         let request_list = dht_a.drain_messages();
-        assert_eq!(request_list.len(), 2);
-        let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
+        let mut bundle_list = Vec::new();
         for mut request in request_list {
-            match request.take_message().expect("exists") {
-                DhtRequestToParent::GossipTo(gossip_to) => {
-                    println!("gossip_to = {:?}", gossip_to);
-                    assert_eq!(gossip_to.peer_address_list.len(), 1);
-                    assert!(
-                        gossip_to.peer_address_list[0] == PEER_C
-                            || gossip_to.peer_address_list[0] == PEER_B
-                    );
-                    if gossip_to.peer_address_list[0] == PEER_B {
-                        bundle = gossip_to.bundle.clone();
-                    }
+            if let DhtRequestToParent::GossipTo(gossip_to) = request.take_message().expect("exists") {
+                println!("gossip_to = {:?}", gossip_to);
+                assert!(
+                    gossip_to.peer_address_list[0] == PEER_C
+                        || gossip_to.peer_address_list[0] == PEER_B
+                );
+                if gossip_to.peer_address_list[0] == PEER_B {
+                    bundle_list.push(gossip_to.bundle.clone());
                 }
-                _ => panic!("Expecting a different request type"),
             }
         }
+        assert_ne!(bundle_list.len(), 0);
         // Flush any pending requests from child
         let request_list = dht_b.drain_messages();
         println!("dht_b.drain_messages(): {}", request_list.len());
         // Tell B to hold C from A's gossip
+        for bundle in bundle_list {
         let remote_gossip = RemoteGossipBundleData {
             from_peer_address: PEER_A.to_owned(),
             bundle,
@@ -593,33 +593,31 @@ pub mod tests {
                 DhtRequestToChild::HandleGossip(remote_gossip),
             )
             .unwrap();
+            }
         dht_b.process(&mut ud).unwrap();
         // Should return gossipTos
         let request_list = dht_b.drain_messages();
-        assert_eq!(request_list.len(), 1);
-        let mut peer_to_hold = PeerData {
-            peer_address: "FIXME".to_string(),
-            peer_uri: Url::parse("fixme://host:123").unwrap(),
-            timestamp: 0,
-        };
+        assert_ne!(request_list.len(), 0);
+        let mut peer_to_hold_list = Vec::new();
         for mut request in request_list {
-            match request.take_message().expect("exists") {
-                DhtRequestToParent::HoldPeerRequested(peer) => {
-                    peer_to_hold = peer;
-                    println!("peer_to_hold = {:?}", peer_to_hold);
-                }
-                _ => panic!("Expecting a different request type"),
+            if let DhtRequestToParent::HoldPeerRequested(peer) = request.take_message().expect("exists") {
+                peer_to_hold_list.push(peer.clone());
+                println!("peer_to_hold = {:?}", peer);
             }
         }
+    assert_ne!(peer_to_hold_list.len(), 0);
+    for peer in peer_to_hold_list {
         // Accept HoldPeerRequested
         dht_b
             .publish(
                 test_span(""),
-                DhtRequestToChild::HoldPeer(peer_to_hold.clone()),
+                DhtRequestToChild::HoldPeer(peer.clone()),
             )
             .unwrap();
+            }
         dht_b.process(&mut ud).unwrap();
         // B should have C
+        println!("dht_b should have PEER_C:");
         let peer_info = get_peer(&mut dht_b, PEER_C).unwrap();
         assert_eq!(peer_info, peer_c_data);
     }
