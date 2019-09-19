@@ -526,7 +526,6 @@ mod tests {
         }
     }
 
-    // FIXME: This test is currently flaky on macOS.
     /// Tests if we can release ourself from the network.
     #[test]
     fn release_test() {
@@ -588,7 +587,6 @@ mod tests {
         }
     }
 
-    // FIXME: This test is currently flaky on macOS.
     /// Tests if we are able to query info to other peer on the network for our NetworkId.
     #[test]
     fn query_test() -> MulticastDnsResult<()> {
@@ -652,7 +650,6 @@ mod tests {
         Ok(())
     }
 
-    // FIXME: This test is currently flaky on macOS.
     /// Tests if we are able to make ourselves known on the network.
     #[test]
     fn advertise_test() {
