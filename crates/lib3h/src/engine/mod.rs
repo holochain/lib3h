@@ -71,8 +71,10 @@ enum RealEngineTrackerData {
     HoldEntryRequested,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 /// Transport specific configuration
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+#[serde(tag = "type", content = "data")]
 pub enum TransportConfig {
     Websocket(TlsConfig),
     Memory(String),
