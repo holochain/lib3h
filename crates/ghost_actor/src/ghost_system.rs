@@ -1,4 +1,18 @@
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
+
+fn ghost_try_lock<'a, M>(m: &'a mut Arc<Mutex<M>>) -> MutexGuard<'a, M> {
+    let mut wait_ms = 0;
+    for _ in 0..100 {
+        match m.try_lock() {
+            Ok(g) => return g,
+            Err(_) => {
+                std::thread::sleep(std::time::Duration::from_millis(wait_ms));
+                wait_ms += 1;
+            }
+        }
+    }
+    panic!("failed to obtain mutex lock");
+}
 
 // --- demo --- ///
 
@@ -91,7 +105,7 @@ impl<'lt> GhostSystemInner<'lt> {
 pub struct GhostSystemRef<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessCb<'lt>>,
     // just a refcount
-    _system_inner: Arc<RwLock<GhostSystemInner<'lt>>>,
+    _system_inner: Arc<Mutex<GhostSystemInner<'lt>>>,
 }
 
 impl<'lt> GhostSystemRef<'lt> {
@@ -104,13 +118,13 @@ impl<'lt> GhostSystemRef<'lt> {
     /// spawn / manage a new actor
     pub fn spawn<'a, X: 'lt + Send + Sync, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>>(
         &'a mut self,
-        user_data: Weak<RwLock<X>>,
-        mut actor: A,
+        user_data: Weak<Mutex<X>>,
+        actor: A,
     ) -> GhostResult<GhostEndpointRef<'lt, X, A, P>> {
         let (s1, r1) = crossbeam_channel::unbounded();
         let (s2, r2) = crossbeam_channel::unbounded();
 
-        let actor = Arc::new(RwLock::new(actor));
+        let mut actor = Arc::new(Mutex::new(actor));
         let weak_ref = Arc::downgrade(&actor);
 
         let inflator = GhostInflator {
@@ -121,10 +135,20 @@ impl<'lt> GhostSystemRef<'lt> {
             receiver: r1,
         };
 
-        actor
-            .write()
-            .expect("failed to obtain write lock")
-            .actor_init(weak_ref, inflator)?;
+        ghost_try_lock(&mut actor).actor_init(weak_ref, inflator)?;
+
+        let weak_ref = Arc::downgrade(&actor);
+
+        self.enqueue_processor(Box::new(move || match weak_ref.upgrade() {
+            Some(mut strong_actor) => {
+                let mut strong_actor = ghost_try_lock(&mut strong_actor);
+                match strong_actor.process() {
+                    Ok(()) => true,
+                    Err(e) => panic!("actor.process() error: {:?}", e),
+                }
+            }
+            None => false,
+        }))?;
 
         GhostEndpointRef::new(s1, r2, self, actor, user_data)
     }
@@ -134,7 +158,7 @@ impl<'lt> GhostSystemRef<'lt> {
 /// and provides a process() function to actually execute them
 pub struct GhostSystem<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessCb<'lt>>,
-    system_inner: Arc<RwLock<GhostSystemInner<'lt>>>,
+    system_inner: Arc<Mutex<GhostSystemInner<'lt>>>,
 }
 
 impl<'lt> GhostSystem<'lt> {
@@ -143,7 +167,7 @@ impl<'lt> GhostSystem<'lt> {
         let (process_send, process_recv) = crossbeam_channel::unbounded();
         Self {
             process_send,
-            system_inner: Arc::new(RwLock::new(GhostSystemInner::new(process_recv))),
+            system_inner: Arc::new(Mutex::new(GhostSystemInner::new(process_recv))),
         }
     }
 
@@ -158,10 +182,7 @@ impl<'lt> GhostSystem<'lt> {
 
     /// execute all queued processor functions
     pub fn process(&mut self) -> GhostResult<()> {
-        self.system_inner
-            .write()
-            .expect("failed to obtain write lock")
-            .process()
+        ghost_try_lock(&mut self.system_inner).process()
     }
 }
 
@@ -266,12 +287,12 @@ struct GhostEndpointRefInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
 }
 
 pub struct GhostEndpointRef<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> {
-    inner: Arc<RwLock<GhostEndpointRefInner<'lt, X, P>>>,
+    inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P>>>,
     phantom_a: std::marker::PhantomData<&'lt A>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     req_sender: crossbeam_channel::Sender<(RequestId, GhostResponseCb<'lt, X, P>)>,
     count: u64,
-    a_ref: Arc<RwLock<A>>,
+    a_ref: Arc<Mutex<A>>,
 }
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, X, A, P> {
@@ -279,12 +300,12 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, 
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
         system_ref: &mut GhostSystemRef<'lt>,
-        a_ref: Arc<RwLock<A>>,
-        user_data: Weak<RwLock<X>>,
+        a_ref: Arc<Mutex<A>>,
+        user_data: Weak<Mutex<X>>,
     ) -> GhostResult<Self> {
         let (req_sender, req_receiver) = crossbeam_channel::unbounded();
         let endpoint_ref = Self {
-            inner: Arc::new(RwLock::new(GhostEndpointRefInner {
+            inner: Arc::new(Mutex::new(GhostEndpointRefInner {
                 phantom_x: std::marker::PhantomData,
                 phantom_p: std::marker::PhantomData,
                 receiver,
@@ -299,23 +320,32 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, 
         };
 
         let weak = Arc::downgrade(&endpoint_ref.inner);
-        system_ref.enqueue_processor(Box::new(move || {
-            match weak.upgrade() {
-                Some(_strong_inner) => {
-                    match user_data.upgrade() {
-                        Some(_strong_user_data) => {
-                            // TODO XXX - Hey! we have what we need to process
-                            //
-                            // TODO - receieve reqs / add to callbacks map
-                            //
-                            // TODO - receive messages - check callbacks map
-                            false
+        system_ref.enqueue_processor(Box::new(move || match weak.upgrade() {
+            Some(mut strong_inner) => match user_data.upgrade() {
+                Some(mut strong_user_data) => {
+                    let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                    loop {
+                        match strong_inner.req_receiver.try_recv() {
+                            Ok((id, cb)) => {
+                                strong_inner.callbacks.insert(id, cb);
+                            }
+                            Err(_) => break,
                         }
-                        None => false,
                     }
+
+                    loop {
+                        match strong_inner.receiver.try_recv() {
+                            Ok((maybe_id, message)) => {}
+                            Err(_) => break,
+                        }
+                    }
+
+                    true
                 }
                 None => false,
-            }
+            },
+            None => false,
         }))?;
 
         Ok(endpoint_ref)
@@ -418,14 +448,14 @@ pub struct GhostInflator<'a, 'lt, P: GhostProtocol> {
 impl<'a, 'lt, P: GhostProtocol> GhostInflator<'a, 'lt, P> {
     pub fn inflate<X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>(
         mut self,
-        weak_ref: Weak<RwLock<X>>,
+        weak_ref: Weak<Mutex<X>>,
         handler: H,
     ) -> GhostResult<(GhostSystemRef<'lt>, GhostEndpointRef<'lt, X, (), P>)> {
         let owner_ref = GhostEndpointRef::new(
             self.sender,
             self.receiver,
             &mut self.system_ref,
-            Arc::new(RwLock::new(())),
+            Arc::new(Mutex::new(())),
             weak_ref,
         )?;
         Ok((self.system_ref, owner_ref))
@@ -435,7 +465,7 @@ impl<'a, 'lt, P: GhostProtocol> GhostInflator<'a, 'lt, P> {
 pub trait GhostActor<'lt, P: GhostProtocol, X: 'lt + Send + Sync>: Send + Sync {
     fn actor_init<'a>(
         &'a mut self,
-        weak_ref: Weak<RwLock<X>>,
+        weak_ref: Weak<Mutex<X>>,
         inflator: GhostInflator<'a, 'lt, P>,
     ) -> GhostResult<()>;
     fn process(&mut self) -> GhostResult<()>;
@@ -462,7 +492,7 @@ mod tests {
     impl<'lt> GhostActor<'lt, Fake, TestActor<'lt>> for TestActor<'lt> {
         fn actor_init<'a>(
             &'a mut self,
-            weak_ref: Weak<RwLock<TestActor<'lt>>>,
+            weak_ref: Weak<Mutex<TestActor<'lt>>>,
             inflator: GhostInflator<'a, 'lt, Fake>,
         ) -> GhostResult<()> {
             let (system_ref, mut owner_ref) = inflator.inflate(
@@ -504,7 +534,7 @@ mod tests {
         let mut system_ref = system.create_ref();
 
         struct MyContext {}
-        let my_context = Arc::new(RwLock::new(MyContext {}));
+        let my_context = Arc::new(Mutex::new(MyContext {}));
         let my_context_weak = Arc::downgrade(&my_context);
 
         let mut actor_ref = system_ref
@@ -529,15 +559,15 @@ mod tests {
 
     #[test]
     fn it_can_process() {
-        let count = Arc::new(RwLock::new(0));
+        let mut count = Arc::new(Mutex::new(0));
         let mut system = GhostSystem::new();
 
         {
-            let count = count.clone();
+            let mut count = count.clone();
             system
                 .create_ref()
                 .enqueue_processor(Box::new(move || {
-                    let mut count = count.write().unwrap();
+                    let mut count = ghost_try_lock(&mut count);
                     *count += 1;
                     if *count >= 2 {
                         false
@@ -550,12 +580,12 @@ mod tests {
 
         // should increment
         system.process().unwrap();
-        assert_eq!(1, *count.read().unwrap());
+        assert_eq!(1, *ghost_try_lock(&mut count));
         // should increment
         system.process().unwrap();
-        assert_eq!(2, *count.read().unwrap());
+        assert_eq!(2, *ghost_try_lock(&mut count));
         // removed - should not increment
         system.process().unwrap();
-        assert_eq!(2, *count.read().unwrap());
+        assert_eq!(2, *ghost_try_lock(&mut count));
     }
 }
