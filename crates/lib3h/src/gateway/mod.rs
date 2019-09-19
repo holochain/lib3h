@@ -5,14 +5,14 @@ pub mod gateway_transport;
 pub mod p2p_gateway;
 pub mod protocol;
 
-use crate::{dht::dht_protocol::*, gateway::protocol::*, transport};
+use crate::{dht::dht_protocol::*, engine::GatewayId, gateway::protocol::*, transport};
 use detach::prelude::*;
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 pub struct P2pGateway {
-    /// Used for distinguishing gateways
-    identifier: String,
+    // either network_id or space_address depending on which type of gateway
+    identifier: GatewayId,
 
     /// Transport
     inner_transport: Detach<transport::protocol::TransportActorParentWrapperDyn<Self>>,

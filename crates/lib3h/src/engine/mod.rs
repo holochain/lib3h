@@ -26,7 +26,11 @@ use url::Url;
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
-pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct GatewayId {
+    pub nickname: String,
+    pub id: Address,
+}
 
 fn vec_url_de<'de, D>(deserializer: D) -> Result<Vec<Url>, D::Error>
 where
@@ -77,7 +81,7 @@ pub enum TransportConfig {
 /// Struct holding all config settings for the Engine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EngineConfig {
-    pub network_id: Address,
+    pub network_id: GatewayId,
     pub transport_configs: Vec<TransportConfig>,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,

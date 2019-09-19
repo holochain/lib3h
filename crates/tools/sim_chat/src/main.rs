@@ -11,14 +11,22 @@ use url::Url;
 use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{EngineConfig, GhostEngine, TransportConfig},
+    engine::{EngineConfig, GatewayId, GhostEngine, TransportConfig},
 };
 use lib3h_sodium::SodiumCryptoSystem;
+
+// Real test network-id should be a hc version of sha256 of a string
+fn test_network_id() -> GatewayId {
+    GatewayId {
+        nickname: "test-net".into(),
+        id: "Hc_fake_addr_for_test-net".into(),
+    }
+}
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
-        network_id: "test_network".into(),
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Memory("test_net".into())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),

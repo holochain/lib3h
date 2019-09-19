@@ -10,6 +10,8 @@ pub mod seeded_prng;
 #[macro_use]
 pub mod processor_harness;
 
+use lib3h::engine::GatewayId;
+
 #[allow(unused_macros)]
 macro_rules! assert_process_success {
     ($node: ident, $req: ident) => {
@@ -26,4 +28,12 @@ macro_rules! assert_process_success {
             _ => panic!("Received unexpected Protocol message type"),
         }
     };
+}
+
+// Real test network-id should be a hc version of sha256 of a string
+pub fn test_network_id() -> GatewayId {
+    GatewayId {
+        nickname: "test-net".into(),
+        id: "Hc_fake_addr_for_test-net".into(),
+    }
 }

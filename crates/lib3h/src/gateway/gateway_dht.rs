@@ -52,7 +52,7 @@ impl P2pGateway {
     ) -> Lib3hResult<()> {
         debug!(
             "({}) Serving request from child dht: {:?}",
-            self.identifier, request
+            self.identifier.nickname, request
         );
         let span = request.span().child("handle_dht_RequestToParent");
         match request.take_message().expect("exists") {
@@ -67,7 +67,7 @@ impl P2pGateway {
                 // Connect to every peer we are requested to hold.
                 info!(
                     "{} auto-connect to peer: {} ({})",
-                    self.identifier, peer_data.peer_address, peer_data.peer_uri,
+                    self.identifier.nickname, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
                 self.inner_transport.publish(
