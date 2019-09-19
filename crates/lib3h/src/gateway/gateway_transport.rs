@@ -89,7 +89,7 @@ impl P2pGateway {
     ) -> GhostResult<()> {
         trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
         // Forward to the child Transport
-        self.inner_transport.request_options(
+        self.inner_transport.request(
             span.child("SendMessage"),
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
@@ -131,9 +131,6 @@ impl P2pGateway {
                     }
                 }
             }),
-            GhostTrackRequestOptions {
-                timeout: Some(std::time::Duration::from_millis(2000)),
-            },
         )
     }
 
@@ -237,7 +234,6 @@ impl P2pGateway {
                                         )
                                     }),
                                 )?;
-                                //.unwrap(); // FIXME unwrap
                             } else {
                                 let span_name = format!("P2pGateway -> pending message because no peer found to send PeerData{{{:?}}} Message{{{:?}}}",
                                     maybe_peer_data, payload);
@@ -297,7 +293,6 @@ impl P2pGateway {
                     "({}) Connection Error for {}: {}\n Closing connection.",
                     self.identifier, uri, error,
                 );
-                // self.inner_transport.as_mut().close(id)?;
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
                 // TODO

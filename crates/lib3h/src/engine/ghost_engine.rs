@@ -650,20 +650,14 @@ impl<'engine> GhostEngine<'engine> {
                 Box::new(|_me, response| {
                     debug!("GhostEngine: response to handle_direct_message message: {:?}", response);
                     match response {
-                        GhostCallbackData::Timeout => ghost_message.respond(
-                            Err("Timout in GhostEngine while requesting SendMessage of transport".into())
-                        )?,
-                        GhostCallbackData::Response(response) => {
-                            debug!("GHOST ENGINE send message handler: {:?}", response);
-                            ghost_message.respond(response.map(|r| {
-                                match r {
-                                    GatewayRequestToChildResponse::Transport(_transport_response) =>
-                                        ClientToLib3hResponse::BootstrapSuccess,
-                                    _ => panic!("Got non-transport response from gateway on Transport::SendMessage request?!")
-                                }
-                            }))?
-                        },
-                    }
+                        GhostCallbackData::Response(Ok(
+                                GatewayRequestToChildResponse::Transport(
+                                    transport::protocol::RequestToChildResponse::SendMessageSuccess
+                        ))) => {
+                            panic!("We Need to bookmark this ghost_message so that we can invoke it with a message from the remote peer when they send it back");
+                        }
+                        _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                    };
                     Ok(())
                 })
             )
