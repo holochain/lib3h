@@ -2,7 +2,7 @@ use crate::transport::error::{TransportError, TransportResult};
 use lib3h_protocol::{data_types::Opaque, Address, DidWork};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    sync::{Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard},
 };
 use url::Url;
 
@@ -50,11 +50,22 @@ impl MemoryNet {
         self.url_count += 1;
         Url::parse(&format!("mem://addr_{}", self.url_count).as_str()).unwrap()
     }
+    pub fn get_server(&mut self, url: &Url) -> Option<&mut MemoryServer> {
+        self.server_map.get_mut(url)
+    }
+    pub fn bind(&mut self) -> Url {
+        let binding = self.new_url();
+        self.server_map
+            .entry(binding.clone())
+            .or_insert_with(|| MemoryServer::new(&binding));
+        binding
+    }
+
 }
 
 /// Holds a universe of memory networks so we can run tests in separate universes
 pub struct MemoryVerse {
-    server_maps: HashMap<String, MemoryNet>,
+    server_maps: HashMap<String, Arc<Mutex<MemoryNet>>>,
 }
 impl MemoryVerse {
     pub fn new() -> Self {
@@ -62,24 +73,13 @@ impl MemoryVerse {
             server_maps: HashMap::new(),
         }
     }
-    pub fn get_net(&mut self, network: &str) -> Option<&mut MemoryNet> {
-        self.server_maps.get_mut(network)
-    }
-
-    pub fn get_server(&mut self, network: &str, url: &Url) -> Option<&mut MemoryServer> {
-        self.server_maps.get_mut(network)?.server_map.get_mut(url)
-    }
-
-    pub fn bind(&mut self, network: &str) -> Url {
-        let net = self
+    pub fn get_network(&mut self, network: &str) -> Arc<Mutex<MemoryNet>> {
+        let net = Arc::new(Mutex::new(MemoryNet::new()));
+        self
             .server_maps
             .entry(network.to_string())
-            .or_insert_with(|| MemoryNet::new());
-        let binding = net.new_url();
-        net.server_map
-            .entry(binding.clone())
-            .or_insert_with(|| MemoryServer::new(&binding));
-        binding
+            .or_insert_with(|| net.clone());
+        net
     }
 }
 
@@ -89,7 +89,7 @@ lazy_static! {
 }
 
 pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
-    for _ in 0..100 {
+    for _ in 0..1 {
         match MEMORY_VERSE.try_lock() {
             Ok(l) => return l,
             _ => std::thread::sleep(std::time::Duration::from_millis(1)),
