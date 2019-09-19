@@ -24,57 +24,6 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 use url::Url;
 
-#[allow(non_snake_case)]
-pub fn handle_gossipTo<
-    'engine,
-    G: GhostActor<
-        GatewayRequestToParent,
-        GatewayRequestToParentResponse,
-        GatewayRequestToChild,
-        GatewayRequestToChildResponse,
-        Lib3hError,
-    >,
->(
-    gateway_identifier: &str,
-    gateway: &mut GatewayParentWrapper<GhostEngine<'engine>, G>,
-    gossip_data: GossipToData,
-) -> Lib3hResult<()> {
-    debug!(
-        "({}) handle_gossipTo: {:?}",
-        gateway_identifier, gossip_data,
-    );
-
-    for to_peer_address in gossip_data.peer_address_list {
-        // FIXME
-        //            // TODO #150 - should not gossip to self in the first place
-        //            let me = self.get_this_peer_sync(&mut gateway).peer_address;
-        //            if to_peer_address == me {
-        //                continue;
-        //            }
-        //            // TODO END
-
-        // Convert DHT Gossip to P2P Gossip
-        let p2p_gossip = P2pProtocol::Gossip(GossipData {
-            space_address: gateway_identifier.into(),
-            to_peer_address: to_peer_address.clone().into(),
-            from_peer_address: "FIXME".into(), // FIXME
-            bundle: gossip_data.bundle.clone(),
-        });
-        let mut payload = Vec::new();
-        p2p_gossip
-            .serialize(&mut Serializer::new(&mut payload))
-            .expect("P2pProtocol::Gossip serialization failed");
-        // Forward gossip to the inner_transport
-        // FIXME peer_address to Url convert
-        let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
-            payload: payload.into(),
-        };
-        gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
-    }
-    Ok(())
-}
-
 impl<'engine> CanAdvertise for GhostEngine<'engine> {
     fn advertise(&self) -> Url {
         self.this_net_peer.peer_uri.to_owned()
@@ -83,7 +32,7 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with for GhostEngine
     pub fn new(
-        span: Span,
+        span: Lib3hSpan,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -102,7 +51,6 @@ impl<'engine> GhostEngine<'engine> {
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
         };
-
         let transport = TransportEncoding::new(
             crypto.box_clone(),
             transport_keys.transport_id.clone(),
@@ -133,7 +81,7 @@ impl<'engine> GhostEngine<'engine> {
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
         multiplexer.as_mut().request(
-            Span::fixme(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Transport(RequestToChild::Bind {
                 spec: config.bind_url.clone(),
             }),
@@ -181,7 +129,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.multiplexer.as_mut().publish(
-            Span::fixme(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
                 engine.this_net_peer.peer_uri.clone(),
             )),
@@ -191,12 +139,12 @@ impl<'engine> GhostEngine<'engine> {
         Ok(engine)
     }
 
-    fn priv_connect_bootstraps(&mut self, span: Span) -> GhostResult<()> {
+    fn priv_connect_bootstraps(&mut self, span: Lib3hSpan) -> GhostResult<()> {
         let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                space_address: self.config.network_id.clone(),
+                space_address: "bogus_space".into(),
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
@@ -271,7 +219,7 @@ impl<'engine> GhostEngine<'engine> {
         data: BootstrapData,
     ) -> GhostResult<()> {
         self.multiplexer.request(
-            Span::fixme(),
+            Lib3hSpan::fixme(),
             GatewayRequestToChild::Bootstrap(data),
             Box::new(move |_me, response| {
                 match response {
@@ -379,7 +327,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn broadcast_join(
         &mut self,
-        span: Span,
+        span: Lib3hSpan,
         space_address: Address,
         peer: PeerData,
     ) -> GhostResult<()> {
@@ -422,7 +370,7 @@ impl<'engine> GhostEngine<'engine> {
             let provider_agent_id = entry_list.provider_agent_id.clone();
             // Check aspects and only request entry with new aspects
             space_gateway.request(
-                Span::fixme(),
+                Lib3hSpan::fixme(),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
                     entry_address.clone(),
                 )),
@@ -457,7 +405,7 @@ impl<'engine> GhostEngine<'engine> {
                             };
 
                             me.lib3h_endpoint.request(
-                                Span::fixme(),
+                                Lib3hSpan::fixme(),
                                 Lib3hToClient::HandleFetchEntry(msg_data),
                                 Box::new(move |me, response| {
                                     let space_gateway = me
@@ -470,7 +418,7 @@ impl<'engine> GhostEngine<'engine> {
                                         GhostCallbackData::Response(Ok(
                                             Lib3hToClientResponse::HandleFetchEntryResult(msg),
                                         )) => space_gateway.publish(
-                                            Span::fixme(),
+                                            Lib3hSpan::fixme(),
                                             GatewayRequestToChild::Dht(
                                                 DhtRequestToChild::BroadcastEntry(
                                                     msg.entry.clone(),
@@ -519,7 +467,7 @@ impl<'engine> GhostEngine<'engine> {
             };
             space_gateway
                 .publish(
-                    Span::fixme(),
+                    Lib3hSpan::fixme(),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
                         shallow_entry,
                     )),
@@ -531,7 +479,7 @@ impl<'engine> GhostEngine<'engine> {
 
     /// Create a gateway for this agent in this space, if not already part of it.
     /// Must not already be part of this space.
-    fn handle_join(&mut self, span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_join(&mut self, span: Lib3hSpan, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
@@ -588,7 +536,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
-    fn handle_leave(&mut self, _span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_leave(&mut self, _span: Lib3hSpan, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         match self.space_gateway_map.remove(&chain_id) {
             Some(_) => Ok(()), //TODO is there shutdown code we need to call
@@ -598,7 +546,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn handle_direct_message(
         &mut self,
-        span: Span,
+        span: Lib3hSpan,
         msg: &DirectMessageData,
         is_response: bool,
     ) -> Lib3hResult<()> {
@@ -645,7 +593,11 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_publish_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
+    fn handle_publish_entry(
+        &mut self,
+        span: Lib3hSpan,
+        msg: &ProvidedEntryData,
+    ) -> Lib3hResult<()> {
         // MIRROR - reflecting hold for now
         for aspect in &msg.entry.aspect_list {
             let data = StoreEntryAspectData {
@@ -681,7 +633,7 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_hold_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
+    fn handle_hold_entry(&mut self, span: Lib3hSpan, msg: &ProvidedEntryData) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
@@ -698,7 +650,7 @@ impl<'engine> GhostEngine<'engine> {
 
     fn handle_query_entry(
         &mut self,
-        span: Span,
+        span: Lib3hSpan,
         msg: ClientToLib3hMessage,
         data: QueryEntryData,
     ) -> Lib3hResult<()> {
@@ -795,7 +747,7 @@ pub fn handle_gossip_to<
             uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
             payload: payload.into(),
         };
-        gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(Lib3hSpan::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
 }
@@ -803,8 +755,8 @@ pub fn handle_gossip_to<
 mod tests {
     use super::*;
     use crate::{dht::mirror_dht::MirrorDht, tests::enable_logging_for_test};
-    use holochain_tracing::test_span;
     use lib3h_sodium::SodiumCryptoSystem;
+    use lib3h_tracing::test_span;
     use std::path::PathBuf;
     use url::Url;
 
@@ -812,15 +764,9 @@ mod tests {
         //    state: String,
     }
 
-    // Real test network-id should be a hc version of sha256 of a string
-    fn test_network_id() -> Address {
-        "test-net".into()
-    }
-
     fn make_test_engine(test_net: &str) -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = EngineConfig {
-            network_id: test_network_id(),
             transport_configs: vec![TransportConfig::Memory(test_net.into())],
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),
