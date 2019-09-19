@@ -13,7 +13,8 @@ pub mod processor_harness;
 #[allow(unused_macros)]
 macro_rules! assert_process_success {
     ($node: ident, $req: ident) => {
-        let (did_work, srv_msg_list) = $node.process().unwrap();
+        let _req = $req.clone();
+        let (did_work, _srv_msg_list) = $node.process().unwrap();
         assert!(did_work);
 // TODO - fixed with new test macros
         // assert_eq!(srv_msg_list.len(), 1);

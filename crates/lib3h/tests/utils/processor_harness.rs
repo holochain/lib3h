@@ -9,6 +9,7 @@ use crate::utils::seeded_prng::SeededBooleanPrng;
 
 use std::sync::Mutex;
 
+#[allow(dead_code)]
 pub const MAX_PROCESSING_LOOPS: usize = 100;
 
 lazy_static! {
@@ -417,15 +418,15 @@ macro_rules! wait_connect {
 /// is true
 #[allow(unused_macros)]
 #[macro_export]
-macro_rules! wait_did_work {
+macro_rules! wait_engine_wrapper_did_work {
     ($engine: ident,
      $should_abort: expr
     ) => {{
         let timeout = std::time::Duration::from_millis(2000);
-        $crate::wait_did_work!($engine, $should_abort, timeout)
+        $crate::wait_engine_wrapper_did_work!($engine, $should_abort, timeout)
     }};
     ($engine:ident) => {
-        $crate::wait_did_work!($engine, true)
+        $crate::wait_engine_wrapper_did_work!($engine, true)
     };
     ($engine: ident,
      $should_abort: expr,
@@ -447,7 +448,7 @@ macro_rules! wait_did_work {
             if elapsed > $timeout {
                 break;
             }
-            println!("[{}] wait_did_work", i);
+            println!("[{}] wait_engine_wrapper_did_work", i);
             std::thread::sleep(std::time::Duration::from_millis(1))
         }
         if $should_abort {
@@ -464,7 +465,7 @@ macro_rules! wait_until_no_work {
     ($engine: ident) => {{
         let mut did_work;
         loop {
-            did_work = $crate::wait_did_work!($engine, false);
+            did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
             if !did_work {
                 break;
             }
@@ -479,7 +480,7 @@ macro_rules! wait_until_did_work {
     ($engine: ident) => {{
         let mut did_work;
         loop {
-            did_work = $crate::wait_did_work!($engine, false);
+            did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
             if did_work {
                 break;
             }

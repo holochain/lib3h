@@ -14,12 +14,12 @@ pub mod tests {
         tests::enable_logging_for_test,
     };
     use detach::prelude::*;
+    use holochain_tracing::test_span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
         Address,
     };
-    use lib3h_tracing::test_span;
     use url::Url;
 
     lazy_static! {
