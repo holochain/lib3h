@@ -323,6 +323,7 @@ impl MirrorDht {
         debug!("@MirrorDht@ serving request: {:?}", request);
         let span = request.span().child("handle_request_from_parent");
         let msg = request.take_message().expect("exists");
+        debug!("@MirrorDht@ - request: {:?}", msg);
         match msg {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {

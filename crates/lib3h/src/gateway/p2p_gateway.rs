@@ -36,7 +36,7 @@ impl P2pGateway {
                 inner_transport,
                 "to_child_transport_",
             )),
-            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht")),
+            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
             this_peer: PeerData {
@@ -44,6 +44,7 @@ impl P2pGateway {
                 peer_uri: Url::parse("none:").unwrap(),
                 timestamp: 0, // FIXME
             },
+            pending_outgoing_messages: Vec::new(),
         }
     }
 

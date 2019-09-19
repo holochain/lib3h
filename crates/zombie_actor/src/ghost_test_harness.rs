@@ -109,7 +109,7 @@ macro_rules! wait_until_no_work {
     ($ghost_can_track: ident, $user_data: ident) => {{
         let mut did_work;
         loop {
-            did_work = wait_can_track_did_work!($ghost_can_track, $user_data, false);
+            did_work = $crate::wait_can_track_did_work!($ghost_can_track, $user_data, false);
             if !did_work {
                 break;
             }

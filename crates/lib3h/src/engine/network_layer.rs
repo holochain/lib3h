@@ -17,9 +17,11 @@ use url::Url;
 impl<'engine> GhostEngine<'engine> {
     /// Process whatever the network has in for us.
     pub(crate) fn process_multiplexer(&mut self) -> Lib3hResult<DidWork> {
+        let mut did_work = false;
         // Process the network gateway
         detach_run!(&mut self.multiplexer, |ng| ng.process(self))?;
         for mut request in self.multiplexer.drain_messages() {
+            did_work = true;
             // this should probably be changed so each arm has a different name span
             let span = request.span().child("process_multiplexer");
             let payload = request.take_message().expect("exists");
@@ -33,7 +35,7 @@ impl<'engine> GhostEngine<'engine> {
             }
         }
         // Done
-        Ok(true /* fixme */)
+        Ok(did_work)
     }
 
     /// Handle a DhtRequestToParent sent to us by our network gateway
@@ -134,15 +136,20 @@ impl<'engine> GhostEngine<'engine> {
             //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
-                let mut de = Deserializer::new(&payload[..]);
-                let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                if let Err(e) = maybe_msg {
-                    error!("Failed deserializing msg: {:?}", e);
-                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                // zero len() means its just a ping, no need to deserialize and handle
+                if payload.len() == 0 {
+                    debug!("Implement Ping!");
+                } else {
+                    let mut de = Deserializer::new(&payload[..]);
+                    let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                        Deserialize::deserialize(&mut de);
+                    if let Err(e) = maybe_msg {
+                        error!("Failed deserializing msg: {:?}", e);
+                        return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                    }
+                    let p2p_msg = maybe_msg.unwrap();
+                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
                 }
-                let p2p_msg = maybe_msg.unwrap();
-                self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
             }
         };
         Ok(())
