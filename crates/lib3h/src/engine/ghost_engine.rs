@@ -638,7 +638,7 @@ impl<'engine> GhostEngine<'engine> {
             .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
         space_gateway
-            .publish(
+            .request(
                 span,
                 GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
@@ -647,6 +647,25 @@ impl<'engine> GhostEngine<'engine> {
                         payload: payload.into(),
                     },
                 ),
+                Box::new(|_me, response| {
+                    debug!("GhostEngine: response to handle_direct_message message: {:?}", response);
+                    match response {
+                        GhostCallbackData::Timeout => ghost_message.respond(
+                            Err("Timout in GhostEngine while requesting SendMessage of transport".into())
+                        )?,
+                        GhostCallbackData::Response(response) => {
+                            debug!("GHOST ENGINE send message handler: {:?}", response);
+                            ghost_message.respond(response.map(|r| {
+                                match r {
+                                    GatewayRequestToChildResponse::Transport(transport_response) =>
+                                        ClientToLib3hResponse::BootstrapSuccess
+                                    _ => panic!("Got non-transport response from gateway on Transport::SendMessage request?!")
+                                }
+                            }))?
+                        },
+                    }
+                    Ok(())
+                })
             )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
