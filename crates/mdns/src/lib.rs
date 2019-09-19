@@ -395,13 +395,7 @@ impl MulticastDns {
             // the standard https://tools.ietf.org/html/rfc6762#section-8.3)
             self.broadcast_message(&dmesg)?;
             self.broadcast_message(&dmesg)?;
-
-            // This is needed because of the way macOS (and potentially windows) network stack is
-            // working to avoid failing tests (release, query and advertise).
-            if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
-                self.broadcast_message(&dmesg)?;
-                self.broadcast_message(&dmesg)?;
-            }
+            self.broadcast_message(&dmesg)?;
         }
         Ok(())
     }
@@ -423,7 +417,6 @@ impl Discovery for MulticastDns {
         // next iteration) "every amount of time"
         if self.timestamp.elapsed().as_millis() > self.query_interval_ms {
             self.query()?;
-            // self.responder()?;
             self.timestamp = Instant::now();
         }
 
@@ -449,13 +442,6 @@ impl Discovery for MulticastDns {
             self.broadcast_message(&release_dmesg)?;
             self.broadcast_message(&release_dmesg)?;
             self.broadcast_message(&release_dmesg)?;
-
-            // // This is needed because of the way macOS (and potentially windows) network stack is
-            // // working to avoid failing tests (release, query and advertise).
-            // if cfg!(target_os = "macos") || cfg!(target_os = "windows") {
-            //     self.broadcast_message(&release_dmesg)?;
-            //     self.broadcast_message(&release_dmesg)?;
-            // }
         }
 
         Ok(())
