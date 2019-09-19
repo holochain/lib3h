@@ -116,10 +116,11 @@ impl<'lt> GhostSystemRef<'lt> {
     }
 
     /// spawn / manage a new actor
-    pub fn spawn<'a, X: 'lt + Send + Sync, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>>(
+    pub fn spawn<'a, X: 'lt + Send + Sync, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, H: GhostHandler<'lt, X, P>>(
         &'a mut self,
         user_data: Weak<Mutex<X>>,
         actor: A,
+        handler: H,
     ) -> GhostResult<GhostEndpointRef<'lt, X, A, P>> {
         let (s1, r1) = crossbeam_channel::unbounded();
         let (s2, r2) = crossbeam_channel::unbounded();
@@ -292,7 +293,8 @@ pub struct GhostEndpointRef<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol>
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     req_sender: crossbeam_channel::Sender<(RequestId, GhostResponseCb<'lt, X, P>)>,
     count: u64,
-    a_ref: Arc<Mutex<A>>,
+    // just for ref counting
+    _a_ref: Arc<Mutex<A>>,
 }
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, X, A, P> {
@@ -316,7 +318,7 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, 
             sender,
             req_sender,
             count: 0,
-            a_ref,
+            _a_ref: a_ref,
         };
 
         let weak = Arc::downgrade(&endpoint_ref.inner);
@@ -538,7 +540,16 @@ mod tests {
         let my_context_weak = Arc::downgrade(&my_context);
 
         let mut actor_ref = system_ref
-            .spawn::<MyContext, Fake, TestActor>(my_context_weak, TestActor::new())
+            .spawn::<MyContext, Fake, TestActor, TestOwnerHandler<MyContext>>(my_context_weak, TestActor::new(), TestOwnerHandler {
+                phantom: std::marker::PhantomData,
+                handle_event_to_owner_print: Box::new(|_me, message| {
+                    println!("owner got: {}", message);
+                    Ok(())
+                }),
+                handle_request_to_owner_sub_1: Box::new(|_me, message, cb| {
+                    cb(Ok(message - 1))
+                }),
+            })
             .unwrap();
 
         actor_ref
