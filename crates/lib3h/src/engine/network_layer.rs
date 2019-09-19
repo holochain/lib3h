@@ -36,7 +36,7 @@ impl<'engine> GhostEngine<'engine> {
         }
 
         for (to, payload) in self.multiplexer_defered_sends.drain(..) {
-            println!("########## {} {}", to, payload);
+            // println!("########## {} {}", to, payload);
             self.multiplexer.request(
                 Span::fixme(),
                 GatewayRequestToChild::Transport(
@@ -201,16 +201,17 @@ impl<'engine> GhostEngine<'engine> {
                             our_joined_space_list
                                 .serialize(&mut Serializer::new(&mut payload))
                                 .unwrap();
-                            println!(
+                            trace!(
                                 "AllJoinedSpaceList: {:?} to {:?}",
-                                our_joined_space_list, uri_copy,
+                                our_joined_space_list,
+                                uri_copy,
                             );
                             // we need a transportId, so search for it in the DHT
                             let maybe_peer_data =
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
-                            println!("--- got peerlist: {:?}", maybe_peer_data);
+                            trace!("--- got peerlist: {:?}", maybe_peer_data);
                             if let Some(peer_data) = maybe_peer_data {
-                                println!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                                 me.defer_send(
                                     Url::parse(&peer_data.peer_address).unwrap(),
                                     payload.into(),
@@ -322,7 +323,7 @@ impl<'engine> GhostEngine<'engine> {
                 // no-op
             }
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
-                println!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
+                debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.publish(
                         span.follower("P2pProtocol::BroadcastJoinSpace"),

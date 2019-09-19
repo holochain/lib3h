@@ -127,7 +127,7 @@ impl P2pGateway {
                                             payload: payload.clone().into(),
                                         },
                                         Box::new(move |_me, response| {
-                                            println!(
+                                            debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
                                                 peer.peer_uri, response
                                             );

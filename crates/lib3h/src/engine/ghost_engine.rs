@@ -354,9 +354,11 @@ impl<'engine> GhostEngine<'engine> {
         p2p_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
-        println!(
+        trace!(
             "{} - Broadcasting JoinSpace: {}, {}",
-            self.name, space_address, peer.peer_address,
+            self.name,
+            space_address,
+            peer.peer_address,
         );
         self.multiplexer
             .publish(span, GatewayRequestToChild::SendAll(payload))
