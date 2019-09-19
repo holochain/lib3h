@@ -657,8 +657,8 @@ impl<'engine> GhostEngine<'engine> {
                             debug!("GHOST ENGINE send message handler: {:?}", response);
                             ghost_message.respond(response.map(|r| {
                                 match r {
-                                    GatewayRequestToChildResponse::Transport(transport_response) =>
-                                        ClientToLib3hResponse::BootstrapSuccess
+                                    GatewayRequestToChildResponse::Transport(_transport_response) =>
+                                        ClientToLib3hResponse::BootstrapSuccess,
                                     _ => panic!("Got non-transport response from gateway on Transport::SendMessage request?!")
                                 }
                             }))?
