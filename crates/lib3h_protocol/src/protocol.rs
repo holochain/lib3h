@@ -1,7 +1,10 @@
 use crate::{
     data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
+    error::{ErrorKind, Lib3hProtocolError}
 };
 use url::Url;
+
+use std::convert::TryFrom;
 
 /// Enum holding the message types describe the lib3h protocol.
 /// There are 4 categories of messages:
@@ -102,55 +105,60 @@ pub enum Lib3hToClientResponse {
     HandleGetGossipingEntryListResult(EntryListData),
 }
 
-impl From<Lib3hClientProtocol> for ClientToLib3h {
-    fn from(c: Lib3hClientProtocol) -> Self {
+impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
+    type Error = Lib3hProtocolError;
+    fn try_from(c: Lib3hClientProtocol) -> Result<Self, Self::Error> {
         match c {
-            Lib3hClientProtocol::Connect(connect_data) => ClientToLib3h::Bootstrap(BootstrapData {
+            Lib3hClientProtocol::Connect(connect_data) => Ok(ClientToLib3h::Bootstrap(BootstrapData {
                 space_address: connect_data.network_id.into(),
                 bootstrap_uri: connect_data.peer_uri,
-            }),
-            Lib3hClientProtocol::JoinSpace(space_data) => ClientToLib3h::JoinSpace(space_data),
-            Lib3hClientProtocol::LeaveSpace(space_data) => ClientToLib3h::LeaveSpace(space_data),
+            })),
+            Lib3hClientProtocol::JoinSpace(space_data) =>
+                Ok(ClientToLib3h::JoinSpace(space_data)),
+            Lib3hClientProtocol::LeaveSpace(space_data) =>
+                Ok(ClientToLib3h::LeaveSpace(space_data)),
             Lib3hClientProtocol::SendDirectMessage(direct_message_data) => {
-                ClientToLib3h::SendDirectMessage(direct_message_data)
+                Ok(ClientToLib3h::SendDirectMessage(direct_message_data))
             }
             Lib3hClientProtocol::FetchEntry(fetch_entry_data) => {
-                ClientToLib3h::FetchEntry(fetch_entry_data)
+                Ok(ClientToLib3h::FetchEntry(fetch_entry_data))
             }
             Lib3hClientProtocol::PublishEntry(provided_entry_data) => {
-                ClientToLib3h::PublishEntry(provided_entry_data)
+                Ok(ClientToLib3h::PublishEntry(provided_entry_data))
             }
             Lib3hClientProtocol::HoldEntry(provided_entry_data) => {
-                ClientToLib3h::HoldEntry(provided_entry_data)
+                Ok(ClientToLib3h::HoldEntry(provided_entry_data))
             }
             Lib3hClientProtocol::QueryEntry(query_entry_data) => {
-                ClientToLib3h::QueryEntry(query_entry_data)
+                Ok(ClientToLib3h::QueryEntry(query_entry_data))
             }
-            variant => panic!("{:?} can't convert to ClientToLib3h", variant),
+            variant => Err(Lib3hProtocolError::new(
+                    ErrorKind::Other(format!("{:?} can't convert to ClientToLib3h", variant)))),
         }
     }
 }
 
-impl From<Lib3hClientProtocol> for Lib3hToClientResponse {
-    fn from(c: Lib3hClientProtocol) -> Self {
+impl TryFrom<Lib3hClientProtocol> for Lib3hToClientResponse {
+    type Error = Lib3hProtocolError;
+    fn try_from(c: Lib3hClientProtocol) -> Result<Self, Self::Error> {
         match c {
             Lib3hClientProtocol::HandleSendDirectMessageResult(direct_message_data) => {
-                Lib3hToClientResponse::HandleSendDirectMessageResult(direct_message_data)
+                Ok(Lib3hToClientResponse::HandleSendDirectMessageResult(direct_message_data))
             }
             Lib3hClientProtocol::HandleFetchEntryResult(fetch_entry_result_data) => {
-                Lib3hToClientResponse::HandleFetchEntryResult(fetch_entry_result_data)
+                Ok(Lib3hToClientResponse::HandleFetchEntryResult(fetch_entry_result_data))
             }
             Lib3hClientProtocol::HandleQueryEntryResult(query_entry_result_data) => {
-                Lib3hToClientResponse::HandleQueryEntryResult(query_entry_result_data)
+                Ok(Lib3hToClientResponse::HandleQueryEntryResult(query_entry_result_data))
             }
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(entry_list_data) => {
-                Lib3hToClientResponse::HandleGetAuthoringEntryListResult(entry_list_data)
+                Ok(Lib3hToClientResponse::HandleGetAuthoringEntryListResult(entry_list_data))
             }
             Lib3hClientProtocol::HandleGetGossipingEntryListResult(entry_list_data) => {
-                Lib3hToClientResponse::HandleGetGossipingEntryListResult(entry_list_data)
+                Ok(Lib3hToClientResponse::HandleGetGossipingEntryListResult(entry_list_data))
             }
-
-            variant => panic!("{:?} can't convert to Lib3hToClientResponse", variant),
+            variant => Err(Lib3hProtocolError::new(ErrorKind::Other(
+                        format!("{:?} can't convert to Lib3hToClientResponse", variant)))),
         }
     }
 }

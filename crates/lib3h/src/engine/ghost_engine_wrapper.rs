@@ -1,7 +1,9 @@
 use crate::{
     engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
     error::*,
+    track::Tracker
 };
+
 use detach::Detach;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::*;
@@ -32,6 +34,7 @@ where
     #[allow(dead_code)]
     name: String,
     client_request_responses: Vec<Lib3hServerProtocol>,
+    tracker : Tracker<ClientToLib3hResponse>
 }
 
 fn server_failure(
@@ -80,6 +83,7 @@ where
             engine: Detach::new(GhostParentWrapper::new(engine, name)),
             name: name.into(),
             client_request_responses: Vec::new(),
+            tracker: Tracker::new("client_to_lib3_response".into(), 2000)
         }
     }
 
@@ -221,11 +225,19 @@ where
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
         // get any "server" messages that came as responses to the client requests
-        let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
+        let mut responses: Vec<Lib3hServerProtocol> = self.client_request_responses.drain(0..).collect();
 
         for mut msg in self.engine.as_mut().drain_messages() {
-            let server_msg = msg.take_message().expect("exists");
-            responses.push(server_msg.into());
+            let lib3h_to_client_msg : Lib3hToClient = msg.take_message().expect("exists");
+
+            if let Some(client_to_lib3h_response) = maybe_client_to_lib3h(lib3h_to_client_msg) {
+                let req_id = self.tracker.reserve();
+                let tracked : Lib3hToClientResponse = lib3h_to_client_msg.into();
+                self.tracker.set(&req_id, Some(tracked));
+            } else {
+                let lib3h_server_protocol_msg : Lib3hServerProtocol = lib3h_to_client_msg.into();
+                responses.push(lib3h_server_protocol_msg);
+            }
         }
 
         Ok((*did_work, responses))
