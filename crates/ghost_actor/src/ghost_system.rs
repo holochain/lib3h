@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Weak};
 
 // --- demo --- ///
 
@@ -102,12 +102,16 @@ impl<'lt> GhostSystemRef<'lt> {
     }
 
     /// spawn / manage a new actor
-    pub fn spawn<'a, X: 'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P>>(
+    pub fn spawn<'a, X: 'lt + Send + Sync, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>>(
         &'a mut self,
+        user_data: Weak<RwLock<X>>,
         mut actor: A,
     ) -> GhostResult<GhostEndpointRef<'lt, X, A, P>> {
         let (s1, r1) = crossbeam_channel::unbounded();
         let (s2, r2) = crossbeam_channel::unbounded();
+
+        let actor = Arc::new(RwLock::new(actor));
+        let weak_ref = Arc::downgrade(&actor);
 
         let inflator = GhostInflator {
             phantom_a: std::marker::PhantomData,
@@ -117,9 +121,12 @@ impl<'lt> GhostSystemRef<'lt> {
             receiver: r1,
         };
 
-        actor.actor_init(inflator)?;
+        actor
+            .write()
+            .expect("failed to obtain write lock")
+            .actor_init(weak_ref, inflator)?;
 
-        GhostEndpointRef::new(s1, r2, self, Arc::new(RwLock::new(actor)))
+        GhostEndpointRef::new(s1, r2, self, actor, user_data)
     }
 }
 
@@ -183,7 +190,7 @@ impl GhostProtocol for Fake {
     }
 }
 
-pub trait GhostHandler<'lt, X: 'lt, P: GhostProtocol> {
+pub trait GhostHandler<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     fn trigger(
         &mut self,
         user_data: &mut X,
@@ -193,14 +200,14 @@ pub trait GhostHandler<'lt, X: 'lt, P: GhostProtocol> {
 }
 
 #[allow(clippy::complexity)]
-pub struct TestActorHandler<'lt, X: 'lt> {
+pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
     phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_actor_print: Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt>,
     pub handle_request_to_actor_add_1:
         Box<dyn FnMut(&mut X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
 }
 
-impl<'lt, X: 'lt> GhostHandler<'lt, X, Fake> for TestActorHandler<'lt, X> {
+impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, Fake> for TestActorHandler<'lt, X> {
     fn trigger(
         &mut self,
         user_data: &mut X,
@@ -220,14 +227,14 @@ impl<'lt, X: 'lt> GhostHandler<'lt, X, Fake> for TestActorHandler<'lt, X> {
 }
 
 #[allow(clippy::complexity)]
-pub struct TestOwnerHandler<'lt, X: 'lt> {
+pub struct TestOwnerHandler<'lt, X: 'lt + Send + Sync> {
     phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_owner_print: Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt>,
     pub handle_request_to_owner_sub_1:
         Box<dyn FnMut(&mut X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()> + 'lt>,
 }
 
-impl<'lt, X: 'lt> GhostHandler<'lt, X, Fake> for TestOwnerHandler<'lt, X> {
+impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, Fake> for TestOwnerHandler<'lt, X> {
     fn trigger(
         &mut self,
         user_data: &mut X,
@@ -250,7 +257,7 @@ pub type RequestId = String;
 
 use std::collections::HashMap;
 
-struct GhostEndpointRefInner<'lt, X: 'lt, P: GhostProtocol> {
+struct GhostEndpointRefInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     pub phantom_x: std::marker::PhantomData<&'lt X>,
     pub phantom_p: std::marker::PhantomData<&'lt P>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -258,7 +265,7 @@ struct GhostEndpointRefInner<'lt, X: 'lt, P: GhostProtocol> {
     callbacks: HashMap<RequestId, GhostResponseCb<'lt, X, P>>,
 }
 
-pub struct GhostEndpointRef<'lt, X: 'lt, A: 'lt, P: GhostProtocol> {
+pub struct GhostEndpointRef<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> {
     inner: Arc<RwLock<GhostEndpointRefInner<'lt, X, P>>>,
     phantom_a: std::marker::PhantomData<&'lt A>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -267,12 +274,13 @@ pub struct GhostEndpointRef<'lt, X: 'lt, A: 'lt, P: GhostProtocol> {
     a_ref: Arc<RwLock<A>>,
 }
 
-impl<'lt, X: 'lt, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, X, A, P> {
+impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, X, A, P> {
     fn new(
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
         system_ref: &mut GhostSystemRef<'lt>,
         a_ref: Arc<RwLock<A>>,
+        user_data: Weak<RwLock<X>>,
     ) -> GhostResult<Self> {
         let (req_sender, req_receiver) = crossbeam_channel::unbounded();
         let endpoint_ref = Self {
@@ -290,24 +298,31 @@ impl<'lt, X: 'lt, A: 'lt, P: GhostProtocol> GhostEndpointRef<'lt, X, A, P> {
             a_ref,
         };
 
-        //let weak = Arc::downgrade(&endpoint_ref.inner);
+        let weak = Arc::downgrade(&endpoint_ref.inner);
         system_ref.enqueue_processor(Box::new(move || {
-            /*
             match weak.upgrade() {
-                Some(_strong) => {
-                    false
+                Some(_strong_inner) => {
+                    match user_data.upgrade() {
+                        Some(_strong_user_data) => {
+                            // TODO XXX - Hey! we have what we need to process
+                            //
+                            // TODO - receieve reqs / add to callbacks map
+                            //
+                            // TODO - receive messages - check callbacks map
+                            false
+                        }
+                        None => false,
+                    }
                 }
-                None => false
+                None => false,
             }
-            */
-            false
         }))?;
 
         Ok(endpoint_ref)
     }
 }
 
-impl<'lt, X: 'lt, A: 'lt, P: GhostProtocol> GhostEndpoint<'lt, X, P>
+impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol> GhostEndpoint<'lt, X, P>
     for GhostEndpointRef<'lt, X, A, P>
 {
     fn send_protocol(
@@ -330,7 +345,7 @@ impl<'lt, X: 'lt, A: 'lt, P: GhostProtocol> GhostEndpoint<'lt, X, P>
     }
 }
 
-pub trait GhostEndpoint<'lt, X: 'lt, P: GhostProtocol> {
+pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     fn send_protocol(
         &mut self,
         message: P,
@@ -338,7 +353,7 @@ pub trait GhostEndpoint<'lt, X: 'lt, P: GhostProtocol> {
     ) -> GhostResult<()>;
 }
 
-pub trait TestActorRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
+pub trait TestActorRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, Fake> {
     fn event_to_actor_print(&mut self, message: String) -> GhostResult<()> {
         self.send_protocol(Fake::APrint(message), None)
     }
@@ -363,9 +378,9 @@ pub trait TestActorRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
     }
 }
 
-impl<'lt, X: 'lt, A: 'lt> TestActorRef<'lt, X> for GhostEndpointRef<'lt, X, A, Fake> {}
+impl<'lt, X: 'lt + Send + Sync, A: 'lt> TestActorRef<'lt, X> for GhostEndpointRef<'lt, X, A, Fake> {}
 
-pub trait TestOwnerRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
+pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, Fake> {
     fn event_to_owner_print(&mut self, message: String) -> GhostResult<()> {
         self.send_protocol(Fake::OPrint(message), None)
     }
@@ -390,7 +405,7 @@ pub trait TestOwnerRef<'lt, X: 'lt>: GhostEndpoint<'lt, X, Fake> {
     }
 }
 
-impl<'lt, X: 'lt, A: 'lt> TestOwnerRef<'lt, X> for GhostEndpointRef<'lt, X, A, Fake> {}
+impl<'lt, X: 'lt + Send + Sync, A: 'lt> TestOwnerRef<'lt, X> for GhostEndpointRef<'lt, X, A, Fake> {}
 
 pub struct GhostInflator<'a, 'lt, P: GhostProtocol> {
     phantom_a: std::marker::PhantomData<&'a P>,
@@ -401,8 +416,9 @@ pub struct GhostInflator<'a, 'lt, P: GhostProtocol> {
 }
 
 impl<'a, 'lt, P: GhostProtocol> GhostInflator<'a, 'lt, P> {
-    pub fn inflate<X: 'lt, H: GhostHandler<'lt, X, P>>(
+    pub fn inflate<X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>(
         mut self,
+        weak_ref: Weak<RwLock<X>>,
         handler: H,
     ) -> GhostResult<(GhostSystemRef<'lt>, GhostEndpointRef<'lt, X, (), P>)> {
         let owner_ref = GhostEndpointRef::new(
@@ -410,13 +426,18 @@ impl<'a, 'lt, P: GhostProtocol> GhostInflator<'a, 'lt, P> {
             self.receiver,
             &mut self.system_ref,
             Arc::new(RwLock::new(())),
+            weak_ref,
         )?;
         Ok((self.system_ref, owner_ref))
     }
 }
 
-pub trait GhostActor<'lt, P: GhostProtocol> {
-    fn actor_init<'a>(&'a mut self, inflator: GhostInflator<'a, 'lt, P>) -> GhostResult<()>;
+pub trait GhostActor<'lt, P: GhostProtocol, X: 'lt + Send + Sync>: Send + Sync {
+    fn actor_init<'a>(
+        &'a mut self,
+        weak_ref: Weak<RwLock<X>>,
+        inflator: GhostInflator<'a, 'lt, P>,
+    ) -> GhostResult<()>;
     fn process(&mut self) -> GhostResult<()>;
 }
 
@@ -438,18 +459,25 @@ mod tests {
         }
     }
 
-    impl<'lt> GhostActor<'lt, Fake> for TestActor<'lt> {
-        fn actor_init<'a>(&'a mut self, inflator: GhostInflator<'a, 'lt, Fake>) -> GhostResult<()> {
-            let (system_ref, mut owner_ref) = inflator.inflate(TestActorHandler {
-                phantom: std::marker::PhantomData,
-                handle_event_to_actor_print: Box::new(|_me: &mut TestActor<'lt>, message| {
-                    println!("actor print: {}", message);
-                    Ok(())
-                }),
-                handle_request_to_actor_add_1: Box::new(|_me: &mut TestActor<'lt>, message, cb| {
-                    cb(Ok(message + 1))
-                }),
-            })?;
+    impl<'lt> GhostActor<'lt, Fake, TestActor<'lt>> for TestActor<'lt> {
+        fn actor_init<'a>(
+            &'a mut self,
+            weak_ref: Weak<RwLock<TestActor<'lt>>>,
+            inflator: GhostInflator<'a, 'lt, Fake>,
+        ) -> GhostResult<()> {
+            let (system_ref, mut owner_ref) = inflator.inflate(
+                weak_ref,
+                TestActorHandler {
+                    phantom: std::marker::PhantomData,
+                    handle_event_to_actor_print: Box::new(|_me: &mut TestActor<'lt>, message| {
+                        println!("actor print: {}", message);
+                        Ok(())
+                    }),
+                    handle_request_to_actor_add_1: Box::new(
+                        |_me: &mut TestActor<'lt>, message, cb| cb(Ok(message + 1)),
+                    ),
+                },
+            )?;
             owner_ref.event_to_owner_print("message from actor".to_string())?;
             owner_ref.request_to_owner_sub_1(
                 42,
@@ -475,8 +503,12 @@ mod tests {
         let mut system = GhostSystem::new();
         let mut system_ref = system.create_ref();
 
+        struct MyContext {}
+        let my_context = Arc::new(RwLock::new(MyContext {}));
+        let my_context_weak = Arc::downgrade(&my_context);
+
         let mut actor_ref = system_ref
-            .spawn::<(), Fake, TestActor>(TestActor::new())
+            .spawn::<MyContext, Fake, TestActor>(my_context_weak, TestActor::new())
             .unwrap();
 
         actor_ref
