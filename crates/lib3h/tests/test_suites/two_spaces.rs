@@ -36,7 +36,7 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     let msg_1 = &srv_msg_list[0];
     one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
         let content = std::str::from_utf8(response.result_info.as_slice()).unwrap();
-        assert_eq!(content, "Agent alex does not track space SPACE_A");
+        assert_eq!(content, "Unknown error encountered: \'No space at chainId\'.");
     });
     // Billy should not receive it.
     let res = billy.wait_with_timeout(
