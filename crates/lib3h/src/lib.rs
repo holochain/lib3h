@@ -42,7 +42,7 @@ pub mod tests {
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
         if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "debug");
+            std::env::set_var("RUST_LOG", "trace");
         }
         let _ = env_logger::builder()
             .default_format_timestamp(false)

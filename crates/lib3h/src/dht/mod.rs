@@ -495,18 +495,18 @@ pub mod tests {
         let request_list = dht_b.drain_messages();
         println!("dht_b.drain_messages(): {}", request_list.len());
         for bundle in bundle_list {
-        // Post a remoteGossipTo
-        let remote_gossip = RemoteGossipBundleData {
-            from_peer_address: PEER_A.to_owned(),
-            bundle,
-        };
-        dht_b
-            .publish(
-                test_span(""),
-                DhtRequestToChild::HandleGossip(remote_gossip),
-            )
-            .unwrap();
-            }
+            // Post a remoteGossipTo
+            let remote_gossip = RemoteGossipBundleData {
+                from_peer_address: PEER_A.to_owned(),
+                bundle,
+            };
+            dht_b
+                .publish(
+                    test_span(""),
+                    DhtRequestToChild::HandleGossip(remote_gossip),
+                )
+                .unwrap();
+        }
         dht_b.process(&mut ud).unwrap();
         // Should receive a HoldRequested
         let request_list = dht_b.drain_messages();
@@ -566,7 +566,8 @@ pub mod tests {
         let request_list = dht_a.drain_messages();
         let mut bundle_list = Vec::new();
         for mut request in request_list {
-            if let DhtRequestToParent::GossipTo(gossip_to) = request.take_message().expect("exists") {
+            if let DhtRequestToParent::GossipTo(gossip_to) = request.take_message().expect("exists")
+            {
                 println!("gossip_to = {:?}", gossip_to);
                 assert!(
                     gossip_to.peer_address_list[0] == PEER_C
@@ -583,38 +584,37 @@ pub mod tests {
         println!("dht_b.drain_messages(): {}", request_list.len());
         // Tell B to hold C from A's gossip
         for bundle in bundle_list {
-        let remote_gossip = RemoteGossipBundleData {
-            from_peer_address: PEER_A.to_owned(),
-            bundle,
-        };
-        dht_b
-            .publish(
-                test_span(""),
-                DhtRequestToChild::HandleGossip(remote_gossip),
-            )
-            .unwrap();
-            }
+            let remote_gossip = RemoteGossipBundleData {
+                from_peer_address: PEER_A.to_owned(),
+                bundle,
+            };
+            dht_b
+                .publish(
+                    test_span(""),
+                    DhtRequestToChild::HandleGossip(remote_gossip),
+                )
+                .unwrap();
+        }
         dht_b.process(&mut ud).unwrap();
         // Should return gossipTos
         let request_list = dht_b.drain_messages();
         assert_ne!(request_list.len(), 0);
         let mut peer_to_hold_list = Vec::new();
         for mut request in request_list {
-            if let DhtRequestToParent::HoldPeerRequested(peer) = request.take_message().expect("exists") {
+            if let DhtRequestToParent::HoldPeerRequested(peer) =
+                request.take_message().expect("exists")
+            {
                 peer_to_hold_list.push(peer.clone());
                 println!("peer_to_hold = {:?}", peer);
             }
         }
-    assert_ne!(peer_to_hold_list.len(), 0);
-    for peer in peer_to_hold_list {
-        // Accept HoldPeerRequested
-        dht_b
-            .publish(
-                test_span(""),
-                DhtRequestToChild::HoldPeer(peer.clone()),
-            )
-            .unwrap();
-            }
+        assert_ne!(peer_to_hold_list.len(), 0);
+        for peer in peer_to_hold_list {
+            // Accept HoldPeerRequested
+            dht_b
+                .publish(test_span(""), DhtRequestToChild::HoldPeer(peer.clone()))
+                .unwrap();
+        }
         dht_b.process(&mut ud).unwrap();
         // B should have C
         println!("dht_b should have PEER_C:");
