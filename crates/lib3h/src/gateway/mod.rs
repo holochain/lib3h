@@ -44,5 +44,5 @@ struct PendingOutgoingMessage {
     span: Span,
     uri: Url,
     payload: Opaque,
-    cb: SendCallback,
+    parent_request: GatewayToChildMessage,
 }

@@ -95,7 +95,7 @@ impl P2pGateway {
                 uri: uri.clone(),
                 payload: payload.clone(),
             },
-            Box::new(move |me, response| {
+            Box::new(move |_me, response| {
                 // In case of a transport error or timeout we store the message in the
                 // pending list to retry sending it later
                 match response {
@@ -106,7 +106,7 @@ impl P2pGateway {
                         debug!("Gateway send message successfully");
                         cb(Ok(GatewayRequestToChildResponse::Transport(
                             transport::protocol::RequestToChildResponse::SendMessageSuccess,
-                        )))?;
+                        )))
                     }
                     // No error but something other than SendMessageSuccess:
                     GhostCallbackData::Response(Ok(_)) => {
@@ -114,30 +114,19 @@ impl P2pGateway {
                             "Gateway got bad response type from transport: {:?}",
                             response
                         );
-                        cb(Err(format!("bad response type: {:?}", response).into()))?;
+                        cb(Err(format!("bad response type: {:?}", response).into()))
                     }
                     // Transport error:
-                    GhostCallbackData::Response(Err(_error)) => {
+                    GhostCallbackData::Response(Err(error)) => {
                         debug!("Gateway got error from transport. Adding message to pending");
-                        me.pending_outgoing_messages.push(PendingOutgoingMessage {
-                            uri,
-                            payload,
-                            span: span.follower("pending due to error"),
-                            cb,
-                        });
+                        Err(format!("Transport error while trying to send message: {:?}", error).into())
                     }
                     // Timeout:
                     GhostCallbackData::Timeout => {
                         debug!("Gateway got timeout from transport. Adding message to pending");
-                        me.pending_outgoing_messages.push(PendingOutgoingMessage {
-                            uri,
-                            payload,
-                            span: span.follower("pending due to timeout"),
-                            cb,
-                        });
+                        Err(format!("Ghost timeout error while trying to send message").into())
                     }
                 }
-                Ok(())
             }),
             GhostTrackRequestOptions {
                 timeout: Some(std::time::Duration::from_millis(2000)),
@@ -149,9 +138,26 @@ impl P2pGateway {
         let pending: Vec<PendingOutgoingMessage> =
             self.pending_outgoing_messages.drain(..).collect();
         for p in pending {
-            let _ = self.send(p.span, p.uri, p.payload, p.cb);
+            let transport_request = transport::protocol::RequestToChild::SendMessage {
+                uri: p.uri,
+                payload: p.payload
+            };
+            let _ = self.handle_transport_RequestToChild(
+                p.span,
+                transport_request,
+                p.parent_request
+            )?;
         }
         Ok(())
+    }
+
+    fn add_to_pending(&mut self, span: Span, uri: Url, payload: Opaque, parent_request: GatewayToChildMessage) {
+        self.pending_outgoing_messages.push(PendingOutgoingMessage {
+            span,
+            uri,
+            payload,
+            parent_request,
+        });
     }
 
     /// Handle Transport request sent to use by our parent
@@ -195,9 +201,19 @@ impl P2pGateway {
                     Box::new(move |me, response| {
                         let response = {
                             match response {
-                                GhostCallbackData::Timeout => panic!("timeout"),
+                                GhostCallbackData::Timeout => {
+                                    let span_name = format!("P2pGateway -> pending message because of GhostCallbackData::Timeout");
+                                    debug!("{}", span_name);
+                                    me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
+                                    return Ok(())
+                                },
                                 GhostCallbackData::Response(response) => match response {
-                                    Err(e) => panic!("{:?}", e),
+                                    Err(e) => {
+                                        let span_name = format!("P2pGateway -> pending message because of error: {:?}", e);
+                                        debug!("{}", span_name);
+                                        me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
+                                        return Ok(())
+                                    }
                                     Ok(response) => response,
                                 },
                             }
@@ -214,14 +230,14 @@ impl P2pGateway {
                                                 .map_err(|transport_error| transport_error.into()),
                                         )
                                     }),
-                                )
-                                .unwrap(); // FIXME unwrap
+                                )?;
+                                //.unwrap(); // FIXME unwrap
                             } else {
-                                parent_request.respond(Err(format!(
-                                    "no peer found to send PeerData{{{:?}}} Message{{{:?}}}",
-                                    maybe_peer_data, payload
-                                )
-                                .into()))?;
+                                let span_name = format!("P2pGateway -> pending message because no peer found to send PeerData{{{:?}}} Message{{{:?}}}",
+                                    maybe_peer_data, payload);
+                                debug!("{}", span_name);
+                                me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
+                                return Ok(())
                             };
                         } else {
                             parent_request.respond(Err(format!(
