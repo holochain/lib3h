@@ -34,7 +34,7 @@ impl P2pGateway {
                 if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
                     // Send to other node our PeerAddress
                     let our_peer_address = P2pProtocol::PeerAddress(
-                        me.identifier.to_string(),
+                        me.identifier.id.to_owned().into(),
                         this_peer.peer_address,
                         this_peer.timestamp,
                     );
@@ -44,7 +44,7 @@ impl P2pGateway {
                         .unwrap();
                     trace!(
                         "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
-                        me.identifier,
+                        me.identifier.nickname,
                         our_peer_address,
                         uri,
                     );
@@ -87,7 +87,12 @@ impl P2pGateway {
         payload: Opaque,
         cb: SendCallback,
     ) -> GhostResult<()> {
-        trace!("({}).send() {} | {}", self.identifier, uri, payload.len());
+        trace!(
+            "({}).send() {} | {}",
+            self.identifier.nickname,
+            uri,
+            payload.len()
+        );
         // Forward to the child Transport
         self.inner_transport.request(
             span.child("SendMessage"),
@@ -297,7 +302,7 @@ impl P2pGateway {
     ) -> TransportResult<()> {
         debug!(
             "({}) Serving request from child transport: {:?}",
-            self.identifier, msg
+            self.identifier.nickname, msg
         );
         let span = msg.span().child("handle_transport_RequestToParent");
         let request = msg.take_message().expect("exists");
@@ -306,12 +311,15 @@ impl P2pGateway {
                 // TODO
                 error!(
                     "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier, uri, error,
+                    self.identifier.nickname, uri, error,
                 );
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
                 // TODO
-                info!("({}) Incoming connection opened: {}", self.identifier, uri);
+                info!(
+                    "({}) Incoming connection opened: {}",
+                    self.identifier.nickname, uri
+                );
                 self.handle_incoming_connection(
                     span.child("transport::protocol::RequestToParent::IncomingConnection"),
                     uri.clone(),
@@ -333,9 +341,9 @@ impl P2pGateway {
                         {
                             debug!(
                                 "Received PeerAddress: {} | {} ({})",
-                                peer_address, gateway_id, self.identifier
+                                peer_address, gateway_id, self.identifier.nickname
                             );
-                            if self.identifier == gateway_id {
+                            if self.identifier.id == gateway_id.into() {
                                 let peer = PeerData {
                                     peer_address,
                                     peer_uri: uri.clone(),
