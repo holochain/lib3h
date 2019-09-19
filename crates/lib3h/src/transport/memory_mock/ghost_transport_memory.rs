@@ -409,7 +409,6 @@ mod tests {
 
         // check that machine_ids were advertised
         let found = transport1.discover().unwrap();
-        println!("FOUND: {:?}", found);
         assert!(
             &format!("{:?}", found[0]) == "\"mem://addr_1/\""
                 || &format!("{:?}", found[0]) == "\"mem://addr_2/\""
