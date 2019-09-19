@@ -238,16 +238,24 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        trace!("[legacy engine] process");
+
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
         // get any "server" messages that came as responses to the client requests
         let mut responses: Vec<Lib3hServerProtocol> =
-            self.client_request_responses.drain(0..).collect();
+            self.client_request_responses.drain(..).collect();
 
         for mut msg in self.engine.as_mut().drain_messages() {
             let request_id = self.tracker.reserve();
 
             let lib3h_to_client_msg: Lib3hToClient = msg.take_message().expect("exists");
+
+            trace!(
+                "[legacy engine] reserve {:?} for {:?}",
+                request_id,
+                lib3h_to_client_msg
+            );
 
             self.tracker.set(request_id.as_str(), Some(msg));
 
@@ -377,11 +385,23 @@ mod tests {
             result.map_err(|e| e.to_string())
         }
 
-        /// create a fake lib3h event
-        pub fn inject_lib3h_event(&mut self, msg: Lib3hToClient) {
+        /// create a fake lib3h publish event
+        pub fn inject_lib3h_publish(&mut self, msg: Lib3hToClient) {
             let _ = self
                 .lib3h_endpoint
                 .publish(test_span("inject_lib3h_event"), msg);
+        }
+
+        /// create a fake lib3h request
+        pub fn inject_lib3h_request(&mut self, msg: Lib3hToClient) {
+            let f: GhostCallback<_, _, _> = Box::new(|_user_data, cb_data| {
+                debug!("inject_lib3h_request: {:?}", cb_data);
+                Ok(())
+            });
+
+            let _ = self
+                .lib3h_endpoint
+                .request(test_span("inject_lib3h_request"), msg, f);
         }
     }
 
@@ -430,7 +450,34 @@ mod tests {
             format!("{:?}", result)
         );
 
-        detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_event(
+        detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_request(
+            Lib3hToClient::HandleGetGossipingEntryList(GetListData {
+                space_address: "fake_space_address".into(),
+                provider_agent_id: "fake_id".into(),
+                request_id: "post_gossip_req_id".into(),
+            })
+        ));
+
+        let result = legacy.process();
+        let expected = "Ok((true, [HandleGetGossipingEntryList(GetListData { space_address: HashString(\"fake_space_address\"), provider_agent_id: HashString(\"fake_id\"), request_id: \"post_gossip_req_id\" })]))";
+
+        assert_eq!(expected, format!("{:?}", result));
+
+        legacy
+            .post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(
+                EntryListData {
+                    space_address: "fake_space_address".into(),
+                    provider_agent_id: "fake_id".into(),
+                    request_id: "post_gossip_req_id".into(),
+                    address_map: std::collections::HashMap::new(),
+                },
+            ))
+            .unwrap();
+        let result = legacy.process();
+
+        assert_eq!("R2", format!("{:?}", result));
+
+        detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_publish(
             Lib3hToClient::Disconnected(DisconnectedData {
                 network_id: "some_network_id".into()
             })
