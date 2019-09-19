@@ -301,12 +301,10 @@ impl
         self.process_actor_inbox()?;
 
         // make sure we have bound and get our address if so
-        let my_addr = match &self.bound_url {
+        let _my_addr = match &self.bound_url {
             Some(my_addr) => my_addr.clone(),
             None => return Ok(false.into()),
         };
-
-        trace!("Processing for: {}", my_addr);
 
         let (did_work, stream_events) = self.streams.process()?;
         self.process_stream_events(stream_events)?;

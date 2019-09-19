@@ -389,8 +389,8 @@ impl<
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
-        trace!("ghost_channel: send request (id={:?})", request_id);
-        span.event(format!("ghost_channel: send request (id={:?})", request_id));
+        trace!("ghost_channel: send request {:?}", request_id);
+        span.event(format!("ghost_channel: send request {:?}", request_id));
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: backtrace::Backtrace::new(),
             request_id: Some(request_id),

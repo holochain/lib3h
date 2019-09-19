@@ -140,8 +140,8 @@ impl<
 
     /// see GhostContextEndpoint::process and GhostActor::process
     fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone> {
-        let mut work_was_done = self.actor.process()?;
-        work_was_done = work_was_done.or(self.endpoint.process(user_data)?);
+        let work_was_done = self.actor.process()?;
+        let _endpoint_did_work = self.endpoint.process(user_data)?;
         Ok(work_was_done)
     }
 }
