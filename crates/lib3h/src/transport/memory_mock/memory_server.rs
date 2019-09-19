@@ -89,7 +89,7 @@ lazy_static! {
 }
 
 pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
-    for _ in 0..10 {
+    for _ in 0..100 {
         match MEMORY_VERSE.try_lock() {
             Ok(l) => return l,
             _ => std::thread::sleep(std::time::Duration::from_millis(1)),

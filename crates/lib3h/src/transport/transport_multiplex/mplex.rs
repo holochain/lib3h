@@ -150,22 +150,27 @@ impl<
             self.handle_received_data(uri, payload)?;
             Ok(())
         } else {
-            self.endpoint_self.request(
-                Span::fixme(),
-                data,
-                Box::new(move |_, response| {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
-                        }
-                        GhostCallbackData::Response(response) => {
-                            msg.respond(response)?;
-                        }
-                    };
-                    Ok(())
-                }),
-            )?;
+            if msg.is_request() {
+                self.endpoint_self.request(
+                    Span::fixme(),
+                    data,
+                    Box::new(move |_, response| {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                msg.respond(Err("timeout".into()))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => {
+                                msg.respond(response)?;
+                            }
+                        };
+                        Ok(())
+                    }),
+                )?;
+            } else {
+                self.endpoint_self.publish(Span::fixme(), data)?;
+            }
+
             Ok(())
         }
     }
@@ -288,24 +293,33 @@ impl<
         >,
     ) -> Lib3hResult<()> {
         let data = msg.take_message().expect("exists");
-        self.inner_gateway.as_mut().request(
-            msg.span()
-                .follower("TODO follower of message in handle_msg_from_parent"),
-            data,
-            Box::new(move |_, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
+        if msg.is_request() {
+            self.inner_gateway.as_mut().request(
+                msg.span()
+                    .follower("TODO follower of message in handle_msg_from_parent"),
+                data,
+                Box::new(move |_, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                msg.respond(Err("timeout".into()))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => response,
                         }
-                        GhostCallbackData::Response(response) => response,
-                    }
-                };
-                msg.respond(response)?;
-                Ok(())
-            }),
-        )?;
+                    };
+                    msg.respond(response)?;
+                    Ok(())
+                }),
+            )?;
+        } else {
+            self.inner_gateway.as_mut().publish(
+                msg.span()
+                    .follower("TODO follower of message in handle_msg_from_parent"),
+                data,
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -341,9 +355,16 @@ impl<
             self.handle_msg_from_inner(msg)?;
         }
         detach_run!(&mut self.route_endpoints, |re| {
-            for (_route_spec, endpoint) in re.iter_mut() {
+            let mut disconnected_endpoints = Vec::new();
+            for (route_spec, endpoint) in re.iter_mut() {
                 if let Err(e) = endpoint.process(self) {
-                    return Err(TransportError::from(e));
+                    match e.kind() {
+                        ErrorKind::EndpointDisconnected => {
+                            disconnected_endpoints.push(route_spec.clone());
+                            continue;
+                        }
+                        _ => return Err(TransportError::from(e)),
+                    }
                 }
                 for msg in endpoint.drain_messages() {
                     if let Err(e) = self.handle_msg_from_route(msg) {
@@ -351,6 +372,9 @@ impl<
                     }
                 }
             }
+            disconnected_endpoints.iter().for_each(|e| {
+                re.remove(e);
+            });
             Ok(())
         })?;
         Ok(false.into())

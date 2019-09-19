@@ -117,7 +117,8 @@ fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock) {
 pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send DM
     let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
-    assert_process_success!(alex, req_id);
+    wait_engine_wrapper_did_work!(alex);
+    //assert_process_success!(alex, req_id);
     // Receive
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);

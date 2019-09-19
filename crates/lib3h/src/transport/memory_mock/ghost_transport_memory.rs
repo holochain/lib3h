@@ -1,7 +1,7 @@
 use crate::transport::{
     error::TransportError,
     memory_mock::memory_server::{self, *},
-    protocol::*,
+    protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
 use detach::Detach;
 use holochain_tracing::Span;
@@ -317,6 +317,7 @@ impl
                                     );
                                     // Send it data from us
                                     server.post(&my_addr, &payload).unwrap();
+                                    msg.respond(Ok(SendMessageSuccess))?;
                                 }
                             }
                         }
@@ -432,7 +433,7 @@ mod tests {
                 },
                 Box::new(|_: &mut Url, r| {
                     // parent should see that the send request was OK
-                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                    assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
                     Ok(())
                 }),
             )
