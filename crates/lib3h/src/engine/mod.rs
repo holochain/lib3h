@@ -77,6 +77,7 @@ pub enum TransportConfig {
 /// Struct holding all config settings for the Engine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EngineConfig {
+    pub network_id: Address,
     pub transport_configs: Vec<TransportConfig>,
     #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,

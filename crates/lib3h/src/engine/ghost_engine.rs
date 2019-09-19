@@ -196,7 +196,7 @@ impl<'engine> GhostEngine<'engine> {
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                space_address: "fixme_space_address".into(), // FIXME change to the space address that comes in the config when that gets added
+                space_address: self.config.network_id.clone(),
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
@@ -812,9 +812,15 @@ mod tests {
         //    state: String,
     }
 
+    // Real test network-id should be a hc version of sha256 of a string
+    fn test_network_id() -> Address {
+        "test-net".into()
+    }
+
     fn make_test_engine(test_net: &str) -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = EngineConfig {
+            network_id: test_network_id(),
             transport_configs: vec![TransportConfig::Memory(test_net.into())],
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),

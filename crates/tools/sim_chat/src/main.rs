@@ -18,6 +18,7 @@ use lib3h_sodium::SodiumCryptoSystem;
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
+        network_id: "test_network".into(),
         transport_configs: vec![TransportConfig::Memory("test_net".into())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),

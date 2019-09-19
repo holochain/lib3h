@@ -104,6 +104,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
+        network_id: "test_network".into(),
         transport_configs: vec![TransportConfig::Memory(fn_name.clone())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -132,6 +133,7 @@ fn setup_wss_node(
         .expect("invalid web socket url");
 
     let config = EngineConfig {
+        network_id: "test_network".into(),
         transport_configs: vec![TransportConfig::Websocket(tls_config)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
