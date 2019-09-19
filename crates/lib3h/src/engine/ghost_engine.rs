@@ -63,7 +63,7 @@ impl<'engine> GhostEngine<'engine> {
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
-            peer_uri: prebound_binding,
+            peer_uri: prebound_binding.clone(),
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
@@ -72,6 +72,7 @@ impl<'engine> GhostEngine<'engine> {
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 config.network_id.clone(),
+                prebound_binding,
                 Box::new(transport),
                 dht_factory,
                 &dht_config,
@@ -120,6 +121,7 @@ impl<'engine> GhostEngine<'engine> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
+            multiplexer_defered_sends: Vec::new(),
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -322,7 +324,17 @@ impl<'engine> GhostEngine<'engine> {
             ),
         };
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
-            P2pGateway::new(gateway_id, Box::new(uniplex), self.dht_factory, &dht_config),
+            P2pGateway::new(
+                gateway_id,
+                Url::parse(&format!(
+                    "transportid:{}?a={}",
+                    self.transport_keys.transport_id, agent_id,
+                ))
+                .unwrap(),
+                Box::new(uniplex),
+                self.dht_factory,
+                &dht_config,
+            ),
             "space_gateway_",
         ));
         self.space_gateway_map
@@ -342,11 +354,9 @@ impl<'engine> GhostEngine<'engine> {
         p2p_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
-        trace!(
+        println!(
             "{} - Broadcasting JoinSpace: {}, {}",
-            self.name,
-            space_address,
-            peer.peer_address,
+            self.name, space_address, peer.peer_address,
         );
         self.multiplexer
             .publish(span, GatewayRequestToChild::SendAll(payload))
@@ -489,18 +499,12 @@ impl<'engine> GhostEngine<'engine> {
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
         let this_peer = self.this_space_peer(chain_id.clone())?;
-        self.broadcast_join(
-            span.child("broadcast_join"),
-            join_msg.space_address.clone(),
-            this_peer.clone(),
-        )?;
-
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
 
         // Have DHT broadcast our PeerData
         space_gateway.publish(
             span.follower("space_gateway.publish"),
-            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)),
+            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer.clone())),
         )?;
 
         // Send Get*Lists requests
@@ -537,7 +541,15 @@ impl<'engine> GhostEngine<'engine> {
                     _ => Err("bad response type".into()),
                 }),
             )
-            .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))
+            .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))?;
+
+        self.broadcast_join(
+            span.child("broadcast_join"),
+            join_msg.space_address.clone(),
+            this_peer.clone(),
+        )?;
+
+        Ok(())
     }
 
     /// Destroy gateway for this agent in this space, if part of it.

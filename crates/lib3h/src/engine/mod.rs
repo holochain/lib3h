@@ -145,6 +145,8 @@ pub struct GhostEngine<'engine> {
     #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
     transport_keys: TransportKeys,
+    /// items we need to send on our multiplexer in another process loop
+    multiplexer_defered_sends: Vec<(Url, lib3h_protocol::data_types::Opaque)>,
 
     client_endpoint: Option<
         GhostEndpoint<

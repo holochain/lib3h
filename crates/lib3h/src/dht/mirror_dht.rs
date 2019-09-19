@@ -371,7 +371,7 @@ impl MirrorDht {
 
             // Owner is asking us to hold a peer info
             DhtRequestToChild::HoldPeer(new_peer_data) => {
-                trace!("DhtRequestToChild::HoldPeer: {:?}", new_peer_data);
+                println!("DhtRequestToChild::HoldPeer: {:?}", new_peer_data);
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let others_list = self.get_other_peer_list();
                 // Store it
@@ -459,8 +459,8 @@ impl MirrorDht {
             }
 
             DhtRequestToChild::RequestPeer(peer_address) => {
-                trace!("DhtRequestToChild::RequestPeer: {:?}", peer_address);
-                let maybe_peer = self.get_peer(&peer_address);
+                println!("DhtRequestToChild::RequestPeer: {:?}", peer_address);
+                let maybe_peer = self.get_peer(peer_address.path());
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
                 request.respond(payload)?;
             }

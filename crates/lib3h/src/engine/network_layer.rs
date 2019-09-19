@@ -34,6 +34,18 @@ impl<'engine> GhostEngine<'engine> {
                 }
             }
         }
+
+        for (to, payload) in self.multiplexer_defered_sends.drain(..) {
+            println!("########## {} {}", to, payload);
+            self.multiplexer.request(
+                Span::fixme(),
+                GatewayRequestToChild::Transport(
+                    transport::protocol::RequestToChild::SendMessage { uri: to, payload },
+                ),
+                Box::new(move |_me, _response| Ok(())),
+            )?;
+        }
+
         // Done
         Ok(did_work)
     }
@@ -155,6 +167,10 @@ impl<'engine> GhostEngine<'engine> {
         Ok(())
     }
 
+    fn defer_send(&mut self, to: Url, payload: Opaque) {
+        self.multiplexer_defered_sends.push((to, payload));
+    }
+
     fn handle_incoming_connection(&mut self, span: Span, net_uri: Url) -> Lib3hResult<()> {
         // Get list of known peers
         let uri_copy = net_uri.clone();
@@ -185,16 +201,20 @@ impl<'engine> GhostEngine<'engine> {
                             our_joined_space_list
                                 .serialize(&mut Serializer::new(&mut payload))
                                 .unwrap();
-                            trace!(
+                            println!(
                                 "AllJoinedSpaceList: {:?} to {:?}",
-                                our_joined_space_list,
-                                uri_copy,
+                                our_joined_space_list, uri_copy,
                             );
                             // we need a transportId, so search for it in the DHT
                             let maybe_peer_data =
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
+                            println!("--- got peerlist: {:?}", maybe_peer_data);
                             if let Some(peer_data) = maybe_peer_data {
-                                trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                println!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                me.defer_send(
+                                    Url::parse(&peer_data.peer_address).unwrap(),
+                                    payload.into(),
+                                );
                                 /* TODO: #777
                                 me.multiplexer.publish(
                                     span.follower("publish TODO name"),
@@ -302,7 +322,7 @@ impl<'engine> GhostEngine<'engine> {
                 // no-op
             }
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
-                debug!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
+                println!("Received JoinSpace: {} {:?}", gateway_id, peer_data);
                 for (_, space_gateway) in self.space_gateway_map.iter_mut() {
                     space_gateway.publish(
                         span.follower("P2pProtocol::BroadcastJoinSpace"),

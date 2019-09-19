@@ -200,29 +200,65 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                let to_agent_id = uri.path();
+                println!(
+                    "try-send {:?} {} {} bytes",
+                    self.identifier.id,
+                    to_agent_id,
+                    payload.len()
+                );
+
                 let request_id = nanoid::simple();
                 // as a gateway, we need to wrap items going to our children
                 let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
                     space_address: self.identifier.id.clone(),
                     request_id: request_id.clone(),
-                    to_agent_id: "".into(),
+                    to_agent_id: to_agent_id.into(),
                     from_agent_id: self.this_peer.peer_address.clone().into(),
-                    content: payload,
+                    content: payload.clone(),
                 });
 
                 // Serialize payload
-                let mut payload = Vec::new();
+                let mut payload_wrapped = Vec::new();
                 wrap_payload
-                    .serialize(&mut Serializer::new(&mut payload))
+                    .serialize(&mut Serializer::new(&mut payload_wrapped))
                     .unwrap();
-                let payload = Opaque::from(payload);
+                let payload_wrapped = Opaque::from(payload_wrapped);
 
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
                     span.child("transport::protocol::RequestToChild::SendMessage"),
-                    DhtRequestToChild::RequestPeer(uri.to_string()),
+                    DhtRequestToChild::RequestPeer(uri.clone()),
                     Box::new(move |me, response| {
+                        match response {
+                            GhostCallbackData::Response(Ok(
+                                DhtRequestToChildResponse::RequestPeer(Some(peer_data)),
+                            )) => {
+                                me.send(
+                                    span.follower("TODO send"),
+                                    peer_data.peer_uri.clone(),
+                                    payload_wrapped,
+                                    Box::new(|response| {
+                                        println!("SENT!");
+                                        parent_request.respond(
+                                            response
+                                                .map_err(|transport_error| transport_error.into()),
+                                        )
+                                    }),
+                                )?;
+                            }
+                            _ => {
+                                println!("Couldn't Send: {:?}", response);
+                                me.add_to_pending(
+                                    span.follower("retry_gateway_send"),
+                                    uri,
+                                    payload,
+                                    parent_request,
+                                );
+                            }
+                        };
+                        /*
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => {
@@ -247,8 +283,9 @@ impl P2pGateway {
                                 me.send(
                                     span.follower("TODO send"),
                                     peer_data.peer_uri.clone(),
-                                    payload,
+                                    payload_wrapped,
                                     Box::new(|response| {
+                                        println!("SENT!");
                                         parent_request.respond(
                                             response
                                                 .map_err(|transport_error| transport_error.into()),
@@ -256,6 +293,7 @@ impl P2pGateway {
                                     }),
                                 )?;
                             } else {
+                                println!("no peer");
                                 let span_name = format!("P2pGateway -> pending message because no peer found to send PeerData{{{:?}}} Message{{{:?}}}",
                                     maybe_peer_data, payload);
                                 debug!("{}", span_name);
@@ -263,12 +301,14 @@ impl P2pGateway {
                                 return Ok(())
                             };
                         } else {
+                            println!("err");
                             parent_request.respond(Err(format!(
                                 "bad response to RequestPeer: {:?}",
                                 response
                             )
                             .into()))?;
                         }
+                        */
                         Ok(())
                     }),
                 )?;
