@@ -657,33 +657,39 @@ mod tests {
         let networkid = "holonaute-advertise.holo.host";
 
         // This is the one from which we want to see another node disapearing from its cache
-        let mut mdns = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+        let mut mdns_actor1 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.252")
             .bind_port(8252)
             .build()
             .expect("Fail to build mDNS.");
 
-        eprintln!("bind addr = {}", mdns.multicast_address());
+        eprintln!("bind addr = {}", mdns_actor1.multicast_address());
 
-        let mut mdns_other = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
+        let mut mdns_actor2 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor2"])
             .multicast_address("224.0.0.252")
             .bind_port(8252)
             .build()
             .expect("Fail to build mDNS.");
 
         // Make itself known on the network
-        mdns_other
+        mdns_actor2
             .advertise()
-            .expect("Fail to advertise my existence during release test.");
+            .expect("Fail to advertise mdns_actor1 existence during release test.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+
+        mdns_actor1
+            .advertise()
+            .expect("Fail to advertise mdns_actor2 existence during release test.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
 
         // Discovering the soon leaving participant
-        mdns.discover().expect("Fail to discover.");
-        eprintln!("mdns = {:#?}", &mdns.map_record);
+        mdns_actor1.discover().expect("Fail to discover.");
+        eprintln!("mdns = {:#?}", &mdns_actor1.map_record);
 
         // Let's check that we discovered the soon to release record
-        let records = mdns
+        let records = mdns_actor1
             .map_record
             .get(networkid)
             .expect("Fail to get records from the networkid");
