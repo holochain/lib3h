@@ -78,6 +78,26 @@ impl<
         }
     }
 
+    #[cfg(Test)]
+    pub fn test_constructor() -> (
+        Self,
+        crossbeam_channel::Receiver<
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
+        >,
+    ) {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+        (
+            Self {
+                requester_bt: backtrace::Backtrace::new(),
+                request_id: None,
+                message: None,
+                sender,
+                span: Span::fixme(),
+            },
+            receiver,
+        )
+    }
+
     /// create a request message
     #[allow(dead_code)]
     fn new_request(
