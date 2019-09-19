@@ -75,7 +75,7 @@ impl P2pGateway {
     fn handle_RequestToChild(&mut self, mut msg: GatewayToChildMessage) -> Lib3hResult<()> {
         debug!(
             "({}) Serving request from parent: {:?}",
-            self.identifier, msg
+            self.identifier.nickname, msg
         );
         // let parent_request = msg.clone();
         let span = msg.span().child("handle_RequestToChild");
