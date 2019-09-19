@@ -57,13 +57,12 @@ impl MemoryNet {
     }
     pub fn bind(&mut self) -> Url {
         let binding = self.new_url();
-        trace!("In Memory bind for {}, url:{}",self.name,binding);
+        trace!("In Memory bind for {}, url:{}", self.name, binding);
         self.server_map
             .entry(binding.clone())
             .or_insert_with(|| MemoryServer::new(&binding));
         binding
     }
-
 }
 
 /// Holds a universe of memory networks so we can run tests in separate universes
@@ -77,10 +76,10 @@ impl MemoryVerse {
         }
     }
     pub fn get_network(&mut self, network_name: &str) -> Arc<Mutex<MemoryNet>> {
-        self
-            .server_maps
+        self.server_maps
             .entry(network_name.to_string())
-            .or_insert_with(|| Arc::new(Mutex::new(MemoryNet::new(network_name)))).clone()
+            .or_insert_with(|| Arc::new(Mutex::new(MemoryNet::new(network_name))))
+            .clone()
     }
 }
 

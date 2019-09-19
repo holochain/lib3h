@@ -11,8 +11,10 @@ use lib3h_discovery::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
-use std::{collections::HashSet, time::Instant,
-          sync::{Arc, Mutex,},
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    time::Instant,
 };
 use url::Url;
 
@@ -64,13 +66,14 @@ impl Discovery for GhostTransportMemory {
             .maybe_my_address
             .clone()
             .ok_or_else(|| DiscoveryError::new_other("must bind before advertising"))?;
-        self.network.lock().unwrap()
+        self.network
+            .lock()
+            .unwrap()
             .advertise(uri, self.machine_id.clone());
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
-        let machines = self.network.lock().unwrap()
-            .discover();
+        let machines = self.network.lock().unwrap().discover();
         Ok(machines.into_iter().map(|(uri, _)| uri).collect())
     }
     fn release(&mut self) -> DiscoveryResult<()> {
@@ -261,9 +264,7 @@ impl
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
-                    let bound_url = {
-                        self.network.lock().unwrap().bind()
-                    };
+                    let bound_url = { self.network.lock().unwrap().bind() };
                     self.maybe_my_address = Some(bound_url.clone());
                     self.advertise()
                         .map_err(|e| GhostError::from(e.to_string()))?;
