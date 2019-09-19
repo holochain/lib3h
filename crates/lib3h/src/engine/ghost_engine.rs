@@ -217,13 +217,13 @@ impl<'engine> GhostEngine<'engine> {
         Ok(())
     }
 
-    pub fn this_space_peer(&mut self, chain_id: ChainId) -> PeerData {
+    pub fn this_space_peer(&mut self, chain_id: ChainId) -> Lib3hResult<PeerData> {
         trace!("engine.this_space_peer() ...");
         let space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
-            .expect("No space at chainId");
-        space_gateway.as_mut().as_mut().this_peer()
+            .ok_or_else(|| Lib3hError::from("No space at chainId"))?;
+        Ok(space_gateway.as_mut().as_mut().this_peer())
     }
 }
 
@@ -314,7 +314,7 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), &data, false)
+                self.handle_direct_message(span.follower("TODO name"), msg, &data, false)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
@@ -535,7 +535,7 @@ impl<'engine> GhostEngine<'engine> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
-        let this_peer = self.this_space_peer(chain_id.clone());
+        let this_peer = self.this_space_peer(chain_id.clone())?;
         self.broadcast_join(
             span.child("broadcast_join"),
             join_msg.space_address.clone(),
@@ -599,12 +599,18 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_direct_message(
         &mut self,
         span: Span,
+        ghost_message: ClientToLib3hMessage,
         msg: &DirectMessageData,
         is_response: bool,
     ) -> Lib3hResult<()> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
 
-        let this_peer = self.this_space_peer(chain_id.clone());
+        let maybe_this_peer = self.this_space_peer(chain_id.clone());
+        if let Err(error) = maybe_this_peer {
+            ghost_message.respond(Err(error))?;
+            return Ok(());
+        };
+        let this_peer = maybe_this_peer.unwrap();
 
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if &this_peer.peer_address == &to_agent_id {
@@ -632,7 +638,7 @@ impl<'engine> GhostEngine<'engine> {
             .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
         space_gateway
-            .publish(
+            .request(
                 span,
                 GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
@@ -641,6 +647,19 @@ impl<'engine> GhostEngine<'engine> {
                         payload: payload.into(),
                     },
                 ),
+                Box::new(|_me, response| {
+                    debug!("GhostEngine: response to handle_direct_message message: {:?}", response);
+                    match response {
+                        GhostCallbackData::Response(Ok(
+                                GatewayRequestToChildResponse::Transport(
+                                    transport::protocol::RequestToChildResponse::SendMessageSuccess
+                        ))) => {
+                            panic!("We Need to bookmark this ghost_message so that we can invoke it with a message from the remote peer when they send it back");
+                        }
+                        _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                    };
+                    Ok(())
+                })
             )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
@@ -902,9 +921,12 @@ mod tests {
             content: b"foo content".to_vec().into(),
         };
 
-        let result = lib3h
-            .as_mut()
-            .handle_direct_message(test_span(""), &direct_message, false);
+        let msg = GhostMessage::test_constructor();
+
+        let result =
+            lib3h
+                .as_mut()
+                .handle_direct_message(test_span(""), msg, &direct_message, false);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 

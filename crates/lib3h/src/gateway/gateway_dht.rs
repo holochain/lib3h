@@ -21,8 +21,8 @@ impl P2pGateway {
         // TODO: which span do we actually want?
         let span_parent = parent_msg.span().child("handle_dht_RequestToChild");
         // forward to child dht
-        self.inner_dht
-            .request(
+        if parent_msg.is_request() {
+            self.inner_dht.request(
                 span_parent,
                 request,
                 Box::new(|_me, response| {
@@ -40,8 +40,11 @@ impl P2pGateway {
                         .respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
                     Ok(())
                 }),
-            )
-            .unwrap(); // FIXME unwrap
+            )?;
+        } else {
+            self.inner_dht.publish(span_parent, request)?;
+        }
+
         Ok(())
     }
 

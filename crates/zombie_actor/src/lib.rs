@@ -82,10 +82,10 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
-        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
-        GhostTrackerBookmarkOptions, WorkWasDone,
+        create_ghost_channel, ghost_error::ErrorKind, GhostActor, GhostCallback, GhostCallbackData,
+        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
+        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
+        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
