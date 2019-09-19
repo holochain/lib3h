@@ -399,13 +399,13 @@ macro_rules! wait_did_work {
      $engine2:ident,
      $should_abort: expr
     ) => {{
-        let p1: Box<dyn Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert(
+        let p1: Box<dyn $crate::utils::processor_harness::Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert(
             $engine1.name(),
         ));
-        let p2: Box<dyn Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert(
+        let p2: Box<dyn $crate::utils::processor_harness::Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert(
             $engine2.name(),
         ));
-        let processors: Vec<Box<dyn Processor>> = vec![p1, p2];
+        let processors: Vec<Box<dyn $crate::utils::processor_harness::Processor>> = vec![p1, p2];
         assert_processed!($engine1, $engine2, processors, $should_abort)
     }};
     ($engine1:ident, $engine2:ident) => {
