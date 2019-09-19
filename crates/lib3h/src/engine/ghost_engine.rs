@@ -314,7 +314,7 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), msg, &data, false)
+                self.handle_direct_message(span.follower("TODO name"), msg, &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
@@ -601,7 +601,6 @@ impl<'engine> GhostEngine<'engine> {
         span: Span,
         ghost_message: ClientToLib3hMessage,
         msg: &DirectMessageData,
-        is_response: bool,
     ) -> Lib3hResult<()> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
 
@@ -617,12 +616,7 @@ impl<'engine> GhostEngine<'engine> {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
 
-        // Change into P2pProtocol
-        let net_msg = if is_response {
-            P2pProtocol::DirectMessageResult(msg.clone())
-        } else {
-            P2pProtocol::DirectMessage(msg.clone())
-        };
+        let net_msg = P2pProtocol::DirectMessage(msg.clone());
 
         // Serialize payload
         let mut payload = Vec::new();
@@ -660,8 +654,8 @@ impl<'engine> GhostEngine<'engine> {
                     };
                     Ok(())
                 })
-            )
-            .map_err(|e| Lib3hError::new_other(&e.to_string()))
+            )?;
+        Ok(())
     }
 
     fn handle_publish_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
@@ -923,10 +917,9 @@ mod tests {
 
         let msg = GhostMessage::test_constructor();
 
-        let result =
-            lib3h
-                .as_mut()
-                .handle_direct_message(test_span(""), msg, &direct_message, false);
+        let result = lib3h
+            .as_mut()
+            .handle_direct_message(test_span(""), msg, &direct_message);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 

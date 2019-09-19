@@ -9,7 +9,7 @@ use crate::{
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_protocol::data_types::*;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -142,8 +142,7 @@ impl P2pGateway {
                 uri: p.uri,
                 payload: p.payload,
             };
-            let _ =
-                self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
+            self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
         }
         Ok(())
     }
@@ -196,6 +195,22 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                // as a gateway, we need to wrap items going to our children
+                let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
+                    space_address: "".into(),
+                    request_id: "".into(),
+                    to_agent_id: "".into(),
+                    from_agent_id: "".into(),
+                    content: payload,
+                });
+
+                // Serialize payload
+                let mut payload = Vec::new();
+                wrap_payload
+                    .serialize(&mut Serializer::new(&mut payload))
+                    .unwrap();
+                let payload = Opaque::from(payload);
+
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
