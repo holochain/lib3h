@@ -63,7 +63,7 @@ impl<'engine> GhostEngine<'engine> {
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
-            peer_uri: prebound_binding,
+            peer_uri: prebound_binding.clone(),
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
@@ -72,6 +72,7 @@ impl<'engine> GhostEngine<'engine> {
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 config.network_id.clone(),
+                prebound_binding,
                 Box::new(transport),
                 dht_factory,
                 &dht_config,
@@ -120,6 +121,7 @@ impl<'engine> GhostEngine<'engine> {
             network_connections: HashSet::new(),
             space_gateway_map: HashMap::new(),
             transport_keys,
+            multiplexer_defered_sends: Vec::new(),
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -263,7 +265,7 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), msg, &data, false)
+                self.handle_direct_message(span.follower("TODO name"), msg, &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
@@ -322,7 +324,17 @@ impl<'engine> GhostEngine<'engine> {
             ),
         };
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
-            P2pGateway::new(gateway_id, Box::new(uniplex), self.dht_factory, &dht_config),
+            P2pGateway::new(
+                gateway_id,
+                Url::parse(&format!(
+                    "transportid:{}?a={}",
+                    self.transport_keys.transport_id, agent_id,
+                ))
+                .unwrap(),
+                Box::new(uniplex),
+                self.dht_factory,
+                &dht_config,
+            ),
             "space_gateway_",
         ));
         self.space_gateway_map
@@ -489,18 +501,12 @@ impl<'engine> GhostEngine<'engine> {
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
         let this_peer = self.this_space_peer(chain_id.clone())?;
-        self.broadcast_join(
-            span.child("broadcast_join"),
-            join_msg.space_address.clone(),
-            this_peer.clone(),
-        )?;
-
         let space_gateway = self.space_gateway_map.get_mut(&chain_id).unwrap();
 
         // Have DHT broadcast our PeerData
         space_gateway.publish(
             span.follower("space_gateway.publish"),
-            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer)),
+            GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer.clone())),
         )?;
 
         // Send Get*Lists requests
@@ -537,7 +543,15 @@ impl<'engine> GhostEngine<'engine> {
                     _ => Err("bad response type".into()),
                 }),
             )
-            .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))
+            .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))?;
+
+        self.broadcast_join(
+            span.child("broadcast_join"),
+            join_msg.space_address.clone(),
+            this_peer.clone(),
+        )?;
+
+        Ok(())
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
@@ -554,7 +568,6 @@ impl<'engine> GhostEngine<'engine> {
         span: Span,
         ghost_message: ClientToLib3hMessage,
         msg: &DirectMessageData,
-        is_response: bool,
     ) -> Lib3hResult<()> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
 
@@ -570,12 +583,7 @@ impl<'engine> GhostEngine<'engine> {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
 
-        // Change into P2pProtocol
-        let net_msg = if is_response {
-            P2pProtocol::DirectMessageResult(msg.clone())
-        } else {
-            P2pProtocol::DirectMessage(msg.clone())
-        };
+        let net_msg = P2pProtocol::DirectMessage(msg.clone());
 
         // Serialize payload
         let mut payload = Vec::new();
@@ -613,8 +621,8 @@ impl<'engine> GhostEngine<'engine> {
                     };
                     Ok(())
                 })
-            )
-            .map_err(|e| Lib3hError::new_other(&e.to_string()))
+            )?;
+        Ok(())
     }
 
     fn handle_publish_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
@@ -885,10 +893,9 @@ mod tests {
 
         let msg = GhostMessage::test_constructor();
 
-        let result =
-            lib3h
-                .as_mut()
-                .handle_direct_message(test_span(""), msg, &direct_message, false);
+        let result = lib3h
+            .as_mut()
+            .handle_direct_message(test_span(""), msg, &direct_message);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 
