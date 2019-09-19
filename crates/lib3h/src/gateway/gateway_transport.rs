@@ -119,12 +119,15 @@ impl P2pGateway {
                     // Transport error:
                     GhostCallbackData::Response(Err(error)) => {
                         debug!("Gateway got error from transport. Adding message to pending");
-                        Err(format!("Transport error while trying to send message: {:?}", error).into())
+                        Err(
+                            format!("Transport error while trying to send message: {:?}", error)
+                                .into(),
+                        )
                     }
                     // Timeout:
                     GhostCallbackData::Timeout => {
                         debug!("Gateway got timeout from transport. Adding message to pending");
-                        Err(format!("Ghost timeout error while trying to send message").into())
+                        Err("Ghost timeout error while trying to send message".into())
                     }
                 }
             }),
@@ -140,18 +143,21 @@ impl P2pGateway {
         for p in pending {
             let transport_request = transport::protocol::RequestToChild::SendMessage {
                 uri: p.uri,
-                payload: p.payload
+                payload: p.payload,
             };
-            let _ = self.handle_transport_RequestToChild(
-                p.span,
-                transport_request,
-                p.parent_request
-            )?;
+            let _ =
+                self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
         }
         Ok(())
     }
 
-    fn add_to_pending(&mut self, span: Span, uri: Url, payload: Opaque, parent_request: GatewayToChildMessage) {
+    fn add_to_pending(
+        &mut self,
+        span: Span,
+        uri: Url,
+        payload: Opaque,
+        parent_request: GatewayToChildMessage,
+    ) {
         self.pending_outgoing_messages.push(PendingOutgoingMessage {
             span,
             uri,
@@ -202,7 +208,7 @@ impl P2pGateway {
                         let response = {
                             match response {
                                 GhostCallbackData::Timeout => {
-                                    let span_name = format!("P2pGateway -> pending message because of GhostCallbackData::Timeout");
+                                    let span_name = "P2pGateway -> pending message because of GhostCallbackData::Timeout".to_string();
                                     debug!("{}", span_name);
                                     me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
                                     return Ok(())

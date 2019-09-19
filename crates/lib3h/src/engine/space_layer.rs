@@ -26,7 +26,12 @@ impl<'engine> GhostEngine<'engine> {
             .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, self.this_space_peer(chainId.clone()).expect("Shouldn't find non-existing peer").clone()));
+            result.push((
+                space_address,
+                self.this_space_peer(chainId.clone())
+                    .expect("Shouldn't find non-existing peer")
+                    .clone(),
+            ));
         }
         result
     }

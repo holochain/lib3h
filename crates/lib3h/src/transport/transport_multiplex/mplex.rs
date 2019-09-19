@@ -316,7 +316,7 @@ impl<
             self.inner_gateway.as_mut().publish(
                 msg.span()
                     .follower("TODO follower of message in handle_msg_from_parent"),
-                data
+                data,
             )?;
         }
 
@@ -361,8 +361,8 @@ impl<
                     match e.kind() {
                         ErrorKind::EndpointDisconnected => {
                             disconnected_endpoints.push(route_spec.clone());
-                            continue
-                        },
+                            continue;
+                        }
                         _ => return Err(TransportError::from(e)),
                     }
                 }
@@ -372,7 +372,9 @@ impl<
                     }
                 }
             }
-            disconnected_endpoints.iter().for_each(|e| {re.remove(e);});
+            disconnected_endpoints.iter().for_each(|e| {
+                re.remove(e);
+            });
             Ok(())
         })?;
         Ok(false.into())

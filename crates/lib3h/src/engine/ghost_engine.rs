@@ -608,7 +608,7 @@ impl<'engine> GhostEngine<'engine> {
         let maybe_this_peer = self.this_space_peer(chain_id.clone());
         if let Err(error) = maybe_this_peer {
             ghost_message.respond(Err(error))?;
-            return Ok(())
+            return Ok(());
         };
         let this_peer = maybe_this_peer.unwrap();
 
@@ -929,14 +929,10 @@ mod tests {
 
         let msg = GhostMessage::test_constructor();
 
-        let result = lib3h
-            .as_mut()
-            .handle_direct_message(
-                test_span(""),
-                msg,
-                &direct_message,
-                false
-            );
+        let result =
+            lib3h
+                .as_mut()
+                .handle_direct_message(test_span(""), msg, &direct_message, false);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 

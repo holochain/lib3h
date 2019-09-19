@@ -433,7 +433,7 @@ mod tests {
                 },
                 Box::new(|_: &mut Url, r| {
                     // parent should see that the send request was OK
-                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                    assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
                     Ok(())
                 }),
             )

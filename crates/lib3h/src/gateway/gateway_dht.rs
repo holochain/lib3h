@@ -22,26 +22,25 @@ impl P2pGateway {
         let span_parent = parent_msg.span().child("handle_dht_RequestToChild");
         // forward to child dht
         if parent_msg.is_request() {
-            self.inner_dht
-                .request(
-                    span_parent,
-                    request,
-                    Box::new(|_me, response| {
-                        let response = {
-                            match response {
-                                GhostCallbackData::Timeout => {
-                                    parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
-                                    return Ok(());
-                                }
-                                GhostCallbackData::Response(response) => response,
+            self.inner_dht.request(
+                span_parent,
+                request,
+                Box::new(|_me, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout => {
+                                parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                                return Ok(());
                             }
-                        };
-                        // forward back to parent
-                        parent_msg
-                            .respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
-                        Ok(())
-                    }),
-                )?;
+                            GhostCallbackData::Response(response) => response,
+                        }
+                    };
+                    // forward back to parent
+                    parent_msg
+                        .respond(Ok(GatewayRequestToChildResponse::Dht(response.unwrap())))?;
+                    Ok(())
+                }),
+            )?;
         } else {
             self.inner_dht.publish(span_parent, request)?;
         }

@@ -1,6 +1,8 @@
-use crate::{GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone, GhostError};
+use crate::{
+    ghost_error::ErrorKind, GhostCallback, GhostError, GhostResult, GhostTracker,
+    GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone,
+};
 use holochain_tracing::Span;
-use crate::ghost_error::ErrorKind;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -77,9 +79,7 @@ impl<
     }
 
     //#[cfg(test)]
-    pub fn test_constructor() -> (
-        Self
-    ) {
+    pub fn test_constructor() -> (Self) {
         let (sender, _receiver) = crossbeam_channel::unbounded();
         Self {
             requester_bt: backtrace::Backtrace::new(),
