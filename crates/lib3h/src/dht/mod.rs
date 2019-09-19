@@ -460,6 +460,11 @@ pub mod tests {
         // Flush any pending requests from child
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
+        for mut request in request_list {
+            let payload = request.take_message().expect("exists");
+            trace!(" - {:?}", payload);
+        }
+
         // Add a data item in DHT A
         let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
         dht_a
@@ -471,10 +476,12 @@ pub mod tests {
         dht_a.process(&mut ud).unwrap();
         // Should return a gossipTo
         let request_list = dht_a.drain_messages();
-        assert_eq!(request_list.len(), 1);
+        trace!("request_list len: {}", request_list.len());
         let mut bundle: lib3h_protocol::data_types::Opaque = "".into();
         for mut request in request_list {
-            match request.take_message().expect("exists") {
+            let payload = request.take_message().expect("exists");
+            trace!(" - {:?}", payload);
+            match payload {
                 DhtRequestToParent::GossipTo(gossip_data) => {
                     assert_eq!(gossip_data.peer_address_list.len(), 1);
                     assert_eq!(gossip_data.peer_address_list[0], PEER_B);

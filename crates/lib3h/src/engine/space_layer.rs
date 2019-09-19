@@ -53,9 +53,11 @@ impl<'engine> GhostEngine<'engine> {
             ChainId,
             Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
+        let mut did_work = false;
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             detach_run!(space_gateway, |g| g.process(self))?;
             let request_list = space_gateway.drain_messages();
+            did_work = did_work || request_list.len() > 0;
             space_outbox_map.insert(chain_id.clone(), request_list);
             self.space_gateway_map.insert(chain_id, space_gateway);
         }
@@ -70,7 +72,7 @@ impl<'engine> GhostEngine<'engine> {
             }
         }
         // Done
-        Ok(true /* fixme */)
+        Ok(did_work)
     }
 
     /// Handle a GatewayRequestToParent sent to us by one of our space gateway

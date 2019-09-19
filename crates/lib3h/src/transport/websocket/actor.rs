@@ -301,12 +301,10 @@ impl
         self.process_actor_inbox()?;
 
         // make sure we have bound and get our address if so
-        let my_addr = match &self.bound_url {
+        let _my_addr = match &self.bound_url {
             Some(my_addr) => my_addr.clone(),
             None => return Ok(false.into()),
         };
-
-        trace!("Processing for: {}", my_addr);
 
         let (did_work, stream_events) = self.streams.process()?;
         self.process_stream_events(stream_events)?;
@@ -322,7 +320,6 @@ mod tests {
     use super::*;
     use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
     use lib3h_ghost_actor::wait_for_message;
-    use regex::Regex;
     use std::{net::TcpListener, thread, time};
     use url::Url;
 

@@ -76,6 +76,26 @@ impl<
         }
     }
 
+    #[cfg(Test)]
+    pub fn test_constructor() -> (
+        Self,
+        crossbeam_channel::Receiver<
+            GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
+        >,
+    ) {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+        (
+            Self {
+                requester_bt: backtrace::Backtrace::new(),
+                request_id: None,
+                message: None,
+                sender,
+                span: Span::fixme(),
+            },
+            receiver,
+        )
+    }
+
     /// create a request message
     #[allow(dead_code)]
     fn new_request(
@@ -387,8 +407,8 @@ impl<
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
-        trace!("ghost_channel: send request (id={:?})", request_id);
-        span.event(format!("ghost_channel: send request (id={:?})", request_id));
+        trace!("ghost_channel: send request {:?}", request_id);
+        span.event(format!("ghost_channel: send request {:?}", request_id));
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: backtrace::Backtrace::new(),
             request_id: Some(request_id),
