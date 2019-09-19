@@ -200,12 +200,13 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                let request_id = nanoid::simple();
                 // as a gateway, we need to wrap items going to our children
                 let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
-                    space_address: "".into(),
-                    request_id: "".into(),
+                    space_address: self.identifier.id.clone(),
+                    request_id: request_id.clone(),
                     to_agent_id: "".into(),
-                    from_agent_id: "".into(),
+                    from_agent_id: self.this_peer.peer_address.clone().into(),
                     content: payload,
                 });
 
