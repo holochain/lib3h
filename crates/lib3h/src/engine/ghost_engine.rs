@@ -55,19 +55,19 @@ impl<'engine> GhostEngine<'engine> {
         let transport = TransportEncoding::new(
             crypto.box_clone(),
             transport_keys.transport_id.clone(),
-            "NETWORK_ID_STUB".to_string(),
+            config.network_id.id.to_string(),
             Box::new(KeystoreStub::new()),
             transport,
         );
 
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
-            peer_address: format!("{}_tId", name),
+            peer_address: transport_keys.transport_id.clone().into(),
             peer_uri: prebound_binding.clone(),
             timestamp: 0, // TODO #166
         };
         // Create DhtConfig
-        let dht_config = DhtConfig::with_engine_config(&format!("{}_tId", name), &config);
+        let dht_config = DhtConfig::with_engine_config(&transport_keys.transport_id.to_string(), &config);
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
