@@ -18,7 +18,7 @@ use lib3h_sodium::SodiumCryptoSystem;
 // Real test network-id should be a hc version of sha256 of a string
 fn test_network_id() -> GatewayId {
     GatewayId {
-        nickname: "test-net".into(),
+        nickname: "simchat-test-net".into(),
         id: "Hc_fake_addr_for_test-net".into(),
     }
 }
