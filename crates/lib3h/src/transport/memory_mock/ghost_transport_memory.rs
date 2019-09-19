@@ -93,8 +93,6 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // make sure we have bound and get our address if so
         if let Some(my_addr) = &self.maybe_my_address {
-            trace!("Processing for: {}", my_addr);
-
             // get our own server
             let (success, event_list) = {
                 let mut verse = memory_server::get_memory_verse();

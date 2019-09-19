@@ -290,8 +290,6 @@ impl
             None => return Ok(false.into()),
         };
 
-        trace!("Processing for: {}", my_addr);
-
         let (did_work, stream_events) = self.streams.process()?;
         self.process_stream_events(stream_events)?;
         self.process_pending_messages()?;
