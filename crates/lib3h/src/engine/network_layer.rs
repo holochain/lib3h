@@ -213,7 +213,8 @@ impl<'engine> GhostEngine<'engine> {
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                                 me.defer_send(
-                                    Url::parse(&format!("transportid:{}",&peer_data.peer_address)).unwrap(),
+                                    Url::parse(&format!("transportid:{}", &peer_data.peer_address))
+                                        .unwrap(),
                                     payload.into(),
                                 );
                                 /* TODO: #777
