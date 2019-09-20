@@ -69,7 +69,7 @@ pub enum DhtRequestToChild {
 
     /// Requests
     /// Parent wants PeerData for a specific Peer
-    RequestPeer(String),
+    RequestPeer(Url),
     /// Parent wants the list of peers we are holding
     RequestPeerList,
     /// Parent wants PeerData of this entity
