@@ -135,6 +135,8 @@ impl P2pGateway {
                 // We should handle these cases, and pick the ones we want to
                 // send up the chain, and which ones should be handled here.
 
+                error!("received {} {}", uri, String::from_utf8_lossy(&payload));
+
                 self.endpoint_self.as_mut().publish(
                     span.follower("bubble up to parent"),
                     GatewayRequestToParent::Transport(
@@ -434,7 +436,12 @@ impl P2pGateway {
             }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 // TODO
-                debug!("Received message from: {} | size: {}", uri, payload.len());
+                trace!(
+                    "{:?} Received message from: {} | size: {}",
+                    self.identifier,
+                    uri,
+                    payload.len()
+                );
                 // trace!("Deserialize msg: {:?}", payload);
                 if payload.len() == 0 {
                     debug!("Implement Ping!");

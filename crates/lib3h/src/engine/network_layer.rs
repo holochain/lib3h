@@ -160,7 +160,7 @@ impl<'engine> GhostEngine<'engine> {
                         return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                     }
                     let p2p_msg = maybe_msg.unwrap();
-                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
+                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, p2p_msg)?;
                 }
             }
         };
@@ -258,8 +258,8 @@ impl<'engine> GhostEngine<'engine> {
     fn serve_P2pProtocol(
         &mut self,
         span: Span,
-        from: &Url,
-        p2p_msg: &P2pProtocol,
+        _from: &Url,
+        p2p_msg: P2pProtocol,
     ) -> Lib3hResult<()> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
@@ -293,14 +293,22 @@ impl<'engine> GhostEngine<'engine> {
                 // we got some data that should go up the multiplexer
                 // let's try decoding it : )
 
-                let to_agent_id = &dm_data.to_agent_id;
-                let from_agent_id = &dm_data.from_agent_id;
-                let content = &dm_data.content;
+                self.multiplexer
+                    .as_mut()
+                    .as_mut()
+                    .received_data_for_agent_space_route(
+                        &dm_data.space_address,
+                        &dm_data.to_agent_id,
+                        &dm_data.from_agent_id,
+                        dm_data.content,
+                    )?;
 
+                /*
                 panic!(
-                    "YAY: {:?} {:?} {:?} {:?} {:?}",
-                    from, self.config.network_id.id, to_agent_id, from_agent_id, content,
+                    "YAY: f {:?} s {:?} {:#?}",
+                    from, self.config.network_id.id, dm_data,
                 );
+                */
 
                 /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
@@ -352,7 +360,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pProtocol::AllJoinedSpaceList(join_list) => {
                 debug!("Received AllJoinedSpaceList: {:?}", join_list);
                 for (space_address, peer_data) in join_list {
-                    let maybe_space_gateway = self.get_first_space_mut(space_address);
+                    let maybe_space_gateway = self.get_first_space_mut(&space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
                             span.follower("P2pProtocol::AllJoinedSpaceList"),

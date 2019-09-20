@@ -142,7 +142,24 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             println!("1 got: {:?}", msg.take_message());
         }
         for mut msg in self.engine2.drain_messages() {
-            println!("2 got: {:?}", msg.take_message());
+            let payload = msg.take_message();
+            match payload {
+                Some(Lib3hToClient::HandleSendDirectMessage(dm_data)) => {
+                    msg.respond(Ok(Lib3hToClientResponse::HandleSendDirectMessageResult(
+                        DirectMessageData {
+                            space_address: dm_data.space_address,
+                            request_id: dm_data.request_id,
+                            to_agent_id: dm_data.from_agent_id,
+                            from_agent_id: dm_data.to_agent_id,
+                            content: format!("echo: {}", String::from_utf8_lossy(&dm_data.content))
+                                .into_bytes()
+                                .into(),
+                        },
+                    )))
+                    .unwrap();
+                }
+                _ => println!("2 got: {:?}", payload),
+            }
         }
     }
 
@@ -183,6 +200,14 @@ pub fn main() {
     let mut engines = EngineContainer::new();
     engines.send_1_to_2();
     engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    // node 2 should have message now-ish... run a couple more to get it back
     engines.process();
     engines.process();
     engines.process();
