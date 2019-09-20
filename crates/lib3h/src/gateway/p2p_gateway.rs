@@ -2,6 +2,7 @@ use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::GatewayId,
     gateway::P2pGateway,
+    message_encoding::*,
     transport,
 };
 use detach::prelude::*;
@@ -38,6 +39,10 @@ impl P2pGateway {
                 "to_child_transport_",
             )),
             inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
+            message_encoding: Detach::new(GhostParentWrapper::new(
+                MessageEncoding::new(),
+                "to_message_encoding_",
+            )),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
             this_peer: PeerData {

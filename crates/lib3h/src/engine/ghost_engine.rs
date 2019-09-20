@@ -11,11 +11,10 @@ use crate::{
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::{protocol::*, P2pGateway},
-    keystore::KeystoreStub,
     track::Tracker,
     transport::{
         self, memory_mock::ghost_transport_memory::*, protocol::*,
-        websocket::actor::GhostTransportWebsocket, TransportEncoding, TransportMultiplex,
+        websocket::actor::GhostTransportWebsocket, TransportMultiplex,
     },
 };
 use holochain_tracing::Span;
@@ -44,6 +43,7 @@ impl<'engine> GhostEngine<'engine> {
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
         let machine_id = transport_keys.transport_id.clone().into();
+
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
@@ -55,14 +55,6 @@ impl<'engine> GhostEngine<'engine> {
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
         };
-
-        let transport = TransportEncoding::new(
-            crypto.box_clone(),
-            transport_keys.transport_id.clone(),
-            config.network_id.id.to_string(),
-            Box::new(KeystoreStub::new()),
-            transport,
-        );
 
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
@@ -78,7 +70,7 @@ impl<'engine> GhostEngine<'engine> {
             TransportMultiplex::new(P2pGateway::new(
                 config.network_id.clone(),
                 prebound_binding,
-                Box::new(transport),
+                transport,
                 dht_factory,
                 &dht_config,
             )),
@@ -311,13 +303,6 @@ impl<'engine> GhostEngine<'engine> {
                 .as_mut()
                 .as_mut()
                 .create_agent_space_route(&space_address, &agent_id),
-        );
-        let uniplex = TransportEncoding::new(
-            self.crypto.box_clone(),
-            agent_id.to_string(),
-            space_address.clone().into(),
-            Box::new(KeystoreStub::new()),
-            Box::new(uniplex),
         );
 
         let gateway_id = GatewayId {

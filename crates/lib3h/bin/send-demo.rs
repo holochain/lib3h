@@ -172,6 +172,14 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 }
 
 pub fn main() {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "warn");
+    }
+    let _ = env_logger::builder()
+        .default_format_timestamp(false)
+        .is_test(false)
+        .try_init();
+
     let mut engines = EngineContainer::new();
     engines.send_1_to_2();
     engines.process();

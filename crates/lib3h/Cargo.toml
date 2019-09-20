@@ -15,6 +15,7 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 backtrace = "=0.3.26"
 detach = { version = "=0.0.10", path = "../detach" }
+env_logger = "=0.6.1"
 hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.8"
 holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/holochain-tracing" }
@@ -42,7 +43,6 @@ lazy_static = "=1.2.0"
 [dev-dependencies]
 crossbeam-channel = "=0.3.8"
 unwrap_to = "=0.1.0"
-env_logger = "=0.6.1"
 bincode = "=1.1.4"
 multihash = "=0.8.0"
 regex = "=1.1.2"
