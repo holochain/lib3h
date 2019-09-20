@@ -389,6 +389,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                         Err(e.into())
                     }
                     Err(tungstenite::error::Error::ConnectionClosed) => {
+                        error!("Connection unexpectedly closed");
                         // close event will be published
                         Ok(())
                     }
@@ -422,6 +423,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                     }
                     Err(tungstenite::error::Error::ConnectionClosed) => {
                         // close event will be published
+                        error!("Connection unexpectedly closed");
                         Ok(())
                     }
                     Err(e) => Err(e.into()),
