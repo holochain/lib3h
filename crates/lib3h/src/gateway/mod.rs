@@ -32,7 +32,6 @@ pub struct P2pGateway {
     inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
 
     /// message encoding actor
-    #[allow(dead_code)]
     message_encoding: Detach<MessageEncodingActorParentWrapper<P2pGateway>>,
 
     /// self ghost actor
