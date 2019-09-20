@@ -139,7 +139,10 @@ impl P2pGateway {
                 )?;
             }
             _ => {
-                panic!("unexpected received data type {:?}", maybe_p2p_msg);
+                panic!(
+                    "unexpected received data type {} {:?}",
+                    payload, maybe_p2p_msg
+                );
             }
         };
         Ok(())

@@ -1,5 +1,5 @@
 use detach::Detach;
-use lib3h_ghost_actor::prelude::*;
+use lib3h_ghost_actor::{prelude::*, RequestId};
 use lib3h_protocol::{data_types::*, protocol::*, Address};
 use std::collections::{HashMap, HashSet};
 
@@ -115,6 +115,7 @@ impl<'engine> GhostEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             multiplexer_defered_sends: Vec::new(),
+            pending_client_direct_messages: HashMap::new(),
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -258,7 +259,7 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), msg, &data)
+                self.handle_direct_message(span.follower("TODO name"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
@@ -553,7 +554,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         span: Span,
         ghost_message: ClientToLib3hMessage,
-        msg: &DirectMessageData,
+        mut msg: DirectMessageData,
     ) -> Lib3hResult<()> {
         let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
 
@@ -569,6 +570,9 @@ impl<'engine> GhostEngine<'engine> {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
 
+        // Generate a new request_id
+        let request_id = RequestId::new();
+        msg.request_id = request_id.clone().into();
         let net_msg = P2pProtocol::DirectMessage(msg.clone());
 
         // Serialize payload
@@ -584,30 +588,30 @@ impl<'engine> GhostEngine<'engine> {
             .get_mut(&chain_id)
             .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
-        space_gateway
-            .request(
-                span,
-                GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage {
-                        uri: Url::parse(&("agentId:".to_string() + &peer_address))
-                            .expect("invalid url format"),
-                        payload: payload.into(),
-                    },
-                ),
-                Box::new(|_me, response| {
-                    debug!("GhostEngine: response to handle_direct_message message: {:?}", response);
-                    match response {
-                        GhostCallbackData::Response(Ok(
-                                GatewayRequestToChildResponse::Transport(
-                                    transport::protocol::RequestToChildResponse::SendMessageSuccess
-                        ))) => {
-                            panic!("We Need to bookmark this ghost_message so that we can invoke it with a message from the remote peer when they send it back");
-                        }
-                        _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
-                    };
-                    Ok(())
-                })
-            )?;
+        space_gateway.request(
+            span,
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
+                uri: Url::parse(&("agentId:".to_string() + &peer_address))
+                    .expect("invalid url format"),
+                payload: payload.into(),
+            }),
+            Box::new(move |me, response| {
+                debug!(
+                    "GhostEngine: response to handle_direct_message message: {:?}",
+                    response
+                );
+                match response {
+                    GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
+                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                    ))) => {
+                        me.pending_client_direct_messages
+                            .insert(request_id, ghost_message);
+                    }
+                    _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                };
+                Ok(())
+            }),
+        )?;
         Ok(())
     }
 
@@ -881,7 +885,7 @@ mod tests {
 
         let result = lib3h
             .as_mut()
-            .handle_direct_message(test_span(""), msg, &direct_message);
+            .handle_direct_message(test_span(""), msg, direct_message);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 
