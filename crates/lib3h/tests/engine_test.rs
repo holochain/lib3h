@@ -14,7 +14,7 @@ extern crate regex;
 extern crate log;
 use holochain_tracing::test_span;
 
-use lib3h_ghost_actor::{wait1_for_messages, wait_did_work};
+use lib3h_ghost_actor::{wait1_for_callback, wait1_for_messages};
 
 use holochain_tracing::Span;
 use lib3h::{
@@ -160,7 +160,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
         .unwrap()
         .as_context_endpoint_builder()
         .request_id_prefix("parent")
-        .build::<()>();
+        .build::<Option<String>>();
 
     parent_endpoint
         .publish(
@@ -179,29 +179,16 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
         handle_get_gossip_entry_list_regex,
     ];
 
-    wait1_for_messages!(engine, parent_endpoint, regexes);
+    wait1_for_messages!(engine, parent_endpoint, None, regexes);
 
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
+    let expected = "Response(Err(Lib3hError(Other(\"Already joined space\"))))";
 
-    let f: GhostCallback<(), _, _> = Box::new(|&mut _user_data, _cb_data| Ok(()));
-    parent_endpoint
-        .request(
-            test_span("publish join space again"),
-            ClientToLib3h::JoinSpace(track_space.clone()),
-            f,
-        )
-        .unwrap();
-
-    wait_did_work!(engine);
-
-    /*
-    let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::FailureResult(GenericResultData {
-            request_id: "track_a_2".to_string(),
-            space_address: SPACE_ADDRESS_A.clone(),
-            to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: "Unknown error encountered: \'Already joined space\'.".into(),
-        }),
-    ));*/
+    wait1_for_callback!(
+        engine,
+        parent_endpoint,
+        ClientToLib3h::JoinSpace(track_space),
+        expected
+    );
 }
