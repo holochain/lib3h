@@ -72,7 +72,7 @@ pub struct EngineConfig {
 
 pub struct TransportKeys {
     /// Our TransportId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
-    pub transport_id: String,
+    pub transport_id: Address,
     /// The TransportId public key
     pub transport_public_key: Box<dyn Buffer>,
     /// The TransportId secret key
@@ -85,7 +85,7 @@ impl TransportKeys {
         let mut secret_key = crypto.buf_new_secure(crypto.sign_secret_key_bytes());
         crypto.sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(Self {
-            transport_id: hcm0.encode(&public_key)?,
+            transport_id: hcm0.encode(&public_key)?.into(),
             transport_public_key: public_key,
             transport_secret_key: secret_key,
         })
