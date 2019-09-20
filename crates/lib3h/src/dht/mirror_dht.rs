@@ -4,9 +4,9 @@ use crate::{
     time,
 };
 use detach::prelude::*;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, Address, DidWork};
-use lib3h_tracing::Lib3hSpan;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -311,7 +311,7 @@ impl
         let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
         for command in command_list {
             self.endpoint_self
-                .publish(Lib3hSpan::todo("where does span come from?"), command)?;
+                .publish(Span::todo("where does span come from?"), command)?;
         }
         Ok(did_work.into())
     }
@@ -323,6 +323,7 @@ impl MirrorDht {
         debug!("@MirrorDht@ serving request: {:?}", request);
         let span = request.span().child("handle_request_from_parent");
         let msg = request.take_message().expect("exists");
+        debug!("@MirrorDht@ - request: {:?}", msg);
         match msg {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {
@@ -459,7 +460,7 @@ impl MirrorDht {
 
             DhtRequestToChild::RequestPeer(peer_address) => {
                 trace!("DhtRequestToChild::RequestPeer: {:?}", peer_address);
-                let maybe_peer = self.get_peer(&peer_address);
+                let maybe_peer = self.get_peer(peer_address.path());
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
                 request.respond(payload)?;
             }

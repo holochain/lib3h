@@ -8,9 +8,9 @@ use crate::{
     gateway::{protocol::*, P2pGateway},
 };
 use detach::prelude::*;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, DidWork};
-use lib3h_tracing::Lib3hSpan;
 use std::collections::HashMap;
 
 /// Space layer related private methods
@@ -26,7 +26,12 @@ impl<'engine> GhostEngine<'engine> {
             .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, self.this_space_peer(chainId.clone()).clone()));
+            result.push((
+                space_address,
+                self.this_space_peer(chainId.clone())
+                    .expect("Shouldn't find non-existing peer")
+                    .clone(),
+            ));
         }
         result
     }
@@ -53,9 +58,11 @@ impl<'engine> GhostEngine<'engine> {
             ChainId,
             Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>,
         > = self.space_gateway_map.drain().collect();
+        let mut did_work = false;
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             detach_run!(space_gateway, |g| g.process(self))?;
             let request_list = space_gateway.drain_messages();
+            did_work = did_work || request_list.len() > 0;
             space_outbox_map.insert(chain_id.clone(), request_list);
             self.space_gateway_map.insert(chain_id, space_gateway);
         }
@@ -70,13 +77,13 @@ impl<'engine> GhostEngine<'engine> {
             }
         }
         // Done
-        Ok(true /* fixme */)
+        Ok(did_work)
     }
 
     /// Handle a GatewayRequestToParent sent to us by one of our space gateway
     fn handle_space_request(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         chain_id: &ChainId,
         mut request: GatewayToParentMessage,
     ) -> Lib3hResult<DidWork> {
@@ -95,7 +102,7 @@ impl<'engine> GhostEngine<'engine> {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossip_to(&chain_id.0.to_string(), space_gateway, gossip_data)
+                        handle_gossip_to(chain_id.0.clone(), space_gateway, gossip_data)
                             .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
@@ -134,7 +141,7 @@ impl<'engine> GhostEngine<'engine> {
                                 Some(RealEngineTrackerData::HoldEntryRequested),
                             );
                             self.lib3h_endpoint.publish(
-                                Lib3hSpan::fixme(),
+                                Span::fixme(),
                                 Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
                             )?;
                         }
@@ -153,7 +160,7 @@ impl<'engine> GhostEngine<'engine> {
                         };
                         self.lib3h_endpoint
                             .request(
-                                Lib3hSpan::fixme(),
+                                Span::fixme(),
                                 Lib3hToClient::HandleFetchEntry(msg.clone()),
                                 Box::new(move |me, response| {
                                     let mut is_data_for_author_list = false;
@@ -191,7 +198,7 @@ impl<'engine> GhostEngine<'engine> {
                                             };
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
-                                                    Lib3hSpan::fixme(),
+                                                    Span::fixme(),
                                                     GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
                                             } else {
                                                 request.respond(Ok(

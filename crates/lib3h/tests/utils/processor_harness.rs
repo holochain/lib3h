@@ -9,6 +9,7 @@ use crate::utils::seeded_prng::SeededBooleanPrng;
 
 use std::sync::Mutex;
 
+#[allow(dead_code)]
 pub const MAX_PROCESSING_LOOPS: usize = 100;
 
 lazy_static! {
@@ -391,49 +392,6 @@ pub fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEqual
     }))
 }
 
-/// Waits for work to be done. Will interrupt the program if no work was done and should_abort
-/// is true
-#[allow(unused_macros)]
-macro_rules! wait_did_work {
-    ($engine1:ident, //&mut Vec<&mut Box<dyn NetworkEngine>>,
-     $engine2:ident,
-     $should_abort: expr
-    ) => {{
-        let p1: Box<dyn Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert(
-            $engine1.name(),
-        ));
-        let p2: Box<dyn Processor> = Box::new($crate::utils::processor_harness::DidWorkAssert(
-            $engine2.name(),
-        ));
-        let processors: Vec<Box<dyn Processor>> = vec![p1, p2];
-        assert_processed!($engine1, $engine2, processors, $should_abort)
-    }};
-    ($engine1:ident, $engine2:ident) => {
-        wait_did_work!($engine1, $engine2, true)
-    };
-}
-
-/// Continues processing the engine until no work is being done.
-#[allow(unused_macros)]
-macro_rules! wait_until_no_work {
-    ($engine1: ident, $engine2:ident) => {{
-        let mut result;
-        loop {
-            result = wait_did_work!($engine1, $engine2, false);
-            if result.is_empty() {
-                break;
-            } else {
-                if result.iter().find(|x| x.did_work).is_some() {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-        }
-        result
-    }};
-}
-
 #[allow(unused_macros)]
 macro_rules! wait_connect {
     (
@@ -442,16 +400,92 @@ macro_rules! wait_connect {
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
-        let connected_data =
-            Lib3hServerProtocol::Connected(lib3h_protocol::data_types::ConnectedData {
-                uri: $other.advertise(),
-                // TODO should be able to set non a blank request id
-                request_id: "".into(), //$connect_data.clone().request_id,
-            });
+        let re = regex::Regex::new("ConnectedData").expect("valid regex");
+        let assertion = Box::new(predicates::prelude::predicate::function(move |x| {
+            let to_match = format!("{:?}", x);
+            re.is_match(&to_match)
+        }));
+
         let predicate: Box<dyn $crate::utils::processor_harness::Processor> = Box::new(
-            $crate::utils::processor_harness::Lib3hServerProtocolEquals(connected_data),
+            $crate::utils::processor_harness::Lib3hServerProtocolAssert(assertion),
         );
+
         let result = assert_one_processed!($me, $other, predicate);
         result
+    }};
+}
+
+/// Waits for work to be done. Will interrupt the program if no work was done and should_abort
+/// is true
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_engine_wrapper_did_work {
+    ($engine: ident,
+     $should_abort: expr
+    ) => {{
+        let timeout = std::time::Duration::from_millis(2000);
+        $crate::wait_engine_wrapper_did_work!($engine, $should_abort, timeout)
+    }};
+    ($engine:ident) => {
+        $crate::wait_engine_wrapper_did_work!($engine, true)
+    };
+    ($engine: ident,
+     $should_abort: expr,
+     $timeout : expr
+      ) => {{
+        let mut did_work = false;
+        let clock = std::time::SystemTime::now();
+
+        for i in 0..20 {
+            let (did_work_now, _) = $engine
+                .process()
+                .map_err(|e| println!("ghost actor processing error: {:?}", e))
+                .unwrap_or((false, vec![]));
+            did_work = did_work_now;
+            if did_work {
+                break;
+            }
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > $timeout {
+                break;
+            }
+            println!("[{}] wait_engine_wrapper_did_work", i);
+            std::thread::sleep(std::time::Duration::from_millis(1))
+        }
+        if $should_abort {
+            assert!(did_work);
+        }
+        did_work
+    }};
+}
+
+/// Continues processing the GhostActor trait until no work is being done.
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_until_no_work {
+    ($engine: ident) => {{
+        let mut did_work;
+        loop {
+            did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
+            if !did_work {
+                break;
+            }
+        }
+        did_work
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_until_did_work {
+    ($engine: ident) => {{
+        let mut did_work;
+        loop {
+            did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
+            if did_work {
+                break;
+            }
+        }
+        did_work
     }};
 }

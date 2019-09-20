@@ -12,4 +12,5 @@ documentation = "https://docs.rs/lib3h_discovery"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-url = "=1.7.2"
+url = { version = "=2.1.0", features = ["serde"] }
+

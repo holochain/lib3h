@@ -26,9 +26,10 @@ impl GhostError {
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
     /// returned on an attempt to handle an callback for a non-existent request
-    RequestIdNotFound,
+    RequestIdNotFound(String),
     /// Generic stringified errors
     Other(String),
+    EndpointDisconnected,
     /// Hints that destructuring should not be exhaustive.
     ///
     /// This enum may grow additional variants, so this makes sure clients
@@ -42,7 +43,7 @@ impl std::error::Error for GhostError {
     /// The lower-level source of this error, if any.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self.0 {
-            ErrorKind::RequestIdNotFound => None,
+            ErrorKind::RequestIdNotFound(ref _s) => None,
             ErrorKind::Other(ref _s) => None,
             _ => unreachable!(),
         }
@@ -52,7 +53,7 @@ impl std::error::Error for GhostError {
 impl std::fmt::Display for GhostError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self.0 {
-            ErrorKind::RequestIdNotFound => write!(f, "RequestIdNotFound"),
+            ErrorKind::RequestIdNotFound(ref s) => write!(f, "RequestIdNotFound {{{:?}}}", s),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
