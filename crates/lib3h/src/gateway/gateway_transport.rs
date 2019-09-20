@@ -49,23 +49,22 @@ impl P2pGateway {
                         our_peer_address,
                         uri,
                     );
-                    me.inner_transport.request(
-                        span,
-                        transport::protocol::RequestToChild::SendMessage {
-                            uri: uri.clone(),
-                            payload: buf.into(),
-                        },
-                        Box::new(|_me, response| {
+                    me.send(
+                        span.follower("TODO send"),
+                        uri.clone(),
+                        buf.into(),
+                        Box::new(|response| {
                             match response {
-                                GhostCallbackData::Response(Err(e)) => error!(
-                                    "Error exchanging peer info with new connection: {:?}",
-                                    e,
-                                ),
-                                GhostCallbackData::Timeout => {
-                                    error!("Timeout exchanging peer info with new connection")
+                                Ok(GatewayRequestToChildResponse::Transport(
+                                    transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                                )) => {
+                                    trace!("Successfully exchanged peer info with new connection")
                                 }
-                                _ => trace!("Successfully exchanged peer info with new connection"),
-                            };
+                                _ => error!(
+                                    "peer info exchange with new connection failed {:?}",
+                                    response
+                                ),
+                            }
                             Ok(())
                         }),
                     )?;
@@ -90,7 +89,11 @@ impl P2pGateway {
                             result: encoding_protocol::DecodeData::Payload { payload },
                         },
                     )) => {
-                        me.priv_on_receive(e_span, uri, payload)?;
+                        if payload.len() == 0 {
+                            debug!("Implement Ping!");
+                        } else {
+                            me.priv_on_receive(e_span, uri, payload)?;
+                        }
                     }
                     _ => panic!("unexpected decode result: {:?}", resp),
                 }
@@ -142,6 +145,7 @@ impl P2pGateway {
                     GhostCallbackData::Response(Ok(
                         encoding_protocol::RequestToChildResponse::EncodePayloadResult { payload },
                     )) => {
+                        error!("sending: {:?}", payload);
                         me.priv_low_level_send(e_span, uri, payload, cb)?;
                     }
                     _ => {
@@ -293,39 +297,6 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
-                let payload_wrapped = payload.clone(); // not really wrapped
-
-                // TODO - XXX - We need to wrap this so we know how / where
-                //              to put this message (which gateway) on the
-                //              remote side
-
-                /*
-                let to_agent_id = uri.path();
-                trace!(
-                    "try-send {:?} {} {} bytes",
-                    self.identifier.id,
-                    to_agent_id,
-                    payload.len()
-                );
-
-                let request_id = nanoid::simple();
-                // as a gateway, we need to wrap items going to our children
-                let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
-                    space_address: self.identifier.id.clone(),
-                    request_id: request_id.clone(),
-                    to_agent_id: to_agent_id.into(),
-                    from_agent_id: self.this_peer.peer_address.clone().into(),
-                    content: payload.clone(),
-                });
-
-                // Serialize payload
-                let mut payload_wrapped = Vec::new();
-                wrap_payload
-                    .serialize(&mut Serializer::new(&mut payload_wrapped))
-                    .unwrap();
-                let payload_wrapped = Opaque::from(payload_wrapped);
-                */
-
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
@@ -339,7 +310,7 @@ impl P2pGateway {
                                 me.send(
                                     span.follower("TODO send"),
                                     peer_data.peer_uri.clone(),
-                                    payload_wrapped,
+                                    payload,
                                     Box::new(|response| {
                                         trace!("SENT!");
                                         parent_request.respond(
@@ -423,38 +394,6 @@ impl P2pGateway {
                     debug!("Implement Ping!");
                 } else {
                     self.priv_decode_on_receive(span, uri, payload)?;
-                    /*
-                    let mut de = Deserializer::new(&payload[..]);
-                    let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                        Deserialize::deserialize(&mut de);
-                    if let Ok(p2p_msg) = maybe_p2p_msg {
-                        if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) =
-                            p2p_msg
-                        {
-                            debug!(
-                                "Received PeerAddress: {} | {} ({})",
-                                peer_address, gateway_id, self.identifier.nickname
-                            );
-                            if self.identifier.id == gateway_id.into() {
-                                let peer = PeerData {
-                                    peer_address,
-                                    peer_uri: uri.clone(),
-                                    timestamp,
-                                };
-                                // HACK
-                                let _ = self.inner_dht.publish(
-                                    span.follower(
-                                        "transport::protocol::RequestToParent::ReceivedData",
-                                    ),
-                                    DhtRequestToChild::HoldPeer(peer),
-                                );
-                                // TODO #58
-                                // TODO #150 - Should not call process manually
-                                self.process().expect("HACK");
-                            }
-                        }
-                    }
-                    */
                 }
             }
         };

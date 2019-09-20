@@ -34,6 +34,8 @@ impl
             self.handle_transport_RequestToParent(request)?;
         }
 
+        detach_run!(&mut self.message_encoding, |enc| { enc.process(self) })?;
+
         self.handle_transport_pending_outgoing_messages()?;
 
         // Update this_peer cache

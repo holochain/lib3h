@@ -24,7 +24,14 @@ impl InterimEncodingProtocol {
     }
 
     fn from_slice(v: &[u8]) -> Self {
-        serde_json::from_slice(v).unwrap()
+        match serde_json::from_slice(v) {
+            Ok(s) => s,
+            Err(e) => panic!(
+                "failed to decode {:?} - {:?}",
+                String::from_utf8_lossy(v),
+                e
+            ),
+        }
     }
 }
 
@@ -123,6 +130,7 @@ impl MessageEncoding {
         &mut self,
         mut msg: MessageEncodingMessageFromParent,
     ) -> Lib3hResult<()> {
+        error!("{:?}", msg.backtrace());
         match msg.take_message().expect("exists") {
             RequestToChild::Decode { payload } => self.handle_decode(msg, payload),
             RequestToChild::EncodeHandshake { space_address, id } => {
