@@ -173,7 +173,6 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 
 // -- Memory Transport Tests --
 #[test]
-#[ignore]
 fn test_two_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {

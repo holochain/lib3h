@@ -117,19 +117,19 @@ fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock) {
 pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send DM
     let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
-    wait_engine_wrapper_did_work!(alex);
-    //assert_process_success!(alex, req_id);
-    // Receive
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleSendDirectMessage);
-    assert_eq!(msg.request_id, req_id);
-    let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
-    println!("HandleSendDirectMessage: {}", content);
+
+    let handle_send_direct_msg = Lib3hServerProtocol::HandleSendDirectMessage( DirectMessageData {
+            request_id: req_id.clone(),
+            content: "wah".into(),
+            from_agent_id : "alex".into(),
+            space_address: "space_address_a".into(),
+            to_agent_id : "billy".into()
+    });
+
+    assert_processed_eq!(alex, billy, handle_send_direct_msg);
 
     // Send response
-    let response_content = format!("echo: {}", content).as_bytes().to_vec();
+    let response_content = format!("echo: {}", "wah").as_bytes().to_vec();
     billy.send_response(&req_id, &alex.agent_id(), response_content.clone());
     assert_process_success!(billy, req_id);
     // Receive response

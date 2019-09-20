@@ -233,9 +233,9 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 macro_rules! assert_processed_eq {
     ($engine1:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
      $engine2:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
-     $equal_to:ident,// Box<dyn Processor>,
+     $equal_to:ident // Box<dyn Processor>,
     ) => {{
-        let p = Box::new(Lib3hServerProtocolEquals($equal_to));
+        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals($equal_to));
         assert_one_processed!($engine1, $engine2, p)
     }};
 }
