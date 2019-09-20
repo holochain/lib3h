@@ -644,7 +644,7 @@ mod tests {
         assert_eq!(transport1.bound_url, None);
         assert_eq!(transport2.bound_url, None);
 
-        let port1 = get_available_port(1025).expect("Must be able to find free port");
+        let port1 = get_available_port(3125).expect("Must be able to find free port");
         let expected_transport1_address =
             Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
         t1_endpoint
@@ -667,7 +667,7 @@ mod tests {
             )
             .unwrap();
 
-        let port2 = get_available_port(1026).expect("Must be able to find free port");
+        let port2 = get_available_port(3126).expect("Must be able to find free port");
         let expected_transport2_address =
             Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
         t2_endpoint
