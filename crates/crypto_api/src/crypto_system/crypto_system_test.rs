@@ -103,15 +103,13 @@ impl FullSuite {
         let ctx1: Box<dyn Buffer> = Box::new(vec![1; self.crypto.kdf_context_bytes()]);
         let ctx2: Box<dyn Buffer> = Box::new(vec![2; self.crypto.kdf_context_bytes()]);
 
-        let mut root: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
+        let root: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_key_bytes()]);
         let mut a_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut a_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut a_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut b_1_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut b_2_1: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
         let mut b_1_2: Box<dyn Buffer> = Box::new(vec![0; self.crypto.kdf_min_bytes()]);
-
-        self.crypto.randombytes_buf(&mut root).unwrap();
 
         self.crypto.kdf(&mut a_1_1, 1, &ctx1, &root).unwrap();
         self.crypto.kdf(&mut a_2_1, 2, &ctx1, &root).unwrap();
@@ -630,6 +628,10 @@ mod test {
             Ok(())
         }
 
+        fn kdf_key_bytes(&self) -> usize {
+            8
+        }
+
         fn kdf_context_bytes(&self) -> usize {
             1
         }
@@ -653,7 +655,7 @@ mod test {
                 return Err(CryptoError::BadOutBufferSize);
             }
 
-            if parent.len() < self.kdf_min_bytes() || parent.len() > self.kdf_max_bytes() {
+            if parent.len() != self.kdf_key_bytes() {
                 return Err(CryptoError::BadParentSize);
             }
 
