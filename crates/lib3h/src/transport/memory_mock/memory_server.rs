@@ -227,7 +227,7 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!(
-                    "(MemoryServer {}) received: {} (from {})",
+                    "(MemoryServer {}) received: {}B (from {})",
                     self.this_uri,
                     payload.len(),
                     uri

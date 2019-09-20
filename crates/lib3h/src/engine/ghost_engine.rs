@@ -64,7 +64,7 @@ impl<'engine> GhostEngine<'engine> {
         let this_net_peer = PeerData {
             peer_address: format!("{}_tId", name),
             peer_uri: prebound_binding,
-            timestamp: 0, // TODO #166
+            timestamp: crate::time::since_epoch_ms(),
         };
         // Create DhtConfig
         let dht_config = DhtConfig::with_engine_config(&format!("{}_tId", name), &config);

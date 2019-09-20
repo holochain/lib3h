@@ -109,11 +109,14 @@ impl NodeMock {
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        println!("\n\n({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
+        println!("({}).process() END - {}", self.name, self.recv_msg_log.len());
         self.recv_msg_log.extend_from_slice(msgs.as_slice());
         for msg in msgs.iter() {
             self.handle_lib3h(msg.clone());
         }
+        println!("({}).process() - END END\n", self.name);
         Ok((did_work, msgs))
     }
 

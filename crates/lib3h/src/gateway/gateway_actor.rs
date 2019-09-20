@@ -51,6 +51,7 @@ impl
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
+                    println!("Received RequestThisPeer response: {:?}", peer_response);
                     me.this_peer = peer_response;
                 } else {
                     panic!("bad response to RequestThisPeer: {:?}", response);

@@ -110,8 +110,8 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
-        dht_gossip_interval: 500,
-        dht_timeout_threshold: 3000,
+        dht_gossip_interval: 5000,
+        dht_timeout_threshold: 30000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -173,7 +173,6 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 
 // -- Memory Transport Tests --
 #[test]
-#[ignore]
 fn test_two_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {

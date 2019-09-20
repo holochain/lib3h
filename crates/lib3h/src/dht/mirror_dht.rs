@@ -119,6 +119,7 @@ impl MirrorDht {
         let now = time::since_epoch_ms();
         let mut outbox = Vec::new();
         let mut did_work = false;
+        println!("mirrorDht.this_peer = {:?}", self.this_peer);
         // Check if others timed-out
         // TODO: Might need to optimize performance as walking a map is expensive
         // see comment: https://github.com/holochain/lib3h/pull/210/#discussion_r304518608
@@ -138,7 +139,7 @@ impl MirrorDht {
             }
             // Check if timed-out
             if now - peer.timestamp > self.config.timeout_threshold() {
-                debug!("@MirrorDht@ peer {} timed-out", peer_address);
+                debug!("@MirrorDht@ peer {} timed-out ({} > {})", peer_address, now - peer.timestamp, self.config.timeout_threshold());
                 outbox.push(DhtRequestToParent::PeerTimedOut(peer_address.clone()));
                 timed_out_list.push(peer_address.clone());
                 did_work = true;

@@ -53,12 +53,13 @@ impl P2pGateway {
         &mut self,
         mut request: DhtToParentMessage,
     ) -> Lib3hResult<()> {
-        debug!(
-            "({}) Serving request from child dht: {:?}",
-            self.identifier.nickname, request
-        );
         let span = request.span().child("handle_dht_RequestToParent");
-        match request.take_message().expect("exists") {
+        let payload = request.take_message().expect("exists");
+                debug!(
+            "({}) Serving request from child dht: {:?}",
+            self.identifier.nickname, payload
+        );
+        match payload {
             DhtRequestToParent::GossipTo(_data) => {
                 // no-op
             }

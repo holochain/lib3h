@@ -42,7 +42,7 @@ impl P2pGateway {
             this_peer: PeerData {
                 peer_address: dht_config.this_peer_address(),
                 peer_uri: Url::parse("none:").unwrap(),
-                timestamp: 0, // FIXME
+                timestamp: crate::time::since_epoch_ms(),
             },
             pending_outgoing_messages: Vec::new(),
         }
