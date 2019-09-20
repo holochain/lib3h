@@ -11,7 +11,7 @@ extern crate syn;
 extern crate quote;
 
 mod ghost_error;
-pub use ghost_error::{GhostError, GhostResult};
+pub use ghost_error::{GhostError, GhostResult, ErrorKind};
 
 pub mod code_gen;
 

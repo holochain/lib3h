@@ -19,6 +19,8 @@ pub enum MemoryEvent {
     ReceivedData(Url, Opaque),
     /// A connection closed for whatever reason
     ConnectionClosed(Url),
+    /// Simulates network unbinding
+    Unbind(Url),
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -62,6 +64,14 @@ impl MemoryNet {
             .entry(binding.clone())
             .or_insert_with(|| MemoryServer::new(&binding));
         binding
+    }
+    pub fn unbind(&mut self, url: &Url) -> bool {
+        if let Some(server) = self.get_server(url) {
+            server.close();
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -111,12 +121,20 @@ pub struct MemoryServer {
     /// Inbox of connection state change requests
     /// (true = incoming connection, false = connection closed)
     connection_inbox: Vec<(Url, bool)>,
+    state: State,
 }
 
 impl Drop for MemoryServer {
     fn drop(&mut self) {
         trace!("(MemoryServer) dropped: {:?}", self.this_uri);
     }
+}
+
+#[derive(PartialEq, Debug)]
+enum State {
+    Running,
+    Closing,
+    Closed,
 }
 
 impl MemoryServer {
@@ -126,7 +144,13 @@ impl MemoryServer {
             this_uri: uri.clone(),
             inbox_map: HashMap::new(),
             connection_inbox: Vec::new(),
+            state: State::Running,
         }
+    }
+
+    // shut down the server (simulates unbinding)
+    pub fn close(&mut self) {
+        self.state = State::Closing;
     }
 
     pub fn is_connected_to(&self, uri: &Url) -> bool {
@@ -137,7 +161,7 @@ impl MemoryServer {
     /// This creates a new connection: An inbox is created for receiving payloads from this requester.
     /// This also generates a request for us to connect to the other node in the other way.
     pub fn request_connect(&mut self, other_uri: &Url) -> TransportResult<()> {
-        info!(
+        debug!(
             "(MemoryServer) {} creates inbox for {}",
             self.this_uri, other_uri
         );
@@ -164,7 +188,7 @@ impl MemoryServer {
 
     /// Another node closes its connection with us
     pub fn request_close(&mut self, other_uri: &Url) -> TransportResult<()> {
-        info!("(MemoryServer {}).close({})", self.this_uri, other_uri);
+        debug!("(MemoryServer {}).close({})", self.this_uri, other_uri);
         // delete this uri's inbox
         let res = self.inbox_map.remove(other_uri);
         if res.is_none() {
@@ -198,6 +222,9 @@ impl MemoryServer {
     /// a TransportEvent::IncomingConnectionEstablished for each incoming connection.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<MemoryEvent>)> {
         trace!("(MemoryServer {}).process()", self.this_uri);
+        if self.state == State::Closed {
+            return Ok((false, Vec::new()));
+        }
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connection inbox
@@ -235,6 +262,12 @@ impl MemoryServer {
                 let evt = MemoryEvent::ReceivedData(uri.clone(), payload.into());
                 outbox.push(evt);
             }
+        }
+        if self.state == State::Closing {
+            trace!("(MemoryServer {}).closing", self.this_uri);
+            outbox.push(MemoryEvent::Unbind(self.this_uri.clone()));
+            self.state = State::Closed;
+            did_work = true;
         }
         Ok((did_work, outbox))
     }

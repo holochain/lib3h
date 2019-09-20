@@ -505,8 +505,8 @@ mod tests {
         assert_eq!("Ok((true, []))", format!("{:?}", result));
 
         detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_publish(
-            Lib3hToClient::Disconnected(DisconnectedData {
-                network_id: "some_network_id".into()
+            Lib3hToClient::Unbound(UnboundData {
+                uri: Url::parse("mem:/addr_1/").unwrap()
             })
         ));
 

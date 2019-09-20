@@ -63,7 +63,7 @@ impl From<RequestId> for String {
 }
 
 mod ghost_error;
-pub use ghost_error::{GhostError, GhostResult};
+pub use ghost_error::{GhostError, GhostResult, ErrorKind};
 
 mod ghost_tracker;
 pub use ghost_tracker::{

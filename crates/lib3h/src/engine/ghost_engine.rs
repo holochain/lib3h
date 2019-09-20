@@ -768,11 +768,14 @@ pub fn handle_gossip_to<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test};
+    use crate::{dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
+                transport::memory_mock::memory_server,
+    };
     use holochain_tracing::test_span;
     use lib3h_sodium::SodiumCryptoSystem;
     use std::path::PathBuf;
     use url::Url;
+    use lib3h_ghost_actor::wait_can_track_did_work;
 
     struct MockCore {
         //    state: String,
@@ -859,6 +862,40 @@ mod tests {
         assert_eq!(
             "Err(Lib3hError(Other(\"Not part of that space\")))",
             format!("{:?}", result)
+        );
+    }
+
+    // this test simulates an unbind happening in our transport layer
+    // i.e. we moved to a different cell tower, or someone turned off the
+    // networking interface
+    #[test]
+    fn test_ghost_engine_unbind() {
+        enable_logging_for_test(true);
+        let mut core = MockCore {
+            //        state: "".to_string(),
+        };
+        let network_name = "test_ghost_engine_unbind";
+        let mut engine = make_test_engine_wrapper(network_name);
+        let req_data = make_test_join_request();
+        let result = engine.as_mut().handle_join(test_span(""), &req_data);
+        assert!(result.is_ok());
+        let network = {
+            let mut verse = memory_server::get_memory_verse();
+            verse.get_network(network_name)
+        };
+
+        println!("FISHSFDISDF: {:?}",engine.as_ref().advertise());
+        let my_url = &Url::parse("mem://addr_1/").unwrap();
+        //let my_url = &engine.as_ref().advertise();
+        assert!(network.lock().unwrap().unbind(my_url));
+        wait_can_track_did_work!(engine,core,false);
+//        println!("engine.process() -> {:?}", res);
+        let mut msgs = engine.drain_messages();
+        println!("engine.drain() -> {:?}", msgs);
+        assert_eq!(msgs.len(),3);
+        assert_eq!(
+            "",
+            format!("{:?}",msgs[2].take_message())
         );
     }
 

@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::TransportError,
+    error::{TransportError,ErrorKind},
     memory_mock::memory_server::{self, *},
     protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
@@ -239,12 +239,22 @@ impl
                 for event in non_connect_events {
                     match event {
                         MemoryEvent::ReceivedData(from_addr, payload) => {
-                            trace!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
+                            trace!("MemoryEvent::RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
                             self.endpoint_self.publish(
                                 Span::fixme(),
                                 RequestToParent::ReceivedData {
                                     uri: from_addr,
                                     payload,
+                                },
+                            )?;
+                        }
+                        MemoryEvent::Unbind(url) => {
+                            trace!("MemoryEvent::Unbind: {:?}", url);
+                            self.endpoint_self.publish(
+                                Span::fixme(),
+                                RequestToParent::ErrorOccured {
+                                    uri: url,
+                                    error: TransportError::new_kind(ErrorKind::Unbind),
                                 },
                             )?;
                         }

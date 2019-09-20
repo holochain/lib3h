@@ -359,7 +359,7 @@ impl<
             for (route_spec, endpoint) in re.iter_mut() {
                 if let Err(e) = endpoint.process(self) {
                     match e.kind() {
-                        ErrorKind::EndpointDisconnected => {
+                        lib3h_ghost_actor::ErrorKind::EndpointDisconnected => {
                             disconnected_endpoints.push(route_spec.clone());
                             continue;
                         }
