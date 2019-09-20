@@ -8,7 +8,10 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
-use lib3h_discovery::{error::{DiscoveryError, DiscoveryResult}, Discovery};
+use lib3h_discovery::{
+    error::{DiscoveryError, DiscoveryResult},
+    Discovery,
+};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, Address};
 use url::Url;
@@ -53,14 +56,14 @@ impl Discovery for GhostTransportWebsocket {
 
         match &mut self.mdns {
             Some(mdns) => mdns.advertise(),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
         match &mut self.mdns {
             Some(mdns) => mdns.discover(),
-            None => Ok(Vec::new())
+            None => Ok(Vec::new()),
         }
     }
 
@@ -708,8 +711,6 @@ mod tests {
         transport2
             .advertise()
             .expect("Fail to advertise WSS transport2.");
-
-
 
         let urls = transport1
             .discover()
