@@ -18,6 +18,7 @@ impl P2pGateway {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
+        wrap_dm: bool,
         identifier: GatewayId,
         peer_uri: Url,
         inner_transport: transport::protocol::DynTransportActor,
@@ -33,6 +34,7 @@ impl P2pGateway {
                 .build(),
         );
         P2pGateway {
+            wrap_dm,
             identifier: identifier,
             inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
                 inner_transport,

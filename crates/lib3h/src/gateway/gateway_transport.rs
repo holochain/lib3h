@@ -51,6 +51,10 @@ impl P2pGateway {
                     );
                     me.send(
                         span.follower("TODO send"),
+                        // We don't know who our remote is...
+                        // we might need some special handling on
+                        // the remote side for this
+                        "".to_string().into(),
                         uri.clone(),
                         buf.into(),
                         Box::new(|response| {
@@ -151,6 +155,7 @@ impl P2pGateway {
     fn priv_encoded_send(
         &mut self,
         span: Span,
+        to_address: lib3h_protocol::Address,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
@@ -165,7 +170,7 @@ impl P2pGateway {
                         encoding_protocol::RequestToChildResponse::EncodePayloadResult { payload },
                     )) => {
                         trace!("sending: {:?}", payload);
-                        me.priv_low_level_send(e_span, uri, payload, cb)?;
+                        me.priv_low_level_send(e_span, to_address, uri, payload, cb)?;
                     }
                     _ => {
                         cb(Err(format!(
@@ -183,16 +188,36 @@ impl P2pGateway {
     fn priv_low_level_send(
         &mut self,
         span: Span,
+        to_address: lib3h_protocol::Address,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
     ) -> GhostResult<()> {
+        let payload = if self.wrap_dm {
+            let dm_wrapper = DirectMessageData {
+                space_address: self.identifier.id.clone(),
+                request_id: "".to_string(),
+                to_agent_id: to_address,
+                from_agent_id: self.this_peer.peer_address.clone().into(),
+                content: payload,
+            };
+            error!("BANG ZOOM: {:#?}", dm_wrapper);
+            let mut payload = Vec::new();
+            let p2p_msg = P2pProtocol::DirectMessage(dm_wrapper);
+            p2p_msg
+                .serialize(&mut Serializer::new(&mut payload))
+                .unwrap();
+            Opaque::from(payload)
+        } else {
+            payload
+        };
+
         // Forward to the child Transport
         self.inner_transport.request(
             span.child("SendMessage"),
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
-                payload: payload.clone(),
+                payload: payload,
             },
             Box::new(move |_me, response| {
                 // In case of a transport error or timeout we store the message in the
@@ -242,6 +267,7 @@ impl P2pGateway {
     pub(crate) fn send(
         &mut self,
         span: Span,
+        to_address: lib3h_protocol::Address,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
@@ -252,7 +278,7 @@ impl P2pGateway {
             uri,
             payload.len()
         );
-        self.priv_encoded_send(span, uri, payload, cb)
+        self.priv_encoded_send(span, to_address, uri, payload, cb)
     }
 
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
@@ -326,12 +352,13 @@ impl P2pGateway {
                             GhostCallbackData::Response(Ok(
                                 DhtRequestToChildResponse::RequestPeer(Some(peer_data)),
                             )) => {
+                                //error!("BANG ZOOM: {}", peer_data.peer_uri);
                                 me.send(
                                     span.follower("TODO send"),
+                                    peer_data.peer_address.clone().into(),
                                     peer_data.peer_uri.clone(),
                                     payload,
                                     Box::new(|response| {
-                                        trace!("SENT!");
                                         parent_request.respond(
                                             response
                                                 .map_err(|transport_error| transport_error.into()),

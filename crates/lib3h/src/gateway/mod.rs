@@ -23,6 +23,7 @@ use url::Url;
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 pub struct P2pGateway {
+    wrap_dm: bool,
     // either network_id or space_address depending on which type of gateway
     identifier: GatewayId,
 

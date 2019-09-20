@@ -64,6 +64,7 @@ impl<'engine> GhostEngine<'engine> {
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
+                false,
                 config.network_id.clone(),
                 prebound_binding,
                 transport,
@@ -312,6 +313,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new(
+                true,
                 gateway_id,
                 Url::parse(&format!(
                     "transportid:{}?a={}",
