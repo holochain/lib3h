@@ -1,96 +1,55 @@
-#![allow(non_snake_case)]
-
 use crate::{
-    dht::dht_trait::{Dht, DhtConfig, DhtFactory},
-    gateway::{Gateway, P2pGateway},
-    transport::{protocol::*, TransportWrapper},
+    dht::{dht_config::DhtConfig, dht_protocol::*},
+    engine::GatewayId,
+    gateway::P2pGateway,
+    transport,
 };
-use lib3h_protocol::Address;
-use std::collections::{HashMap, VecDeque};
+use detach::prelude::*;
+use lib3h_ghost_actor::prelude::*;
+use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
 //--------------------------------------------------------------------------------------------------
 
-/// any Transport Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
+/// P2pGateway Constructors
+impl P2pGateway {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
-        identifier: &str,
-        inner_transport: TransportWrapper<'gateway>,
-        dht_factory: DhtFactory<D>,
+        identifier: GatewayId,
+        peer_uri: Url,
+        inner_transport: transport::protocol::DynTransportActor,
+        dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
-        P2pGateway {
-            inner_transport,
-            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
-            identifier: identifier.to_owned(),
-            connection_map: HashMap::new(),
-            transport_inbox: VecDeque::new(),
-            transport_inject_events: Vec::new(),
-        }
-    }
-}
-
-impl<'gateway, D: Dht> Gateway for P2pGateway<'gateway, D> {
-    /// This Gateway's identifier
-    fn identifier(&self) -> &str {
-        self.identifier.as_str()
-    }
-
-    fn transport_inject_event(&mut self, evt: TransportEvent) {
-        self.transport_inject_events.push(evt);
-    }
-
-    /// Helper for getting a connectionId from a peer_address
-    fn get_connection_id(&self, peer_address: &str) -> Option<String> {
-        // get peer_uri
-        let maybe_peer_data = self.inner_dht.get_peer(peer_address);
-        if maybe_peer_data.is_none() {
-            return None;
-        }
-        let peer_uri = maybe_peer_data.unwrap().peer_uri;
-        trace!(
-            "({}) get_connection_id: {} -> {}",
-            self.identifier,
-            peer_address,
-            peer_uri,
+        let dht = dht_factory(dht_config).expect("Failed to construct DHT");
+        let (endpoint_parent, endpoint_self) = create_ghost_channel();
+        let endpoint_self = Detach::new(
+            endpoint_self
+                .as_context_endpoint_builder()
+                .request_id_prefix(&format!("{}_to_parent_", identifier.nickname))
+                .build(),
         );
-        // get connection_id
-        let maybe_connection_id = self.connection_map.get(&peer_uri);
-        if maybe_connection_id.is_none() {
-            return None;
-        }
-        let conn_id = maybe_connection_id.unwrap().clone();
-        trace!(
-            "({}) get_connection_id: {} -> {} -> {}",
-            self.identifier,
-            peer_address,
-            peer_uri,
-            conn_id,
-        );
-        Some(conn_id)
-    }
-}
-
-/// P2pGateway Constructor
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
-    /// Constructors
-    pub fn new_with_space(
-        network_gateway: TransportWrapper<'gateway>,
-        space_address: &Address,
-        dht_factory: DhtFactory<D>,
-        dht_config: &DhtConfig,
-    ) -> Self {
-        let identifier: String = space_address.clone().into();
         P2pGateway {
-            inner_transport: network_gateway,
-            inner_dht: dht_factory(dht_config).expect("Failed to construct DHT"),
-            identifier,
-            connection_map: HashMap::new(),
-            transport_inbox: VecDeque::new(),
-            transport_inject_events: Vec::new(),
+            identifier: identifier,
+            inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
+                inner_transport,
+                "to_child_transport_",
+            )),
+            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
+            endpoint_parent: Some(endpoint_parent),
+            endpoint_self,
+            this_peer: PeerData {
+                peer_address: dht_config.this_peer_address(),
+                peer_uri,
+                timestamp: 0, // FIXME
+            },
+            pending_outgoing_messages: Vec::new(),
         }
+    }
+
+    pub fn this_peer(&self) -> PeerData {
+        self.this_peer.clone()
     }
 }

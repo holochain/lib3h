@@ -1,306 +1,383 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht},
+    dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
-    gateway::{Gateway, P2pGateway},
-    transport::{
-        error::{TransportError, TransportResult},
-        protocol::{TransportCommand, TransportEvent},
-        transport_trait::Transport,
-        ConnectionId, ConnectionIdRef,
-    },
+    error::*,
+    gateway::{protocol::*, P2pGateway, PendingOutgoingMessage, SendCallback},
+    transport::{self, error::TransportResult},
 };
-use lib3h_protocol::DidWork;
+use holochain_tracing::Span;
+use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::data_types::*;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-/// Compose Transport
-impl<'gateway, D: Dht> Transport for P2pGateway<'gateway, D> {
-    // TODO #176 - Return a higher-level uri instead?
-    fn connect(&mut self, uri: &Url) -> TransportResult<ConnectionId> {
-        trace!("({}).connect() {}", self.identifier, uri);
-        // Connect
-        let connection_id = self.inner_transport.as_mut().connect(&uri)?;
-        // Store result in connection map
-        self.connection_map
-            .insert(uri.clone(), connection_id.clone());
-        // Done
-        Ok(connection_id)
-    }
-
-    // TODO #176 - remove conn id conn_map??
-    fn close(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        self.inner_transport.as_mut().close(id)
-    }
-
-    // TODO #176
-    fn close_all(&mut self) -> TransportResult<()> {
-        self.inner_transport.as_mut().close_all()
-    }
-
-    /// id_list =
-    ///   - Network : transportId
-    ///   - space   : agentId
-    fn send(&mut self, dht_id_list: &[&ConnectionIdRef], payload: &[u8]) -> TransportResult<()> {
-        // get connectionId from the inner dht first
-        let dht_uri_list = self.dht_address_to_uri_list(dht_id_list)?;
-        // send
-        trace!(
-            "({}).send() {:?} -> {:?} | {}",
-            self.identifier,
-            dht_id_list,
-            dht_uri_list,
-            payload.len(),
-        );
-        // Get connectionIds for the inner Transport.
-        let mut conn_list = Vec::new();
-        for dht_uri in dht_uri_list {
-            let net_uri = self.connection_map.get(&dht_uri).expect("unknown dht_uri");
-            conn_list.push(net_uri);
-            trace!(
-                "({}).send() reversed mapped dht_uri {:?} to net_uri {:?}",
-                self.identifier,
-                dht_uri,
-                net_uri,
-            )
-        }
-        let ref_list: Vec<&str> = conn_list.iter().map(|v| v.as_str()).collect();
-        // Send on the inner Transport
-        self.inner_transport.as_mut().send(&ref_list, payload)
-    }
-
-    ///
-    fn send_all(&mut self, payload: &[u8]) -> TransportResult<()> {
-        let connection_list = self.connection_id_list()?;
-        let dht_id_list: Vec<&str> = connection_list.iter().map(|v| &**v).collect();
-        trace!("({}) send_all() {:?}", self.identifier, dht_id_list);
-        self.send(&dht_id_list, payload)
-    }
-
-    ///
-    fn bind(&mut self, url: &Url) -> TransportResult<Url> {
-        trace!("({}) bind() {}", self.identifier, url);
-        self.inner_transport.as_mut().bind(url)
-    }
-
-    ///
-    fn post(&mut self, command: TransportCommand) -> TransportResult<()> {
-        self.transport_inbox.push_back(command);
+/// Private internals
+impl P2pGateway {
+    /// Handle IncomingConnection event from child transport
+    fn handle_incoming_connection(&mut self, span: Span, uri: Url) -> TransportResult<()> {
+        self.inner_dht.request(
+            span.child("handle_incoming_connection"),
+            DhtRequestToChild::RequestThisPeer,
+            Box::new(move |me, response| {
+                let response = {
+                    match response {
+                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Response(response) => match response {
+                            Err(e) => panic!("{:?}", e),
+                            Ok(response) => response,
+                        },
+                    }
+                };
+                if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
+                    // Send to other node our PeerAddress
+                    let our_peer_address = P2pProtocol::PeerAddress(
+                        me.identifier.id.to_owned().into(),
+                        this_peer.peer_address,
+                        this_peer.timestamp,
+                    );
+                    let mut buf = Vec::new();
+                    our_peer_address
+                        .serialize(&mut Serializer::new(&mut buf))
+                        .unwrap();
+                    trace!(
+                        "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
+                        me.identifier.nickname,
+                        our_peer_address,
+                        uri,
+                    );
+                    me.inner_transport.request(
+                        span,
+                        transport::protocol::RequestToChild::SendMessage {
+                            uri: uri.clone(),
+                            payload: buf.into(),
+                        },
+                        Box::new(|_me, response| {
+                            match response {
+                                GhostCallbackData::Response(Err(e)) => error!(
+                                    "Error exchanging peer info with new connection: {:?}",
+                                    e,
+                                ),
+                                GhostCallbackData::Timeout => {
+                                    error!("Timeout exchanging peer info with new connection")
+                                }
+                                _ => trace!("Successfully exchanged peer info with new connection"),
+                            };
+                            Ok(())
+                        }),
+                    )?;
+                } else {
+                    panic!("bad response to RequestThisPeer: {:?}", response);
+                }
+                Ok(())
+            }),
+        )?;
         Ok(())
     }
 
-    /// Handle TransportEvents directly
-    fn process(&mut self) -> TransportResult<(DidWork, Vec<TransportEvent>)> {
-        let mut outbox = Vec::new();
-        let mut did_work = false;
-        // Process TransportCommand inbox
-        loop {
-            let cmd = match self.transport_inbox.pop_front() {
-                None => break,
-                Some(msg) => msg,
-            };
-            let res = self.serve_TransportCommand(&cmd);
-            if let Ok(mut output) = res {
-                did_work = true;
-                outbox.append(&mut output);
-            }
-        }
+    /// uri =
+    ///   - Network : transportId
+    ///   - space   : agentId
+    pub(crate) fn send(
+        &mut self,
+        span: Span,
+        uri: Url,
+        payload: Opaque,
+        cb: SendCallback,
+    ) -> GhostResult<()> {
         trace!(
-            "({}).Transport.process() - output: {} {}",
-            self.identifier,
-            did_work,
-            outbox.len(),
+            "({}).send() {} | {}",
+            self.identifier.nickname,
+            uri,
+            payload.len()
         );
-        for evt in self.transport_inject_events.drain(..).collect::<Vec<_>>() {
-            info!("#$#$# GW {:?}", &evt);
-            did_work = true;
-            self.handle_TransportEvent(&evt)?;
-            outbox.push(evt);
-        }
-        Ok((did_work, outbox))
-    }
-
-    /// A Gateway uses its inner_dht's peerData.peer_address as connectionId
-    fn connection_id_list(&self) -> TransportResult<Vec<ConnectionId>> {
-        let peer_data_list = self.inner_dht.get_peer_list();
-        let mut id_list = Vec::new();
-        for peer_data in peer_data_list {
-            id_list.push(peer_data.peer_address);
-        }
-        Ok(id_list)
-    }
-
-    /// TODO: return a higher-level uri instead
-    fn get_uri(&self, id: &ConnectionIdRef) -> Option<Url> {
-        self.inner_transport.as_ref().get_uri(id)
-        //let maybe_peer_data = self.inner_dht.get_peer(id);
-        //maybe_peer_data.map(|pd| pd.peer_address)
-    }
-}
-
-/// Private internals
-impl<'gateway, D: Dht> P2pGateway<'gateway, D> {
-    /// Get Uris from DHT peer_address'
-    pub(crate) fn dht_address_to_uri_list(
-        &self,
-        address_list: &[&str],
-    ) -> TransportResult<Vec<Url>> {
-        let mut uri_list = Vec::with_capacity(address_list.len());
-        for address in address_list {
-            let maybe_peer = self.inner_dht.get_peer(address);
-            match maybe_peer {
-                None => {
-                    return Err(TransportError::new(format!(
-                        "Unknown peerAddress: {}",
-                        address
-                    )));
-                }
-                Some(peer) => uri_list.push(peer.peer_uri),
-            }
-        }
-        Ok(uri_list)
-    }
-
-    fn handle_new_connection(&mut self, id: &ConnectionIdRef) -> TransportResult<()> {
-        let maybe_uri = self.get_uri(id);
-        if maybe_uri.is_none() {
-            return Ok(());
-        }
-        let uri = maybe_uri.unwrap();
-        trace!("({}) new_connection: {} -> {}", self.identifier, uri, id,);
-        // TODO #176 - Maybe we shouldn't have different code paths for populating
-        // the connection_map between space and network gateways.
-        let maybe_previous = self.connection_map.insert(uri.clone(), id.to_string());
-        if let Some(previous_cId) = maybe_previous {
-            debug!("Replaced connectionId for {} ; was: {}", uri, previous_cId,);
-        }
-
-        // Send to other node our PeerAddress
-        let this_peer = self.this_peer().clone();
-        let our_peer_address = P2pProtocol::PeerAddress(
-            self.identifier().to_string(),
-            this_peer.peer_address,
-            this_peer.timestamp,
-        );
-        let mut buf = Vec::new();
-        our_peer_address
-            .serialize(&mut Serializer::new(&mut buf))
-            .unwrap();
-        trace!(
-            "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
-            self.identifier,
-            our_peer_address,
-            id,
-        );
-        return self.inner_transport.as_mut().send(&[&id], &buf);
-    }
-
-    /// Process a transportEvent received from our internal connection.
-    pub(crate) fn handle_TransportEvent(&mut self, evt: &TransportEvent) -> TransportResult<()> {
-        debug!(
-            "<<< '({})' recv transport event: {:?}",
-            self.identifier, evt
-        );
-        // Note: use same order as the enum
-        match evt {
-            TransportEvent::ErrorOccured(id, e) => {
-                error!(
-                    "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier, id, e,
-                );
-                self.inner_transport.as_mut().close(id)?;
-            }
-            TransportEvent::ConnectResult(id, _) => {
-                info!("({}) Outgoing connection opened: {}", self.identifier, id);
-                self.handle_new_connection(id)?;
-            }
-            TransportEvent::IncomingConnectionEstablished(id) => {
-                info!("({}) Incoming connection opened: {}", self.identifier, id);
-                self.handle_new_connection(id)?;
-            }
-            TransportEvent::ConnectionClosed(_id) => {
-                // TODO #176
-            }
-            TransportEvent::ReceivedData(connection_id, payload) => {
-                debug!("Received message from: {}", connection_id);
-                // trace!("Deserialize msg: {:?}", payload);
-                let mut de = Deserializer::new(&payload[..]);
-                let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                    Deserialize::deserialize(&mut de);
-                if let Ok(p2p_msg) = maybe_p2p_msg {
-                    if let P2pProtocol::PeerAddress(gateway_id, peer_address, peer_timestamp) =
-                        p2p_msg
-                    {
-                        debug!(
-                            "Received PeerAddress: {} | {} ({})",
-                            peer_address, gateway_id, self.identifier
+        // Forward to the child Transport
+        self.inner_transport.request(
+            span.child("SendMessage"),
+            transport::protocol::RequestToChild::SendMessage {
+                uri: uri.clone(),
+                payload: payload.clone(),
+            },
+            Box::new(move |_me, response| {
+                // In case of a transport error or timeout we store the message in the
+                // pending list to retry sending it later
+                match response {
+                    // Success case:
+                    GhostCallbackData::Response(Ok(
+                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                    )) => {
+                        debug!("Gateway send message successfully");
+                        cb(Ok(GatewayRequestToChildResponse::Transport(
+                            transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                        )))
+                    }
+                    // No error but something other than SendMessageSuccess:
+                    GhostCallbackData::Response(Ok(_)) => {
+                        warn!(
+                            "Gateway got bad response type from transport: {:?}",
+                            response
                         );
-                        let peer_uri = self
-                            .inner_transport
-                            .as_mut()
-                            .get_uri(connection_id)
-                            .expect("FIXME"); // TODO #58
-                        debug!("peer_uri of: {} = {}", connection_id, peer_uri);
-                        if self.identifier == gateway_id {
-                            let peer = PeerData {
-                                peer_address: peer_address.clone(),
-                                peer_uri,
-                                timestamp: peer_timestamp,
-                            };
-                            Dht::post(self, DhtCommand::HoldPeer(peer)).expect("FIXME"); // TODO #58
-                                                                                         // TODO #150 - Should not call process manually
-                            Dht::process(self).expect("HACK");
-                        }
+                        cb(Err(format!("bad response type: {:?}", response).into()))
+                    }
+                    // Transport error:
+                    GhostCallbackData::Response(Err(error)) => {
+                        debug!("Gateway got error from transport. Adding message to pending");
+                        Err(
+                            format!("Transport error while trying to send message: {:?}", error)
+                                .into(),
+                        )
+                    }
+                    // Timeout:
+                    GhostCallbackData::Timeout => {
+                        debug!("Gateway got timeout from transport. Adding message to pending");
+                        Err("Ghost timeout error while trying to send message".into())
                     }
                 }
+            }),
+        )
+    }
+
+    pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
+        let pending: Vec<PendingOutgoingMessage> =
+            self.pending_outgoing_messages.drain(..).collect();
+        for p in pending {
+            let transport_request = transport::protocol::RequestToChild::SendMessage {
+                uri: p.uri,
+                payload: p.payload,
+            };
+            self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
+        }
+        Ok(())
+    }
+
+    fn add_to_pending(
+        &mut self,
+        span: Span,
+        uri: Url,
+        payload: Opaque,
+        parent_request: GatewayToChildMessage,
+    ) {
+        self.pending_outgoing_messages.push(PendingOutgoingMessage {
+            span,
+            uri,
+            payload,
+            parent_request,
+        });
+    }
+
+    /// Handle Transport request sent to use by our parent
+    pub(crate) fn handle_transport_RequestToChild(
+        &mut self,
+        span: Span,
+        transport_request: transport::protocol::RequestToChild,
+        parent_request: GatewayToChildMessage,
+    ) -> Lib3hResult<()> {
+        match transport_request {
+            transport::protocol::RequestToChild::Bind { spec: _ } => {
+                // Forward to child transport
+                let _ = self.inner_transport.as_mut().request(
+                    span.child("handle_transport_RequestToChild"),
+                    transport_request,
+                    Box::new(|_me, response| {
+                        let response = {
+                            match response {
+                                GhostCallbackData::Timeout => {
+                                    parent_request
+                                        .respond(Err(Lib3hError::new_other("timeout")))?;
+                                    return Ok(());
+                                }
+                                GhostCallbackData::Response(response) => response,
+                            }
+                        };
+                        // forward back to parent
+                        parent_request.respond(Ok(GatewayRequestToChildResponse::Transport(
+                            response.unwrap(),
+                        )))?;
+                        Ok(())
+                    }),
+                );
+            }
+            transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                let payload_wrapped = payload.clone(); // not really wrapped
+
+                // TODO - XXX - We need to wrap this so we know how / where
+                //              to put this message (which gateway) on the
+                //              remote side
+
+                /*
+                let to_agent_id = uri.path();
+                trace!(
+                    "try-send {:?} {} {} bytes",
+                    self.identifier.id,
+                    to_agent_id,
+                    payload.len()
+                );
+
+                let request_id = nanoid::simple();
+                // as a gateway, we need to wrap items going to our children
+                let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
+                    space_address: self.identifier.id.clone(),
+                    request_id: request_id.clone(),
+                    to_agent_id: to_agent_id.into(),
+                    from_agent_id: self.this_peer.peer_address.clone().into(),
+                    content: payload.clone(),
+                });
+
+                // Serialize payload
+                let mut payload_wrapped = Vec::new();
+                wrap_payload
+                    .serialize(&mut Serializer::new(&mut payload_wrapped))
+                    .unwrap();
+                let payload_wrapped = Opaque::from(payload_wrapped);
+                */
+
+                // uri is actually a dht peerKey
+                // get actual uri from the inner dht before sending
+                self.inner_dht.request(
+                    span.child("transport::protocol::RequestToChild::SendMessage"),
+                    DhtRequestToChild::RequestPeer(uri.clone()),
+                    Box::new(move |me, response| {
+                        match response {
+                            GhostCallbackData::Response(Ok(
+                                DhtRequestToChildResponse::RequestPeer(Some(peer_data)),
+                            )) => {
+                                me.send(
+                                    span.follower("TODO send"),
+                                    peer_data.peer_uri.clone(),
+                                    payload_wrapped,
+                                    Box::new(|response| {
+                                        trace!("SENT!");
+                                        parent_request.respond(
+                                            response
+                                                .map_err(|transport_error| transport_error.into()),
+                                        )
+                                    }),
+                                )?;
+                            }
+                            _ => {
+                                debug!("Couldn't Send: {:?}", response);
+                                me.add_to_pending(
+                                    span.follower("retry_gateway_send"),
+                                    uri,
+                                    payload,
+                                    parent_request,
+                                );
+                            }
+                        };
+                        Ok(())
+                    }),
+                )?;
+            }
+        }
+        // Done
+        Ok(())
+    }
+
+    /// handle RequestToChildResponse received from child Transport
+    /// before forwarding it to our parent
+    #[allow(dead_code)]
+    pub(crate) fn handle_transport_RequestToChildResponse(
+        &mut self,
+        response: &transport::protocol::RequestToChildResponse,
+    ) -> TransportResult<()> {
+        match response {
+            transport::protocol::RequestToChildResponse::Bind(_result_data) => {
+                // no-op
+            }
+            transport::protocol::RequestToChildResponse::SendMessageSuccess => {
+                // no-op
             }
         };
         Ok(())
     }
 
-    /// Process a TransportCommand: Call the corresponding method and possibily return some Events.
-    /// Return a list of TransportEvents to owner.
-    #[allow(non_snake_case)]
-    fn serve_TransportCommand(
+    /// Handle request received from child transport
+    pub(crate) fn handle_transport_RequestToParent(
         &mut self,
-        cmd: &TransportCommand,
-    ) -> TransportResult<Vec<TransportEvent>> {
-        trace!("({}) serving transport cmd: {:?}", self.identifier, cmd);
-        // Note: use same order as the enum
-        match cmd {
-            TransportCommand::Connect(url, request_id) => {
-                let id = self.connect(url)?;
-                let evt = TransportEvent::ConnectResult(id, request_id.clone());
-                Ok(vec![evt])
+        mut msg: transport::protocol::ToParentMessage,
+    ) -> TransportResult<()> {
+        debug!(
+            "({}) Serving request from child transport: {:?}",
+            self.identifier.nickname, msg
+        );
+        let span = msg.span().child("handle_transport_RequestToParent");
+        let request = msg.take_message().expect("exists");
+        match &request {
+            transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
+                // TODO
+                error!(
+                    "({}) Connection Error for {}: {}\n Closing connection.",
+                    self.identifier.nickname, uri, error,
+                );
             }
-            TransportCommand::Send(id_list, payload) => {
-                let mut id_ref_list = Vec::with_capacity(id_list.len());
-                for id in id_list {
-                    id_ref_list.push(id.as_str());
+            transport::protocol::RequestToParent::IncomingConnection { uri } => {
+                // TODO
+                info!(
+                    "({}) Incoming connection opened: {}",
+                    self.identifier.nickname, uri
+                );
+                self.handle_incoming_connection(
+                    span.child("transport::protocol::RequestToParent::IncomingConnection"),
+                    uri.clone(),
+                )?;
+            }
+            transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
+                // TODO
+                debug!("Received message from: {} | size: {}", uri, payload.len());
+                // trace!("Deserialize msg: {:?}", payload);
+                if payload.len() == 0 {
+                    debug!("Implement Ping!");
+                } else {
+                    let mut de = Deserializer::new(&payload[..]);
+                    let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                        Deserialize::deserialize(&mut de);
+                    if let Ok(p2p_msg) = maybe_p2p_msg {
+                        if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) =
+                            p2p_msg
+                        {
+                            debug!(
+                                "Received PeerAddress: {} | {} ({})",
+                                peer_address, gateway_id, self.identifier.nickname
+                            );
+                            if self.identifier.id == gateway_id.into() {
+                                let peer = PeerData {
+                                    peer_address,
+                                    peer_uri: uri.clone(),
+                                    timestamp,
+                                };
+                                // HACK
+                                let _ = self.inner_dht.publish(
+                                    span.follower(
+                                        "transport::protocol::RequestToParent::ReceivedData",
+                                    ),
+                                    DhtRequestToChild::HoldPeer(peer),
+                                );
+                                // TODO #58
+                                // TODO #150 - Should not call process manually
+                                self.process().expect("HACK");
+                            }
+                        }
+                    }
                 }
-                let _id = self.send(&id_ref_list, payload)?;
-                Ok(vec![])
             }
-            TransportCommand::SendAll(payload) => {
-                let _id = self.send_all(payload)?;
-                Ok(vec![])
-            }
-            TransportCommand::Close(id) => {
-                self.close(id)?;
-                let evt = TransportEvent::ConnectionClosed(id.to_string());
-                Ok(vec![evt])
-            }
-            TransportCommand::CloseAll => {
-                self.close_all()?;
-                let outbox = Vec::new();
-                Ok(outbox)
-            }
-            TransportCommand::Bind(url) => {
-                self.bind(url)?;
-                Ok(vec![])
-            }
-        }
+        };
+        // Bubble up to parent
+        self.endpoint_self.as_mut().publish(
+            span.follower("bubble up to parent"),
+            GatewayRequestToParent::Transport(request),
+        )?;
+        Ok(())
+    }
+
+    /// handle response we got from our parent
+    #[allow(dead_code)]
+    pub(crate) fn handle_transport_RequestToParentResponse(
+        &mut self,
+        _response: &transport::protocol::RequestToParentResponse,
+    ) -> TransportResult<()> {
+        // no-op
+        Ok(())
     }
 }

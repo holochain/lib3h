@@ -45,8 +45,9 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let enty_address_str = &entry.entry_address;
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let query_data = node.request_entry(entry.entry_address.clone());
-    let (did_work, _srv_msg_list) = node.process().unwrap();
+    let (did_work, srv_msg_list) = node.process().unwrap();
     assert!(did_work);
+    println!("\n srv_msg_list: {:?}", srv_msg_list);
 
     // #fullsync
     // Billy sends that data back to the network
@@ -116,7 +117,8 @@ fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock) {
 pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send DM
     let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
-    assert_process_success!(alex, req_id);
+    wait_engine_wrapper_did_work!(alex);
+    //assert_process_success!(alex, req_id);
     // Receive
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
@@ -137,7 +139,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::SendDirectMessageResult);
     let content = std::str::from_utf8(msg.content.as_slice()).unwrap();
     println!("SendDirectMessageResult: {}", content);
-    assert_eq!(msg.content, response_content);
+    assert_eq!(msg.content, response_content.into());
 }
 
 /// Test SendDirectMessage and response
@@ -173,7 +175,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -206,22 +208,18 @@ fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
     let entry = alex
         .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
+    let (did_work, _srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
 
-    // #fullsync
-    // mirrorDht wants the entry to broadcast it
-    assert_eq!(srv_msg_list.len(), 1);
-    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleFetchEntry);
-    assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
-    alex.reply_to_HandleFetchEntry(msg).unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
     // Process the HoldEntry generated from receiving HandleStoreEntryAspect
-    let (did_work, _srv_msg_list) = billy.process().unwrap();
+    println!("\nBilly should receive entry from gossip and asks owner to validate it:\n");
+    let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-
+    println!("\n srv_msg_list: {:?}", srv_msg_list);
+    println!("\nBilly should process the HoldEntry from NodeMock auto-validation:\n");
+    let (did_work, srv_msg_list) = billy.process().unwrap();
+    assert!(did_work);
+    println!("\n srv_msg_list: {:?}", srv_msg_list);
     // Billy asks for that entry
     request_entry_ok(billy, &entry);
 
@@ -268,7 +266,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 2);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -294,7 +292,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
@@ -314,7 +312,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = billy.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
     // Alex or Billy should receive the entry store request
