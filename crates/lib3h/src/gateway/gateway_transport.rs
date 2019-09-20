@@ -161,7 +161,7 @@ impl P2pGateway {
                     GhostCallbackData::Response(Ok(
                         encoding_protocol::RequestToChildResponse::EncodePayloadResult { payload },
                     )) => {
-                        //error!("sending: {:?}", payload);
+                        trace!("sending: {:?}", payload);
                         me.priv_low_level_send(e_span, uri, payload, cb)?;
                     }
                     _ => {
