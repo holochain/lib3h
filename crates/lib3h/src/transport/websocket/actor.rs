@@ -8,13 +8,13 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
-use lib3h_discovery::{error::DiscoveryResult, Discovery};
+use lib3h_discovery::{error::{DiscoveryError, DiscoveryResult}, Discovery};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, Address};
 use url::Url;
 
 // Use mDNS for bootstrapping
-use lib3h_mdns::MulticastDnsBuilder;
+use lib3h_mdns::{MulticastDns, MulticastDnsBuilder};
 
 pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
@@ -28,22 +28,46 @@ pub struct GhostTransportWebsocket {
     streams: StreamManager<std::net::TcpStream>,
     bound_url: Option<Url>,
     pending: Vec<Message>,
+    mdns: Option<MulticastDns>,
 }
-
-// Maybe we should put an mDNS instance in a lazy_static ?
 
 // Here we just need to use mDNS, but use it only once, with advertise probably, and that's all.
 impl Discovery for GhostTransportWebsocket {
     fn advertise(&mut self) -> DiscoveryResult<()> {
-        Ok(())
+        // Lazily instantiate mDNS
+        if self.mdns.is_none() {
+            let uri = self
+                .bound_url
+                .clone()
+                .ok_or_else(|| DiscoveryError::new_other("Must bind URL before advertising."))?;
+
+            let netid: String = self.networkid_address.clone().into();
+
+            let mut mdns = MulticastDnsBuilder::new()
+                .own_record(&netid, &[&uri.clone().into_string()])
+                .build()?;
+            mdns.insert_record(&netid, &[&uri.into_string()]);
+
+            self.mdns = Some(mdns);
+        }
+
+        match &mut self.mdns {
+            Some(mdns) => mdns.advertise(),
+            None => Ok(())
+        }
     }
+
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
-        let nodes = Vec::new();
-        Ok(nodes)
+        match &mut self.mdns {
+            Some(mdns) => mdns.discover(),
+            None => Ok(Vec::new())
+        }
     }
+
     fn release(&mut self) -> DiscoveryResult<()> {
         Ok(())
     }
+
     fn flush(&mut self) -> DiscoveryResult<()> {
         Ok(())
     }
@@ -77,6 +101,7 @@ impl GhostTransportWebsocket {
             streams: StreamManager::with_std_tcp_stream(tls_config),
             bound_url: None,
             pending: Vec::new(),
+            mdns: None,
         }
     }
 
@@ -584,19 +609,112 @@ mod tests {
     /// Check if we manage to discover nodes using WebSocket for bootstapping using mDNS.
     #[test]
     fn mdns_wss_bootstrapping_test() {
-        let machine_id1 = "fake_machine_using_wss_id1".into();
-        let networkid_address1 = "wss-bootstapping-network-id.holo.host".into();
-        let mut wss_transport1 =
-            GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted, networkid_address1);
+        let networkid_address: Address = "wss-bootstapping-network-id.holo.host".into();
 
-        wss_transport1
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(
+            machine_id1,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("twss_to_child1")
+            .build::<()>();
+
+        let machine_id2 = "fake_machine_id2".into();
+        let mut transport2 = GhostTransportWebsocket::new(
+            machine_id2,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+        let mut t2_endpoint = transport2
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("twss_to_child2")
+            .build::<()>();
+
+        // create two memory bindings so that we have addresses
+        assert_eq!(transport1.bound_url, None);
+        assert_eq!(transport2.bound_url, None);
+
+        let port1 = get_available_port(1025).expect("Must be able to find free port");
+        let expected_transport1_address =
+            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
+        t1_endpoint
+            .request(
+                Span::fixme(),
+                RequestToChild::Bind {
+                    spec: expected_transport1_address.clone(),
+                },
+                Box::new(move |_: &mut (), r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        format!(
+                            "Response(Ok(Bind(BindResultData {{ bound_url: \"wss://127.0.0.1:{}/\" }})))",
+                            port1.clone(),
+                        ),
+                        format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        let port2 = get_available_port(1026).expect("Must be able to find free port");
+        let expected_transport2_address =
+            Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
+        t2_endpoint
+            .request(
+                Span::fixme(),
+                RequestToChild::Bind {
+                    spec: expected_transport2_address.clone(),
+                },
+                Box::new(move |_: &mut (), r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        &format!(
+                            "Response(Ok(Bind(BindResultData {{ bound_url: \"wss://127.0.0.1:{}/\" }})))",
+                            port2.clone(),
+                        ),
+                        &format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut ());
+
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut ());
+
+        assert_eq!(
+            transport1.bound_url(),
+            Some(expected_transport1_address.clone())
+        );
+        assert_eq!(
+            transport2.bound_url(),
+            Some(expected_transport2_address.clone())
+        );
+
+        transport1
             .advertise()
-            .expect("Fail to advertise WSS transport.");
-        let urls = wss_transport1
-            .discover()
-            .expect("Fail to discover nodes using WSS transport.");
+            .expect("Fail to advertise WSS transport2.");
+        transport2
+            .advertise()
+            .expect("Fail to advertise WSS transport2.");
 
-        dbg!(&urls);
-        assert_eq!(urls.is_empty(), false);
+
+
+        let urls = transport1
+            .discover()
+            .expect("Fail to discover nodes using WSS transport1.");
+
+        assert_eq!(urls.len(), 2);
     }
 }
