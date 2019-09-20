@@ -413,16 +413,6 @@ impl P2pGateway {
                 }
             }
         };
-        /*
-         * TODO XXX - We shouldn't do this, we want to manually create events from our other
-         * handlers - made this change, but does it break things?
-         *
-        // Bubble up to parent
-        self.endpoint_self.as_mut().publish(
-            span.follower("bubble up to parent"),
-            GatewayRequestToParent::Transport(request),
-        )?;
-        */
         Ok(())
     }
 
