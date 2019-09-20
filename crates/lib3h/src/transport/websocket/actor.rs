@@ -13,12 +13,16 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, Address};
 use url::Url;
 
+// Use mDNS for bootstrapping
+use lib3h_mdns::MulticastDnsBuilder;
+
 pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
 
 pub struct GhostTransportWebsocket {
     #[allow(dead_code)]
     machine_id: Address,
+    networkid_address: Address,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
@@ -26,6 +30,9 @@ pub struct GhostTransportWebsocket {
     pending: Vec<Message>,
 }
 
+// Maybe we should put an mDNS instance in a lazy_static ?
+
+// Here we just need to use mDNS, but use it only once, with advertise probably, and that's all.
 impl Discovery for GhostTransportWebsocket {
     fn advertise(&mut self) -> DiscoveryResult<()> {
         Ok(())
@@ -51,10 +58,15 @@ impl Drop for GhostTransportWebsocket {
 }
 
 impl GhostTransportWebsocket {
-    pub fn new(machine_id: Address, tls_config: TlsConfig) -> GhostTransportWebsocket {
+    pub fn new(
+        machine_id: Address,
+        tls_config: TlsConfig,
+        networkid_address: Address,
+    ) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
             machine_id,
+            networkid_address,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -344,8 +356,14 @@ mod tests {
 
     #[test]
     fn test_websocket_transport() {
+        let networkid_address: Address = "wss-bootstapping-network-id1.holo.host".into();
+
         let machine_id1 = "fake_machine_id1".into();
-        let mut transport1 = GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted);
+        let mut transport1 = GhostTransportWebsocket::new(
+            machine_id1,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -354,7 +372,11 @@ mod tests {
             .build::<()>();
 
         let machine_id2 = "fake_machine_id2".into();
-        let mut transport2 = GhostTransportWebsocket::new(machine_id2, TlsConfig::Unencrypted);;
+        let mut transport2 = GhostTransportWebsocket::new(
+            machine_id2,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
@@ -453,8 +475,15 @@ mod tests {
     #[test]
     fn test_websocket_transport_reconnect() {
         enable_logging_for_test(true);
+
+        let networkid_address: Address = "wss-bootstapping-network-id.holo.host".into();
+
         let machine_id1 = "fake_machine_id1".into();
-        let mut transport1 = GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted);
+        let mut transport1 = GhostTransportWebsocket::new(
+            machine_id1,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -489,8 +518,11 @@ mod tests {
             transport1.process().unwrap();
             {
                 let machine_id2 = "fake_machine_id2".into();
-                let mut transport2 =
-                    GhostTransportWebsocket::new(machine_id2, TlsConfig::Unencrypted);;
+                let mut transport2 = GhostTransportWebsocket::new(
+                    machine_id2,
+                    TlsConfig::Unencrypted,
+                    networkid_address.clone(),
+                );
                 let mut t2_endpoint = transport2
                     .take_parent_endpoint()
                     .expect("exists")
@@ -547,5 +579,24 @@ mod tests {
     #[test]
     fn should_invoke_drop() {
         // TODO
+    }
+
+    /// Check if we manage to discover nodes using WebSocket for bootstapping using mDNS.
+    #[test]
+    fn mdns_wss_bootstrapping_test() {
+        let machine_id1 = "fake_machine_using_wss_id1".into();
+        let networkid_address1 = "wss-bootstapping-network-id.holo.host".into();
+        let mut wss_transport1 =
+            GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted, networkid_address1);
+
+        wss_transport1
+            .advertise()
+            .expect("Fail to advertise WSS transport.");
+        let urls = wss_transport1
+            .discover()
+            .expect("Fail to discover nodes using WSS transport.");
+
+        dbg!(&urls);
+        assert_eq!(urls.is_empty(), false);
     }
 }
