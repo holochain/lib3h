@@ -461,7 +461,7 @@ impl MirrorDht {
 
             DhtRequestToChild::RequestPeer(peer_address) => {
                 trace!("DhtRequestToChild::RequestPeer: {:?}", peer_address);
-                let maybe_peer = self.get_peer(&peer_address);
+                let maybe_peer = self.get_peer(peer_address.path());
                 let payload = Ok(DhtRequestToChildResponse::RequestPeer(maybe_peer));
                 request.respond(payload)?;
             }

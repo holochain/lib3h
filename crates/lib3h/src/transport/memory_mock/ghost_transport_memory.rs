@@ -11,7 +11,11 @@ use lib3h_discovery::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 use url::Url;
 
 pub type UserData = GhostTransportMemory;
@@ -45,7 +49,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
     machine_id: Address,
-    network: String,
+    network: Arc<Mutex<MemoryNet>>,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -61,20 +65,15 @@ impl Discovery for GhostTransportMemory {
         let uri = self
             .maybe_my_address
             .clone()
-            .ok_or_else(|| DiscoveryError::new_other("must bind before discovering"))?;
-        let mut verse = memory_server::get_memory_verse();
-        verse
-            .get_net(&self.network)
-            .ok_or_else(|| DiscoveryError::new_other("net not found"))?
+            .ok_or_else(|| DiscoveryError::new_other("must bind before advertising"))?;
+        self.network
+            .lock()
+            .unwrap()
             .advertise(uri, self.machine_id.clone());
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
-        let mut verse = memory_server::get_memory_verse();
-        let machines = verse
-            .get_net(&self.network)
-            .ok_or_else(|| DiscoveryError::new_other("net not found"))?
-            .discover();
+        let machines = self.network.lock().unwrap().discover();
         Ok(machines.into_iter().map(|(uri, _)| uri).collect())
     }
     fn release(&mut self) -> DiscoveryResult<()> {
@@ -87,14 +86,17 @@ impl Discovery for GhostTransportMemory {
 const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
-    #[allow(dead_code)]
     pub fn new(machine_id: Address, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
         let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
+        let network = {
+            let mut verse = memory_server::get_memory_verse();
+            verse.get_network(network_name)
+        };
         Self {
             machine_id,
-            network: network_name.to_string(),
+            network,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -117,7 +119,6 @@ impl GhostTransportMemory {
                 if let Ok(machines) = self.discover() {
                     if machines.len() > 0 {
                         let my_addr = self.maybe_my_address.as_ref().expect("should have bound");
-                        let mut verse = memory_server::get_memory_verse();
                         for found_uri in machines {
                             if found_uri == *my_addr {
                                 continue;
@@ -125,8 +126,7 @@ impl GhostTransportMemory {
                             // if not already connected, request a connections
                             if self.connections.get(&found_uri).is_none() {
                                 // Get other node's server
-                                let maybe_server = verse.get_server(&self.network, &found_uri);
-                                match maybe_server {
+                                match self.network.lock().unwrap().get_server(&found_uri) {
                                     Some(remote_server) => {
                                         let _result = remote_server.request_connect(&my_addr);
                                         self.connections.insert(found_uri.clone());
@@ -184,8 +184,7 @@ impl
         if let Some(my_addr) = &self.maybe_my_address {
             // get our own server
             let (success, event_list) = {
-                let mut verse = memory_server::get_memory_verse();
-                match verse.get_server(&self.network, &my_addr) {
+                match self.network.lock().unwrap().get_server(&my_addr) {
                     None => return Err(format!("No Memory server at this uri: {}", my_addr).into()),
                     Some(server) => server.process()?,
                 }
@@ -220,8 +219,7 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        let mut verse = memory_server::get_memory_verse();
-                        match verse.get_server(&self.network, &remote_addr) {
+                        match self.network.lock().unwrap().get_server(&remote_addr) {
                             Some(server) => {
                                 server.request_connect(&my_addr)?;
                                 self.connections.insert(remote_addr.clone());
@@ -264,10 +262,7 @@ impl
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
-                    let bound_url = {
-                        let mut verse = memory_server::get_memory_verse();
-                        verse.bind(&self.network)
-                    };
+                    let bound_url = { self.network.lock().unwrap().bind() };
                     self.maybe_my_address = Some(bound_url.clone());
                     self.advertise()
                         .map_err(|e| GhostError::from(e.to_string()))?;
@@ -289,12 +284,11 @@ impl
                         }
                         Some(my_addr) => {
                             // get destinations server
-                            let mut verse = memory_server::get_memory_verse();
-                            match verse.get_server(&self.network, &uri) {
+                            match self.network.lock().unwrap().get_server(&uri) {
                                 None => {
                                     msg.respond(Err(TransportError::new(format!(
                                         "No Memory server at this uri: {}",
-                                        my_addr
+                                        uri
                                     ))))?;
                                     continue;
                                 }
@@ -336,72 +330,72 @@ mod tests {
     //use protocol::RequestToChildResponse;
     use holochain_tracing::test_span;
 
-    #[test]
-    fn test_gmem_transport() {
-        let machine_id1 = "fake_machine_id1".into();
-        let mut transport1 = GhostTransportMemory::new(machine_id1, "net1");
-        let mut t1_endpoint: GhostTransportMemoryEndpointContextParent = transport1
+    fn make_test_transport(
+        id: &str,
+        net_name: &str,
+    ) -> (
+        GhostTransportMemory,
+        GhostTransportMemoryEndpointContextParent,
+    ) {
+        let machine_id = format!("fake_machine_id{}", id).into();
+        let req_id_prefix = format!("tmem_to_child{}", id);
+        let mut transport = GhostTransportMemory::new(machine_id, &net_name);
+        let endpoint: GhostTransportMemoryEndpointContextParent = transport
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
-            .request_id_prefix("tmem_to_child1")
+            .request_id_prefix(&req_id_prefix)
             .build::<Url>();
+        (transport, endpoint)
+    }
 
-        let machine_id2 = "fake_machine_id2".into();
-        let mut transport2 = GhostTransportMemory::new(machine_id2, "net1");
-        let mut t2_endpoint = transport2
-            .take_parent_endpoint()
-            .expect("exists")
-            .as_context_endpoint_builder()
-            .request_id_prefix("tmem_to_child2")
-            .build::<Url>();
+    fn do_bind(endpoint: &mut GhostTransportMemoryEndpointContextParent) {
+        endpoint
+            .request(
+                test_span(""),
+                RequestToChild::Bind {
+                    spec: Url::parse("mem://_").unwrap(),
+                },
+                Box::new(|ud: &mut Url, r| {
+                    match r {
+                        GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
+                            BindResultData { bound_url },
+                        ))) => *ud = bound_url,
+                        _ => assert!(false),
+                    };
+                    Ok(())
+                }),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn test_gmem_transport_bind_and_discover() {
+        let (mut transport1, mut t1_endpoint) = make_test_transport("1", "net1");
+        let (mut transport2, mut t2_endpoint) = make_test_transport("2", "net1");
+
+        // transport on a different network
+        let (mut transport3, mut t3_endpoint) = make_test_transport("3", "net2");
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.maybe_my_address, None);
         assert_eq!(transport2.maybe_my_address, None);
 
-        let mut bound_transport1_address = Url::parse("mem://addr_1").unwrap();
-        t1_endpoint
-            .request(
-                test_span(""),
-                RequestToChild::Bind {
-                    spec: Url::parse("mem://_").unwrap(),
-                },
-                Box::new(|ud: &mut Url, r| {
-                    match r {
-                        GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
-                            BindResultData { bound_url },
-                        ))) => *ud = bound_url,
-                        _ => assert!(false),
-                    };
-                    Ok(())
-                }),
-            )
-            .unwrap();
-        let mut bound_transport2_address = Url::parse("mem://addr_2").unwrap();
-        t2_endpoint
-            .request(
-                test_span(""),
-                RequestToChild::Bind {
-                    spec: Url::parse("mem://_").unwrap(),
-                },
-                Box::new(|ud: &mut Url, r| {
-                    match r {
-                        GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
-                            BindResultData { bound_url },
-                        ))) => *ud = bound_url,
-                        _ => assert!(false),
-                    };
-                    Ok(())
-                }),
-            )
-            .unwrap();
+        let mut bound_transport1_address = Url::parse("none:").unwrap();
+        do_bind(&mut t1_endpoint);
+        let mut bound_transport2_address = Url::parse("none:").unwrap();
+        do_bind(&mut t2_endpoint);
+        let mut bound_transport3_address = Url::parse("none:").unwrap();
+        do_bind(&mut t3_endpoint);
 
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut bound_transport1_address);
 
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut bound_transport2_address);
+
+        transport3.process().unwrap();
+        let _ = t3_endpoint.process(&mut bound_transport3_address);
 
         assert_eq!(
             transport1.maybe_my_address,
@@ -410,6 +404,10 @@ mod tests {
         assert_eq!(
             transport2.maybe_my_address,
             Some(bound_transport2_address.clone())
+        );
+        assert_eq!(
+            transport3.maybe_my_address,
+            Some(bound_transport3_address.clone())
         );
 
         // check that machine_ids were advertised
@@ -422,8 +420,28 @@ mod tests {
             &format!("{:?}", found[1]) == "\"mem://addr_1/\""
                 || &format!("{:?}", found[1]) == "\"mem://addr_2/\""
         );
+        let found = transport3.discover().unwrap();
+        assert_eq!(&format!("{:?}", found[0]), "\"mem://addr_1/\""); // because of different network
+    }
 
-        // now send a message from transport1 to transport2 over the bound addresses
+    #[test]
+    fn test_gmem_transport_send() {
+        let (mut transport1, mut t1_endpoint) = make_test_transport("1", "send_net1");
+        let (mut transport2, mut t2_endpoint) = make_test_transport("2", "send_net1");
+        let (mut transport3, mut t3_endpoint) = make_test_transport("3", "send_net2");
+        let mut bound_transport1_address = Url::parse("none:").unwrap();
+        do_bind(&mut t1_endpoint);
+        let mut bound_transport2_address = Url::parse("none:").unwrap();
+        do_bind(&mut t2_endpoint);
+        let mut bound_transport3_address = Url::parse("none:").unwrap();
+        do_bind(&mut t3_endpoint);
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
+
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut bound_transport2_address);
+
+        // send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
                 test_span(""),
@@ -439,11 +457,33 @@ mod tests {
             )
             .unwrap();
 
+        // and also a message to a non-existent address
+        t1_endpoint
+            .request(
+                test_span(""),
+                RequestToChild::SendMessage {
+                    uri: Url::parse("mem://addr_3").unwrap(),
+                    payload: b"test message".to_vec().into(),
+                },
+                Box::new(|_: &mut Url, r| {
+                    // parent should see that the send request was OK
+                    assert_eq!("Response(Err(TransportError(\"No Memory server at this uri: mem://addr_3/\")))", &format!("{:?}", r));
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut bound_transport1_address);
 
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut bound_transport2_address);
+
+        transport3.process().unwrap();
+        let _ = t3_endpoint.process(&mut bound_transport3_address);
+
+        let requests = t1_endpoint.drain_messages();
+        assert_eq!(1, requests.len());
 
         let mut requests = t2_endpoint.drain_messages();
         assert_eq!(3, requests.len());

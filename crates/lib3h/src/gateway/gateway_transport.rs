@@ -9,7 +9,7 @@ use crate::{
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_protocol::data_types::*;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -147,8 +147,7 @@ impl P2pGateway {
                 uri: p.uri,
                 payload: p.payload,
             };
-            let _ =
-                self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
+            self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
         }
         Ok(())
     }
@@ -201,58 +200,72 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+                let payload_wrapped = payload.clone(); // not really wrapped
+
+                // TODO - XXX - We need to wrap this so we know how / where
+                //              to put this message (which gateway) on the
+                //              remote side
+
+                /*
+                let to_agent_id = uri.path();
+                trace!(
+                    "try-send {:?} {} {} bytes",
+                    self.identifier.id,
+                    to_agent_id,
+                    payload.len()
+                );
+
+                let request_id = nanoid::simple();
+                // as a gateway, we need to wrap items going to our children
+                let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
+                    space_address: self.identifier.id.clone(),
+                    request_id: request_id.clone(),
+                    to_agent_id: to_agent_id.into(),
+                    from_agent_id: self.this_peer.peer_address.clone().into(),
+                    content: payload.clone(),
+                });
+
+                // Serialize payload
+                let mut payload_wrapped = Vec::new();
+                wrap_payload
+                    .serialize(&mut Serializer::new(&mut payload_wrapped))
+                    .unwrap();
+                let payload_wrapped = Opaque::from(payload_wrapped);
+                */
+
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
                     span.child("transport::protocol::RequestToChild::SendMessage"),
-                    DhtRequestToChild::RequestPeer(uri.to_string()),
+                    DhtRequestToChild::RequestPeer(uri.clone()),
                     Box::new(move |me, response| {
-                        let response = {
-                            match response {
-                                GhostCallbackData::Timeout => {
-                                    let span_name = "P2pGateway -> pending message because of GhostCallbackData::Timeout".to_string();
-                                    debug!("{}", span_name);
-                                    me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
-                                    return Ok(())
-                                },
-                                GhostCallbackData::Response(response) => match response {
-                                    Err(e) => {
-                                        let span_name = format!("P2pGateway -> pending message because of error: {:?}", e);
-                                        debug!("{}", span_name);
-                                        me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
-                                        return Ok(())
-                                    }
-                                    Ok(response) => response,
-                                },
-                            }
-                        };
-                        if let DhtRequestToChildResponse::RequestPeer(maybe_peer_data) = response {
-                            if let Some(peer_data) = maybe_peer_data {
+                        match response {
+                            GhostCallbackData::Response(Ok(
+                                DhtRequestToChildResponse::RequestPeer(Some(peer_data)),
+                            )) => {
                                 me.send(
                                     span.follower("TODO send"),
                                     peer_data.peer_uri.clone(),
-                                    payload,
+                                    payload_wrapped,
                                     Box::new(|response| {
+                                        trace!("SENT!");
                                         parent_request.respond(
                                             response
                                                 .map_err(|transport_error| transport_error.into()),
                                         )
                                     }),
                                 )?;
-                            } else {
-                                let span_name = format!("P2pGateway -> pending message because no peer found to send PeerData{{{:?}}} Message{{{:?}}}",
-                                    maybe_peer_data, payload);
-                                debug!("{}", span_name);
-                                me.add_to_pending(span.follower(span_name), uri, payload, parent_request);
-                                return Ok(())
-                            };
-                        } else {
-                            parent_request.respond(Err(format!(
-                                "bad response to RequestPeer: {:?}",
-                                response
-                            )
-                            .into()))?;
-                        }
+                            }
+                            _ => {
+                                debug!("Couldn't Send: {:?}", response);
+                                me.add_to_pending(
+                                    span.follower("retry_gateway_send"),
+                                    uri,
+                                    payload,
+                                    parent_request,
+                                );
+                            }
+                        };
                         Ok(())
                     }),
                 )?;

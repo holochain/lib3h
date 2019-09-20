@@ -400,15 +400,16 @@ macro_rules! wait_connect {
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
-        let connected_data =
-            Lib3hServerProtocol::Connected(lib3h_protocol::data_types::ConnectedData {
-                uri: $other.advertise(),
-                // TODO should be able to set non a blank request id
-                request_id: "".into(), //$connect_data.clone().request_id,
-            });
+        let re = regex::Regex::new("ConnectedData").expect("valid regex");
+        let assertion = Box::new(predicates::prelude::predicate::function(move |x| {
+            let to_match = format!("{:?}", x);
+            re.is_match(&to_match)
+        }));
+
         let predicate: Box<dyn $crate::utils::processor_harness::Processor> = Box::new(
-            $crate::utils::processor_harness::Lib3hServerProtocolEquals(connected_data),
+            $crate::utils::processor_harness::Lib3hServerProtocolAssert(assertion),
         );
+
         let result = assert_one_processed!($me, $other, predicate);
         result
     }};

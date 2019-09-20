@@ -18,6 +18,7 @@ impl P2pGateway {
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
         identifier: GatewayId,
+        peer_uri: Url,
         inner_transport: transport::protocol::DynTransportActor,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
@@ -41,7 +42,7 @@ impl P2pGateway {
             endpoint_self,
             this_peer: PeerData {
                 peer_address: dht_config.this_peer_address(),
-                peer_uri: Url::parse("none:").unwrap(),
+                peer_uri,
                 timestamp: crate::time::since_epoch_ms(),
             },
             pending_outgoing_messages: Vec::new(),
