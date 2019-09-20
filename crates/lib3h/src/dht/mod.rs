@@ -160,7 +160,7 @@ pub mod tests {
         let mut ud = DhtData::new();
         dht.request(
             test_span(""),
-            DhtRequestToChild::RequestPeer(address.to_string()),
+            DhtRequestToChild::RequestPeer(Url::parse(&format!("agentid:{}", address)).unwrap()),
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
