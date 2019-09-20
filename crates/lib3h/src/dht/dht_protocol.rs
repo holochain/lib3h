@@ -141,7 +141,6 @@ pub struct GossipToData {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct PeerData {
     pub peer_address: PeerAddress,
-    #[serde(with = "url_serde")]
     pub peer_uri: Url,
     pub timestamp: u64,
 }

@@ -8,7 +8,6 @@ extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 extern crate nanoid;
 extern crate native_tls;
 extern crate tungstenite;
-extern crate url_serde;
 #[macro_use]
 extern crate lazy_static;
 extern crate serde;
