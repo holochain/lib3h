@@ -581,11 +581,12 @@ impl<'engine> GhostEngine<'engine> {
 
         let to_agent_id: String = msg.to_agent_id.clone().into();
         if &this_peer.peer_address == &to_agent_id {
+            warn!("tried to send message to self");
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
 
         let net_msg = P2pProtocol::DirectMessage(msg.clone());
-
+        trace!("net_msg: {:?}", net_msg);
         // Serialize payload
         let mut payload = Vec::new();
         net_msg

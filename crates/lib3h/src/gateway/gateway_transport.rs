@@ -200,6 +200,9 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+
+                trace!("Gateway trying SendMessage to {:?}", uri);
+
                 let payload_wrapped = payload.clone(); // not really wrapped
 
                 // TODO - XXX - We need to wrap this so we know how / where
