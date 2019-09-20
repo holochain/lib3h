@@ -229,9 +229,9 @@ where
             // TODO Handle optional value better here!
             let ghost_message: GhostMessage<_, _, Lib3hToClientResponse, _> =
                 self.tracker.remove(request_id.as_str()).unwrap();
-            // TODO Handle errors better here!
-            let _result = ghost_message.respond(Ok(lib3h_to_client_response));
-            Ok(())
+            ghost_message
+                .respond(Ok(lib3h_to_client_response))
+                .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         }
     }
 
