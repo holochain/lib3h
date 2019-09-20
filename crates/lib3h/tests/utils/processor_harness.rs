@@ -402,8 +402,8 @@ macro_rules! wait_connect {
         let _connect_data = $connect_data;
         let re = regex::Regex::new("ConnectedData").expect("valid regex");
         let assertion = Box::new(predicates::prelude::predicate::function(move |x| {
-           let to_match = format!("{:?}", x);
-           re.is_match(&to_match)
+            let to_match = format!("{:?}", x);
+            re.is_match(&to_match)
         }));
 
         let predicate: Box<dyn $crate::utils::processor_harness::Processor> = Box::new(
