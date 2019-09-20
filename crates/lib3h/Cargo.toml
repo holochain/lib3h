@@ -23,6 +23,7 @@ lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
 lib3h_crypto_api = { version = "=0.0.10", path = "../crypto_api" }
 lib3h_zombie_actor = { version = "=0.0.10", path = "../zombie_actor" }
 lib3h_discovery = { version = "=0.0.10", path = "../discovery" }
+lib3h_sodium = { version = "=0.0.10", path = "../sodium" }
 nanoid = "=0.2.0"
 tungstenite = "=0.6.1"
 url = "=1.7.2"
@@ -39,7 +40,6 @@ lazy_static = "=1.2.0"
 
 [dev-dependencies]
 crossbeam-channel = "=0.3.8"
-lib3h_sodium = { version = "=0.0.10", path = "../sodium" }
 unwrap_to = "=0.1.0"
 env_logger = "=0.6.1"
 bincode = "=1.1.4"
@@ -48,3 +48,7 @@ regex = "=1.1.2"
 xoroshiro128 = "0.3.0"
 hexf = "0.1.0"
 rand = "0.7.0"
+
+[[bin]]
+name = "send-demo"
+path = "bin/send-demo.rs"

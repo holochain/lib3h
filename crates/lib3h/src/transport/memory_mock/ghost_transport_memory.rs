@@ -1,7 +1,7 @@
 use crate::transport::{
     error::TransportError,
     memory_mock::memory_server::{self, *},
-    protocol::*,
+    protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
 use detach::Detach;
 use holochain_tracing::Span;
@@ -11,7 +11,11 @@ use lib3h_discovery::{
 };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::Address;
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 use url::Url;
 
 pub type UserData = GhostTransportMemory;
@@ -45,7 +49,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
     machine_id: Address,
-    network: String,
+    network: Arc<Mutex<MemoryNet>>,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -61,20 +65,15 @@ impl Discovery for GhostTransportMemory {
         let uri = self
             .maybe_my_address
             .clone()
-            .ok_or_else(|| DiscoveryError::new_other("must bind before discovering"))?;
-        let mut verse = memory_server::get_memory_verse();
-        verse
-            .get_net(&self.network)
-            .ok_or_else(|| DiscoveryError::new_other("net not found"))?
+            .ok_or_else(|| DiscoveryError::new_other("must bind before advertising"))?;
+        self.network
+            .lock()
+            .unwrap()
             .advertise(uri, self.machine_id.clone());
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
-        let mut verse = memory_server::get_memory_verse();
-        let machines = verse
-            .get_net(&self.network)
-            .ok_or_else(|| DiscoveryError::new_other("net not found"))?
-            .discover();
+        let machines = self.network.lock().unwrap().discover();
         Ok(machines.into_iter().map(|(uri, _)| uri).collect())
     }
     fn release(&mut self) -> DiscoveryResult<()> {
@@ -87,14 +86,17 @@ impl Discovery for GhostTransportMemory {
 const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
-    #[allow(dead_code)]
     pub fn new(machine_id: Address, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
         let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
+        let network = {
+            let mut verse = memory_server::get_memory_verse();
+            verse.get_network(network_name)
+        };
         Self {
             machine_id,
-            network: network_name.to_string(),
+            network,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -117,7 +119,6 @@ impl GhostTransportMemory {
                 if let Ok(machines) = self.discover() {
                     if machines.len() > 0 {
                         let my_addr = self.maybe_my_address.as_ref().expect("should have bound");
-                        let mut verse = memory_server::get_memory_verse();
                         for found_uri in machines {
                             if found_uri == *my_addr {
                                 continue;
@@ -125,8 +126,7 @@ impl GhostTransportMemory {
                             // if not already connected, request a connections
                             if self.connections.get(&found_uri).is_none() {
                                 // Get other node's server
-                                let maybe_server = verse.get_server(&self.network, &found_uri);
-                                match maybe_server {
+                                match self.network.lock().unwrap().get_server(&found_uri) {
                                     Some(remote_server) => {
                                         let _result = remote_server.request_connect(&my_addr);
                                         self.connections.insert(found_uri.clone());
@@ -184,8 +184,7 @@ impl
         if let Some(my_addr) = &self.maybe_my_address {
             // get our own server
             let (success, event_list) = {
-                let mut verse = memory_server::get_memory_verse();
-                match verse.get_server(&self.network, &my_addr) {
+                match self.network.lock().unwrap().get_server(&my_addr) {
                     None => return Err(format!("No Memory server at this uri: {}", my_addr).into()),
                     Some(server) => server.process()?,
                 }
@@ -220,8 +219,7 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        let mut verse = memory_server::get_memory_verse();
-                        match verse.get_server(&self.network, &remote_addr) {
+                        match self.network.lock().unwrap().get_server(&my_addr) {
                             Some(server) => {
                                 server.request_connect(&my_addr)?;
                                 self.connections.insert(remote_addr.clone());
@@ -264,10 +262,7 @@ impl
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
-                    let bound_url = {
-                        let mut verse = memory_server::get_memory_verse();
-                        verse.bind(&self.network)
-                    };
+                    let bound_url = { self.network.lock().unwrap().bind() };
                     self.maybe_my_address = Some(bound_url.clone());
                     self.advertise()
                         .map_err(|e| GhostError::from(e.to_string()))?;
@@ -289,8 +284,7 @@ impl
                         }
                         Some(my_addr) => {
                             // get destinations server
-                            let mut verse = memory_server::get_memory_verse();
-                            match verse.get_server(&self.network, &uri) {
+                            match self.network.lock().unwrap().get_server(&uri) {
                                 None => {
                                     msg.respond(Err(TransportError::new(format!(
                                         "No Memory server at this uri: {}",
@@ -317,6 +311,7 @@ impl
                                     );
                                     // Send it data from us
                                     server.post(&my_addr, &payload).unwrap();
+                                    msg.respond(Ok(SendMessageSuccess))?;
                                 }
                             }
                         }
@@ -432,7 +427,7 @@ mod tests {
                 },
                 Box::new(|_: &mut Url, r| {
                     // parent should see that the send request was OK
-                    assert_eq!("Response(Ok(SendMessage))", &format!("{:?}", r));
+                    assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
                     Ok(())
                 }),
             )

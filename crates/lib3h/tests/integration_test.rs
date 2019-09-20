@@ -32,7 +32,7 @@ use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
-use utils::constants::*;
+use utils::{constants::*, test_network_id};
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -104,6 +104,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Memory(fn_name.clone())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -132,6 +133,7 @@ fn setup_wss_node(
         .expect("invalid web socket url");
 
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Websocket(tls_config)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -171,6 +173,7 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 
 // -- Memory Transport Tests --
 #[test]
+#[ignore]
 fn test_two_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
