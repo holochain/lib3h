@@ -111,7 +111,7 @@ pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     alex.reply_to_first_HandleGetAuthoringEntryList();
     let (did_work, _srv_msg_list) = alex.process().unwrap();
@@ -136,7 +136,7 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     println!("\nAlex authored and stored Aspects \n");
     let (did_work, srv_msg_list) = alex.process().unwrap();
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 0);
+    assert_eq!(srv_msg_list.len(), 1);
 
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
     println!("\nBilly should receive first aspect \n");
@@ -167,11 +167,11 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (did_work, srv_msg_list) = billy.process().unwrap();
     println!("\nBilly srv_msg_list = {:?}\n", srv_msg_list);
     assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 4);
+    assert_eq!(srv_msg_list.len(), 3);
     //let _ = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleFetchEntry); // #fullsync
+    let _ = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleStoreEntryAspect);
     let _ = unwrap_to!(srv_msg_list[1] => Lib3hServerProtocol::HandleStoreEntryAspect);
     let _ = unwrap_to!(srv_msg_list[2] => Lib3hServerProtocol::HandleStoreEntryAspect);
-    let _ = unwrap_to!(srv_msg_list[3] => Lib3hServerProtocol::HandleStoreEntryAspect);
 
     // Send GossipingList
     // ==================

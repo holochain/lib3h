@@ -25,14 +25,14 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         request_id: "rid".to_string(),
         space_address: "adr".to_string().into(),
         to_agent_id: "aid".to_string().into(),
-        result_info: b"yo".to_vec(),
+        result_info: b"yo".to_vec().into(),
     }));
 
     test_client(Lib3hClientProtocol::FailureResult(GenericResultData {
         request_id: "rid".to_string(),
         space_address: "adr".to_string().into(),
         to_agent_id: "aid".to_string().into(),
-        result_info: b"yo".to_vec(),
+        result_info: b"yo".to_vec().into(),
     }));
 
     test_client(Lib3hClientProtocol::Connect(ConnectData {
@@ -58,7 +58,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         request_id: "rid".to_string(),
         to_agent_id: "aid".to_string().into(),
         from_agent_id: "aid".to_string().into(),
-        content: b"yo".to_vec(),
+        content: b"yo".to_vec().into(),
     }));
 
     test_client(Lib3hClientProtocol::HandleSendDirectMessageResult(
@@ -67,7 +67,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             request_id: "rid".to_string(),
             to_agent_id: "aid".to_string().into(),
             from_agent_id: "aid".to_string().into(),
-            content: b"yo".to_vec(),
+            content: b"yo".to_vec().into(),
         },
     ));
 
@@ -89,7 +89,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
                 aspect_list: vec![EntryAspectData {
                     aspect_address: "adr".to_string().into(),
                     type_hint: "hint".to_string(),
-                    aspect: b"yo".to_vec(),
+                    aspect: b"yo".to_vec().into(),
                     publish_ts: 42,
                 }],
             },
@@ -104,7 +104,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             aspect_list: vec![EntryAspectData {
                 aspect_address: "adr".to_string().into(),
                 type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec(),
+                aspect: b"yo".to_vec().into(),
                 publish_ts: 42,
             }],
         },
@@ -118,7 +118,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             aspect_list: vec![EntryAspectData {
                 aspect_address: "adr".to_string().into(),
                 type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec(),
+                aspect: b"yo".to_vec().into(),
                 publish_ts: 42,
             }],
         },
@@ -129,7 +129,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         entry_address: "adr".to_string().into(),
         request_id: "rid".to_string(),
         requester_agent_id: "aid".to_string().into(),
-        query: b"yo".to_vec(),
+        query: b"yo".to_vec().into(),
     }));
 
     test_client(Lib3hClientProtocol::HandleQueryEntryResult(
@@ -139,7 +139,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             request_id: "rid".to_string(),
             requester_agent_id: "aid".to_string().into(),
             responder_agent_id: "aid".to_string().into(),
-            query_result: b"yo".to_vec(),
+            query_result: b"yo".to_vec().into(),
         },
     ));
 
@@ -177,14 +177,14 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         request_id: "rid".to_string(),
         space_address: "adr".to_string().into(),
         to_agent_id: "aid".to_string().into(),
-        result_info: b"yo".to_vec(),
+        result_info: b"yo".to_vec().into(),
     }));
 
     test_server(Lib3hServerProtocol::FailureResult(GenericResultData {
         request_id: "rid".to_string(),
         space_address: "adr".to_string().into(),
         to_agent_id: "aid".to_string().into(),
-        result_info: b"yo".to_vec(),
+        result_info: b"yo".to_vec().into(),
     }));
 
     test_server(Lib3hServerProtocol::Connected(ConnectedData {
@@ -202,7 +202,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             request_id: "rid".to_string(),
             to_agent_id: "aid".to_string().into(),
             from_agent_id: "aid".to_string().into(),
-            content: b"yo".to_vec(),
+            content: b"yo".to_vec().into(),
         },
     ));
 
@@ -212,7 +212,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             request_id: "rid".to_string(),
             to_agent_id: "aid".to_string().into(),
             from_agent_id: "aid".to_string().into(),
-            content: b"yo".to_vec(),
+            content: b"yo".to_vec().into(),
         },
     ));
 
@@ -226,7 +226,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
                 aspect_list: vec![EntryAspectData {
                     aspect_address: "adr".to_string().into(),
                     type_hint: "hint".to_string(),
-                    aspect: b"yo".to_vec(),
+                    aspect: b"yo".to_vec().into(),
                     publish_ts: 42,
                 }],
             },
@@ -250,7 +250,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             entry_aspect: EntryAspectData {
                 aspect_address: "adr".to_string().into(),
                 type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec(),
+                aspect: b"yo".to_vec().into(),
                 publish_ts: 42,
             },
         },
@@ -267,7 +267,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         entry_address: "adr".to_string().into(),
         request_id: "rid".to_string(),
         requester_agent_id: "aid".to_string().into(),
-        query: b"yo".to_vec(),
+        query: b"yo".to_vec().into(),
     }));
 
     test_server(Lib3hServerProtocol::QueryEntryResult(
@@ -277,7 +277,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
             request_id: "rid".to_string(),
             requester_agent_id: "aid".to_string().into(),
             responder_agent_id: "aid".to_string().into(),
-            query_result: b"yo".to_vec(),
+            query_result: b"yo".to_vec().into(),
         },
     ));
 

@@ -1,16 +1,17 @@
 // simple p2p mdns usage
 extern crate lib3h_mdns;
-use lib3h::{
+/*use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{RealEngine, RealEngineConfig},
+    engine::{GhostEngine, EngineConfig},
     transport_wss::TlsConfig,
-};
+};*/
 use lib3h_discovery::Discovery;
 use lib3h_mdns::MulticastDnsBuilder;
-use lib3h_protocol::network_engine::NetworkEngine;
-use lib3h_sodium::SodiumCryptoSystem;
-use url::Url;
+//use lib3h_protocol::network_engine::NetworkEngine;
+//use lib3h_sodium::SodiumCryptoSystem;
+//use url::Url;
 
+/* FIXME when wss ghost lands #336
 fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     let config = RealEngineConfig {
         tls_config: TlsConfig::Unencrypted,
@@ -34,11 +35,12 @@ fn basic_setup_wss<'a>() -> RealEngine<'a, MirrorDht> {
     println!("test_engine advertise: {}", p2p_binding);
     engine
 }
+ */
 
 #[test]
 fn main() {
-    let url = basic_setup_wss().advertise();
-
+    //    let url = basic_setup_wss().advertise();  FIXME
+    let url = "wss://127.0.0.1:64159?a=hc0".to_string();
     // In order to avoid using the service loop MulticastDns::responder() in a separate thread
     // we make our hostname unique
     let hostname = &format!("holonaute::{}", &url);
