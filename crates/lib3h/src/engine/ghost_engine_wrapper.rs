@@ -238,7 +238,7 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        println!("[legacy engine] process");
+        trace!("[legacy engine] process");
 
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
@@ -251,7 +251,7 @@ where
 
             let lib3h_to_client_msg: Lib3hToClient = msg.take_message().expect("exists");
 
-            println!(
+            trace!(
                 "[legacy engine] reserve {:?} for {:?}",
                 request_id, lib3h_to_client_msg
             );
