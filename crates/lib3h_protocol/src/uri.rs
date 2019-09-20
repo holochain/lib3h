@@ -14,7 +14,7 @@ use url::Url;
 /// - `transportid:HcMmachineid` - A network-level unqualified locator
 ///   again, for an incoming connection (at the space layer) we may not yet know the signing pubkey (aka agent id)
 ///
-/// - `transportid:HcMmachineid?a=HcSagentid` - A network-level qualified locator: 
+/// - `transportid:HcMmachineid?a=HcSagentid` - A network-level qualified locator:
 ///   we know who the remote end is supposed to be, so we can verify their signature
 ///
 /// - `agentid:HcSagentid` - A space-level unqualified locator
