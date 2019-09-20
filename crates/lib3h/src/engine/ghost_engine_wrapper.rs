@@ -253,7 +253,8 @@ where
 
             trace!(
                 "[legacy engine] reserve {:?} for {:?}",
-                request_id, lib3h_to_client_msg
+                request_id,
+                lib3h_to_client_msg
             );
 
             self.tracker.set(request_id.as_str(), Some(msg));
