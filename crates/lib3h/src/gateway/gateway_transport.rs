@@ -106,26 +106,42 @@ impl P2pGateway {
         let mut de = Deserializer::new(&payload[..]);
         let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
             Deserialize::deserialize(&mut de);
-        if let Ok(P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp)) = maybe_p2p_msg {
-            debug!(
-                "Received PeerAddress: {} | {} ({})",
-                peer_address, gateway_id, self.identifier.nickname
-            );
-            if self.identifier.id == gateway_id.into() {
-                let peer = PeerData {
-                    peer_address,
-                    peer_uri: uri.clone(),
-                    timestamp,
-                };
-                // HACK
-                self.inner_dht.publish(
-                    span.follower("transport::protocol::RequestToParent::ReceivedData"),
-                    DhtRequestToChild::HoldPeer(peer),
+
+        match maybe_p2p_msg {
+            Ok(P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp)) => {
+                debug!(
+                    "Received PeerAddress: {} | {} ({})",
+                    peer_address, gateway_id, self.identifier.nickname
+                );
+                if self.identifier.id == gateway_id.into() {
+                    let peer = PeerData {
+                        peer_address,
+                        peer_uri: uri.clone(),
+                        timestamp,
+                    };
+                    // HACK
+                    self.inner_dht.publish(
+                        span.follower("transport::protocol::RequestToParent::ReceivedData"),
+                        DhtRequestToChild::HoldPeer(peer),
+                    )?;
+                }
+            }
+            Ok(_) => {
+                // TODO XXX - nope!
+                // We should handle these cases, and pick the ones we want to
+                // send up the chain, and which ones should be handled here.
+
+                self.endpoint_self.as_mut().publish(
+                    span.follower("bubble up to parent"),
+                    GatewayRequestToParent::Transport(
+                        transport::protocol::RequestToParent::ReceivedData { uri, payload },
+                    ),
                 )?;
             }
-        } else {
-            panic!("unexpected received data type {:?}", maybe_p2p_msg);
-        }
+            _ => {
+                panic!("unexpected received data type {:?}", maybe_p2p_msg);
+            }
+        };
         Ok(())
     }
 
@@ -145,7 +161,7 @@ impl P2pGateway {
                     GhostCallbackData::Response(Ok(
                         encoding_protocol::RequestToChildResponse::EncodePayloadResult { payload },
                     )) => {
-                        error!("sending: {:?}", payload);
+                        //error!("sending: {:?}", payload);
                         me.priv_low_level_send(e_span, uri, payload, cb)?;
                     }
                     _ => {

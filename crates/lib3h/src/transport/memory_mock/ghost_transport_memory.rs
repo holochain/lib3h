@@ -272,6 +272,10 @@ impl
                     })))?;
                 }
                 RequestToChild::SendMessage { uri, payload } => {
+                    //error!("mem send: {:?}", payload);
+                    if payload[0] != b'{' {
+                        error!("{:?}", msg.backtrace());
+                    }
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
 

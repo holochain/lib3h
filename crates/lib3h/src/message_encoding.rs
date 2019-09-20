@@ -130,7 +130,7 @@ impl MessageEncoding {
         &mut self,
         mut msg: MessageEncodingMessageFromParent,
     ) -> Lib3hResult<()> {
-        error!("{:?}", msg.backtrace());
+        //error!("{:?}", msg.backtrace());
         match msg.take_message().expect("exists") {
             RequestToChild::Decode { payload } => self.handle_decode(msg, payload),
             RequestToChild::EncodeHandshake { space_address, id } => {

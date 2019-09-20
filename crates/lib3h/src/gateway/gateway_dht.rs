@@ -4,7 +4,6 @@ use crate::{
     dht::dht_protocol::*,
     error::*,
     gateway::{protocol::*, P2pGateway},
-    transport,
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
@@ -73,12 +72,20 @@ impl P2pGateway {
                     self.identifier.nickname, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
+                /*
                 self.inner_transport.publish(
                     span.follower("DhtRequestToParent::HoldPeerRequested"),
                     transport::protocol::RequestToChild::SendMessage {
                         uri: peer_data.peer_uri,
                         payload: Opaque::new(),
                     },
+                )?;
+                */
+                self.send(
+                    span.follower("DhtRequestToParent::HoldPeerRequested"),
+                    peer_data.peer_uri,
+                    Opaque::new(),
+                    Box::new(|_| Ok(())),
                 )?;
             }
             DhtRequestToParent::PeerTimedOut(_peer_address) => {

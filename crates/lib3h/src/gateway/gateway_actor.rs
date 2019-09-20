@@ -2,7 +2,6 @@ use crate::{
     dht::dht_protocol::*,
     error::*,
     gateway::{protocol::*, P2pGateway},
-    transport::protocol::RequestToChild as TransportRequestToChild,
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
@@ -122,13 +121,11 @@ impl P2pGateway {
                                 DhtRequestToChildResponse::RequestPeerList(peer_list),
                             )) => {
                                 for peer in peer_list {
-                                    me.inner_transport.request(
+                                    me.send(
                                         Span::fixme(),
-                                        TransportRequestToChild::SendMessage {
-                                            uri: peer.peer_uri.clone(),
-                                            payload: payload.clone().into(),
-                                        },
-                                        Box::new(move |_me, response| {
+                                        peer.peer_uri.clone(),
+                                        payload.clone().into(),
+                                        Box::new(move |response| {
                                             debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
                                                 peer.peer_uri, response
