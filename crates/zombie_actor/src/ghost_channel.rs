@@ -157,6 +157,10 @@ impl<
     pub fn span(&self) -> &Span {
         &self.span
     }
+
+    pub fn backtrace(&self) -> &backtrace::Backtrace {
+        &self.requester_bt
+    }
 }
 
 /// `create_ghost_channel` outputs two endpoints,

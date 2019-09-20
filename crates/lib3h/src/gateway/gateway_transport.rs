@@ -200,20 +200,13 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
-                let payload_wrapped = payload.clone(); // not really wrapped
+                let payload_wrapped = payload.clone(); // not actually wrapped
 
                 // TODO - XXX - We need to wrap this so we know how / where
                 //              to put this message (which gateway) on the
                 //              remote side
 
-                /*
                 let to_agent_id = uri.path();
-                trace!(
-                    "try-send {:?} {} {} bytes",
-                    self.identifier.id,
-                    to_agent_id,
-                    payload.len()
-                );
 
                 let request_id = nanoid::simple();
                 // as a gateway, we need to wrap items going to our children
@@ -224,6 +217,18 @@ impl P2pGateway {
                     from_agent_id: self.this_peer.peer_address.clone().into(),
                     content: payload.clone(),
                 });
+
+                error!("try-send {:#?} {}", wrap_payload, uri);
+
+                /*
+                println!("{:?}", parent_request.backtrace());
+
+                error!(
+                    "try-send {:?} {} {:#?}",
+                    self.identifier.id,
+                    to_agent_id,
+                    wrap_payload,
+                );
 
                 // Serialize payload
                 let mut payload_wrapped = Vec::new();

@@ -213,7 +213,8 @@ impl<'engine> GhostEngine<'engine> {
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
                                 me.defer_send(
-                                    Url::parse(&format!("transportid:{}",&peer_data.peer_address)).unwrap(),
+                                    Url::parse(&format!("transportid:{}", &peer_data.peer_address))
+                                        .unwrap(),
                                     payload.into(),
                                 );
                                 /* TODO: #777
@@ -257,7 +258,7 @@ impl<'engine> GhostEngine<'engine> {
     fn serve_P2pProtocol(
         &mut self,
         span: Span,
-        _from: &Url,
+        from: &Url,
         p2p_msg: &P2pProtocol,
     ) -> Lib3hResult<()> {
         match p2p_msg {
@@ -289,6 +290,19 @@ impl<'engine> GhostEngine<'engine> {
                 }
             }
             P2pProtocol::DirectMessage(dm_data) => {
+                // we got some data that should go up the multiplexer
+                // let's try decoding it : )
+
+                let to_agent_id = &dm_data.to_agent_id;
+                let from_agent_id = &dm_data.from_agent_id;
+                let content = &dm_data.content;
+
+                panic!(
+                    "YAY: {:?} {:?} {:?} {:?} {:?}",
+                    from, self.config.network_id.id, to_agent_id, from_agent_id, content,
+                );
+
+                /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
                     dm_data.space_address.to_owned(),
                     dm_data.to_agent_id.to_owned(),
@@ -303,8 +317,11 @@ impl<'engine> GhostEngine<'engine> {
                         dm_data.space_address,
                     );
                 }
+                */
             }
-            P2pProtocol::DirectMessageResult(dm_data) => {
+            P2pProtocol::DirectMessageResult(_dm_data) => {
+                panic!("we should never get a DirectMessageResult at this layer... only using DirectMessage");
+                /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
                     dm_data.space_address.to_owned(),
                     dm_data.to_agent_id.to_owned(),
@@ -318,6 +335,7 @@ impl<'engine> GhostEngine<'engine> {
                         dm_data.space_address,
                     );
                 }
+                */
             }
             P2pProtocol::PeerAddress(_, _, _) => {
                 // no-op

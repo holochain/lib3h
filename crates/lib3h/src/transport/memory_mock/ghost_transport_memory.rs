@@ -219,8 +219,9 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        match self.network.lock().unwrap().get_server(&my_addr) {
+                        match self.network.lock().unwrap().get_server(&remote_addr) {
                             Some(server) => {
+                                trace!(">> {} {}", remote_addr, my_addr);
                                 server.request_connect(&my_addr)?;
                                 self.connections.insert(remote_addr.clone());
                             }
@@ -295,6 +296,7 @@ impl
                                 Some(server) => {
                                     // if not already connected, request a connections
                                     if self.connections.get(&uri).is_none() {
+                                        trace!("]] {} {}", uri, my_addr);
                                         match server.request_connect(&my_addr) {
                                             Err(err) => {
                                                 msg.respond(Err(err))?;

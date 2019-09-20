@@ -188,6 +188,7 @@ impl<
     /// private dispatcher for messages coming from our parent
     fn handle_msg_from_route(
         &mut self,
+        route_spec: &LocalRouteSpec,
         mut msg: GhostMessage<
             RequestToChild,
             RequestToParent,
@@ -198,7 +199,7 @@ impl<
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
             RequestToChild::SendMessage { uri, payload } => {
-                self.handle_route_send_message(msg, uri, payload)
+                self.handle_route_send_message(route_spec, msg, uri, payload)
             }
         }
     }
@@ -245,10 +246,16 @@ impl<
     /// private handler for SendMessage requests from a route
     fn handle_route_send_message(
         &mut self,
+        route_spec: &LocalRouteSpec,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         uri: Url,
         payload: Opaque,
     ) -> Lib3hResult<()> {
+        // wrap messages here?
+
+        error!("ZZZZ {:?} {:?}", route_spec, uri);
+        //std::process::exit(127);
+
         // forward the request to our inner_gateway
         self.inner_gateway.as_mut().request(
             Span::fixme(),
@@ -367,7 +374,7 @@ impl<
                     }
                 }
                 for msg in endpoint.drain_messages() {
-                    if let Err(e) = self.handle_msg_from_route(msg) {
+                    if let Err(e) = self.handle_msg_from_route(route_spec, msg) {
                         return Err(e.into());
                     }
                 }
