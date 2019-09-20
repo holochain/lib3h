@@ -9,6 +9,7 @@ use crate::{
     dht::dht_protocol::*,
     engine::GatewayId,
     gateway::protocol::*,
+    message_encoding::*,
     transport::{self, error::TransportResult},
 };
 
@@ -29,6 +30,9 @@ pub struct P2pGateway {
     inner_transport: Detach<transport::protocol::TransportActorParentWrapperDyn<Self>>,
     /// DHT
     inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
+
+    /// message encoding actor
+    message_encoding: Detach<MessageEncodingActorParentWrapper<P2pGateway>>,
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,
