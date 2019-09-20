@@ -18,6 +18,7 @@ extern crate multihash;
 mod node_mock;
 mod test_suites;
 
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
@@ -25,14 +26,13 @@ use lib3h::{
     transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::Address;
-use lib3h_tracing::Lib3hSpan;
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
-use utils::constants::*;
+use utils::{constants::*, test_network_id};
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -61,7 +61,7 @@ fn enable_logging_for_test(enable: bool) {
 
 fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -79,7 +79,7 @@ fn construct_mock_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrapp
 
 fn construct_wss_engine(config: &EngineConfig, name: &str) -> Lib3hResult<WrappedGhostLib3h> {
     let engine: GhostEngine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(lib3h_sodium::SodiumCryptoSystem::new()),
         config.clone(),
         name.into(),
@@ -104,6 +104,7 @@ pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Memory(fn_name.clone())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -132,6 +133,7 @@ fn setup_wss_node(
         .expect("invalid web socket url");
 
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Websocket(tls_config)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),

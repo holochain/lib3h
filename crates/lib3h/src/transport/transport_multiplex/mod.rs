@@ -26,9 +26,9 @@ mod tests {
     use super::*;
     use crate::{error::Lib3hError, gateway::protocol::*, transport::protocol::*};
     use detach::prelude::*;
+    use holochain_tracing::Span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::data_types::Opaque;
-    use lib3h_tracing::Lib3hSpan;
     use url::Url;
 
     pub struct GatewayMock {
@@ -107,7 +107,7 @@ mod tests {
                 }
             }
             loop {
-                let span = Lib3hSpan::fixme();
+                let span = Span::fixme();
                 match self.mock_receiver.try_recv() {
                     Ok((uri, payload)) => {
                         self.endpoint_self.publish(
@@ -153,7 +153,7 @@ mod tests {
         // send a message from route A
         route_a
             .request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 RequestToChild::SendMessage {
                     uri: addr_none.clone(),
                     payload: "hello-from-a".into(),

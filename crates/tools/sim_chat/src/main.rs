@@ -8,16 +8,25 @@ use regex::Regex;
 use std::path::PathBuf;
 use url::Url;
 
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{EngineConfig, GhostEngine, TransportConfig},
+    engine::{EngineConfig, GatewayId, GhostEngine, TransportConfig},
 };
 use lib3h_sodium::SodiumCryptoSystem;
-use lib3h_tracing::Lib3hSpan;
+
+// Real test network-id should be a hc version of sha256 of a string
+fn test_network_id() -> GatewayId {
+    GatewayId {
+        nickname: "simchat-test-net".into(),
+        id: "Hc_fake_addr_for_test-net".into(),
+    }
+}
 
 fn engine_builder() -> GhostEngine<'static> {
     let crypto = Box::new(SodiumCryptoSystem::new());
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Memory("test_net".into())],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -29,7 +38,7 @@ fn engine_builder() -> GhostEngine<'static> {
     };
     let dht_factory = MirrorDht::new_with_config;
     GhostEngine::new(
-        Lib3hSpan::fixme(), // TODO: actually hook up real tracer here
+        Span::fixme(), // TODO: actually hook up real tracer here
         crypto,
         config,
         "test_engine",

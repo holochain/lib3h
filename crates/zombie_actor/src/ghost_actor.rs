@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use lib3h_tracing::Lib3hSpan;
+use holochain_tracing::Span;
 
 //--------------------------------------------------------------------------------------------------
 // GhostParentWrapper
@@ -106,14 +106,14 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, span: Lib3hSpan, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, span: Span, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(span, payload)
     }
 
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -123,7 +123,7 @@ impl<
     /// see GhostContextEndpoint::request
     fn request_options(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -140,8 +140,8 @@ impl<
 
     /// see GhostContextEndpoint::process and GhostActor::process
     fn process(&mut self, user_data: &mut UserData) -> GhostResult<WorkWasDone> {
-        let mut work_was_done = self.actor.process()?;
-        work_was_done = work_was_done.or(self.endpoint.process(user_data)?);
+        let work_was_done = self.actor.process()?;
+        let _endpoint_did_work = self.endpoint.process(user_data)?;
         Ok(work_was_done)
     }
 }
@@ -343,14 +343,14 @@ impl<
     >
 {
     /// see GhostContextEndpoint::publish
-    fn publish(&mut self, span: Lib3hSpan, payload: RequestToChild) -> GhostResult<()> {
+    fn publish(&mut self, span: Span, payload: RequestToChild) -> GhostResult<()> {
         self.endpoint.publish(span, payload)
     }
 
     /// see GhostContextEndpoint::request
     fn request(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
     ) -> GhostResult<()> {
@@ -359,7 +359,7 @@ impl<
 
     fn request_options(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         payload: RequestToChild,
         cb: GhostCallback<UserData, RequestToChildResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -387,7 +387,7 @@ mod tests {
     use super::*;
     use crate::{ghost_channel::create_ghost_channel, ghost_tracker::GhostCallbackData};
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
     //    use predicates::prelude::*;
     type TestError = String;
 

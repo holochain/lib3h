@@ -3,6 +3,7 @@ use crate::{
     error::*,
 };
 use detach::Detach;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
     data_types::{ConnectedData, GenericResultData, Opaque},
@@ -12,7 +13,6 @@ use lib3h_protocol::{
     protocol_server::*,
     Address, DidWork,
 };
-use lib3h_tracing::Lib3hSpan;
 use url::Url;
 pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
 
@@ -204,10 +204,10 @@ where
         };
 
         let result = if request_id == "" {
-            self.engine.publish(Lib3hSpan::fixme(), client_msg.into())
+            self.engine.publish(Span::fixme(), client_msg.into())
         } else {
             self.engine.request(
-                Lib3hSpan::fixme(),
+                Span::fixme(),
                 client_msg.into(),
                 LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
             )
@@ -218,9 +218,8 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        detach_run!(&mut self.engine, |lib3h| lib3h.process(self))
+        let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
-
         // get any "server" messages that came as responses to the client requests
         let mut responses: Vec<_> = self.client_request_responses.drain(0..).collect();
 
@@ -229,7 +228,7 @@ where
             responses.push(server_msg.into());
         }
 
-        Ok((responses.len() > 0, responses))
+        Ok((*did_work, responses))
     }
 
     pub fn advertise(&self) -> Url {
@@ -244,8 +243,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_tracing::test_span;
     use lib3h_protocol::data_types::*;
-    use lib3h_tracing::test_span;
     use url::Url;
 
     type EngineError = String;
