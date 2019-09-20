@@ -86,7 +86,7 @@ where
             engine: Detach::new(GhostParentWrapper::new(engine, name)),
             name: name.into(),
             client_request_responses: Vec::new(),
-            tracker: Tracker::new("client_to_lib3_response".into(), 2000),
+            tracker: Tracker::new("client_to_lib3_response", 2000),
         }
     }
 
@@ -238,7 +238,7 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        trace!("[legacy engine] process");
+        println!("[legacy engine] process");
 
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
@@ -251,15 +251,15 @@ where
 
             let lib3h_to_client_msg: Lib3hToClient = msg.take_message().expect("exists");
 
-            trace!(
+            println!(
                 "[legacy engine] reserve {:?} for {:?}",
-                request_id,
-                lib3h_to_client_msg
+                request_id, lib3h_to_client_msg
             );
 
             self.tracker.set(request_id.as_str(), Some(msg));
 
-            let lib3h_server_protocol_msg: Lib3hServerProtocol = lib3h_to_client_msg.into();
+            let lib3h_server_protocol_msg: Lib3hServerProtocol =
+                inject_request_id(request_id, lib3h_to_client_msg.into());
             responses.push(lib3h_server_protocol_msg);
         }
 
@@ -273,6 +273,22 @@ where
     pub fn name(&self) -> String {
         self.name.clone()
     }
+}
+
+fn inject_request_id(request_id: String, mut msg: Lib3hServerProtocol) -> Lib3hServerProtocol {
+    match &mut msg {
+        Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
+        Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleSendDirectMessage(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
+        Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
+        _ => (),
+    }
+    msg
 }
 
 #[cfg(test)]
@@ -459,23 +475,33 @@ mod tests {
         ));
 
         let result = legacy.process();
-        let expected = "Ok((true, [HandleGetGossipingEntryList(GetListData { space_address: HashString(\"fake_space_address\"), provider_agent_id: HashString(\"fake_id\"), request_id: \"post_gossip_req_id\" })]))";
-
-        assert_eq!(expected, format!("{:?}", result));
+        let requestid = match result {
+            Ok((true, responses)) => {
+                assert_eq!(responses.len(), 1);
+                match &responses[0] {
+                    Lib3hServerProtocol::HandleGetGossipingEntryList(data) => {
+                        data.request_id.clone()
+                    }
+                    _ => "bogus".to_string(),
+                }
+            }
+            _ => "bogus".to_string(),
+        };
+        assert_eq!("client_to_lib3_response", requestid.split_at(23).0);
 
         legacy
             .post(Lib3hClientProtocol::HandleGetGossipingEntryListResult(
                 EntryListData {
                     space_address: "fake_space_address".into(),
                     provider_agent_id: "fake_id".into(),
-                    request_id: "post_gossip_req_id".into(),
+                    request_id: requestid,
                     address_map: std::collections::HashMap::new(),
                 },
             ))
             .unwrap();
         let result = legacy.process();
 
-        assert_eq!("R2", format!("{:?}", result));
+        assert_eq!("Ok((true, []))", format!("{:?}", result));
 
         detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_publish(
             Lib3hToClient::Disconnected(DisconnectedData {
