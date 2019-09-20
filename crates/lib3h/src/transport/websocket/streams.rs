@@ -124,7 +124,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
 
     /// close all currently tracked connections
     #[allow(dead_code)]
-    fn close_all(&mut self) -> TransportResult<()> {
+    pub fn close_all(&mut self) -> TransportResult<()> {
         let mut errors: Vec<TransportError> = Vec::new();
 
         while !self.stream_sockets.is_empty() {
