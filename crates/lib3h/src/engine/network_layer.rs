@@ -1,8 +1,6 @@
 use crate::{
     dht::dht_protocol::*,
-    engine::{
-        ghost_engine::handle_gossip_to, p2p_protocol::P2pProtocol, GhostEngine, NETWORK_GATEWAY_ID,
-    },
+    engine::{ghost_engine::handle_gossip_to, p2p_protocol::P2pProtocol, GhostEngine},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
     transport,
@@ -36,6 +34,18 @@ impl<'engine> GhostEngine<'engine> {
                 }
             }
         }
+
+        for (to, payload) in self.multiplexer_defered_sends.drain(..) {
+            // println!("########## {} {}", to, payload);
+            self.multiplexer.request(
+                Span::fixme(),
+                GatewayRequestToChild::Transport(
+                    transport::protocol::RequestToChild::SendMessage { uri: to, payload },
+                ),
+                Box::new(move |_me, _response| Ok(())),
+            )?;
+        }
+
         // Done
         Ok(did_work)
     }
@@ -49,8 +59,12 @@ impl<'engine> GhostEngine<'engine> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossip_to(NETWORK_GATEWAY_ID, self.multiplexer.as_mut(), gossip_data)
-                    .expect("Failed to gossip with multiplexer");
+                handle_gossip_to(
+                    self.config.network_id.id.clone(),
+                    self.multiplexer.as_mut(),
+                    gossip_data,
+                )
+                .expect("Failed to gossip with multiplexer");
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
                 // no-op
@@ -135,7 +149,9 @@ impl<'engine> GhostEngine<'engine> {
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
                 // zero len() means its just a ping, no need to deserialize and handle
-                if payload.len() > 0 {
+                if payload.len() == 0 {
+                    debug!("Implement Ping!");
+                } else {
                     let mut de = Deserializer::new(&payload[..]);
                     let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
@@ -149,6 +165,10 @@ impl<'engine> GhostEngine<'engine> {
             }
         };
         Ok(())
+    }
+
+    fn defer_send(&mut self, to: Url, payload: Opaque) {
+        self.multiplexer_defered_sends.push((to, payload));
     }
 
     fn handle_incoming_connection(&mut self, span: Span, net_uri: Url) -> Lib3hResult<()> {
@@ -189,8 +209,14 @@ impl<'engine> GhostEngine<'engine> {
                             // we need a transportId, so search for it in the DHT
                             let maybe_peer_data =
                                 peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
+                            trace!("--- got peerlist: {:?}", maybe_peer_data);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
+                                me.defer_send(
+                                    Url::parse(&format!("transportid:{}", &peer_data.peer_address))
+                                        .unwrap(),
+                                    payload.into(),
+                                );
                                 /* TODO: #777
                                 me.multiplexer.publish(
                                     span.follower("publish TODO name"),
@@ -243,7 +269,7 @@ impl<'engine> GhostEngine<'engine> {
                     bundle: msg.bundle.clone(),
                 };
                 // Check if its for the multiplexer
-                if msg.space_address.to_string() == NETWORK_GATEWAY_ID {
+                if msg.space_address == self.config.network_id.id {
                     let _ = self.multiplexer.publish(
                         span.follower("TODO"),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),

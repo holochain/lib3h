@@ -1,6 +1,6 @@
 use crate::{
-    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
-    RequestId, WorkWasDone,
+    ghost_error::ErrorKind, GhostCallback, GhostError, GhostResult, GhostTracker,
+    GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone,
 };
 use holochain_tracing::Span;
 
@@ -75,6 +75,18 @@ impl<
             message: Some(message),
             sender,
             span,
+        }
+    }
+
+    //#[cfg(test)]
+    pub fn test_constructor() -> (Self) {
+        let (sender, _receiver) = crossbeam_channel::unbounded();
+        Self {
+            requester_bt: backtrace::Backtrace::new(),
+            request_id: None,
+            message: None,
+            sender,
+            span: Span::fixme(),
         }
     }
 
@@ -518,7 +530,7 @@ impl<
                         break;
                     }
                     crossbeam_channel::TryRecvError::Disconnected => {
-                        return Err("disconnected GhostActor Endpoint".into());
+                        return Err(GhostError::new(ErrorKind::EndpointDisconnected));
                     }
                 },
             }

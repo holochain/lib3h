@@ -69,7 +69,7 @@ pub enum DhtRequestToChild {
 
     /// Requests
     /// Parent wants PeerData for a specific Peer
-    RequestPeer(String),
+    RequestPeer(Url),
     /// Parent wants the list of peers we are holding
     RequestPeerList,
     /// Parent wants PeerData of this entity
@@ -141,7 +141,6 @@ pub struct GossipToData {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct PeerData {
     pub peer_address: PeerAddress,
-    #[serde(with = "url_serde")]
     pub peer_uri: Url,
     pub timestamp: u64,
 }

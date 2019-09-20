@@ -26,7 +26,12 @@ impl<'engine> GhostEngine<'engine> {
             .collect();
         for chainId in chain_id_list {
             let space_address: String = chainId.0.clone().into();
-            result.push((space_address, self.this_space_peer(chainId.clone()).clone()));
+            result.push((
+                space_address,
+                self.this_space_peer(chainId.clone())
+                    .expect("Shouldn't find non-existing peer")
+                    .clone(),
+            ));
         }
         result
     }
@@ -97,7 +102,7 @@ impl<'engine> GhostEngine<'engine> {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossip_to(&chain_id.0.to_string(), space_gateway, gossip_data)
+                        handle_gossip_to(chain_id.0.clone(), space_gateway, gossip_data)
                             .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {

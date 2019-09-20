@@ -30,7 +30,7 @@ use lib3h_protocol::{data_types::*, protocol::*};
 use lib3h_sodium::SodiumCryptoSystem;
 use std::path::PathBuf;
 use url::Url;
-use utils::constants::*;
+use utils::{constants::*, test_network_id};
 //--------------------------------------------------------------------------------------------------
 // Test suites
 //--------------------------------------------------------------------------------------------------
@@ -66,6 +66,7 @@ fn basic_setup_mock_bootstrap<'engine>(
         None => vec![],
     };
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Memory(net.into())],
         bootstrap_nodes,
         work_dir: PathBuf::new(),
@@ -97,6 +98,7 @@ fn basic_setup_mock<'engine>(net: &str, name: &str) -> GhostEngine<'engine> {
 
 fn basic_setup_wss<'engine>(name: &str) -> GhostEngine<'engine> {
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
