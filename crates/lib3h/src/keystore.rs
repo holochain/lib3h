@@ -1,9 +1,6 @@
 //! This is a stub of the keystore so we can prove out the encoding transport
 
-use crate::{
-    error::{Lib3hError, Lib3hResult},
-    transport::TransportEncoding,
-};
+use crate::error::{Lib3hError, Lib3hResult};
 
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
@@ -46,8 +43,8 @@ pub type KeystoreActorParentEndpoint = GhostEndpoint<
     Lib3hError,
 >;
 
-pub type KeystoreActorParentWrapperDyn = GhostParentWrapperDyn<
-    TransportEncoding,
+pub type KeystoreActorParentWrapperDyn<C> = GhostParentWrapperDyn<
+    C,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
