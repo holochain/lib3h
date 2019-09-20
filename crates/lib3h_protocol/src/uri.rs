@@ -4,6 +4,22 @@ use url::Url;
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
+/// some example uri-s used in the lib3h transport stack:
+/// - `wss://1.1.1.1:55888` - A low-level unqualified locator
+///   you might use this temporarily to refer to an incoming connection
+///
+/// - `wss://1.1.1.1:55888?a=HcMmachineid` - A low-level qualified locator
+///   now we have network/transport/machine level signing key, so we can verify
+///
+/// - `transportid:HcMmachineid` - A network-level unqualified locator
+///   again, for an incoming connection (at the space layer) we may not yet know the signing pubkey (aka agent id)
+///
+/// - `transportid:HcMmachineid?a=HcSagentid` - A network-level qualified locator: 
+///   we know who the remote end is supposed to be, so we can verify their signature
+///
+/// - `agentid:HcSagentid` - A space-level unqualified locator
+///   this just lets us send messages through a space-gateway as a transport.
+///   There is no higher level, so no qualified version.
 pub struct Lib3hUri(pub Url);
 
 pub enum UriScheme {
