@@ -249,6 +249,34 @@ macro_rules! wait1_for_messages {
     }};
 }
 
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_callback {
+    ($ghost_can_track: ident, $endpoint: ident, $regexes: expr) => {{
+
+    let f: GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
+        // prints timeout for some reason..
+        user_data.replace(format!("{:?}", cb_data).to_string());
+        Ok(())
+    });
+
+    parent_endpoint
+        .request(
+            test_span("publish join space again"),
+            ClientToLib3h::JoinSpace(track_space.clone()),
+            f,
+        )
+        .unwrap();
+    wait_did_work!(engine);
+    wait_until_no_work!(parent_endpoint, user_data);
+    let error_msg = "Response(Err(Lib3hError(Other(\"Already joined space\"))))";
+    assert_eq!(
+        error_msg.to_string(),
+        user_data.unwrap_or("Callback not triggered".to_string())
+    );
+
+}}
+}
 #[cfg(test)]
 mod tests {
 
