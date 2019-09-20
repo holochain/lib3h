@@ -8,7 +8,7 @@ use detach::prelude::*;
 use holochain_tracing::{test_span, Span};
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 use std::{
     collections::{HashMap, HashSet},
     sync::RwLock,
@@ -18,16 +18,16 @@ use url::Url;
 // We need an "internet" that a transport can bind to that will
 // deliver messages to bound transports, we'll call it the Mockernet
 pub struct Mockernet {
-    bindings: HashMap<Url, Tube>,
-    connections: HashMap<Url, HashSet<Url>>,
-    errors: Vec<(Url, String)>,
+    bindings: HashMap<Lib3hUri, Tube>,
+    connections: HashMap<Lib3hUri, HashSet<Lib3hUri>>,
+    errors: Vec<(Lib3hUri, String)>,
 }
 
 // These are the events that the mockernet can generate that must by handled
 // by any mockernet client.
 pub enum MockernetEvent {
-    Connection { from: Url },
-    Message { from: Url, payload: Opaque },
+    Connection { from: Lib3hUri },
+    Message { from: Lib3hUri, payload: Opaque },
     Error(String),
 }
 
@@ -35,12 +35,12 @@ pub enum MockernetEvent {
 // sets of crossbeam channels in the bindings that mockernet shuttles
 // data between.
 pub struct Tube {
-    sender: crossbeam_channel::Sender<(Url, Opaque)>,
-    receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
+    sender: crossbeam_channel::Sender<(Lib3hUri, Opaque)>,
+    receiver: crossbeam_channel::Receiver<(Lib3hUri, Opaque)>,
 }
 impl Tube {
     pub fn new() -> Self {
-        let (sender, receiver) = crossbeam_channel::unbounded::<(Url, Opaque)>();
+        let (sender, receiver) = crossbeam_channel::unbounded::<(Lib3hUri, Opaque)>();
         Tube { sender, receiver }
     }
 }
@@ -315,7 +315,7 @@ fn ghost_transport() {
     t1.request(
         test_span(""),
         RequestToChild::Bind {
-            spec: Url::parse("mocknet://t1").expect("can parse url"),
+            spec: Url::parse("mocknet://t1").expect("can parse url").into(),
         },
         // callback should simply log the response
         Box::new(|owner, response| {
@@ -335,7 +335,7 @@ fn ghost_transport() {
     t1.request(
         test_span(""),
         RequestToChild::SendMessage {
-            uri: Url::parse("mocknet://t2").expect("can parse url"),
+            uri: Url::parse("mocknet://t2").expect("can parse url").into(),
             payload: "won't be received!".into(),
         },
         // callback should simply log the response
@@ -356,7 +356,7 @@ fn ghost_transport() {
     t2.request(
         test_span(""),
         RequestToChild::Bind {
-            spec: Url::parse("mocknet://t2").expect("can parse url"),
+            spec: Url::parse("mocknet://t2").expect("can parse url").into(),
         },
         // callback should simply log the response
         Box::new(|owner, response| {
@@ -374,7 +374,7 @@ fn ghost_transport() {
     t1.request(
         test_span(""),
         RequestToChild::SendMessage {
-            uri: Url::parse("mocknet://t2").expect("can parse url"),
+            uri: Url::parse("mocknet://t2").expect("can parse url").into(),
             payload: "foo".into(),
         },
         // callback should simply log the response
@@ -408,7 +408,7 @@ fn ghost_transport() {
 
     {
         let mut mockernet = MOCKERNET.write().unwrap();
-        mockernet.unbind(Url::parse("mocknet://t1").expect("can parse url"));
+        mockernet.unbind(Url::parse("mocknet://t1").expect("can parse url").into());
     }
     t1.process(&mut owner).expect("should process");
     let mut messages = t1.drain_messages();

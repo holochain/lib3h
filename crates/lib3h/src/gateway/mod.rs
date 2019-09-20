@@ -15,9 +15,8 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::GhostResult;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 use std::boxed::Box;
-use url::Url;
 
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
@@ -44,7 +43,7 @@ type SendCallback =
 
 struct PendingOutgoingMessage {
     span: Span,
-    uri: Url,
+    uri: Lib3hUri,
     payload: Opaque,
     parent_request: GatewayToChildMessage,
 }

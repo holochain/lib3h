@@ -2,7 +2,7 @@ use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
 use std::collections::{HashMap, HashSet};
-
+use holochain_persistence_api::hash::HashString;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
@@ -22,11 +22,10 @@ use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
 use rmp_serde::Serializer;
 use serde::Serialize;
-use url::Url;
 
 impl<'engine> CanAdvertise for GhostEngine<'engine> {
-    fn advertise(&self) -> Url {
-        self.this_net_peer.peer_uri.to_owned()
+    fn advertise(&self) -> Lib3hUri {
+        self.this_net_peer.peer_location.to_owned()
     }
 }
 impl<'engine> GhostEngine<'engine> {
@@ -43,13 +42,13 @@ impl<'engine> GhostEngine<'engine> {
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
-        let machine_id = transport_keys.transport_id.clone();
+        let transport_id = transport_keys.transport_id.clone();
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
-                Box::new(GhostTransportWebsocket::new(machine_id, tls))
+                Box::new(GhostTransportWebsocket::new(transport_id, tls))
             }
-            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
+            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(transport_id, &net)),
         };
 
         let transport = TransportEncoding::new(
@@ -60,15 +59,15 @@ impl<'engine> GhostEngine<'engine> {
             transport,
         );
 
-        let prebound_binding = Url::parse("none:").unwrap();
+        let prebound_binding = Lib3hUri::with_undefined("");
+        let transport_id_uri = Lib3hUri::with_transport_id(&transport_keys.transport_id, &HashString::new());
         let this_net_peer = PeerData {
-            peer_address: transport_keys.transport_id.clone().into(),
-            peer_uri: prebound_binding.clone(),
+            peer_name: transport_id_uri.clone(),
+            peer_location: prebound_binding.clone(),
             timestamp: crate::time::since_epoch_ms(),
         };
         // Create DhtConfig
-        let dht_config =
-            DhtConfig::with_engine_config(&transport_keys.transport_id.to_string(), &config);
+        let dht_config = DhtConfig::with_engine_config(&transport_id_uri, &config);
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
@@ -102,7 +101,7 @@ impl<'engine> GhostEngine<'engine> {
                     bind_data,
                 )) = response
                 {
-                    me.this_net_peer.peer_uri = bind_data.bound_url;
+                    me.this_net_peer.peer_location = bind_data.bound_url;
                 } else {
                     panic!("bad response to bind: {:?}", response);
                 }
@@ -135,7 +134,7 @@ impl<'engine> GhostEngine<'engine> {
         engine.multiplexer.as_mut().publish(
             Span::fixme(),
             GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
-                engine.this_net_peer.peer_uri.clone(),
+                engine.this_net_peer.peer_location.clone(),
             )),
         )?;
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
@@ -144,7 +143,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     fn priv_connect_bootstraps(&mut self, span: Span) -> GhostResult<()> {
-        let nodes: Vec<Url> = self.config.bootstrap_nodes.drain(..).collect();
+        let nodes: Vec<Lib3hUri> = self.config.bootstrap_nodes.drain(..).collect();
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
@@ -298,8 +297,8 @@ impl<'engine> GhostEngine<'engine> {
         if self.space_gateway_map.contains_key(&chain_id) {
             return Err(Lib3hError::new_other("Already joined space"));
         }
-
-        let dht_config = DhtConfig::with_engine_config(&agent_id.to_string(), &self.config);
+        let agent_id_uri = Lib3hUri::with_agent_id(&agent_id);
+        let dht_config = DhtConfig::with_engine_config(&agent_id_uri, &self.config);
 
         // Create new space gateway for this ChainId
         let uniplex = TransportEndpointAsActor::new(
@@ -327,7 +326,7 @@ impl<'engine> GhostEngine<'engine> {
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new(
                 gateway_id,
-                Lib3hUri::new_transport(&self.transport_keys.transport_id, &agent_id),
+                Lib3hUri::with_transport_id(&self.transport_keys.transport_id, &agent_id),
                 Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,
@@ -355,7 +354,7 @@ impl<'engine> GhostEngine<'engine> {
             "{} - Broadcasting JoinSpace: {}, {}",
             self.name,
             space_address,
-            peer.peer_address,
+            peer.peer_name,
         );
         self.multiplexer
             .publish(span, GatewayRequestToChild::SendAll(payload))
@@ -575,8 +574,8 @@ impl<'engine> GhostEngine<'engine> {
         };
         let this_peer = maybe_this_peer.unwrap();
 
-        let to_agent_id: String = msg.to_agent_id.clone().into();
-        if &this_peer.peer_address == &to_agent_id {
+        let to_agent_id_uri = Lib3hUri::with_agent_id(&msg.to_agent_id);
+        if &this_peer.peer_name == &to_agent_id_uri {
             warn!("tried to send message to self");
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
@@ -589,7 +588,7 @@ impl<'engine> GhostEngine<'engine> {
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
         // Send
-        let peer_address: String = msg.to_agent_id.clone().into();
+        let agent_uri = Lib3hUri::with_agent_id(&msg.to_agent_id);
 
         let space_gateway = self
             .space_gateway_map
@@ -601,8 +600,7 @@ impl<'engine> GhostEngine<'engine> {
                 span,
                 GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
-                        uri: Url::parse(&("agentId:".to_string() + &peer_address))
-                            .expect("invalid url format"),
+                        uri: agent_uri,
                         payload: payload.into(),
                     },
                 ),
@@ -747,11 +745,11 @@ pub fn handle_gossip_to<
         gateway_identifier, gossip_data,
     );
 
-    for to_peer_address in gossip_data.peer_address_list {
+    for to_peer_name in gossip_data.peer_name_list {
         // FIXME
         //            // TODO #150 - should not gossip to self in the first place
-        //            let me = self.get_this_peer_sync(&mut gateway).peer_address;
-        //            if to_peer_address == me {
+        //            let me = self.get_this_peer_sync(&mut gateway).peer_name;
+        //            if to_peer_name == me {
         //                continue;
         //            }
         //            // TODO END
@@ -759,8 +757,8 @@ pub fn handle_gossip_to<
         // Convert DHT Gossip to P2P Gossip
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
             space_address: gateway_identifier.clone(),
-            to_peer_address: to_peer_address.clone().into(),
-            from_peer_address: "FIXME".into(), // FIXME
+            to_peer_name: to_peer_name.clone().into(),
+            from_peer_name: Lib3hUri::with_undefined("FIXME"), // FIXME
             bundle: gossip_data.bundle.clone(),
         });
         let mut payload = Vec::new();
@@ -768,9 +766,8 @@ pub fn handle_gossip_to<
             .serialize(&mut Serializer::new(&mut payload))
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
-        // FIXME peer_address to Url convert
         let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: Url::parse(&("agentId:".to_string() + &to_peer_address)).expect("invalid Url"),
+            uri: to_peer_name,
             payload: payload.into(),
         };
         gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
@@ -784,7 +781,6 @@ mod tests {
     use holochain_tracing::test_span;
     use lib3h_sodium::SodiumCryptoSystem;
     use std::path::PathBuf;
-    use url::Url;
 
     struct MockCore {
         //    state: String,
@@ -806,7 +802,7 @@ mod tests {
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),
             log_level: 'd',
-            bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
+            bind_url: Lib3hUri::with_memory("test_engine"),
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],

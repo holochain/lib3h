@@ -120,17 +120,17 @@ impl<'engine> GhostEngine<'engine> {
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)),
                         );
                     }
-                    DhtRequestToParent::PeerTimedOut(_peer_address) => {
+                    DhtRequestToParent::PeerTimedOut(_peer_name) => {
                         // no-op
                     }
                     // HoldEntryRequested from gossip
                     // -> Send each aspect to Core for validation
-                    DhtRequestToParent::HoldEntryRequested { from_peer, entry } => {
+                    DhtRequestToParent::HoldEntryRequested { from_peer_name, entry } => {
                         for aspect in entry.aspect_list {
                             let lib3h_msg = StoreEntryAspectData {
                                 request_id: self.request_track.reserve(),
                                 space_address: chain_id.0.clone(),
-                                provider_agent_id: from_peer.clone().into(),
+                                provider_agent_id: from_peer_name.clone().into(),
                                 entry_address: entry.entry_address.clone(),
                                 entry_aspect: aspect,
                             };

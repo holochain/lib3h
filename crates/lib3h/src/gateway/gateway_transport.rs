@@ -9,15 +9,16 @@ use crate::{
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::*;
+use lib3h_protocol::{
+    data_types::*, uri::Lib3hUri,
+    };
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 /// Private internals
 impl P2pGateway {
     /// Handle IncomingConnection event from child transport
-    fn handle_incoming_connection(&mut self, span: Span, uri: Url) -> TransportResult<()> {
+    fn handle_incoming_connection(&mut self, span: Span, uri: Lib3hUri) -> TransportResult<()> {
         self.inner_dht.request(
             span.child("handle_incoming_connection"),
             DhtRequestToChild::RequestThisPeer,
@@ -32,20 +33,20 @@ impl P2pGateway {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
-                    // Send to other node our PeerAddress
-                    let our_peer_address = P2pProtocol::PeerAddress(
+                    // Send to other node our PeerName
+                    let our_peer_name = P2pProtocol::PeerName(
                         me.identifier.id.to_owned().into(),
-                        this_peer.peer_address,
+                        this_peer.peer_name,
                         this_peer.timestamp,
                     );
                     let mut buf = Vec::new();
-                    our_peer_address
+                    our_peer_name
                         .serialize(&mut Serializer::new(&mut buf))
                         .unwrap();
                     trace!(
-                        "({}) sending P2pProtocol::PeerAddress: {:?} to {:?}",
+                        "({}) sending P2pProtocol::PeerName: {:?} to {:?}",
                         me.identifier.nickname,
-                        our_peer_address,
+                        our_peer_name,
                         uri,
                     );
                     me.inner_transport.request(
@@ -83,7 +84,7 @@ impl P2pGateway {
     pub(crate) fn send(
         &mut self,
         span: Span,
-        uri: Url,
+        uri: Lib3hUri,
         payload: Opaque,
         cb: SendCallback,
     ) -> GhostResult<()> {
@@ -155,7 +156,7 @@ impl P2pGateway {
     fn add_to_pending(
         &mut self,
         span: Span,
-        uri: Url,
+        uri: Lib3hUri,
         payload: Opaque,
         parent_request: GatewayToChildMessage,
     ) {
@@ -224,7 +225,7 @@ impl P2pGateway {
                     space_address: self.identifier.id.clone(),
                     request_id: request_id.clone(),
                     to_agent_id: to_agent_id.into(),
-                    from_agent_id: self.this_peer.peer_address.clone().into(),
+                    from_agent_id: self.this_peer.peer_name.clone().into(),
                     content: payload.clone(),
                 });
 
@@ -248,7 +249,7 @@ impl P2pGateway {
                             )) => {
                                 me.send(
                                     span.follower("TODO send"),
-                                    peer_data.peer_uri.clone(),
+                                    peer_data.peer_location.clone(),
                                     payload_wrapped,
                                     Box::new(|response| {
                                         trace!("SENT!");
@@ -337,17 +338,17 @@ impl P2pGateway {
                     let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
                     if let Ok(p2p_msg) = maybe_p2p_msg {
-                        if let P2pProtocol::PeerAddress(gateway_id, peer_address, timestamp) =
+                        if let P2pProtocol::PeerName(gateway_id, peer_name, timestamp) =
                             p2p_msg
                         {
                             debug!(
-                                "Received PeerAddress: {} | {} ({})",
-                                peer_address, gateway_id, self.identifier.nickname
+                                "Received P2pProtocol::PeerName: {} | {} ({})",
+                                peer_name, gateway_id, self.identifier.nickname
                             );
                             if self.identifier.id == gateway_id.into() {
                                 let peer = PeerData {
-                                    peer_address,
-                                    peer_uri: uri.clone(),
+                                    peer_name,
+                                    peer_location: uri.clone(),
                                     timestamp,
                                 };
                                 // HACK

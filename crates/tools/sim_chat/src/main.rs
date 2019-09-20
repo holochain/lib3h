@@ -31,7 +31,7 @@ fn engine_builder() -> GhostEngine<'static> {
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}", "test_engine").as_str()).unwrap(),
+        bind_url: Lib3hUri::with_memory("test_engine"),
         dht_gossip_interval: 100,
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],

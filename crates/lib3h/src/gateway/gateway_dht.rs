@@ -71,23 +71,23 @@ impl P2pGateway {
                 // Connect to every peer we are requested to hold.
                 info!(
                     "{} auto-connect to peer: {} ({})",
-                    self.identifier.nickname, peer_data.peer_address, peer_data.peer_uri,
+                    self.identifier.nickname, peer_data.peer_name, peer_data.peer_location,
                 );
                 // Send phony SendMessage request so we connect to it
                 self.inner_transport.publish(
                     span.follower("DhtRequestToParent::HoldPeerRequested"),
                     transport::protocol::RequestToChild::SendMessage {
-                        uri: peer_data.peer_uri,
+                        uri: peer_data.peer_location,
                         payload: Opaque::new(),
                     },
                 )?;
             }
-            DhtRequestToParent::PeerTimedOut(_peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_name) => {
                 // TODO
             }
             // No entries in Network DHT
             DhtRequestToParent::HoldEntryRequested {
-                from_peer: _,
+                from_peer_name: _,
                 entry: _,
             } => {
                 unreachable!();

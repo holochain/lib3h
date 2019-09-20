@@ -124,13 +124,13 @@ impl P2pGateway {
                                     me.inner_transport.request(
                                         Span::fixme(),
                                         TransportRequestToChild::SendMessage {
-                                            uri: peer.peer_uri.clone(),
+                                            uri: peer.peer_location.clone(),
                                             payload: payload.clone().into(),
                                         },
                                         Box::new(move |_me, response| {
                                             debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
-                                                peer.peer_uri, response
+                                                peer.peer_location, response
                                             );
                                             Ok(())
                                         }),

@@ -7,7 +7,7 @@ use crate::transport::{
         WssSrvAcceptResult, WssSrvMidHandshake, WssStream, FAKE_PASS, FAKE_PKCS12,
     },
 };
-use lib3h_protocol::DidWork;
+use lib3h_protocol::{DidWork, uri::Lib3hUri};
 use std::{
     io::{Read, Write},
     sync::{Arc, Mutex},
@@ -109,7 +109,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         );
         let socket = (self.stream_factory)(&host_port)?;
         let info = WssInfo::client(uri.clone(), socket);
-        self.stream_sockets.insert(uri.clone(), info);
+        self.stream_sockets.insert(uri.clone().into(), info);
         Ok(())
     }
 
@@ -165,7 +165,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         //println!("send() 1 {:?}", url);
         let mut info = self
             .stream_sockets
-            .get_mut(&url)
+            .get_mut(url)
             .ok_or_else(|| format!("No socket found for URL: {}", url.to_string()))?;
 
         //println!("send() 2 {:?}", url);
@@ -219,7 +219,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             }
             Ok(acceptor) => (acceptor)()
                 .map(move |wss_info| {
-                    let _insert_result = self.stream_sockets.insert(wss_info.url.clone(), wss_info);
+                    let _insert_result = self.stream_sockets.insert(wss_info.url.clone().into(), wss_info);
                     true
                 })
                 .unwrap_or_else(|err| {
@@ -237,7 +237,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         did_work |= self.priv_process_accept();
 
         // take sockets out, so we can mut ref into self and it at same time
-        let sockets: Vec<(Url, WssInfo<T>)> = self.stream_sockets.drain().collect();
+        let sockets: Vec<(Lib3hUri, WssInfo<T>)> = self.stream_sockets.drain().collect();
 
         for (id, mut info) in sockets {
             if let Err(e) = self.priv_process_socket(&mut did_work, &mut info) {

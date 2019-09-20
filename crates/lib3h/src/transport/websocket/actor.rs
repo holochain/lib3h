@@ -10,19 +10,18 @@ use detach::Detach;
 use holochain_tracing::Span;
 use lib3h_discovery::{error::DiscoveryResult, Discovery};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, Address};
-use url::Url;
+use lib3h_protocol::{data_types::Opaque, Address, uri::Lib3hUri};
 
 pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
 
 pub struct GhostTransportWebsocket {
     #[allow(dead_code)]
-    machine_id: Address,
+    transport_id: Address,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
-    bound_url: Option<Url>,
+    bound_url: Option<Lib3hUri>,
     pending: Vec<Message>,
 }
 
@@ -30,7 +29,7 @@ impl Discovery for GhostTransportWebsocket {
     fn advertise(&mut self) -> DiscoveryResult<()> {
         Ok(())
     }
-    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
+    fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
         let nodes = Vec::new();
         Ok(nodes)
     }
@@ -51,10 +50,10 @@ impl Drop for GhostTransportWebsocket {
 }
 
 impl GhostTransportWebsocket {
-    pub fn new(machine_id: Address, tls_config: TlsConfig) -> GhostTransportWebsocket {
+    pub fn new(transport_id: Address, tls_config: TlsConfig) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
-            machine_id,
+            transport_id,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -68,7 +67,7 @@ impl GhostTransportWebsocket {
         }
     }
 
-    pub fn bound_url(&self) -> Option<Url> {
+    pub fn bound_url(&self) -> Option<Lib3hUri> {
         self.bound_url.clone()
     }
 
@@ -127,11 +126,11 @@ impl GhostTransportWebsocket {
                 RequestToChild::Bind { spec: url } => {
                     let maybe_bound_url = self.streams.bind(&url);
                     msg.respond(maybe_bound_url.clone().map(|url| {
-                        RequestToChildResponse::Bind(BindResultData { bound_url: url })
+                        RequestToChildResponse::Bind(BindResultData { bound_url: url.into() })
                     }))?;
 
                     if let Ok(url) = maybe_bound_url {
-                        self.bound_url = Some(url.clone());
+                        self.bound_url = Some(url.clone().into());
                     }
                 }
                 RequestToChild::SendMessage { uri, payload } => {
@@ -199,7 +198,7 @@ impl GhostTransportWebsocket {
                         uri, error
                     );
                     self.endpoint_self
-                        .publish(Span::fixme(), RequestToParent::ErrorOccured { uri, error })?;
+                        .publish(Span::fixme(), RequestToParent::ErrorOccured { uri: uri.into(), error })?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
@@ -207,7 +206,7 @@ impl GhostTransportWebsocket {
                 StreamEvent::IncomingConnectionEstablished(uri) => {
                     trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
                     self.endpoint_self
-                        .publish(Span::fixme(), RequestToParent::IncomingConnection { uri })?;
+                        .publish(Span::fixme(), RequestToParent::IncomingConnection { uri: uri.into() })?;
                 }
                 StreamEvent::ReceivedData(uri, payload) => {
                     trace!(
@@ -217,7 +216,7 @@ impl GhostTransportWebsocket {
                     self.endpoint_self.publish(
                         Span::fixme(),
                         RequestToParent::ReceivedData {
-                            uri,
+                            uri: uri.into(),
                             payload: Opaque::from(payload),
                         },
                     )?;
@@ -344,8 +343,8 @@ mod tests {
 
     #[test]
     fn test_websocket_transport() {
-        let machine_id1 = "fake_machine_id1".into();
-        let mut transport1 = GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted);
+        let transport_id1 = "fake_transport_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(transport_id1, TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -353,8 +352,8 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        let machine_id2 = "fake_machine_id2".into();
-        let mut transport2 = GhostTransportWebsocket::new(machine_id2, TlsConfig::Unencrypted);;
+        let transport_id2 = "fake_transport_id2".into();
+        let mut transport2 = GhostTransportWebsocket::new(transport_id2, TlsConfig::Unencrypted);;
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
@@ -367,8 +366,8 @@ mod tests {
         assert_eq!(transport2.bound_url, None);
 
         let port1 = get_available_port(1025).expect("Must be able to find free port");
-        let expected_transport1_address =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
+        let expected_transport1_address: Lib3hUri =
+            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap().into();
         t1_endpoint
             .request(
                 Span::fixme(),
@@ -390,8 +389,8 @@ mod tests {
             .unwrap();
 
         let port2 = get_available_port(1026).expect("Must be able to find free port");
-        let expected_transport2_address =
-            Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
+        let expected_transport2_address: Lib3hUri =
+            Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap().into();
         t2_endpoint
             .request(
                 Span::fixme(),
@@ -453,8 +452,8 @@ mod tests {
     #[test]
     fn test_websocket_transport_reconnect() {
         enable_logging_for_test(true);
-        let machine_id1 = "fake_machine_id1".into();
-        let mut transport1 = GhostTransportWebsocket::new(machine_id1, TlsConfig::Unencrypted);
+        let transport_id1 = "fake_transport_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(transport_id1, TlsConfig::Unencrypted);
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -463,8 +462,8 @@ mod tests {
             .build::<()>();
 
         let port1 = get_available_port(2025).expect("Must be able to find free port");
-        let expected_transport1_address =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap();
+        let expected_transport1_address: Lib3hUri =
+            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap().into();
         t1_endpoint
             .request(
                 Span::fixme(),
@@ -488,9 +487,9 @@ mod tests {
         for index in 1..10 {
             transport1.process().unwrap();
             {
-                let machine_id2 = "fake_machine_id2".into();
+                let transport_id2 = "fake_transport_id2".into();
                 let mut transport2 =
-                    GhostTransportWebsocket::new(machine_id2, TlsConfig::Unencrypted);;
+                    GhostTransportWebsocket::new(transport_id2, TlsConfig::Unencrypted);;
                 let mut t2_endpoint = transport2
                     .take_parent_endpoint()
                     .expect("exists")
@@ -498,8 +497,8 @@ mod tests {
                     .request_id_prefix("twss_to_child2")
                     .build::<()>();
 
-                let expected_transport2_address =
-                    Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap();
+                let expected_transport2_address: Lib3hUri =
+                    Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap().into();
                 t2_endpoint
                     .request(
                         Span::fixme(),

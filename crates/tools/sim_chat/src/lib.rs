@@ -74,7 +74,7 @@ impl Drop for Lib3hSimChat {
 }
 
 impl Lib3hSimChat {
-    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_uri: Url) -> Self
+    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_location: Url) -> Self
     where
         T: GhostActor<
                 Lib3hToClient,
@@ -113,7 +113,7 @@ impl Lib3hSimChat {
 
                 // call connect to start the networking process
                 // (should probably wait for confirmatio before continuing)
-                Self::connect(&mut parent_endpoint, peer_uri);
+                Self::connect(&mut parent_endpoint, peer_location);
 
                 while thread_continue_inner.load(Ordering::Relaxed) {
                     // call process to make stuff happen
@@ -288,11 +288,11 @@ impl Lib3hSimChat {
             Lib3hToClientResponse,
             Lib3hError,
         >,
-        peer_uri: Url,
+        peer_location: Lib3hUri,
     ) {
         let connect_message = ClientToLib3h::Bootstrap(BootstrapData {
             space_address: String::from("").into(), // connect to any
-            bootstrap_uri: peer_uri,
+            bootstrap_uri: peer_location,
             //request_id: String::from("connect-request"),
         });
         endpoint
@@ -333,7 +333,7 @@ mod tests {
         Lib3hSimChat::new(
             MockEngine::new,
             callback,
-            Url::parse("http://test.boostrap").unwrap(),
+            Url::parse("http://test.boostrap").unwrap().into(),
         )
     }
 

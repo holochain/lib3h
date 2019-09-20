@@ -43,7 +43,7 @@ impl NodeMock {
         None
     }
 
-    pub fn advertise(&self) -> Url {
+    pub fn advertise(&self) -> Lib3hUri {
         self.my_advertise.clone()
     }
 }
@@ -95,10 +95,10 @@ impl NodeMock {
     }
 
     /// Connect to another peer via its uri
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<ConnectData> {
+    pub fn connect_to(&mut self, uri: &Lib3hUri) -> Lib3hProtocolResult<ConnectData> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
-            peer_uri: uri.clone(),
+            peer_location: uri.clone(),
             network_id: NETWORK_A_ID.clone(),
         };
         self.connected_list.insert(uri.clone());
@@ -812,7 +812,7 @@ impl lib3h_protocol::network_engine::NetworkEngine for NodeMock {
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process()
     }
-    fn advertise(&self) -> Url {
+    fn advertise(&self) -> Lib3hUri {
         self.advertise()
     }
 

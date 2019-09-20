@@ -109,7 +109,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
+        bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
         dht_gossip_interval: 5000,
         dht_timeout_threshold: 30000,
         dht_custom_config: vec![],
@@ -130,7 +130,7 @@ fn setup_wss_node(
         TlsConfig::SuppliedCertificate(_) | TlsConfig::FakeServer => "wss",
     };
     let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
-        .expect("invalid web socket url");
+        .expect("invalid web socket url").into();
 
     let config = EngineConfig {
         network_id: test_network_id(),

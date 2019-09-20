@@ -1,6 +1,7 @@
-use crate::Address;
+use crate::{
+    Address, uri::Lib3hUri,
+    };
 use std::cmp::Ordering;
-use url::Url;
 
 /// Tuple holding all the info required for identifying an Aspect.
 /// (entry_address, aspect_address)
@@ -176,7 +177,7 @@ pub struct BootstrapData {
     /// connection uri, such as
     ///   `wss://1.2.3.4:55888?a=HcMyada`
     ///   `transportid:HcMyada?a=HcSagent`
-    pub bootstrap_uri: Url,
+    pub bootstrap_uri: Lib3hUri,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -188,7 +189,7 @@ pub struct ConnectData {
     /// Ex:
     ///  - `wss://192.168.0.102:58081/`
     ///  - `holorelay://x.x.x.x`
-    pub peer_uri: Url,
+    pub peer_location: Lib3hUri,
     /// Specify to which network to connect to.
     /// Empty string for 'any'
     pub network_id: String,
@@ -199,7 +200,7 @@ pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
     /// The first uri we are connected to
-    pub uri: Url,
+    pub uri: Lib3hUri,
     // TODO #172 - Add network_id? Or let local client figure it out with the request_id?
     // TODO #178 - Add some info on network state
     // pub peer_count: u32,

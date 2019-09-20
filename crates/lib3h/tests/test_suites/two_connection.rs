@@ -54,7 +54,7 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
 
-    // More process: Have Billy process P2p::PeerAddress of alex
+    // More process: Have Billy process P2p::PeerName of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 

@@ -385,7 +385,7 @@ macro_rules! assert_processed {
 /// Creates a processor that verifies a connected data response is produced
 /// by an engine
 #[allow(dead_code)]
-pub fn is_connected(request_id: &str, uri: url::Url) -> Lib3hServerProtocolEquals {
+pub fn is_connected(request_id: &str, uri: Lib3hUri) -> Lib3hServerProtocolEquals {
     Lib3hServerProtocolEquals(Lib3hServerProtocol::Connected(ConnectedData {
         request_id: request_id.into(),
         uri,
