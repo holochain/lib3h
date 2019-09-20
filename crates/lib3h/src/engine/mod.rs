@@ -71,8 +71,12 @@ enum RealEngineTrackerData {
     HoldEntryRequested,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 /// Transport specific configuration
+/// NB: must be externally tagged because that is the only way that
+/// tuple struct variants can be serialized to TOML
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+#[serde(tag = "type", content = "data")]
 pub enum TransportConfig {
     Websocket(TlsConfig),
     Memory(String),
