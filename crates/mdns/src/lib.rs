@@ -177,9 +177,10 @@ impl MulticastDns {
     }
 
     /// Insert a new record to our cache.
-    pub fn insert_record(&mut self, hostname: &str, records: &[Record]) {
+    pub fn insert_record(&mut self, netid: &str, records: &[&str]) {
+        let records: Vec<Record> = records.iter().map(|rec| Record::new(netid, rec, 255)).collect();
         self.map_record
-            .insert(hostname.to_string(), records.to_vec());
+            .insert(netid.to_string(), records);
     }
 
     /// Update our cache of resource records.
