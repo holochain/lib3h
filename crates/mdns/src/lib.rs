@@ -264,6 +264,8 @@ impl MulticastDns {
     pub fn query(&mut self) -> MulticastDnsResult<()> {
         if let Some(query_message) = self.build_query_message() {
             self.broadcast_message(&query_message)?;
+            self.broadcast_message(&query_message)?;
+            self.broadcast_message(&query_message)?;
         }
 
         Ok(())
@@ -393,6 +395,7 @@ impl MulticastDns {
             // the standard https://tools.ietf.org/html/rfc6762#section-8.3)
             self.broadcast_message(&dmesg)?;
             self.broadcast_message(&dmesg)?;
+            self.broadcast_message(&dmesg)?;
         }
         Ok(())
     }
@@ -435,6 +438,9 @@ impl Discovery for MulticastDns {
 
         let net_ids = self.own_networkids();
         if let Some(release_dmesg) = self.own_map_record.to_dns_response_message(&net_ids) {
+            self.broadcast_message(&release_dmesg)?;
+            self.broadcast_message(&release_dmesg)?;
+            self.broadcast_message(&release_dmesg)?;
             self.broadcast_message(&release_dmesg)?;
         }
 
@@ -520,6 +526,7 @@ mod tests {
         }
     }
 
+    /// Tests if we can release ourself from the network.
     #[test]
     fn release_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
@@ -540,13 +547,15 @@ mod tests {
             .build()
             .expect("Fail to build mDNS.");
 
-        // Make itself known ion the network
+        // Make itself known in the network
         mdns_releaser
             .advertise()
             .expect("Fail to advertise my existence during release test.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
-        // Discovering the soon leaving participant
+        // Discovering the soon-to-be-leaving participant
         mdns.discover().expect("Fail to discover.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         println!("mdns = {:#?}", &mdns.map_record);
         // Let's check that we discovered the soon-to-be-released record
@@ -554,7 +563,7 @@ mod tests {
             let records = mdns
                 .map_record
                 .get(networkid)
-                .expect("Fail to get records from the networkid");
+                .expect("Fail to get records from the networkid after 'Advertising'.");
             assert_eq!(records.len(), 2);
         }
 
@@ -562,97 +571,125 @@ mod tests {
         mdns_releaser
             .release()
             .expect("Fail to release myself from the participants on the network.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         // Updating the cache
         mdns.discover().expect("Fail to discover.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         println!("mdns = {:#?}", &mdns.map_record);
         {
             let records = mdns
                 .map_record
                 .get(networkid)
-                .expect("Fail to get records from the networkid");
+                .expect("Fail to get records from the networkid after 'Releasing'.");
             assert_eq!(records.len(), 1);
         }
     }
 
+    /// Tests if we are able to query info to other peer on the network for our NetworkId.
     #[test]
-    fn query_test() {
+    fn query_test() -> MulticastDnsResult<()> {
         // Let's share the same NetworkId, meaning we are on the same network.
         let networkid = "holonaute-query.holo.host";
 
-        let mut mdns = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+        let mut mdns_actor1 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
+            .query_interval_ms(1)
             .build()
             .expect("Fail to build mDNS.");
 
-        eprintln!("bind addr = {}", mdns.multicast_address());
-
-        let mut mdns_other = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
+        let mut mdns_actor2 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-actor2"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
+            .query_interval_ms(1)
             .build()
             .expect("Fail to build mDNS.");
 
-        mdns.query().expect("Fail to advertise during Query test.");
-        mdns_other
-            .discover()
-            .expect("Fail to run discovery during Query test.");
-        mdns.discover()
-            .expect("Fail to run discovery during Query test.");
+        // We want to make sure that that client1 can discover himself and client2
 
-        eprintln!("mdns = {:#?}", &mdns.map_record);
-
-        let mut records = mdns
+        // We should not need to advertise, query should be enough
+        mdns_actor1.query()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        mdns_actor1.query()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        mdns_actor1.discover()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        mdns_actor1.discover()?;
+        // At this point mdns_actor1 should know about himself
+        let records = mdns_actor1
             .map_record
             .get(networkid)
-            .expect("Fail to get records from the networkid")
+            .expect("Fail to get records from the networkid during Query test on mdns_actor1")
             .to_vec();
+        assert_eq!(records.len(), 1);
+        eprintln!("mdns_actor1 = {:#?}", &mdns_actor1.map_record);
+
+        // Let's do the same for the second actor
+        mdns_actor2.query()?;
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        mdns_actor2.discover()?;
+        // At this point mdns_actor2 should know about himself
+        let mut records = mdns_actor2
+            .map_record
+            .get(networkid)
+            .expect("Fail to get records from the networkid during Query test on mdns_actor2")
+            .to_vec();
+        eprintln!("mdns_actor2 = {:#?}", &mdns_actor2.map_record);
 
         // Make the order deterministic
         records.sort_by(|a, b| a.url.cmp(&b.url));
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].url, "wss://192.168.0.87:88088?a=hc-other");
-        assert_eq!(records[1].url, "wss://192.168.0.88:88088?a=hc0");
+        assert_eq!(records[0].url, "wss://192.168.0.87:88088?a=hc-actor2");
+        assert_eq!(records[1].url, "wss://192.168.0.88:88088?a=hc-actor1");
+
+        Ok(())
     }
 
+    /// Tests if we are able to make ourselves known on the network.
     #[test]
     fn advertise_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
         let networkid = "holonaute-advertise.holo.host";
 
         // This is the one from which we want to see another node disapearing from its cache
-        let mut mdns = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc0"])
+        let mut mdns_actor1 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.252")
             .bind_port(8252)
             .build()
             .expect("Fail to build mDNS.");
 
-        eprintln!("bind addr = {}", mdns.multicast_address());
+        eprintln!("bind addr = {}", mdns_actor1.multicast_address());
 
-        let mut mdns_other = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-other"])
+        let mut mdns_actor2 = MulticastDnsBuilder::new()
+            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor2"])
             .multicast_address("224.0.0.252")
             .bind_port(8252)
             .build()
             .expect("Fail to build mDNS.");
 
         // Make itself known on the network
-        mdns_other
+        mdns_actor2
             .advertise()
-            .expect("Fail to advertise my existence during release test.");
+            .expect("Fail to advertise mdns_actor1 existence during release test.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+
+        mdns_actor1
+            .advertise()
+            .expect("Fail to advertise mdns_actor2 existence during release test.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
 
         // Discovering the soon leaving participant
-        mdns.discover().expect("Fail to discover.");
-        eprintln!("mdns = {:#?}", &mdns.map_record);
+        mdns_actor1.discover().expect("Fail to discover.");
+        eprintln!("mdns = {:#?}", &mdns_actor1.map_record);
 
         // Let's check that we discovered the soon to release record
-        let records = mdns
+        let records = mdns_actor1
             .map_record
             .get(networkid)
             .expect("Fail to get records from the networkid");
