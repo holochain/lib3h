@@ -5,6 +5,8 @@ use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::Opaque;
 
+const CURRENT_ENCODING_HEURISTIC_MAGIC: u16 = 0x1f6c;
+
 /// temporary protocol enum for wire encoding
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum InterimEncodingProtocol {
@@ -151,8 +153,12 @@ impl MessageEncoding {
                 network_id,
                 id,
             } => {
-                if magic != 0x1f6c {
-                    msg.respond(Err("bad magic".into()))?;
+                if magic != CURRENT_ENCODING_HEURISTIC_MAGIC {
+                    msg.respond(Err(format!(
+                        "bad magic, cannot speak to remote peer {} {}",
+                        network_id, id
+                    )
+                    .into()))?;
                     return Ok(());
                 }
                 DecodeData::Handshake {
@@ -173,7 +179,7 @@ impl MessageEncoding {
         id: String,
     ) -> Lib3hResult<()> {
         let payload = InterimEncodingProtocol::Handshake {
-            magic: 0x1f6c,
+            magic: CURRENT_ENCODING_HEURISTIC_MAGIC,
             network_id: space_address,
             id: id,
         }
@@ -209,11 +215,14 @@ impl
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
+        let mut did_work = detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
+
         for msg in self.endpoint_self.as_mut().drain_messages() {
+            did_work = true.into();
             self.handle_msg_from_parent(msg).expect("no ghost errors");
         }
-        Ok(false.into())
+
+        Ok(did_work)
     }
 }
 
