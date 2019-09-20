@@ -24,7 +24,7 @@ impl Lib3hUri {
         let s: String = scheme.into();
         self.scheme() == s
     }
-    pub fn new_transport(machine_id: Address, agent_id: Address) -> Self {
+    pub fn new_transport(machine_id: &Address, agent_id: &Address) -> Self {
         let url = Url::parse(&format!(
             "{}:{}?a={}",
             TRANSPORT_SCHEME, machine_id, agent_id
@@ -63,6 +63,18 @@ impl TryFrom<&str> for Lib3hUri {
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let url = Url::parse(s)?;
         Ok(Lib3hUri(url))
+    }
+}
+
+impl From<Lib3hUri> for Url {
+    fn from(u: Lib3hUri) -> Url {
+        u.0
+    }
+}
+
+impl From<Url> for Lib3hUri {
+    fn from(u: Url) -> Lib3hUri {
+        Lib3hUri(u)
     }
 }
 
@@ -122,9 +134,9 @@ mod tests {
 
     #[test]
     fn test_uri_create_transport() {
-        let machine_id = "fake_machine_id".into();
-        let agent_id = "HcAfake_agent_id".into();
-        let uri = Lib3hUri::new_transport(machine_id, agent_id);
+        let machine_id: Address = "fake_machine_id".into();
+        let agent_id: Address = "HcAfake_agent_id".into();
+        let uri = Lib3hUri::new_transport(&machine_id, &agent_id);
         assert_eq!(
             "Lib3hUri(\"transportid:fake_machine_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)

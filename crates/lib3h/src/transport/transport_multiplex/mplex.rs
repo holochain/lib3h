@@ -6,7 +6,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, Address};
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address};
 use std::collections::HashMap;
 use url::Url;
 
@@ -113,18 +113,14 @@ impl<
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
         };
-        let path = Url::parse(&format!(
-            "transportId:{}?a={}",
-            remote_machine_id, remote_agent_id
-        ))
-        .expect("can parse url");
+        let path = Lib3hUri::new_transport(remote_machine_id, remote_agent_id);
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {
                 ep.publish(
                     Span::fixme(),
                     RequestToParent::ReceivedData {
-                        uri: path,
+                        uri: path.into(),
                         payload: unpacked_payload,
                     },
                 )?;

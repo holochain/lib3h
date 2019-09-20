@@ -1,6 +1,6 @@
 use detach::Detach;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, Address};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -43,7 +43,7 @@ impl<'engine> GhostEngine<'engine> {
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
-        let machine_id = transport_keys.transport_id.clone().into();
+        let machine_id = transport_keys.transport_id.clone();
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
@@ -54,7 +54,7 @@ impl<'engine> GhostEngine<'engine> {
 
         let transport = TransportEncoding::new(
             crypto.box_clone(),
-            transport_keys.transport_id.clone(),
+            transport_keys.transport_id.clone().into(),
             config.network_id.id.to_string(),
             Box::new(KeystoreStub::new()),
             transport,
@@ -62,7 +62,7 @@ impl<'engine> GhostEngine<'engine> {
 
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
-            peer_address: transport_keys.transport_id.clone(),
+            peer_address: transport_keys.transport_id.clone().into(),
             peer_uri: prebound_binding.clone(),
             timestamp: 0, // TODO #166
         };
@@ -73,7 +73,7 @@ impl<'engine> GhostEngine<'engine> {
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 config.network_id.clone(),
-                prebound_binding,
+                prebound_binding.into(),
                 Box::new(transport),
                 dht_factory,
                 &dht_config,
@@ -327,11 +327,7 @@ impl<'engine> GhostEngine<'engine> {
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new(
                 gateway_id,
-                Url::parse(&format!(
-                    "transportid:{}?a={}",
-                    self.transport_keys.transport_id, agent_id,
-                ))
-                .unwrap(),
+                Lib3hUri::new_transport(&self.transport_keys.transport_id, &agent_id),
                 Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,
