@@ -72,15 +72,6 @@ impl P2pGateway {
                     self.identifier.nickname, peer_data.peer_address, peer_data.peer_uri,
                 );
                 // Send phony SendMessage request so we connect to it
-                /*
-                self.inner_transport.publish(
-                    span.follower("DhtRequestToParent::HoldPeerRequested"),
-                    transport::protocol::RequestToChild::SendMessage {
-                        uri: peer_data.peer_uri,
-                        payload: Opaque::new(),
-                    },
-                )?;
-                */
                 self.send(
                     span.follower("DhtRequestToParent::HoldPeerRequested"),
                     peer_data.peer_uri,
