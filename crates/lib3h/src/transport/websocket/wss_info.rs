@@ -12,6 +12,7 @@ pub struct WssInfo<T: std::io::Read + std::io::Write + std::fmt::Debug> {
 impl<T: std::io::Read + std::io::Write + std::fmt::Debug> WssInfo<T> {
     pub fn close(&mut self) -> TransportResult<()> {
         if let WebsocketStreamState::ReadyWss(socket) = &mut self.stateful_socket {
+            socket.write_message(tungstenite::Message::Close(None))?;
             socket.close(None)?;
             socket.write_pending()?;
         }

@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate hexf;
-#[macro_use]
 mod utils;
 #[macro_use]
 extern crate lazy_static;
@@ -8,40 +7,33 @@ extern crate backtrace;
 extern crate lib3h;
 extern crate lib3h_protocol;
 extern crate lib3h_sodium;
-extern crate predicates;
+extern crate lib3h_zombie_actor as lib3h_ghost_actor;
+extern crate regex;
 
-use predicates::prelude::*;
+#[macro_use]
+extern crate log;
+use holochain_tracing::test_span;
 
+use lib3h_ghost_actor::{wait1_for_messages, wait_did_work};
+
+use holochain_tracing::Span;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
-    engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
+    engine::{EngineConfig, GhostEngine, TransportConfig},
     transport::websocket::tls::TlsConfig,
 };
-use lib3h_protocol::{
-    data_types::*, protocol_client::Lib3hClientProtocol, protocol_server::Lib3hServerProtocol,
-};
+
+use lib3h_ghost_actor::prelude::*;
+
+use crate::lib3h::engine::CanAdvertise;
+use lib3h_protocol::{data_types::*, protocol::*};
 use lib3h_sodium::SodiumCryptoSystem;
-use lib3h_tracing::Lib3hSpan;
 use std::path::PathBuf;
 use url::Url;
-use utils::{
-    constants::*,
-    processor_harness::{Lib3hServerProtocolAssert, Lib3hServerProtocolEquals, Processor},
-};
-
+use utils::{constants::*, test_network_id};
 //--------------------------------------------------------------------------------------------------
 // Test suites
 //--------------------------------------------------------------------------------------------------
-
-type TwoEnginesTestFn = fn(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h);
-
-lazy_static! {
-    pub static ref TWO_ENGINES_BASIC_TEST_FNS: Vec<(TwoEnginesTestFn, bool)> = vec![
-        (setup_only, true),
-        (basic_two_send_message, true),
-        (basic_two_join_first, false),
-    ];
-}
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -64,13 +56,18 @@ fn enable_logging_for_test(enable: bool) {
 // Engine Setup
 //--------------------------------------------------------------------------------------------------
 
-fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostLib3h {
+fn basic_setup_mock_bootstrap<'engine>(
+    net: &str,
+    name: &str,
+    bs: Option<Vec<Url>>,
+) -> GhostEngine<'engine> {
     let bootstrap_nodes = match bs {
         Some(s) => s,
         None => vec![],
     };
     let config = EngineConfig {
-        transport_configs: vec![TransportConfig::Memory],
+        network_id: test_network_id(),
+        transport_configs: vec![TransportConfig::Memory(net.into())],
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
@@ -80,28 +77,28 @@ fn basic_setup_mock_bootstrap(name: &str, bs: Option<Vec<Url>>) -> WrappedGhostL
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
         name.into(),
         MirrorDht::new_with_config,
     )
     .unwrap();
-    let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
-    println!(
+    info!(
         "basic_setup_mock(): test engine for {}, advertise: {}",
         name, p2p_binding
     );
     engine
 }
 
-fn basic_setup_mock(name: &str) -> WrappedGhostLib3h {
-    basic_setup_mock_bootstrap(name, None)
+fn basic_setup_mock<'engine>(net: &str, name: &str) -> GhostEngine<'engine> {
+    basic_setup_mock_bootstrap(net, name, None)
 }
 
-fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
+fn basic_setup_wss<'engine>(name: &str) -> GhostEngine<'engine> {
     let config = EngineConfig {
+        network_id: test_network_id(),
         transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
@@ -112,17 +109,16 @@ fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
         dht_custom_config: vec![],
     };
     let engine = GhostEngine::new(
-        Lib3hSpan::fixme(),
+        Span::fixme(),
         Box::new(SodiumCryptoSystem::new()),
         config,
-        "test_engine_wss".into(),
+        name,
         MirrorDht::new_with_config,
     )
     .unwrap();
-    let engine = WrappedGhostLib3h::new(name, engine);
     let p2p_binding = engine.advertise();
 
-    println!("test_engine advertise: {}", p2p_binding);
+    info!("test_engine advertise: {}", p2p_binding);
     engine
 }
 
@@ -130,73 +126,15 @@ fn basic_setup_wss(name: &str) -> WrappedGhostLib3h {
 // Utils
 //--------------------------------------------------------------------------------------------------
 
-fn print_two_engines_test_name(print_str: &str, test_fn: TwoEnginesTestFn) {
-    print_test_name(print_str, test_fn as *mut std::os::raw::c_void);
-}
-
-/// Print name of test function
-fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
-    backtrace::resolve(test_fn, |symbol| {
-        let mut full_name = symbol.name().unwrap().as_str().unwrap().to_string();
-        let mut test_name = full_name.split_off("engine_test::".to_string().len());
-        test_name.push_str("()");
-        println!("{}{}", print_str, test_name);
-    });
-}
-
 //--------------------------------------------------------------------------------------------------
 // Custom tests
 //--------------------------------------------------------------------------------------------------
 
 #[test]
-fn basic_connect_test_mock() {
-    enable_logging_for_test(true);
-    // Setup
-    let mut engine_a: WrappedGhostLib3h = basic_setup_mock("basic_send_test_mock_node_a");
-    let mut engine_b: WrappedGhostLib3h = basic_setup_mock("basic_send_test_mock_node_b");
-    // Get URL
-    let url_b = engine_b.advertise();
-    println!("url_b: {}", url_b);
-    // Send Connect Command
-    let request_id: String = "".into();
-    let connect_msg = ConnectData {
-        request_id: request_id.clone(),
-        peer_uri: url_b.clone(),
-        network_id: NETWORK_A_ID.clone(),
-    };
-    engine_a
-        .post(Lib3hClientProtocol::Connect(connect_msg.clone()))
-        .unwrap();
-    println!("\nengine_a.process()...");
-
-    wait_connect!(engine_a, connect_msg, engine_b);
-}
-
-#[test]
-#[ignore]
-fn basic_connect_bootstrap_test_mock() {
-    enable_logging_for_test(true);
-    // Setup
-    let engine_b = basic_setup_mock("basic_connect_bootstrap_test_node_b");
-    // Get URL
-    let url_b = engine_b.advertise();
-    println!("url_b: {}", url_b);
-
-    // Create a with b as a bootstrap
-    let mut engine_a =
-        basic_setup_mock_bootstrap("basic_connect_bootstrap_test_node_a", Some(vec![url_b]));
-
-    println!("\nengine_a.process()...");
-    let (did_work, srv_msg_list) = engine_a.process().unwrap();
-    println!("engine_a: {:?}", srv_msg_list);
-    assert!(did_work);
-}
-
-#[test]
 fn basic_track_test_wss() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine: WrappedGhostLib3h = basic_setup_wss("wss_test_node");
+    let mut engine: GhostEngine = basic_setup_wss("wss_test_node");
     basic_track_test(&mut engine);
 }
 
@@ -204,58 +142,60 @@ fn basic_track_test_wss() {
 fn basic_track_test_mock() {
     enable_logging_for_test(true);
     // Setup
-    let mut engine: WrappedGhostLib3h = basic_setup_mock("basic_track_test_mock");
+    let mut engine: GhostEngine = basic_setup_mock("alex", "basic_track_test_mock");
     basic_track_test(&mut engine);
 }
 
-fn basic_track_test(engine: &mut WrappedGhostLib3h) {
+fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
     // Test
     let mut track_space = SpaceData {
         request_id: "track_a_1".into(),
         space_address: SPACE_ADDRESS_A.clone(),
         agent_id: ALEX_AGENT_ID.clone(),
     };
+
     // First track should succeed
-    engine
-        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+    let mut parent_endpoint = engine
+        .take_parent_endpoint()
+        .unwrap()
+        .as_context_endpoint_builder()
+        .request_id_prefix("parent")
+        .build::<()>();
+
+    parent_endpoint
+        .publish(
+            test_span("publish join space"),
+            ClientToLib3h::JoinSpace(track_space.clone()),
+        )
         .unwrap();
+    let handle_get_gossip_entry_list_regex =
+        "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
-    let is_success_result = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::SuccessResult(GenericResultData {
-            request_id: "track_a_1".into(),
-            space_address: SPACE_ADDRESS_A.clone(),
-            to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: vec![].into(),
-        }),
-    ));
+    let handle_get_authoring_entry_list_regex =
+        "HandleGetAuthoringEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
-    let handle_get_gosip_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
-        predicate::function(|x| match x {
-            Lib3hServerProtocol::HandleGetGossipingEntryList(_) => true,
-            _ => false,
-        }),
-    )));
-    let handle_get_author_entry_list = Box::new(Lib3hServerProtocolAssert(Box::new(
-        predicate::function(|x| match x {
-            Lib3hServerProtocol::HandleGetAuthoringEntryList(_) => true,
-            _ => false,
-        }),
-    )));
-
-    let processors = vec![
-        is_success_result as Box<dyn Processor>,
-        handle_get_gosip_entry_list as Box<dyn Processor>,
-        handle_get_author_entry_list as Box<dyn Processor>,
+    let regexes = vec![
+        handle_get_authoring_entry_list_regex,
+        handle_get_gossip_entry_list_regex,
     ];
-    assert_processed!(engine, engine, processors);
+
+    wait1_for_messages!(engine, parent_endpoint, regexes);
 
     // Track same again, should fail
     track_space.request_id = "track_a_2".into();
 
-    engine
-        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
+    let f: GhostCallback<(), _, _> = Box::new(|&mut _user_data, _cb_data| Ok(()));
+    parent_endpoint
+        .request(
+            test_span("publish join space again"),
+            ClientToLib3h::JoinSpace(track_space.clone()),
+            f,
+        )
         .unwrap();
 
+    wait_did_work!(engine);
+
+    /*
     let handle_failure_result = Box::new(Lib3hServerProtocolEquals(
         Lib3hServerProtocol::FailureResult(GenericResultData {
             request_id: "track_a_2".to_string(),
@@ -263,192 +203,5 @@ fn basic_track_test(engine: &mut WrappedGhostLib3h) {
             to_agent_id: ALEX_AGENT_ID.clone(),
             result_info: "Unknown error encountered: \'Already joined space\'.".into(),
         }),
-    ));
-
-    assert_one_processed!(engine, engine, handle_failure_result);
-}
-
-#[test]
-#[ignore]
-fn basic_two_nodes_mock() {
-    enable_logging_for_test(true);
-    // Launch tests on each setup
-    for (test_fn, can_setup) in TWO_ENGINES_BASIC_TEST_FNS.iter() {
-        launch_two_nodes_test_with_memory_network(*test_fn, *can_setup).unwrap();
-    }
-}
-
-// Do general test with config
-fn launch_two_nodes_test_with_memory_network(
-    test_fn: TwoEnginesTestFn,
-    can_setup: bool,
-) -> Result<(), ()> {
-    println!("");
-    print_two_engines_test_name("IN-MEMORY TWO ENGINES TEST: ", test_fn);
-    println!("=======================");
-
-    // Setup
-    let mut alex: WrappedGhostLib3h = basic_setup_mock("alex");
-    let mut billy: WrappedGhostLib3h = basic_setup_mock("billy");
-    if can_setup {
-        basic_two_setup(&mut alex, &mut billy);
-    }
-
-    // Execute test
-    test_fn(&mut alex, &mut billy);
-
-    // Wrap-up test
-    println!("==================");
-    print_two_engines_test_name("IN-MEMORY TWO ENGINES TEST END: ", test_fn);
-
-    // Done
-    Ok(())
-}
-
-/// Empty function that triggers the test suite
-fn setup_only(_alex: &mut WrappedGhostLib3h, _billy: &mut WrappedGhostLib3h) {
-    // n/a
-}
-
-///
-fn basic_two_setup(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) {
-    // Connect Alex to Billy
-    let req_connect = ConnectData {
-        // TODO Should be able to specify a non blank string
-        request_id: "".to_string(),
-        peer_uri: billy.advertise(),
-        network_id: NETWORK_A_ID.clone(),
-    };
-
-    alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
-        .unwrap();
-
-    wait_connect!(alex, req_connect, billy);
-
-    // Alex joins space A
-    println!("\n Alex joins space \n");
-    let mut track_space = SpaceData {
-        request_id: "track_a_1".into(),
-        space_address: SPACE_ADDRESS_A.clone(),
-        agent_id: ALEX_AGENT_ID.clone(),
-    };
-
-    track_space.agent_id = ALEX_AGENT_ID.clone();
-    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-        .unwrap();
-    track_space.agent_id = BILLY_AGENT_ID.clone();
-    billy
-        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-        .unwrap();
-
-    // TODO check for join space response messages.
-
-    wait_did_work!(alex, billy);
-    wait_until_no_work!(alex, billy);
-
-    println!("DONE basic_two_setup DONE \n\n\n");
-}
-
-//
-fn basic_two_send_message(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) {
-    // Create message
-    let req_dm = DirectMessageData {
-        space_address: SPACE_ADDRESS_A.clone(),
-        request_id: "dm_1".to_string(),
-        to_agent_id: BILLY_AGENT_ID.clone(),
-        from_agent_id: ALEX_AGENT_ID.clone(),
-        content: "wah".into(),
-    };
-    // Send
-    println!("\nAlex sends DM to Billy...\n");
-    alex.post(Lib3hClientProtocol::SendDirectMessage(req_dm.clone()))
-        .unwrap();
-    let is_success_result = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::SuccessResult(GenericResultData {
-            request_id: req_dm.clone().request_id,
-            space_address: SPACE_ADDRESS_A.clone(),
-            to_agent_id: ALEX_AGENT_ID.clone(),
-            result_info: "".into(),
-        }),
-    ));
-
-    let handle_send_direct_message = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::HandleSendDirectMessage(req_dm.clone()),
-    ));
-
-    let processors = vec![is_success_result, handle_send_direct_message];
-    // Send / Receive request
-    assert_processed!(alex, billy, processors);
-
-    // Post response
-    let mut res_dm = req_dm.clone();
-    res_dm.to_agent_id = req_dm.from_agent_id.clone();
-    res_dm.from_agent_id = req_dm.to_agent_id.clone();
-    res_dm.content = format!("echo: {}", req_dm.content).as_bytes().into();
-    billy
-        .post(Lib3hClientProtocol::HandleSendDirectMessageResult(
-            res_dm.clone(),
-        ))
-        .unwrap();
-
-    let is_success_result = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::SuccessResult(GenericResultData {
-            request_id: res_dm.clone().request_id,
-            space_address: SPACE_ADDRESS_A.clone(),
-            to_agent_id: BILLY_AGENT_ID.clone(),
-            result_info: "".into(),
-        }),
-    ));
-
-    let handle_send_direct_message_result = Box::new(Lib3hServerProtocolEquals(
-        Lib3hServerProtocol::SendDirectMessageResult(res_dm.clone()),
-    ));
-
-    let processors = vec![is_success_result, handle_send_direct_message_result];
-
-    assert_processed!(alex, billy, processors);
-}
-
-//
-fn basic_two_join_first(alex: &mut WrappedGhostLib3h, billy: &mut WrappedGhostLib3h) {
-    // Setup: Track before connecting
-
-    // A joins space
-    let mut track_space = SpaceData {
-        request_id: "track_a_1".into(),
-        space_address: SPACE_ADDRESS_A.clone(),
-        agent_id: ALEX_AGENT_ID.clone(),
-    };
-    println!("\n Alex joins space \n");
-    alex.post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-        .unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-
-    // Billy joins space
-    println!("\n Billy joins space \n");
-    track_space.agent_id = BILLY_AGENT_ID.clone();
-    billy
-        .post(Lib3hClientProtocol::JoinSpace(track_space.clone()))
-        .unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-
-    // Connect Alex to Billy
-    let req_connect = ConnectData {
-        // TODO Should be able to set a non blank request id
-        request_id: "".to_string(),
-        peer_uri: billy.advertise(),
-        network_id: NETWORK_A_ID.clone(),
-    };
-    println!("\n Alex connects to Billy \n");
-    alex.post(Lib3hClientProtocol::Connect(req_connect.clone()))
-        .unwrap();
-
-    wait_connect!(alex, req_connect, billy);
-
-    println!("DONE Setup for basic_two_multi_join() DONE \n\n\n");
-
-    wait_until_no_work!(alex, billy);
-
-    // Do Send DM test
-    basic_two_send_message(alex, billy);
+    ));*/
 }

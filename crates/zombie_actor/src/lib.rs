@@ -3,7 +3,7 @@ extern crate crossbeam_channel;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate detach;
-extern crate lib3h_tracing;
+extern crate holochain_tracing;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -82,10 +82,10 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
-        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
-        GhostTrackerBookmarkOptions, WorkWasDone,
+        create_ghost_channel, ghost_error::ErrorKind, GhostActor, GhostCallback, GhostCallbackData,
+        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
+        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
+        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -93,7 +93,7 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
 
     type FakeError = String;
 

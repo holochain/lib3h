@@ -1,8 +1,8 @@
 use crate::transport::error::{TransportError, TransportResult};
-use lib3h_protocol::{data_types::Opaque, DidWork};
+use lib3h_protocol::{data_types::Opaque, Address, DidWork};
 use std::{
-    collections::{HashMap, VecDeque},
-    sync::{Arc, Mutex, RwLock},
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{Arc, Mutex, MutexGuard},
 };
 use url::Url;
 
@@ -26,45 +26,76 @@ pub enum MemoryEvent {
 //--------------------------------------------------------------------------------------------------
 
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
+pub struct MemoryNet {
+    name: String,
+    pub server_map: HashMap<Url, MemoryServer>,
+    url_count: u32,
+    advertised_machines: HashSet<(Url, Address)>,
+}
+
+impl MemoryNet {
+    pub fn new(name: &str) -> Self {
+        MemoryNet {
+            name: name.into(),
+            server_map: HashMap::new(),
+            url_count: 0,
+            advertised_machines: HashSet::new(),
+        }
+    }
+    pub fn advertise(&mut self, uri: Url, machine_id: Address) {
+        self.advertised_machines.insert((uri, machine_id));
+    }
+    pub fn discover(&mut self) -> Vec<(Url, Address)> {
+        self.advertised_machines.iter().cloned().collect()
+    }
+    pub fn new_url(&mut self) -> Url {
+        self.url_count += 1;
+        Url::parse(&format!("mem://addr_{}", self.url_count).as_str()).unwrap()
+    }
+    pub fn get_server(&mut self, url: &Url) -> Option<&mut MemoryServer> {
+        self.server_map.get_mut(url)
+    }
+    pub fn bind(&mut self) -> Url {
+        let binding = self.new_url();
+        trace!("In Memory bind for {}, url:{}", self.name, binding);
+        self.server_map
+            .entry(binding.clone())
+            .or_insert_with(|| MemoryServer::new(&binding));
+        binding
+    }
+}
+
+/// Holds a universe of memory networks so we can run tests in separate universes
+pub struct MemoryVerse {
+    server_maps: HashMap<String, Arc<Mutex<MemoryNet>>>,
+}
+impl MemoryVerse {
+    pub fn new() -> Self {
+        MemoryVerse {
+            server_maps: HashMap::new(),
+        }
+    }
+    pub fn get_network(&mut self, network_name: &str) -> Arc<Mutex<MemoryNet>> {
+        self.server_maps
+            .entry(network_name.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(MemoryNet::new(network_name))))
+            .clone()
+    }
+}
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
-    pub(crate) static ref MEMORY_SERVER_MAP: RwLock<MemoryServerMap> = RwLock::new(HashMap::new());
-    static ref URL_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+    pub static ref MEMORY_VERSE: Mutex<MemoryVerse> = Mutex::new(MemoryVerse::new());
 }
 
-pub fn new_url() -> Url {
-    let mut tc = URL_COUNT
-        .lock()
-        .expect("could not lock transport count mutex");
-    *tc += 1;
-    Url::parse(&format!("mem://addr_{}", *tc).as_str()).unwrap()
-}
-
-/// Add new MemoryServer to the global server map
-pub fn set_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::set_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if server_map.contains_key(uri) {
-        return Ok(());
+pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
+    for _ in 0..10 {
+        match MEMORY_VERSE.try_lock() {
+            Ok(l) => return l,
+            _ => std::thread::sleep(std::time::Duration::from_millis(1)),
+        }
     }
-    let server = MemoryServer::new(uri);
-    server_map.insert(uri.clone(), Mutex::new(server));
-    Ok(())
-}
-
-/// Remove a MemoryServer from the global server map
-pub fn unset_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::unset_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if !server_map.contains_key(uri) {
-        return Err(TransportError::new("Server doesn't exist".to_string()));
-    }
-    server_map.remove(uri);
-    Ok(())
+    panic!("unable to obtain mutex lock on MEMORY_VERSE");
 }
 
 //--------------------------------------------------------------------------------------------------

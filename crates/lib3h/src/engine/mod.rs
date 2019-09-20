@@ -16,7 +16,6 @@ use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{protocol::*, Address};
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -26,31 +25,10 @@ use url::Url;
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
 
-pub static NETWORK_GATEWAY_ID: &'static str = "__network__";
-
-fn vec_url_de<'de, D>(deserializer: D) -> Result<Vec<Url>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct Wrapper(#[serde(with = "url_serde")] Url);
-
-    let v = Vec::deserialize(deserializer)?;
-    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
-}
-
-fn vec_url_se<S>(v: &[Url], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    #[derive(Serialize)]
-    struct Wrapper(#[serde(with = "url_serde")] Url);
-
-    let mut seq = serializer.serialize_seq(Some(v.len()))?;
-    for u in v {
-        seq.serialize_element(&Wrapper(u.clone()))?;
-    }
-    seq.end()
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct GatewayId {
+    pub nickname: String,
+    pub id: Address,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,22 +45,25 @@ enum RealEngineTrackerData {
     HoldEntryRequested,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 /// Transport specific configuration
+/// NB: must be externally tagged because that is the only way that
+/// tuple struct variants can be serialized to TOML
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+#[serde(tag = "type", content = "data")]
 pub enum TransportConfig {
     Websocket(TlsConfig),
-    Memory,
+    Memory(String),
 }
 
 /// Struct holding all config settings for the Engine
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EngineConfig {
+    pub network_id: GatewayId,
     pub transport_configs: Vec<TransportConfig>,
-    #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,
     pub work_dir: PathBuf,
     pub log_level: char,
-    #[serde(with = "url_serde")]
     pub bind_url: Url,
     pub dht_gossip_interval: u64,
     pub dht_timeout_threshold: u64,
@@ -140,6 +121,8 @@ pub struct GhostEngine<'engine> {
     #[allow(dead_code)]
     /// transport_id data, public/private keys, etc
     transport_keys: TransportKeys,
+    /// items we need to send on our multiplexer in another process loop
+    multiplexer_defered_sends: Vec<(Url, lib3h_protocol::data_types::Opaque)>,
 
     client_endpoint: Option<
         GhostEndpoint<

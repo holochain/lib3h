@@ -2,10 +2,11 @@ use crate::{
     dht::dht_protocol::*,
     error::*,
     gateway::{protocol::*, P2pGateway},
+    transport::protocol::RequestToChild as TransportRequestToChild,
 };
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::*;
-use lib3h_tracing::Lib3hSpan;
 
 impl
     GhostActor<
@@ -33,9 +34,11 @@ impl
             self.handle_transport_RequestToParent(request)?;
         }
 
+        self.handle_transport_pending_outgoing_messages()?;
+
         // Update this_peer cache
         self.inner_dht.request(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {
@@ -72,7 +75,7 @@ impl P2pGateway {
     fn handle_RequestToChild(&mut self, mut msg: GatewayToChildMessage) -> Lib3hResult<()> {
         debug!(
             "({}) Serving request from parent: {:?}",
-            self.identifier, msg
+            self.identifier.nickname, msg
         );
         // let parent_request = msg.clone();
         let span = msg.span().child("handle_RequestToChild");
@@ -87,14 +90,57 @@ impl P2pGateway {
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
-                self.send(span, &data.bootstrap_uri, &Opaque::new(), msg)?;
+                self.send(
+                    span,
+                    data.bootstrap_uri.clone(),
+                    Opaque::new(),
+                    Box::new(move |response| {
+                        if response.is_ok() {
+                            msg.respond(Ok(GatewayRequestToChildResponse::BootstrapSuccess))?;
+                            Ok(())
+                        } else {
+                            msg.respond(Err(response.err().unwrap().into()))?;
+                            Ok(())
+                        }
+                    }),
+                )?;
                 Ok(())
             }
-            GatewayRequestToChild::SendAll(_) => {
-                println!("BADDBADD");
-                error!("BADDBADD");
-                // TODO XXX - fixme
-                //unimplemented!();
+            GatewayRequestToChild::SendAll(payload) => {
+                self.inner_dht.request(
+                    Span::fixme(),
+                    DhtRequestToChild::RequestPeerList,
+                    Box::new(move |me, response| {
+                        match response {
+                            GhostCallbackData::Timeout => panic!("Timeout on RequestPeerList"),
+                            GhostCallbackData::Response(Err(error)) => {
+                                panic!("Error on RequestPeerList: {:?}", error)
+                            }
+                            GhostCallbackData::Response(Ok(
+                                DhtRequestToChildResponse::RequestPeerList(peer_list),
+                            )) => {
+                                for peer in peer_list {
+                                    me.inner_transport.request(
+                                        Span::fixme(),
+                                        TransportRequestToChild::SendMessage {
+                                            uri: peer.peer_uri.clone(),
+                                            payload: payload.clone().into(),
+                                        },
+                                        Box::new(move |_me, response| {
+                                            debug!(
+                                                "P2pGateway::SendAll to {:?} response: {:?}",
+                                                peer.peer_uri, response
+                                            );
+                                            Ok(())
+                                        }),
+                                    )?;
+                                }
+                            }
+                            _ => panic!("Whatever"),
+                        }
+                        Ok(())
+                    }),
+                )?;
                 Ok(())
             }
         }
