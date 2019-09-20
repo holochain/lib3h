@@ -278,6 +278,10 @@ impl CryptoSystem for SodiumCryptoSystem {
         }
     }
 
+    fn kdf_key_bytes(&self) -> usize {
+        rust_sodium_sys::crypto_kdf_KEYBYTES as usize
+    }
+
     fn kdf_context_bytes(&self) -> usize {
         rust_sodium_sys::crypto_kdf_CONTEXTBYTES as usize
     }
@@ -301,7 +305,7 @@ impl CryptoSystem for SodiumCryptoSystem {
             return Err(CryptoError::BadOutBufferSize);
         }
 
-        if parent.len() < self.kdf_min_bytes() || parent.len() > self.kdf_max_bytes() {
+        if parent.len() != self.kdf_key_bytes() {
             return Err(CryptoError::BadParentSize);
         }
 
@@ -773,5 +777,78 @@ mod test {
         let crypto: Box<dyn CryptoSystem> =
             Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
         crypto_system_test::full_suite(crypto);
+    }
+
+    #[test]
+    fn sodium_should_kdf_derive_as_expected() {
+        let crypto: Box<dyn CryptoSystem> =
+            Box::new(SodiumCryptoSystem::new().set_pwhash_interactive());
+
+        let ctx1: Box<dyn Buffer> = Box::new(vec![1; crypto.kdf_context_bytes()]);
+        let ctx2: Box<dyn Buffer> = Box::new(vec![2; crypto.kdf_context_bytes()]);
+
+        let root: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_key_bytes()]);
+        let mut a_1_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut a_2_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut a_1_2: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut b_1_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut b_2_1: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+        let mut b_1_2: Box<dyn Buffer> = Box::new(vec![0; crypto.kdf_min_bytes()]);
+
+        crypto.kdf(&mut a_1_1, 1, &ctx1, &root).unwrap();
+        crypto.kdf(&mut a_2_1, 2, &ctx1, &root).unwrap();
+        crypto.kdf(&mut a_1_2, 1, &ctx2, &root).unwrap();
+
+        crypto.kdf(&mut b_1_1, 1, &ctx1, &root).unwrap();
+        crypto.kdf(&mut b_2_1, 2, &ctx1, &root).unwrap();
+        crypto.kdf(&mut b_1_2, 1, &ctx2, &root).unwrap();
+
+        assert_eq!(
+            "[163, 55, 238, 63, 149, 30, 99, 242, 9, 249, 55, 237, 48, 207, 230, 249]",
+            format!("{:?}", &*a_1_1.read_lock()),
+            "a_1_1 exact"
+        );
+        assert_eq!(
+            "[89, 155, 201, 255, 133, 74, 112, 143, 164, 90, 72, 218, 209, 152, 4, 103]",
+            format!("{:?}", &*a_2_1.read_lock()),
+            "a_2_1 exact"
+        );
+        assert_eq!(
+            "[138, 140, 25, 65, 64, 127, 136, 237, 195, 38, 209, 228, 17, 110, 221, 107]",
+            format!("{:?}", &*a_1_2.read_lock()),
+            "a_1_2 exact"
+        );
+
+        assert_eq!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", b_1_1),
+            "a_1_1 == b_1_1"
+        );
+        assert_eq!(
+            &format!("{:?}", a_2_1),
+            &format!("{:?}", b_2_1),
+            "a_2_1 == b_2_1"
+        );
+        assert_eq!(
+            &format!("{:?}", a_1_2),
+            &format!("{:?}", b_1_2),
+            "a_1_2 == b_1_2"
+        );
+
+        assert_ne!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", a_2_1),
+            "a_1_1 != a_2_1"
+        );
+        assert_ne!(
+            &format!("{:?}", a_1_1),
+            &format!("{:?}", a_1_2),
+            "a_1_1 != a_1_2"
+        );
+        assert_ne!(
+            &format!("{:?}", a_2_1),
+            &format!("{:?}", a_1_2),
+            "a_2_1 != a_1_2"
+        );
     }
 }

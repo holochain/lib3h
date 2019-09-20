@@ -124,7 +124,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
 
     /// close all currently tracked connections
     #[allow(dead_code)]
-    fn close_all(&mut self) -> TransportResult<()> {
+    pub fn close_all(&mut self) -> TransportResult<()> {
         let mut errors: Vec<TransportError> = Vec::new();
 
         while !self.stream_sockets.is_empty() {
@@ -388,7 +388,8 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                         }
                         Err(e.into())
                     }
-                    Err(tungstenite::error::Error::ConnectionClosed(_)) => {
+                    Err(tungstenite::error::Error::ConnectionClosed) => {
+                        error!("Connection unexpectedly closed");
                         // close event will be published
                         Ok(())
                     }
@@ -420,8 +421,9 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                         }
                         Err(e.into())
                     }
-                    Err(tungstenite::error::Error::ConnectionClosed(_)) => {
+                    Err(tungstenite::error::Error::ConnectionClosed) => {
                         // close event will be published
+                        error!("Connection unexpectedly closed");
                         Ok(())
                     }
                     Err(e) => Err(e.into()),

@@ -62,7 +62,7 @@ impl<'engine> GhostEngine<'engine> {
 
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
-            peer_address: transport_keys.transport_id.clone().into(),
+            peer_address: transport_keys.transport_id.clone(),
             peer_uri: prebound_binding.clone(),
             timestamp: 0, // TODO #166
         };
