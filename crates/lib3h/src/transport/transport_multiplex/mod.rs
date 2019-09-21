@@ -203,7 +203,6 @@ mod tests {
                 &"space_b".into(),
                 &"agent_b".into(),
                 &"agent_x".into(),
-                &"machine_x".into(),
                 "hello".into(),
             )
             .unwrap();
@@ -216,10 +215,7 @@ mod tests {
 
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { uri, payload } = msg {
-            assert_eq!(
-                &Url::parse("transportid:machine_x?a=agent_x").unwrap(),
-                &uri
-            );
+            assert_eq!(&Url::parse("agentid:agent_x").unwrap(), &uri);
             let expected: Opaque = "hello".into();
             assert_eq!(&expected, &payload);
         } else {

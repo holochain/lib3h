@@ -160,7 +160,7 @@ impl<'engine> GhostEngine<'engine> {
                         return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                     }
                     let p2p_msg = maybe_msg.unwrap();
-                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, &p2p_msg)?;
+                    self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, p2p_msg)?;
                 }
             }
         };
@@ -259,7 +259,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         span: Span,
         _from: &Url,
-        p2p_msg: &P2pProtocol,
+        p2p_msg: P2pProtocol,
     ) -> Lib3hResult<()> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
@@ -290,35 +290,21 @@ impl<'engine> GhostEngine<'engine> {
                 }
             }
             P2pProtocol::DirectMessage(dm_data) => {
-                let maybe_space_gateway = self.space_gateway_map.get(&(
-                    dm_data.space_address.to_owned(),
-                    dm_data.to_agent_id.to_owned(),
-                ));
-                if let Some(_) = maybe_space_gateway {
-                    // Change into Lib3hToClient
-                    let lib3_msg = Lib3hToClient::HandleSendDirectMessage(dm_data.clone());
-                    self.lib3h_endpoint.publish(Span::fixme(), lib3_msg)?;
-                } else {
-                    warn!(
-                        "Received message from unjoined space: {}",
-                        dm_data.space_address,
-                    );
-                }
+                // we got some data that should go up the multiplexer
+                // let's try decoding it : )
+
+                self.multiplexer
+                    .as_mut()
+                    .as_mut()
+                    .received_data_for_agent_space_route(
+                        &dm_data.space_address,
+                        &dm_data.to_agent_id,
+                        &dm_data.from_agent_id,
+                        dm_data.content,
+                    )?;
             }
-            P2pProtocol::DirectMessageResult(dm_data) => {
-                let maybe_space_gateway = self.space_gateway_map.get(&(
-                    dm_data.space_address.to_owned(),
-                    dm_data.to_agent_id.to_owned(),
-                ));
-                if let Some(_) = maybe_space_gateway {
-                    let lib3_msg = Lib3hToClient::SendDirectMessageResult(dm_data.clone());
-                    self.lib3h_endpoint.publish(Span::fixme(), lib3_msg)?;
-                } else {
-                    warn!(
-                        "Received message from unjoined space: {}",
-                        dm_data.space_address,
-                    );
-                }
+            P2pProtocol::DirectMessageResult(_dm_data) => {
+                panic!("we should never get a DirectMessageResult at this layer... only using DirectMessage");
             }
             P2pProtocol::PeerAddress(_, _, _) => {
                 // no-op
@@ -335,7 +321,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pProtocol::AllJoinedSpaceList(join_list) => {
                 debug!("Received AllJoinedSpaceList: {:?}", join_list);
                 for (space_address, peer_data) in join_list {
-                    let maybe_space_gateway = self.get_first_space_mut(space_address);
+                    let maybe_space_gateway = self.get_first_space_mut(&space_address);
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
                             span.follower("P2pProtocol::AllJoinedSpaceList"),
