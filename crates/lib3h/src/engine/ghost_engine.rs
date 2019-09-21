@@ -10,7 +10,7 @@ use crate::{
         GhostEngine, TransportConfig, TransportKeys,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    gateway::{protocol::*, P2pGateway},
+    gateway::{protocol::*, GatewayOutputWrapType, P2pGateway},
     track::Tracker,
     transport::{
         self, memory_mock::ghost_transport_memory::*, protocol::*,
@@ -64,7 +64,7 @@ impl<'engine> GhostEngine<'engine> {
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
-                false,
+                GatewayOutputWrapType::DoNotWrapOutput,
                 config.network_id.clone(),
                 prebound_binding,
                 transport,
@@ -313,7 +313,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new(
-                true,
+                GatewayOutputWrapType::WrapOutputWithP2pDirectMessage,
                 gateway_id,
                 Url::parse(&format!(
                     "transportid:{}?a={}",

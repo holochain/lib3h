@@ -4,7 +4,9 @@ use crate::{
     dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
     error::*,
-    gateway::{protocol::*, P2pGateway, PendingOutgoingMessage, SendCallback},
+    gateway::{
+        protocol::*, GatewayOutputWrapType, P2pGateway, PendingOutgoingMessage, SendCallback,
+    },
     message_encoding::encoding_protocol,
     transport::{self, error::TransportResult},
 };
@@ -195,24 +197,24 @@ impl P2pGateway {
         payload: Opaque,
         cb: SendCallback,
     ) -> GhostResult<()> {
-        let payload = if self.wrap_dm {
-            let dm_wrapper = DirectMessageData {
-                space_address: self.identifier.id.clone(),
-                request_id: "".to_string(),
-                to_agent_id: to_address,
-                from_agent_id: self.this_peer.peer_address.clone().into(),
-                content: payload,
+        let payload =
+            if let GatewayOutputWrapType::WrapOutputWithP2pDirectMessage = self.wrap_output_type {
+                let dm_wrapper = DirectMessageData {
+                    space_address: self.identifier.id.clone(),
+                    request_id: "".to_string(),
+                    to_agent_id: to_address,
+                    from_agent_id: self.this_peer.peer_address.clone().into(),
+                    content: payload,
+                };
+                let mut payload = Vec::new();
+                let p2p_msg = P2pProtocol::DirectMessage(dm_wrapper);
+                p2p_msg
+                    .serialize(&mut Serializer::new(&mut payload))
+                    .unwrap();
+                Opaque::from(payload)
+            } else {
+                payload
             };
-            error!("BANG ZOOM: {:#?}", dm_wrapper);
-            let mut payload = Vec::new();
-            let p2p_msg = P2pProtocol::DirectMessage(dm_wrapper);
-            p2p_msg
-                .serialize(&mut Serializer::new(&mut payload))
-                .unwrap();
-            Opaque::from(payload)
-        } else {
-            payload
-        };
 
         // Forward to the child Transport
         self.inner_transport.request(
@@ -354,7 +356,6 @@ impl P2pGateway {
                             GhostCallbackData::Response(Ok(
                                 DhtRequestToChildResponse::RequestPeer(Some(peer_data)),
                             )) => {
-                                //error!("BANG ZOOM: {}", peer_data.peer_uri);
                                 me.send(
                                     span.follower("TODO send"),
                                     peer_data.peer_address.clone().into(),

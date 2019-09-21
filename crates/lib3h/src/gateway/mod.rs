@@ -20,10 +20,16 @@ use lib3h_protocol::data_types::Opaque;
 use std::boxed::Box;
 use url::Url;
 
+pub enum GatewayOutputWrapType {
+    DoNotWrapOutput,
+    WrapOutputWithP2pDirectMessage,
+}
+
 /// Combines a Transport and a DHT.
 /// Tracks distributed data for that P2P network in a DHT.
 pub struct P2pGateway {
-    wrap_dm: bool,
+    wrap_output_type: GatewayOutputWrapType,
+
     // either network_id or space_address depending on which type of gateway
     identifier: GatewayId,
 

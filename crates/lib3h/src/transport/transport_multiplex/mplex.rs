@@ -183,7 +183,6 @@ impl<
     /// private dispatcher for messages coming from our parent
     fn handle_msg_from_route(
         &mut self,
-        route_spec: &LocalRouteSpec,
         mut msg: GhostMessage<
             RequestToChild,
             RequestToParent,
@@ -194,7 +193,7 @@ impl<
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
             RequestToChild::SendMessage { uri, payload } => {
-                self.handle_route_send_message(route_spec, msg, uri, payload)
+                self.handle_route_send_message(msg, uri, payload)
             }
         }
     }
@@ -241,7 +240,6 @@ impl<
     /// private handler for SendMessage requests from a route
     fn handle_route_send_message(
         &mut self,
-        _route_spec: &LocalRouteSpec,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
         uri: Url,
         payload: Opaque,
@@ -364,7 +362,7 @@ impl<
                     }
                 }
                 for msg in endpoint.drain_messages() {
-                    if let Err(e) = self.handle_msg_from_route(route_spec, msg) {
+                    if let Err(e) = self.handle_msg_from_route(msg) {
                         return Err(e.into());
                     }
                 }
