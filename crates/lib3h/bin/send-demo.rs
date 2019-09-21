@@ -6,6 +6,7 @@ use holochain_tracing::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{engine_actor::*, *},
+    transport::websocket::tls::TlsConfig,
     error::*,
 };
 use lib3h_protocol::{data_types::*, protocol::*};
@@ -35,19 +36,28 @@ struct EngineContainer<
 }
 
 impl<'lt> EngineContainer<GhostEngine<'lt>> {
-    pub fn new() -> Self {
+    pub fn new(ws: bool) -> Self {
         let crypto = Box::new(SodiumCryptoSystem::new());
 
-        let config = EngineConfig {
+        let (transport_config, bind_url) = if ws {
+            (TransportConfig::Websocket(TlsConfig::Unencrypted),
+             Url::parse("ws://127.0.0.1:63518").unwrap())
+        } else {
+            (TransportConfig::Memory("send-demo".to_string()),
+             Url::parse("none:").unwrap()
+             )
+        };
+
+        let mut config = EngineConfig {
             network_id: GatewayId {
                 nickname: NET_ID.to_string(),
                 id: NET_ID.to_string().into(),
             },
-            transport_configs: vec![TransportConfig::Memory("send-demo".to_string())],
+            transport_configs: vec![transport_config],
             bootstrap_nodes: vec![],
             work_dir: std::path::PathBuf::new(),
             log_level: 'd',
-            bind_url: Url::parse("none:").unwrap(),
+            bind_url: bind_url,
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],
@@ -67,6 +77,11 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         println!("e1: {}", e1_addr);
 
         let e1 = GhostParentWrapper::new(e1, "e1_");
+
+        if ws {
+            config.bootstrap_nodes = vec![config.bind_url.clone()];
+            config.bind_url =  Url::parse("wss://127.0.0.1:63519").unwrap();
+        }
 
         let e2 =
             GhostEngine::new(Span::fixme(), crypto, config, "send-demo-e2", dht_factory).unwrap();
@@ -198,7 +213,7 @@ pub fn main() {
         .is_test(false)
         .try_init();
 
-    let mut engines = EngineContainer::new();
+    let mut engines = EngineContainer::new(false);
     engines.send_1_to_2();
     engines.process();
     engines.process();

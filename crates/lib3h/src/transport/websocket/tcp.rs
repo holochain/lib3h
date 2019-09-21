@@ -48,12 +48,14 @@ impl StreamManager<std::net::TcpStream> {
                             listener
                                 .accept()
                                 .map_err(|err| {
-                                    error!("transport_wss::tcp accept error: {:?}", err);
                                     match err.kind() {
                                         std::io::ErrorKind::WouldBlock => TransportError::new_kind(
                                             ErrorKind::Ignore(err.to_string()),
                                         ),
-                                        _ => err.into(),
+                                        _ => {
+                                            error!("transport_wss::tcp accept error: {:?}", err);
+                                            err.into()
+                                        }
                                     }
                                 })
                                 .and_then(|(tcp_stream, socket_address)| {
