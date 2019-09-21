@@ -596,7 +596,9 @@ impl<'engine> GhostEngine<'engine> {
     ) -> Lib3hResult<()> {
         let to_agent_id = msg.to_agent_id.clone();
 
-        // Generate a new request_id
+        // Generate a new request_id for the network transport exchange.
+        // we can overwrite the value in the DirectMessageData because the ghost tracker will handle
+        // the request response pairing 
         let request_id = RequestId::new();
         msg.request_id = request_id.clone().into();
 
