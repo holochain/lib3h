@@ -6,8 +6,8 @@ use holochain_tracing::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{engine_actor::*, *},
-    transport::websocket::tls::TlsConfig,
     error::*,
+    transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::{data_types::*, protocol::*};
 use lib3h_sodium::SodiumCryptoSystem;
@@ -40,12 +40,15 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         let crypto = Box::new(SodiumCryptoSystem::new());
 
         let (transport_config, bind_url) = if ws {
-            (TransportConfig::Websocket(TlsConfig::Unencrypted),
-             Url::parse("ws://127.0.0.1:63518").unwrap())
+            (
+                TransportConfig::Websocket(TlsConfig::Unencrypted),
+                Url::parse("ws://127.0.0.1:63518").unwrap(),
+            )
         } else {
-            (TransportConfig::Memory("send-demo".to_string()),
-             Url::parse("none:").unwrap()
-             )
+            (
+                TransportConfig::Memory("send-demo".to_string()),
+                Url::parse("none:").unwrap(),
+            )
         };
 
         let mut config = EngineConfig {
@@ -80,7 +83,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 
         if ws {
             config.bootstrap_nodes = vec![config.bind_url.clone()];
-            config.bind_url =  Url::parse("wss://127.0.0.1:63519").unwrap();
+            config.bind_url = Url::parse("wss://127.0.0.1:63519").unwrap();
         }
 
         let e2 =
@@ -213,7 +216,7 @@ pub fn main() {
         .is_test(false)
         .try_init();
 
-    let mut engines = EngineContainer::new(false);
+    let mut engines = EngineContainer::new(true);
     engines.send_1_to_2();
     engines.process();
     engines.process();
