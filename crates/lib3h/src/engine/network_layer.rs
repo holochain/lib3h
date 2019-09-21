@@ -302,41 +302,9 @@ impl<'engine> GhostEngine<'engine> {
                         &dm_data.from_agent_id,
                         dm_data.content,
                     )?;
-
-                /*
-                let maybe_space_gateway = self.space_gateway_map.get(&(
-                    dm_data.space_address.to_owned(),
-                    dm_data.to_agent_id.to_owned(),
-                ));
-                if let Some(_) = maybe_space_gateway {
-                    // Change into Lib3hToClient
-                    let lib3_msg = Lib3hToClient::HandleSendDirectMessage(dm_data.clone());
-                    self.lib3h_endpoint.publish(Span::fixme(), lib3_msg)?;
-                } else {
-                    warn!(
-                        "Received message from unjoined space: {}",
-                        dm_data.space_address,
-                    );
-                }
-                */
             }
             P2pProtocol::DirectMessageResult(_dm_data) => {
                 panic!("we should never get a DirectMessageResult at this layer... only using DirectMessage");
-                /*
-                let maybe_space_gateway = self.space_gateway_map.get(&(
-                    dm_data.space_address.to_owned(),
-                    dm_data.to_agent_id.to_owned(),
-                ));
-                if let Some(_) = maybe_space_gateway {
-                    let lib3_msg = Lib3hToClient::SendDirectMessageResult(dm_data.clone());
-                    self.lib3h_endpoint.publish(Span::fixme(), lib3_msg)?;
-                } else {
-                    warn!(
-                        "Received message from unjoined space: {}",
-                        dm_data.space_address,
-                    );
-                }
-                */
             }
             P2pProtocol::PeerAddress(_, _, _) => {
                 // no-op

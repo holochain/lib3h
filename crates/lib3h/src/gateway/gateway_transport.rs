@@ -138,7 +138,12 @@ impl P2pGateway {
                 // We should handle these cases, and pick the ones we want to
                 // send up the chain, and which ones should be handled here.
 
-                error!("received {} {}", uri, String::from_utf8_lossy(&payload));
+                trace!(
+                    "{:?} received {} {}",
+                    self.identifier,
+                    uri,
+                    String::from_utf8_lossy(&payload)
+                );
 
                 self.endpoint_self.as_mut().publish(
                     span.follower("bubble up to parent"),

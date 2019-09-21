@@ -220,7 +220,7 @@ impl<'engine> GhostEngine<'engine> {
             // Handle Space's Transport request
             // ================================
             GatewayRequestToParent::Transport(transport_request) => {
-                error!("space_layer got {:#?}", transport_request);
+                trace!("space_layer got {:#?}", transport_request);
                 match transport_request {
                     RequestToParent::ErrorOccured { uri: _, error } => {
                         panic!("can't handle {:?}", error);
