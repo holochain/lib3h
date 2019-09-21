@@ -106,18 +106,13 @@ impl<
         space_address: &Address,
         local_agent_id: &Address,
         remote_agent_id: &Address,
-        remote_machine_id: &Address,
         unpacked_payload: Opaque,
     ) -> Lib3hResult<()> {
         let route_spec = LocalRouteSpec {
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
         };
-        let path = Url::parse(&format!(
-            "transportId:{}?a={}",
-            remote_machine_id, remote_agent_id
-        ))
-        .expect("can parse url");
+        let path = Url::parse(&format!("agentid:{}", remote_agent_id,)).expect("can parse url");
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {

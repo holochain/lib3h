@@ -93,6 +93,8 @@ impl P2pGateway {
             GatewayRequestToChild::Bootstrap(data) => {
                 self.send(
                     span,
+                    // this will be fixed when we get Ping working
+                    "".to_string().into(),
                     data.bootstrap_uri.clone(),
                     Opaque::new(),
                     Box::new(move |response| {
@@ -123,6 +125,7 @@ impl P2pGateway {
                                 for peer in peer_list {
                                     me.send(
                                         Span::fixme(),
+                                        peer.peer_address.clone().into(),
                                         peer.peer_uri.clone(),
                                         payload.clone().into(),
                                         Box::new(move |response| {
