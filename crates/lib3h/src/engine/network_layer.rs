@@ -303,12 +303,7 @@ impl<'engine> GhostEngine<'engine> {
                         dm_data.content,
                     )?;
 
-                /*
-                panic!(
-                    "YAY: f {:?} s {:?} {:#?}",
-                    from, self.config.network_id.id, dm_data,
-                );
-                */
+                
 
                 /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
