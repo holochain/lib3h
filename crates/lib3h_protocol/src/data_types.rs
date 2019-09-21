@@ -9,7 +9,7 @@ pub type AspectKey = (Address, Address);
 /// Represents an opaque vector of bytes. Lib3h will
 /// store or transfer this data but will never inspect
 /// or interpret its contents
-#[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 pub struct Opaque(#[serde(with = "base64")] Vec<u8>);
 
 impl Opaque {
@@ -74,7 +74,7 @@ impl std::ops::DerefMut for Opaque {
 // Entry (Semi-opaque Holochain entry type)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 pub struct EntryAspectData {
     pub aspect_address: Address,
     pub type_hint: String,
