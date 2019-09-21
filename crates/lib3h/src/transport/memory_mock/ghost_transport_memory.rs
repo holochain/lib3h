@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::{TransportError,ErrorKind},
+    error::{ErrorKind, TransportError},
     memory_mock::memory_server::{self, *},
     protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
@@ -239,7 +239,11 @@ impl
                 for event in non_connect_events {
                     match event {
                         MemoryEvent::ReceivedData(from_addr, payload) => {
-                            trace!("MemoryEvent::RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
+                            trace!(
+                                "MemoryEvent::RecivedData--- from:{:?} payload:{:?}",
+                                from_addr,
+                                payload
+                            );
                             self.endpoint_self.publish(
                                 Span::fixme(),
                                 RequestToParent::ReceivedData {
@@ -478,7 +482,7 @@ mod tests {
                 },
                 Box::new(|_: &mut Url, r| {
                     // parent should see that the send request was OK
-                    assert_eq!("Response(Err(TransportError(\"No Memory server at this uri: mem://addr_3/\")))", &format!("{:?}", r));
+                    assert_eq!("Response(Err(TransportError(Other(\"No Memory server at this uri: mem://addr_3/\"))))", &format!("{:?}", r));
                     Ok(())
                 }),
             )

@@ -179,7 +179,9 @@ impl TryFrom<Lib3hServerProtocol> for Lib3hToClient {
                 Ok(Lib3hToClient::Connected(connected_data))
             }
             Lib3hServerProtocol::Disconnected(_disconnected_data) => {
-                Ok(Lib3hToClient::Unbound(UnboundData{uri:Url::parse("none:").unwrap()}))
+                Ok(Lib3hToClient::Unbound(UnboundData {
+                    uri: Url::parse("none:").unwrap(),
+                }))
             }
             Lib3hServerProtocol::SendDirectMessageResult(direct_message_data) => {
                 Ok(Lib3hToClient::SendDirectMessageResult(direct_message_data))
@@ -293,7 +295,9 @@ impl From<Lib3hToClient> for Lib3hServerProtocol {
                 Lib3hServerProtocol::Connected(connected_data)
             }
             Lib3hToClient::Unbound(_unbound_data) => {
-                Lib3hServerProtocol::Disconnected(DisconnectedData{network_id:"".into()})
+                Lib3hServerProtocol::Disconnected(DisconnectedData {
+                    network_id: "".into(),
+                })
             }
             Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
                 Lib3hServerProtocol::SendDirectMessageResult(direct_message_data)

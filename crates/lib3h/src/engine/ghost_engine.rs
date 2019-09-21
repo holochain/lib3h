@@ -768,14 +768,15 @@ pub fn handle_gossip_to<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
-                transport::memory_mock::memory_server,
+    use crate::{
+        dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
+        transport::memory_mock::memory_server,
     };
     use holochain_tracing::test_span;
+    use lib3h_ghost_actor::wait_can_track_did_work;
     use lib3h_sodium::SodiumCryptoSystem;
     use std::path::PathBuf;
     use url::Url;
-    use lib3h_ghost_actor::wait_can_track_did_work;
 
     struct MockCore {
         //    state: String,
@@ -884,18 +885,16 @@ mod tests {
             verse.get_network(network_name)
         };
 
-        println!("FISHSFDISDF: {:?}",engine.as_ref().advertise());
         let my_url = &Url::parse("mem://addr_1/").unwrap();
         //let my_url = &engine.as_ref().advertise();
         assert!(network.lock().unwrap().unbind(my_url));
-        wait_can_track_did_work!(engine,core,false);
-//        println!("engine.process() -> {:?}", res);
+        wait_can_track_did_work!(engine, core, false);
         let mut msgs = engine.drain_messages();
         println!("engine.drain() -> {:?}", msgs);
-        assert_eq!(msgs.len(),3);
+        assert_eq!(msgs.len(), 3);
         assert_eq!(
-            "",
-            format!("{:?}",msgs[2].take_message())
+            "Some(Unbound(UnboundData { uri: \"mem://addr_1/\" }))",
+            format!("{:?}", msgs[2].take_message())
         );
     }
 

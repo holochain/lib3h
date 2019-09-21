@@ -383,13 +383,14 @@ impl P2pGateway {
             self.identifier.nickname, msg
         );
         let span = msg.span().child("handle_transport_RequestToParent");
-        match msg.take_message().expect("exists") {
-            transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
-                // TODO
-                error!(
-                    "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier.nickname, uri, error,
-                );
+        let msg = msg.take_message().expect("exists");
+        match &msg {
+            transport::protocol::RequestToParent::ErrorOccured { uri: _, error: _ } => {
+                // pass any errors back up the chain so network layer can handle them (i.e.)
+                self.endpoint_self.publish(
+                    Span::fixme(),
+                    GatewayRequestToParent::Transport(msg.clone()),
+                )?;
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
                 // TODO
@@ -409,7 +410,7 @@ impl P2pGateway {
                 if payload.len() == 0 {
                     debug!("Implement Ping!");
                 } else {
-                    self.priv_decode_on_receive(span, uri, payload)?;
+                    self.priv_decode_on_receive(span, uri.clone(), payload.clone())?;
                 }
             }
         };

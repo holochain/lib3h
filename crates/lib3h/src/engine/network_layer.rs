@@ -121,13 +121,10 @@ impl<'engine> GhostEngine<'engine> {
         match request {
             transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
                 if error.kind() == &transport::error::ErrorKind::Unbind {
-                    let data = UnboundData {
-                        uri: uri.clone()
-                    };
+                    let data = UnboundData { uri: uri.clone() };
                     self.lib3h_endpoint
                         .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
-                }
-                else {
+                } else {
                     panic!("unhandled error {}", error);
                     /*
                     self.network_connections.remove(uri);

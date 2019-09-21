@@ -75,7 +75,6 @@ impl From<String> for TransportError {
     }
 }
 
-
 impl From<&str> for TransportError {
     fn from(s: &str) -> Self {
         TransportError::new_kind(ErrorKind::Other(s.to_string()))

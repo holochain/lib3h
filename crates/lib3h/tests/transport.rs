@@ -348,7 +348,7 @@ fn ghost_transport() {
 
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Err(TransportError(\\\"mocknet://t2/ not bound\\\")))\"",
+        "\"Response(Err(TransportError(Other(\\\"mocknet://t2/ not bound\\\"))))\"",
         format!("{:?}", owner.log[1])
     );
 
