@@ -25,7 +25,7 @@ pub type Message =
 pub struct GhostTransportWebsocket {
     #[allow(dead_code)]
     machine_id: Address,
-    networkid_address: Address,
+    network_id_address: Address,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
@@ -44,7 +44,7 @@ impl Discovery for GhostTransportWebsocket {
                 .clone()
                 .ok_or_else(|| DiscoveryError::new_other("Must bind URL before advertising."))?;
 
-            let netid: String = self.networkid_address.clone().into();
+            let netid: String = self.network_id_address.clone().into();
 
             let mut mdns = MulticastDnsBuilder::new()
                 .own_record(&netid, &[&uri.clone().into_string()])
@@ -93,7 +93,7 @@ impl GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
             machine_id,
-            networkid_address,
+            network_id_address: networkid_address,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
