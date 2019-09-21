@@ -216,7 +216,13 @@ pub fn main() {
         .is_test(false)
         .try_init();
 
-    let mut engines = EngineContainer::new(true);
+    let mut ws = false;
+    if let Ok(transport) = std::env::var("LIB3H_TRANSPORT") {
+        if transport == "ws" {
+            ws = true
+        }
+    }
+    let mut engines = EngineContainer::new(ws);
     engines.send_1_to_2();
     engines.process();
     engines.process();
