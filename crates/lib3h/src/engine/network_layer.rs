@@ -303,8 +303,6 @@ impl<'engine> GhostEngine<'engine> {
                         dm_data.content,
                     )?;
 
-                
-
                 /*
                 let maybe_space_gateway = self.space_gateway_map.get(&(
                     dm_data.space_address.to_owned(),

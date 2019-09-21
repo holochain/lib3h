@@ -253,6 +253,7 @@ impl<'engine> GhostEngine<'engine> {
         Ok(true /* fixme */)
     }
 
+    /// process P2pProtocol messages that have bubbled up to the space_layer
     fn handle_p2p_protocol(
         &mut self,
         span: Span,
@@ -270,7 +271,7 @@ impl<'engine> GhostEngine<'engine> {
                         )) => {
                             let to_agent_id = dm_data.to_agent_id.clone();
 
-                            let (space_gateway, payload) = match me.direct_peer_send(
+                            let (space_gateway, payload) = match me.prepare_direct_peer_msg(
                                 dm_data.space_address.clone(),
                                 dm_data.from_agent_id.clone(),
                                 dm_data.to_agent_id.clone(),

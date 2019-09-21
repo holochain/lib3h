@@ -552,7 +552,7 @@ impl<'engine> GhostEngine<'engine> {
         }
     }
 
-    pub(crate) fn direct_peer_send(
+    pub(crate) fn prepare_direct_peer_msg(
         &mut self,
         space_address: Address,
         from_agent_id: Address,
@@ -598,11 +598,11 @@ impl<'engine> GhostEngine<'engine> {
 
         // Generate a new request_id for the network transport exchange.
         // we can overwrite the value in the DirectMessageData because the ghost tracker will handle
-        // the request response pairing 
+        // the request response pairing
         let request_id = RequestId::new();
         msg.request_id = request_id.clone().into();
 
-        let (space_gateway, payload) = match self.direct_peer_send(
+        let (space_gateway, payload) = match self.prepare_direct_peer_msg(
             msg.space_address.clone(),
             msg.from_agent_id.clone(),
             msg.to_agent_id.clone(),

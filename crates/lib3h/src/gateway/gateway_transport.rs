@@ -53,9 +53,10 @@ impl P2pGateway {
                     );
                     me.send(
                         span.follower("TODO send"),
-                        // We don't know who our remote is...
-                        // we might need some special handling on
-                        // the remote side for this
+                        // This is a little awkward. If we are in wrapping
+                        // mode, we still need this to be wrapped... but
+                        // the remote side will intercept this message before
+                        // it is sent up the chain, so it's ok this is blank.
                         "".to_string().into(),
                         uri.clone(),
                         buf.into(),
