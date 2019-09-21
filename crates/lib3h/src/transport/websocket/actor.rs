@@ -499,6 +499,7 @@ mod tests {
         wait_for_message!(
             vec![&mut transport1, &mut transport2],
             t2_endpoint,
+            (),
             "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
         );
     }
@@ -599,6 +600,7 @@ mod tests {
                 wait_for_message!(
                     vec![&mut transport1, &mut transport2],
                     t2_endpoint,
+                    (),
                     "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
                 );
             }
