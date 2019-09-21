@@ -32,12 +32,22 @@ impl TransportError {
     pub fn into_kind(self) -> ErrorKind {
         *self.0
     }
+
+    /// is this an Ignore kind error
+    pub fn is_ignorable(&self) -> bool {
+        if let ErrorKind::Ignore(_) = self.kind() {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// The specific type of an error.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ErrorKind {
     Unbind,
+    Ignore(String),
     Other(String),
     /// Hints that destructuring should not be exhaustive.
     ///

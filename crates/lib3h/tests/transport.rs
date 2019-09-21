@@ -414,7 +414,7 @@ fn ghost_transport() {
     let mut messages = t1.drain_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(
-        "ErrorOccured { uri: \"mocknet://t1/\", error: TransportError(\"mocknet://t1/ has become unbound\") }",
+        "ErrorOccured { uri: \"mocknet://t1/\", error: TransportError(Other(\"mocknet://t1/ has become unbound\")) }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
 }

@@ -223,7 +223,11 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                     true
                 })
                 .unwrap_or_else(|err| {
-                    warn!("did not accept any connections: {:?}", err);
+                    if !err.is_ignorable() {
+                        // TODO: handle these actual errors, and probably this is where the unbinding
+                        // would be detectable.
+                        panic!("Error when attempting to accept connections: {:?}", err);
+                    }
                     false
                 }),
         }
