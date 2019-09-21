@@ -254,10 +254,8 @@ impl MulticastDns {
         let own_urls = self.own_urls();
         for (_netid, records) in self.map_record.iter_mut() {
             for record in records {
-                if !own_urls.contains(&record.url) {
-                    if record.ttl > 0 {
-                        record.ttl -= 1;
-                    }
+                if !own_urls.contains(&record.url) && record.ttl > 0 {
+                    record.ttl -= 1;
                 }
             }
         }

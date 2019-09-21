@@ -15,7 +15,7 @@ use std::{
 pub type HashMapRecord = HashMap<String, Vec<Record>>;
 
 /// Type helper corresponding to the resource record of a host.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MapRecord(pub(crate) HashMapRecord);
 
 impl Deref for MapRecord {
@@ -34,7 +34,7 @@ impl DerefMut for MapRecord {
 
 impl MapRecord {
     pub fn new() -> Self {
-        Self(HashMapRecord::new())
+        Self(HashMapRecord::default())
     }
 
     /// Creates a new [`MapRecord`] with one record.
