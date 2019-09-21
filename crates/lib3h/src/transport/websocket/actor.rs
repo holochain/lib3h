@@ -612,7 +612,8 @@ mod tests {
     /// Check if we manage to discover nodes using WebSocket for bootstapping using mDNS.
     #[test]
     fn mdns_wss_bootstrapping_test() {
-        let networkid_address: Address = "wss-bootstapping-network-id.holo.host".into();
+        let networkid_address: Address =
+            format!("wss-bootstapping-network-id-{}.holo.host", nanoid::simple()).into();
 
         let machine_id1 = "fake_machine_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(

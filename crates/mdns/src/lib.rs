@@ -460,6 +460,7 @@ impl Discovery for MulticastDns {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nanoid;
 
     #[test]
     fn it_should_loop_question() {
@@ -533,18 +534,18 @@ mod tests {
     #[test]
     fn release_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
-        let networkid = "holonaute-release.holo.host";
+        let networkid = format!("holonaute-release-{}.holo.host", nanoid::simple());
 
         // This is the one from which we want to see another node disapearing from its cache
         let mut mdns = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=to-keep"])
+            .own_record(&networkid, &["wss://192.168.0.88:88088?a=to-keep"])
             .multicast_address("224.0.0.251")
             .bind_port(8251)
             .build()
             .expect("Fail to build mDNS.");
 
         let mut mdns_releaser = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.87:88088?a=to-release"])
+            .own_record(&networkid, &["wss://192.168.0.87:88088?a=to-release"])
             .multicast_address("224.0.0.251")
             .bind_port(8251)
             .build()
@@ -565,7 +566,7 @@ mod tests {
         {
             let records = mdns
                 .map_record
-                .get(networkid)
+                .get(&networkid)
                 .expect("Fail to get records from the networkid after 'Advertising'.");
             assert_eq!(records.len(), 2);
         }
@@ -584,7 +585,7 @@ mod tests {
         {
             let records = mdns
                 .map_record
-                .get(networkid)
+                .get(&networkid)
                 .expect("Fail to get records from the networkid after 'Releasing'.");
             assert_eq!(records.len(), 1);
         }
@@ -594,10 +595,10 @@ mod tests {
     #[test]
     fn query_test() -> MulticastDnsResult<()> {
         // Let's share the same NetworkId, meaning we are on the same network.
-        let networkid = "holonaute-query.holo.host";
+        let networkid = format!("holonaute-query-{}.holo.host", nanoid::simple());
 
         let mut mdns_actor1 = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
+            .own_record(&networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
             .query_interval_ms(1)
@@ -605,7 +606,7 @@ mod tests {
             .expect("Fail to build mDNS.");
 
         let mut mdns_actor2 = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.87:88088?a=hc-actor2"])
+            .own_record(&networkid, &["wss://192.168.0.87:88088?a=hc-actor2"])
             .multicast_address("224.0.0.223")
             .bind_port(8223)
             .query_interval_ms(1)
@@ -625,7 +626,7 @@ mod tests {
         // At this point mdns_actor1 should know about himself
         let records = mdns_actor1
             .map_record
-            .get(networkid)
+            .get(&networkid)
             .expect("Fail to get records from the networkid during Query test on mdns_actor1")
             .to_vec();
         assert_eq!(records.len(), 1);
@@ -638,7 +639,7 @@ mod tests {
         // At this point mdns_actor2 should know about himself
         let mut records = mdns_actor2
             .map_record
-            .get(networkid)
+            .get(&networkid)
             .expect("Fail to get records from the networkid during Query test on mdns_actor2")
             .to_vec();
         eprintln!("mdns_actor2 = {:#?}", &mdns_actor2.map_record);
@@ -657,11 +658,11 @@ mod tests {
     #[test]
     fn advertise_test() {
         // Let's share the same NetworkId, meaning we are on the same network.
-        let networkid = "holonaute-advertise.holo.host";
+        let networkid = format!("holonaute-advertise-{}.holo.host", nanoid::simple());
 
         // This is the one from which we want to see another node disapearing from its cache
         let mut mdns_actor1 = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
+            .own_record(&networkid, &["wss://192.168.0.88:88088?a=hc-actor1"])
             .multicast_address("224.0.0.252")
             .bind_port(8252)
             .build()
@@ -670,7 +671,7 @@ mod tests {
         eprintln!("bind addr = {}", mdns_actor1.multicast_address());
 
         let mut mdns_actor2 = MulticastDnsBuilder::new()
-            .own_record(networkid, &["wss://192.168.0.88:88088?a=hc-actor2"])
+            .own_record(&networkid, &["wss://192.168.0.88:88088?a=hc-actor2"])
             .multicast_address("224.0.0.252")
             .bind_port(8252)
             .build()
@@ -694,7 +695,7 @@ mod tests {
         // Let's check that we discovered the soon to release record
         let records = mdns_actor1
             .map_record
-            .get(networkid)
+            .get(&networkid)
             .expect("Fail to get records from the networkid");
         assert_eq!(records.len(), 2);
     }
