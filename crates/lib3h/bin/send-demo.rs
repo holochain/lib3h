@@ -139,10 +139,28 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         detach_run!(self.engine1, |e| { e.process(self) }).unwrap();
         detach_run!(self.engine2, |e| { e.process(self) }).unwrap();
         for mut msg in self.engine1.drain_messages() {
-            println!("1 got: {:?}", msg.take_message());
+            let payload = msg.take_message();
+            println!("1 got: {:?}", payload);
         }
         for mut msg in self.engine2.drain_messages() {
-            println!("2 got: {:?}", msg.take_message());
+            let payload = msg.take_message();
+            match payload {
+                Some(Lib3hToClient::HandleSendDirectMessage(dm_data)) => {
+                    msg.respond(Ok(Lib3hToClientResponse::HandleSendDirectMessageResult(
+                        DirectMessageData {
+                            space_address: dm_data.space_address,
+                            request_id: dm_data.request_id,
+                            to_agent_id: dm_data.from_agent_id,
+                            from_agent_id: dm_data.to_agent_id,
+                            content: format!("echo: {}", String::from_utf8_lossy(&dm_data.content))
+                                .into_bytes()
+                                .into(),
+                        },
+                    )))
+                    .unwrap();
+                }
+                _ => println!("2 got: {:?}", payload),
+            }
         }
     }
 
@@ -152,13 +170,13 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Span::fixme(),
                 ClientToLib3h::SendDirectMessage(DirectMessageData {
                     space_address: SPACE_ID.to_string().into(),
-                    request_id: "".to_string(),
+                    request_id: "TEST_REQ_ID".to_string(),
                     to_agent_id: A_2_ID.to_string().into(),
                     from_agent_id: A_1_ID.to_string().into(),
                     content: b"bob".to_vec().into(),
                 }),
                 Box::new(|_, r| {
-                    println!("got: {:?}", r);
+                    println!("WE GOT A RESULT!!!: {:?}", r);
                     Ok(())
                 }),
             )
@@ -183,6 +201,19 @@ pub fn main() {
     let mut engines = EngineContainer::new();
     engines.send_1_to_2();
     engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    // node 2 should have message now-ish... run a couple more to get it back
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    // now back to node 1?
     engines.process();
     engines.process();
     engines.process();

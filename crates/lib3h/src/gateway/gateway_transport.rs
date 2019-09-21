@@ -4,7 +4,9 @@ use crate::{
     dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
     error::*,
-    gateway::{protocol::*, P2pGateway, PendingOutgoingMessage, SendCallback},
+    gateway::{
+        protocol::*, GatewayOutputWrapType, P2pGateway, PendingOutgoingMessage, SendCallback,
+    },
     message_encoding::encoding_protocol,
     transport::{self, error::TransportResult},
 };
@@ -51,6 +53,11 @@ impl P2pGateway {
                     );
                     me.send(
                         span.follower("TODO send"),
+                        // This is a little awkward. If we are in wrapping
+                        // mode, we still need this to be wrapped... but
+                        // the remote side will intercept this message before
+                        // it is sent up the chain, so it's ok this is blank.
+                        "".to_string().into(),
                         uri.clone(),
                         buf.into(),
                         Box::new(|response| {
@@ -131,6 +138,13 @@ impl P2pGateway {
                 // We should handle these cases, and pick the ones we want to
                 // send up the chain, and which ones should be handled here.
 
+                trace!(
+                    "{:?} received {} {}",
+                    self.identifier,
+                    uri,
+                    String::from_utf8_lossy(&payload)
+                );
+
                 self.endpoint_self.as_mut().publish(
                     span.follower("bubble up to parent"),
                     GatewayRequestToParent::Transport(
@@ -139,7 +153,10 @@ impl P2pGateway {
                 )?;
             }
             _ => {
-                panic!("unexpected received data type {:?}", maybe_p2p_msg);
+                panic!(
+                    "unexpected received data type {} {:?}",
+                    payload, maybe_p2p_msg
+                );
             }
         };
         Ok(())
@@ -148,6 +165,7 @@ impl P2pGateway {
     fn priv_encoded_send(
         &mut self,
         span: Span,
+        to_address: lib3h_protocol::Address,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
@@ -162,7 +180,7 @@ impl P2pGateway {
                         encoding_protocol::RequestToChildResponse::EncodePayloadResult { payload },
                     )) => {
                         trace!("sending: {:?}", payload);
-                        me.priv_low_level_send(e_span, uri, payload, cb)?;
+                        me.priv_low_level_send(e_span, to_address, uri, payload, cb)?;
                     }
                     _ => {
                         cb(Err(format!(
@@ -180,16 +198,36 @@ impl P2pGateway {
     fn priv_low_level_send(
         &mut self,
         span: Span,
+        to_address: lib3h_protocol::Address,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
     ) -> GhostResult<()> {
+        let payload =
+            if let GatewayOutputWrapType::WrapOutputWithP2pDirectMessage = self.wrap_output_type {
+                let dm_wrapper = DirectMessageData {
+                    space_address: self.identifier.id.clone(),
+                    request_id: "".to_string(),
+                    to_agent_id: to_address,
+                    from_agent_id: self.this_peer.peer_address.clone().into(),
+                    content: payload,
+                };
+                let mut payload = Vec::new();
+                let p2p_msg = P2pProtocol::DirectMessage(dm_wrapper);
+                p2p_msg
+                    .serialize(&mut Serializer::new(&mut payload))
+                    .unwrap();
+                Opaque::from(payload)
+            } else {
+                payload
+            };
+
         // Forward to the child Transport
         self.inner_transport.request(
             span.child("SendMessage"),
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
-                payload: payload.clone(),
+                payload: payload,
             },
             Box::new(move |_me, response| {
                 // In case of a transport error or timeout we store the message in the
@@ -239,6 +277,7 @@ impl P2pGateway {
     pub(crate) fn send(
         &mut self,
         span: Span,
+        to_address: lib3h_protocol::Address,
         uri: Url,
         payload: Opaque,
         cb: SendCallback,
@@ -249,7 +288,7 @@ impl P2pGateway {
             uri,
             payload.len()
         );
-        self.priv_encoded_send(span, uri, payload, cb)
+        self.priv_encoded_send(span, to_address, uri, payload, cb)
     }
 
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
@@ -325,10 +364,10 @@ impl P2pGateway {
                             )) => {
                                 me.send(
                                     span.follower("TODO send"),
+                                    peer_data.peer_address.clone().into(),
                                     peer_data.peer_uri.clone(),
                                     payload,
                                     Box::new(|response| {
-                                        trace!("SENT!");
                                         parent_request.respond(
                                             response
                                                 .map_err(|transport_error| transport_error.into()),
@@ -404,7 +443,12 @@ impl P2pGateway {
             }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 // TODO
-                debug!("Received message from: {} | size: {}", uri, payload.len());
+                trace!(
+                    "{:?} Received message from: {} | size: {}",
+                    self.identifier,
+                    uri,
+                    payload.len()
+                );
                 // trace!("Deserialize msg: {:?}", payload);
                 if payload.len() == 0 {
                     debug!("Implement Ping!");

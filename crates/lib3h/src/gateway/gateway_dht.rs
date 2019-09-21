@@ -74,6 +74,7 @@ impl P2pGateway {
                 // Send phony SendMessage request so we connect to it
                 self.send(
                     span.follower("DhtRequestToParent::HoldPeerRequested"),
+                    peer_data.peer_address.clone().into(),
                     peer_data.peer_uri,
                     Opaque::new(),
                     Box::new(|_| Ok(())),
