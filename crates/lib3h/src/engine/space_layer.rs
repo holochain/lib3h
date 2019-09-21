@@ -10,7 +10,7 @@ use crate::{
 };
 use detach::prelude::*;
 use holochain_tracing::Span;
-use lib3h_ghost_actor::{prelude::*, RequestId};
+use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, DidWork};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
@@ -268,17 +268,39 @@ impl<'engine> GhostEngine<'engine> {
                         GhostCallbackData::Response(Ok(
                             Lib3hToClientResponse::HandleSendDirectMessageResult(dm_data),
                         )) => {
-                            let rid: RequestId = dm_data.request_id.clone().into();
+                            let to_agent_id = dm_data.to_agent_id.clone();
 
-                            panic!(
-                                "GOT RESPONSE FROM CORE: {:?} {}",
-                                dm_data,
-                                me.pending_client_direct_messages.contains_key(&rid),
-                            );
+                            let (space_gateway, payload) = match me.direct_peer_send(
+                                dm_data.space_address.clone(),
+                                dm_data.from_agent_id.clone(),
+                                dm_data.to_agent_id.clone(),
+                                P2pProtocol::DirectMessageResult(dm_data),
+                            ) {
+                                Ok(r) => r,
+                                Err(e) => panic!("{:?}", e),
+                            };
+
+                            space_gateway.publish(
+                                Span::fixme(),
+                                GatewayRequestToChild::Transport(RequestToChild::SendMessage {
+                                    uri: Url::parse(&format!("agentid:{}", to_agent_id)).unwrap(),
+                                    payload,
+                                }),
+                            )?;
+
+                            Ok(())
                         }
                         _ => panic!("unhandled: {:?}", resp),
                     }),
                 )?;
+            }
+            P2pProtocol::DirectMessageResult(dm_data) => {
+                if let Some(msg) = self
+                    .pending_client_direct_messages
+                    .remove(&dm_data.request_id)
+                {
+                    msg.respond(Ok(ClientToLib3hResponse::SendDirectMessageResult(dm_data)))?;
+                }
             }
             _ => panic!("can't handle space layer receive of {:?}", p2p_msg),
         };

@@ -552,50 +552,72 @@ impl<'engine> GhostEngine<'engine> {
         }
     }
 
-    fn handle_direct_message(
+    pub(crate) fn direct_peer_send(
         &mut self,
-        span: Span,
-        ghost_message: ClientToLib3hMessage,
-        mut msg: DirectMessageData,
-    ) -> Lib3hResult<()> {
-        let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
+        space_address: Address,
+        from_agent_id: Address,
+        to_agent_id: Address,
+        net_msg: P2pProtocol,
+    ) -> Lib3hResult<(
+        &mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>,
+        Opaque,
+    )> {
+        let chain_id = (space_address, from_agent_id);
 
         let maybe_this_peer = self.this_space_peer(chain_id.clone());
         if let Err(error) = maybe_this_peer {
-            ghost_message.respond(Err(error))?;
-            return Ok(());
+            return Err(error);
         };
         let this_peer = maybe_this_peer.unwrap();
 
-        let to_agent_id: String = msg.to_agent_id.clone().into();
-        if &this_peer.peer_address == &to_agent_id {
+        if &this_peer.peer_address == &to_agent_id.to_string() {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
-
-        // Generate a new request_id
-        let request_id = RequestId::new();
-        msg.request_id = request_id.clone().into();
-        let net_msg = P2pProtocol::DirectMessage(msg.clone());
 
         // Serialize payload
         let mut payload = Vec::new();
         net_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
-        // Send
-        let peer_address: String = msg.to_agent_id.clone().into();
 
         let space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
             .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
+        Ok((space_gateway.as_mut(), Opaque::from(payload)))
+    }
+
+    fn handle_direct_message(
+        &mut self,
+        span: Span,
+        ghost_message: ClientToLib3hMessage,
+        mut msg: DirectMessageData,
+    ) -> Lib3hResult<()> {
+        let to_agent_id = msg.to_agent_id.clone();
+
+        // Generate a new request_id
+        let request_id = RequestId::new();
+        msg.request_id = request_id.clone().into();
+
+        let (space_gateway, payload) = match self.direct_peer_send(
+            msg.space_address.clone(),
+            msg.from_agent_id.clone(),
+            msg.to_agent_id.clone(),
+            P2pProtocol::DirectMessage(msg),
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                return Ok(ghost_message.respond(Err(e))?);
+            }
+        };
+
         space_gateway.request(
             span,
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: Url::parse(&("agentId:".to_string() + &peer_address))
+                uri: Url::parse(&("agentId:".to_string() + &to_agent_id.to_string()))
                     .expect("invalid url format"),
-                payload: payload.into(),
+                payload,
             }),
             Box::new(move |me, response| {
                 debug!(
