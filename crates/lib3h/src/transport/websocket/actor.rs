@@ -68,7 +68,10 @@ impl Discovery for GhostTransportWebsocket {
     }
 
     fn release(&mut self) -> DiscoveryResult<()> {
-        Ok(())
+        match &mut self.mdns {
+            Some(mdns) => mdns.release(),
+            None => Ok(()),
+        }
     }
 
     fn flush(&mut self) -> DiscoveryResult<()> {
