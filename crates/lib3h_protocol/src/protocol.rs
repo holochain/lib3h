@@ -365,7 +365,7 @@ mod tests {
     fn test_translate_protocol() {
         let d = connect_data();
         let s = Lib3hClientProtocol::Connect(d.clone());
-        let to_c: ClientToLib3h = s.clone().try_into().expect("A ClientToLib3h protocol");;
+        let to_c: ClientToLib3h = s.clone().try_into().expect("A ClientToLib3h protocol");
         assert_eq!(
             to_c,
             ClientToLib3h::Bootstrap(BootstrapData {
