@@ -9,7 +9,7 @@ pub type AspectKey = (Address, Address);
 /// Represents an opaque vector of bytes. Lib3h will
 /// store or transfer this data but will never inspect
 /// or interpret its contents
-#[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 pub struct Opaque(#[serde(with = "base64")] Vec<u8>);
 
 impl Opaque {
@@ -74,7 +74,7 @@ impl std::ops::DerefMut for Opaque {
 // Entry (Semi-opaque Holochain entry type)
 //--------------------------------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 pub struct EntryAspectData {
     pub aspect_address: Address,
     pub type_hint: String,
@@ -176,7 +176,6 @@ pub struct BootstrapData {
     /// connection uri, such as
     ///   `wss://1.2.3.4:55888?a=HcMyada`
     ///   `transportid:HcMyada?a=HcSagent`
-    #[serde(with = "url_serde")]
     pub bootstrap_uri: Url,
 }
 
@@ -189,7 +188,6 @@ pub struct ConnectData {
     /// Ex:
     ///  - `wss://192.168.0.102:58081/`
     ///  - `holorelay://x.x.x.x`
-    #[serde(with = "url_serde")]
     pub peer_uri: Url,
     /// Specify to which network to connect to.
     /// Empty string for 'any'
@@ -201,7 +199,6 @@ pub struct ConnectedData {
     /// Identifier of the `Connect` request we are responding to
     pub request_id: String,
     /// The first uri we are connected to
-    #[serde(with = "url_serde")]
     pub uri: Url,
     // TODO #172 - Add network_id? Or let local client figure it out with the request_id?
     // TODO #178 - Add some info on network state

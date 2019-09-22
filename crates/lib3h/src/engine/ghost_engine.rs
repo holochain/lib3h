@@ -1,5 +1,5 @@
 use detach::Detach;
-use lib3h_ghost_actor::prelude::*;
+use lib3h_ghost_actor::{prelude::*, RequestId};
 use lib3h_protocol::{data_types::*, protocol::*, Address};
 use std::collections::{HashMap, HashSet};
 
@@ -10,12 +10,11 @@ use crate::{
         GhostEngine, TransportConfig, TransportKeys,
     },
     error::{ErrorKind, Lib3hError, Lib3hResult},
-    gateway::{protocol::*, P2pGateway},
-    keystore::KeystoreStub,
+    gateway::{protocol::*, GatewayOutputWrapType, P2pGateway},
     track::Tracker,
     transport::{
         self, memory_mock::ghost_transport_memory::*, protocol::*,
-        websocket::actor::GhostTransportWebsocket, TransportEncoding, TransportMultiplex,
+        websocket::actor::GhostTransportWebsocket, TransportMultiplex,
     },
 };
 use holochain_tracing::Span;
@@ -44,6 +43,7 @@ impl<'engine> GhostEngine<'engine> {
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
         let machine_id = transport_keys.transport_id.clone().into();
+
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
@@ -51,14 +51,6 @@ impl<'engine> GhostEngine<'engine> {
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
         };
-
-        let transport = TransportEncoding::new(
-            crypto.box_clone(),
-            transport_keys.transport_id.clone(),
-            config.network_id.id.to_string(),
-            Box::new(KeystoreStub::new()),
-            transport,
-        );
 
         let prebound_binding = Url::parse("none:").unwrap();
         let this_net_peer = PeerData {
@@ -72,9 +64,10 @@ impl<'engine> GhostEngine<'engine> {
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
+                GatewayOutputWrapType::DoNotWrapOutput,
                 config.network_id.clone(),
                 prebound_binding,
-                Box::new(transport),
+                transport,
                 dht_factory,
                 &dht_config,
             )),
@@ -123,6 +116,7 @@ impl<'engine> GhostEngine<'engine> {
             space_gateway_map: HashMap::new(),
             transport_keys,
             multiplexer_defered_sends: Vec::new(),
+            pending_client_direct_messages: HashMap::new(),
             client_endpoint: Some(endpoint_parent),
             lib3h_endpoint: Detach::new(
                 endpoint_self
@@ -266,7 +260,7 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), msg, &data)
+                self.handle_direct_message(span.follower("TODO name"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
@@ -308,13 +302,6 @@ impl<'engine> GhostEngine<'engine> {
                 .as_mut()
                 .create_agent_space_route(&space_address, &agent_id),
         );
-        let uniplex = TransportEncoding::new(
-            self.crypto.box_clone(),
-            agent_id.to_string(),
-            space_address.clone().into(),
-            Box::new(KeystoreStub::new()),
-            Box::new(uniplex),
-        );
 
         let gateway_id = GatewayId {
             id: space_address.clone(),
@@ -326,6 +313,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         let new_space_gateway = Detach::new(GatewayParentWrapper::new(
             P2pGateway::new(
+                GatewayOutputWrapType::WrapOutputWithP2pDirectMessage,
                 gateway_id,
                 Url::parse(&format!(
                     "transportid:{}?a={}",
@@ -564,65 +552,92 @@ impl<'engine> GhostEngine<'engine> {
         }
     }
 
-    fn handle_direct_message(
+    pub(crate) fn prepare_direct_peer_msg(
         &mut self,
-        span: Span,
-        ghost_message: ClientToLib3hMessage,
-        msg: &DirectMessageData,
-    ) -> Lib3hResult<()> {
-        let chain_id = (msg.space_address.clone(), msg.from_agent_id.clone());
+        space_address: Address,
+        from_agent_id: Address,
+        to_agent_id: Address,
+        net_msg: P2pProtocol,
+    ) -> Lib3hResult<(
+        &mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>,
+        Opaque,
+    )> {
+        let chain_id = (space_address, from_agent_id);
 
         let maybe_this_peer = self.this_space_peer(chain_id.clone());
         if let Err(error) = maybe_this_peer {
-            ghost_message.respond(Err(error))?;
-            return Ok(());
+            return Err(error);
         };
         let this_peer = maybe_this_peer.unwrap();
 
-        let to_agent_id: String = msg.to_agent_id.clone().into();
-        if &this_peer.peer_address == &to_agent_id {
+        if &this_peer.peer_address == &to_agent_id.to_string() {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
-
-        let net_msg = P2pProtocol::DirectMessage(msg.clone());
 
         // Serialize payload
         let mut payload = Vec::new();
         net_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
-        // Send
-        let peer_address: String = msg.to_agent_id.clone().into();
 
         let space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
             .ok_or_else(|| Lib3hError::new_other("Not part of that space"))?;
 
-        space_gateway
-            .request(
-                span,
-                GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage {
-                        uri: Url::parse(&("agentId:".to_string() + &peer_address))
-                            .expect("invalid url format"),
-                        payload: payload.into(),
-                    },
-                ),
-                Box::new(|_me, response| {
-                    debug!("GhostEngine: response to handle_direct_message message: {:?}", response);
-                    match response {
-                        GhostCallbackData::Response(Ok(
-                                GatewayRequestToChildResponse::Transport(
-                                    transport::protocol::RequestToChildResponse::SendMessageSuccess
-                        ))) => {
-                            panic!("We Need to bookmark this ghost_message so that we can invoke it with a message from the remote peer when they send it back");
-                        }
-                        _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
-                    };
-                    Ok(())
-                })
-            )?;
+        Ok((space_gateway.as_mut(), Opaque::from(payload)))
+    }
+
+    fn handle_direct_message(
+        &mut self,
+        span: Span,
+        ghost_message: ClientToLib3hMessage,
+        mut msg: DirectMessageData,
+    ) -> Lib3hResult<()> {
+        let to_agent_id = msg.to_agent_id.clone();
+
+        // Generate a new request_id for the network transport exchange.
+        // we can overwrite the value in the DirectMessageData because the ghost tracker will handle
+        // the request response pairing
+        let request_id = RequestId::new();
+        msg.request_id = request_id.clone().into();
+
+        let (space_gateway, payload) = match self.prepare_direct_peer_msg(
+            msg.space_address.clone(),
+            msg.from_agent_id.clone(),
+            msg.to_agent_id.clone(),
+            P2pProtocol::DirectMessage(msg),
+        ) {
+            Ok(r) => r,
+            Err(e) => {
+                return Ok(ghost_message.respond(Err(e))?);
+            }
+        };
+
+        space_gateway.request(
+            span,
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
+                uri: Url::parse(&("agentId:".to_string() + &to_agent_id.to_string()))
+                    .expect("invalid url format"),
+                payload,
+            }),
+            Box::new(move |me, response| {
+                debug!(
+                    "GhostEngine: response to handle_direct_message message: {:?}",
+                    response
+                );
+                match response {
+                    GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
+                        transport::protocol::RequestToChildResponse::SendMessageSuccess,
+                    ))) => {
+                        me.pending_client_direct_messages
+                            .insert(request_id, ghost_message);
+                    }
+                    _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                };
+                Ok(())
+            }),
+        )?;
         Ok(())
     }
 
@@ -896,7 +911,7 @@ mod tests {
 
         let result = lib3h
             .as_mut()
-            .handle_direct_message(test_span(""), msg, &direct_message);
+            .handle_direct_message(test_span(""), msg, direct_message);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 

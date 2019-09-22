@@ -42,6 +42,14 @@ impl Discovery for GhostTransportWebsocket {
     }
 }
 
+impl Drop for GhostTransportWebsocket {
+    fn drop(&mut self) {
+        self.streams
+            .close_all()
+            .unwrap_or_else(|e| error!("Error closing streams: {:?}", e));
+    }
+}
+
 impl GhostTransportWebsocket {
     pub fn new(machine_id: Address, tls_config: TlsConfig) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
@@ -320,7 +328,7 @@ mod tests {
     use super::*;
     use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
     use lib3h_ghost_actor::wait_for_message;
-    use std::{net::TcpListener, thread, time};
+    use std::net::TcpListener;
     use url::Url;
 
     fn port_is_available(port: u16) -> bool {
@@ -438,6 +446,7 @@ mod tests {
         wait_for_message!(
             vec![&mut transport1, &mut transport2],
             t2_endpoint,
+            (),
             "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
         );
     }
@@ -528,12 +537,17 @@ mod tests {
                 wait_for_message!(
                     vec![&mut transport1, &mut transport2],
                     t2_endpoint,
+                    (),
                     "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
                 );
             }
 
             println!("Try {} successful!", index);
-            thread::sleep(time::Duration::from_millis(1));
         }
+    }
+
+    #[test]
+    fn should_invoke_drop() {
+        // TODO
     }
 }

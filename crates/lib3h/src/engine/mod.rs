@@ -7,6 +7,7 @@ mod space_layer;
 
 use crate::{
     dht::dht_protocol::*,
+    engine::engine_actor::ClientToLib3hMessage,
     error::*,
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
@@ -14,9 +15,8 @@ use crate::{
 };
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
-use lib3h_ghost_actor::prelude::*;
+use lib3h_ghost_actor::{prelude::*, RequestId};
 use lib3h_protocol::{protocol::*, Address};
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serializer};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -30,31 +30,6 @@ pub type ChainId = (Address, Address);
 pub struct GatewayId {
     pub nickname: String,
     pub id: Address,
-}
-
-fn vec_url_de<'de, D>(deserializer: D) -> Result<Vec<Url>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct Wrapper(#[serde(with = "url_serde")] Url);
-
-    let v = Vec::deserialize(deserializer)?;
-    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
-}
-
-fn vec_url_se<S>(v: &[Url], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    #[derive(Serialize)]
-    struct Wrapper(#[serde(with = "url_serde")] Url);
-
-    let mut seq = serializer.serialize_seq(Some(v.len()))?;
-    for u in v {
-        seq.serialize_element(&Wrapper(u.clone()))?;
-    }
-    seq.end()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,11 +62,9 @@ pub enum TransportConfig {
 pub struct EngineConfig {
     pub network_id: GatewayId,
     pub transport_configs: Vec<TransportConfig>,
-    #[serde(deserialize_with = "vec_url_de", serialize_with = "vec_url_se")]
     pub bootstrap_nodes: Vec<Url>,
     pub work_dir: PathBuf,
     pub log_level: char,
-    #[serde(with = "url_serde")]
     pub bind_url: Url,
     pub dht_gossip_interval: u64,
     pub dht_timeout_threshold: u64,
@@ -151,6 +124,10 @@ pub struct GhostEngine<'engine> {
     transport_keys: TransportKeys,
     /// items we need to send on our multiplexer in another process loop
     multiplexer_defered_sends: Vec<(Url, lib3h_protocol::data_types::Opaque)>,
+
+    /// when client gives us a SendDirectMessage, we need to cache the
+    /// GhostMessage, re-hydrate when a response comes back from a remote
+    pending_client_direct_messages: HashMap<RequestId, ClientToLib3hMessage>,
 
     client_endpoint: Option<
         GhostEndpoint<
