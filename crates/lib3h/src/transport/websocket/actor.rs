@@ -633,6 +633,11 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
+        let urls = transport1
+            .discover()
+            .expect("Fail to discover nodes using WSS transport1.");
+        assert_eq!(urls.len(), 0);
+
         let machine_id2 = "fake_machine_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
             machine_id2,
@@ -699,21 +704,28 @@ mod tests {
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut ());
 
-        transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut ());
-
         assert_eq!(
             transport1.bound_url(),
             Some(expected_transport1_address.clone())
-        );
-        assert_eq!(
-            transport2.bound_url(),
-            Some(expected_transport2_address.clone())
         );
 
         transport1
             .advertise()
             .expect("Fail to advertise WSS transport2.");
+
+        let urls = transport1
+            .discover()
+            .expect("Fail to discover nodes using WSS transport1.");
+        assert_eq!(vec![expected_transport1_address.clone()], urls);
+
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut ());
+
+        assert_eq!(
+            transport2.bound_url(),
+            Some(expected_transport2_address.clone())
+        );
+
         transport2
             .advertise()
             .expect("Fail to advertise WSS transport2.");
@@ -722,6 +734,7 @@ mod tests {
             .discover()
             .expect("Fail to discover nodes using WSS transport1.");
 
+        // println!("DISCOVERED: {:?}", urls);
         assert_eq!(urls.len(), 2);
     }
 }
