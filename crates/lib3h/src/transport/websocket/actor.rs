@@ -711,10 +711,7 @@ mod tests {
             Some(expected_transport1_address.clone())
         );
 
-        transport1
-            .advertise()
-            .expect("Fail to advertise WSS transport2.");
-
+        // Advertise happens during bind so discover should now work.
         let urls = transport1
             .discover()
             .expect("Fail to discover nodes using WSS transport1.");
@@ -727,10 +724,6 @@ mod tests {
             transport2.bound_url(),
             Some(expected_transport2_address.clone())
         );
-
-        transport2
-            .advertise()
-            .expect("Fail to advertise WSS transport2.");
 
         let urls = transport1
             .discover()
