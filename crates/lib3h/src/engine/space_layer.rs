@@ -11,7 +11,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, DidWork};
+use lib3h_protocol::{data_types::*, protocol::*, DidWork, uri::Lib3hUri};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -287,7 +287,7 @@ impl<'engine> GhostEngine<'engine> {
                             space_gateway.publish(
                                 Span::fixme(),
                                 GatewayRequestToChild::Transport(RequestToChild::SendMessage {
-                                    uri: Url::parse(&format!("agentid:{}", to_agent_id)).unwrap(),
+                                    uri: Lib3hUri::with_agent_id(&to_agent_id),
                                     payload,
                                 }),
                             )?;

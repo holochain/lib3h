@@ -1,8 +1,8 @@
 use detach::Detach;
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{data_types::*, protocol::*, Address};
+use lib3h_protocol::{data_types::*, protocol::*, Address, uri::Lib3hUri};
 use std::collections::{HashMap, HashSet};
-
+use holochain_persistence_api::hash::HashString;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
@@ -17,15 +17,10 @@ use crate::{
         websocket::actor::GhostTransportWebsocket, TransportMultiplex,
     },
 };
-use detach::Detach;
-use holochain_persistence_api::hash::HashString;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
-use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
 use rmp_serde::Serializer;
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
 
 impl<'engine> CanAdvertise for GhostEngine<'engine> {
     fn advertise(&self) -> Lib3hUri {
@@ -46,17 +41,19 @@ impl<'engine> GhostEngine<'engine> {
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
-        let machine_id = transport_keys.transport_id.clone().into();
+        let transport_id = transport_keys.transport_id.clone().into();
+        let transport_id_uri =
+            Lib3hUri::with_transport_id(&transport_keys.transport_id, &HashString::new());
 
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
-                Box::new(GhostTransportWebsocket::new(machine_id, tls))
+                Box::new(GhostTransportWebsocket::new(transport_id, tls))
             }
-            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
+            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(transport_id, &net)),
         };
 
-        let prebound_binding = Url::parse("none:").unwrap();
+        let prebound_binding = Lib3hUri::with_undefined("");
         let this_net_peer = PeerData {
             peer_name: transport_id_uri.clone(),
             peer_location: prebound_binding.clone(),
@@ -569,7 +566,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         let this_peer = maybe_this_peer.unwrap();
 
-        if &this_peer.peer_address == &to_agent_id.to_string() {
+        if &this_peer.peer_name == &Lib3hUri::with_agent_id(&to_agent_id) {
             return Err(Lib3hError::new_other("messaging self not allowed"));
         }
 
@@ -579,8 +576,6 @@ impl<'engine> GhostEngine<'engine> {
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
         // Send
-        let agent_uri = Lib3hUri::with_agent_id(&msg.to_agent_id);
-
         let space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)
@@ -618,11 +613,10 @@ impl<'engine> GhostEngine<'engine> {
         space_gateway.request(
             span,
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: Url::parse(&("agentId:".to_string() + &peer_address))
-                    .expect("invalid url format"),
+                uri: Lib3hUri::with_agent_id(&to_agent_id),
                 payload: payload.into(),
             }),
-            Box::new(|_me, response| {
+            Box::new(|me, response| {
                 debug!(
                     "GhostEngine: response to handle_direct_message message: {:?}",
                     response
