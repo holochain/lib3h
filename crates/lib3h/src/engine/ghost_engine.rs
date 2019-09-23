@@ -73,7 +73,7 @@ impl<'engine> GhostEngine<'engine> {
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
                 config.network_id.clone(),
-                prebound_binding.into(),
+                prebound_binding,
                 Box::new(transport),
                 dht_factory,
                 &dht_config,

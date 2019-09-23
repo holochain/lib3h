@@ -332,6 +332,7 @@ mod tests {
     use super::*;
     mod mock_engine;
     use mock_engine::MockEngine;
+    use url::Url;
 
     fn new_sim_chat_mock_engine(callback: HandleEvent) -> Lib3hSimChat {
         Lib3hSimChat::new(
