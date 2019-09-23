@@ -198,7 +198,10 @@ macro_rules! wait_for_messages {
         let is_empty = message_regexes.is_empty();
 
         if $should_abort {
-            assert!(is_empty);
+            assert!(
+                is_empty,
+                "Did not receive a message matching the provided regexes"
+            );
         }
         is_empty
     }};
