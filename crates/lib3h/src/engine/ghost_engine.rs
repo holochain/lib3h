@@ -1,8 +1,3 @@
-use detach::Detach;
-use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{data_types::*, protocol::*, Address, uri::Lib3hUri};
-use std::collections::{HashMap, HashSet};
-use holochain_persistence_api::hash::HashString;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
@@ -17,10 +12,15 @@ use crate::{
         websocket::actor::GhostTransportWebsocket, TransportMultiplex,
     },
 };
+use detach::Detach;
+use holochain_persistence_api::hash::HashString;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
+use lib3h_ghost_actor::{prelude::*, RequestId};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
 use rmp_serde::Serializer;
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 
 impl<'engine> CanAdvertise for GhostEngine<'engine> {
     fn advertise(&self) -> Lib3hUri {

@@ -11,7 +11,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, DidWork, uri::Lib3hUri};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use std::collections::HashMap;

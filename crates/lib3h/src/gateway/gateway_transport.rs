@@ -84,7 +84,12 @@ impl P2pGateway {
     }
 
     #[allow(dead_code)]
-    fn priv_decode_on_receive(&mut self, span: Span, uri: Lib3hUri, payload: Opaque) -> GhostResult<()> {
+    fn priv_decode_on_receive(
+        &mut self,
+        span: Span,
+        uri: Lib3hUri,
+        payload: Opaque,
+    ) -> GhostResult<()> {
         let e_span = span.child("on_receive");
         self.message_encoding.request(
             span,
@@ -491,9 +496,7 @@ impl P2pGateway {
                     let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
                     if let Ok(p2p_msg) = maybe_p2p_msg {
-                        if let P2pProtocol::PeerName(gateway_id, peer_name, timestamp) =
-                            p2p_msg
-                        {
+                        if let P2pProtocol::PeerName(gateway_id, peer_name, timestamp) = p2p_msg {
                             debug!(
                                 "Received PeerName: {} | {} ({})",
                                 peer_name, gateway_id, self.identifier.nickname
