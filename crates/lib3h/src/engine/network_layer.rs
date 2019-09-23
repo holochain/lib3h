@@ -264,7 +264,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
                 let gossip = RemoteGossipBundleData {
-                    from_peer_name: msg.from_peer_name.clone().into(),
+                    from_peer_name: msg.from_peer_name.clone(),
                     bundle: msg.bundle.clone(),
                 };
                 // Check if its for the multiplexer

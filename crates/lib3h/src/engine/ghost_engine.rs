@@ -758,7 +758,7 @@ pub fn handle_gossip_to<
         // Convert DHT Gossip to P2P Gossip
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
             space_address: gateway_identifier.clone(),
-            to_peer_name: to_peer_name.clone().into(),
+            to_peer_name: to_peer_name.clone(),
             from_peer_name: Lib3hUri::with_undefined("FIXME"), // FIXME
             bundle: gossip_data.bundle.clone(),
         });

@@ -42,7 +42,7 @@ impl P2pGateway {
             endpoint_self,
             this_peer: PeerData {
                 peer_name: dht_config.this_peer_name(),
-                peer_location: peer_location.into(),
+                peer_location,
                 timestamp: crate::time::since_epoch_ms(),
             },
             pending_outgoing_messages: Vec::new(),

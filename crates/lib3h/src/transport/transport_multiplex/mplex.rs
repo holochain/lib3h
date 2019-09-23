@@ -119,7 +119,7 @@ impl<
                 ep.publish(
                     Span::fixme(),
                     RequestToParent::ReceivedData {
-                        uri: path.into(),
+                        uri: path,
                         payload: unpacked_payload,
                     },
                 )?;

@@ -36,7 +36,6 @@ use std::{
         Arc,
     },
 };
-use url::Url;
 
 type EngineBuilder<T> = fn() -> T;
 
