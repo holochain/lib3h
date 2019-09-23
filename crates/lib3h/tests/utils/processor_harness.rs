@@ -228,7 +228,7 @@ impl Processor for Lib3hServerProtocolEquals {
 /// Asserts that the actual matches the given regular expression
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct Lib3hServerProtocolRegex(regex::Regex);
+pub struct Lib3hServerProtocolRegex(pub regex::Regex);
 
 impl AssertRegex<Lib3hServerProtocol> for Lib3hServerProtocolRegex {
     fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
@@ -363,7 +363,7 @@ macro_rules! assert2_msg_matches {
      $regex:expr
     ) => {{
         let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
-            regex::Regex::new($regex),
+            regex::Regex::new($regex).expect(format!("[assert2_msg_matches] Invalid regex: {:?}", $regex).as_str())
         ));
         assert2_processed!($engine1, $engine2, p)
     }};
