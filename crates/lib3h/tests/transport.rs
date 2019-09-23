@@ -326,7 +326,7 @@ fn ghost_transport() {
     .unwrap();
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t1/\\\" })))\"",
+        "\"Response(Ok(Bind(BindResultData { bound_url: Lib3hUri(\\\"mocknet://t1/\\\") })))\"",
         format!("{:?}", owner.log[0])
     );
 
@@ -367,7 +367,7 @@ fn ghost_transport() {
     .unwrap();
     t2.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t2/\\\" })))\"",
+        "\"Response(Ok(Bind(BindResultData { bound_url: Lib3hUri(\\\"mocknet://t2/\\\") })))\"",
         format!("{:?}", owner.log[2])
     );
 
@@ -398,11 +398,11 @@ fn ghost_transport() {
     let mut messages = t2.drain_messages();
     assert_eq!(messages.len(), 2);
     assert_eq!(
-        "IncomingConnection { uri: \"mocknet://t1/\" }",
+        "IncomingConnection { uri: Lib3hUri(\"mocknet://t1/\") }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
     assert_eq!(
-        "ReceivedData { uri: \"mocknet://t1/\", payload: \"foo\" }",
+        "ReceivedData { uri: Lib3hUri(\"mocknet://t1/\"), payload: \"foo\" }",
         format!("{:?}", messages[1].take_message().expect("exists"))
     );
 
@@ -414,7 +414,7 @@ fn ghost_transport() {
     let mut messages = t1.drain_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(
-        "ErrorOccured { uri: \"mocknet://t1/\", error: TransportError(\"mocknet://t1/ has become unbound\") }",
+        "ErrorOccured { uri: Lib3hUri(\"mocknet://t1/\"), error: TransportError(\"mocknet://t1/ has become unbound\") }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
 }
