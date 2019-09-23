@@ -337,8 +337,8 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 #[allow(unused_macros)]
 /// Convenience function that asserts only one particular equality predicate
 /// (over a lib3h server protocol message)
-/// passes for a collection of engines. See assert_processed for
-/// more information. equal_to is compared to the actual and aborts if not actual.
+/// passes for two engine wrappers. See `assert2_processed` for more information.
+/// `equal_to` is compared to the actual and aborts if not actual.
 macro_rules! assert2_msg_eq {
     ($engine1:ident,
      $engine2:ident,
@@ -355,8 +355,8 @@ macro_rules! assert2_msg_eq {
 #[macro_export]
 /// Convenience function that asserts only one particular equality predicate
 /// (over a lib3h server protocol message)
-/// passes for two engine wrappers. See assert_processed for
-/// more information. regex is matches against the actual value and aborts if not present
+/// passes for two engine wrappers. See `assert_processed` for
+/// more information. `regex` is matched against the actual value and aborts if not present
 macro_rules! assert2_msg_matches {
     ($engine1:ident,
      $engine2:ident,
@@ -366,30 +366,28 @@ macro_rules! assert2_msg_matches {
             regex::Regex::new($regex)
                 .expect(format!("[assert2_msg_matches] Invalid regex: {:?}", $regex).as_str()),
         ));
-        assert2_processed!($engine1, $engine2, p)
+        $crate::assert2_processed!($engine1, $engine2, p)
     }};
 }
 
 #[allow(unused_macros)]
 #[macro_export]
-/// Convenience function that asserts only one particular equality predicate
-/// (over a lib3h server protocol message)
-/// passes for two engine wrappers. See assert_processed for
-/// more information. regex is matches against the actual value and aborts if not present
+/// Convenience function that asserts only one particular msg matches
+/// a regular expression over a lib3h server protocol message.
+/// This is a simplified version of `assert2_msg_matches` for one engine only.
 macro_rules! assert_msg_matches {
     ($engine:ident,
      $regex:expr
     ) => {
-        $crate::utils::processor_harness::assert2_msg_matches($engine, $engine, $regex)
+        // TODO Hack make a single engine version
+        $crate::assert2_msg_matches($engine, $engine, $regex)
     };
 }
 
 #[allow(unused_macros)]
 #[macro_export]
-/// Convenience function that asserts only one particular equality predicate
-/// (over a lib3h server protocol message)
-/// passes for two engine wrappers. See assert_processed for
-/// more information. regex is matches against the actual value and aborts if not present
+/// Convenience function that asserts all regular expressions match
+/// over a set of lib3h server protocol messages for two engine wrappers.
 macro_rules! assert2_msg_matches_all {
     ($engine1:ident,
      $engine2:ident,
@@ -400,20 +398,18 @@ macro_rules! assert2_msg_matches_all {
             .map(|re| {
                 Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
                     regex::Regex::new(re)
-                        .expect(format!("Regex must be syntactically correct: {:?}", re).as_str()),
+                        .expect(format!("[assert2_msg_matches_all] Regex must be syntactically correct: {:?}", re).as_str()),
                 ))
             })
             .collect();
-        $crate::utils::processor_harness::assert2_processed!($engine1, $engine2, processors)
+        $crate::assert2_processed!($engine1, $engine2, processors)
     }};
 }
 
 #[allow(unused_macros)]
 #[macro_export]
-/// Convenience function that asserts only one particular equality predicate
-/// (over a lib3h server protocol message)
-/// passes for two engine wrappers. See assert_processed for
-/// more information. regex is matches against the actual value and aborts if not present
+/// Convenience function that asserts all regular expressions match
+/// over a set of lib3h server protocol messages for one engine wrapper.
 macro_rules! assert_msg_matches_all {
     ($engine:ident,
      $regexes:expr
@@ -542,8 +538,8 @@ macro_rules! assert2_processed_all {
     }};
 }
 
-/// Asserts that a collection of engines produce events
-/// matching a set of predicate functions. For the program
+/// Asserts that two engines produce events
+/// matching just one predicate function. For the program
 /// to continue executing all processors must pass.
 ///
 /// Multiple calls to process() will be made as needed for
@@ -564,6 +560,16 @@ macro_rules! assert2_processed {
     }};
 }
 
+/// Asserts that one engine produces events
+/// matching a set of predicate functions. For the program
+/// to continue executing all processors must pass.
+///
+/// Multiple calls to process() will be made as needed for
+/// the passed in processors to pass. It will failure after
+/// MAX_PROCESSING_LOOPS iterations regardless.
+///
+/// Returns all observed processor results for use by
+/// subsequent tests.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! assert_processed_all {
@@ -575,6 +581,16 @@ macro_rules! assert_processed_all {
     };
 }
 
+/// Asserts that one engine produces events
+/// matching just one predicate function. For the program
+/// to continue executing all processors must pass.
+///
+/// Multiple calls to process() will be made as needed for
+/// the passed in processors to pass. It will failure after
+/// MAX_PROCESSING_LOOPS iterations regardless.
+///
+/// Returns all observed processor results for use by
+/// subsequent tests.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! assert_processed {
@@ -586,6 +602,8 @@ macro_rules! assert_processed {
     };
 }
 
+/// `wait_connect!(a, connect_data, b)` waits until engine w4rapper `a` connects
+/// using `connect_data` to engine wrapper `b`.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait_connect {
