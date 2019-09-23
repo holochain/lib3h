@@ -229,11 +229,12 @@ where
             // TODO Handle optional value better here!
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
-            let ghost_mesage =
-                maybe_ghost_message.ok_or(Lib3hProtocolError::new(ErrorKind::Other(format!(
+            let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
+                Lib3hProtocolError::new(ErrorKind::Other(format!(
                     "No ghost message for request: {:?}",
                     request_id.as_str()
-                ))))?;
+                )))
+            })?;
 
             ghost_mesage
                 .respond(Ok(lib3h_to_client_response))
