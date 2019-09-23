@@ -41,7 +41,7 @@ impl<'engine> GhostEngine<'engine> {
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
-        let transport_id = transport_keys.transport_id.clone().into();
+        let transport_id = transport_keys.transport_id.clone();
         let transport_id_uri =
             Lib3hUri::with_transport_id(&transport_keys.transport_id, &HashString::new());
 
@@ -614,7 +614,7 @@ impl<'engine> GhostEngine<'engine> {
             span,
             GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
                 uri: Lib3hUri::with_agent_id(&to_agent_id),
-                payload: payload.into(),
+                payload,
             }),
             Box::new(|me, response| {
                 debug!(
