@@ -55,7 +55,6 @@ pub struct ProcessorResult {
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
 pub trait Processor: Predicate<ProcessorResult> {
-
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
     fn test(&self, args: &ProcessorResult);
@@ -70,7 +69,6 @@ pub trait AssertEquals<T: PartialEq + std::fmt::Debug> {
     /// The expected value to compare to the actual value to
     fn expected(&self) -> T;
 }
-
 
 impl<T: PartialEq + std::fmt::Debug> std::fmt::Display for dyn AssertEquals<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -107,7 +105,6 @@ where
     }
 }
 
-
 /// Asserts some extracted data from ProcessorResult matches a regular expression
 /// Will invoke `assert_eq!(regex, format!("{:?}", actual))` upon failure for easy
 /// to compare output
@@ -139,16 +136,15 @@ where
 {
     fn test(&self, args: &ProcessorResult) -> () {
         if !self.eval(args) {
-            let actual = self.extracted(args).first().map(
-                |a| format!("{:?}", a)).unwrap_or("None".to_string());
-             assert_eq!(
-                self.expected().as_str(),
-                actual.as_str()
-             )
+            let actual = self
+                .extracted(args)
+                .first()
+                .map(|a| format!("{:?}", a))
+                .unwrap_or("None".to_string());
+            assert_eq!(self.expected().as_str(), actual.as_str())
         }
-   }
+    }
 }
-
 
 impl<T: std::fmt::Debug> std::fmt::Display for dyn AssertRegex<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -156,10 +152,7 @@ impl<T: std::fmt::Debug> std::fmt::Display for dyn AssertRegex<T> {
     }
 }
 
-impl<T> predicates::reflection::PredicateReflection for dyn AssertRegex<T> where
-    T: std::fmt::Debug
-{
-}
+impl<T> predicates::reflection::PredicateReflection for dyn AssertRegex<T> where T: std::fmt::Debug {}
 
 /// Asserts some extracted data from ProcessorResult passes a predicate.
 pub trait Assert<T> {
@@ -168,8 +161,7 @@ pub trait Assert<T> {
     fn assert_inner(&self, args: &T) -> bool;
 }
 
-impl<T> Predicate<ProcessorResult> for dyn Assert<T>
-{
+impl<T> Predicate<ProcessorResult> for dyn Assert<T> {
     fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
@@ -179,23 +171,19 @@ impl<T> Predicate<ProcessorResult> for dyn Assert<T>
     }
 }
 
-impl<T> Processor for dyn Assert<T>
-{
+impl<T> Processor for dyn Assert<T> {
     fn test(&self, args: &ProcessorResult) -> () {
         assert!(self.eval(args))
     }
 }
 
-impl<T> predicates::reflection::PredicateReflection for dyn Assert<T>
-{
-}
+impl<T> predicates::reflection::PredicateReflection for dyn Assert<T> {}
 
 impl<T> std::fmt::Display for dyn Assert<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", "assert_processed")
     }
 }
-
 
 /// Asserts that the actual is equal to the given expected
 #[allow(dead_code)]
@@ -219,8 +207,7 @@ impl std::fmt::Display for Lib3hServerProtocolEquals {
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
 
-impl Predicate<ProcessorResult> for Lib3hServerProtocolEquals
-{
+impl Predicate<ProcessorResult> for Lib3hServerProtocolEquals {
     fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
@@ -230,15 +217,13 @@ impl Predicate<ProcessorResult> for Lib3hServerProtocolEquals
     }
 }
 
-impl Processor for Lib3hServerProtocolEquals
-{
+impl Processor for Lib3hServerProtocolEquals {
     fn test(&self, args: &ProcessorResult) {
         let extracted = self.extracted(args);
         let actual = extracted.iter().find(|actual| **actual == self.expected());
         assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
     }
 }
-
 
 /// Asserts that the actual matches the given regular expression
 #[allow(dead_code)]
@@ -255,8 +240,7 @@ impl AssertRegex<Lib3hServerProtocol> for Lib3hServerProtocolRegex {
     }
 }
 
-impl Predicate<ProcessorResult> for Lib3hServerProtocolRegex
-{
+impl Predicate<ProcessorResult> for Lib3hServerProtocolRegex {
     fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
@@ -266,18 +250,17 @@ impl Predicate<ProcessorResult> for Lib3hServerProtocolRegex
     }
 }
 
-impl Processor for Lib3hServerProtocolRegex
-{
+impl Processor for Lib3hServerProtocolRegex {
     fn test(&self, args: &ProcessorResult) -> () {
         if !self.eval(args) {
-            let actual = self.extracted(args).first().map(
-                |a| format!("{:?}", a)).unwrap_or("None".to_string());
-             assert_eq!(
-                self.expected().as_str(),
-                actual.as_str()
-             )
+            let actual = self
+                .extracted(args)
+                .first()
+                .map(|a| format!("{:?}", a))
+                .unwrap_or("None".to_string());
+            assert_eq!(self.expected().as_str(), actual.as_str())
         }
-   }
+    }
 }
 
 impl std::fmt::Display for Lib3hServerProtocolRegex {
@@ -302,8 +285,7 @@ impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
     }
 }
 
-impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert
-{
+impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert {
     fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
@@ -313,13 +295,11 @@ impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert
     }
 }
 
-impl Processor for Lib3hServerProtocolAssert
-{
+impl Processor for Lib3hServerProtocolAssert {
     fn test(&self, args: &ProcessorResult) -> () {
         assert!(self.eval(args))
     }
 }
-
 
 impl std::fmt::Display for Lib3hServerProtocolAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -364,7 +344,9 @@ macro_rules! assert2_msg_eq {
      $engine2:ident,
      $equal_to:expr
     ) => {{
-        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals($equal_to));
+        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals(
+            $equal_to,
+        ));
         assert2_processed!($engine1, $engine2, p)
     }};
 }
@@ -380,7 +362,9 @@ macro_rules! assert2_msg_matches {
      $engine2:ident,
      $regex:expr
     ) => {{
-        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(regex::Regex::new($regex)));
+        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
+            regex::Regex::new($regex),
+        ));
         assert2_processed!($engine1, $engine2, p)
     }};
 }
@@ -399,7 +383,6 @@ macro_rules! assert_msg_matches {
     };
 }
 
-
 #[allow(unused_macros)]
 #[macro_export]
 /// Convenience function that asserts only one particular equality predicate
@@ -411,12 +394,14 @@ macro_rules! assert2_msg_matches_all {
      $engine2:ident,
      $regexes:expr
     ) => {{
-
-        let processors = $regexes.into_iter().map(|re|
-            Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
+        let processors = $regexes
+            .into_iter()
+            .map(|re| {
+                Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
                     regex::Regex::new(re)
-                        .expect(format!("Regex must be syntactically correct: {:?}", re).as_str())
-                    )))
+                        .expect(format!("Regex must be syntactically correct: {:?}", re).as_str()),
+                ))
+            })
             .collect();
         $crate::utils::processor_harness::assert2_processed!($engine1, $engine2, processors)
     }};
@@ -432,10 +417,9 @@ macro_rules! assert_msg_matches_all {
     ($engine:ident,
      $regexes:expr
     ) => {
-        $crate:utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
+        $crate: utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
     };
 }
-
 
 /// Internal function to process one engine of a possibly
 /// multiple engine scenario
@@ -557,7 +541,6 @@ macro_rules! assert2_processed_all {
     }};
 }
 
-
 /// Asserts that a collection of engines produce events
 /// matching a set of predicate functions. For the program
 /// to continue executing all processors must pass.
@@ -574,12 +557,10 @@ macro_rules! assert2_processed {
     ($engine1:ident,
      $engine2:ident,
      $processor:expr
-    ) =>
-    {{
-         let processors = vec![$processor];
-         $crate::assert2_processed_all!(
-             $engine1, $engine2, processors)
-    }}
+    ) => {{
+        let processors = vec![$processor];
+        $crate::assert2_processed_all!($engine1, $engine2, processors)
+    }};
 }
 
 #[allow(unused_macros)]
@@ -589,9 +570,8 @@ macro_rules! assert_processed_all {
      $processors:expr
     ) => {
         // HACK make a singular version
-        $crate::assert2_processed_all!(
-            $engine, $engine, $processors)
-    }
+        $crate::assert2_processed_all!($engine, $engine, $processors)
+    };
 }
 
 #[allow(unused_macros)]
@@ -601,9 +581,8 @@ macro_rules! assert_processed {
      $processor:expr
     ) => {
         // HACK make a singular version
-        $crate::assert2_processed!(
-            $engine, $engine, $processor)
-    }
+        $crate::assert2_processed!($engine, $engine, $processor)
+    };
 }
 
 #[allow(unused_macros)]
