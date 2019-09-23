@@ -11,6 +11,7 @@ use lib3h_protocol::{
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
+    uri::Lib3hUri,
     Address, DidWork,
 };
 use multihash::Hash;
@@ -53,8 +54,9 @@ impl NodeMock {
     /// Disconnect the NetworkEngine by destroying it.
     pub fn disconnect(&mut self) {
         let mut dummy_config = self.config.clone();
-        dummy_config.bind_url =
-            Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
+        dummy_config.bind_url = Url::parse(&format!("{}/dummy", self.config.bind_url.as_str()))
+            .unwrap()
+            .into();
         self.engine =
             (self.engine_factory)(&dummy_config, "__dummy").expect("Failed to create dummy Engine");
         self.engine =
@@ -111,7 +113,11 @@ impl NodeMock {
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         println!("\n\n({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
-        println!("({}).process() END - {}", self.name, self.recv_msg_log.len());
+        println!(
+            "({}).process() END - {}",
+            self.name,
+            self.recv_msg_log.len()
+        );
         self.recv_msg_log.extend_from_slice(msgs.as_slice());
         for msg in msgs.iter() {
             self.handle_lib3h(msg.clone());

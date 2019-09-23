@@ -14,7 +14,7 @@ extern crate regex;
 extern crate log;
 use holochain_tracing::test_span;
 
-use lib3h_ghost_actor::{wait1_for_messages, wait_did_work};
+use lib3h_ghost_actor::wait1_for_messages;
 
 use holochain_tracing::Span;
 use lib3h::{
@@ -26,14 +26,11 @@ use lib3h::{
 use lib3h_ghost_actor::prelude::*;
 
 use crate::lib3h::engine::CanAdvertise;
-use lib3h_protocol::{data_types::*, protocol::*};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri};
 use lib3h_sodium::SodiumCryptoSystem;
 use std::path::PathBuf;
 use url::Url;
 use utils::{constants::*, test_network_id};
-//--------------------------------------------------------------------------------------------------
-// Test suites
-//--------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -71,7 +68,7 @@ fn basic_setup_mock_bootstrap<'engine>(
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
-        bind_url: Lib3hUri::with_memory(name).as_str()),
+        bind_url: Lib3hUri::with_memory(name),
         dht_gossip_interval: 100,
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],

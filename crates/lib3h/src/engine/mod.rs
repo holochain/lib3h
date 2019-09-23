@@ -15,7 +15,7 @@ use crate::{
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{protocol::*, Address, uri::Lib3hUri};
+use lib3h_protocol::{protocol::*, uri::Lib3hUri, Address};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,

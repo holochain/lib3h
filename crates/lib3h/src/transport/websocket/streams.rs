@@ -7,7 +7,7 @@ use crate::transport::{
         WssSrvAcceptResult, WssSrvMidHandshake, WssStream, FAKE_PASS, FAKE_PKCS12,
     },
 };
-use lib3h_protocol::{DidWork, uri::Lib3hUri};
+use lib3h_protocol::{uri::Lib3hUri, DidWork};
 use std::{
     io::{Read, Write},
     sync::{Arc, Mutex},
@@ -219,7 +219,9 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             }
             Ok(acceptor) => (acceptor)()
                 .map(move |wss_info| {
-                    let _insert_result = self.stream_sockets.insert(wss_info.url.clone().into(), wss_info);
+                    let _insert_result = self
+                        .stream_sockets
+                        .insert(wss_info.url.clone().into(), wss_info);
                     true
                 })
                 .unwrap_or_else(|err| {

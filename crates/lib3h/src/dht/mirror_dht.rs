@@ -6,7 +6,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::EntryData, Address, DidWork, uri::Lib3hUri};
+use lib3h_protocol::{data_types::EntryData, uri::Lib3hUri, Address, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -138,7 +138,12 @@ impl MirrorDht {
             }
             // Check if timed-out
             if now - peer.timestamp > self.config.timeout_threshold() {
-                debug!("@MirrorDht@ peer {} timed-out ({} > {})", peer_name, now - peer.timestamp, self.config.timeout_threshold());
+                debug!(
+                    "@MirrorDht@ peer {} timed-out ({} > {})",
+                    peer_name,
+                    now - peer.timestamp,
+                    self.config.timeout_threshold()
+                );
                 outbox.push(DhtRequestToParent::PeerTimedOut(peer_name.clone()));
                 timed_out_list.push(peer_name.clone());
                 did_work = true;

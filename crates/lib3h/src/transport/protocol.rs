@@ -1,10 +1,7 @@
 use crate::transport::error::TransportError;
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{
-    data_types::Opaque,
-    uri::Lib3hUri,
-    };
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 
 #[derive(Debug, Clone)]
 pub struct BindResultData {
@@ -27,9 +24,17 @@ pub enum RequestToChildResponse {
 #[derive(Debug, Clone)]
 pub enum RequestToParent {
     // TODO remove `uri` field once we have refactored how we handle Connection/Disconnection
-    ErrorOccured { uri: Lib3hUri, error: TransportError },
-    IncomingConnection { uri: Lib3hUri },
-    ReceivedData { uri: Lib3hUri, payload: Opaque },
+    ErrorOccured {
+        uri: Lib3hUri,
+        error: TransportError,
+    },
+    IncomingConnection {
+        uri: Lib3hUri,
+    },
+    ReceivedData {
+        uri: Lib3hUri,
+        payload: Opaque,
+    },
 }
 
 #[derive(Debug, Clone)]

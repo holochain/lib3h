@@ -25,7 +25,7 @@ use lib3h::{
     error::Lib3hResult,
     transport::websocket::tls::TlsConfig,
 };
-use lib3h_protocol::Address;
+use lib3h_protocol::{uri::Lib3hUri, Address};
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
@@ -130,7 +130,8 @@ fn setup_wss_node(
         TlsConfig::SuppliedCertificate(_) | TlsConfig::FakeServer => "wss",
     };
     let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
-        .expect("invalid web socket url").into();
+        .expect("invalid web socket url")
+        .into();
 
     let config = EngineConfig {
         network_id: test_network_id(),

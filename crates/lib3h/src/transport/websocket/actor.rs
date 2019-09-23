@@ -10,7 +10,7 @@ use detach::Detach;
 use holochain_tracing::Span;
 use lib3h_discovery::{error::DiscoveryResult, Discovery};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, Address, uri::Lib3hUri};
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address};
 
 pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
@@ -126,7 +126,9 @@ impl GhostTransportWebsocket {
                 RequestToChild::Bind { spec: url } => {
                     let maybe_bound_url = self.streams.bind(&url);
                     msg.respond(maybe_bound_url.clone().map(|url| {
-                        RequestToChildResponse::Bind(BindResultData { bound_url: url.into() })
+                        RequestToChildResponse::Bind(BindResultData {
+                            bound_url: url.into(),
+                        })
                     }))?;
 
                     if let Ok(url) = maybe_bound_url {
@@ -197,16 +199,23 @@ impl GhostTransportWebsocket {
                         "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
                         uri, error
                     );
-                    self.endpoint_self
-                        .publish(Span::fixme(), RequestToParent::ErrorOccured { uri: uri.into(), error })?;
+                    self.endpoint_self.publish(
+                        Span::fixme(),
+                        RequestToParent::ErrorOccured {
+                            uri: uri.into(),
+                            error,
+                        },
+                    )?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
                 }
                 StreamEvent::IncomingConnectionEstablished(uri) => {
                     trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
-                    self.endpoint_self
-                        .publish(Span::fixme(), RequestToParent::IncomingConnection { uri: uri.into() })?;
+                    self.endpoint_self.publish(
+                        Span::fixme(),
+                        RequestToParent::IncomingConnection { uri: uri.into() },
+                    )?;
                 }
                 StreamEvent::ReceivedData(uri, payload) => {
                     trace!(
@@ -367,7 +376,9 @@ mod tests {
 
         let port1 = get_available_port(1025).expect("Must be able to find free port");
         let expected_transport1_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap().into();
+            Url::parse(&format!("wss://127.0.0.1:{}", port1))
+                .unwrap()
+                .into();
         t1_endpoint
             .request(
                 Span::fixme(),
@@ -390,7 +401,9 @@ mod tests {
 
         let port2 = get_available_port(1026).expect("Must be able to find free port");
         let expected_transport2_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap().into();
+            Url::parse(&format!("wss://127.0.0.1:{}", port2))
+                .unwrap()
+                .into();
         t2_endpoint
             .request(
                 Span::fixme(),
@@ -463,7 +476,9 @@ mod tests {
 
         let port1 = get_available_port(2025).expect("Must be able to find free port");
         let expected_transport1_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap().into();
+            Url::parse(&format!("wss://127.0.0.1:{}", port1))
+                .unwrap()
+                .into();
         t1_endpoint
             .request(
                 Span::fixme(),
@@ -498,7 +513,9 @@ mod tests {
                     .build::<()>();
 
                 let expected_transport2_address: Lib3hUri =
-                    Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap().into();
+                    Url::parse(&format!("wss://127.0.0.1:{}", port2))
+                        .unwrap()
+                        .into();
                 t2_endpoint
                     .request(
                         Span::fixme(),

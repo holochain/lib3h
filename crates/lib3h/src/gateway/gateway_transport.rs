@@ -9,9 +9,7 @@ use crate::{
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{
-    data_types::*, uri::Lib3hUri,
-    };
+use lib3h_protocol::{data_types::*, uri::Lib3hUri};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -201,7 +199,6 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
-
                 trace!("Gateway trying SendMessage to {:?}", uri);
 
                 let payload_wrapped = payload.clone(); // not really wrapped
@@ -338,9 +335,7 @@ impl P2pGateway {
                     let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
                         Deserialize::deserialize(&mut de);
                     if let Ok(p2p_msg) = maybe_p2p_msg {
-                        if let P2pProtocol::PeerName(gateway_id, peer_name, timestamp) =
-                            p2p_msg
-                        {
+                        if let P2pProtocol::PeerName(gateway_id, peer_name, timestamp) = p2p_msg {
                             debug!(
                                 "Received P2pProtocol::PeerName: {} | {} ({})",
                                 peer_name, gateway_id, self.identifier.nickname

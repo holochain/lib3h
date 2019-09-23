@@ -7,7 +7,7 @@ use lib3h::{
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
     error::Lib3hResult,
 };
-use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
+use lib3h_protocol::{protocol_server::Lib3hServerProtocol, uri::Lib3hUri, Address};
 use std::collections::{HashMap, HashSet};
 
 static TIMEOUT_MS: usize = 5000;

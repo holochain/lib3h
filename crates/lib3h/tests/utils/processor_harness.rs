@@ -3,7 +3,7 @@
 /// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
 
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol};
+use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, uri::Lib3hUri};
 
 use crate::utils::seeded_prng::SeededBooleanPrng;
 

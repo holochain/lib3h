@@ -1,5 +1,5 @@
 use crate::transport::error::{TransportError, TransportResult};
-use lib3h_protocol::{data_types::Opaque, Address, DidWork, uri::Lib3hUri};
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address, DidWork};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::{Arc, Mutex, MutexGuard},

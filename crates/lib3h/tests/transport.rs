@@ -54,17 +54,17 @@ impl Mockernet {
     }
 
     /// create a binding to the mockernet, without one you can't send or receive
-    pub fn bind(&mut self, url: Url) -> bool {
+    pub fn bind(&mut self, url: Lib3hUri) -> bool {
         if self.bindings.contains_key(&url) {
             false
         } else {
-            self.bindings.insert(url, Tube::new());
+            self.bindings.insert(url.into(), Tube::new());
             true
         }
     }
 
     /// remove a binding, this is should trigger an error event
-    pub fn unbind(&mut self, url: Url) {
+    pub fn unbind(&mut self, url: Lib3hUri) {
         if self.bindings.contains_key(&url) {
             self.bindings.remove(&url);
             self.errors
@@ -73,7 +73,7 @@ impl Mockernet {
     }
 
     /// send a message to anyone on the Mockernet
-    pub fn send_to(&mut self, to: Url, from: Url, payload: Opaque) -> Result<(), String> {
+    pub fn send_to(&mut self, to: Lib3hUri, from: Lib3hUri, payload: Opaque) -> Result<(), String> {
         {
             let _src = self
                 .bindings
@@ -89,7 +89,7 @@ impl Mockernet {
     }
 
     /// check to see, for a given Url, if there are any events waiting
-    pub fn process_for(&mut self, address: Url) -> Result<Vec<MockernetEvent>, String> {
+    pub fn process_for(&mut self, address: Lib3hUri) -> Result<Vec<MockernetEvent>, String> {
         let mut events = Vec::new();
 
         // push any errors for this url into the events
@@ -128,7 +128,7 @@ impl Mockernet {
     }
 
     /// record a connection
-    pub fn connect(&mut self, from: Url, to: Url) {
+    pub fn connect(&mut self, from: Lib3hUri, to: Lib3hUri) {
         if let Some(cmap) = self.connections.get_mut(&from) {
             cmap.insert(to);
         } else {
@@ -139,7 +139,7 @@ impl Mockernet {
     }
 
     /// check to see if two nodes are connected
-    pub fn are_connected(&self, from: &Url, to: &Url) -> bool {
+    pub fn are_connected(&self, from: &Lib3hUri, to: &Lib3hUri) -> bool {
         match self.connections.get(from) {
             None => return false,
             Some(cmap) => cmap.contains(to),
@@ -155,7 +155,7 @@ struct TestTransport {
     // instance name of this transport
     name: String,
     // our parent channel endpoint
-    bound_url: Option<Url>,
+    bound_url: Option<Lib3hUri>,
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
     endpoint_self: Detach<

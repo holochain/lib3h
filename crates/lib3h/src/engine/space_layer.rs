@@ -125,7 +125,10 @@ impl<'engine> GhostEngine<'engine> {
                     }
                     // HoldEntryRequested from gossip
                     // -> Send each aspect to Core for validation
-                    DhtRequestToParent::HoldEntryRequested { from_peer_name, entry } => {
+                    DhtRequestToParent::HoldEntryRequested {
+                        from_peer_name,
+                        entry,
+                    } => {
                         for aspect in entry.aspect_list {
                             let lib3h_msg = StoreEntryAspectData {
                                 request_id: self.request_track.reserve(),

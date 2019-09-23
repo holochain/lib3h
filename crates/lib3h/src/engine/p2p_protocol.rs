@@ -1,8 +1,8 @@
-use crate::dht::{dht_protocol::PeerData};
+use crate::dht::dht_protocol::PeerData;
 use lib3h_protocol::{
     data_types::{DirectMessageData, Opaque},
-    Address,
     uri::Lib3hUri,
+    Address,
 };
 
 pub type SpaceAddress = String;

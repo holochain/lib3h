@@ -26,10 +26,10 @@ mod tests {
     use super::*;
     use crate::{error::Lib3hError, gateway::protocol::*, transport::protocol::*};
     use detach::prelude::*;
+    use holochain_persistence_api::hash::HashString;
     use holochain_tracing::Span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
-    use holochain_persistence_api::hash::HashString;
 
     pub struct GatewayMock {
         endpoint_parent: Option<GatewayParentEndpoint>,
@@ -217,7 +217,10 @@ mod tests {
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { uri, payload } = msg {
             assert_eq!(
-                &Lib3hUri::with_transport_id(&HashString::from("machine_x"), &HashString::from("agent_x")),
+                &Lib3hUri::with_transport_id(
+                    &HashString::from("machine_x"),
+                    &HashString::from("agent_x")
+                ),
                 &uri
             );
             let expected: Opaque = "hello".into();

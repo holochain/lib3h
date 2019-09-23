@@ -11,15 +11,15 @@ pub mod tests {
         tests::enable_logging_for_test,
     };
     use detach::prelude::*;
-    use holochain_tracing::test_span;
     use holochain_persistence_api::hash::HashString;
+    use holochain_tracing::test_span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
-        Address,
         uri::Lib3hUri,
+        Address,
     };
- 
+
     lazy_static! {
         /// CONSTS
         /// Entries
@@ -158,7 +158,10 @@ pub mod tests {
         ud.this_peer
     }
 
-    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>, peer_name: &Lib3hUri) -> Option<PeerData> {
+    fn get_peer(
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
+        peer_name: &Lib3hUri,
+    ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
             test_span(""),
@@ -516,7 +519,11 @@ pub mod tests {
         for mut request in request_list {
             let payload = request.take_message().expect("exists");
             trace!(" - {:?}", payload);
-            if let DhtRequestToParent::HoldEntryRequested { from_peer_name, entry } = payload {
+            if let DhtRequestToParent::HoldEntryRequested {
+                from_peer_name,
+                entry,
+            } = payload
+            {
                 assert_eq!(Lib3hUri::from(from_peer_name), *PEER_B);
                 assert_eq!(entry, entry_data.clone());
                 did_get_hold_entry = true;

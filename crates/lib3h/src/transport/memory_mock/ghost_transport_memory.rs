@@ -10,13 +10,12 @@ use lib3h_discovery::{
     Discovery,
 };
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{Address, uri::Lib3hUri};
+use lib3h_protocol::{uri::Lib3hUri, Address};
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
     time::Instant,
 };
-
 
 pub type UserData = GhostTransportMemory;
 

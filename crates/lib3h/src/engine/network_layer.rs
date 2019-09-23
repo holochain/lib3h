@@ -8,7 +8,7 @@ use crate::{
 
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, DidWork, uri::Lib3hUri};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -170,7 +170,11 @@ impl<'engine> GhostEngine<'engine> {
         self.multiplexer_defered_sends.push((to, payload));
     }
 
-    fn handle_incoming_connection(&mut self, span: Span, net_location: Lib3hUri) -> Lib3hResult<()> {
+    fn handle_incoming_connection(
+        &mut self,
+        span: Span,
+        net_location: Lib3hUri,
+    ) -> Lib3hResult<()> {
         // Get list of known peers
         let net_location_copy = net_location.clone();
         self.multiplexer
@@ -206,15 +210,13 @@ impl<'engine> GhostEngine<'engine> {
                                 net_location_copy,
                             );
                             // we need a transportId, so search for it in the DHT
-                            let maybe_peer_data =
-                                peer_list.iter().find(|pd| pd.peer_location == net_location_copy);
+                            let maybe_peer_data = peer_list
+                                .iter()
+                                .find(|pd| pd.peer_location == net_location_copy);
                             trace!("--- got peerlist: {:?}", maybe_peer_data);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                                me.defer_send(
-                                    peer_data.peer_name.clone(),
-                                    payload.into(),
-                                );
+                                me.defer_send(peer_data.peer_name.clone(), payload.into());
                                 /* TODO: #777
                                 me.multiplexer.publish(
                                     span.follower("publish TODO name"),
@@ -273,9 +275,10 @@ impl<'engine> GhostEngine<'engine> {
                     );
                 } else {
                     // otherwise should be for one of our space
-                    let maybe_space_gateway = self
-                        .space_gateway_map
-                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_name.clone().into()));
+                    let maybe_space_gateway = self.space_gateway_map.get_mut(&(
+                        msg.space_address.to_owned(),
+                        msg.to_peer_name.clone().into(),
+                    ));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
                             span.follower("TODO"),

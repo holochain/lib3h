@@ -1,8 +1,3 @@
-use detach::Detach;
-use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
-use std::collections::{HashMap, HashSet};
-use holochain_persistence_api::hash::HashString;
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::{
@@ -18,10 +13,15 @@ use crate::{
         websocket::actor::GhostTransportWebsocket, TransportEncoding, TransportMultiplex,
     },
 };
+use detach::Detach;
+use holochain_persistence_api::hash::HashString;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
+use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
 use rmp_serde::Serializer;
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 
 impl<'engine> CanAdvertise for GhostEngine<'engine> {
     fn advertise(&self) -> Lib3hUri {
@@ -60,7 +60,8 @@ impl<'engine> GhostEngine<'engine> {
         );
 
         let prebound_binding = Lib3hUri::with_undefined("");
-        let transport_id_uri = Lib3hUri::with_transport_id(&transport_keys.transport_id, &HashString::new());
+        let transport_id_uri =
+            Lib3hUri::with_transport_id(&transport_keys.transport_id, &HashString::new());
         let this_net_peer = PeerData {
             peer_name: transport_id_uri.clone(),
             peer_location: prebound_binding.clone(),

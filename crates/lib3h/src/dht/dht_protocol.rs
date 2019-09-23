@@ -1,7 +1,7 @@
 use lib3h_protocol::{
     data_types::{EntryData, Opaque},
-    Address,
     uri::Lib3hUri,
+    Address,
 };
 
 use crate::{dht::dht_config::DhtConfig, error::*};
@@ -106,7 +106,10 @@ pub enum DhtRequestToParent {
     /// Notify owner that we believe a peer has dropped
     PeerTimedOut(Lib3hUri),
     /// Notify owner that gossip is requesting we hold an entry.
-    HoldEntryRequested { from_peer_name: Lib3hUri, entry: EntryData },
+    HoldEntryRequested {
+        from_peer_name: Lib3hUri,
+        entry: EntryData,
+    },
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),
