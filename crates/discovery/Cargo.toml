@@ -12,5 +12,4 @@ documentation = "https://docs.rs/lib3h_discovery"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-#url = { version = "=2.1.0", features = ["serde"] }
 lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }

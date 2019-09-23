@@ -325,7 +325,7 @@ mod tests {
 
     impl CanAdvertise for MockGhostEngine {
         fn advertise(&self) -> Lib3hUri {
-            Lib3hUri::with_memory("")
+            Lib3hUri::with_memory("fixme")
         }
     }
 

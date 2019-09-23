@@ -575,7 +575,7 @@ impl<'engine> GhostEngine<'engine> {
         net_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
-        // Send
+
         let space_gateway = self
             .space_gateway_map
             .get_mut(&chain_id)

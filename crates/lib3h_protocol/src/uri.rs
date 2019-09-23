@@ -2,15 +2,15 @@ use crate::{error::Lib3hProtocolError, Address};
 use std::convert::TryFrom;
 use url::Url;
 
+//--------------------------------------------------------------------------------------------------
+// UriScheme
+//--------------------------------------------------------------------------------------------------
+
 static AGENT_SCHEME: &'static str = "agentid";
 static TRANSPORT_SCHEME: &'static str = "transportid";
 static MEMORY_SCHEME: &'static str = "mem";
 static UNDEFINED_SCHEME: &'static str = "none";
 
-///////////////////////////////////
-/// UriScheme
-///////////////////////////////////
-///
 pub enum UriScheme {
     Agent,
     Transport,
@@ -43,9 +43,9 @@ impl From<UriScheme> for String {
     }
 }
 
-///////////////////////////////////
-/// Lib3hUri
-///////////////////////////////////
+//--------------------------------------------------------------------------------------------------
+// Lib3hUri
+//--------------------------------------------------------------------------------------------------
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[shrinkwrap(mutable)]

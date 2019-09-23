@@ -358,39 +358,6 @@ impl P2pGateway {
                 );
             }
             transport::protocol::RequestToChild::SendMessage { uri, payload } => {
-                let payload_wrapped = payload.clone(); // not really wrapped
-
-                // TODO - XXX - We need to wrap this so we know how / where
-                //              to put this message (which gateway) on the
-                //              remote side
-
-                /*
-                let to_agent_id = uri.path();
-                trace!(
-                    "try-send {:?} {} {} bytes",
-                    self.identifier.id,
-                    to_agent_id,
-                    payload.len()
-                );
-
-                let request_id = nanoid::simple();
-                // as a gateway, we need to wrap items going to our children
-                let wrap_payload = P2pProtocol::DirectMessage(DirectMessageData {
-                    space_address: self.identifier.id.clone(),
-                    request_id: request_id.clone(),
-                    to_agent_id: to_agent_id.into(),
-                    from_agent_id: self.this_peer.peer_address.clone().into(),
-                    content: payload.clone(),
-                });
-
-                // Serialize payload
-                let mut payload_wrapped = Vec::new();
-                wrap_payload
-                    .serialize(&mut Serializer::new(&mut payload_wrapped))
-                    .unwrap();
-                let payload_wrapped = Opaque::from(payload_wrapped);
-                */
-
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
@@ -492,34 +459,7 @@ impl P2pGateway {
                 if payload.len() == 0 {
                     debug!("Implement Ping!");
                 } else {
-                    let mut de = Deserializer::new(&payload[..]);
-                    let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-                        Deserialize::deserialize(&mut de);
-                    if let Ok(p2p_msg) = maybe_p2p_msg {
-                        if let P2pProtocol::PeerName(gateway_id, peer_name, timestamp) = p2p_msg {
-                            debug!(
-                                "Received PeerName: {} | {} ({})",
-                                peer_name, gateway_id, self.identifier.nickname
-                            );
-                            if self.identifier.id == gateway_id.into() {
-                                let peer = PeerData {
-                                    peer_name,
-                                    peer_location: uri.clone(),
-                                    timestamp,
-                                };
-                                // HACK
-                                let _ = self.inner_dht.publish(
-                                    span.follower(
-                                        "transport::protocol::RequestToParent::ReceivedData",
-                                    ),
-                                    DhtRequestToChild::HoldPeer(peer),
-                                );
-                                // TODO #58
-                                // TODO #150 - Should not call process manually
-                                self.process().expect("HACK");
-                            }
-                        }
-                    }
+                    self.priv_decode_on_receive(span, uri, payload)?;
                 }
             }
         };

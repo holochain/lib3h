@@ -283,7 +283,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         // move the socket out, to be replaced
         let socket = std::mem::replace(&mut info.stateful_socket, WebsocketStreamState::None);
 
-        // debug!("transport_wss: socket={:?}", socket);
+        debug!("transport_wss: socket={:?}", socket);
         // TODO remove?
         std::io::stdout().flush().ok().expect("flush stdout");
         match socket {
