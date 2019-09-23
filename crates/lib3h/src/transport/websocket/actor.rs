@@ -175,6 +175,8 @@ impl GhostTransportWebsocket {
 
                     if let Ok(url) = maybe_bound_url {
                         self.bound_url = Some(url.clone());
+                        self.advertise()
+                            .map_err(|e| TransportError::from(e.to_string()))?;
                     }
                 }
                 RequestToChild::SendMessage { uri, payload } => {
