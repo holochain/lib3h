@@ -1,7 +1,6 @@
 use crate::{
     error::Lib3hProtocolResult, protocol_client::Lib3hClientProtocol,
-    protocol_server::Lib3hServerProtocol, DidWork,
-    uri::Lib3hUri,
+    protocol_server::Lib3hServerProtocol, uri::Lib3hUri, DidWork,
 };
 
 /// Common interface for all types of network modules to be used by the Lib3hWorker

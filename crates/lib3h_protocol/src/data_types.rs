@@ -1,6 +1,4 @@
-use crate::{
-    Address, uri::Lib3hUri,
-    };
+use crate::{uri::Lib3hUri, Address};
 use std::cmp::Ordering;
 
 /// Tuple holding all the info required for identifying an Aspect.

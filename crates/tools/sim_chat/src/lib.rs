@@ -74,7 +74,11 @@ impl Drop for Lib3hSimChat {
 }
 
 impl Lib3hSimChat {
-    pub fn new<T>(engine_builder: EngineBuilder<T>, mut handler: HandleEvent, peer_location: Url) -> Self
+    pub fn new<T>(
+        engine_builder: EngineBuilder<T>,
+        mut handler: HandleEvent,
+        peer_location: Url,
+    ) -> Self
     where
         T: GhostActor<
                 Lib3hToClient,

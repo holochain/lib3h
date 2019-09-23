@@ -10,7 +10,7 @@ static UNDEFINED_SCHEME: &'static str = "none";
 ///////////////////////////////////
 /// UriScheme
 ///////////////////////////////////
-/// 
+///
 pub enum UriScheme {
     Agent,
     Transport,
@@ -65,29 +65,17 @@ impl Lib3hUri {
         Lib3hUri(url)
     }
     pub fn with_agent_id(agent_id: &Address) -> Self {
-        let url = Url::parse(&format!(
-            "{}:{}",
-            AGENT_SCHEME, agent_id
-        ))
-        .unwrap();
+        let url = Url::parse(&format!("{}:{}", AGENT_SCHEME, agent_id)).unwrap();
         Lib3hUri(url)
     }
     pub fn with_undefined(other: &str) -> Self {
-        let url = Url::parse(&format!(
-            "{}:{}",
-            UNDEFINED_SCHEME, other
-        ))
-        .unwrap();
+        let url = Url::parse(&format!("{}:{}", UNDEFINED_SCHEME, other)).unwrap();
         Lib3hUri(url)
     }
     pub fn with_memory(other: &str) -> Self {
-        let url = Url::parse(&format!(
-            "{}://{}",
-            MEMORY_SCHEME, other
-        ))
-        .unwrap();
+        let url = Url::parse(&format!("{}://{}", MEMORY_SCHEME, other)).unwrap();
         Lib3hUri(url)
-    }               
+    }
 }
 
 impl TryFrom<&str> for Lib3hUri {
