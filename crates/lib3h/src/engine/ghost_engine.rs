@@ -47,7 +47,11 @@ impl<'engine> GhostEngine<'engine> {
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
-                Box::new(GhostTransportWebsocket::new(machine_id, tls))
+                Box::new(GhostTransportWebsocket::new(
+                    machine_id,
+                    tls,
+                    config.network_id.id.clone(),
+                ))
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(machine_id, &net)),
         };
