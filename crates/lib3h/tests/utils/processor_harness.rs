@@ -230,7 +230,7 @@ impl Predicate<ProcessorResult> for Lib3hServerProtocolEquals
     }
 }
 
-impl Processor for Lib3hServerProtocolEquals 
+impl Processor for Lib3hServerProtocolEquals
 {
     fn test(&self, args: &ProcessorResult) {
         let extracted = self.extracted(args);
@@ -276,6 +276,25 @@ impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
         self.0.eval(&x)
     }
 }
+
+impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert
+{
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| self.assert_inner(*actual))
+            .is_some()
+    }
+}
+
+impl Processor for Lib3hServerProtocolAssert
+{
+    fn test(&self, args: &ProcessorResult) -> () {
+        assert!(self.eval(args))
+    }
+}
+
 
 impl std::fmt::Display for Lib3hServerProtocolAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
