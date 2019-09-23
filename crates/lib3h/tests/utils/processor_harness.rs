@@ -219,6 +219,27 @@ impl std::fmt::Display for Lib3hServerProtocolEquals {
 
 impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
 
+impl Predicate<ProcessorResult> for Lib3hServerProtocolEquals
+{
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| **actual == self.expected())
+            .is_some()
+    }
+}
+
+impl Processor for Lib3hServerProtocolEquals 
+{
+    fn test(&self, args: &ProcessorResult) {
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find(|actual| **actual == self.expected());
+        assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
+    }
+}
+
+
 /// Asserts that the actual matches the given regular expression
 #[allow(dead_code)]
 #[derive(Debug)]
