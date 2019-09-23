@@ -3,15 +3,19 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{ghost_engine::handle_gossip_to, p2p_protocol::SpaceAddress, ChainId, GhostEngine},
+    engine::{ghost_engine::handle_gossip_to, p2p_protocol::*, ChainId, GhostEngine},
     error::*,
     gateway::{protocol::*, P2pGateway},
+    transport::protocol::*,
 };
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, DidWork};
+use rmp_serde::Deserializer;
+use serde::Deserialize;
 use std::collections::HashMap;
+use url::Url;
 
 /// Space layer related private methods
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
@@ -218,10 +222,92 @@ impl<'engine> GhostEngine<'engine> {
             }
             // Handle Space's Transport request
             // ================================
-            GatewayRequestToParent::Transport(_transport_request) => {
-                // FIXME
+            GatewayRequestToParent::Transport(transport_request) => {
+                trace!("space_layer got {:#?}", transport_request);
+                match transport_request {
+                    RequestToParent::ErrorOccured { uri: _, error } => {
+                        panic!("can't handle {:?}", error);
+                    }
+                    RequestToParent::IncomingConnection { uri } => {
+                        panic!("can't handle incoming connection {:?}", uri);
+                    }
+                    RequestToParent::ReceivedData { uri, payload } => {
+                        if payload.len() == 0 {
+                            debug!("Implement Ping!");
+                        } else {
+                            let mut de = Deserializer::new(&payload[..]);
+                            let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
+                                Deserialize::deserialize(&mut de);
+                            if let Err(e) = maybe_msg {
+                                error!("Failed deserializing msg: {:?}", e);
+                                return Err(e.into());
+                            }
+                            let p2p_msg = maybe_msg.unwrap();
+                            self.handle_p2p_protocol(
+                                span.child("handle_p2p_protocol"),
+                                &uri,
+                                p2p_msg,
+                            )?;
+                        }
+                    }
+                }
             }
         }
         Ok(true /* fixme */)
+    }
+
+    /// process P2pProtocol messages that have bubbled up to the space_layer
+    fn handle_p2p_protocol(
+        &mut self,
+        span: Span,
+        _from: &Url,
+        p2p_msg: P2pProtocol,
+    ) -> Lib3hResult<()> {
+        match p2p_msg {
+            P2pProtocol::DirectMessage(dm_data) => {
+                self.lib3h_endpoint.request(
+                    span,
+                    Lib3hToClient::HandleSendDirectMessage(dm_data),
+                    Box::new(move |me, resp| match resp {
+                        GhostCallbackData::Response(Ok(
+                            Lib3hToClientResponse::HandleSendDirectMessageResult(dm_data),
+                        )) => {
+                            let to_agent_id = dm_data.to_agent_id.clone();
+
+                            let (space_gateway, payload) = match me.prepare_direct_peer_msg(
+                                dm_data.space_address.clone(),
+                                dm_data.from_agent_id.clone(),
+                                dm_data.to_agent_id.clone(),
+                                P2pProtocol::DirectMessageResult(dm_data),
+                            ) {
+                                Ok(r) => r,
+                                Err(e) => panic!("{:?}", e),
+                            };
+
+                            space_gateway.publish(
+                                Span::fixme(),
+                                GatewayRequestToChild::Transport(RequestToChild::SendMessage {
+                                    uri: Url::parse(&format!("agentid:{}", to_agent_id)).unwrap(),
+                                    payload,
+                                }),
+                            )?;
+
+                            Ok(())
+                        }
+                        _ => panic!("unhandled: {:?}", resp),
+                    }),
+                )?;
+            }
+            P2pProtocol::DirectMessageResult(dm_data) => {
+                if let Some(msg) = self
+                    .pending_client_direct_messages
+                    .remove(&dm_data.request_id)
+                {
+                    msg.respond(Ok(ClientToLib3hResponse::SendDirectMessageResult(dm_data)))?;
+                }
+            }
+            _ => panic!("can't handle space layer receive of {:?}", p2p_msg),
+        };
+        Ok(())
     }
 }

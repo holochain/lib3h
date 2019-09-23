@@ -1,7 +1,8 @@
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
     engine::GatewayId,
-    gateway::P2pGateway,
+    gateway::{GatewayOutputWrapType, P2pGateway},
+    message_encoding::*,
     transport,
 };
 use detach::prelude::*;
@@ -17,6 +18,7 @@ impl P2pGateway {
     /// Constructor
     /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
+        wrap_output_type: GatewayOutputWrapType,
         identifier: GatewayId,
         peer_location: Lib3hUri,
         inner_transport: transport::protocol::DynTransportActor,
@@ -32,12 +34,17 @@ impl P2pGateway {
                 .build(),
         );
         P2pGateway {
+            wrap_output_type,
             identifier: identifier,
             inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
                 inner_transport,
                 "to_child_transport_",
             )),
             inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
+            message_encoding: Detach::new(GhostParentWrapper::new(
+                MessageEncoding::new(),
+                "to_message_encoding_",
+            )),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
             this_peer: PeerData {

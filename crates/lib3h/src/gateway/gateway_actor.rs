@@ -2,7 +2,6 @@ use crate::{
     dht::dht_protocol::*,
     error::*,
     gateway::{protocol::*, P2pGateway},
-    transport::protocol::RequestToChild as TransportRequestToChild,
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
@@ -33,6 +32,8 @@ impl
         for request in self.inner_transport.drain_messages() {
             self.handle_transport_RequestToParent(request)?;
         }
+
+        detach_run!(&mut self.message_encoding, |enc| { enc.process(self) })?;
 
         self.handle_transport_pending_outgoing_messages()?;
 
@@ -93,6 +94,8 @@ impl P2pGateway {
             GatewayRequestToChild::Bootstrap(data) => {
                 self.send(
                     span,
+                    // this will be fixed when we get Ping working
+                    "".to_string().into(),
                     data.bootstrap_uri.clone(),
                     Opaque::new(),
                     Box::new(move |response| {
@@ -121,13 +124,12 @@ impl P2pGateway {
                                 DhtRequestToChildResponse::RequestPeerList(peer_list),
                             )) => {
                                 for peer in peer_list {
-                                    me.inner_transport.request(
+                                    me.send(
                                         Span::fixme(),
-                                        TransportRequestToChild::SendMessage {
-                                            uri: peer.peer_location.clone(),
-                                            payload: payload.clone().into(),
-                                        },
-                                        Box::new(move |_me, response| {
+                                        peer.peer_name.clone().into(),
+                                        peer.peer_location.clone(),
+                                        payload.clone().into(),
+                                        Box::new(move |response| {
                                             debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
                                                 peer.peer_location, response

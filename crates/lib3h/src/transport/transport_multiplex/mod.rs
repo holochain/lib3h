@@ -203,7 +203,6 @@ mod tests {
                 &"space_b".into(),
                 &"agent_b".into(),
                 &"agent_x".into(),
-                &"machine_x".into(),
                 "hello".into(),
             )
             .unwrap();
@@ -216,13 +215,7 @@ mod tests {
 
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { uri, payload } = msg {
-            assert_eq!(
-                &Lib3hUri::with_transport_id(
-                    &HashString::from("machine_x"),
-                    &HashString::from("agent_x")
-                ),
-                &uri
-            );
+            assert_eq!(&Lib3hUri::with_agent_id(&HashString::from("agent_x")), &uri);
             let expected: Opaque = "hello".into();
             assert_eq!(&expected, &payload);
         } else {

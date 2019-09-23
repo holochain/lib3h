@@ -7,6 +7,7 @@ mod space_layer;
 
 use crate::{
     dht::dht_protocol::*,
+    engine::engine_actor::ClientToLib3hMessage,
     error::*,
     gateway::{protocol::*, P2pGateway},
     track::Tracker,
@@ -14,7 +15,7 @@ use crate::{
 };
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
-use lib3h_ghost_actor::prelude::*;
+use lib3h_ghost_actor::{prelude::*, RequestId};
 use lib3h_protocol::{protocol::*, uri::Lib3hUri, Address};
 use std::{
     collections::{HashMap, HashSet},
@@ -122,6 +123,10 @@ pub struct GhostEngine<'engine> {
     transport_keys: TransportKeys,
     /// items we need to send on our multiplexer in another process loop
     multiplexer_defered_sends: Vec<(Lib3hUri, lib3h_protocol::data_types::Opaque)>,
+
+    /// when client gives us a SendDirectMessage, we need to cache the
+    /// GhostMessage, re-hydrate when a response comes back from a remote
+    pending_client_direct_messages: HashMap<RequestId, ClientToLib3hMessage>,
 
     client_endpoint: Option<
         GhostEndpoint<

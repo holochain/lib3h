@@ -105,14 +105,13 @@ impl<
         space_address: &Address,
         local_agent_id: &Address,
         remote_agent_id: &Address,
-        remote_transport_id: &Address,
         unpacked_payload: Opaque,
     ) -> Lib3hResult<()> {
         let route_spec = LocalRouteSpec {
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
         };
-        let path = Lib3hUri::with_transport_id(remote_transport_id, remote_agent_id);
+        let path = Lib3hUri::with_agent_id(remote_agent_id);
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {

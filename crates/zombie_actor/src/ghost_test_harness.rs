@@ -51,19 +51,19 @@ macro_rules! wait_did_work {
 #[macro_export]
 macro_rules! wait_can_track_did_work {
     ($ghost_can_track: ident,
-     $user_data: ident,
+     $user_data: expr,
      $should_abort: expr
     ) => {{
         let duration = std::time::Duration::from_millis(2000);
         $crate::wait_can_track_did_work!($ghost_can_track, $user_data, $should_abort, duration)
     }};
     ($ghost_can_track: ident,
-     $user_data: ident
+     $user_data: expr
     ) => {
         wait_can_track_did_work!($ghost_can_track, $user_data, true)
     };
     ($ghost_can_track: ident,
-     $user_data: ident,
+     $user_data: expr,
      $should_abort: expr,
      $timeout: expr
     ) => {{
@@ -120,36 +120,28 @@ macro_rules! wait_until_no_work {
 
 #[allow(unused_macros)]
 #[macro_export]
-macro_rules! wait_until_did_work {
-    ($ghost_actor: ident) => {{
-        let mut did_work;
-        loop {
-            did_work = $crate::wait_did_work!($ghost_actor, false);
-            if did_work {
-                break;
-            }
-        }
-        did_work
-    }};
-}
-
-#[allow(unused_macros)]
-#[macro_export]
 macro_rules! wait_for_messages {
-    ($ghost_actors: expr, $endpoint: ident, $regexes: expr) => {{
-        $crate::wait_for_messages!($ghost_actors, $endpoint, $regexes, 5000, true)
+    ($ghost_actors: expr, $endpoint: ident, $user_data: expr, $regexes: expr) => {{
+        $crate::wait_for_messages!($ghost_actors, $endpoint, $user_data, $regexes, 5000, true)
     }};
-    ($ghost_actors: expr, $endpoint: ident, $regexes: expr, $timeout_ms: expr) => {{
-        $crate::wait_for_messages!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
+    ($ghost_actors: expr, $endpoint: ident, $user_data: expr, $regexes: expr, $timeout_ms: expr) => {{
+        $crate::wait_for_messages!(
+            $ghost_actors,
+            $endpoint,
+            $user_data,
+            $regexes,
+            $timeout_ms,
+            true
+        )
     }};
     (
         $ghost_actors: expr,
         $endpoint: ident,
+        $user_data: expr,
         $regexes: expr,
         $timeout_ms: expr,
         $should_abort: expr
     ) => {{
-        let mut found = false;
         let mut tries = 0;
 
         let mut message_regexes: Vec<regex::Regex> = $regexes
@@ -172,7 +164,7 @@ macro_rules! wait_for_messages {
                     actor
                 })
                 .collect::<Vec<_>>();
-            let _ = $endpoint.process(&mut ());
+            let _ = $endpoint.process(&mut $user_data);
             for mut message in $endpoint.drain_messages() {
                 let message_regexes2 = message_regexes.clone();
                 message_regexes = message
@@ -210,15 +202,23 @@ macro_rules! wait_for_messages {
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait_for_message {
-    ($ghost_actors: expr, $endpoint: ident, $regex: expr) => {{
-        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, 5000, true)
+    ($ghost_actors: expr, $endpoint: ident, $user_data: expr, $regex: expr) => {{
+        $crate::wait_for_message!($ghost_actors, $endpoint, $user_data, $regex, 5000, true)
     }};
-    ($ghost_actors: expr, $endpoint: ident, $regexes: expr, $timeout_ms: expr) => {{
-        $crate::wait_for_message!($ghost_actors, $endpoint, $regex, $timeout_ms, true)
+    ($ghost_actors: expr, $endpoint: ident, $user_data: expr, $regexes: expr, $timeout_ms: expr) => {{
+        $crate::wait_for_message!(
+            $ghost_actors,
+            $endpoint,
+            $user_data,
+            $regex,
+            $timeout_ms,
+            true
+        )
     }};
     (
         $ghost_actors: expr,
         $endpoint: ident,
+        $user_data: expr,
         $regex: expr,
         $timeout_ms: expr,
         $should_abort: expr
@@ -227,6 +227,7 @@ macro_rules! wait_for_message {
         $crate::wait_for_messages!(
             $ghost_actors,
             $endpoint,
+            $user_data,
             regexes,
             $timeout_ms,
             $should_abort
@@ -246,9 +247,54 @@ macro_rules! wait1_for_message {
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait1_for_messages {
-    ($ghost_actor: expr, $endpoint: ident, $regexes: expr) => {{
+    ($ghost_actor: expr, $endpoint: ident, $user_data: expr, $regexes: expr) => {{
         let actors = vec![&mut $ghost_actor];
-        $crate::wait_for_messages!(actors, $endpoint, $regexes)
+        $crate::wait_for_messages!(actors, $endpoint, $user_data, $regexes)
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_callback {
+    ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr) => {{
+        let regex = regex::Regex::new($re.clone())
+            .expect(format!("[wait1_for_callback] invalid regex: {:?}", $re).as_str());
+
+        let mut user_data = None;
+
+        let f: GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
+            user_data.replace(format!("{:?}", cb_data).to_string());
+            Ok(())
+        });
+
+        $ghost_can_track
+            .request(
+                holochain_tracing::test_span("wait1_for_callback"),
+                $request,
+                f,
+            )
+            .unwrap();
+
+        let MAX_ITERS = 20;
+        let mut work_to_do = true;
+        for _iter in 0..MAX_ITERS {
+            work_to_do |= $crate::wait_until_no_work!($actor);
+            work_to_do |= $crate::wait_until_no_work!($ghost_can_track, user_data);
+            if !work_to_do {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1))
+        }
+
+        let actual = user_data.unwrap_or("Callback not triggered".to_string());
+
+        let is_match = regex.is_match(actual.as_str());
+
+        if is_match {
+            assert!(is_match);
+        } else {
+            assert_eq!($re, actual.as_str());
+        }
     }};
 }
 
