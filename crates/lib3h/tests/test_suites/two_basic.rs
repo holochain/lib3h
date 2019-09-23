@@ -126,7 +126,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
             to_agent_id : "billy".into()
     });
 
-    assert_processed_eq!(alex, billy, handle_send_direct_msg);
+    assert2_msg_eq!(alex, billy, handle_send_direct_msg);
 
     // Send response
     let response_content = format!("echo: {}", "wah").as_bytes().to_vec();
