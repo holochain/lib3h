@@ -13,6 +13,7 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{EngineConfig, GatewayId, GhostEngine, TransportConfig},
 };
+use lib3h_protocol::uri::Lib3hUri;
 use lib3h_sodium::SodiumCryptoSystem;
 
 // Real test network-id should be a hc version of sha256 of a string
@@ -78,7 +79,7 @@ fn main() {
             }
             writeln!(rl_t, "SIMCHAT GOT {:?}", event).expect("write fail");
         }),
-        Url::parse("http://bootstrap.holo.host").unwrap(),
+        Url::parse("http://bootstrap.holo.host").unwrap().into(),
     );
 
     let help_text = || {

@@ -24,6 +24,7 @@ use lib3h_ghost_actor::{
 use lib3h_protocol::{
     data_types::{BootstrapData, DirectMessageData, SpaceData},
     protocol::{ClientToLib3h, ClientToLib3hResponse, Lib3hToClient, Lib3hToClientResponse},
+    uri::Lib3hUri,
     Address,
 };
 use lib3h_sodium::{hash, secbuf::SecBuf};
@@ -77,7 +78,7 @@ impl Lib3hSimChat {
     pub fn new<T>(
         engine_builder: EngineBuilder<T>,
         mut handler: HandleEvent,
-        peer_location: Url,
+        peer_location: Lib3hUri,
     ) -> Self
     where
         T: GhostActor<
