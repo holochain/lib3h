@@ -621,7 +621,7 @@ mod tests {
             Box::new(|_: &mut bool, response| {
                 assert_eq!(
                     &format!("{:?}", response),
-                    "Response(Ok(Bind(BindResultData { bound_url: \"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\" })))"
+                    "Response(Ok(Bind(BindResultData { bound_url: Lib3hUri(\"test://1/bound?a=HcSCJ9G64XDKYo433rIMm57wfI8Y59Udeb4hkVvQBZdm6bgbJ5Wgs79pBGBcuzz\") })))"
                 );
                 Ok(())
             })
@@ -655,7 +655,7 @@ mod tests {
             Box::new(|_:&mut (), response| {
                 assert_eq!(
                     &format!("{:?}", response),
-                    "Response(Ok(Bind(BindResultData { bound_url: \"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\" })))"
+                    "Response(Ok(Bind(BindResultData { bound_url: Lib3hUri(\"test://2/bound?a=HcMCJ8HpYvB4zqic93d3R4DjkVQ4hhbbv9UrZmWXOcn3m7w4O3AIr56JRfrt96r\") })))"
                 );
                 Ok(())
             })

@@ -82,7 +82,7 @@ impl Lib3hUri {
     }
     pub fn with_memory(other: &str) -> Self {
         let url = Url::parse(&format!(
-            "{}//:{}",
+            "{}://{}",
             MEMORY_SCHEME, other
         ))
         .unwrap();

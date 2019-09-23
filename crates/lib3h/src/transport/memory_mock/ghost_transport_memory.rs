@@ -412,15 +412,15 @@ mod tests {
         // check that transport_ids were advertised
         let found = transport1.discover().unwrap();
         assert!(
-            &format!("{:?}", found[0]) == "\"mem://addr_1/\""
-                || &format!("{:?}", found[0]) == "\"mem://addr_2/\""
+            &format!("{}", found[0]) == "mem://addr_1/"
+                || &format!("{}", found[0]) == "mem://addr_2/"
         );
         assert!(
-            &format!("{:?}", found[1]) == "\"mem://addr_1/\""
-                || &format!("{:?}", found[1]) == "\"mem://addr_2/\""
+            &format!("{}", found[1]) == "mem://addr_1/"
+                || &format!("{}", found[1]) == "mem://addr_2/"
         );
         let found = transport3.discover().unwrap();
-        assert_eq!(&format!("{:?}", found[0]), "\"mem://addr_1/\""); // because of different network
+        assert_eq!(&format!("{}", found[0]), "mem://addr_1/"); // because of different network
     }
 
     #[test]
@@ -489,15 +489,16 @@ mod tests {
         let msg = requests[0].take_message();
         // which url was discovered is non-deterministic
         assert!(
-            "Some(IncomingConnection { uri: \"mem://addr_1/\" })" == format!("{:?}", msg)
-                || "Some(IncomingConnection { uri: \"mem://addr_2/\" })" == format!("{:?}", msg)
+            "Some(IncomingConnection { uri: Lib3hUri(\"mem://addr_1/\") })" == format!("{:?}", msg)
+                || "Some(IncomingConnection { uri: Lib3hUri(\"mem://addr_2/\") })"
+                    == format!("{:?}", msg)
         );
         assert_eq!(
-            "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
+            "Some(IncomingConnection { uri: Lib3hUri(\"mem://addr_1/\") })",
             format!("{:?}", requests[1].take_message())
         );
         assert_eq!(
-            "Some(ReceivedData { uri: \"mem://addr_1/\", payload: \"test message\" })",
+            "Some(ReceivedData { uri: Lib3hUri(\"mem://addr_1/\"), payload: \"test message\" })",
             format!("{:?}", requests[2].take_message())
         );
     }

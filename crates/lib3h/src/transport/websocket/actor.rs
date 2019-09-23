@@ -389,7 +389,7 @@ mod tests {
                     // parent should see the bind event
                     assert_eq!(
                         format!(
-                            "Response(Ok(Bind(BindResultData {{ bound_url: \"wss://127.0.0.1:{}/\" }})))",
+                            "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
                             port1.clone(),
                         ),
                         format!("{:?}", r)
@@ -414,7 +414,7 @@ mod tests {
                     // parent should see the bind event
                     assert_eq!(
                         &format!(
-                            "Response(Ok(Bind(BindResultData {{ bound_url: \"wss://127.0.0.1:{}/\" }})))",
+                            "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
                             port2.clone(),
                         ),
                         &format!("{:?}", r)
@@ -458,7 +458,7 @@ mod tests {
         wait_for_message!(
             vec![&mut transport1, &mut transport2],
             t2_endpoint,
-            "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
+            "ReceivedData \\{ uri: Lib3hUri(\"wss://127\\.0\\.0\\.1:\\d+/\"), payload: \"test message\" \\}"
         );
     }
 
@@ -552,7 +552,7 @@ mod tests {
                 wait_for_message!(
                     vec![&mut transport1, &mut transport2],
                     t2_endpoint,
-                    "ReceivedData \\{ uri: \"wss://127\\.0\\.0\\.1:\\d+/\", payload: \"test message\" \\}"
+                    "ReceivedData \\{ uri: Lib3hUri(\"wss://127\\.0\\.0\\.1:\\d+/\"), payload: \"test message\" \\}"
                 );
             }
 
