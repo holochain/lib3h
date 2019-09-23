@@ -255,6 +255,31 @@ impl AssertRegex<Lib3hServerProtocol> for Lib3hServerProtocolRegex {
     }
 }
 
+impl Predicate<ProcessorResult> for Lib3hServerProtocolRegex
+{
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| self.expected().is_match(format!("{:?}", **actual).as_str()))
+            .is_some()
+    }
+}
+
+impl Processor for Lib3hServerProtocolRegex
+{
+    fn test(&self, args: &ProcessorResult) -> () {
+        if !self.eval(args) {
+            let actual = self.extracted(args).first().map(
+                |a| format!("{:?}", a)).unwrap_or("None".to_string());
+             assert_eq!(
+                self.expected().as_str(),
+                actual.as_str()
+             )
+        }
+   }
+}
+
 impl std::fmt::Display for Lib3hServerProtocolRegex {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
