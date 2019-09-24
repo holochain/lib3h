@@ -125,7 +125,8 @@ impl<'engine> GhostEngine<'engine> {
                     self.lib3h_endpoint
                         .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
                 } else {
-                    panic!("unhandled error {}", error);
+                    // FIXME #391
+                    error!("unhandled error {}", error);
                     /*
                     self.network_connections.remove(uri);
                     error!("{} Network error from {} : {:?}", self.name, uri, error);
