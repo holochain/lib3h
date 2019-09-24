@@ -45,7 +45,7 @@ pub fn generate_agent_id(i: u32) -> String {
 
 #[allow(dead_code)]
 pub fn generate_space_address(i: u32) -> Address {
-    format!("SPACE_{}", i).into()
+    format!("app{}", i).into()
 }
 
 #[allow(dead_code)]

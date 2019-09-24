@@ -1,10 +1,8 @@
 //! Discovery trait definition.
 
-extern crate lib3h_protocol;
-
 pub mod error;
-pub use error::DiscoveryResult;
-use lib3h_protocol::uri::Lib3hUri;
+
+use crate::{discovery::error::DiscoveryResult, uri::Lib3hUri};
 
 pub trait Discovery {
     fn advertise(&mut self) -> DiscoveryResult<()>;

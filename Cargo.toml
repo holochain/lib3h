@@ -9,7 +9,6 @@ members = [
   "crates/lib3h_protocol",
   "crates/p2p_protocol",
   "crates/lib3h",
-  "crates/discovery",
   "crates/mdns",
   "crates/detach",
   "crates/tools/capnp_build",
