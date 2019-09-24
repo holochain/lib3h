@@ -45,26 +45,41 @@ pub struct MirrorDht {
 
 /// Constructors
 impl MirrorDht {
-    pub fn new(this_peer_name: &Lib3hUri) -> Box<DhtActor> {
-        let dht_config = DhtConfig::new(this_peer_name);
-        let dht = Self::new_with_config(&dht_config).expect("Failed creating default MirrorDht");
+    pub fn with_this_peer(this_peer: &PeerData) -> Box<DhtActor> {
+        let dht_config = DhtConfig::new(&this_peer.peer_name);
+        let dht = Self::new_with_config(&dht_config, Some(this_peer.clone()))
+            .expect("Failed creating default MirrorDht");
         dht
     }
 
-    pub fn new_with_config(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>> {
+    pub fn new(this_peer_name: &Lib3hUri) -> Box<DhtActor> {
+        let dht_config = DhtConfig::new(this_peer_name);
+        let dht =
+            Self::new_with_config(&dht_config, None).expect("Failed creating default MirrorDht");
+        dht
+    }
+
+    pub fn new_with_config(
+        config: &DhtConfig,
+        maybe_this_peer: Option<PeerData>,
+    ) -> Lib3hResult<Box<DhtActor>> {
         let timestamp = time::since_epoch_ms();
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
+
+        let this_peer = match maybe_this_peer {
+            None => PeerData {
+                peer_name: config.this_peer_name().to_owned(),
+                peer_location: Lib3hUri::with_undefined(),
+                timestamp,
+            },
+            Some(this_peer) => this_peer,
+        };
 
         let this = MirrorDht {
             peer_map: HashMap::new(),
             timed_out_map: HashMap::new(),
             entry_list: HashMap::new(),
-            this_peer: PeerData {
-                // maybe this will go away
-                peer_name: config.this_peer_name().to_owned(),
-                peer_location: Lib3hUri::with_undefined(),
-                timestamp,
-            },
+            this_peer,
             last_gossip_of_self: timestamp,
             config: config.clone(),
             endpoint_parent: Some(endpoint_parent),
@@ -118,7 +133,6 @@ impl MirrorDht {
         let now = time::since_epoch_ms();
         let mut outbox = Vec::new();
         let mut did_work = false;
-        println!("mirrorDht.this_peer = {:?}", self.this_peer);
         // Check if others timed-out
         // TODO: Might need to optimize performance as walking a map is expensive
         // see comment: https://github.com/holochain/lib3h/pull/210/#discussion_r304518608
@@ -459,7 +473,11 @@ impl MirrorDht {
             DhtRequestToChild::DropEntryAddress(_) => (),
 
             DhtRequestToChild::UpdateAdvertise(peer_location) => {
-                trace!("DhtRequestToChild::UpdateAdvertise: {:?}", peer_location);
+                trace!(
+                    "({}).DhtRequestToChild::UpdateAdvertise: {:?}",
+                    self.config.this_peer_name(),
+                    peer_location
+                );
                 self.this_peer.peer_location = peer_location;
             }
 
@@ -480,6 +498,10 @@ impl MirrorDht {
                 let payload = Ok(DhtRequestToChildResponse::RequestThisPeer(
                     self.this_peer.clone(),
                 ));
+                trace!(
+                    "DhtRequestToChild::RequestThisPeer:  sending {:?}",
+                    self.this_peer
+                );
                 request.respond(payload)?;
             }
 
