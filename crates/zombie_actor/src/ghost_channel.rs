@@ -771,7 +771,7 @@ mod tests {
         // wait 1 ms for the callback to have expired
         std::thread::sleep(std::time::Duration::from_millis(1));
         assert!(endpoint.process(fake_dyn_actor).is_ok());
-        assert_eq!("Timeout", fake_dyn_actor.0);
+        assert_eq!("Timeout", &fake_dyn_actor.0[..7]);
 
         // now lets simulate sending an event from the parent
         parent_side
