@@ -132,7 +132,8 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let response_content = format!("echo: {}", "wah").as_bytes().to_vec();
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
-    let expected = "FUCK Lib3hServerProtocol::SendDirectMessageResult";
+    // TODO Set this to correct value once test passes
+    let expected = "Lib3hServerProtocol::SendDirectMessageResult";
 
     assert2_msg_matches!(alex, billy, expected);
 }
