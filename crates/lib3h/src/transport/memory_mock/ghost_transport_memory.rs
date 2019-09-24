@@ -5,12 +5,15 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
-use lib3h_discovery::{
-    error::{DiscoveryError, DiscoveryResult},
-    Discovery,
-};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{uri::Lib3hUri, Address};
+use lib3h_protocol::{
+    discovery::{
+        error::{DiscoveryError, DiscoveryResult},
+        Discovery,
+    },
+    uri::Lib3hUri,
+    Address,
+};
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
