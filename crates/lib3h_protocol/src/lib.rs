@@ -10,6 +10,7 @@ extern crate rmp_serde;
 extern crate shrinkwraprs;
 
 pub mod data_types;
+pub mod discovery;
 pub mod network_engine;
 pub mod protocol;
 pub mod protocol_client;

@@ -5,8 +5,8 @@ extern crate lib3h_mdns;
     engine::{GhostEngine, EngineConfig},
     transport_wss::TlsConfig,
 };*/
-use lib3h_discovery::Discovery;
 use lib3h_mdns::MulticastDnsBuilder;
+use lib3h_protocol::discovery::Discovery;
 //use lib3h_protocol::network_engine::NetworkEngine;
 //use lib3h_sodium::SodiumCryptoSystem;
 //use url::Url;
