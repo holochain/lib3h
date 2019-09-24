@@ -429,11 +429,11 @@ macro_rules! process_one_engine {
   ) => {{
         let (did_work, events) = $engine
             .process()
-            .map_err(|err| dbg!(err))
+            .map_err(|err| error!("[process_one_engine] process generated an error: {:?}", err))
             .unwrap_or((false, vec![]));
         if events.is_empty() {
         } else {
-            let events = dbg!(events);
+            trace!("[process_one_engine]: {:?}", events);
             let processor_result = $crate::utils::processor_harness::ProcessorResult {
                 did_work,
                 events,

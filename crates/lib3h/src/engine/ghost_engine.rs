@@ -585,17 +585,21 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_direct_message(
         &mut self,
         span: Span,
-        ghost_message: ClientToLib3hMessage,
+        client_to_lib3h_msg: ClientToLib3hMessage,
         mut msg: DirectMessageData,
     ) -> Lib3hResult<()> {
         let to_agent_id = msg.to_agent_id.clone();
-
         // Generate a new request_id for the network transport exchange.
         // we can overwrite the value in the DirectMessageData because the ghost tracker will handle
         // the request response pairing
         let request_id = RequestId::new();
+        trace!(
+            "GhostEngine: mutating request id from {:?} to {:?} for {:?}",
+            msg.request_id,
+            request_id,
+            msg
+        );
         msg.request_id = request_id.clone().into();
-
         let (space_gateway, payload) = match self.prepare_direct_peer_msg(
             msg.space_address.clone(),
             msg.from_agent_id.clone(),
@@ -604,7 +608,7 @@ impl<'engine> GhostEngine<'engine> {
         ) {
             Ok(r) => r,
             Err(e) => {
-                return Ok(ghost_message.respond(Err(e))?);
+                return Ok(client_to_lib3h_msg.respond(Err(e))?);
             }
         };
 
@@ -623,10 +627,11 @@ impl<'engine> GhostEngine<'engine> {
                     GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
                         transport::protocol::RequestToChildResponse::SendMessageSuccess,
                     ))) => {
+                        trace!("GhostEngine: insert pending client direct message with request id {:?}", request_id);
                         me.pending_client_direct_messages
-                            .insert(request_id, ghost_message);
+                            .insert(request_id, client_to_lib3h_msg);
                     }
-                    _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                    _ => client_to_lib3h_msg.respond(Err(format!("{:?}", response).into()))?,
                 };
                 Ok(())
             }),

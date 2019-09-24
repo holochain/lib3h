@@ -38,6 +38,7 @@ where
     client_request_responses: Vec<Lib3hServerProtocol>,
     tracker:
         Tracker<GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, EngineError>>,
+    req_id_map: std::collections::HashMap<String, String>,
 }
 
 fn server_failure(
@@ -86,7 +87,8 @@ where
             engine: Detach::new(GhostParentWrapper::new(engine, name)),
             name: name.into(),
             client_request_responses: Vec::new(),
-            tracker: Tracker::new("client_to_lib3_response", 2000),
+            tracker: Tracker::new("client_to_lib3_response_", 2000),
+            req_id_map: std::collections::HashMap::new(),
         }
     }
 
@@ -226,7 +228,6 @@ where
             // TODO Handle errors better here!
             let lib3h_to_client_response: Lib3hToClientResponse =
                 client_msg.clone().try_into().unwrap();
-            // TODO Handle optional value better here!
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
             let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
@@ -236,8 +237,23 @@ where
                 )))
             })?;
 
+            let resp;
+            if let Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =
+                lib3h_to_client_response.clone()
+            {
+                trace!("IS CASE: {:?}", lib3h_to_client_response);
+                let result = self.req_id_map.remove(&request_id);
+                if let Some(req_id) = result {
+                    trace!("REPLACE req_id {:?} with {:?}", data.request_id, req_id);
+                    data.request_id = req_id.clone();
+                }
+                resp = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
+            } else {
+                resp = lib3h_to_client_response.clone();
+            }
+
             ghost_mesage
-                .respond(Ok(lib3h_to_client_response))
+                .respond(Ok(resp))
                 .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         }
     }
@@ -254,20 +270,19 @@ where
             self.client_request_responses.drain(..).collect();
 
         for mut msg in self.engine.as_mut().drain_messages() {
-            let request_id = self.tracker.reserve();
+            let tracker_request_id = self.tracker.reserve();
 
             let lib3h_to_client_msg: Lib3hToClient = msg.take_message().expect("exists");
 
             trace!(
                 "[legacy engine] reserve {:?} for {:?}",
-                request_id,
+                tracker_request_id,
                 lib3h_to_client_msg
             );
 
-            self.tracker.set(request_id.as_str(), Some(msg));
-
+            self.tracker.set(tracker_request_id.as_str(), Some(msg));
             let lib3h_server_protocol_msg: Lib3hServerProtocol =
-                inject_request_id(request_id, lib3h_to_client_msg.into());
+                self.inject_request_id(tracker_request_id.clone(), lib3h_to_client_msg.into());
             responses.push(lib3h_server_protocol_msg);
         }
 
@@ -281,22 +296,30 @@ where
     pub fn name(&self) -> String {
         self.name.clone()
     }
-}
 
-fn inject_request_id(request_id: String, mut msg: Lib3hServerProtocol) -> Lib3hServerProtocol {
-    match &mut msg {
-        Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
-        Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleSendDirectMessage(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
-        _ => (),
+    fn inject_request_id(
+        &mut self,
+        request_id: String,
+        mut msg: Lib3hServerProtocol,
+    ) -> Lib3hServerProtocol {
+        match &mut msg {
+            Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
+            Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleSendDirectMessage(data) => {
+                self.req_id_map
+                    .insert(request_id.clone(), data.request_id.clone());
+                data.request_id = request_id
+            }
+            msg => error!("[inject_request_id] CONVERT ME: {:?}", msg),
+        }
+        msg
     }
-    msg
 }
 
 #[cfg(test)]
