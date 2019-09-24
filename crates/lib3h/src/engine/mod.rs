@@ -16,12 +16,11 @@ use crate::{
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{protocol::*, Address};
+use lib3h_protocol::{protocol::*, uri::Lib3hUri, Address};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
-use url::Url;
 
 /// Identifier of a source chain: SpaceAddress+AgentId
 pub type ChainId = (Address, Address);
@@ -62,10 +61,10 @@ pub enum TransportConfig {
 pub struct EngineConfig {
     pub network_id: GatewayId,
     pub transport_configs: Vec<TransportConfig>,
-    pub bootstrap_nodes: Vec<Url>,
+    pub bootstrap_nodes: Vec<Lib3hUri>,
     pub work_dir: PathBuf,
     pub log_level: char,
-    pub bind_url: Url,
+    pub bind_url: Lib3hUri,
     pub dht_gossip_interval: u64,
     pub dht_timeout_threshold: u64,
     pub dht_custom_config: Vec<u8>,
@@ -73,7 +72,7 @@ pub struct EngineConfig {
 
 pub struct TransportKeys {
     /// Our TransportId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
-    pub transport_id: String,
+    pub transport_id: Address,
     /// The TransportId public key
     pub transport_public_key: Box<dyn Buffer>,
     /// The TransportId secret key
@@ -86,7 +85,7 @@ impl TransportKeys {
         let mut secret_key = crypto.buf_new_secure(crypto.sign_secret_key_bytes());
         crypto.sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(Self {
-            transport_id: hcm0.encode(&public_key)?,
+            transport_id: hcm0.encode(&public_key)?.into(),
             transport_public_key: public_key,
             transport_secret_key: secret_key,
         })
@@ -94,7 +93,7 @@ impl TransportKeys {
 }
 
 pub trait CanAdvertise {
-    fn advertise(&self) -> Url;
+    fn advertise(&self) -> Lib3hUri;
 }
 
 pub struct GhostEngine<'engine> {
@@ -112,7 +111,7 @@ pub struct GhostEngine<'engine> {
     this_net_peer: PeerData,
 
     /// Store active connections?
-    network_connections: HashSet<Url>,
+    network_connections: HashSet<Lib3hUri>,
     /// Map of P2p gateway per Space+Agent
     space_gateway_map:
         HashMap<ChainId, Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>>,
@@ -123,7 +122,7 @@ pub struct GhostEngine<'engine> {
     /// transport_id data, public/private keys, etc
     transport_keys: TransportKeys,
     /// items we need to send on our multiplexer in another process loop
-    multiplexer_defered_sends: Vec<(Url, lib3h_protocol::data_types::Opaque)>,
+    multiplexer_defered_sends: Vec<(Lib3hUri, lib3h_protocol::data_types::Opaque)>,
 
     /// when client gives us a SendDirectMessage, we need to cache the
     /// GhostMessage, re-hydrate when a response comes back from a remote

@@ -15,11 +15,11 @@ use lib3h_protocol::{
     protocol::*,
     protocol_client::*,
     protocol_server::*,
+    uri::Lib3hUri,
     Address, DidWork,
 };
-use url::Url;
-
 pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
+
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
 pub struct LegacyLib3h<Engine, EngineError: 'static + std::fmt::Debug>
@@ -104,7 +104,7 @@ where
                             ClientToLib3hResponse::BootstrapSuccess => {
                                 Lib3hServerProtocol::Connected(ConnectedData {
                                     request_id,
-                                    uri: Url::parse("none:").unwrap(), // client should have this allready deprecated
+                                    uri: Lib3hUri::with_undefined(), // client should have this already deprecated
                                 })
                             }
                             ClientToLib3hResponse::JoinSpaceResult => {
@@ -274,7 +274,7 @@ where
         Ok((*did_work, responses))
     }
 
-    pub fn advertise(&self) -> Url {
+    pub fn advertise(&self) -> Lib3hUri {
         self.engine.as_ref().as_ref().advertise()
     }
 
@@ -331,8 +331,8 @@ mod tests {
     }
 
     impl CanAdvertise for MockGhostEngine {
-        fn advertise(&self) -> Url {
-            Url::parse("mem://fixme").unwrap()
+        fn advertise(&self) -> Lib3hUri {
+            Lib3hUri::with_memory("fixme")
         }
     }
 
@@ -445,7 +445,7 @@ mod tests {
 
         let data = ConnectData {
             request_id: "foo_request_id".into(),
-            peer_uri: Url::parse("mocknet://t1").expect("can parse url"),
+            peer_location: Url::parse("mocknet://t1").expect("can parse url").into(),
             network_id: "fake_id".to_string(),
         };
 

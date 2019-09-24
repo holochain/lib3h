@@ -32,6 +32,8 @@
 #![feature(never_type)]
 #![feature(drain_filter)]
 
+extern crate lib3h_protocol;
+
 use log::{debug, error, trace};
 // Used to clean our buffer to avoid mixing messages together.
 use url::Url;
@@ -43,6 +45,7 @@ use std::{
 };
 
 use lib3h_discovery::{error::DiscoveryResult, Discovery};
+use lib3h_protocol::uri::Lib3hUri;
 
 pub mod error;
 pub use error::{MulticastDnsError, MulticastDnsResult};
@@ -152,16 +155,16 @@ impl MulticastDns {
     }
 
     /// Returns all the urls for every NetworkId.
-    pub fn urls(&self) -> Vec<Url> {
+    pub fn urls(&self) -> Vec<Lib3hUri> {
         self.map_record
             .iter()
             .flat_map(|(_, v)| {
                 v.iter()
                     .filter_map(|r| match Url::parse(&r.url) {
-                        Ok(url) => Some(url),
+                        Ok(url) => Some(url.into()),
                         Err(_) => None,
                     })
-                    .collect::<Vec<Url>>()
+                    .collect::<Vec<Lib3hUri>>()
             })
             .collect()
     }
@@ -410,7 +413,7 @@ impl Discovery for MulticastDns {
     }
 
     /// Read the UDP stack and update our cache accordingly.
-    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
+    fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
         self.responder()?;
 
         // We should query (and announce in the same time because we will anwser to our query in the
