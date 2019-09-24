@@ -671,13 +671,13 @@ impl NodeMock {
         predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     ) -> Vec<ProcessorResult> {
         let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolAssert(predicate));
-        assert_one_processed!(self, self, predicate)
+        assert_processed!(self, predicate)
     }
 
     /// Asserts some event produced by produce equals actual
     pub fn wait_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
         let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(actual.clone()));
-        assert_one_processed!(self, self, predicate)
+        assert_processed!(self, predicate)
     }
 
     /// Waits for work to be done
@@ -689,7 +689,7 @@ impl NodeMock {
     /// Continues processing the engine until no work is being done.
     pub fn wait_until_no_work(&mut self) -> bool {
         let me = self;
-        wait_until_no_work!(me)
+        wait_engine_wrapper_until_no_work!(me)
     }
 
     pub fn agent_id(&self) -> Address {
