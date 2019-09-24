@@ -7,14 +7,14 @@ pub type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-        (test_setup_only, true),
+ //       (test_setup_only, true),
         (test_send_message, true),
-        (test_send_message_fail, true),
-        (test_hold_entry, true),
-        (test_author_no_aspect, true),
-        (test_author_one_aspect, true),
-        (test_author_two_aspects, true),
-        (test_two_authors, true),
+ //       (test_send_message_fail, true),
+ //       (test_hold_entry, true),
+ //       (test_author_no_aspect, true),
+//      (test_author_one_aspect, true),
+  //      (test_author_two_aspects, true),
+    //    (test_two_authors, true),
     ];
 }
 
@@ -22,7 +22,7 @@ lazy_static! {
 // Test setup
 //--------------------------------------------------------------------------------------------------
 
-///
+#[allow(dead_code)]
 pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
     // Connect Alex to Billy
     let connect_data = alex.connect_to(&billy.advertise()).unwrap();
@@ -41,6 +41,7 @@ pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
 //--------------------------------------------------------------------------------------------------
 
 /// Request ENTRY_ADDRESS_1 from the network and should get it back
+#[allow(dead_code)]
 pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let enty_address_str = &entry.entry_address;
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
@@ -68,6 +69,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 }
 
 ///
+#[allow(dead_code)]
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
     println!(
         "\ntwo_join_space ({},{}) -> {}\n",
@@ -109,6 +111,7 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
 //--------------------------------------------------------------------------------------------------
 
 /// Empty function that triggers the test suite
+#[allow(dead_code)]
 fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock) {
     // n/a
 }
@@ -139,6 +142,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 }
 
 /// Test SendDirectMessage and response
+#[allow(dead_code)]
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
     // Send to self
     let req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
@@ -164,6 +168,7 @@ fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
 }
 
 /// Test publish, Store, Query
+#[allow(dead_code)]
 pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex publish data on the network
     let entry = alex
@@ -199,6 +204,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 }
 
 /// Test Hold & Query
+#[allow(dead_code)]
 fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex holds an entry
     let entry = alex
@@ -232,6 +238,7 @@ fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
 }
 
 /// Entry with no Aspect case: Should no-op
+#[allow(dead_code)]
 fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex publish data on the network
     alex.author_entry(&ENTRY_ADDRESS_1, vec![], true).unwrap();
@@ -251,6 +258,7 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 }
 
 /// Entry with two aspects case
+#[allow(dead_code)]
 fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex authors and broadcast an entry on the space
     let entry = alex
@@ -280,6 +288,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
 }
 
 /// Entry with two aspects case
+#[allow(dead_code)]
 fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex authors and broadcast first aspect
     // =======================================
