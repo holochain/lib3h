@@ -3,7 +3,7 @@
 /// times a necessary until success (up to a hard coded number of iterations, currently).
 use predicates::prelude::*;
 
-use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, uri::Lib3hUri};
+use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 use crate::utils::seeded_prng::SeededBooleanPrng;
 
@@ -12,9 +12,11 @@ use std::sync::Mutex;
 #[allow(dead_code)]
 pub const MAX_PROCESSING_LOOPS: usize = 100;
 
-lazy_static! {
+#[allow(dead_code)]
+pub const MAX_DID_WEIGHT_LOOPS: usize = 20;
 
-    pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
+lazy_static! {
+pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
 
         // generate a random seed here
         // if you see an error "sometimes" manually paste the seed from the logs in here and
@@ -53,11 +55,6 @@ pub struct ProcessorResult {
 /// test function which will break control flow similar to
 /// how calling assert! or assert_eq! would.
 pub trait Processor: Predicate<ProcessorResult> {
-    /// Processor name, for debugging and mapping purposes
-    fn name(&self) -> String {
-        "default_processor".into()
-    }
-
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
     fn test(&self, args: &ProcessorResult);
@@ -66,7 +63,7 @@ pub trait Processor: Predicate<ProcessorResult> {
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
 pub trait AssertEquals<T: PartialEq + std::fmt::Debug> {
     /// User defined function for extracting a collection data of a specific
-    /// type from the proessor arguments
+    /// type from the processor arguments
     fn extracted(&self, args: &ProcessorResult) -> Vec<T>;
 
     /// The expected value to compare to the actual value to
@@ -78,6 +75,7 @@ impl<T: PartialEq + std::fmt::Debug> std::fmt::Display for dyn AssertEquals<T> {
         write!(f, "{}", "assert_equals")
     }
 }
+
 impl<T> predicates::reflection::PredicateReflection for dyn AssertEquals<T> where
     T: PartialEq + std::fmt::Debug
 {
@@ -96,6 +94,66 @@ where
     }
 }
 
+impl<T> Processor for dyn AssertEquals<T>
+where
+    T: PartialEq + std::fmt::Debug,
+{
+    fn test(&self, args: &ProcessorResult) -> () {
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find(|actual| **actual == self.expected());
+        assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
+    }
+}
+
+/// Asserts some extracted data from ProcessorResult matches a regular expression
+/// Will invoke `assert_eq!(regex, format!("{:?}", actual))` upon failure for easy
+/// to compare output
+pub trait AssertRegex<T: std::fmt::Debug> {
+    /// User defined function for extracting a collection data of a specific
+    /// type from the processor arguments
+    fn extracted(&self, args: &ProcessorResult) -> Vec<T>;
+
+    /// The regex value to match against the actual value
+    fn expected(&self) -> regex::Regex;
+}
+
+impl<T> Predicate<ProcessorResult> for dyn AssertRegex<T>
+where
+    T: std::fmt::Debug,
+{
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| self.expected().is_match(format!("{:?}", **actual).as_str()))
+            .is_some()
+    }
+}
+
+impl<T> Processor for dyn AssertRegex<T>
+where
+    T: std::fmt::Debug,
+{
+    fn test(&self, args: &ProcessorResult) -> () {
+        if !self.eval(args) {
+            let actual = self
+                .extracted(args)
+                .first()
+                .map(|a| format!("{:?}", a))
+                .unwrap_or("None".to_string());
+            assert_eq!(self.expected().as_str(), actual.as_str())
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Display for dyn AssertRegex<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "assert_regex")
+    }
+}
+
+impl<T> predicates::reflection::PredicateReflection for dyn AssertRegex<T> where T: std::fmt::Debug {}
+
 /// Asserts some extracted data from ProcessorResult passes a predicate.
 pub trait Assert<T> {
     fn extracted(&self, args: &ProcessorResult) -> Vec<T>;
@@ -103,77 +161,7 @@ pub trait Assert<T> {
     fn assert_inner(&self, args: &T) -> bool;
 }
 
-/// Asserts that the actual is equal to the given expected
-#[allow(dead_code)]
-#[derive(PartialEq, Debug)]
-pub struct Lib3hServerProtocolEquals(pub Lib3hServerProtocol);
-
-/// Asserts using an arbitrary predicate over a lib3h server protocol event
-#[allow(dead_code)]
-pub struct Lib3hServerProtocolAssert(pub Box<dyn Predicate<Lib3hServerProtocol>>);
-
-/// Asserts work was done
-#[allow(dead_code)]
-#[derive(PartialEq, Debug)]
-pub struct DidWorkAssert(pub String /* engine name */);
-
-impl Processor for Lib3hServerProtocolAssert {
-    fn test(&self, args: &ProcessorResult) {
-        let extracted = self.extracted(args);
-        let actual = extracted
-            .iter()
-            .find(move |actual| self.assert_inner(*actual))
-            .or(extracted.first());
-
-        if let Some(actual) = actual {
-            assert!(self.assert_inner(actual));
-        } else {
-            assert!(actual.is_some());
-        }
-    }
-
-    fn name(&self) -> String {
-        "Lib3hServerProtocolAssert".to_string()
-    }
-}
-
-impl Processor for DidWorkAssert {
-    fn test(&self, args: &ProcessorResult) {
-        assert!(args.engine_name == self.0);
-        assert!(args.did_work);
-    }
-
-    fn name(&self) -> String {
-        format!("{:?}", self).to_string()
-    }
-}
-
-impl Predicate<ProcessorResult> for DidWorkAssert {
-    fn eval(&self, args: &ProcessorResult) -> bool {
-        args.engine_name == self.0 && args.did_work
-    }
-}
-
-impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
-    fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
-        args.events.iter().map(|x| x.clone()).collect()
-    }
-
-    fn assert_inner(&self, x: &Lib3hServerProtocol) -> bool {
-        self.0.eval(&x)
-    }
-}
-
-impl predicates::Predicate<ProcessorResult> for Lib3hServerProtocolEquals {
-    fn eval(&self, args: &ProcessorResult) -> bool {
-        self.extracted(args)
-            .iter()
-            .find(|actual| **actual == self.expected())
-            .is_some()
-    }
-}
-
-impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert {
+impl<T> Predicate<ProcessorResult> for dyn Assert<T> {
     fn eval(&self, args: &ProcessorResult) -> bool {
         let extracted = self.extracted(args);
         extracted
@@ -183,17 +171,24 @@ impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert {
     }
 }
 
-impl Processor for Lib3hServerProtocolEquals {
-    fn test(&self, args: &ProcessorResult) {
-        let extracted = self.extracted(args);
-        let actual = extracted.iter().find(|actual| **actual == self.expected());
-        assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
-    }
-
-    fn name(&self) -> String {
-        format!("{:?}", self).to_string()
+impl<T> Processor for dyn Assert<T> {
+    fn test(&self, args: &ProcessorResult) -> () {
+        assert!(self.eval(args))
     }
 }
+
+impl<T> predicates::reflection::PredicateReflection for dyn Assert<T> {}
+
+impl<T> std::fmt::Display for dyn Assert<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", "assert_processed")
+    }
+}
+
+/// Asserts that the actual is equal to the given expected
+#[allow(dead_code)]
+#[derive(PartialEq, Debug)]
+pub struct Lib3hServerProtocolEquals(pub Lib3hServerProtocol);
 
 impl AssertEquals<Lib3hServerProtocol> for Lib3hServerProtocolEquals {
     fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
@@ -210,9 +205,124 @@ impl std::fmt::Display for Lib3hServerProtocolEquals {
     }
 }
 
+impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
+
+impl Predicate<ProcessorResult> for Lib3hServerProtocolEquals {
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| **actual == self.expected())
+            .is_some()
+    }
+}
+
+impl Processor for Lib3hServerProtocolEquals {
+    fn test(&self, args: &ProcessorResult) {
+        let extracted = self.extracted(args);
+        let actual = extracted.iter().find(|actual| **actual == self.expected());
+        assert_eq!(Some(&self.expected()), actual.or(extracted.first()));
+    }
+}
+
+/// Asserts that the actual matches the given regular expression
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct Lib3hServerProtocolRegex(pub regex::Regex);
+
+impl AssertRegex<Lib3hServerProtocol> for Lib3hServerProtocolRegex {
+    fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
+        args.events.iter().map(|x| x.clone()).collect()
+    }
+
+    fn expected(&self) -> regex::Regex {
+        self.0.clone()
+    }
+}
+
+impl Predicate<ProcessorResult> for Lib3hServerProtocolRegex {
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| self.expected().is_match(format!("{:?}", **actual).as_str()))
+            .is_some()
+    }
+}
+
+impl Processor for Lib3hServerProtocolRegex {
+    fn test(&self, args: &ProcessorResult) -> () {
+        if !self.eval(args) {
+            let actual = self
+                .extracted(args)
+                .first()
+                .map(|a| format!("{:?}", a))
+                .unwrap_or("None".to_string());
+            assert_eq!(self.expected().as_str(), actual.as_str())
+        }
+    }
+}
+
+impl std::fmt::Display for Lib3hServerProtocolRegex {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl predicates::reflection::PredicateReflection for Lib3hServerProtocolRegex {}
+
+/// Asserts using an arbitrary predicate over a lib3h server protocol event
+#[allow(dead_code)]
+pub struct Lib3hServerProtocolAssert(pub Box<dyn Predicate<Lib3hServerProtocol>>);
+
+impl Assert<Lib3hServerProtocol> for Lib3hServerProtocolAssert {
+    fn extracted(&self, args: &ProcessorResult) -> Vec<Lib3hServerProtocol> {
+        args.events.iter().map(|x| x.clone()).collect()
+    }
+
+    fn assert_inner(&self, x: &Lib3hServerProtocol) -> bool {
+        self.0.eval(&x)
+    }
+}
+
+impl Predicate<ProcessorResult> for Lib3hServerProtocolAssert {
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        let extracted = self.extracted(args);
+        extracted
+            .iter()
+            .find(|actual| self.assert_inner(*actual))
+            .is_some()
+    }
+}
+
+impl Processor for Lib3hServerProtocolAssert {
+    fn test(&self, args: &ProcessorResult) -> () {
+        assert!(self.eval(args))
+    }
+}
+
 impl std::fmt::Display for Lib3hServerProtocolAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", "Lib3hServer protocol assertion")
+    }
+}
+
+impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {}
+
+/// Asserts work was done
+#[allow(dead_code)]
+#[derive(PartialEq, Debug)]
+pub struct DidWorkAssert(pub String /* engine name */);
+impl Processor for DidWorkAssert {
+    fn test(&self, args: &ProcessorResult) {
+        assert!(args.engine_name == self.0);
+        assert!(args.did_work);
+    }
+}
+
+impl Predicate<ProcessorResult> for DidWorkAssert {
+    fn eval(&self, args: &ProcessorResult) -> bool {
+        args.engine_name == self.0 && args.did_work
     }
 }
 
@@ -222,48 +332,97 @@ impl std::fmt::Display for DidWorkAssert {
     }
 }
 
-impl predicates::reflection::PredicateReflection for Lib3hServerProtocolEquals {}
-impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {}
 impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 
 #[allow(unused_macros)]
 /// Convenience function that asserts only one particular equality predicate
-/// passes for a collection of engines. See assert_processed for
-/// more information. equal_to is compared to the actual and aborts if not actual.
-macro_rules! assert_processed_eq {
-    ($engine1:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
-     $engine2:ident, //: &mumut t Vec<&mut Box<dyn NetworkEngine>>,
-     $equal_to:ident,// Box<dyn Processor>,
+/// (over a lib3h server protocol message)
+/// passes for two engine wrappers. See `assert2_processed` for more information.
+/// `equal_to` is compared to the actual and aborts if not actual.
+macro_rules! assert2_msg_eq {
+    ($engine1:ident,
+     $engine2:ident,
+     $equal_to:expr
     ) => {{
-        let p = Box::new(Lib3hServerProtocolEquals($equal_to));
-        assert_one_processed!($engine1, $engine2, p)
+        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals(
+            $equal_to,
+        ));
+        assert2_processed!($engine1, $engine2, p)
     }};
 }
 
 #[allow(unused_macros)]
-/// Convenience function that asserts only one particular predicate
-/// passes for a collection of engines. See assert_processed for
-/// more information.
-macro_rules! assert_one_processed {
+#[macro_export]
+/// Convenience function that asserts only one particular equality predicate
+/// (over a lib3h server protocol message)
+/// passes for two engine wrappers. See `assert_processed` for
+/// more information. `regex` is matched against the actual value and aborts if not present
+macro_rules! assert2_msg_matches {
     ($engine1:ident,
      $engine2:ident,
-     $processor:ident,
-    $should_abort:expr
+     $regex:expr
     ) => {{
-        let processors = vec![$processor];
-        let result = assert_processed!($engine1, $engine2, processors, $should_abort);
-        result
+        let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
+            regex::Regex::new($regex)
+                .expect(format!("[assert2_msg_matches] Invalid regex: {:?}", $regex).as_str()),
+        ));
+        $crate::assert2_processed!($engine1, $engine2, p)
     }};
-    ($engine1:ident,
-     $engine2:ident,
-     $processor:ident
-     ) => {
-        assert_one_processed!($engine1, $engine2, $processor, true)
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+/// Convenience function that asserts only one particular msg matches
+/// a regular expression over a lib3h server protocol message.
+/// This is a simplified version of `assert2_msg_matches` for one engine only.
+macro_rules! assert_msg_matches {
+    ($engine:ident,
+     $regex:expr
+    ) => {
+        // TODO Hack make a single engine version
+        $crate::assert2_msg_matches($engine, $engine, $regex)
     };
 }
 
 #[allow(unused_macros)]
-macro_rules! process_one {
+#[macro_export]
+/// Convenience function that asserts all regular expressions match
+/// over a set of lib3h server protocol messages for two engine wrappers.
+macro_rules! assert2_msg_matches_all {
+    ($engine1:ident,
+     $engine2:ident,
+     $regexes:expr
+    ) => {{
+        let processors = $regexes
+            .into_iter()
+            .map(|re| {
+                Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
+                    regex::Regex::new(re)
+                        .expect(format!("[assert2_msg_matches_all] Regex must be syntactically correct: {:?}", re).as_str()),
+                ))
+            })
+            .collect();
+        $crate::assert2_processed!($engine1, $engine2, processors)
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+/// Convenience function that asserts all regular expressions match
+/// over a set of lib3h server protocol messages for one engine wrapper.
+macro_rules! assert_msg_matches_all {
+    ($engine:ident,
+     $regexes:expr
+    ) => {
+        $crate: utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
+    };
+}
+
+/// Internal function to process one engine of a possibly
+/// multiple engine scenario
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! process_one_engine {
     ($engine: ident,
   $previous: ident,
   $errors: ident
@@ -313,18 +472,16 @@ macro_rules! process_one {
 ///
 /// Returns all observed processor results for use by
 /// subsequent tests.
+///
+/// This is a public function but most likely won't be used in preferred
+/// over a specialized form for specific processor implementations.
 #[allow(unused_macros)]
-macro_rules! assert_processed {
-    ($engine1:ident,
-  $engine2:ident,
-  $processors:ident
- ) => {
-        assert_processed!($engine1, $engine2, $processors, true)
-    };
+#[macro_export]
+macro_rules! assert2_processed_all {
     ($engine1:ident,
      $engine2:ident,
-     $processors:ident,
-     $should_abort:expr) => {{
+     $processors:expr
+    ) => {{
         let mut previous = Vec::new();
         let mut errors: Vec<(
             Box<dyn $crate::utils::processor_harness::Processor>,
@@ -355,48 +512,104 @@ macro_rules! assert_processed {
 
             // pick either engine1 or engine2 with equal probability
             if b {
-                process_one!($engine1, previous, errors);
+                $crate::process_one_engine!($engine1, previous, errors);
             } else {
-                process_one!($engine2, previous, errors);
+                $crate::process_one_engine!($engine2, previous, errors);
             }
             if errors.is_empty() {
                 break;
             }
         }
 
-        if $should_abort {
-            for (p, args) in errors {
-                if let Some(args) = args {
-                    p.test(&args)
-                } else {
-                    // Make degenerate result which should fail
-                    p.test(&$crate::utils::processor_harness::ProcessorResult {
-                        engine_name: "none".into(),
-                        previous: vec![],
-                        events: vec![],
-                        did_work: false,
-                    })
-                }
+        for (p, args) in errors {
+            if let Some(args) = args {
+                p.test(&args)
+            } else {
+                // Make degenerate result which should fail
+                p.test(&$crate::utils::processor_harness::ProcessorResult {
+                    engine_name: "none".into(),
+                    previous: vec![],
+                    events: vec![],
+                    did_work: false,
+                })
             }
         }
         previous
     }};
 }
-/// Creates a processor that verifies a connected data response is produced
-/// by an engine
-#[allow(dead_code)]
-pub fn is_connected(request_id: &str, uri: Lib3hUri) -> Lib3hServerProtocolEquals {
-    Lib3hServerProtocolEquals(Lib3hServerProtocol::Connected(ConnectedData {
-        request_id: request_id.into(),
-        uri,
-    }))
+
+/// Asserts that two engines produce events
+/// matching just one predicate function. For the program
+/// to continue executing all processors must pass.
+///
+/// Multiple calls to process() will be made as needed for
+/// the passed in processors to pass. It will failure after
+/// MAX_PROCESSING_LOOPS iterations regardless.
+///
+/// Returns all observed processor results for use by
+/// subsequent tests.
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! assert2_processed {
+    ($engine1:ident,
+     $engine2:ident,
+     $processor:expr
+    ) => {{
+        let processors = vec![$processor];
+        $crate::assert2_processed_all!($engine1, $engine2, processors)
+    }};
 }
 
+/// Asserts that one engine produces events
+/// matching a set of predicate functions. For the program
+/// to continue executing all processors must pass.
+///
+/// Multiple calls to process() will be made as needed for
+/// the passed in processors to pass. It will failure after
+/// MAX_PROCESSING_LOOPS iterations regardless.
+///
+/// Returns all observed processor results for use by
+/// subsequent tests.
 #[allow(unused_macros)]
+#[macro_export]
+macro_rules! assert_processed_all {
+    ($engine:ident,
+     $processors:expr
+    ) => {
+        // HACK make a singular version
+        $crate::assert2_processed_all!($engine, $engine, $processors)
+    };
+}
+
+/// Asserts that one engine produces events
+/// matching just one predicate function. For the program
+/// to continue executing all processors must pass.
+///
+/// Multiple calls to process() will be made as needed for
+/// the passed in processors to pass. It will failure after
+/// MAX_PROCESSING_LOOPS iterations regardless.
+///
+/// Returns all observed processor results for use by
+/// subsequent tests.
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! assert_processed {
+    ($engine:ident,
+     $processor:expr
+    ) => {
+        // HACK make a singular version
+        $crate::assert2_processed!($engine, $engine, $processor)
+    };
+}
+
+/// `wait_connect!(a, connect_data, b)` waits until engine w4rapper `a` connects
+/// using `connect_data` to engine wrapper `b`.
+#[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_connect {
     (
         $me:ident,
-        $connect_data: ident,
+        $connect_data: expr,
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
@@ -410,7 +623,7 @@ macro_rules! wait_connect {
             $crate::utils::processor_harness::Lib3hServerProtocolAssert(assertion),
         );
 
-        let result = assert_one_processed!($me, $other, predicate);
+        let result = assert2_processed!($me, $other, predicate);
         result
     }};
 }
@@ -436,10 +649,10 @@ macro_rules! wait_engine_wrapper_did_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
 
-        for i in 0..20 {
-            let (did_work_now, _) = $engine
+        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+            let (did_work_now, results) = $engine
                 .process()
-                .map_err(|e| println!("ghost actor processing error: {:?}", e))
+                .map_err(|e| error!("ghost actor processing error: {:?}", e))
                 .unwrap_or((false, vec![]));
             did_work = did_work_now;
             if did_work {
@@ -449,7 +662,7 @@ macro_rules! wait_engine_wrapper_did_work {
             if elapsed > $timeout {
                 break;
             }
-            println!("[{}] wait_engine_wrapper_did_work", i);
+            trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
             std::thread::sleep(std::time::Duration::from_millis(1))
         }
         if $should_abort {
@@ -459,30 +672,15 @@ macro_rules! wait_engine_wrapper_did_work {
     }};
 }
 
-/// Continues processing the GhostActor trait until no work is being done.
+/// Continues processing the engine wrapper until no more work is observed
 #[allow(unused_macros)]
 #[macro_export]
-macro_rules! wait_until_no_work {
+macro_rules! wait_engine_wrapper_until_no_work {
     ($engine: ident) => {{
         let mut did_work;
         loop {
             did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
             if !did_work {
-                break;
-            }
-        }
-        did_work
-    }};
-}
-
-#[allow(unused_macros)]
-#[macro_export]
-macro_rules! wait_until_did_work {
-    ($engine: ident) => {{
-        let mut did_work;
-        loop {
-            did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
-            if did_work {
                 break;
             }
         }
