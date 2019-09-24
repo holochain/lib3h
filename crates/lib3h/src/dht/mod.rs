@@ -72,7 +72,7 @@ pub mod tests {
     }
 
     fn create_test_uri(peer_name: &Lib3hUri) -> Lib3hUri {
-        Lib3hUri::with_transport_id(&HashString::from("test"), &peer_name.clone().into())
+        Lib3hUri::with_transport_and_agent_id(&HashString::from("test"), &peer_name.clone().into())
     }
 
     #[allow(non_snake_case)]

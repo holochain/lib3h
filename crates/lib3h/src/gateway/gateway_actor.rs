@@ -126,7 +126,7 @@ impl P2pGateway {
                                 for peer in peer_list {
                                     me.send(
                                         Span::fixme(),
-                                        peer.peer_name.clone().into_agent_id(),
+                                        peer.peer_name.clone().into(),
                                         peer.peer_location.clone(),
                                         payload.clone().into(),
                                         Box::new(move |response| {

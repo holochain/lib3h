@@ -13,7 +13,6 @@ use crate::{
     },
 };
 use detach::Detach;
-use holochain_persistence_api::hash::HashString;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::{prelude::*, RequestId};
@@ -42,8 +41,7 @@ impl<'engine> GhostEngine<'engine> {
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
         let transport_id = transport_keys.transport_id.clone();
-        let transport_id_uri =
-            Lib3hUri::with_transport_id(&transport_keys.transport_id, &HashString::new());
+        let transport_id_uri = Lib3hUri::with_transport_id(&transport_keys.transport_id);
 
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
@@ -315,7 +313,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pGateway::new(
                 GatewayOutputWrapType::WrapOutputWithP2pDirectMessage,
                 gateway_id,
-                Lib3hUri::with_transport_id(&self.transport_keys.transport_id, &agent_id),
+                Lib3hUri::with_transport_and_agent_id(&self.transport_keys.transport_id, &agent_id),
                 Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,

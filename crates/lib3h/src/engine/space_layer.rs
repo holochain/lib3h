@@ -137,7 +137,7 @@ impl<'engine> GhostEngine<'engine> {
                             let lib3h_msg = StoreEntryAspectData {
                                 request_id: self.request_track.reserve(),
                                 space_address: chain_id.0.clone(),
-                                provider_agent_id: from_peer_name.clone().into_agent_id(),
+                                provider_agent_id: from_peer_name.clone().into(),
                                 entry_address: entry.entry_address.clone(),
                                 entry_aspect: aspect,
                             };

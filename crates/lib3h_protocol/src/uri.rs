@@ -54,11 +54,15 @@ pub struct Lib3hUri(pub Url);
 impl Lib3hUri {
     // -- Constructors -- //
 
-    pub fn with_transport_id(transport_id: &Address, agent_id: &Address) -> Self {
+    pub fn with_transport_and_agent_id(transport_id: &Address, agent_id: &Address) -> Self {
         let url = Self::parse(&format!(
             "{}:{}?a={}",
             TRANSPORT_SCHEME, transport_id, agent_id
         ));
+        Lib3hUri(url)
+    }
+    pub fn with_transport_id(transport_id: &Address) -> Self {
+        let url = Self::parse(&format!("{}:{}", TRANSPORT_SCHEME, transport_id));
         Lib3hUri(url)
     }
     pub fn with_agent_id(agent_id: &Address) -> Self {
@@ -168,10 +172,13 @@ mod tests {
 
     #[test]
     fn test_address_from_uri() {
-        let agent_id: Address = "HcAsdkfjsdflkjsdf".into();
-        let uri = Lib3hUri::with_agent_id(&agent_id);
+        let id: Address = "HcAsdkfjsdflkjsdf".into();
+        let uri = Lib3hUri::with_agent_id(&id);
         let roundtrip: Address = uri.into();
-        assert_eq!(roundtrip, agent_id);
+        assert_eq!(roundtrip, id);
+        let uri = Lib3hUri::with_transport_id(&id);
+        let roundtrip: Address = uri.into();
+        assert_eq!(roundtrip, id);
     }
 
     #[test]
@@ -189,7 +196,7 @@ mod tests {
     fn test_uri_create_transport() {
         let transport_id: Address = "fake_transport_id".into();
         let agent_id: Address = "HcAfake_agent_id".into();
-        let uri = Lib3hUri::with_transport_id(&transport_id, &agent_id);
+        let uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
         assert_eq!(
             "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
