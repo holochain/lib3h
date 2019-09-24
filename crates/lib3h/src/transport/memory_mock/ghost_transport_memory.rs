@@ -410,7 +410,7 @@ mod tests {
             Some(bound_transport3_address.clone())
         );
 
-        // check that transport_ids were advertised
+        // check that bindings were advertised
         let found = transport1.discover().unwrap();
         assert!(
             &format!("{}", found[0]) == "mem://addr_1/"
