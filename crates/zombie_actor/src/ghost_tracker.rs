@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
 
-const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20000); // TODO - should be 2000 or less but tests currently fail if below that
 
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure

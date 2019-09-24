@@ -7,7 +7,7 @@ use crate::{
 };
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use url::Url;
+use lib3h_protocol::uri::Lib3hUri;
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
@@ -20,7 +20,7 @@ impl P2pGateway {
     pub fn new(
         wrap_output_type: GatewayOutputWrapType,
         identifier: GatewayId,
-        peer_uri: Url,
+        peer_location: Lib3hUri,
         inner_transport: transport::protocol::DynTransportActor,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
@@ -48,9 +48,9 @@ impl P2pGateway {
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
             this_peer: PeerData {
-                peer_address: dht_config.this_peer_address(),
-                peer_uri,
-                timestamp: 0, // FIXME
+                peer_name: dht_config.this_peer_name(),
+                peer_location,
+                timestamp: crate::time::since_epoch_ms(),
             },
             pending_outgoing_messages: Vec::new(),
         }

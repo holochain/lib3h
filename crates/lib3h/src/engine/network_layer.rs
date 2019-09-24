@@ -8,10 +8,9 @@ use crate::{
 
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, DidWork};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 /// Network layer related private methods
 impl<'engine> GhostEngine<'engine> {
@@ -74,24 +73,24 @@ impl<'engine> GhostEngine<'engine> {
                 // Connect to every peer we are requested to hold.
                 info!(
                     "{} auto-connect to peer: {} ({})",
-                    self.name, peer_data.peer_address, peer_data.peer_uri,
+                    self.name, peer_data.peer_name, peer_data.peer_location,
                 );
                 let cmd = GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::SendMessage {
-                        uri: peer_data.peer_uri,
+                        uri: peer_data.peer_location,
                         payload: Opaque::new(),
                     },
                 );
                 self.multiplexer
                     .publish(span.child("DhtRequestToParent::HoldPeerRequested"), cmd)?;
             }
-            DhtRequestToParent::PeerTimedOut(_peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_name) => {
                 // Disconnect from that peer by calling a Close on it.
                 // FIXME
             }
             // No entries in Network DHT
             DhtRequestToParent::HoldEntryRequested {
-                from_peer: _,
+                from_peer_name: _,
                 entry: _,
             } => {
                 unreachable!();
@@ -167,13 +166,17 @@ impl<'engine> GhostEngine<'engine> {
         Ok(())
     }
 
-    fn defer_send(&mut self, to: Url, payload: Opaque) {
+    fn defer_send(&mut self, to: Lib3hUri, payload: Opaque) {
         self.multiplexer_defered_sends.push((to, payload));
     }
 
-    fn handle_incoming_connection(&mut self, span: Span, net_uri: Url) -> Lib3hResult<()> {
+    fn handle_incoming_connection(
+        &mut self,
+        span: Span,
+        net_location: Lib3hUri,
+    ) -> Lib3hResult<()> {
         // Get list of known peers
-        let uri_copy = net_uri.clone();
+        let net_location_copy = net_location.clone();
         self.multiplexer
             .request(
                 span.child("handle_incoming_connection, .request"),
@@ -204,26 +207,22 @@ impl<'engine> GhostEngine<'engine> {
                             trace!(
                                 "AllJoinedSpaceList: {:?} to {:?}",
                                 our_joined_space_list,
-                                uri_copy,
+                                net_location_copy,
                             );
                             // we need a transportId, so search for it in the DHT
-                            let maybe_peer_data =
-                                peer_list.iter().find(|pd| pd.peer_uri == uri_copy);
+                            let maybe_peer_data = peer_list
+                                .iter()
+                                .find(|pd| pd.peer_location == net_location_copy);
                             trace!("--- got peerlist: {:?}", maybe_peer_data);
                             if let Some(peer_data) = maybe_peer_data {
                                 trace!("AllJoinedSpaceList ; sending back to {:?}", peer_data);
-                                me.defer_send(
-                                    Url::parse(&format!("transportid:{}", &peer_data.peer_address))
-                                        .unwrap(),
-                                    payload.into(),
-                                );
+                                me.defer_send(peer_data.peer_name.clone(), payload.into());
                                 /* TODO: #777
                                 me.multiplexer.publish(
                                     span.follower("publish TODO name"),
                                     GatewayRequestToChild::Transport(
                                         transport::protocol::RequestToChild::SendMessage {
-                                            uri: Url::parse(&peer_data.peer_address)
-                                                .expect("invalid url format"),
+                                            uri: &peer_data.peer_name,
                                             payload: payload.into(),
                                         },
                                     ),
@@ -243,12 +242,12 @@ impl<'engine> GhostEngine<'engine> {
         if self.network_connections.is_empty() {
             let data = ConnectedData {
                 request_id: "".to_string(),
-                uri: net_uri.clone(),
+                uri: net_location.clone(),
             };
             self.lib3h_endpoint
                 .publish(Span::fixme(), Lib3hToClient::Connected(data))?;
         }
-        let _ = self.network_connections.insert(net_uri.to_owned());
+        let _ = self.network_connections.insert(net_location.to_owned());
         Ok(())
     }
 
@@ -258,14 +257,14 @@ impl<'engine> GhostEngine<'engine> {
     fn serve_P2pProtocol(
         &mut self,
         span: Span,
-        _from: &Url,
+        _from: &Lib3hUri,
         p2p_msg: P2pProtocol,
     ) -> Lib3hResult<()> {
         match p2p_msg {
             P2pProtocol::Gossip(msg) => {
                 // Prepare remoteGossipTo to post to dht
                 let gossip = RemoteGossipBundleData {
-                    from_peer_address: msg.from_peer_address.clone().into(),
+                    from_peer_name: msg.from_peer_name.clone(),
                     bundle: msg.bundle.clone(),
                 };
                 // Check if its for the multiplexer
@@ -276,9 +275,10 @@ impl<'engine> GhostEngine<'engine> {
                     );
                 } else {
                     // otherwise should be for one of our space
-                    let maybe_space_gateway = self
-                        .space_gateway_map
-                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_address.to_owned()));
+                    let maybe_space_gateway = self.space_gateway_map.get_mut(&(
+                        msg.space_address.to_owned(),
+                        msg.to_peer_name.clone().into(),
+                    ));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
                             span.follower("TODO"),
@@ -306,7 +306,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pProtocol::DirectMessageResult(_dm_data) => {
                 panic!("we should never get a DirectMessageResult at this layer... only using DirectMessage");
             }
-            P2pProtocol::PeerAddress(_, _, _) => {
+            P2pProtocol::PeerName(_, _, _) => {
                 // no-op
             }
             P2pProtocol::BroadcastJoinSpace(gateway_id, peer_data) => {
