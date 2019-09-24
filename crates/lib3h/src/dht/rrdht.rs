@@ -19,8 +19,8 @@ impl RrDht {
         RrDht {
             inbox: VecDeque::new(),
             this_peer: PeerData {
-                peer_name: Lib3hUri::with_undefined("FIXME"),
-                peer_location: Lib3hUri::with_undefined("host:123"),
+                peer_name: Lib3hUri::with_undefined(),
+                peer_location: Lib3hUri::with_undefined(),
                 timestamp: 0, // TODO #166
             },
         }

@@ -64,7 +64,7 @@ mod tests {
             Self {
                 endpoint_parent,
                 endpoint_self,
-                bound_url: Lib3hUri::with_undefined(""),
+                bound_url: Lib3hUri::with_undefined(),
                 mock_sender,
                 mock_receiver,
             }
@@ -130,7 +130,7 @@ mod tests {
         let (s_out, r_out) = crossbeam_channel::unbounded();
         let (s_in, r_in) = crossbeam_channel::unbounded();
 
-        let addr_none = Lib3hUri::with_undefined("");
+        let addr_none = Lib3hUri::with_undefined();
 
         let mut mplex: GatewayParentWrapper<(), TransportMultiplex<GatewayMock>> =
             GhostParentWrapper::new(

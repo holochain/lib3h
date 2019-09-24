@@ -277,7 +277,7 @@ impl<'engine> GhostEngine<'engine> {
                     // otherwise should be for one of our space
                     let maybe_space_gateway = self.space_gateway_map.get_mut(&(
                         msg.space_address.to_owned(),
-                        msg.to_peer_name.clone().into(),
+                        msg.to_peer_name.clone().into_agent_id(),
                     ));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(

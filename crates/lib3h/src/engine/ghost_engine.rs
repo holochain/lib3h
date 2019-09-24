@@ -53,7 +53,7 @@ impl<'engine> GhostEngine<'engine> {
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(transport_id, &net)),
         };
 
-        let prebound_binding = Lib3hUri::with_undefined("");
+        let prebound_binding = Lib3hUri::with_undefined();
         let this_net_peer = PeerData {
             peer_name: transport_id_uri.clone(),
             peer_location: prebound_binding.clone(),
@@ -773,7 +773,7 @@ pub fn handle_gossip_to<
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
             space_address: gateway_identifier.clone(),
             to_peer_name: to_peer_name.clone(),
-            from_peer_name: Lib3hUri::with_undefined("FIXME"), // FIXME
+            from_peer_name: Lib3hUri::with_undefined(), // FIXME
             bundle: gossip_data.bundle.clone(),
         });
         let mut payload = Vec::new();

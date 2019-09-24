@@ -338,8 +338,8 @@ impl From<ClientToLib3hResponse> for Lib3hServerProtocol {
             }
             ClientToLib3hResponse::BootstrapSuccess => {
                 Lib3hServerProtocol::Connected(ConnectedData {
-                    request_id: "".to_string(),
-                    uri: Lib3hUri::with_undefined(""),
+                    request_id: String::new(),
+                    uri: Lib3hUri::with_undefined(),
                 })
             }
             variant => panic!("{:?} can't convert to Lib3hServerProtocol", variant),

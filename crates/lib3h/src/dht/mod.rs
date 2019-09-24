@@ -59,8 +59,8 @@ pub mod tests {
         pub fn new() -> Self {
             DhtData {
                 this_peer: PeerData {
-                    peer_name: Lib3hUri::with_undefined("FIXME"),
-                    peer_location: Lib3hUri::with_undefined("host:123"),
+                    peer_name: Lib3hUri::with_undefined(),
+                    peer_location: Lib3hUri::with_undefined(),
                     timestamp: 0,
                 },
                 maybe_peer: None,

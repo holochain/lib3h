@@ -372,7 +372,7 @@ impl P2pGateway {
                                     span.follower("TODO send"),
                                     Address::from(peer_data.peer_name),
                                     peer_data.peer_location.clone(),
-                                    payload_wrapped,
+                                    payload,
                                     Box::new(|response| {
                                         parent_request.respond(
                                             response

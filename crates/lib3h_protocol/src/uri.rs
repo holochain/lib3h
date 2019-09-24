@@ -52,29 +52,48 @@ impl From<UriScheme> for String {
 pub struct Lib3hUri(pub Url);
 
 impl Lib3hUri {
+    // -- Constructors -- //
+
+    pub fn with_transport_id(transport_id: &Address, agent_id: &Address) -> Self {
+        let url = Self::parse(&format!(
+            "{}:{}?a={}",
+            TRANSPORT_SCHEME, transport_id, agent_id
+        ));
+        Lib3hUri(url)
+    }
+    pub fn with_agent_id(agent_id: &Address) -> Self {
+        let url = Self::parse(&format!("{}:{}", AGENT_SCHEME, agent_id));
+        Lib3hUri(url)
+    }
+    pub fn with_undefined() -> Self {
+        let url = Self::parse(&format!("{}:", UNDEFINED_SCHEME));
+        Lib3hUri(url)
+    }
+    pub fn with_memory(other: &str) -> Self {
+        let url = Self::parse(&format!("{}://{}", MEMORY_SCHEME, other));
+        Lib3hUri(url)
+    }
+
+    // -- Misc -- //
+
     pub fn is_scheme(&self, scheme: UriScheme) -> bool {
         let s: String = scheme.into();
         self.scheme() == s
     }
-    pub fn with_transport_id(transport_id: &Address, agent_id: &Address) -> Self {
-        let url = Url::parse(&format!(
-            "{}:{}?a={}",
-            TRANSPORT_SCHEME, transport_id, agent_id
-        ))
-        .unwrap();
-        Lib3hUri(url)
+
+    fn parse(url_str: &str) -> Url {
+        Url::parse(url_str).expect(&format!("Invalid url format: '{}'", url_str))
     }
-    pub fn with_agent_id(agent_id: &Address) -> Self {
-        let url = Url::parse(&format!("{}:{}", AGENT_SCHEME, agent_id)).unwrap();
-        Lib3hUri(url)
-    }
-    pub fn with_undefined(other: &str) -> Self {
-        let url = Url::parse(&format!("{}:{}", UNDEFINED_SCHEME, other)).unwrap();
-        Lib3hUri(url)
-    }
-    pub fn with_memory(other: &str) -> Self {
-        let url = Url::parse(&format!("{}://{}", MEMORY_SCHEME, other)).unwrap();
-        Lib3hUri(url)
+}
+
+// -- Converters -- //
+
+impl From<Lib3hUri> for Address {
+    fn from(u: Lib3hUri) -> Address {
+        if !(u.is_scheme(UriScheme::Agent) || u.is_scheme(UriScheme::Transport)) {
+            panic!("Can't convert a non *Id Lib3hUri into an address")
+        }
+        u.path().into()
     }
 }
 
@@ -95,15 +114,6 @@ impl From<Lib3hUri> for Url {
 impl From<Url> for Lib3hUri {
     fn from(u: Url) -> Lib3hUri {
         Lib3hUri(u)
-    }
-}
-
-impl From<Lib3hUri> for Address {
-    fn from(u: Lib3hUri) -> Address {
-        if !u.is_scheme(UriScheme::Agent) {
-            panic!("Can't convert a non agentId Lib3hUri into an address")
-        }
-        u.path().into()
     }
 }
 

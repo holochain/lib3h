@@ -104,7 +104,7 @@ where
                             ClientToLib3hResponse::BootstrapSuccess => {
                                 Lib3hServerProtocol::Connected(ConnectedData {
                                     request_id,
-                                    uri: Lib3hUri::with_undefined(""), // client should have this already deprecated
+                                    uri: Lib3hUri::with_undefined(), // client should have this already deprecated
                                 })
                             }
                             ClientToLib3hResponse::JoinSpaceResult => {

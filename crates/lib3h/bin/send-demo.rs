@@ -46,7 +46,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             bootstrap_nodes: vec![],
             work_dir: std::path::PathBuf::new(),
             log_level: 'd',
-            bind_url: Lib3hUri::with_undefined(""),
+            bind_url: Lib3hUri::with_undefined(),
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],

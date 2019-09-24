@@ -62,7 +62,7 @@ impl MirrorDht {
             this_peer: PeerData {
                 // maybe this will go away
                 peer_name: config.this_peer_name().to_owned(),
-                peer_location: Lib3hUri::with_undefined(""),
+                peer_location: Lib3hUri::with_undefined(),
                 timestamp,
             },
             last_gossip_of_self: timestamp,

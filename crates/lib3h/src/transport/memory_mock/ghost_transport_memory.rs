@@ -381,11 +381,11 @@ mod tests {
         assert_eq!(transport1.maybe_my_address, None);
         assert_eq!(transport2.maybe_my_address, None);
 
-        let mut bound_transport1_address = Lib3hUri::with_undefined("");
+        let mut bound_transport1_address = Lib3hUri::with_undefined();
         do_bind(&mut t1_endpoint);
-        let mut bound_transport2_address = Lib3hUri::with_undefined("");
+        let mut bound_transport2_address = Lib3hUri::with_undefined();
         do_bind(&mut t2_endpoint);
-        let mut bound_transport3_address = Lib3hUri::with_undefined("");
+        let mut bound_transport3_address = Lib3hUri::with_undefined();
         do_bind(&mut t3_endpoint);
 
         transport1.process().unwrap();
@@ -429,11 +429,11 @@ mod tests {
         let (mut transport1, mut t1_endpoint) = make_test_transport("1", "send_net1");
         let (mut transport2, mut t2_endpoint) = make_test_transport("2", "send_net1");
         let (mut transport3, mut t3_endpoint) = make_test_transport("3", "send_net2");
-        let mut bound_transport1_address = Lib3hUri::with_undefined("");
+        let mut bound_transport1_address = Lib3hUri::with_undefined();
         do_bind(&mut t1_endpoint);
-        let mut bound_transport2_address = Lib3hUri::with_undefined("");
+        let mut bound_transport2_address = Lib3hUri::with_undefined();
         do_bind(&mut t2_endpoint);
-        let mut bound_transport3_address = Lib3hUri::with_undefined("");
+        let mut bound_transport3_address = Lib3hUri::with_undefined();
         do_bind(&mut t3_endpoint);
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut bound_transport1_address);
