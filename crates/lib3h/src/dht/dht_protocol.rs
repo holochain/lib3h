@@ -9,7 +9,8 @@ use lib3h_ghost_actor::prelude::*;
 
 pub type FromPeerName = Lib3hUri;
 
-pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>>;
+pub type DhtFactory =
+    fn(config: &DhtConfig, maybe_this_peer: Option<PeerData>) -> Lib3hResult<Box<DhtActor>>;
 
 pub type DhtActor = dyn GhostActor<
     DhtRequestToParent,
