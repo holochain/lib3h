@@ -52,7 +52,7 @@ impl P2pGateway {
         &mut self,
         mut request: DhtToParentMessage,
     ) -> Lib3hResult<()> {
-        debug!(
+        trace!(
             "({}) Serving request from child dht: {:?}",
             self.identifier.nickname, request
         );

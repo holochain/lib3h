@@ -199,7 +199,7 @@ impl MirrorDht {
 
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
-        trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
+        debug!("@MirrorDht@ {:?} Adding peer: {:?}", self.this_peer,peer_info);
         let maybe_peer = self.peer_map.get_mut(&peer_info.peer_address);
         match maybe_peer {
             None => {

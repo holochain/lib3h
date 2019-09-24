@@ -193,6 +193,8 @@ impl<
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
             RequestToChild::SendMessage { uri, payload } => {
+
+                debug!("handle_route_send to {}",  uri.clone());
                 self.handle_route_send_message(msg, uri, payload)
             }
         }

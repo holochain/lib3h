@@ -74,7 +74,7 @@ impl
 /// Private internals
 impl P2pGateway {
     fn handle_RequestToChild(&mut self, mut msg: GatewayToChildMessage) -> Lib3hResult<()> {
-        debug!(
+        trace!(
             "({}) Serving request from parent: {:?}",
             self.identifier.nickname, msg
         );
