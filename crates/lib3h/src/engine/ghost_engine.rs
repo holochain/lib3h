@@ -313,7 +313,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pGateway::new(
                 GatewayOutputWrapType::WrapOutputWithP2pDirectMessage,
                 gateway_id,
-                Lib3hUri::with_transport_and_agent_id(&self.transport_keys.transport_id, &agent_id),
+                Lib3hUri::with_transport_id(&self.transport_keys.transport_id),
                 Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,

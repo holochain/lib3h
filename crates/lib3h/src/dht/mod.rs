@@ -71,15 +71,15 @@ pub mod tests {
         }
     }
 
-    fn create_test_uri(peer_name: &Lib3hUri) -> Lib3hUri {
-        Lib3hUri::with_transport_and_agent_id(&HashString::from("test"), &peer_name.clone().into())
+    fn create_test_uri() -> Lib3hUri {
+        Lib3hUri::with_transport_id(&HashString::from("test"))
     }
 
     #[allow(non_snake_case)]
     fn create_PeerData(peer_name: &Lib3hUri) -> PeerData {
         PeerData {
             peer_name: peer_name.to_owned(),
-            peer_location: create_test_uri(peer_name),
+            peer_location: create_test_uri(),
             timestamp: crate::time::since_epoch_ms(),
         }
     }

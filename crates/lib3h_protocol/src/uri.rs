@@ -54,6 +54,7 @@ pub struct Lib3hUri(pub Url);
 impl Lib3hUri {
     // -- Constructors -- //
 
+    #[allow(dead_code)]
     pub fn with_transport_and_agent_id(transport_id: &Address, agent_id: &Address) -> Self {
         let url = Self::parse(&format!(
             "{}:{}?a={}",
