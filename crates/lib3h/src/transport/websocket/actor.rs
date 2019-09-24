@@ -8,9 +8,13 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
-use lib3h_discovery::{error::DiscoveryResult, Discovery};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address};
+use lib3h_protocol::{
+    data_types::Opaque,
+    discovery::{error::DiscoveryResult, Discovery},
+    uri::Lib3hUri,
+    Address,
+};
 
 pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;

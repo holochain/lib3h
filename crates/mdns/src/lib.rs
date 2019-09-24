@@ -3,7 +3,7 @@
 //! Our simple use case is the following:
 //! ```rust
 //! use lib3h_mdns as mdns;
-//! use lib3h_discovery::Discovery;
+//! use lib3h_protocol::discovery::Discovery;
 //! use std::{thread, time::Duration};
 //!
 //! let mut mdns = mdns::MulticastDnsBuilder::new()
@@ -44,8 +44,10 @@ use std::{
     time::Instant,
 };
 
-use lib3h_discovery::{error::DiscoveryResult, Discovery};
-use lib3h_protocol::uri::Lib3hUri;
+use lib3h_protocol::{
+    discovery::{error::DiscoveryResult, Discovery},
+    uri::Lib3hUri,
+};
 
 pub mod error;
 pub use error::{MulticastDnsError, MulticastDnsResult};
