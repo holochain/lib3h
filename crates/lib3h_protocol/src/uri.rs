@@ -87,7 +87,8 @@ impl Lib3hUri {
     }
 
     fn parse(url_str: &str) -> Url {
-        Url::parse(url_str).expect(&format!("Invalid url format: '{}'", url_str))
+        Url::parse(url_str)
+            .unwrap_or_else(|_| panic!("Invalid url format: '{}'", url_str))
     }
 }
 
