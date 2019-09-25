@@ -82,7 +82,7 @@ impl<'engine> GhostEngine<'engine> {
             Box::new(|me: &mut GhostEngine<'engine>, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -148,7 +148,7 @@ impl<'engine> GhostEngine<'engine> {
                 cmd,
                 Box::new(|_, response| {
                     let response = match response {
-                        GhostCallbackData::Timeout => panic!("bootstrap timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("bootstrap timeout: {:?}", bt),
                         GhostCallbackData::Response(r) => r,
                     };
                     if let Err(e) = response {
@@ -223,7 +223,9 @@ impl<'engine> GhostEngine<'engine> {
                         GatewayRequestToChildResponse::BootstrapSuccess,
                     )) => msg.respond(Ok(ClientToLib3hResponse::BootstrapSuccess))?,
                     GhostCallbackData::Response(Err(e)) => msg.respond(Err(e))?,
-                    GhostCallbackData::Timeout => msg.respond(Err("timeout".into()))?,
+                    GhostCallbackData::Timeout(bt) => {
+                        msg.respond(Err(format!("timeout: {:?}", bt).into()))?
+                    }
                     _ => msg.respond(Err(format!("bad response: {:?}", response).into()))?,
                 }
                 Ok(())
@@ -377,7 +379,9 @@ impl<'engine> GhostEngine<'engine> {
                 Box::new(move |me, response| {
                     let response = {
                         match response {
-                            GhostCallbackData::Timeout => return Err("timeout".into()),
+                            GhostCallbackData::Timeout(bt) => {
+                                return Err(format!("timeout: {:?}", bt).into())
+                            }
                             GhostCallbackData::Response(response) => match response {
                                 Err(e) => return Err(e.into()),
                                 Ok(response) => response,
@@ -426,7 +430,9 @@ impl<'engine> GhostEngine<'engine> {
                                             ),
                                         ),
                                         GhostCallbackData::Response(Err(e)) => Err(e.into()),
-                                        GhostCallbackData::Timeout => Err("timeout".into()),
+                                        GhostCallbackData::Timeout(bt) => {
+                                            Err(format!("timeout: {:?}", bt).into())
+                                        }
                                         _ => Err("bad response type".into()),
                                     }
                                 }),
@@ -507,7 +513,7 @@ impl<'engine> GhostEngine<'engine> {
                     Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                 )) => Ok(me.handle_HandleGetGossipingEntryListResult(msg)?),
                 GhostCallbackData::Response(Err(e)) => Err(e.into()),
-                GhostCallbackData::Timeout => Err("timeout".into()),
+                GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                 _ => Err("bad response type".into()),
             }),
         )?;
@@ -522,7 +528,7 @@ impl<'engine> GhostEngine<'engine> {
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => Ok(me.handle_HandleGetAuthoringEntryListResult(msg)?),
                     GhostCallbackData::Response(Err(e)) => Err(e.into()),
-                    GhostCallbackData::Timeout => Err("timeout".into()),
+                    GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                     _ => Err("bad response type".into()),
                 }),
             )
@@ -706,8 +712,8 @@ impl<'engine> GhostEngine<'engine> {
                         GhostCallbackData::Response(Err(e)) => {
                             error!("Got error on HandleQueryEntryResult: {:?} ", e);
                         }
-                        GhostCallbackData::Timeout => {
-                            error!("Got timeout on HandleQueryEntryResult");
+                        GhostCallbackData::Timeout(bt) => {
+                            error!("Got timeout on HandleQueryEntryResult: {:?}", bt);
                         }
                         _ => panic!("bad response type"),
                     }

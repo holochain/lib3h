@@ -27,8 +27,8 @@ impl P2pGateway {
                 Box::new(|_me, response| {
                     let response = {
                         match response {
-                            GhostCallbackData::Timeout => {
-                                parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                            GhostCallbackData::Timeout(bt) => {
+                                parent_msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                                 return Ok(());
                             }
                             GhostCallbackData::Response(response) => response,

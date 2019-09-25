@@ -11,7 +11,7 @@ const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20
 #[derive(Debug, Clone)]
 pub enum GhostCallbackData<CbData: 'static, E: 'static> {
     Response(Result<CbData, E>),
-    Timeout,
+    Timeout(backtrace::Backtrace),
 }
 
 /// definition for a ghost request callback
@@ -26,6 +26,7 @@ pub type GhostCallback<UserData, CbData, E> =
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<UserData, CbData: 'static, E: 'static> {
+    backtrace: backtrace::Backtrace,
     expires: std::time::SystemTime,
     cb: GhostCallback<UserData, CbData, E>,
 }
@@ -110,7 +111,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
             match self.pending.remove(&request_id) {
                 None => (),
                 Some(entry) => {
-                    (entry.cb)(ga, GhostCallbackData::Timeout)?;
+                    (entry.cb)(ga, GhostCallbackData::Timeout(entry.backtrace))?;
                 }
             }
         }
@@ -140,6 +141,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
         self.pending.insert(
             request_id.clone(),
             GhostTrackerEntry {
+                backtrace: backtrace::Backtrace::new(),
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
@@ -254,7 +256,7 @@ mod tests {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {
-                    GhostCallbackData::Timeout => me.state = "timed_out".into(),
+                    GhostCallbackData::Timeout(_) => me.state = "timed_out".into(),
                     _ => assert!(false),
                 }
                 Ok(())

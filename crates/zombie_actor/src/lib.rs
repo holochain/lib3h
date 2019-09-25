@@ -357,7 +357,7 @@ mod tests {
                             Box::new(move |_m:&mut GatewayTransport, response| {
 
                                 // got a timeout error
-                                if let GhostCallbackData::Timeout = response {
+                                if let GhostCallbackData::Timeout(_) = response {
                                     msg.respond(Err("Timeout".into()))?;
                                     return Ok(());
                                 }
