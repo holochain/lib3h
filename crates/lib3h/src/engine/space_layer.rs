@@ -11,7 +11,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, DidWork};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -124,17 +124,20 @@ impl<'engine> GhostEngine<'engine> {
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)),
                         );
                     }
-                    DhtRequestToParent::PeerTimedOut(_peer_address) => {
+                    DhtRequestToParent::PeerTimedOut(_peer_name) => {
                         // no-op
                     }
                     // HoldEntryRequested from gossip
                     // -> Send each aspect to Core for validation
-                    DhtRequestToParent::HoldEntryRequested { from_peer, entry } => {
+                    DhtRequestToParent::HoldEntryRequested {
+                        from_peer_name,
+                        entry,
+                    } => {
                         for aspect in entry.aspect_list {
                             let lib3h_msg = StoreEntryAspectData {
                                 request_id: self.request_track.reserve(),
                                 space_address: chain_id.0.clone(),
-                                provider_agent_id: from_peer.clone().into(),
+                                provider_agent_id: from_peer_name.clone().into(),
                                 entry_address: entry.entry_address.clone(),
                                 entry_aspect: aspect,
                             };
@@ -195,8 +198,8 @@ impl<'engine> GhostEngine<'engine> {
                                                 GhostCallbackData::Response(Err(e)) => {
                                                     panic!("Got error on HandleFetchEntry: {:?} ", e);
                                                 }
-                                                GhostCallbackData::Timeout => {
-                                                    panic!("Got timeout on HandleFetchEntry");
+                                                GhostCallbackData::Timeout(bt) => {
+                                                    panic!("Got timeout on HandleFetchEntry: {:?}", bt);
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
@@ -284,7 +287,7 @@ impl<'engine> GhostEngine<'engine> {
                             space_gateway.publish(
                                 Span::fixme(),
                                 GatewayRequestToChild::Transport(RequestToChild::SendMessage {
-                                    uri: Url::parse(&format!("agentid:{}", to_agent_id)).unwrap(),
+                                    uri: Lib3hUri::with_agent_id(&to_agent_id),
                                     payload,
                                 }),
                             )?;

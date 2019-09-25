@@ -23,7 +23,6 @@ holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/ho
 lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
 lib3h_crypto_api = { version = "=0.0.10", path = "../crypto_api" }
 lib3h_zombie_actor = { version = "=0.0.10", path = "../zombie_actor" }
-lib3h_discovery = { version = "=0.0.10", path = "../discovery" }
 lib3h_sodium = { version = "=0.0.10", path = "../sodium" }
 nanoid = "=0.2.0"
 tungstenite = "=0.9.1"
