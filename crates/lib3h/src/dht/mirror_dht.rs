@@ -168,12 +168,12 @@ impl MirrorDht {
             self.timed_out_map.insert(peer_name, true);
         }
         // Check if must gossip self
-        trace!(
+        /*trace!(
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
             now,
             self.last_gossip_of_self,
             self.config.gossip_interval(),
-        );
+        );*/
         if now - self.last_gossip_of_self > self.config.gossip_interval() {
             self.last_gossip_of_self = now;
             let gossip_data = self.gossip_self(self.get_other_peer_list());
@@ -339,10 +339,10 @@ impl
 impl MirrorDht {
     #[allow(irrefutable_let_patterns)]
     fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
-        debug!("@MirrorDht@ serving request: {:?}", request);
+        //debug!("@MirrorDht@ serving request: {:?}", request);
         let span = request.span().child("handle_request_from_parent");
         let msg = request.take_message().expect("exists");
-        debug!("@MirrorDht@ - request: {:?}", msg);
+        //debug!("@MirrorDht@ - request: {:?}", msg);
         match msg {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {
