@@ -16,7 +16,7 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::Opaque,
     discovery::{
-        error::{DiscoveryError, DiscoveryResult},
+        error::{DiscoveryError, DiscoveryResult, ErrorKind as DiscoveryErrorKind},
         Discovery,
     },
     uri::Lib3hUri,
@@ -66,21 +66,40 @@ impl Discovery for GhostTransportWebsocket {
 
         match &mut self.mdns {
             Some(mdns) => mdns.advertise(),
-            None => Ok(()),
+            None => {
+                error!("Fail to advertise: No mDNS instance found.");
+                Err(DiscoveryError::new(DiscoveryErrorKind::Other(
+                    "No mDNS instance found during Advertising step.".to_string(),
+                )))
+            }
         }
     }
 
     fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
         match &mut self.mdns {
             Some(mdns) => mdns.discover(),
-            None => Ok(Vec::new()),
+            // None => Ok(Vec::new()),
+            None => {
+                self.advertise()?;
+                if let Some(mdns) = &mut self.mdns {
+                    mdns.discover()
+                } else {
+                    error!("Fail to advertise: No mDNS instance found.");
+                    Err(DiscoveryError::new(DiscoveryErrorKind::Other(
+                        "No mDNS instance found during Discovering step.".to_string(),
+                    )))
+                }
+            }
         }
     }
 
     fn release(&mut self) -> DiscoveryResult<()> {
         match &mut self.mdns {
             Some(mdns) => mdns.release(),
-            None => Ok(()),
+            None => {
+                warn!("mDNS Discovery: Fail to release.");
+                Ok(())
+            },
         }
     }
 
