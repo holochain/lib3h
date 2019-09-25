@@ -26,7 +26,7 @@ impl P2pGateway {
             Box::new(move |me, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -234,6 +234,7 @@ impl P2pGateway {
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
                 payload: payload,
+                attempt: 0,
             },
             Box::new(move |_me, response| {
                 // In case of a transport error or timeout we store the message in the
@@ -266,11 +267,16 @@ impl P2pGateway {
                         .into()))
                     }
                     // Timeout:
-                    GhostCallbackData::Timeout => {
-                        debug!("Gateway got timeout from transport. Adding message to pending");
-                        cb(Err(
-                            "Ghost timeout error while trying to send message".into()
-                        ))
+                    GhostCallbackData::Timeout(bt) => {
+                        debug!(
+                            "Gateway got timeout from transport. Adding message to pending: {:?}",
+                            bt
+                        );
+                        cb(Err(format!(
+                            "Ghost timeout error while trying to send message: {:?}",
+                            bt
+                        )
+                        .into()))
                     }
                 }
             }),
@@ -297,6 +303,7 @@ impl P2pGateway {
         self.priv_encoded_send(span, to_address, uri, payload, cb)
     }
 
+    const MAX_RETRY_ATTEMPTS: u8 = 5;
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
         let pending: Vec<PendingOutgoingMessage> =
             self.pending_outgoing_messages.drain(..).collect();
@@ -304,6 +311,7 @@ impl P2pGateway {
             let transport_request = transport::protocol::RequestToChild::SendMessage {
                 uri: p.uri,
                 payload: p.payload,
+                attempt: p.attempt + 1,
             };
             self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
         }
@@ -316,13 +324,24 @@ impl P2pGateway {
         uri: Lib3hUri,
         payload: Opaque,
         parent_request: GatewayToChildMessage,
-    ) {
-        self.pending_outgoing_messages.push(PendingOutgoingMessage {
-            span,
-            uri,
-            payload,
-            parent_request,
-        });
+        attempt: u8,
+    ) -> Option<GatewayToChildMessage> {
+        if attempt < Self::MAX_RETRY_ATTEMPTS {
+            self.pending_outgoing_messages.push(PendingOutgoingMessage {
+                span,
+                uri,
+                payload,
+                parent_request,
+                attempt,
+            });
+            trace!(
+                "[gateway_transport] add_to_pending, pending_outgoing_messages: {:?}",
+                self.pending_outgoing_messages
+            );
+            None
+        } else {
+            Some(parent_request)
+        }
     }
 
     /// Handle Transport request sent to use by our parent
@@ -341,9 +360,9 @@ impl P2pGateway {
                     Box::new(|_me, response| {
                         let response = {
                             match response {
-                                GhostCallbackData::Timeout => {
+                                GhostCallbackData::Timeout(bt) => {
                                     parent_request
-                                        .respond(Err(Lib3hError::new_other("timeout")))?;
+                                        .respond(Err(format!("timeout: {:?}", bt).into()))?;
                                     return Ok(());
                                 }
                                 GhostCallbackData::Response(response) => response,
@@ -357,7 +376,11 @@ impl P2pGateway {
                     }),
                 );
             }
-            transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+            transport::protocol::RequestToChild::SendMessage {
+                uri,
+                payload,
+                attempt,
+            } => {
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
@@ -388,7 +411,18 @@ impl P2pGateway {
                                     uri,
                                     payload,
                                     parent_request,
-                                );
+                                    attempt,
+                                )
+                                .map(|parent_request| {
+                                    parent_request.respond(Err(Lib3hError::from(format!(
+                                        "Maximum retries of {:?} already attempted.",
+                                        Self::MAX_RETRY_ATTEMPTS
+                                    ))))
+                                })
+                                .unwrap_or_else(|| {
+                                    trace!("queued retry for response {:?}", response);
+                                    Ok(())
+                                })?
                             }
                         };
                         Ok(())
@@ -428,13 +462,14 @@ impl P2pGateway {
             self.identifier.nickname, msg
         );
         let span = msg.span().child("handle_transport_RequestToParent");
-        match msg.take_message().expect("exists") {
-            transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
-                // TODO
-                error!(
-                    "({}) Connection Error for {}: {}\n Closing connection.",
-                    self.identifier.nickname, uri, error,
-                );
+        let msg = msg.take_message().expect("exists");
+        match &msg {
+            transport::protocol::RequestToParent::ErrorOccured { uri: _, error: _ } => {
+                // pass any errors back up the chain so network layer can handle them (i.e.)
+                self.endpoint_self.publish(
+                    Span::fixme(),
+                    GatewayRequestToParent::Transport(msg.clone()),
+                )?;
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
                 // TODO
@@ -459,7 +494,7 @@ impl P2pGateway {
                 if payload.len() == 0 {
                     debug!("Implement Ping!");
                 } else {
-                    self.priv_decode_on_receive(span, uri, payload)?;
+                    self.priv_decode_on_receive(span, uri.clone(), payload.clone())?;
                 }
             }
         };

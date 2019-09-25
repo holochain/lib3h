@@ -63,7 +63,7 @@ impl From<RequestId> for String {
 }
 
 mod ghost_error;
-pub use ghost_error::{GhostError, GhostResult};
+pub use ghost_error::{ErrorKind, GhostError, GhostResult};
 
 mod ghost_tracker;
 pub use ghost_tracker::{
@@ -357,7 +357,7 @@ mod tests {
                             Box::new(move |_m:&mut GatewayTransport, response| {
 
                                 // got a timeout error
-                                if let GhostCallbackData::Timeout = response {
+                                if let GhostCallbackData::Timeout(_) = response {
                                     msg.respond(Err("Timeout".into()))?;
                                     return Ok(());
                                 }

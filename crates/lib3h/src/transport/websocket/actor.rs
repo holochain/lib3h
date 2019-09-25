@@ -8,13 +8,23 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
+// use lib3h_discovery::{
+//     error::{DiscoveryError, DiscoveryResult},
+//     Discovery,
+// };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::Opaque,
-    discovery::{error::DiscoveryResult, Discovery},
+    discovery::{
+        error::{DiscoveryError, DiscoveryResult, ErrorKind as DiscoveryErrorKind},
+        Discovery,
+    },
     uri::Lib3hUri,
     Address,
 };
+
+// Use mDNS for bootstrapping
+use lib3h_mdns::{MulticastDns, MulticastDnsBuilder};
 
 pub type Message =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>;
@@ -22,24 +32,77 @@ pub type Message =
 pub struct GhostTransportWebsocket {
     #[allow(dead_code)]
     transport_id: Address,
+    network_id_address: Address,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
     bound_url: Option<Lib3hUri>,
     pending: Vec<Message>,
+    mdns: Option<MulticastDns>,
 }
 
+// Here we just need to use mDNS, but use it only once, with advertise probably, and that's all.
 impl Discovery for GhostTransportWebsocket {
     fn advertise(&mut self) -> DiscoveryResult<()> {
-        Ok(())
+        // Lazily instantiate mDNS
+        if self.mdns.is_none() {
+            let uri: url::Url = self
+                .bound_url
+                .clone()
+                .ok_or_else(|| DiscoveryError::new_other("Must bind URL before advertising."))?
+                .into();
+
+            // let uri: url::Url = uri.into();
+
+            let netid: String = self.network_id_address.clone().into();
+
+            let mut mdns = MulticastDnsBuilder::new()
+                .own_record(&netid, &[&uri.clone().into_string()])
+                .build()?;
+            mdns.insert_record(&netid, &[&uri.into_string()]);
+
+            self.mdns = Some(mdns);
+        }
+
+        match &mut self.mdns {
+            Some(mdns) => mdns.advertise(),
+            None => {
+                error!("Fail to advertise: No mDNS instance found.");
+                Err(DiscoveryError::new(DiscoveryErrorKind::Other(
+                    "No mDNS instance found during Advertising step.".to_string(),
+                )))
+            }
+        }
     }
+
     fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
-        let nodes = Vec::new();
-        Ok(nodes)
+        match &mut self.mdns {
+            Some(mdns) => mdns.discover(),
+            // None => Ok(Vec::new()),
+            None => {
+                self.advertise()?;
+                if let Some(mdns) = &mut self.mdns {
+                    mdns.discover()
+                } else {
+                    error!("Fail to advertise: No mDNS instance found.");
+                    Err(DiscoveryError::new(DiscoveryErrorKind::Other(
+                        "No mDNS instance found during Discovering step.".to_string(),
+                    )))
+                }
+            }
+        }
     }
+
     fn release(&mut self) -> DiscoveryResult<()> {
-        Ok(())
+        match &mut self.mdns {
+            Some(mdns) => mdns.release(),
+            None => {
+                warn!("mDNS Discovery: Fail to release.");
+                Ok(())
+            }
+        }
     }
+
     fn flush(&mut self) -> DiscoveryResult<()> {
         Ok(())
     }
@@ -54,10 +117,15 @@ impl Drop for GhostTransportWebsocket {
 }
 
 impl GhostTransportWebsocket {
-    pub fn new(transport_id: Address, tls_config: TlsConfig) -> GhostTransportWebsocket {
+    pub fn new(
+        transport_id: Address,
+        tls_config: TlsConfig,
+        networkid_address: Address,
+    ) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
             transport_id,
+            network_id_address: networkid_address,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -68,6 +136,7 @@ impl GhostTransportWebsocket {
             streams: StreamManager::with_std_tcp_stream(tls_config),
             bound_url: None,
             pending: Vec::new(),
+            mdns: None,
         }
     }
 
@@ -86,7 +155,7 @@ impl GhostTransportWebsocket {
             .take_message()
             .expect("GhostMessage must have inner RequestToChild")
         {
-            RequestToChild::SendMessage { uri, payload } => {
+            RequestToChild::SendMessage { uri, payload, .. } => {
                 match self.bound_url.clone() {
                     None => {
                         let _ = msg.respond(Err(TransportError::new(
@@ -109,7 +178,7 @@ impl GhostTransportWebsocket {
                             // it as error so the calling context can put it back into the pending
                             // list to try again later.
                             let payload = Opaque::from(bytes);
-                            msg.put_message(RequestToChild::SendMessage { uri, payload });
+                            msg.put_message(RequestToChild::create_send_message(uri, payload));
                             Err(msg)
                         } else {
                             let _ = msg.respond(Ok(RequestToChildResponse::SendMessageSuccess));
@@ -137,9 +206,11 @@ impl GhostTransportWebsocket {
 
                     if let Ok(url) = maybe_bound_url {
                         self.bound_url = Some(url.clone().into());
+                        self.advertise()
+                            .map_err(|e| TransportError::from(e.to_string()))?;
                     }
                 }
-                RequestToChild::SendMessage { uri, payload } => {
+                RequestToChild::SendMessage { uri, payload, .. } => {
                     // make sure we have bound and got our address
                     if self.bound_url.is_none() {
                         msg.respond(Err(TransportError::new(
@@ -168,18 +239,18 @@ impl GhostTransportWebsocket {
                                 }
 
                                 // And save message for later:
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                msg.put_message(RequestToChild::create_send_message(uri, payload));
                                 self.pending.push(msg);
                             }
                             ConnectionStatus::Initializing => {
                                 trace!("Send tried while initializing");
                                 // If the connection is there but not ready yet, save message for later
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                msg.put_message(RequestToChild::create_send_message(uri, payload));
                                 self.pending.push(msg);
                             }
                             ConnectionStatus::Ready => {
                                 trace!("Send via previously established connection");
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                msg.put_message(RequestToChild::create_send_message(uri, payload));
                                 if let Err(msg) = self.handle_send_message(msg) {
                                     trace!(
                                         "Error while sending message, putting it in pending list"
@@ -247,16 +318,16 @@ impl GhostTransportWebsocket {
         while let Some(mut msg) = self.pending.pop() {
             trace!("Processing pending message...");
             let inner_msg = msg.take_message().expect("exists");
-            if let RequestToChild::SendMessage { uri, payload } = inner_msg {
+            if let RequestToChild::SendMessage { uri, payload, .. } = inner_msg {
                 if self.streams.connection_status(&uri) == ConnectionStatus::Ready {
                     trace!("Sending pending message to: {:?}", uri);
-                    msg.put_message(RequestToChild::SendMessage { uri, payload });
+                    msg.put_message(RequestToChild::create_send_message(uri, payload));
                     if let Err(msg) = self.handle_send_message(msg) {
                         trace!("Error while sending message, putting it back in pending list");
                         temp.push(msg);
                     }
                 } else {
-                    msg.put_message(RequestToChild::SendMessage { uri, payload });
+                    msg.put_message(RequestToChild::create_send_message(uri, payload));
                     temp.push(msg);
                 }
             } else {
@@ -356,8 +427,15 @@ mod tests {
 
     #[test]
     fn test_websocket_transport() {
-        let transport_id1 = "fake_transport_id1".into();
-        let mut transport1 = GhostTransportWebsocket::new(transport_id1, TlsConfig::Unencrypted);
+        let networkid_address: Address = "wss-bootstapping-network-id1.holo.host".into();
+
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(
+            machine_id1,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -365,8 +443,13 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        let transport_id2 = "fake_transport_id2".into();
-        let mut transport2 = GhostTransportWebsocket::new(transport_id2, TlsConfig::Unencrypted);;
+        let machine_id2 = "fake_machine_id2".into();
+        let mut transport2 = GhostTransportWebsocket::new(
+            machine_id2,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+
         let mut t2_endpoint = transport2
             .take_parent_endpoint()
             .expect("exists")
@@ -447,10 +530,10 @@ mod tests {
         t1_endpoint
             .request(
                 Span::fixme(),
-                RequestToChild::SendMessage {
-                    uri: expected_transport2_address.clone(),
-                    payload: b"test message".to_vec().into(),
-                },
+                RequestToChild::create_send_message(
+                    expected_transport2_address.clone(),
+                    b"test message".to_vec().into(),
+                ),
                 Box::new(|_: &mut (), r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
@@ -470,8 +553,16 @@ mod tests {
     #[test]
     fn test_websocket_transport_reconnect() {
         enable_logging_for_test(true);
-        let transport_id1 = "fake_transport_id1".into();
-        let mut transport1 = GhostTransportWebsocket::new(transport_id1, TlsConfig::Unencrypted);
+
+        let networkid_address: Address = "wss-bootstapping-network-id.holo.host".into();
+
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(
+            machine_id1,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
             .take_parent_endpoint()
             .expect("exists")
@@ -507,9 +598,13 @@ mod tests {
         for index in 1..10 {
             transport1.process().unwrap();
             {
-                let transport_id2 = "fake_transport_id2".into();
-                let mut transport2 =
-                    GhostTransportWebsocket::new(transport_id2, TlsConfig::Unencrypted);;
+                let machine_id2 = "fake_machine_id2".into();
+                let mut transport2 = GhostTransportWebsocket::new(
+                    machine_id2,
+                    TlsConfig::Unencrypted,
+                    networkid_address.clone(),
+                );
+
                 let mut t2_endpoint = transport2
                     .take_parent_endpoint()
                     .expect("exists")
@@ -542,10 +637,10 @@ mod tests {
                 t1_endpoint
                     .request(
                         Span::fixme(),
-                        RequestToChild::SendMessage {
-                            uri: expected_transport2_address.clone(),
-                            payload: b"test message".to_vec().into(),
-                        },
+                        RequestToChild::create_send_message(
+                            expected_transport2_address.clone(),
+                            b"test message".to_vec().into(),
+                        ),
                         Box::new(|_: &mut (), r| {
                             // parent should see that the send request was OK
                             assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
@@ -569,5 +664,128 @@ mod tests {
     #[test]
     fn should_invoke_drop() {
         // TODO
+    }
+
+    /// Check if we manage to discover nodes using WebSocket for bootstapping using mDNS.
+    #[test]
+    fn mdns_wss_bootstrapping_test() {
+        let networkid_address: Address =
+            format!("wss-bootstapping-network-id-{}.holo.host", nanoid::simple()).into();
+
+        let machine_id1 = "fake_machine_id1".into();
+        let mut transport1 = GhostTransportWebsocket::new(
+            machine_id1,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("twss_to_child1")
+            .build::<()>();
+
+        // Here we should get an error because we indeed did not bind yet, so it's the expected
+        // behavior
+        assert_eq!(
+            "Err(DiscoveryError(Other(\"Must bind URL before advertising.\")))",
+            format!("{:?}", transport1.discover())
+        );
+
+        let machine_id2 = "fake_machine_id2".into();
+        let mut transport2 = GhostTransportWebsocket::new(
+            machine_id2,
+            TlsConfig::Unencrypted,
+            networkid_address.clone(),
+        );
+        let mut t2_endpoint = transport2
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("twss_to_child2")
+            .build::<()>();
+
+        // create two memory bindings so that we have addresses
+        assert_eq!(transport1.bound_url, None);
+        assert_eq!(transport2.bound_url, None);
+
+        let port1 = get_available_port(3125).expect("Must be able to find free port");
+        let expected_transport1_address: Lib3hUri =
+            Url::parse(&format!("wss://127.0.0.1:{}", port1))
+                .unwrap()
+                .into();
+        t1_endpoint
+            .request(
+                Span::fixme(),
+                RequestToChild::Bind {
+                    spec: expected_transport1_address.clone(),
+                },
+                Box::new(move |_: &mut (), r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        format!(
+                            "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
+                            port1.clone(),
+                        ),
+                        format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        let port2 = get_available_port(3126).expect("Must be able to find free port");
+        let expected_transport2_address: Lib3hUri =
+            Url::parse(&format!("wss://127.0.0.1:{}", port2))
+                .unwrap()
+                .into();
+        t2_endpoint
+            .request(
+                Span::fixme(),
+                RequestToChild::Bind {
+                    spec: expected_transport2_address.clone(),
+                },
+                Box::new(move |_: &mut (), r| {
+                    // parent should see the bind event
+                    assert_eq!(
+                        &format!(
+                            "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
+                            port2.clone(),
+                        ),
+                        &format!("{:?}", r)
+                    );
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut ());
+
+        assert_eq!(
+            transport1.bound_url(),
+            Some(expected_transport1_address.clone())
+        );
+
+        // Advertise happens during bind so discover should now work.
+        let urls = transport1
+            .discover()
+            .expect("Fail to discover nodes using WSS transport1.");
+        assert_eq!(vec![expected_transport1_address.clone()], urls);
+
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut ());
+
+        assert_eq!(
+            transport2.bound_url(),
+            Some(expected_transport2_address.clone())
+        );
+
+        let urls = transport1
+            .discover()
+            .expect("Fail to discover nodes using WSS transport1.");
+
+        // println!("DISCOVERED: {:?}", urls);
+        assert_eq!(urls.len(), 2);
     }
 }

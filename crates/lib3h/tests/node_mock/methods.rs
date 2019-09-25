@@ -120,6 +120,7 @@ impl NodeMock {
         );
         self.recv_msg_log.extend_from_slice(msgs.as_slice());
         for msg in msgs.iter() {
+            trace!("({}).process() handle_lib3h({:?})", self.name, msg);
             self.handle_lib3h(msg.clone());
         }
         debug!("({}).process() - DRAIN END\n", self.name);

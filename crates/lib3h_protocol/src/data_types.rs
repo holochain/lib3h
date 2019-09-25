@@ -204,11 +204,18 @@ pub struct ConnectedData {
     // pub peer_count: u32,
 }
 
+//  This will be converted to network health data later
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DisconnectedData {
-    /// Specify to which network to connect to.
+    /// Specify which network
     /// Empty string for 'all'
     pub network_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct UnboundData {
+    /// Specify which binding was unbound
+    pub uri: Lib3hUri,
 }
 
 //--------------------------------------------------------------------------------------------------

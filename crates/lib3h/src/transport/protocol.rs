@@ -11,8 +11,24 @@ pub struct BindResultData {
 /// Transport protocol enums for use with GhostActor implementation
 #[derive(Debug, Clone)]
 pub enum RequestToChild {
-    Bind { spec: Lib3hUri }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { uri: Lib3hUri, payload: Opaque },
+    Bind {
+        spec: Lib3hUri,
+    }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    SendMessage {
+        uri: Lib3hUri,
+        payload: Opaque,
+        attempt: u8,
+    },
+}
+
+impl RequestToChild {
+    pub fn create_send_message(uri: Lib3hUri, payload: Opaque) -> Self {
+        RequestToChild::SendMessage {
+            uri,
+            payload,
+            attempt: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,7 +133,7 @@ impl
                 data,
                 Box::new(move |_, response| {
                     msg.respond(match response {
-                        GhostCallbackData::Timeout => Err("timeout".into()),
+                        GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                         GhostCallbackData::Response(r) => r,
                     })?;
                     Ok(())

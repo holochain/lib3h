@@ -46,7 +46,11 @@ impl<'engine> GhostEngine<'engine> {
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
-                Box::new(GhostTransportWebsocket::new(transport_id, tls))
+                Box::new(GhostTransportWebsocket::new(
+                    transport_id,
+                    tls,
+                    config.network_id.id.clone(),
+                ))
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(transport_id, &net)),
         };
@@ -82,7 +86,7 @@ impl<'engine> GhostEngine<'engine> {
             Box::new(|me: &mut GhostEngine<'engine>, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -148,7 +152,7 @@ impl<'engine> GhostEngine<'engine> {
                 cmd,
                 Box::new(|_, response| {
                     let response = match response {
-                        GhostCallbackData::Timeout => panic!("bootstrap timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("bootstrap timeout: {:?}", bt),
                         GhostCallbackData::Response(r) => r,
                     };
                     if let Err(e) = response {
@@ -223,7 +227,9 @@ impl<'engine> GhostEngine<'engine> {
                         GatewayRequestToChildResponse::BootstrapSuccess,
                     )) => msg.respond(Ok(ClientToLib3hResponse::BootstrapSuccess))?,
                     GhostCallbackData::Response(Err(e)) => msg.respond(Err(e))?,
-                    GhostCallbackData::Timeout => msg.respond(Err("timeout".into()))?,
+                    GhostCallbackData::Timeout(bt) => {
+                        msg.respond(Err(format!("timeout: {:?}", bt).into()))?
+                    }
                     _ => msg.respond(Err(format!("bad response: {:?}", response).into()))?,
                 }
                 Ok(())
@@ -377,7 +383,9 @@ impl<'engine> GhostEngine<'engine> {
                 Box::new(move |me, response| {
                     let response = {
                         match response {
-                            GhostCallbackData::Timeout => return Err("timeout".into()),
+                            GhostCallbackData::Timeout(bt) => {
+                                return Err(format!("timeout: {:?}", bt).into())
+                            }
                             GhostCallbackData::Response(response) => match response {
                                 Err(e) => return Err(e.into()),
                                 Ok(response) => response,
@@ -426,7 +434,9 @@ impl<'engine> GhostEngine<'engine> {
                                             ),
                                         ),
                                         GhostCallbackData::Response(Err(e)) => Err(e.into()),
-                                        GhostCallbackData::Timeout => Err("timeout".into()),
+                                        GhostCallbackData::Timeout(bt) => {
+                                            Err(format!("timeout: {:?}", bt).into())
+                                        }
                                         _ => Err("bad response type".into()),
                                     }
                                 }),
@@ -507,7 +517,7 @@ impl<'engine> GhostEngine<'engine> {
                     Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
                 )) => Ok(me.handle_HandleGetGossipingEntryListResult(msg)?),
                 GhostCallbackData::Response(Err(e)) => Err(e.into()),
-                GhostCallbackData::Timeout => Err("timeout".into()),
+                GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                 _ => Err("bad response type".into()),
             }),
         )?;
@@ -522,7 +532,7 @@ impl<'engine> GhostEngine<'engine> {
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
                     )) => Ok(me.handle_HandleGetAuthoringEntryListResult(msg)?),
                     GhostCallbackData::Response(Err(e)) => Err(e.into()),
-                    GhostCallbackData::Timeout => Err("timeout".into()),
+                    GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                     _ => Err("bad response type".into()),
                 }),
             )
@@ -585,17 +595,21 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_direct_message(
         &mut self,
         span: Span,
-        ghost_message: ClientToLib3hMessage,
+        client_to_lib3h_msg: ClientToLib3hMessage,
         mut msg: DirectMessageData,
     ) -> Lib3hResult<()> {
         let to_agent_id = msg.to_agent_id.clone();
-
         // Generate a new request_id for the network transport exchange.
         // we can overwrite the value in the DirectMessageData because the ghost tracker will handle
         // the request response pairing
         let request_id = RequestId::new();
+        trace!(
+            "GhostEngine: mutating request id from {:?} to {:?} for {:?}",
+            msg.request_id,
+            request_id,
+            msg
+        );
         msg.request_id = request_id.clone().into();
-
         let (space_gateway, payload) = match self.prepare_direct_peer_msg(
             msg.space_address.clone(),
             msg.from_agent_id.clone(),
@@ -604,16 +618,16 @@ impl<'engine> GhostEngine<'engine> {
         ) {
             Ok(r) => r,
             Err(e) => {
-                return Ok(ghost_message.respond(Err(e))?);
+                return Ok(client_to_lib3h_msg.respond(Err(e))?);
             }
         };
 
         space_gateway.request(
             span,
-            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: Lib3hUri::with_agent_id(&to_agent_id),
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::create_send_message(
+                Lib3hUri::with_agent_id(&to_agent_id),
                 payload,
-            }),
+            )),
             Box::new(|me, response| {
                 debug!(
                     "GhostEngine: response to handle_direct_message message: {:?}",
@@ -623,10 +637,11 @@ impl<'engine> GhostEngine<'engine> {
                     GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
                         transport::protocol::RequestToChildResponse::SendMessageSuccess,
                     ))) => {
+                        trace!("GhostEngine: insert pending client direct message with request id {:?}", request_id);
                         me.pending_client_direct_messages
-                            .insert(request_id, ghost_message);
+                            .insert(request_id, client_to_lib3h_msg);
                     }
-                    _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                    _ => client_to_lib3h_msg.respond(Err(format!("{:?}", response).into()))?,
                 };
                 Ok(())
             }),
@@ -706,8 +721,8 @@ impl<'engine> GhostEngine<'engine> {
                         GhostCallbackData::Response(Err(e)) => {
                             error!("Got error on HandleQueryEntryResult: {:?} ", e);
                         }
-                        GhostCallbackData::Timeout => {
-                            error!("Got timeout on HandleQueryEntryResult");
+                        GhostCallbackData::Timeout(bt) => {
+                            error!("Got timeout on HandleQueryEntryResult: {:?}", bt);
                         }
                         _ => panic!("bad response type"),
                     }
@@ -779,10 +794,8 @@ pub fn handle_gossip_to<
             .serialize(&mut Serializer::new(&mut payload))
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
-        let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: to_peer_name,
-            payload: payload.into(),
-        };
+        let msg =
+            transport::protocol::RequestToChild::create_send_message(to_peer_name, payload.into());
         gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
@@ -790,8 +803,12 @@ pub fn handle_gossip_to<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test};
+    use crate::{
+        dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
+        transport::memory_mock::memory_server,
+    };
     use holochain_tracing::test_span;
+    use lib3h_ghost_actor::wait_can_track_did_work;
     use lib3h_sodium::SodiumCryptoSystem;
     use std::path::PathBuf;
 
@@ -880,6 +897,38 @@ mod tests {
         assert_eq!(
             "Err(Lib3hError(Other(\"Not part of that space\")))",
             format!("{:?}", result)
+        );
+    }
+
+    // this test simulates an unbind happening in our transport layer
+    // i.e. we moved to a different cell tower, or someone turned off the
+    // networking interface
+    #[test]
+    fn test_ghost_engine_unbind() {
+        enable_logging_for_test(true);
+        let mut core = MockCore {
+            //        state: "".to_string(),
+        };
+        let network_name = "test_ghost_engine_unbind";
+        let mut engine = make_test_engine_wrapper(network_name);
+        let req_data = make_test_join_request();
+        let result = engine.as_mut().handle_join(test_span(""), &req_data);
+        assert!(result.is_ok());
+        let network = {
+            let mut verse = memory_server::get_memory_verse();
+            verse.get_network(network_name)
+        };
+
+        let my_url = &Lib3hUri::with_memory("addr_1");
+        //let my_url = &engine.as_ref().advertise();
+        assert!(network.lock().unwrap().unbind(my_url));
+        wait_can_track_did_work!(engine, core, false);
+        let mut msgs = engine.drain_messages();
+        println!("engine.drain() -> {:?}", msgs);
+        assert_eq!(msgs.len(), 3);
+        assert_eq!(
+            "Some(Unbound(UnboundData { uri: Lib3hUri(\"mem://addr_1/\") }))",
+            format!("{:?}", msgs[2].take_message())
         );
     }
 

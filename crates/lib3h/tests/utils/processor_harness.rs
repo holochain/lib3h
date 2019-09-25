@@ -27,7 +27,7 @@ pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
         // let seed = [rand::random::<u64>(), rand::random::<u64>()];
         // let seed = [1840432774656682167, 15353179927896983378];
 
-        println!("seed is: {:?}", &seed);
+        trace!("seed is: {:?}", &seed);
         let seeded_boolean_prng = SeededBooleanPrng::from(seed);
 
         Mutex::new(seeded_boolean_prng)
@@ -380,7 +380,7 @@ macro_rules! assert_msg_matches {
      $regex:expr
     ) => {
         // TODO Hack make a single engine version
-        $crate::assert2_msg_matches($engine, $engine, $regex)
+        $crate::assert2_msg_matches!($engine, $engine, $regex)
     };
 }
 
@@ -429,11 +429,11 @@ macro_rules! process_one_engine {
   ) => {{
         let (did_work, events) = $engine
             .process()
-            .map_err(|err| dbg!(err))
+            .map_err(|err| error!("[process_one_engine] process generated an error: {:?}", err))
             .unwrap_or((false, vec![]));
         if events.is_empty() {
         } else {
-            let events = dbg!(events);
+            trace!("[process_one_engine]: {:?}", events);
             let processor_result = $crate::utils::processor_harness::ProcessorResult {
                 did_work,
                 events,
@@ -499,7 +499,7 @@ macro_rules! assert2_processed_all {
                 .expect("could not acquire lock on boolean prng")
                 .next()
                 .expect("could not generate a new seeded prng value");
-            println!(
+            trace!(
                 "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
                 $crate::utils::processor_harness::BOOLEAN_PRNG
                     .lock()
