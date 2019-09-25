@@ -38,7 +38,7 @@ where
     client_request_responses: Vec<Lib3hServerProtocol>,
     tracker:
         Tracker<GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, EngineError>>,
-    req_id_map: std::collections::HashMap<String, String>,
+    request_id_map: std::collections::HashMap<String, String>,
 }
 
 fn server_failure(
@@ -88,7 +88,7 @@ where
             name: name.into(),
             client_request_responses: Vec::new(),
             tracker: Tracker::new("client_to_lib3_response_", 2000),
-            req_id_map: std::collections::HashMap::new(),
+            request_id_map: std::collections::HashMap::new(),
         }
     }
 
@@ -237,23 +237,22 @@ where
                 )))
             })?;
 
-            let resp;
+            let response;
             if let Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =
                 lib3h_to_client_response.clone()
             {
-                trace!("IS CASE: {:?}", lib3h_to_client_response);
-                let result = self.req_id_map.remove(&request_id);
-                if let Some(req_id) = result {
-                    trace!("REPLACE req_id {:?} with {:?}", data.request_id, req_id);
-                    data.request_id = req_id.clone();
+                let result = self.request_id_map.remove(&request_id);
+                if let Some(request_id) = result {
+                    trace!("REPLACE request_id {:?} with {:?}", data.request_id, request_id);
+                    data.request_id = request_id.clone();
                 }
-                resp = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
+                response = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
             } else {
-                resp = lib3h_to_client_response.clone();
+                response = lib3h_to_client_response.clone();
             }
 
             ghost_mesage
-                .respond(Ok(resp))
+                .respond(Ok(response))
                 .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         }
     }
@@ -312,7 +311,7 @@ where
             Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleSendDirectMessage(data) => {
-                self.req_id_map
+                self.request_id_map
                     .insert(request_id.clone(), data.request_id.clone());
                 data.request_id = request_id
             }
