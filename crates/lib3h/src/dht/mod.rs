@@ -137,7 +137,7 @@ pub mod tests {
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -169,7 +169,7 @@ pub mod tests {
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -198,7 +198,7 @@ pub mod tests {
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -227,7 +227,7 @@ pub mod tests {
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -260,7 +260,7 @@ pub mod tests {
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -361,7 +361,7 @@ pub mod tests {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
