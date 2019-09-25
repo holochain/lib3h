@@ -237,13 +237,19 @@ where
                 )))
             })?;
 
+            // HACK: If it is send message result, put back the original request id.
+            // TODO: consider this operation for all messages
             let response;
             if let Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =
                 lib3h_to_client_response.clone()
             {
                 let result = self.request_id_map.remove(&request_id);
                 if let Some(request_id) = result {
-                    trace!("REPLACE request_id {:?} with {:?}", data.request_id, request_id);
+                    trace!(
+                        "REPLACE request_id {:?} with {:?}",
+                        data.request_id,
+                        request_id
+                    );
                     data.request_id = request_id.clone();
                 }
                 response = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
@@ -311,6 +317,8 @@ where
             Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleSendDirectMessage(data) => {
+                // Cache this request_id as the ghost engine layer needs it to associate
+                // the response message
                 self.request_id_map
                     .insert(request_id.clone(), data.request_id.clone());
                 data.request_id = request_id
