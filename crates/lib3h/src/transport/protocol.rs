@@ -117,7 +117,7 @@ impl
                 data,
                 Box::new(move |_, response| {
                     msg.respond(match response {
-                        GhostCallbackData::Timeout => Err("timeout".into()),
+                        GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                         GhostCallbackData::Response(r) => r,
                     })?;
                     Ok(())

@@ -44,7 +44,7 @@ impl
             Box::new(|mut me, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -116,7 +116,9 @@ impl P2pGateway {
                     DhtRequestToChild::RequestPeerList,
                     Box::new(move |me, response| {
                         match response {
-                            GhostCallbackData::Timeout => panic!("Timeout on RequestPeerList"),
+                            GhostCallbackData::Timeout(bt) => {
+                                panic!("Timeout on RequestPeerList: {:?}", bt)
+                            }
                             GhostCallbackData::Response(Err(error)) => {
                                 panic!("Error on RequestPeerList: {:?}", error)
                             }
