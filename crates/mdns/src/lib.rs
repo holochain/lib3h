@@ -177,6 +177,15 @@ impl MulticastDns {
     }
 
     /// Insert a new record to our cache.
+    pub fn insert_own_record(&mut self, netid: &str, records: &[&str]) {
+        let records: Vec<Record> = records
+            .iter()
+            .map(|rec| Record::new(netid, rec, 255))
+            .collect();
+        self.own_map_record.insert(netid.to_string(), records);
+    }
+
+    /// Insert a new record to our cache.
     pub fn insert_record(&mut self, netid: &str, records: &[&str]) {
         let records: Vec<Record> = records
             .iter()
