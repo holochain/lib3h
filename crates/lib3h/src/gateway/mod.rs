@@ -52,9 +52,11 @@ pub struct P2pGateway {
 type SendCallback =
     Box<dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static>;
 
+#[derive(Debug)]
 struct PendingOutgoingMessage {
     span: Span,
     uri: Lib3hUri,
     payload: Opaque,
     parent_request: GatewayToChildMessage,
+    attempt: u8,
 }

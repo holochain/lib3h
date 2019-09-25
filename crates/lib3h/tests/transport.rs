@@ -230,7 +230,7 @@ impl TestTransport {
                 self.bound_url = Some(spec);
                 msg.respond(response)?;
             }
-            RequestToChild::SendMessage { uri, payload } => {
+            RequestToChild::SendMessage { uri, payload, .. } => {
                 if self.bound_url.is_none() {
                     msg.respond(Err(TransportError::new(format!("{} not bound", self.name))))?;
                 } else {
@@ -334,10 +334,10 @@ fn ghost_transport() {
     // to someone not bount to the network
     t1.request(
         test_span(""),
-        RequestToChild::SendMessage {
-            uri: Url::parse("mocknet://t2").expect("can parse url").into(),
-            payload: "won't be received!".into(),
-        },
+        RequestToChild::create_send_message(
+            Url::parse("mocknet://t2").expect("can parse url").into(),
+            "won't be received!".into(),
+        ),
         // callback should simply log the response
         Box::new(|owner, response| {
             owner.log.push(format!("{:?}", response));
@@ -373,10 +373,10 @@ fn ghost_transport() {
 
     t1.request(
         test_span(""),
-        RequestToChild::SendMessage {
-            uri: Url::parse("mocknet://t2").expect("can parse url").into(),
-            payload: "foo".into(),
-        },
+        RequestToChild::create_send_message(
+            Url::parse("mocknet://t2").expect("can parse url").into(),
+            "foo".into(),
+        ),
         // callback should simply log the response
         Box::new(|owner, response| {
             owner.log.push(format!("{:?}", response));
