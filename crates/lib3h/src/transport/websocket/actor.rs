@@ -99,7 +99,7 @@ impl Discovery for GhostTransportWebsocket {
             None => {
                 warn!("mDNS Discovery: Fail to release.");
                 Ok(())
-            },
+            }
         }
     }
 
@@ -685,15 +685,10 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        // Here we would like to bind URL before Advertising, but we have no idea how ¯\_(ツ)_/¯
-        // transport1.process().expect("Fail to process 'transport1'.");
-        // eprintln!("Before Advertising.");
-        // transport1.advertise().unwrap();
-
-        let urls = transport1
-            .discover()
-            .expect("Fail to discover nodes using WSS transport1.");
-        assert_eq!(urls.len(), 0);
+        assert_eq!(
+            "Err(DiscoveryError(Other(\"Must bind URL before advertising.\")))",
+            format!("{:?}", transport1.discover())
+        );
 
         let machine_id2 = "fake_machine_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
