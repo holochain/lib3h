@@ -68,7 +68,7 @@ pub enum Lib3hToClient {
     /// Notification of successful connection to a network
     Connected(ConnectedData),
     /// Notification of disconnection from a network
-    Disconnected(DisconnectedData),
+    Unbound(UnboundData),
 
     // -- Direct Messaging -- //
     /// the response received from a previous `SendDirectMessage`
@@ -178,8 +178,10 @@ impl TryFrom<Lib3hServerProtocol> for Lib3hToClient {
             Lib3hServerProtocol::Connected(connected_data) => {
                 Ok(Lib3hToClient::Connected(connected_data))
             }
-            Lib3hServerProtocol::Disconnected(disconnected_data) => {
-                Ok(Lib3hToClient::Disconnected(disconnected_data))
+            Lib3hServerProtocol::Disconnected(_disconnected_data) => {
+                Ok(Lib3hToClient::Unbound(UnboundData {
+                    uri: Lib3hUri::with_undefined(),
+                }))
             }
             Lib3hServerProtocol::SendDirectMessageResult(direct_message_data) => {
                 Ok(Lib3hToClient::SendDirectMessageResult(direct_message_data))
@@ -292,8 +294,10 @@ impl From<Lib3hToClient> for Lib3hServerProtocol {
             Lib3hToClient::Connected(connected_data) => {
                 Lib3hServerProtocol::Connected(connected_data)
             }
-            Lib3hToClient::Disconnected(disconnected_data) => {
-                Lib3hServerProtocol::Disconnected(disconnected_data)
+            Lib3hToClient::Unbound(_unbound_data) => {
+                Lib3hServerProtocol::Disconnected(DisconnectedData {
+                    network_id: "".into(),
+                })
             }
             Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
                 Lib3hServerProtocol::SendDirectMessageResult(direct_message_data)

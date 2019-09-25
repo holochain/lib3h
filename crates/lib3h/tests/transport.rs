@@ -348,7 +348,7 @@ fn ghost_transport() {
 
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Err(TransportError(\\\"mocknet://t2/ not bound\\\")))\"",
+        "\"Response(Err(TransportError(Other(\\\"mocknet://t2/ not bound\\\"))))\"",
         format!("{:?}", owner.log[1])
     );
 
@@ -414,7 +414,7 @@ fn ghost_transport() {
     let mut messages = t1.drain_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(
-        "ErrorOccured { uri: Lib3hUri(\"mocknet://t1/\"), error: TransportError(\"mocknet://t1/ has become unbound\") }",
+        "ErrorOccured { uri: Lib3hUri(\"mocknet://t1/\"), error: TransportError(Other(\"mocknet://t1/ has become unbound\")) }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
 }

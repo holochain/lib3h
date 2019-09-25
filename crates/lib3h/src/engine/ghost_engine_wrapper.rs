@@ -542,15 +542,15 @@ mod tests {
         assert_eq!("Ok((true, []))", format!("{:?}", result));
 
         detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_publish(
-            Lib3hToClient::Disconnected(DisconnectedData {
-                network_id: "some_network_id".into()
+            Lib3hToClient::Unbound(UnboundData {
+                uri: Lib3hUri::with_memory("addr_1")
             })
         ));
 
         let result = legacy.process();
 
         assert_eq!(
-            "Ok((true, [Disconnected(DisconnectedData { network_id: \"some_network_id\" })]))",
+            "Ok((true, [Disconnected(DisconnectedData { network_id: \"\" })]))",
             format!("{:?}", result)
         );
     }
