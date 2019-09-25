@@ -1,26 +1,24 @@
 pub mod dht_config;
 pub mod dht_protocol;
 pub mod mirror_dht;
+// TODO - Fix rrdht
 //pub mod rrdht;
-
-/// a Peer identifier
-pub type PeerAddress = String;
-pub type PeerAddressRef = str;
 
 #[cfg(test)]
 pub mod tests {
     use crate::{
-        dht::{dht_protocol::*, mirror_dht::MirrorDht, PeerAddressRef},
+        dht::{dht_protocol::*, mirror_dht::MirrorDht},
         tests::enable_logging_for_test,
     };
     use detach::prelude::*;
+    use holochain_persistence_api::hash::HashString;
     use holochain_tracing::test_span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
+        uri::Lib3hUri,
         Address,
     };
-    use url::Url;
 
     lazy_static! {
         /// CONSTS
@@ -35,11 +33,15 @@ pub mod tests {
         pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".into();
         pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".into();
         pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".into();
+        /// Peers
+        pub static ref PEER_A: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_A_STR));
+        pub static ref PEER_B: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_B_STR));
+        pub static ref PEER_C: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_C_STR));
     }
 
-    const PEER_A: &PeerAddressRef = "alex";
-    const PEER_B: &PeerAddressRef = "billy";
-    const PEER_C: &PeerAddressRef = "camille";
+    const PEER_A_STR: &str = "alex";
+    const PEER_B_STR: &str = "billy";
+    const PEER_C_STR: &str = "camille";
 
     // Request counters
     #[allow(dead_code)]
@@ -57,8 +59,8 @@ pub mod tests {
         pub fn new() -> Self {
             DhtData {
                 this_peer: PeerData {
-                    peer_address: "FIXME".to_string(),
-                    peer_uri: Url::parse("fixme://host:123").unwrap(),
+                    peer_name: Lib3hUri::with_undefined(),
+                    peer_location: Lib3hUri::with_undefined(),
                     timestamp: 0,
                 },
                 maybe_peer: None,
@@ -69,15 +71,15 @@ pub mod tests {
         }
     }
 
-    fn create_test_uri(peer_address: &PeerAddressRef) -> Url {
-        Url::parse(format!("test://{}", peer_address).as_str()).unwrap()
+    fn create_test_uri() -> Lib3hUri {
+        Lib3hUri::with_transport_id(&HashString::from("test"))
     }
 
     #[allow(non_snake_case)]
-    fn create_PeerData(peer_address: &PeerAddressRef) -> PeerData {
+    fn create_PeerData(peer_name: &Lib3hUri) -> PeerData {
         PeerData {
-            peer_address: peer_address.to_owned(),
-            peer_uri: create_test_uri(peer_address),
+            peer_name: peer_name.to_owned(),
+            peer_location: create_test_uri(),
             timestamp: crate::time::since_epoch_ms(),
         }
     }
@@ -112,18 +114,18 @@ pub mod tests {
         }
     }
 
-    fn new_dht(_is_mirror: bool, peer_address: &PeerAddressRef) -> Box<DhtActor> {
+    fn new_dht(_is_mirror: bool, peer_name: &Lib3hUri) -> Box<DhtActor> {
         //if is_mirror {
-        return MirrorDht::new(peer_address);
+        return MirrorDht::new(peer_name);
         //}
         //Box::new(RrDht::new())
     }
 
     fn new_dht_wrapper(
         _is_mirror: bool,
-        peer_address: &PeerAddressRef,
+        peer_name: &Lib3hUri,
     ) -> Detach<ChildDhtWrapperDyn<DhtData>> {
-        let dht = new_dht(true, peer_address);
+        let dht = new_dht(true, peer_name);
         Detach::new(ChildDhtWrapperDyn::new(dht, "dht_parent_"))
     }
 
@@ -156,11 +158,14 @@ pub mod tests {
         ud.this_peer
     }
 
-    fn get_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>, address: &str) -> Option<PeerData> {
+    fn get_peer(
+        dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
+        peer_name: &Lib3hUri,
+    ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
             test_span(""),
-            DhtRequestToChild::RequestPeer(Url::parse(&format!("agentid:{}", address)).unwrap()),
+            DhtRequestToChild::RequestPeer(peer_name.clone()),
             Box::new(|mut ud, response| {
                 let response = {
                     match response {
@@ -279,44 +284,44 @@ pub mod tests {
     #[test]
     fn test_this_peer() {
         enable_logging_for_test(true);
-        let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut dht = new_dht_wrapper(true, &*PEER_A);
         let this_peer = get_this_peer(&mut dht);
-        assert_eq!(this_peer.peer_address, PEER_A);
+        assert_eq!(this_peer.peer_name, *PEER_A);
     }
 
     #[test]
     fn test_own_peer_list() {
         enable_logging_for_test(true);
-        let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut dht = new_dht_wrapper(true, &*PEER_A);
         let mut ud = DhtData::new();
         // Should be empty
-        let maybe_peer = get_peer(&mut dht, PEER_A);
+        let maybe_peer = get_peer(&mut dht, &*PEER_A);
         assert!(maybe_peer.is_none());
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 0);
         // Add a peer
         dht.publish(
             test_span(""),
-            DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)),
+            DhtRequestToChild::HoldPeer(create_PeerData(&*PEER_B)),
         )
         .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
-        let peer = get_peer(&mut dht, PEER_B).unwrap();
-        assert_eq!(peer.peer_address, PEER_B);
+        let peer = get_peer(&mut dht, &*PEER_B).unwrap();
+        assert_eq!(peer.peer_name, *PEER_B);
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 1);
-        assert_eq!(peer_list[0].peer_address, PEER_B);
+        assert_eq!(peer_list[0].peer_name, *PEER_B);
         // Add a peer again
         dht.publish(
             test_span(""),
-            DhtRequestToChild::HoldPeer(create_PeerData(PEER_C)),
+            DhtRequestToChild::HoldPeer(create_PeerData(&*PEER_C)),
         )
         .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
-        let peer = get_peer(&mut dht, PEER_B).unwrap();
-        assert_eq!(peer.peer_address, PEER_B);
+        let peer = get_peer(&mut dht, &*PEER_B).unwrap();
+        assert_eq!(peer.peer_name, *PEER_B);
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 2);
     }
@@ -324,7 +329,7 @@ pub mod tests {
     #[test]
     fn test_get_own_entry() {
         enable_logging_for_test(true);
-        let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut dht = new_dht_wrapper(true, &*PEER_A);
         let mut ud = DhtData::new();
         // Should be empty
         let entry_address_list = get_entry_address_list(&mut dht);
@@ -397,10 +402,10 @@ pub mod tests {
     #[test]
     fn test_update_peer() {
         enable_logging_for_test(true);
-        let mut dht = new_dht_wrapper(true, PEER_A);
+        let mut dht = new_dht_wrapper(true, &*PEER_A);
         let mut ud = DhtData::new();
         // Should be empty
-        let this = get_peer(&mut dht, PEER_A);
+        let this = get_peer(&mut dht, &*PEER_A);
         assert!(this.is_none());
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 0);
@@ -408,7 +413,7 @@ pub mod tests {
         // wait a bit so that the -1 does not underflow
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let mut peer_b_data = create_PeerData(PEER_B);
+        let mut peer_b_data = create_PeerData(&*PEER_B);
         dht.publish(
             test_span(""),
             DhtRequestToChild::HoldPeer(peer_b_data.clone()),
@@ -416,8 +421,8 @@ pub mod tests {
         .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have it
-        let peer = get_peer(&mut dht, PEER_B).unwrap();
-        assert_eq!(peer.peer_address, PEER_B);
+        let peer = get_peer(&mut dht, &*PEER_B).unwrap();
+        assert_eq!(peer.peer_name, *PEER_B);
         // Add older peer info
         let ref_time = peer_b_data.timestamp;
         peer_b_data.timestamp -= 1;
@@ -428,7 +433,7 @@ pub mod tests {
         .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
-        let peer = get_peer(&mut dht, PEER_B).unwrap();
+        let peer = get_peer(&mut dht, &*PEER_B).unwrap();
         assert_eq!(peer.timestamp, ref_time);
         // Add newer peer info
         // wait a bit so that the +1 is not ahead of 'now'
@@ -439,21 +444,21 @@ pub mod tests {
             .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
-        let peer = get_peer(&mut dht, PEER_B).unwrap();
+        let peer = get_peer(&mut dht, &*PEER_B).unwrap();
         assert!(peer.timestamp > ref_time);
     }
 
     #[test]
     fn test_mirror_broadcast_entry() {
         enable_logging_for_test(true);
-        let mut dht_a = new_dht_wrapper(true, PEER_A);
-        let mut dht_b = new_dht_wrapper(true, PEER_B);
+        let mut dht_a = new_dht_wrapper(true, &*PEER_A);
+        let mut dht_b = new_dht_wrapper(true, &*PEER_B);
         let mut ud = DhtData::new();
         // Add a peer
         dht_a
             .publish(
                 test_span(""),
-                DhtRequestToChild::HoldPeer(create_PeerData(PEER_B)),
+                DhtRequestToChild::HoldPeer(create_PeerData(&*PEER_B)),
             )
             .unwrap();
         dht_a.process(&mut ud).unwrap();
@@ -483,8 +488,8 @@ pub mod tests {
             trace!(" - {:?}", payload);
             match payload {
                 DhtRequestToParent::GossipTo(gossip_data) => {
-                    assert_eq!(gossip_data.peer_address_list.len(), 1);
-                    assert_eq!(gossip_data.peer_address_list[0], PEER_B);
+                    assert_eq!(gossip_data.peer_name_list.len(), 1);
+                    assert_eq!(gossip_data.peer_name_list[0], *PEER_B);
                     bundle_list.push(gossip_data.bundle.clone());
                 }
                 _ => panic!("Expecting a different request type"),
@@ -497,7 +502,7 @@ pub mod tests {
         for bundle in bundle_list {
             // Post a remoteGossipTo
             let remote_gossip = RemoteGossipBundleData {
-                from_peer_address: PEER_A.to_owned(),
+                from_peer_name: (*PEER_A).clone(),
                 bundle,
             };
             dht_b
@@ -514,8 +519,12 @@ pub mod tests {
         for mut request in request_list {
             let payload = request.take_message().expect("exists");
             trace!(" - {:?}", payload);
-            if let DhtRequestToParent::HoldEntryRequested { from_peer, entry } = payload {
-                assert_eq!(from_peer, PEER_B.clone());
+            if let DhtRequestToParent::HoldEntryRequested {
+                from_peer_name,
+                entry,
+            } = payload
+            {
+                assert_eq!(Lib3hUri::from(from_peer_name), *PEER_B);
                 assert_eq!(entry, entry_data.clone());
                 did_get_hold_entry = true;
             }
@@ -537,12 +546,12 @@ pub mod tests {
     #[test]
     fn test_mirror_gossip_peer() {
         enable_logging_for_test(true);
-        let mut dht_a = new_dht_wrapper(true, PEER_A);
-        let mut dht_b = new_dht_wrapper(true, PEER_B);
+        let mut dht_a = new_dht_wrapper(true, &*PEER_A);
+        let mut dht_b = new_dht_wrapper(true, &*PEER_B);
         let mut ud = DhtData::new();
         // Tell A to hold B
         let peer_b_data = get_this_peer(&mut dht_b);
-        assert_eq!(peer_b_data.peer_address, PEER_B);
+        assert_eq!(peer_b_data.peer_name, *PEER_B);
         dht_a
             .publish(
                 test_span(""),
@@ -554,7 +563,7 @@ pub mod tests {
         let request_list = dht_a.drain_messages();
         println!("dht_a.drain_messages(): {}", request_list.len());
         // Tell A to hold C
-        let peer_c_data = create_PeerData(PEER_C);
+        let peer_c_data = create_PeerData(&*PEER_C);
         dht_a
             .publish(
                 test_span(""),
@@ -570,10 +579,10 @@ pub mod tests {
             {
                 println!("gossip_to = {:?}", gossip_to);
                 assert!(
-                    gossip_to.peer_address_list[0] == PEER_C
-                        || gossip_to.peer_address_list[0] == PEER_B
+                    gossip_to.peer_name_list[0] == *PEER_C
+                        || gossip_to.peer_name_list[0] == *PEER_B
                 );
-                if gossip_to.peer_address_list[0] == PEER_B {
+                if gossip_to.peer_name_list[0] == *PEER_B {
                     bundle_list.push(gossip_to.bundle.clone());
                 }
             }
@@ -585,7 +594,7 @@ pub mod tests {
         // Tell B to hold C from A's gossip
         for bundle in bundle_list {
             let remote_gossip = RemoteGossipBundleData {
-                from_peer_address: PEER_A.to_owned(),
+                from_peer_name: (*PEER_A).clone(),
                 bundle,
             };
             dht_b
@@ -618,7 +627,7 @@ pub mod tests {
         dht_b.process(&mut ud).unwrap();
         // B should have C
         println!("dht_b should have PEER_C:");
-        let peer_info = get_peer(&mut dht_b, PEER_C).unwrap();
+        let peer_info = get_peer(&mut dht_b, &*PEER_C).unwrap();
         assert_eq!(peer_info, peer_c_data);
     }
 }

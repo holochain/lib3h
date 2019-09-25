@@ -1,20 +1,18 @@
 use crate::transport::error::TransportError;
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
-
-use url::Url;
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 
 #[derive(Debug, Clone)]
 pub struct BindResultData {
-    pub bound_url: Url,
+    pub bound_url: Lib3hUri,
 }
 
 /// Transport protocol enums for use with GhostActor implementation
 #[derive(Debug, Clone)]
 pub enum RequestToChild {
-    Bind { spec: Url }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage { uri: Url, payload: Opaque },
+    Bind { spec: Lib3hUri }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    SendMessage { uri: Lib3hUri, payload: Opaque },
 }
 
 #[derive(Debug, Clone)]
@@ -26,9 +24,17 @@ pub enum RequestToChildResponse {
 #[derive(Debug, Clone)]
 pub enum RequestToParent {
     // TODO remove `uri` field once we have refactored how we handle Connection/Disconnection
-    ErrorOccured { uri: Url, error: TransportError },
-    IncomingConnection { uri: Url },
-    ReceivedData { uri: Url, payload: Opaque },
+    ErrorOccured {
+        uri: Lib3hUri,
+        error: TransportError,
+    },
+    IncomingConnection {
+        uri: Lib3hUri,
+    },
+    ReceivedData {
+        uri: Lib3hUri,
+        payload: Opaque,
+    },
 }
 
 #[derive(Debug, Clone)]

@@ -26,14 +26,11 @@ use lib3h::{
 use lib3h_ghost_actor::prelude::*;
 
 use crate::lib3h::engine::CanAdvertise;
-use lib3h_protocol::{data_types::*, protocol::*};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri};
 use lib3h_sodium::SodiumCryptoSystem;
 use std::path::PathBuf;
 use url::Url;
 use utils::{constants::*, test_network_id};
-//--------------------------------------------------------------------------------------------------
-// Test suites
-//--------------------------------------------------------------------------------------------------
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -59,7 +56,7 @@ fn enable_logging_for_test(enable: bool) {
 fn basic_setup_mock_bootstrap<'engine>(
     net: &str,
     name: &str,
-    bs: Option<Vec<Url>>,
+    bs: Option<Vec<Lib3hUri>>,
 ) -> GhostEngine<'engine> {
     let bootstrap_nodes = match bs {
         Some(s) => s,
@@ -71,7 +68,7 @@ fn basic_setup_mock_bootstrap<'engine>(
         bootstrap_nodes,
         work_dir: PathBuf::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}", name).as_str()).unwrap(),
+        bind_url: Lib3hUri::with_memory(name),
         dht_gossip_interval: 100,
         dht_timeout_threshold: 1000,
         dht_custom_config: vec![],
@@ -103,7 +100,7 @@ fn basic_setup_wss<'engine>(name: &str) -> GhostEngine<'engine> {
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
-        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap(),
+        bind_url: Url::parse("wss://127.0.0.1:64519").unwrap().into(),
         dht_gossip_interval: 200,
         dht_timeout_threshold: 2000,
         dht_custom_config: vec![],
@@ -169,10 +166,10 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
         )
         .unwrap();
     let handle_get_gossip_entry_list_regex =
-        "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
+        "HandleGetGossipingEntryList\\(GetListData \\{ space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
     let handle_get_authoring_entry_list_regex =
-        "HandleGetAuthoringEntryList\\(GetListData \\{ space_address: HashString\\(\"SPACE_A\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
+        "HandleGetAuthoringEntryList\\(GetListData \\{ space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
     let regexes = vec![
         handle_get_authoring_entry_list_regex,

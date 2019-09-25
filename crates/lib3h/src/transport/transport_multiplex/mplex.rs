@@ -6,9 +6,8 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, Address};
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address};
 use std::collections::HashMap;
-use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct LocalRouteSpec {
@@ -112,7 +111,7 @@ impl<
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
         };
-        let path = Url::parse(&format!("agentid:{}", remote_agent_id,)).expect("can parse url");
+        let path = Lib3hUri::with_agent_id(remote_agent_id);
         match self.route_endpoints.get_mut(&route_spec) {
             None => panic!("no such route"),
             Some(ep) => {
@@ -171,7 +170,7 @@ impl<
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> Lib3hResult<()> {
+    fn handle_received_data(&mut self, uri: Lib3hUri, payload: Opaque) -> Lib3hResult<()> {
         // forward
         self.endpoint_self.publish(
             Span::fixme(),
@@ -202,7 +201,7 @@ impl<
     fn handle_route_bind(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        spec: Url,
+        spec: Lib3hUri,
     ) -> Lib3hResult<()> {
         // forward the bind to our inner_gateway
         self.inner_gateway.as_mut().request(
@@ -241,7 +240,7 @@ impl<
     fn handle_route_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        uri: Url,
+        uri: Lib3hUri,
         payload: Opaque,
     ) -> Lib3hResult<()> {
         // forward the request to our inner_gateway

@@ -7,9 +7,8 @@ use lib3h::{
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
     error::Lib3hResult,
 };
-use lib3h_protocol::{protocol_server::Lib3hServerProtocol, Address};
+use lib3h_protocol::{protocol_server::Lib3hServerProtocol, uri::Lib3hUri, Address};
 use std::collections::{HashMap, HashSet};
-use url::Url;
 
 static TIMEOUT_MS: usize = 5000;
 
@@ -30,12 +29,12 @@ pub struct NodeMock {
     /// The node's simulated agentId
     pub agent_id: Address,
     /// The node's uri
-    my_advertise: Url,
+    my_advertise: Lib3hUri,
     /// This node's handle
     pub name: String,
     /// Keep track of the URIs used when calling `connect()`
     /// in order to do `reconnect()`
-    connected_list: HashSet<Url>,
+    connected_list: HashSet<Lib3hUri>,
 
     /// Sent messages logs
     request_log: Vec<String>,

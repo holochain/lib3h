@@ -8,10 +8,9 @@ use lib3h::{
     engine::{engine_actor::*, *},
     error::*,
 };
-use lib3h_protocol::{data_types::*, protocol::*};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri};
 use lib3h_sodium::SodiumCryptoSystem;
 use lib3h_zombie_actor::*;
-use url::Url;
 
 static NET_ID: &'static str = "send-demo-network";
 static SPACE_ID: &'static str = "send-demo-space";
@@ -29,9 +28,9 @@ struct EngineContainer<
     >,
 > {
     engine1: Detach<GhostEngineParentWrapper<EngineContainer<E>, E, Lib3hError>>,
-    engine1_addr: Url,
+    engine1_addr: Lib3hUri,
     engine2: Detach<GhostEngineParentWrapper<EngineContainer<E>, E, Lib3hError>>,
-    engine2_addr: Url,
+    engine2_addr: Lib3hUri,
 }
 
 impl<'lt> EngineContainer<GhostEngine<'lt>> {
@@ -47,7 +46,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             bootstrap_nodes: vec![],
             work_dir: std::path::PathBuf::new(),
             log_level: 'd',
-            bind_url: Url::parse("none:").unwrap(),
+            bind_url: Lib3hUri::with_undefined(),
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],

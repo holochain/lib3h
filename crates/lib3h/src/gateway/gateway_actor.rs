@@ -52,6 +52,7 @@ impl
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
+                    trace!("Received RequestThisPeer response: {:?}", peer_response);
                     me.this_peer = peer_response;
                 } else {
                     panic!("bad response to RequestThisPeer: {:?}", response);
@@ -125,13 +126,13 @@ impl P2pGateway {
                                 for peer in peer_list {
                                     me.send(
                                         Span::fixme(),
-                                        peer.peer_address.clone().into(),
-                                        peer.peer_uri.clone(),
+                                        peer.peer_name.clone().into(),
+                                        peer.peer_location.clone(),
                                         payload.clone().into(),
                                         Box::new(move |response| {
                                             debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
-                                                peer.peer_uri, response
+                                                peer.peer_location, response
                                             );
                                             Ok(())
                                         }),

@@ -1,6 +1,6 @@
 //! Let's say we have two agentIds: a1 and a2
-//! a1 is running on machineId: m1
-//! a2 is running on machineId: m2
+//! a1 is running on transportId: m1
+//! a2 is running on transportId: m2
 //!
 //! The AgentSpaceGateway will wrap messages in a p2p_proto direct message:
 //!   DirectMessage {
@@ -10,7 +10,7 @@
 //!     payload: <...>,
 //!   }
 //!
-//! Then send it to the machine id:
+//! Then send it to the transport id:
 //!   dest: "m2", payload: <above, but binary>
 //!
 //! When the multiplexer receives data (at the network/machine gateway),
@@ -26,10 +26,10 @@ mod tests {
     use super::*;
     use crate::{error::Lib3hError, gateway::protocol::*, transport::protocol::*};
     use detach::prelude::*;
+    use holochain_persistence_api::hash::HashString;
     use holochain_tracing::Span;
     use lib3h_ghost_actor::prelude::*;
-    use lib3h_protocol::data_types::Opaque;
-    use url::Url;
+    use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 
     pub struct GatewayMock {
         endpoint_parent: Option<GatewayParentEndpoint>,
@@ -43,15 +43,15 @@ mod tests {
                 Lib3hError,
             >,
         >,
-        bound_url: Url,
-        mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
-        mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
+        bound_url: Lib3hUri,
+        mock_sender: crossbeam_channel::Sender<(Lib3hUri, Opaque)>,
+        mock_receiver: crossbeam_channel::Receiver<(Lib3hUri, Opaque)>,
     }
 
     impl GatewayMock {
         pub fn new(
-            mock_sender: crossbeam_channel::Sender<(Url, Opaque)>,
-            mock_receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
+            mock_sender: crossbeam_channel::Sender<(Lib3hUri, Opaque)>,
+            mock_receiver: crossbeam_channel::Receiver<(Lib3hUri, Opaque)>,
         ) -> Self {
             let (endpoint_parent, endpoint_self) = create_ghost_channel();
             let endpoint_parent = Some(endpoint_parent);
@@ -64,7 +64,7 @@ mod tests {
             Self {
                 endpoint_parent,
                 endpoint_self,
-                bound_url: Url::parse("none:").expect("can parse url"),
+                bound_url: Lib3hUri::with_undefined(),
                 mock_sender,
                 mock_receiver,
             }
@@ -130,7 +130,7 @@ mod tests {
         let (s_out, r_out) = crossbeam_channel::unbounded();
         let (s_in, r_in) = crossbeam_channel::unbounded();
 
-        let addr_none = Url::parse("none:").expect("can parse url");
+        let addr_none = Lib3hUri::with_undefined();
 
         let mut mplex: GatewayParentWrapper<(), TransportMultiplex<GatewayMock>> =
             GhostParentWrapper::new(
@@ -215,7 +215,7 @@ mod tests {
 
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { uri, payload } = msg {
-            assert_eq!(&Url::parse("agentid:agent_x").unwrap(), &uri);
+            assert_eq!(&Lib3hUri::with_agent_id(&HashString::from("agent_x")), &uri);
             let expected: Opaque = "hello".into();
             assert_eq!(&expected, &payload);
         } else {
