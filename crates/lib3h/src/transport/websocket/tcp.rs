@@ -2,7 +2,7 @@
 //! TcpStream specific functions
 
 use crate::transport::{
-    error::TransportResult,
+    error::{ErrorKind, TransportError, TransportResult},
     websocket::{
         streams::{Acceptor, Bind, StreamManager},
         tls::TlsConfig,
@@ -47,9 +47,14 @@ impl StreamManager<std::net::TcpStream> {
                         let acceptor: Acceptor<TcpStream> = Box::new(move || {
                             listener
                                 .accept()
-                                .map_err(|err| {
-                                    error!("transport_wss::tcp accept error: {:?}", err);
-                                    err.into()
+                                .map_err(|err| match err.kind() {
+                                    std::io::ErrorKind::WouldBlock => {
+                                        TransportError::new_kind(ErrorKind::Ignore(err.to_string()))
+                                    }
+                                    _ => {
+                                        error!("transport_wss::tcp accept error: {:?}", err);
+                                        err.into()
+                                    }
                                 })
                                 .and_then(|(tcp_stream, socket_address)| {
                                     tcp_stream.set_nonblocking(true)?;

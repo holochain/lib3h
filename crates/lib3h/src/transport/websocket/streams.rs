@@ -94,7 +94,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             stream_sockets: std::collections::HashMap::new(),
             event_queue: Vec::new(),
             bind,
-            acceptor: Err(TransportError("acceptor not initialized".into())),
+            acceptor: Err(TransportError::new("acceptor not initialized".into())),
         }
     }
 
@@ -103,9 +103,9 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         let host_port = format!(
             "{}:{}",
             uri.host_str()
-                .ok_or_else(|| TransportError("bad connect host".into()))?,
+                .ok_or_else(|| TransportError::new("bad connect host".into()))?,
             uri.port()
-                .ok_or_else(|| TransportError("bad connect port".into()))?,
+                .ok_or_else(|| TransportError::new("bad connect port".into()))?,
         );
         let socket = (self.stream_factory)(&host_port)?;
         let info = WssInfo::client(uri.clone(), socket);
@@ -225,7 +225,11 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                     true
                 })
                 .unwrap_or_else(|err| {
-                    warn!("did not accept any connections: {:?}", err);
+                    if !err.is_ignorable() {
+                        // TODO: handle these actual errors, and probably this is where the unbinding
+                        // would be detectable.
+                        panic!("Error when attempting to accept connections: {:?}", err);
+                    }
                     false
                 }),
         }
