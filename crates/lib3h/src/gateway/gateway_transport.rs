@@ -382,7 +382,11 @@ impl P2pGateway {
                     }),
                 );
             }
-            transport::protocol::RequestToChild::SendMessage { uri, payload, attempt } => {
+            transport::protocol::RequestToChild::SendMessage {
+                uri,
+                payload,
+                attempt,
+            } => {
                 debug!(
                     "gateway_transport: SendMessage, first resolving address {:?}",
                     uri.clone()
