@@ -9,7 +9,7 @@ use lib3h::{
     error::*,
     transport::websocket::tls::TlsConfig,
 };
-use lib3h_protocol::{data_types::*, protocol::*};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri};
 use lib3h_sodium::SodiumCryptoSystem;
 use lib3h_zombie_actor::*;
 use url::Url;
@@ -30,9 +30,9 @@ struct EngineContainer<
     >,
 > {
     engine1: Detach<GhostEngineParentWrapper<EngineContainer<E>, E, Lib3hError>>,
-    engine1_addr: Url,
+    engine1_addr: Lib3hUri,
     engine2: Detach<GhostEngineParentWrapper<EngineContainer<E>, E, Lib3hError>>,
-    engine2_addr: Url,
+    engine2_addr: Lib3hUri,
 }
 
 impl<'lt> EngineContainer<GhostEngine<'lt>> {
@@ -42,12 +42,12 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         let (transport_config, bind_url) = if ws {
             (
                 TransportConfig::Websocket(TlsConfig::Unencrypted),
-                Url::parse("ws://127.0.0.1:63518").unwrap(),
+                Url::parse("ws://127.0.0.1:63518").unwrap().into(),
             )
         } else {
             (
                 TransportConfig::Memory("send-demo".to_string()),
-                Url::parse("none:").unwrap(),
+                Lib3hUri::with_undefined(),
             )
         };
 
@@ -83,7 +83,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 
         if ws {
             config.bootstrap_nodes = vec![config.bind_url.clone()];
-            config.bind_url = Url::parse("wss://127.0.0.1:63519").unwrap();
+            config.bind_url = Url::parse("wss://127.0.0.1:63519").unwrap().into();
         }
 
         let e2 =

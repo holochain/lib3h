@@ -36,7 +36,7 @@ pub fn setup_three_nodes(
     // Connect Camille to Billy
     let connect_data = camille.connect_to(&billy.advertise()).unwrap();
     wait_connect!(camille, connect_data, billy);
-    // More process: Have Billy process P2p::PeerAddress of Camille
+    // More process: Have Billy process P2p::PeerName of Camille
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = camille.process().unwrap();
     // More process so Camille can handshake with billy
