@@ -27,8 +27,8 @@ impl P2pGateway {
                 Box::new(|_me, response| {
                     let response = {
                         match response {
-                            GhostCallbackData::Timeout => {
-                                parent_msg.respond(Err(Lib3hError::new_other("timeout")))?;
+                            GhostCallbackData::Timeout(bt) => {
+                                parent_msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                                 return Ok(());
                             }
                             GhostCallbackData::Response(response) => response,
@@ -52,12 +52,14 @@ impl P2pGateway {
         &mut self,
         mut request: DhtToParentMessage,
     ) -> Lib3hResult<()> {
+        let span = request.span().child("handle_dht_RequestToParent");
+        let payload = request.take_message().expect("exists");
         trace!(
             "({}) Serving request from child dht: {:?}",
-            self.identifier.nickname, request
+            self.identifier.nickname,
+            payload
         );
-        let span = request.span().child("handle_dht_RequestToParent");
-        match request.take_message().expect("exists") {
+        match payload {
             DhtRequestToParent::GossipTo(_data) => {
                 // no-op
             }
@@ -69,23 +71,23 @@ impl P2pGateway {
                 // Connect to every peer we are requested to hold.
                 info!(
                     "{} auto-connect to peer: {} ({})",
-                    self.identifier.nickname, peer_data.peer_address, peer_data.peer_uri,
+                    self.identifier.nickname, peer_data.peer_name, peer_data.peer_location,
                 );
                 // Send phony SendMessage request so we connect to it
                 self.send(
                     span.follower("DhtRequestToParent::HoldPeerRequested"),
-                    peer_data.peer_address.clone().into(),
-                    peer_data.peer_uri,
+                    peer_data.peer_name.clone().into(),
+                    peer_data.peer_location,
                     Opaque::new(),
                     Box::new(|_| Ok(())),
                 )?;
             }
-            DhtRequestToParent::PeerTimedOut(_peer_address) => {
+            DhtRequestToParent::PeerTimedOut(_peer_name) => {
                 // TODO
             }
             // No entries in Network DHT
             DhtRequestToParent::HoldEntryRequested {
-                from_peer: _,
+                from_peer_name: _,
                 entry: _,
             } => {
                 unreachable!();

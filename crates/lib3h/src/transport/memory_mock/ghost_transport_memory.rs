@@ -5,18 +5,20 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
-use lib3h_discovery::{
-    error::{DiscoveryError, DiscoveryResult},
-    Discovery,
-};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::Address;
+use lib3h_protocol::{
+    discovery::{
+        error::{DiscoveryError, DiscoveryResult},
+        Discovery,
+    },
+    uri::Lib3hUri,
+    Address,
+};
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
     time::Instant,
 };
-use url::Url;
 
 pub type UserData = GhostTransportMemory;
 
@@ -38,7 +40,7 @@ type GhostTransportMemoryEndpointContext = GhostContextEndpoint<
 >;
 
 pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
-    Url,
+    Lib3hUri,
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -48,14 +50,14 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
-    machine_id: Address,
+    transport_id: Address,
     network: Arc<Mutex<MemoryNet>>,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
-    maybe_my_address: Option<Url>,
+    maybe_my_address: Option<Lib3hUri>,
     /// Addresses of connections to remotes
-    connections: HashSet<Url>,
+    connections: HashSet<Lib3hUri>,
     last_discover: Option<Instant>,
     discover_interval_ms: u128,
 }
@@ -69,10 +71,10 @@ impl Discovery for GhostTransportMemory {
         self.network
             .lock()
             .unwrap()
-            .advertise(uri, self.machine_id.clone());
+            .advertise(uri, self.transport_id.clone());
         Ok(())
     }
-    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
+    fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
         let machines = self.network.lock().unwrap().discover();
         Ok(machines.into_iter().map(|(uri, _)| uri).collect())
     }
@@ -86,7 +88,7 @@ impl Discovery for GhostTransportMemory {
 const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
-    pub fn new(machine_id: Address, network_name: &str) -> Self {
+    pub fn new(transport_id: Address, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
         let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
@@ -95,7 +97,7 @@ impl GhostTransportMemory {
             verse.get_network(network_name)
         };
         Self {
-            machine_id,
+            transport_id,
             network,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
@@ -190,7 +192,7 @@ impl
                 }
             };
             if success {
-                let mut to_connect_list: Vec<(Url)> = Vec::new();
+                let mut to_connect_list: Vec<(Lib3hUri)> = Vec::new();
                 let mut non_connect_events = Vec::new();
 
                 // process any connection events
@@ -352,15 +354,15 @@ mod tests {
         GhostTransportMemory,
         GhostTransportMemoryEndpointContextParent,
     ) {
-        let machine_id = format!("fake_machine_id{}", id).into();
+        let transport_id = format!("fake_transport_id{}", id).into();
         let req_id_prefix = format!("tmem_to_child{}", id);
-        let mut transport = GhostTransportMemory::new(machine_id, &net_name);
+        let mut transport = GhostTransportMemory::new(transport_id, &net_name);
         let endpoint: GhostTransportMemoryEndpointContextParent = transport
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix(&req_id_prefix)
-            .build::<Url>();
+            .build::<Lib3hUri>();
         (transport, endpoint)
     }
 
@@ -369,9 +371,9 @@ mod tests {
             .request(
                 test_span(""),
                 RequestToChild::Bind {
-                    spec: Url::parse("mem://_").unwrap(),
+                    spec: Lib3hUri::with_memory(""),
                 },
-                Box::new(|ud: &mut Url, r| {
+                Box::new(|ud: &mut Lib3hUri, r| {
                     match r {
                         GhostCallbackData::Response(Ok(RequestToChildResponse::Bind(
                             BindResultData { bound_url },
@@ -396,11 +398,11 @@ mod tests {
         assert_eq!(transport1.maybe_my_address, None);
         assert_eq!(transport2.maybe_my_address, None);
 
-        let mut bound_transport1_address = Url::parse("none:").unwrap();
+        let mut bound_transport1_address = Lib3hUri::with_undefined();
         do_bind(&mut t1_endpoint);
-        let mut bound_transport2_address = Url::parse("none:").unwrap();
+        let mut bound_transport2_address = Lib3hUri::with_undefined();
         do_bind(&mut t2_endpoint);
-        let mut bound_transport3_address = Url::parse("none:").unwrap();
+        let mut bound_transport3_address = Lib3hUri::with_undefined();
         do_bind(&mut t3_endpoint);
 
         transport1.process().unwrap();
@@ -425,18 +427,18 @@ mod tests {
             Some(bound_transport3_address.clone())
         );
 
-        // check that machine_ids were advertised
+        // check that bindings were advertised
         let found = transport1.discover().unwrap();
         assert!(
-            &format!("{:?}", found[0]) == "\"mem://addr_1/\""
-                || &format!("{:?}", found[0]) == "\"mem://addr_2/\""
+            &format!("{}", found[0]) == "mem://addr_1/"
+                || &format!("{}", found[0]) == "mem://addr_2/"
         );
         assert!(
-            &format!("{:?}", found[1]) == "\"mem://addr_1/\""
-                || &format!("{:?}", found[1]) == "\"mem://addr_2/\""
+            &format!("{}", found[1]) == "mem://addr_1/"
+                || &format!("{}", found[1]) == "mem://addr_2/"
         );
         let found = transport3.discover().unwrap();
-        assert_eq!(&format!("{:?}", found[0]), "\"mem://addr_1/\""); // because of different network
+        assert_eq!(&format!("{}", found[0]), "mem://addr_1/"); // because of different network
     }
 
     #[test]
@@ -444,11 +446,11 @@ mod tests {
         let (mut transport1, mut t1_endpoint) = make_test_transport("1", "send_net1");
         let (mut transport2, mut t2_endpoint) = make_test_transport("2", "send_net1");
         let (mut transport3, mut t3_endpoint) = make_test_transport("3", "send_net2");
-        let mut bound_transport1_address = Url::parse("none:").unwrap();
+        let mut bound_transport1_address = Lib3hUri::with_undefined();
         do_bind(&mut t1_endpoint);
-        let mut bound_transport2_address = Url::parse("none:").unwrap();
+        let mut bound_transport2_address = Lib3hUri::with_undefined();
         do_bind(&mut t2_endpoint);
-        let mut bound_transport3_address = Url::parse("none:").unwrap();
+        let mut bound_transport3_address = Lib3hUri::with_undefined();
         do_bind(&mut t3_endpoint);
         transport1.process().unwrap();
         let _ = t1_endpoint.process(&mut bound_transport1_address);
@@ -461,10 +463,10 @@ mod tests {
             .request(
                 test_span(""),
                 RequestToChild::SendMessage {
-                    uri: Url::parse("mem://addr_2").unwrap(),
+                    uri: Lib3hUri::with_memory("addr_2"),
                     payload: b"test message".to_vec().into(),
                 },
-                Box::new(|_: &mut Url, r| {
+                Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
                     Ok(())
@@ -477,10 +479,10 @@ mod tests {
             .request(
                 test_span(""),
                 RequestToChild::SendMessage {
-                    uri: Url::parse("mem://addr_3").unwrap(),
+                    uri: Lib3hUri::with_memory("addr_3"),
                     payload: b"test message".to_vec().into(),
                 },
-                Box::new(|_: &mut Url, r| {
+                Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Err(TransportError(Other(\"No Memory server at this uri: mem://addr_3/\"))))", &format!("{:?}", r));
                     Ok(())
@@ -505,15 +507,16 @@ mod tests {
         let msg = requests[0].take_message();
         // which url was discovered is non-deterministic
         assert!(
-            "Some(IncomingConnection { uri: \"mem://addr_1/\" })" == format!("{:?}", msg)
-                || "Some(IncomingConnection { uri: \"mem://addr_2/\" })" == format!("{:?}", msg)
+            "Some(IncomingConnection { uri: Lib3hUri(\"mem://addr_1/\") })" == format!("{:?}", msg)
+                || "Some(IncomingConnection { uri: Lib3hUri(\"mem://addr_2/\") })"
+                    == format!("{:?}", msg)
         );
         assert_eq!(
-            "Some(IncomingConnection { uri: \"mem://addr_1/\" })",
+            "Some(IncomingConnection { uri: Lib3hUri(\"mem://addr_1/\") })",
             format!("{:?}", requests[1].take_message())
         );
         assert_eq!(
-            "Some(ReceivedData { uri: \"mem://addr_1/\", payload: \"test message\" })",
+            "Some(ReceivedData { uri: Lib3hUri(\"mem://addr_1/\"), payload: \"test message\" })",
             format!("{:?}", requests[2].take_message())
         );
     }

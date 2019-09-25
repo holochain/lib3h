@@ -15,11 +15,11 @@ use lib3h_protocol::{
     protocol::*,
     protocol_client::*,
     protocol_server::*,
+    uri::Lib3hUri,
     Address, DidWork,
 };
-use url::Url;
-
 pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
+
 /// A wrapper for talking to lib3h using the legacy Lib3hClient/Server enums
 #[allow(dead_code)]
 pub struct LegacyLib3h<Engine, EngineError: 'static + std::fmt::Debug>
@@ -38,6 +38,7 @@ where
     client_request_responses: Vec<Lib3hServerProtocol>,
     tracker:
         Tracker<GhostMessage<Lib3hToClient, ClientToLib3h, Lib3hToClientResponse, EngineError>>,
+    request_id_map: std::collections::HashMap<String, String>,
 }
 
 fn server_failure(
@@ -86,7 +87,8 @@ where
             engine: Detach::new(GhostParentWrapper::new(engine, name)),
             name: name.into(),
             client_request_responses: Vec::new(),
-            tracker: Tracker::new("client_to_lib3_response", 2000),
+            tracker: Tracker::new("client_to_lib3_response_", 2000),
+            request_id_map: std::collections::HashMap::new(),
         }
     }
 
@@ -104,7 +106,7 @@ where
                             ClientToLib3hResponse::BootstrapSuccess => {
                                 Lib3hServerProtocol::Connected(ConnectedData {
                                     request_id,
-                                    uri: Url::parse("none:").unwrap(), // client should have this allready deprecated
+                                    uri: Lib3hUri::with_undefined(), // client should have this already deprecated
                                 })
                             }
                             ClientToLib3hResponse::JoinSpaceResult => {
@@ -125,9 +127,9 @@ where
                             agent,
                         ));
                     }
-                    GhostCallbackData::Timeout => {
+                    GhostCallbackData::Timeout(bt) => {
                         me.client_request_responses.push(server_failure(
-                            "Request timed out".into(),
+                            format!("Request timed out: {:?}", bt),
                             request_id,
                             space_addr,
                             agent,
@@ -226,7 +228,6 @@ where
             // TODO Handle errors better here!
             let lib3h_to_client_response: Lib3hToClientResponse =
                 client_msg.clone().try_into().unwrap();
-            // TODO Handle optional value better here!
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
             let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
@@ -236,8 +237,28 @@ where
                 )))
             })?;
 
+            // HACK: If it is send message result, put back the original request id.
+            // TODO: consider this operation for all messages
+            let response;
+            if let Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =
+                lib3h_to_client_response.clone()
+            {
+                let result = self.request_id_map.remove(&request_id);
+                if let Some(request_id) = result {
+                    trace!(
+                        "REPLACE request_id {:?} with {:?}",
+                        data.request_id,
+                        request_id
+                    );
+                    data.request_id = request_id.clone();
+                }
+                response = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
+            } else {
+                response = lib3h_to_client_response.clone();
+            }
+
             ghost_mesage
-                .respond(Ok(lib3h_to_client_response))
+                .respond(Ok(response))
                 .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         }
     }
@@ -254,49 +275,58 @@ where
             self.client_request_responses.drain(..).collect();
 
         for mut msg in self.engine.as_mut().drain_messages() {
-            let request_id = self.tracker.reserve();
+            let tracker_request_id = self.tracker.reserve();
 
             let lib3h_to_client_msg: Lib3hToClient = msg.take_message().expect("exists");
 
             trace!(
                 "[legacy engine] reserve {:?} for {:?}",
-                request_id,
+                tracker_request_id,
                 lib3h_to_client_msg
             );
 
-            self.tracker.set(request_id.as_str(), Some(msg));
-
+            self.tracker.set(tracker_request_id.as_str(), Some(msg));
             let lib3h_server_protocol_msg: Lib3hServerProtocol =
-                inject_request_id(request_id, lib3h_to_client_msg.into());
+                self.inject_request_id(tracker_request_id.clone(), lib3h_to_client_msg.into());
             responses.push(lib3h_server_protocol_msg);
         }
 
         Ok((*did_work, responses))
     }
 
-    pub fn advertise(&self) -> Url {
+    pub fn advertise(&self) -> Lib3hUri {
         self.engine.as_ref().as_ref().advertise()
     }
 
     pub fn name(&self) -> String {
         self.name.clone()
     }
-}
 
-fn inject_request_id(request_id: String, mut msg: Lib3hServerProtocol) -> Lib3hServerProtocol {
-    match &mut msg {
-        Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
-        Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleSendDirectMessage(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
-        Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
-        _ => (),
+    fn inject_request_id(
+        &mut self,
+        request_id: String,
+        mut msg: Lib3hServerProtocol,
+    ) -> Lib3hServerProtocol {
+        match &mut msg {
+            Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
+            Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleSendDirectMessage(data) => {
+                // Cache this request_id as the ghost engine layer needs it to associate
+                // the response message
+                self.request_id_map
+                    .insert(request_id.clone(), data.request_id.clone());
+                data.request_id = request_id
+            }
+            msg => error!("[inject_request_id] CONVERT ME: {:?}", msg),
+        }
+        msg
     }
-    msg
 }
 
 #[cfg(test)]
@@ -331,8 +361,8 @@ mod tests {
     }
 
     impl CanAdvertise for MockGhostEngine {
-        fn advertise(&self) -> Url {
-            Url::parse("mem://fixme").unwrap()
+        fn advertise(&self) -> Lib3hUri {
+            Lib3hUri::with_memory("fixme")
         }
     }
 
@@ -445,7 +475,7 @@ mod tests {
 
         let data = ConnectData {
             request_id: "foo_request_id".into(),
-            peer_uri: Url::parse("mocknet://t1").expect("can parse url"),
+            peer_location: Url::parse("mocknet://t1").expect("can parse url").into(),
             network_id: "fake_id".to_string(),
         };
 
@@ -513,7 +543,7 @@ mod tests {
 
         detach_run!(&mut legacy.engine, |l| l.as_mut().inject_lib3h_publish(
             Lib3hToClient::Unbound(UnboundData {
-                uri: Url::parse("mem:/addr_1/").unwrap()
+                uri: Lib3hUri::with_memory("addr_1")
             })
         ));
 

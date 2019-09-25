@@ -3,7 +3,7 @@
 //! Our simple use case is the following:
 //! ```rust
 //! use lib3h_mdns as mdns;
-//! use lib3h_discovery::Discovery;
+//! use lib3h_protocol::discovery::Discovery;
 //! use std::{thread, time::Duration};
 //!
 //! let mut mdns = mdns::MulticastDnsBuilder::new()
@@ -32,6 +32,8 @@
 #![feature(never_type)]
 #![feature(drain_filter)]
 
+extern crate lib3h_protocol;
+
 use log::{debug, error, trace};
 // Used to clean our buffer to avoid mixing messages together.
 use url::Url;
@@ -42,7 +44,10 @@ use std::{
     time::Instant,
 };
 
-use lib3h_discovery::{error::DiscoveryResult, Discovery};
+use lib3h_protocol::{
+    discovery::{error::DiscoveryResult, Discovery},
+    uri::Lib3hUri,
+};
 
 pub mod error;
 pub use error::{MulticastDnsError, MulticastDnsResult};
@@ -152,16 +157,16 @@ impl MulticastDns {
     }
 
     /// Returns all the urls for every NetworkId.
-    pub fn urls(&self) -> Vec<Url> {
+    pub fn urls(&self) -> Vec<Lib3hUri> {
         self.map_record
             .iter()
             .flat_map(|(_, v)| {
                 v.iter()
                     .filter_map(|r| match Url::parse(&r.url) {
-                        Ok(url) => Some(url),
+                        Ok(url) => Some(url.into()),
                         Err(_) => None,
                     })
-                    .collect::<Vec<Url>>()
+                    .collect::<Vec<Lib3hUri>>()
             })
             .collect()
     }
@@ -174,6 +179,15 @@ impl MulticastDns {
     /// Returns the amount of time we wait between two queries.
     pub fn query_interval_ms(&self) -> u128 {
         self.query_interval_ms
+    }
+
+    /// Insert a new record to our cache.
+    pub fn insert_own_record(&mut self, netid: &str, records: &[&str]) {
+        let records: Vec<Record> = records
+            .iter()
+            .map(|rec| Record::new(netid, rec, 255))
+            .collect();
+        self.own_map_record.insert(netid.to_string(), records);
     }
 
     /// Insert a new record to our cache.
@@ -411,7 +425,7 @@ impl Discovery for MulticastDns {
     }
 
     /// Read the UDP stack and update our cache accordingly.
-    fn discover(&mut self) -> DiscoveryResult<Vec<Url>> {
+    fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
         self.responder()?;
 
         // We should query (and announce in the same time because we will anwser to our query in the

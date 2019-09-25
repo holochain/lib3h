@@ -2,6 +2,7 @@
 
 use serde::de::value::Error as DeserializeError;
 use std::{error::Error as StdError, fmt, io, result};
+use url::ParseError;
 
 /// A type alias for `Result<T, Lib3hProtocolError>`.
 pub type Lib3hProtocolResult<T> = result::Result<T, Lib3hProtocolError>;
@@ -39,6 +40,8 @@ pub enum ErrorKind {
     /// Error occuring in [Lib3h](https://github.com/holochain/lib3h/). This is kind of a hacky way
     /// to do it but it's a viable option to avoid circular dependency.
     Lib3hError(String, Option<backtrace::Backtrace>),
+    /// Error occurred while parsing URLs
+    UrlError(ParseError),
     /// Yet undefined error.
     Other(String),
     /// Hints that destructuring should not be exhaustive.
@@ -57,6 +60,7 @@ impl StdError for Lib3hProtocolError {
             ErrorKind::Io(ref err) => Some(err),
             ErrorKind::DeserializeError(ref err) => Some(err),
             ErrorKind::Lib3hError(ref _s, ref _bt) => None,
+            ErrorKind::UrlError(ref err) => Some(err),
             ErrorKind::Other(ref _s) | ErrorKind::TransportError(ref _s) => None,
             _ => unreachable!(),
         }
@@ -70,6 +74,7 @@ impl fmt::Display for Lib3hProtocolError {
             ErrorKind::TransportError(ref s) => write!(f, "TransportError: '{}'.", s),
             ErrorKind::DeserializeError(ref err) => err.fmt(f),
             ErrorKind::Lib3hError(ref s, ref _bt) => write!(f, "Li3hError encountered: '{}'.", s),
+            ErrorKind::UrlError(ref s) => write!(f, "Url ParseError: '{}'.", s),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
@@ -85,5 +90,11 @@ impl From<io::Error> for Lib3hProtocolError {
 impl From<DeserializeError> for Lib3hProtocolError {
     fn from(err: DeserializeError) -> Self {
         Lib3hProtocolError::new(ErrorKind::DeserializeError(err))
+    }
+}
+
+impl From<ParseError> for Lib3hProtocolError {
+    fn from(err: ParseError) -> Self {
+        Lib3hProtocolError::new(ErrorKind::UrlError(err))
     }
 }

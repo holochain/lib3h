@@ -1,6 +1,6 @@
 use get_if_addrs;
-use lib3h_discovery::Discovery;
 use lib3h_mdns as mdns;
+use lib3h_protocol::discovery::Discovery;
 use std::{thread, time::Duration};
 
 fn list_ip_v4() -> Vec<String> {

@@ -44,7 +44,7 @@ impl
             Box::new(|mut me, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -52,6 +52,7 @@ impl
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(peer_response) = response {
+                    trace!("Received RequestThisPeer response: {:?}", peer_response);
                     me.this_peer = peer_response;
                 } else {
                     panic!("bad response to RequestThisPeer: {:?}", response);
@@ -76,7 +77,8 @@ impl P2pGateway {
     fn handle_RequestToChild(&mut self, mut msg: GatewayToChildMessage) -> Lib3hResult<()> {
         trace!(
             "({}) Serving request from parent: {:?}",
-            self.identifier.nickname, msg
+            self.identifier.nickname,
+            msg
         );
         // let parent_request = msg.clone();
         let span = msg.span().child("handle_RequestToChild");
@@ -115,7 +117,9 @@ impl P2pGateway {
                     DhtRequestToChild::RequestPeerList,
                     Box::new(move |me, response| {
                         match response {
-                            GhostCallbackData::Timeout => panic!("Timeout on RequestPeerList"),
+                            GhostCallbackData::Timeout(bt) => {
+                                panic!("Timeout on RequestPeerList: {:?}", bt)
+                            }
                             GhostCallbackData::Response(Err(error)) => {
                                 panic!("Error on RequestPeerList: {:?}", error)
                             }
@@ -125,13 +129,13 @@ impl P2pGateway {
                                 for peer in peer_list {
                                     me.send(
                                         Span::fixme(),
-                                        peer.peer_address.clone().into(),
-                                        peer.peer_uri.clone(),
+                                        peer.peer_name.clone().into(),
+                                        peer.peer_location.clone(),
                                         payload.clone().into(),
                                         Box::new(move |response| {
                                             debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
-                                                peer.peer_uri, response
+                                                peer.peer_location, response
                                             );
                                             Ok(())
                                         }),

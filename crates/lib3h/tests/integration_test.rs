@@ -25,7 +25,7 @@ use lib3h::{
     error::Lib3hResult,
     transport::websocket::tls::TlsConfig,
 };
-use lib3h_protocol::Address;
+use lib3h_protocol::{uri::Lib3hUri, Address};
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
@@ -109,7 +109,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         bootstrap_nodes: vec![],
         work_dir: PathBuf::new(),
         log_level: 'd',
-        bind_url: Url::parse(format!("mem://{}/{}", fn_name, name).as_str()).unwrap(),
+        bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
         dht_gossip_interval: 500,
         dht_timeout_threshold: 3000,
         dht_custom_config: vec![],
@@ -130,7 +130,8 @@ fn setup_wss_node(
         TlsConfig::SuppliedCertificate(_) | TlsConfig::FakeServer => "wss",
     };
     let bind_url = Url::parse(format!("{}://127.0.0.1:{}/{}", protocol, port, fn_name).as_str())
-        .expect("invalid web socket url");
+        .expect("invalid web socket url")
+        .into();
 
     let config = EngineConfig {
         network_id: test_network_id(),
@@ -173,7 +174,6 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 
 // -- Memory Transport Tests --
 #[test]
-#[ignore]
 fn test_two_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {

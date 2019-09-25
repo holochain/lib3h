@@ -11,7 +11,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, DidWork};
+use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -124,17 +124,20 @@ impl<'engine> GhostEngine<'engine> {
                             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(peer_data)),
                         );
                     }
-                    DhtRequestToParent::PeerTimedOut(_peer_address) => {
+                    DhtRequestToParent::PeerTimedOut(_peer_name) => {
                         // no-op
                     }
                     // HoldEntryRequested from gossip
                     // -> Send each aspect to Core for validation
-                    DhtRequestToParent::HoldEntryRequested { from_peer, entry } => {
+                    DhtRequestToParent::HoldEntryRequested {
+                        from_peer_name,
+                        entry,
+                    } => {
                         for aspect in entry.aspect_list {
                             let lib3h_msg = StoreEntryAspectData {
                                 request_id: self.request_track.reserve(),
                                 space_address: chain_id.0.clone(),
-                                provider_agent_id: from_peer.clone().into(),
+                                provider_agent_id: from_peer_name.clone().into(),
                                 entry_address: entry.entry_address.clone(),
                                 entry_aspect: aspect,
                             };
@@ -195,8 +198,8 @@ impl<'engine> GhostEngine<'engine> {
                                                 GhostCallbackData::Response(Err(e)) => {
                                                     panic!("Got error on HandleFetchEntry: {:?} ", e);
                                                 }
-                                                GhostCallbackData::Timeout => {
-                                                    panic!("Got timeout on HandleFetchEntry");
+                                                GhostCallbackData::Timeout(bt) => {
+                                                    panic!("Got timeout on HandleFetchEntry: {:?}", bt);
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
@@ -240,6 +243,7 @@ impl<'engine> GhostEngine<'engine> {
                                 return Err(e.into());
                             }
                             let p2p_msg = maybe_msg.unwrap();
+                            trace!("space_layer about to handle p2p_msg: {:?}", p2p_msg);
                             self.handle_p2p_protocol(
                                 span.child("handle_p2p_protocol"),
                                 &uri,
@@ -274,17 +278,21 @@ impl<'engine> GhostEngine<'engine> {
                                 dm_data.space_address.clone(),
                                 dm_data.from_agent_id.clone(),
                                 dm_data.to_agent_id.clone(),
-                                P2pProtocol::DirectMessageResult(dm_data),
+                                P2pProtocol::DirectMessageResult(dm_data.clone()),
                             ) {
                                 Ok(r) => r,
                                 Err(e) => panic!("{:?}", e),
                             };
-                            debug!("handle_p2p_protocol: Got p2p_msg for {}", to_agent_id.clone());
+                            trace!(
+                                "handle_p2p_protocol: Got p2p_msg for {}: {:?}",
+                                to_agent_id.clone(),
+                                dm_data
+                            );
 
                             space_gateway.publish(
                                 Span::fixme(),
                                 GatewayRequestToChild::Transport(RequestToChild::SendMessage {
-                                    uri: Url::parse(&format!("agentid:{}", to_agent_id)).unwrap(),
+                                    uri: Lib3hUri::with_agent_id(&to_agent_id),
                                     payload,
                                 }),
                             )?;
@@ -295,11 +303,24 @@ impl<'engine> GhostEngine<'engine> {
                 )?;
             }
             P2pProtocol::DirectMessageResult(dm_data) => {
+                trace!(
+                    "pending_client_messages: {:?}",
+                    self.pending_client_direct_messages
+                );
                 if let Some(msg) = self
                     .pending_client_direct_messages
                     .remove(&dm_data.request_id)
                 {
+                    trace!(
+                        "space_layer respond with send direct message result: {:?}",
+                        dm_data
+                    );
                     msg.respond(Ok(ClientToLib3hResponse::SendDirectMessageResult(dm_data)))?;
+                } else {
+                    error!(
+                        "space_layer couldn't find message with request_id sourced from {:?}",
+                        dm_data
+                    );
                 }
             }
             _ => panic!("can't handle space layer receive of {:?}", p2p_msg),

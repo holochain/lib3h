@@ -11,6 +11,7 @@ use lib3h_protocol::{
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
+    uri::Lib3hUri,
     Address, DidWork,
 };
 use multihash::Hash;
@@ -43,7 +44,7 @@ impl NodeMock {
         None
     }
 
-    pub fn advertise(&self) -> Url {
+    pub fn advertise(&self) -> Lib3hUri {
         self.my_advertise.clone()
     }
 }
@@ -53,8 +54,9 @@ impl NodeMock {
     /// Disconnect the NetworkEngine by destroying it.
     pub fn disconnect(&mut self) {
         let mut dummy_config = self.config.clone();
-        dummy_config.bind_url =
-            Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
+        dummy_config.bind_url = Url::parse(&format!("{}/dummy", self.config.bind_url.as_str()))
+            .unwrap()
+            .into();
         self.engine =
             (self.engine_factory)(&dummy_config, "__dummy").expect("Failed to create dummy Engine");
         self.engine =
@@ -95,10 +97,10 @@ impl NodeMock {
     }
 
     /// Connect to another peer via its uri
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<ConnectData> {
+    pub fn connect_to(&mut self, uri: &Lib3hUri) -> Lib3hProtocolResult<ConnectData> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
-            peer_uri: uri.clone(),
+            peer_location: uri.clone(),
             network_id: NETWORK_A_ID.clone(),
         };
         self.connected_list.insert(uri.clone());
@@ -109,11 +111,19 @@ impl NodeMock {
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        debug!("\n\n({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
+        debug!(
+            "({}).process() END - {}",
+            self.name,
+            self.recv_msg_log.len()
+        );
         self.recv_msg_log.extend_from_slice(msgs.as_slice());
         for msg in msgs.iter() {
+            trace!("({}).process() handle_lib3h({:?})", self.name, msg);
             self.handle_lib3h(msg.clone());
         }
+        debug!("({}).process() - DRAIN END\n", self.name);
         Ok((did_work, msgs))
     }
 
@@ -809,7 +819,7 @@ impl lib3h_protocol::network_engine::NetworkEngine for NodeMock {
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process()
     }
-    fn advertise(&self) -> Url {
+    fn advertise(&self) -> Lib3hUri {
         self.advertise()
     }
 

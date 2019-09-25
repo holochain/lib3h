@@ -1,6 +1,7 @@
-use crate::dht::{dht_protocol::PeerData, PeerAddress};
+use crate::dht::dht_protocol::PeerData;
 use lib3h_protocol::{
     data_types::{DirectMessageData, Opaque},
+    uri::Lib3hUri,
     Address,
 };
 
@@ -16,7 +17,7 @@ pub enum P2pProtocol {
     DirectMessage(DirectMessageData),
     DirectMessageResult(DirectMessageData),
     /// Notify another node's our identify in a specific gateway/dht
-    PeerAddress(GatewayId, PeerAddress, PeerTimestamp),
+    PeerName(GatewayId, Lib3hUri, PeerTimestamp),
     /// Broadcast JoinSpace to all when joining a space
     BroadcastJoinSpace(SpaceAddress, PeerData),
     /// For sending a peer's 'JoinSpace' info to a newly connected peer
@@ -27,7 +28,7 @@ pub enum P2pProtocol {
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct GossipData {
     pub space_address: Address,
-    pub to_peer_address: Address,
-    pub from_peer_address: Address,
+    pub to_peer_name: Lib3hUri,
+    pub from_peer_name: Lib3hUri,
     pub bundle: Opaque,
 }

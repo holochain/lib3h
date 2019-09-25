@@ -3,8 +3,8 @@ use crate::{
     error::{ErrorKind, Lib3hProtocolError},
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
+    uri::Lib3hUri,
 };
-use url::Url;
 
 use std::convert::TryFrom;
 
@@ -114,7 +114,7 @@ impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
             Lib3hClientProtocol::Connect(connect_data) => {
                 Ok(ClientToLib3h::Bootstrap(BootstrapData {
                     space_address: connect_data.network_id.into(),
-                    bootstrap_uri: connect_data.peer_uri,
+                    bootstrap_uri: connect_data.peer_location,
                 }))
             }
             Lib3hClientProtocol::JoinSpace(space_data) => Ok(ClientToLib3h::JoinSpace(space_data)),
@@ -180,7 +180,7 @@ impl TryFrom<Lib3hServerProtocol> for Lib3hToClient {
             }
             Lib3hServerProtocol::Disconnected(_disconnected_data) => {
                 Ok(Lib3hToClient::Unbound(UnboundData {
-                    uri: Url::parse("none:").unwrap(),
+                    uri: Lib3hUri::with_undefined(),
                 }))
             }
             Lib3hServerProtocol::SendDirectMessageResult(direct_message_data) => {
@@ -241,7 +241,7 @@ impl From<ClientToLib3h> for Lib3hClientProtocol {
         match c {
             ClientToLib3h::Bootstrap(bootstrap_data) => Lib3hClientProtocol::Connect(ConnectData {
                 request_id: "".to_string(),
-                peer_uri: bootstrap_data.bootstrap_uri,
+                peer_location: bootstrap_data.bootstrap_uri,
                 network_id: bootstrap_data.space_address.into(),
             }),
             ClientToLib3h::JoinSpace(space_data) => Lib3hClientProtocol::JoinSpace(space_data),
@@ -342,8 +342,8 @@ impl From<ClientToLib3hResponse> for Lib3hServerProtocol {
             }
             ClientToLib3hResponse::BootstrapSuccess => {
                 Lib3hServerProtocol::Connected(ConnectedData {
-                    request_id: "".to_string(),
-                    uri: Url::parse("none:").unwrap(),
+                    request_id: String::new(),
+                    uri: Lib3hUri::with_undefined(),
                 })
             }
             variant => panic!("{:?} can't convert to Lib3hServerProtocol", variant),
@@ -360,7 +360,7 @@ mod tests {
     fn connect_data() -> ConnectData {
         ConnectData {
             request_id: "".to_string(),
-            peer_uri: Url::parse("wss://192.168.0.102:58081/").unwrap(),
+            peer_location: Url::parse("wss://192.168.0.102:58081/").unwrap().into(),
             network_id: "network_id".into(),
         }
     }
@@ -373,7 +373,7 @@ mod tests {
         assert_eq!(
             to_c,
             ClientToLib3h::Bootstrap(BootstrapData {
-                bootstrap_uri: Url::parse("wss://192.168.0.102:58081/").unwrap(),
+                bootstrap_uri: Url::parse("wss://192.168.0.102:58081/").unwrap().into(),
                 space_address: "network_id".to_string().into(),
             })
         );
