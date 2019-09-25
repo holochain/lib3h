@@ -150,8 +150,8 @@ impl<
                     data,
                     Box::new(move |_, response| {
                         match response {
-                            GhostCallbackData::Timeout => {
-                                msg.respond(Err("timeout".into()))?;
+                            GhostCallbackData::Timeout(bt) => {
+                                msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                                 return Ok(());
                             }
                             GhostCallbackData::Response(response) => {
@@ -210,8 +210,8 @@ impl<
             Box::new(|_, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                        GhostCallbackData::Timeout(bt) => {
+                            msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => match response {
@@ -250,8 +250,8 @@ impl<
             Box::new(|_, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                        GhostCallbackData::Timeout(bt) => {
+                            msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => match response {
@@ -295,8 +295,8 @@ impl<
                 Box::new(move |_, response| {
                     let response = {
                         match response {
-                            GhostCallbackData::Timeout => {
-                                msg.respond(Err("timeout".into()))?;
+                            GhostCallbackData::Timeout(bt) => {
+                                msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                                 return Ok(());
                             }
                             GhostCallbackData::Response(response) => response,
