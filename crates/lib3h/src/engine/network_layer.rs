@@ -39,7 +39,7 @@ impl<'engine> GhostEngine<'engine> {
             self.multiplexer.request(
                 Span::fixme(),
                 GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage { uri: to, payload },
+                    transport::protocol::RequestToChild::create_send_message(to, payload),
                 ),
                 Box::new(move |_me, _response| Ok(())),
             )?;
@@ -76,10 +76,10 @@ impl<'engine> GhostEngine<'engine> {
                     self.name, peer_data.peer_name, peer_data.peer_location,
                 );
                 let cmd = GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage {
-                        uri: peer_data.peer_location,
-                        payload: Opaque::new(),
-                    },
+                    transport::protocol::RequestToChild::create_send_message(
+                        peer_data.peer_location,
+                        Opaque::new(),
+                    ),
                 );
                 self.multiplexer
                     .publish(span.child("DhtRequestToParent::HoldPeerRequested"), cmd)?;

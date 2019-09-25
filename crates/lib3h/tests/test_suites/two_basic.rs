@@ -9,8 +9,9 @@ lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
         (test_setup_only, true),
         (test_send_message, true),
+        (test_send_message_fail, true),
 // TODO will comment out as they are fixed
-/*        (test_send_message_fail, true),
+/*
         (test_hold_entry, true),
         (test_author_no_aspect, true),
         (test_author_one_aspect, true),
@@ -151,26 +152,16 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 #[allow(dead_code)]
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
     // Send to self
-    let req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    println!("response: {:?}", srv_msg_list);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    let _req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
+    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_3\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"alex\"\\), result_info: ";
+    assert_msg_matches!(alex, expected);
 
+    trace!("[test_send_message_fail] alex send to camille");
     // Send to unknown
-    let req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "wah".as_bytes().to_vec());
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
-    println!("response: {:?}", srv_msg_list);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    let _req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "wah".as_bytes().to_vec());
+
+    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_4\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"camille\"\\), result_info: ";
+    assert_msg_matches!(alex, expected);
 }
 
 /// Test publish, Store, Query

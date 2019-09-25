@@ -85,6 +85,7 @@ pub enum DhtRequestToChild {
 #[derive(Debug, Clone)]
 pub enum DhtRequestToChildResponse {
     RequestPeer(Option<PeerData>),
+    RetryRequestPeer(PeerData),
     RequestPeerList(Vec<PeerData>),
     RequestThisPeer(PeerData),
     RequestEntryAddressList(Vec<Address>),

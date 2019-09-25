@@ -288,10 +288,12 @@ impl<'engine> GhostEngine<'engine> {
 
                             space_gateway.publish(
                                 Span::fixme(),
-                                GatewayRequestToChild::Transport(RequestToChild::SendMessage {
-                                    uri: Lib3hUri::with_agent_id(&to_agent_id),
-                                    payload,
-                                }),
+                                GatewayRequestToChild::Transport(
+                                    RequestToChild::create_send_message(
+                                        Lib3hUri::with_agent_id(&to_agent_id),
+                                        payload,
+                                    ),
+                                ),
                             )?;
 
                             Ok(())

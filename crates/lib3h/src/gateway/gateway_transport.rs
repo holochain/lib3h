@@ -234,6 +234,7 @@ impl P2pGateway {
             transport::protocol::RequestToChild::SendMessage {
                 uri: uri.clone(),
                 payload: payload,
+                attempt: 0,
             },
             Box::new(move |_me, response| {
                 // In case of a transport error or timeout we store the message in the
@@ -302,6 +303,7 @@ impl P2pGateway {
         self.priv_encoded_send(span, to_address, uri, payload, cb)
     }
 
+    const MAX_RETRY_ATTEMPTS: u8 = 5;
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
         let pending: Vec<PendingOutgoingMessage> =
             self.pending_outgoing_messages.drain(..).collect();
@@ -309,6 +311,7 @@ impl P2pGateway {
             let transport_request = transport::protocol::RequestToChild::SendMessage {
                 uri: p.uri,
                 payload: p.payload,
+                attempt: p.attempt + 1,
             };
             self.handle_transport_RequestToChild(p.span, transport_request, p.parent_request)?;
         }
@@ -321,13 +324,24 @@ impl P2pGateway {
         uri: Lib3hUri,
         payload: Opaque,
         parent_request: GatewayToChildMessage,
-    ) {
-        self.pending_outgoing_messages.push(PendingOutgoingMessage {
-            span,
-            uri,
-            payload,
-            parent_request,
-        });
+        attempt: u8,
+    ) -> Option<GatewayToChildMessage> {
+        if attempt < Self::MAX_RETRY_ATTEMPTS {
+            self.pending_outgoing_messages.push(PendingOutgoingMessage {
+                span,
+                uri,
+                payload,
+                parent_request,
+                attempt,
+            });
+            trace!(
+                "[gateway_transport] add_to_pending, pending_outgoing_messages: {:?}",
+                self.pending_outgoing_messages
+            );
+            None
+        } else {
+            Some(parent_request)
+        }
     }
 
     /// Handle Transport request sent to use by our parent
@@ -362,7 +376,11 @@ impl P2pGateway {
                     }),
                 );
             }
-            transport::protocol::RequestToChild::SendMessage { uri, payload } => {
+            transport::protocol::RequestToChild::SendMessage {
+                uri,
+                payload,
+                attempt,
+            } => {
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
@@ -393,7 +411,18 @@ impl P2pGateway {
                                     uri,
                                     payload,
                                     parent_request,
-                                );
+                                    attempt,
+                                )
+                                .map(|parent_request| {
+                                    parent_request.respond(Err(Lib3hError::from(format!(
+                                        "Maximum retries of {:?} already attempted.",
+                                        Self::MAX_RETRY_ATTEMPTS
+                                    ))))
+                                })
+                                .unwrap_or_else(|| {
+                                    trace!("queued retry for response {:?}", response);
+                                    Ok(())
+                                })?
                             }
                         };
                         Ok(())
