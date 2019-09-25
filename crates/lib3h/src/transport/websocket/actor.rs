@@ -685,6 +685,8 @@ mod tests {
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
+        // Here we should get an error because we indeed did not bind yet, so it's the expected
+        // behavior
         assert_eq!(
             "Err(DiscoveryError(Other(\"Must bind URL before advertising.\")))",
             format!("{:?}", transport1.discover())
