@@ -127,9 +127,9 @@ where
                             agent,
                         ));
                     }
-                    GhostCallbackData::Timeout => {
+                    GhostCallbackData::Timeout(bt) => {
                         me.client_request_responses.push(server_failure(
-                            "Request timed out".into(),
+                            format!("Request timed out: {:?}", bt),
                             request_id,
                             space_addr,
                             agent,

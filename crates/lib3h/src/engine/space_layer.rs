@@ -198,8 +198,8 @@ impl<'engine> GhostEngine<'engine> {
                                                 GhostCallbackData::Response(Err(e)) => {
                                                     panic!("Got error on HandleFetchEntry: {:?} ", e);
                                                 }
-                                                GhostCallbackData::Timeout => {
-                                                    panic!("Got timeout on HandleFetchEntry");
+                                                GhostCallbackData::Timeout(bt) => {
+                                                    panic!("Got timeout on HandleFetchEntry: {:?}", bt);
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
