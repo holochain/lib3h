@@ -170,26 +170,22 @@ impl SecBuf {
     /// nonce, etc.), without copying it into into intermediate buffers with lower security.  Caller
     /// must ensure that the desired `siz` complies with the underlying Bufferable's valid size
     /// restrictions.
-    pub fn clone_partial(
-        &self,
-        off: usize,
-        siz: usize
-    ) -> SecBuf {
-        if off + siz > self.len() || off > isize::MAX as usize {
+    pub fn clone_partial(&self, off: usize, siz: usize) -> SecBuf {
+        if off + siz > self.len() || off > (isize::MAX as usize) {
             panic!(
                 "SecBuf attempting to clone {}-bytes segment from offset {}, beyond {}-byte extent of source SecBuf",
                 siz, off, self.len()
             )
         }
         let mut out = match self.t {
-            SecurityType::Insecure => SecBuf::with_insecure(siz) ,
+            SecurityType::Insecure => SecBuf::with_insecure(siz),
             SecurityType::Secure => SecBuf::with_secure(siz),
         };
         self.b.readable();
         unsafe {
             let mut out_lock = out.write_lock();
             std::ptr::copy(
-                self.b.ref_().as_ptr().offset(off as isize), // confirmed valid; off+siz <= len()
+                self.b.ref_().as_ptr().offset(off as isize), // off confirmed valid, & off+siz <= len()
                 (**out_lock).as_mut_ptr(),
                 siz,
             );
@@ -417,7 +413,7 @@ mod tests {
         }
         assert_eq!(ProtectState::NoAccess, c.protect_state());
         // No restrictions on Bufferable size for Insecure SecBufs
-        let mut c_sub = b.clone_partial(1, b.len()-2); // clone the middle of `b`
+        let mut c_sub = b.clone_partial(1, b.len() - 2); // clone the middle of `b`
         assert!(!c_sub.is_secure());
         {
             let c_sub_r = c_sub.read_lock();
