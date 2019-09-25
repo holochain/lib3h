@@ -185,7 +185,7 @@ impl SecBuf {
         unsafe {
             let mut out_lock = out.write_lock();
             std::ptr::copy(
-                self.b.ref_().as_ptr().offset(off as isize), // off confirmed valid, & off+siz <= len()
+                self.b.ref_().as_ptr().add(off), // off confirmed valid as isize, & off+siz <= len()
                 (**out_lock).as_mut_ptr(),
                 siz,
             );
