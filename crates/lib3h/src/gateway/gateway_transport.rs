@@ -26,7 +26,7 @@ impl P2pGateway {
             Box::new(move |me, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => panic!("timeout"),
+                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
@@ -266,11 +266,16 @@ impl P2pGateway {
                         .into()))
                     }
                     // Timeout:
-                    GhostCallbackData::Timeout => {
-                        debug!("Gateway got timeout from transport. Adding message to pending");
-                        cb(Err(
-                            "Ghost timeout error while trying to send message".into()
-                        ))
+                    GhostCallbackData::Timeout(bt) => {
+                        debug!(
+                            "Gateway got timeout from transport. Adding message to pending: {:?}",
+                            bt
+                        );
+                        cb(Err(format!(
+                            "Ghost timeout error while trying to send message: {:?}",
+                            bt
+                        )
+                        .into()))
                     }
                 }
             }),
@@ -341,9 +346,9 @@ impl P2pGateway {
                     Box::new(|_me, response| {
                         let response = {
                             match response {
-                                GhostCallbackData::Timeout => {
+                                GhostCallbackData::Timeout(bt) => {
                                     parent_request
-                                        .respond(Err(Lib3hError::new_other("timeout")))?;
+                                        .respond(Err(format!("timeout: {:?}", bt).into()))?;
                                     return Ok(());
                                 }
                                 GhostCallbackData::Response(response) => response,
