@@ -15,7 +15,10 @@ use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::Opaque,
-    discovery::{error::{DiscoveryError, DiscoveryResult}, Discovery},
+    discovery::{
+        error::{DiscoveryError, DiscoveryResult},
+        Discovery,
+    },
     uri::Lib3hUri,
     Address,
 };
@@ -687,7 +690,9 @@ mod tests {
 
         let port1 = get_available_port(3125).expect("Must be able to find free port");
         let expected_transport1_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1)).unwrap().into();
+            Url::parse(&format!("wss://127.0.0.1:{}", port1))
+                .unwrap()
+                .into();
         t1_endpoint
             .request(
                 Span::fixme(),
@@ -710,7 +715,9 @@ mod tests {
 
         let port2 = get_available_port(3126).expect("Must be able to find free port");
         let expected_transport2_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port2)).unwrap().into();
+            Url::parse(&format!("wss://127.0.0.1:{}", port2))
+                .unwrap()
+                .into();
         t2_endpoint
             .request(
                 Span::fixme(),
