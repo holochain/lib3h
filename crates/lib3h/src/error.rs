@@ -61,6 +61,8 @@ pub enum ErrorKind {
     CryptoApiError(CryptoError),
     /// Error occuring when the key is not present in the Map.
     KeyNotFound(String),
+    /// Error occuring from a bad response to RequestEntry.
+    RequestEntryBadResponse(String),
     /// Yet undefined error.
     Other(String),
     /// Hints that destructuring should not be exhaustive.
