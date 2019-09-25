@@ -624,10 +624,10 @@ impl<'engine> GhostEngine<'engine> {
 
         space_gateway.request(
             span,
-            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: Lib3hUri::with_agent_id(&to_agent_id),
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::create_send_message(
+                Lib3hUri::with_agent_id(&to_agent_id),
                 payload,
-            }),
+            )),
             Box::new(|me, response| {
                 debug!(
                     "GhostEngine: response to handle_direct_message message: {:?}",
@@ -794,10 +794,8 @@ pub fn handle_gossip_to<
             .serialize(&mut Serializer::new(&mut payload))
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
-        let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: to_peer_name,
-            payload: payload.into(),
-        };
+        let msg =
+            transport::protocol::RequestToChild::create_send_message(to_peer_name, payload.into());
         gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())

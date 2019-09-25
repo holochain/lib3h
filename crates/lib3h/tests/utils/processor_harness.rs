@@ -380,7 +380,7 @@ macro_rules! assert_msg_matches {
      $regex:expr
     ) => {
         // TODO Hack make a single engine version
-        $crate::assert2_msg_matches($engine, $engine, $regex)
+        $crate::assert2_msg_matches!($engine, $engine, $regex)
     };
 }
 

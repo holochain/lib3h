@@ -155,7 +155,7 @@ impl GhostTransportWebsocket {
             .take_message()
             .expect("GhostMessage must have inner RequestToChild")
         {
-            RequestToChild::SendMessage { uri, payload } => {
+            RequestToChild::SendMessage { uri, payload, .. } => {
                 match self.bound_url.clone() {
                     None => {
                         let _ = msg.respond(Err(TransportError::new(
@@ -178,7 +178,7 @@ impl GhostTransportWebsocket {
                             // it as error so the calling context can put it back into the pending
                             // list to try again later.
                             let payload = Opaque::from(bytes);
-                            msg.put_message(RequestToChild::SendMessage { uri, payload });
+                            msg.put_message(RequestToChild::create_send_message(uri, payload));
                             Err(msg)
                         } else {
                             let _ = msg.respond(Ok(RequestToChildResponse::SendMessageSuccess));
@@ -210,7 +210,7 @@ impl GhostTransportWebsocket {
                             .map_err(|e| TransportError::from(e.to_string()))?;
                     }
                 }
-                RequestToChild::SendMessage { uri, payload } => {
+                RequestToChild::SendMessage { uri, payload, .. } => {
                     // make sure we have bound and got our address
                     if self.bound_url.is_none() {
                         msg.respond(Err(TransportError::new(
@@ -239,18 +239,18 @@ impl GhostTransportWebsocket {
                                 }
 
                                 // And save message for later:
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                msg.put_message(RequestToChild::create_send_message(uri, payload));
                                 self.pending.push(msg);
                             }
                             ConnectionStatus::Initializing => {
                                 trace!("Send tried while initializing");
                                 // If the connection is there but not ready yet, save message for later
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                msg.put_message(RequestToChild::create_send_message(uri, payload));
                                 self.pending.push(msg);
                             }
                             ConnectionStatus::Ready => {
                                 trace!("Send via previously established connection");
-                                msg.put_message(RequestToChild::SendMessage { uri, payload });
+                                msg.put_message(RequestToChild::create_send_message(uri, payload));
                                 if let Err(msg) = self.handle_send_message(msg) {
                                     trace!(
                                         "Error while sending message, putting it in pending list"
@@ -318,16 +318,16 @@ impl GhostTransportWebsocket {
         while let Some(mut msg) = self.pending.pop() {
             trace!("Processing pending message...");
             let inner_msg = msg.take_message().expect("exists");
-            if let RequestToChild::SendMessage { uri, payload } = inner_msg {
+            if let RequestToChild::SendMessage { uri, payload, .. } = inner_msg {
                 if self.streams.connection_status(&uri) == ConnectionStatus::Ready {
                     trace!("Sending pending message to: {:?}", uri);
-                    msg.put_message(RequestToChild::SendMessage { uri, payload });
+                    msg.put_message(RequestToChild::create_send_message(uri, payload));
                     if let Err(msg) = self.handle_send_message(msg) {
                         trace!("Error while sending message, putting it back in pending list");
                         temp.push(msg);
                     }
                 } else {
-                    msg.put_message(RequestToChild::SendMessage { uri, payload });
+                    msg.put_message(RequestToChild::create_send_message(uri, payload));
                     temp.push(msg);
                 }
             } else {
@@ -530,10 +530,10 @@ mod tests {
         t1_endpoint
             .request(
                 Span::fixme(),
-                RequestToChild::SendMessage {
-                    uri: expected_transport2_address.clone(),
-                    payload: b"test message".to_vec().into(),
-                },
+                RequestToChild::create_send_message(
+                    expected_transport2_address.clone(),
+                    b"test message".to_vec().into(),
+                ),
                 Box::new(|_: &mut (), r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
@@ -637,10 +637,10 @@ mod tests {
                 t1_endpoint
                     .request(
                         Span::fixme(),
-                        RequestToChild::SendMessage {
-                            uri: expected_transport2_address.clone(),
-                            payload: b"test message".to_vec().into(),
-                        },
+                        RequestToChild::create_send_message(
+                            expected_transport2_address.clone(),
+                            b"test message".to_vec().into(),
+                        ),
                         Box::new(|_: &mut (), r| {
                             // parent should see that the send request was OK
                             assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));

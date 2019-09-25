@@ -287,7 +287,7 @@ impl
                         bound_url: bound_url,
                     })))?;
                 }
-                RequestToChild::SendMessage { uri, payload } => {
+                RequestToChild::SendMessage { uri, payload, .. } => {
                     trace!("mem send: {:?}", payload);
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
@@ -462,10 +462,10 @@ mod tests {
         t1_endpoint
             .request(
                 test_span(""),
-                RequestToChild::SendMessage {
-                    uri: Lib3hUri::with_memory("addr_2"),
-                    payload: b"test message".to_vec().into(),
-                },
+                RequestToChild::create_send_message(
+                    Lib3hUri::with_memory("addr_2"),
+                    b"test message".to_vec().into(),
+                ),
                 Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
@@ -478,10 +478,10 @@ mod tests {
         t1_endpoint
             .request(
                 test_span(""),
-                RequestToChild::SendMessage {
-                    uri: Lib3hUri::with_memory("addr_3"),
-                    payload: b"test message".to_vec().into(),
-                },
+                RequestToChild::create_send_message (
+                    Lib3hUri::with_memory("addr_3"),
+                    b"test message".to_vec().into(),
+                ),
                 Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Err(TransportError(Other(\"No Memory server at this uri: mem://addr_3/\"))))", &format!("{:?}", r));
