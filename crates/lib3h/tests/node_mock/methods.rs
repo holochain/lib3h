@@ -280,8 +280,13 @@ impl NodeMock {
         aspect_content_list: Vec<Vec<u8>>,
         can_tell_engine: bool,
     ) -> Lib3hResult<EntryData> {
-        trace!("[NodeMock {:?}] hold_entry start: address={:?}", self.name(), entry_address);
         let current_space = self.current_space.clone().expect("Current Space not set");
+        trace!(
+            "[NodeMock {:?}] hold_entry start: address={:?}, current_space={:?}",
+            self.name(),
+            entry_address,
+            current_space
+        );
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
@@ -310,7 +315,11 @@ impl NodeMock {
             self.engine
                 .post(Lib3hClientProtocol::HoldEntry(msg_data).into())?;
         }
-        trace!("[NodeMock {:?}] hold_entry end: entry={:?}", self.name(), entry);
+        trace!(
+            "[NodeMock {:?}] hold_entry end: entry={:?}",
+            self.name(),
+            entry
+        );
         // Done
         Ok(entry)
     }
@@ -349,6 +358,8 @@ impl NodeMock {
         &mut self,
         query: &QueryEntryData,
     ) -> Result<QueryEntryResultData, GenericResultData> {
+
+        trace!("[NodeMock {}] reply_to_HandleQueryEntry: query={:?}", self.name(), query);
         if query.query != b"test_query".to_vec().into() {
             panic!("invalid test query opaque data: {:?}", query.query);
         }
@@ -385,7 +396,7 @@ impl NodeMock {
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
-            .expect("Sending FailureResult failed");
+            .expect("Sending HandleQueryEntryResult failed");
         return Ok(query_res);
     }
 
@@ -421,7 +432,11 @@ impl NodeMock {
         // Get Entry
         let maybe_store = self.chain_store_list.get(&fetch.space_address);
         let maybe_entry = match maybe_store {
-            None => None,
+            None => {
+                trace!("[NodeMock {}] no chain store for space address: {:?}", 
+                    self.name(), fetch.space_address);
+                None
+            }
             Some(chain_store) => chain_store.get_entry(&fetch.entry_address),
         };
         // No entry, send failure
@@ -430,7 +445,9 @@ impl NodeMock {
                 space_address: fetch.space_address.clone(),
                 request_id: fetch.request_id.clone(),
                 to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: "No entry found".as_bytes().into(),
+                result_info: 
+                format!("No entry found for address: {:?}", fetch.entry_address)
+                    .as_bytes().into(),
             };
             return Err(msg_data);
         }
