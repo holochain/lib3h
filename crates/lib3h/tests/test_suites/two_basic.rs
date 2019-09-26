@@ -186,7 +186,7 @@ pub fn test_send_message_self(alex: &mut NodeMock, _billy: &mut NodeMock) {
     // TODO Set this to correct value once test passes
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"echo: wah\" \\}\\)";
 
-    assert2_msg_matches!(alex, alex, expected);
+    assert_msg_matches!(alex, expected);
 }
 
 /// Test publish, Store, Query
