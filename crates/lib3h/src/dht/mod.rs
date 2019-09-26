@@ -294,8 +294,14 @@ pub mod tests {
         enable_logging_for_test(true);
         let mut dht = new_dht_wrapper(true, &*PEER_A);
         let mut ud = DhtData::new();
-        // Should be empty
+        // Should get self
         let maybe_peer = get_peer(&mut dht, &*PEER_A);
+        assert_eq!(
+            "Lib3hUri(\"agentid:alex\")",
+            format!("{:?}", maybe_peer.unwrap().peer_name)
+        );
+        // Should be empty
+        let maybe_peer = get_peer(&mut dht, &*PEER_B);
         assert!(maybe_peer.is_none());
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 0);
@@ -405,7 +411,7 @@ pub mod tests {
         let mut dht = new_dht_wrapper(true, &*PEER_A);
         let mut ud = DhtData::new();
         // Should be empty
-        let this = get_peer(&mut dht, &*PEER_A);
+        let this = get_peer(&mut dht, &*PEER_B);
         assert!(this.is_none());
         let peer_list = get_peer_list(&mut dht);
         assert_eq!(peer_list.len(), 0);
