@@ -14,9 +14,7 @@ jobs:
    working_directory: ~/repo
    steps:
      - checkout
-     - run:
-       name: linux benchmarks
-       command: |
+     - run: |
          apt-get update && apt-get install -y --no-install-recommends git make pkg-config libssl-dev
          curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
          export PATH=$HOME/.cargo/bin:$PATH
