@@ -18,7 +18,7 @@ ENV = RUSTFLAGS='$(RUSTFLAGS)' OPENSSL_STATIC='1' CARGO_BUILD_JOBS='$(shell npro
 all: test
 
 benchmarks: tools
-	cd crates/lib3h && cargo bench
+	cd crates/lib3h && cargo bench -j 1 -- --test-threads=1
 
 test: tools
 	$(ENV) cargo fmt -- --check
