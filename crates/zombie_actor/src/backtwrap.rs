@@ -1,7 +1,11 @@
+/// specify whether we want to capture backtraces, and if they should be resolved
 #[derive(Debug, Clone, Copy)]
 pub enum BacktwrapCaptureStrategy {
+    /// don't capture... Backtwrap will contain None
     DoNotCapture,
+    /// capture unresolved backtraces... you can resolve them before printing
     CaptureUnresolved,
+    /// capture resolved backtraces... they will have debug symbols
     CaptureResolved,
 }
 
@@ -20,11 +24,20 @@ lazy_static! {
     };
 }
 
+/// it seems as though
+/// - linux can caputure resolved backtraces w/o much overhead
+/// - macOs can capture UNresolved backtraces (fn pointers but no debug symbols)
+///   without much overhead
+/// - windows cannot capture backtraces at all without major slowdowns
 #[derive(Shrinkwrap, Debug, Clone)]
 #[shrinkwrap(mutable)]
 pub struct Backtwrap(pub Option<backtrace::Backtrace>);
 
 impl Backtwrap {
+    /// Capture (or doesn't capture) backtraces based on environment variable
+    ///  - default - DoNotCapture
+    ///  - BACKTRACE_STRATEGY=CAPTURE_RESOLVED - CaptureResolved
+    ///  - BACKTRACE_STRATEGY=CAPTURE_UNRESOLVED - CaptureUnresolved
     pub fn new() -> Self {
         Self(
             match *CAPTURE_STRATEGY.lock().expect("failed to lock mutex") {
@@ -35,10 +48,12 @@ impl Backtwrap {
         )
     }
 
+    /// get the current capture strategy
     pub fn get_capture_strategy() -> BacktwrapCaptureStrategy {
         *CAPTURE_STRATEGY.lock().expect("failed to lock mutex")
     }
 
+    /// explicitly set the current capture strategy
     pub fn set_capture_strategy(strategy: BacktwrapCaptureStrategy) {
         *CAPTURE_STRATEGY.lock().expect("failed to lock mutex") = strategy;
     }
