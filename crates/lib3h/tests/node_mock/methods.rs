@@ -280,6 +280,7 @@ impl NodeMock {
         aspect_content_list: Vec<Vec<u8>>,
         can_tell_engine: bool,
     ) -> Lib3hResult<EntryData> {
+        trace!("[NodeMock {:?}] hold_entry start: address={:?}", self.name(), entry_address);
         let current_space = self.current_space.clone().expect("Current Space not set");
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
@@ -309,6 +310,7 @@ impl NodeMock {
             self.engine
                 .post(Lib3hClientProtocol::HoldEntry(msg_data).into())?;
         }
+        trace!("[NodeMock {:?}] hold_entry end: entry={:?}", self.name(), entry);
         // Done
         Ok(entry)
     }

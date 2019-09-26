@@ -209,7 +209,12 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            _ => unimplemented!(),
+            Lib3hClientProtocol::FailureResult(data) => (
+                "".to_string(),
+                data.space_address.clone(),
+                data.to_agent_id.clone(),
+            ),
+            msg => unimplemented!("Handle this case: {:?}", msg),
         };
 
         let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();
@@ -225,9 +230,9 @@ where
             };
             result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         } else {
-            // TODO Handle errors better here!
+            // TODO This will result will fail if its a failure result - what is proper error handling behavior?
             let lib3h_to_client_response: Lib3hToClientResponse =
-                client_msg.clone().try_into().unwrap();
+                client_msg.clone().try_into()?;
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
             let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
@@ -239,9 +244,8 @@ where
 
             // HACK: If it is send message result, put back the original request id.
             // TODO: consider this operation for all messages
-            let response;
-            if let Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =
-                lib3h_to_client_response.clone()
+            let response = match lib3h_to_client_response.clone() {
+                Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =>
             {
                 let result = self.request_id_map.remove(&request_id);
                 if let Some(request_id) = result {
@@ -252,10 +256,26 @@ where
                     );
                     data.request_id = request_id.clone();
                 }
-                response = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
-            } else {
-                response = lib3h_to_client_response.clone();
+                Lib3hToClientResponse::HandleSendDirectMessageResult(data)
+            },
+            Lib3hToClientResponse::HandleQueryEntryResult(mut data) =>
+            {
+                let result = self.request_id_map.remove(&request_id);
+                if let Some(request_id) = result {
+                    trace!(
+                        "REPLACE request_id {:?} with {:?}",
+                        data.request_id,
+                        request_id
+                    );
+                    data.request_id = request_id.clone();
+                }
+                Lib3hToClientResponse::HandleQueryEntryResult(data)
+            },
+            _ => 
+            {
+                lib3h_to_client_response.clone()
             }
+        };
 
             ghost_mesage
                 .respond(Ok(response))
@@ -313,7 +333,11 @@ where
             Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
-            Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleQueryEntry(data) => {
+                self.request_id_map
+                    .insert(request_id.clone(), data.request_id.clone());
+                data.request_id = request_id
+            }
             Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleSendDirectMessage(data) => {

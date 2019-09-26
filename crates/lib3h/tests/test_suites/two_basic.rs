@@ -11,8 +11,8 @@ lazy_static! {
         (test_send_message, true),
         (test_send_message_fail, true),
 // TODO will comment out as they are fixed
-/*
         (test_hold_entry, true),
+/*
         (test_author_no_aspect, true),
         (test_author_one_aspect, true),
         (test_author_two_aspects, true),
@@ -49,16 +49,17 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let enty_address_str = &entry.entry_address;
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let query_data = node.request_entry(entry.entry_address.clone());
-    let (did_work, srv_msg_list) = node.process().unwrap();
-    assert!(did_work);
-    println!("\n srv_msg_list: {:?}", srv_msg_list);
+    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
 
+    let srv_msg_list = assert_msg_matches!(node, expected);
+    trace!("\n srv_msg_list: {:?}", srv_msg_list);
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request:\n", node.name());
+    trace!("\n{} reply to own request:\n", node.name());
+    wait_engine_wrapper_until_no_work!(node);
     let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = node.process().unwrap();
-    println!("\n{} gets own response {:?}\n", node.name(), srv_msg_list);
+    trace!("\n{} gets own response {:?}\n", node.name(), srv_msg_list);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
@@ -207,19 +208,10 @@ fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
     let entry = alex
         .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (did_work, _srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
 
-    // Process the HoldEntry generated from receiving HandleStoreEntryAspect
-    println!("\nBilly should receive entry from gossip and asks owner to validate it:\n");
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    println!("\n srv_msg_list: {:?}", srv_msg_list);
-    println!("\nBilly should process the HoldEntry from NodeMock auto-validation:\n");
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    println!("\n srv_msg_list: {:?}", srv_msg_list);
-    // Billy asks for that entry
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
+
     request_entry_ok(billy, &entry);
 
     // Billy asks for unknown entry
