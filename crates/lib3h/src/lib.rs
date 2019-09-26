@@ -77,6 +77,12 @@ mod tests {
         assert_eq!(&format!("{:?}", bt)[0..16], "stack backtrace:");
     }
 
+    fn bench_unit_capture_backtrace_unresolved() {
+        bench_unit_control_work();
+        let bt = backtrace::Backtrace::new_unresolved();
+        assert_eq!(&format!("{:?}", bt)[0..16], "stack backtrace:");
+    }
+
     fn bench_unit_sync_crossbeam() {
         bench_unit_control_work();
         let (send, recv) = crossbeam_channel::unbounded();
@@ -122,6 +128,7 @@ mod tests {
         bench_helper_use_logging(true);
         bench_unit_control_work();
         bench_unit_capture_backtrace();
+        bench_unit_capture_backtrace_unresolved();
         bench_unit_sync_crossbeam();
         bench_unit_logging();
     }
@@ -136,6 +143,12 @@ mod tests {
     fn bench_capture_backtrace(b: &mut test::Bencher) {
         bench_helper_use_logging(false);
         b.iter(|| bench_unit_capture_backtrace());
+    }
+
+    #[bench]
+    fn bench_capture_backtrace_unresolved(b: &mut test::Bencher) {
+        bench_helper_use_logging(false);
+        b.iter(|| bench_unit_capture_backtrace_unresolved());
     }
 
     #[bench]
