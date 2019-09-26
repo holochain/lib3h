@@ -33,7 +33,7 @@ impl StreamManager<std::net::TcpStream> {
         let host = url.host_str().expect("host name must be supplied");
         let port = url.port().unwrap_or(80); // TODO default or error here?
         let formatted_url = format!("{}:{}", host, port);
-        debug!("formatted url: {}", formatted_url);
+        trace!("websocket tcp_bind with url: {}", formatted_url);
         TcpListener::bind(formatted_url)
             .map_err(|err| err.into())
             .and_then(move |listener: TcpListener| {
@@ -64,13 +64,13 @@ impl StreamManager<std::net::TcpStream> {
                                         socket_address.port()
                                     );
 
-                                    debug!(
+                                    trace!(
                                         "transport_wss::tcp v4 socket_address: {}",
                                         v4_socket_address
                                     );
                                     url::Url::parse(v4_socket_address.as_str())
                                         .map(|url| {
-                                            error!(
+                                            trace!(
                                                 "transport_wss::tcp accepted for url {}",
                                                 url.clone()
                                             );

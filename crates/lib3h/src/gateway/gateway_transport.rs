@@ -185,7 +185,6 @@ impl P2pGateway {
                     GhostCallbackData::Response(Ok(
                         encoding_protocol::RequestToChildResponse::EncodePayloadResult { payload },
                     )) => {
-                        trace!("sending: {:?}", payload);
                         me.priv_low_level_send(e_span, to_address, uri, payload, cb)?;
                     }
                     _ => {
@@ -227,6 +226,13 @@ impl P2pGateway {
             } else {
                 payload
             };
+
+        trace!(
+            "({}).priv_low_level_send message from {} to {}",
+            self.identifier.nickname,
+            self.this_peer.peer_name.clone(),
+            uri.clone()
+        );
 
         // Forward to the child Transport
         self.inner_transport.request(
@@ -294,7 +300,7 @@ impl P2pGateway {
         payload: Opaque,
         cb: SendCallback,
     ) -> GhostResult<()> {
-        trace!(
+        debug!(
             "({}).send() {} | {}",
             self.identifier.nickname,
             uri,
@@ -381,6 +387,10 @@ impl P2pGateway {
                 payload,
                 attempt,
             } => {
+                debug!(
+                    "gateway_transport: SendMessage, first resolving address {:?}",
+                    uri.clone()
+                );
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
@@ -391,6 +401,11 @@ impl P2pGateway {
                             GhostCallbackData::Response(Ok(
                                 DhtRequestToChildResponse::RequestPeer(Some(peer_data)),
                             )) => {
+                                debug!(
+                                    "gateway_transport: address {:?} resolved to {:?}, sending...",
+                                    uri.clone(),
+                                    peer_data.peer_location.clone()
+                                );
                                 me.send(
                                     span.follower("TODO send"),
                                     Address::from(peer_data.peer_name),
@@ -405,7 +420,10 @@ impl P2pGateway {
                                 )?;
                             }
                             _ => {
-                                debug!("Couldn't Send: {:?}", response);
+                                debug!(
+                                    "Couldn't resolve Peer address to send, DHT response was: {:?}",
+                                    response
+                                );
                                 me.add_to_pending(
                                     span.follower("retry_gateway_send"),
                                     uri,
@@ -457,9 +475,10 @@ impl P2pGateway {
         &mut self,
         mut msg: transport::protocol::ToParentMessage,
     ) -> TransportResult<()> {
-        debug!(
+        trace!(
             "({}) Serving request from child transport: {:?}",
-            self.identifier.nickname, msg
+            self.identifier.nickname,
+            msg
         );
         let span = msg.span().child("handle_transport_RequestToParent");
         let msg = msg.take_message().expect("exists");

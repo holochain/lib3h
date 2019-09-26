@@ -560,7 +560,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         space_address: Address,
         from_agent_id: Address,
-        to_agent_id: Address,
+        _to_agent_id: Address,
         net_msg: P2pProtocol,
     ) -> Lib3hResult<(
         &mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>,
@@ -572,11 +572,11 @@ impl<'engine> GhostEngine<'engine> {
         if let Err(error) = maybe_this_peer {
             return Err(error);
         };
-        let this_peer = maybe_this_peer.unwrap();
+        /*        let this_peer = maybe_this_peer.unwrap();
 
         if &this_peer.peer_name == &Lib3hUri::with_agent_id(&to_agent_id) {
             return Err(Lib3hError::new_other("messaging self not allowed"));
-        }
+        }*/
 
         // Serialize payload
         let mut payload = Vec::new();
