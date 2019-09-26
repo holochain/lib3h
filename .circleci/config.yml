@@ -15,7 +15,7 @@ jobs:
    steps:
      - checkout
      - run: |
-         apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates make pkg-config libssl-dev
+         apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates build-essential make pkg-config libssl-dev
          curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
          export PATH=$HOME/.cargo/bin:$PATH
          MAKE_ENV=local make benchmarks
