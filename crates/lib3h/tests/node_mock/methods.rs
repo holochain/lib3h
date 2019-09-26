@@ -358,8 +358,11 @@ impl NodeMock {
         &mut self,
         query: &QueryEntryData,
     ) -> Result<QueryEntryResultData, GenericResultData> {
-
-        trace!("[NodeMock {}] reply_to_HandleQueryEntry: query={:?}", self.name(), query);
+        trace!(
+            "[NodeMock {}] reply_to_HandleQueryEntry: query={:?}",
+            self.name(),
+            query
+        );
         if query.query != b"test_query".to_vec().into() {
             panic!("invalid test query opaque data: {:?}", query.query);
         }
@@ -433,8 +436,11 @@ impl NodeMock {
         let maybe_store = self.chain_store_list.get(&fetch.space_address);
         let maybe_entry = match maybe_store {
             None => {
-                trace!("[NodeMock {}] no chain store for space address: {:?}", 
-                    self.name(), fetch.space_address);
+                trace!(
+                    "[NodeMock {}] no chain store for space address: {:?}",
+                    self.name(),
+                    fetch.space_address
+                );
                 None
             }
             Some(chain_store) => chain_store.get_entry(&fetch.entry_address),
@@ -445,9 +451,9 @@ impl NodeMock {
                 space_address: fetch.space_address.clone(),
                 request_id: fetch.request_id.clone(),
                 to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: 
-                format!("No entry found for address: {:?}", fetch.entry_address)
-                    .as_bytes().into(),
+                result_info: format!("No entry found for address: {:?}", fetch.entry_address)
+                    .as_bytes()
+                    .into(),
             };
             return Err(msg_data);
         }

@@ -313,13 +313,12 @@ impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {
 #[allow(dead_code)]
 #[derive(PartialEq, Debug)]
 pub struct DidWorkAssert {
-    pub engine_name: String , 
-    pub should_assert: bool
+    pub engine_name: String,
+    pub should_assert: bool,
 }
 
 impl Processor for DidWorkAssert {
     fn test(&self, args: &ProcessorResult) {
-
         if self.should_assert {
             assert!(args.engine_name == self.engine_name);
             assert!(args.did_work);
@@ -335,8 +334,11 @@ impl Predicate<ProcessorResult> for DidWorkAssert {
 
 impl std::fmt::Display for DidWorkAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?} did work (should_assert={:?})", 
-            self.engine_name, self.should_assert)
+        write!(
+            f,
+            "{:?} did work (should_assert={:?})",
+            self.engine_name, self.should_assert
+        )
     }
 }
 
@@ -705,18 +707,24 @@ macro_rules! wait2_engine_wrapper_did_work {
      $should_abort: expr
     ) => {{
         let processors = vec![
-            Box::new($crate::utils::processor_harness::DidWorkAssert { engine_name: $engine1.name(), should_assert: $should_abort}), 
-            Box::new($crate::utils::processor_harness::DidWorkAssert{ engine_name: $engine2.name(), should_assert: $should_abort})];
+            Box::new($crate::utils::processor_harness::DidWorkAssert {
+                engine_name: $engine1.name(),
+                should_assert: $should_abort,
+            }),
+            Box::new($crate::utils::processor_harness::DidWorkAssert {
+                engine_name: $engine2.name(),
+                should_assert: $should_abort,
+            }),
+        ];
         $crate::assert2_processed_all!($engine1, $engine2, processors)
     }};
     ($engine1: ident,
      $engine2: ident
     ) => {{
         $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, true)
-    }}
- 
+    }};
 }
- 
+
 /// Continues processing the engine wrapper until nso more work is observed
 #[allow(unused_macros)]
 #[macro_export]
@@ -725,7 +733,8 @@ macro_rules! wait2_engine_wrapper_until_no_work {
         let mut did_work;
         loop {
             did_work = $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, false)
-                .iter().find(|result| result.did_work)
+                .iter()
+                .find(|result| result.did_work)
                 .is_some();
             if !did_work {
                 break;
@@ -734,5 +743,3 @@ macro_rules! wait2_engine_wrapper_until_no_work {
         did_work
     }};
 }
-
-

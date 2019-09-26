@@ -52,7 +52,11 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
 
     let srv_msg_list = assert_msg_matches!(node, expected);
-    trace!("\n{} [request_entry_ok] srv_msg_list: {:?}", node.name(), srv_msg_list);
+    trace!(
+        "\n{} [request_entry_ok] srv_msg_list: {:?}",
+        node.name(),
+        srv_msg_list
+    );
     // #fullsync
     // Billy sends that data back to the network
     trace!("\n{} reply to own request:\n", node.name());
@@ -108,8 +112,6 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     wait_engine_wrapper_until_no_work!(billy);
     wait_engine_wrapper_until_no_work!(alex);
     wait_engine_wrapper_until_no_work!(billy);
- 
-
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -211,7 +213,7 @@ fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
 
     wait2_engine_wrapper_until_no_work!(alex, billy);
-  
+
     request_entry_ok(billy, &entry);
 
     // Billy asks for unknown entry

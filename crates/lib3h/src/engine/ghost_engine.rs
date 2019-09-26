@@ -273,7 +273,11 @@ impl<'engine> GhostEngine<'engine> {
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::HoldEntry(data) => {
-                trace!("[ghost_engine {}] ClientToLib3h::HoldEntry: {:?}", self.name, data);
+                trace!(
+                    "[ghost_engine {}] ClientToLib3h::HoldEntry: {:?}",
+                    self.name,
+                    data
+                );
                 self.handle_hold_entry(span.follower("TODO name"), &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
