@@ -10,6 +10,7 @@ lazy_static! {
         (test_setup_only, true),
         (test_send_message, true),
         (test_send_message_fail, true),
+        (test_send_message_self, true),
 // TODO will comment out as they are fixed
 /*
         (test_hold_entry, true),
@@ -151,16 +152,40 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 /// Test SendDirectMessage and response
 #[allow(dead_code)]
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
-    // Send to self
-    let _req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
-    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_3\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"alex\"\\), result_info: ";
-    assert_msg_matches!(alex, expected);
-
     trace!("[test_send_message_fail] alex send to camille");
     // Send to unknown
     let _req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "wah".as_bytes().to_vec());
 
-    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_4\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"camille\"\\), result_info: ";
+    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_3\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"camille\"\\), result_info: ";
+    assert_msg_matches!(alex, expected);
+}
+
+/// Test SendDirectMessage and response to self
+pub fn test_send_message_self(alex: &mut NodeMock, _billy: &mut NodeMock) {
+    // Send DM
+    let _req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
+
+    let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
+
+    let results = assert_msg_matches!(alex, expected);
+
+    let handle_send_direct_msg = results.first().unwrap();
+
+    let event = handle_send_direct_msg.events.first().unwrap();
+
+    let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
+
+    // Send response
+    let response_content = format!("echo: {}", "wah").as_bytes().to_vec();
+    trace!(
+        "alex send response with msg.request_id={:?}",
+        msg.request_id
+    );
+    alex.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
+
+    // TODO Set this to correct value once test passes
+    let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"echo: wah\" \\}\\)";
+
     assert_msg_matches!(alex, expected);
 }
 
