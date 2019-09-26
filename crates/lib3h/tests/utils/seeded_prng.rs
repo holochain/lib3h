@@ -118,5 +118,4 @@ pub mod tests {
         assert_eq!(some_unit_prng.next(), Some(true));
         assert_eq!(some_unit_prng.next(), Some(false));
     }
-
 }

@@ -24,6 +24,7 @@ lib3h_protocol = { version = "=0.0.10", path = "../lib3h_protocol" }
 lib3h_crypto_api = { version = "=0.0.10", path = "../crypto_api" }
 lib3h_zombie_actor = { version = "=0.0.10", path = "../zombie_actor" }
 lib3h_sodium = { version = "=0.0.10", path = "../sodium" }
+lib3h_mdns = { version = "=0.0.10", path = "../mdns" }
 nanoid = "=0.2.0"
 tungstenite = "=0.9.1"
 url = { version = "=2.1.0", features = ["serde"] }
