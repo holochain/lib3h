@@ -17,6 +17,9 @@ ENV = RUSTFLAGS='$(RUSTFLAGS)' OPENSSL_STATIC='1' CARGO_BUILD_JOBS='$(shell npro
 
 all: test
 
+benchmarks: tools
+	cd crates/lib3h && cargo bench
+
 test: tools
 	$(ENV) cargo fmt -- --check
 	$(ENV) cargo clippy -- \

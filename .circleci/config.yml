@@ -7,6 +7,20 @@ jobs:
   steps:
    - checkout
    - run: nix-shell --run l3h-test
+ linux_bench:
+   docker:
+     - image: debian:10.1-slim
+   resource_class: small
+   working_directory: ~/repo
+   steps:
+     - checkout
+     - run:
+       name: linux benchmarks
+       command: |
+         apt-get update && apt-get install -y --no-install-recommends git make pkg-config libssl-dev
+         curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+         export PATH=$HOME/.cargo/bin:$PATH
+         MAKE_ENV=local make benchmarks
  macos:
   macos:
    xcode: "10.2.0"
@@ -20,10 +34,23 @@ jobs:
        # same as linux from here
        nix-shell --run echo
        nix-shell --run l3h-test
+ macos_bench:
+  macos:
+   xcode: "10.2.0"
+  steps:
+   - checkout
+   - run:
+      name: macos benchmarks
+      command: |
+       curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain none
+       export PATH=$HOME/.cargo/bin:$PATH
+       MAKE_ENV=local make benchmarks
 
 workflows:
  version: 2
  tests:
   jobs:
    - build
+   - linux_bench
    - macos
+   - macos_bench
