@@ -867,6 +867,8 @@ mod tests {
         let engine = make_test_engine(netid);
         let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_inmem_engine");
+
+        // Manually do the binding here ?
     }
 
     fn make_wss_test_engine(_test_net: &str) -> GhostEngine<'static> {
@@ -901,8 +903,13 @@ mod tests {
     fn discovery_bootstrap_wss_test() {
         let netid = "discovery_bootstrap_wss_test";
         let engine = make_wss_test_engine(netid);
+
+        // Why do we need a wrapper here ?
         let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
             GhostParentWrapper::new(engine, "test_wss_engine");
+
+        // Manually do the binding here ? And how to do it ?
+        // engine.request();
     }
 
     fn make_test_join_request() -> SpaceData {
