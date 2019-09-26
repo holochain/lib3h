@@ -177,7 +177,7 @@ where
             Lib3hClientProtocol::HandleSendDirectMessageResult(data) => (
                 data.request_id.to_string(),
                 data.space_address.clone(),
-                "".into(),
+                "bogus_agent".into(),
             ), // agent id is deprecated here, client should know.
             Lib3hClientProtocol::HandleFetchEntryResult(data) => (
                 data.request_id.to_string(),
@@ -187,7 +187,7 @@ where
             Lib3hClientProtocol::HandleQueryEntryResult(data) => (
                 data.request_id.to_string(),
                 data.space_address.clone(),
-                "".into(),
+                "bogus_agent".into(),
             ), // agent id is deprecated here, client should know.
             Lib3hClientProtocol::HandleGetAuthoringEntryListResult(data) => (
                 data.request_id.to_string(),
@@ -214,6 +214,7 @@ where
 
         let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();
         if let Ok(client_to_lib3h) = maybe_client_to_lib3h {
+            debug!("client_to_lib3h: {:?}", client_to_lib3h);
             let result = if request_id == "" {
                 self.engine.publish(Span::fixme(), client_to_lib3h)
             } else {
@@ -236,6 +237,8 @@ where
                     request_id.as_str()
                 )))
             })?;
+
+            debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
 
             // HACK: If it is send message result, put back the original request id.
             // TODO: consider this operation for all messages
@@ -266,7 +269,7 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        trace!("[legacy engine] process");
+        // trace!("[legacy engine] process");
 
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;

@@ -48,12 +48,12 @@ impl P2pGateway {
             identifier: identifier,
             inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
                 inner_transport,
-                "to_child_transport_",
+                "gateway_to_inner_transport_",
             )),
-            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
+            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_to_inner_dht_")),
             message_encoding: Detach::new(GhostParentWrapper::new(
                 MessageEncoding::new(),
-                "to_message_encoding_",
+                "gateway_to_message_encoding_",
             )),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,

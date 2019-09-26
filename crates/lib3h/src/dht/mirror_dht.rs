@@ -205,11 +205,11 @@ impl MirrorDht {
         gossip_this_peer
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
-        trace!(
-            "@MirrorDht@ gossip_self: {:?} | to: {:?}",
-            self.this_peer,
-            peer_name_list,
-        );
+        //        trace!(
+        //            "@MirrorDht@ gossip_self: {:?} | to: {:?}",
+        //            self.this_peer,
+        //            peer_name_list,
+        //        );
         GossipToData {
             peer_name_list,
             bundle: buf.into(),
@@ -501,10 +501,10 @@ impl MirrorDht {
                 let payload = Ok(DhtRequestToChildResponse::RequestThisPeer(
                     self.this_peer.clone(),
                 ));
-                trace!(
-                    "DhtRequestToChild::RequestThisPeer:  sending {:?}",
-                    self.this_peer
-                );
+                //                trace!(
+                //                    "DhtRequestToChild::RequestThisPeer:  sending {:?}",
+                //                    self.this_peer
+                //                );
                 request.respond(payload)?;
             }
 

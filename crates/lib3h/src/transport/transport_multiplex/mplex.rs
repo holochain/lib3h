@@ -55,8 +55,10 @@ impl<
                 .request_id_prefix("mplex_to_parent_")
                 .build(),
         );
-        let inner_gateway =
-            Detach::new(GatewayParentWrapper::new(inner_gateway, "mplex_to_inner_"));
+        let inner_gateway = Detach::new(GatewayParentWrapper::new(
+            inner_gateway,
+            "mplex_to_inner_gateway_",
+        ));
         Self {
             endpoint_parent,
             endpoint_self,
@@ -94,6 +96,19 @@ impl<
         }
 
         endpoint_parent
+    }
+
+    /// Remove route
+    pub fn remove_agent_space_route(
+        &mut self,
+        space_address: &Address,
+        local_agent_id: &Address,
+    ) -> Option<TransportActorSelfEndpoint<TransportMultiplex<G>>> {
+        let route_spec = LocalRouteSpec {
+            space_address: space_address.clone(),
+            local_agent_id: local_agent_id.clone(),
+        };
+        self.route_endpoints.remove(&route_spec)
     }
 
     /// The owner of this multiplex (real_engine) has received a DirectMessage
