@@ -274,17 +274,20 @@ impl<'engine> GhostEngine<'engine> {
                             Lib3hToClientResponse::HandleSendDirectMessageResult(dm_data),
                         )) => {
                             let to_agent_id = dm_data.to_agent_id.clone();
-
-                            trace!("creating direct message result with data: {:?}", dm_data);
                             let (space_gateway, payload) = match me.prepare_direct_peer_msg(
                                 dm_data.space_address.clone(),
                                 dm_data.from_agent_id.clone(),
                                 dm_data.to_agent_id.clone(),
-                                P2pProtocol::DirectMessageResult(dm_data),
+                                P2pProtocol::DirectMessageResult(dm_data.clone()),
                             ) {
                                 Ok(r) => r,
                                 Err(e) => panic!("{:?}", e),
                             };
+                            trace!(
+                                "handle_p2p_protocol: Got p2p_msg for {}: {:?}",
+                                to_agent_id.clone(),
+                                dm_data
+                            );
 
                             space_gateway.publish(
                                 Span::fixme(),
@@ -295,7 +298,6 @@ impl<'engine> GhostEngine<'engine> {
                                     ),
                                 ),
                             )?;
-
                             Ok(())
                         }
                         _ => panic!("unhandled: {:?}", resp),
