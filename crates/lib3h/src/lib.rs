@@ -136,30 +136,50 @@ mod tests {
     #[bench]
     fn bench_control_work(b: &mut test::Bencher) {
         bench_helper_use_logging(false);
-        b.iter(|| bench_unit_control_work());
+        let cb = || bench_unit_control_work();
+        for _ in 0..10 {
+            cb();
+        }
+        b.iter(cb);
     }
 
     #[bench]
     fn bench_capture_backtrace(b: &mut test::Bencher) {
         bench_helper_use_logging(false);
-        b.iter(|| bench_unit_capture_backtrace());
+        let cb = || bench_unit_capture_backtrace();
+        for _ in 0..10 {
+            cb();
+        }
+        b.iter(cb);
     }
 
     #[bench]
     fn bench_capture_backtrace_unresolved(b: &mut test::Bencher) {
         bench_helper_use_logging(false);
-        b.iter(|| bench_unit_capture_backtrace_unresolved());
+        let cb = || bench_unit_capture_backtrace_unresolved();
+        for _ in 0..10 {
+            cb();
+        }
+        b.iter(cb);
     }
 
     #[bench]
     fn bench_sync_crossbeam(b: &mut test::Bencher) {
         bench_helper_use_logging(false);
-        b.iter(|| bench_unit_sync_crossbeam());
+        let cb = || bench_unit_sync_crossbeam();
+        for _ in 0..10 {
+            cb();
+        }
+        b.iter(cb);
     }
 
     #[bench]
     fn bench_logging(b: &mut test::Bencher) {
         bench_helper_use_logging(true);
-        b.iter(|| bench_unit_logging());
+        let cb = || bench_unit_logging();
+        for _ in 0..10 {
+            cb();
+        }
+        b.iter(cb);
     }
 }
