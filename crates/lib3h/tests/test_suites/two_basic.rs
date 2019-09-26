@@ -167,7 +167,7 @@ pub fn test_send_message_self(alex: &mut NodeMock, _billy: &mut NodeMock) {
 
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
 
-    let results = assert2_msg_matches!(alex, alex, expected);
+    let results = assert_msg_matches!(alex, expected);
 
     let handle_send_direct_msg = results.first().unwrap();
 
