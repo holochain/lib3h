@@ -55,8 +55,10 @@ impl<
                 .request_id_prefix("mplex_to_parent_")
                 .build(),
         );
-        let inner_gateway =
-            Detach::new(GatewayParentWrapper::new(inner_gateway, "mplex_to_inner_"));
+        let inner_gateway = Detach::new(GatewayParentWrapper::new(
+            inner_gateway,
+            "mplex_to_inner_gateway_",
+        ));
         Self {
             endpoint_parent,
             endpoint_self,

@@ -1,6 +1,6 @@
 use crate::{
     dht::dht_protocol::*,
-    engine::{ghost_engine::handle_gossip_to, p2p_protocol::P2pProtocol, GhostEngine},
+    engine::{ghost_engine::handle_GossipTo, p2p_protocol::P2pProtocol, GhostEngine},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
     transport,
@@ -58,7 +58,7 @@ impl<'engine> GhostEngine<'engine> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossip_to(
+                handle_GossipTo(
                     self.config.network_id.id.clone(),
                     self.multiplexer.as_mut(),
                     gossip_data,
@@ -169,6 +169,7 @@ impl<'engine> GhostEngine<'engine> {
                         return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                     }
                     let p2p_msg = maybe_msg.unwrap();
+                    // debug!("p2p_msg: {:?}", p2p_msg);
                     self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, p2p_msg)?;
                 }
             }

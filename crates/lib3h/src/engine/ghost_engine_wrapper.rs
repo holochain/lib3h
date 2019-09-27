@@ -209,11 +209,15 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            _ => unimplemented!(),
+            _ => {
+                trace!("posting unimplemented message: {:?}", client_msg);
+                unimplemented!()
+            }
         };
 
         let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();
         if let Ok(client_to_lib3h) = maybe_client_to_lib3h {
+            debug!("client_to_lib3h: {:?}", client_to_lib3h);
             let result = if request_id == "" {
                 self.engine.publish(Span::fixme(), client_to_lib3h)
             } else {
@@ -228,6 +232,7 @@ where
             // TODO Handle errors better here!
             let lib3h_to_client_response: Lib3hToClientResponse =
                 client_msg.clone().try_into().unwrap();
+            debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
             let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
@@ -266,7 +271,7 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        trace!("[legacy engine] process");
+        // trace!("[legacy engine] process");
 
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;

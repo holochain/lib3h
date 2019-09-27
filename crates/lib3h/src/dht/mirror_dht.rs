@@ -208,11 +208,11 @@ impl MirrorDht {
         gossip_this_peer
             .serialize(&mut Serializer::new(&mut buf))
             .unwrap();
-        trace!(
-            "@MirrorDht@ gossip_self: {:?} | to: {:?}",
-            self.this_peer,
-            peer_name_list,
-        );
+        //        trace!(
+        //            "@MirrorDht@ gossip_self: {:?} | to: {:?}",
+        //            self.this_peer,
+        //            peer_name_list,
+        //        );
         GossipToData {
             peer_name_list,
             bundle: buf.into(),
@@ -447,7 +447,7 @@ impl MirrorDht {
                 trace!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
                 let received_new_content = self.add_entry_aspects(&entry);
                 if !received_new_content {
-                    println!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");
+                    trace!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");
                     return Ok(());
                 }
                 // broadcast it by gossiping it to every known peer
@@ -504,10 +504,10 @@ impl MirrorDht {
                 let payload = Ok(DhtRequestToChildResponse::RequestThisPeer(
                     self.this_peer.clone(),
                 ));
-                trace!(
-                    "DhtRequestToChild::RequestThisPeer:  sending {:?}",
-                    self.this_peer
-                );
+                //                trace!(
+                //                    "DhtRequestToChild::RequestThisPeer:  sending {:?}",
+                //                    self.this_peer
+                //                );
                 request.respond(payload)?;
             }
 
