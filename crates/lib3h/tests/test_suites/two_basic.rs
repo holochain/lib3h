@@ -231,7 +231,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         _query_data = h_query_data.to_owned();
     }
 
-    // TODO - currently generates a FailureResult as excepted but is not handled by ghost_engine_wrapper
+    // TODO #423 - currently generates a FailureResult as excepted but is not handled by ghost_engine_wrapper
     // Maybe the workflow for this changed?
     //    let res = billy.reply_to_HandleQueryEntry(&query_data);
     //    println!("\n billy gives response {:?}\n", res);
