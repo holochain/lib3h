@@ -103,6 +103,9 @@ impl MirrorDht {
     }
 
     fn get_peer(&self, peer_name: &Lib3hUri) -> Option<PeerData> {
+        if peer_name == &self.this_peer.peer_name {
+            return Some(self.this_peer.clone());
+        }
         let res = self.peer_map.get(peer_name);
         if let Some(pd) = res {
             return Some(pd.clone());

@@ -4,6 +4,8 @@ extern crate crossbeam_channel;
 #[macro_use]
 extern crate detach;
 extern crate holochain_tracing;
+#[macro_use]
+extern crate lazy_static;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -13,6 +15,9 @@ extern crate log;
 
 #[macro_use]
 pub mod ghost_test_harness;
+
+mod backtwrap;
+pub use backtwrap::{Backtwrap, BacktwrapCaptureStrategy};
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
