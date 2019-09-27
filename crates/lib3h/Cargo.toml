@@ -51,5 +51,5 @@ rand = "0.7.0"
 tempfile = "=3.1.0"
 
 [[bin]]
-name = "send-demo"
-path = "bin/send-demo.rs"
+name = "demo"
+path = "bin/demo.rs"
