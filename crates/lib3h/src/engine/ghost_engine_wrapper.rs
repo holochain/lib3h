@@ -247,17 +247,17 @@ where
             // TODO: consider this operation for all messages
             let response = match lib3h_to_client_response.clone() {
                 Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) => {
-                let result = self.request_id_map.remove(&request_id);
-                if let Some(request_id) = result {
-                    trace!(
-                        "REPLACE request_id {:?} with {:?}",
-                        data.request_id,
-                        request_id
-                    );
-                    data.request_id = request_id.clone();
-                }
+                    let result = self.request_id_map.remove(&request_id);
+                    if let Some(request_id) = result {
+                        trace!(
+                            "REPLACE request_id {:?} with {:?}",
+                            data.request_id,
+                            request_id
+                        );
+                        data.request_id = request_id.clone();
+                    }
                     Lib3hToClientResponse::HandleSendDirectMessageResult(data)
-            }
+                }
                 _ => lib3h_to_client_response.clone(),
             };
 
@@ -270,7 +270,6 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
         // get any "server" messages that came as responses to the client requests
