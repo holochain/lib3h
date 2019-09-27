@@ -7,10 +7,12 @@ use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{engine_actor::*, *},
     error::*,
+    transport::websocket::tls::TlsConfig,
 };
 use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri};
 use lib3h_sodium::SodiumCryptoSystem;
 use lib3h_zombie_actor::*;
+use url::Url;
 
 static NET_ID: &'static str = "send-demo-network";
 static SPACE_ID: &'static str = "send-demo-space";
@@ -34,19 +36,31 @@ struct EngineContainer<
 }
 
 impl<'lt> EngineContainer<GhostEngine<'lt>> {
-    pub fn new() -> Self {
+    pub fn new(ws: bool) -> Self {
         let crypto = Box::new(SodiumCryptoSystem::new());
 
-        let config = EngineConfig {
+        let (transport_config, bind_url) = if ws {
+            (
+                TransportConfig::Websocket(TlsConfig::Unencrypted),
+                Url::parse("ws://127.0.0.1:63518").unwrap().into(),
+            )
+        } else {
+            (
+                TransportConfig::Memory("send-demo".to_string()),
+                Lib3hUri::with_undefined(),
+            )
+        };
+
+        let mut config = EngineConfig {
             network_id: GatewayId {
                 nickname: NET_ID.to_string(),
                 id: NET_ID.to_string().into(),
             },
-            transport_configs: vec![TransportConfig::Memory("send-demo".to_string())],
+            transport_configs: vec![transport_config],
             bootstrap_nodes: vec![],
             work_dir: std::path::PathBuf::new(),
             log_level: 'd',
-            bind_url: Lib3hUri::with_undefined(),
+            bind_url: bind_url,
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],
@@ -66,6 +80,11 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         println!("e1: {}", e1_addr);
 
         let e1 = GhostParentWrapper::new(e1, "e1_");
+
+        if ws {
+            config.bootstrap_nodes = vec![config.bind_url.clone()];
+            config.bind_url = Url::parse("wss://127.0.0.1:63519").unwrap().into();
+        }
 
         let e2 =
             GhostEngine::new(Span::fixme(), crypto, config, "send-demo-e2", dht_factory).unwrap();
@@ -99,6 +118,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         out.process();
         out.process();
         out.process();
+        out.process();
+        out.process();
         out.engine1
             .request(
                 Span::fixme(),
@@ -127,6 +148,9 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+        out.process();
+        out.process();
+        out.process();
         out.process();
         out.process();
         out.process();
@@ -185,6 +209,17 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         self.process();
         self.process();
         self.process();
+        self.process();
+        self.process();
+        self.process();
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
     }
 }
 
@@ -197,7 +232,13 @@ pub fn main() {
         .is_test(false)
         .try_init();
 
-    let mut engines = EngineContainer::new();
+    let mut ws = false;
+    if let Ok(transport) = std::env::var("LIB3H_TRANSPORT") {
+        if transport == "ws" {
+            ws = true
+        }
+    }
+    let mut engines = EngineContainer::new(ws);
     engines.send_1_to_2();
     engines.process();
     engines.process();
@@ -213,6 +254,26 @@ pub fn main() {
     engines.process();
     engines.process();
     // now back to node 1?
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
     engines.process();
     engines.process();
     engines.process();

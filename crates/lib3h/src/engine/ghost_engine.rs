@@ -46,7 +46,11 @@ impl<'engine> GhostEngine<'engine> {
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
-                Box::new(GhostTransportWebsocket::new(transport_id, tls))
+                Box::new(GhostTransportWebsocket::new(
+                    transport_id,
+                    tls,
+                    config.network_id.id.clone(),
+                ))
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(transport_id, &net)),
         };
@@ -247,35 +251,30 @@ impl<'engine> GhostEngine<'engine> {
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
                 let result = self
-                    .handle_join(span.follower("TODO name"), &data)
+                    .handle_join(span.follower("handle_join"), &data)
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::LeaveSpace(data) => {
                 trace!("ClientToLib3h::LeaveSpace: {:?}", data);
                 let result = self
-                    .handle_leave(span.follower("TODO name"), &data)
+                    .handle_leave(span.follower("handle_leave"), &data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), msg, data)
+                self.handle_direct_message(span.follower("handle_direct_message"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
                 trace!("ClientToLib3h::PublishEntry: {:?}", data);
-                self.handle_publish_entry(span.follower("TODO name"), &data)
-                    .map_err(|e| GhostError::from(e.to_string()))
-            }
-            ClientToLib3h::HoldEntry(data) => {
-                trace!("ClientToLib3h::HoldEntry: {:?}", data);
-                self.handle_hold_entry(span.follower("TODO name"), &data)
+                self.handle_publish_entry(span.follower("handle_publish_entry"), &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::QueryEntry(data) => {
                 trace!("ClientToLib3h::QueryEntry: {:?}", data);
-                self.handle_query_entry(span.follower("TODO name"), msg, data)
+                self.handle_query_entry(span.follower("handle_query_entry"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::FetchEntry(_) => panic!("FetchEntry Deprecated"),
@@ -556,7 +555,7 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         space_address: Address,
         from_agent_id: Address,
-        to_agent_id: Address,
+        _to_agent_id: Address,
         net_msg: P2pProtocol,
     ) -> Lib3hResult<(
         &mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>,
@@ -568,11 +567,11 @@ impl<'engine> GhostEngine<'engine> {
         if let Err(error) = maybe_this_peer {
             return Err(error);
         };
-        let this_peer = maybe_this_peer.unwrap();
+        /*        let this_peer = maybe_this_peer.unwrap();
 
         if &this_peer.peer_name == &Lib3hUri::with_agent_id(&to_agent_id) {
             return Err(Lib3hError::new_other("messaging self not allowed"));
-        }
+        }*/
 
         // Serialize payload
         let mut payload = Vec::new();
@@ -591,17 +590,21 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_direct_message(
         &mut self,
         span: Span,
-        ghost_message: ClientToLib3hMessage,
+        client_to_lib3h_msg: ClientToLib3hMessage,
         mut msg: DirectMessageData,
     ) -> Lib3hResult<()> {
         let to_agent_id = msg.to_agent_id.clone();
-
         // Generate a new request_id for the network transport exchange.
         // we can overwrite the value in the DirectMessageData because the ghost tracker will handle
         // the request response pairing
         let request_id = RequestId::new();
+        trace!(
+            "GhostEngine: mutating request id from {:?} to {:?} for {:?}",
+            msg.request_id,
+            request_id,
+            msg
+        );
         msg.request_id = request_id.clone().into();
-
         let (space_gateway, payload) = match self.prepare_direct_peer_msg(
             msg.space_address.clone(),
             msg.from_agent_id.clone(),
@@ -610,16 +613,16 @@ impl<'engine> GhostEngine<'engine> {
         ) {
             Ok(r) => r,
             Err(e) => {
-                return Ok(ghost_message.respond(Err(e))?);
+                return Ok(client_to_lib3h_msg.respond(Err(e))?);
             }
         };
 
         space_gateway.request(
             span,
-            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::SendMessage {
-                uri: Lib3hUri::with_agent_id(&to_agent_id),
+            GatewayRequestToChild::Transport(transport::protocol::RequestToChild::create_send_message(
+                Lib3hUri::with_agent_id(&to_agent_id),
                 payload,
-            }),
+            )),
             Box::new(|me, response| {
                 debug!(
                     "GhostEngine: response to handle_direct_message message: {:?}",
@@ -629,10 +632,11 @@ impl<'engine> GhostEngine<'engine> {
                     GhostCallbackData::Response(Ok(GatewayRequestToChildResponse::Transport(
                         transport::protocol::RequestToChildResponse::SendMessageSuccess,
                     ))) => {
+                        trace!("GhostEngine: insert pending client direct message with request id {:?}", request_id);
                         me.pending_client_direct_messages
-                            .insert(request_id, ghost_message);
+                            .insert(request_id, client_to_lib3h_msg);
                     }
-                    _ => ghost_message.respond(Err(format!("{:?}", response).into()))?,
+                    _ => client_to_lib3h_msg.respond(Err(format!("{:?}", response).into()))?,
                 };
                 Ok(())
             }),
@@ -672,21 +676,6 @@ impl<'engine> GhostEngine<'engine> {
             .publish(
                 span,
                 GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(msg.entry.clone())),
-            )
-            .map_err(|e| Lib3hError::new_other(&e.to_string()))
-    }
-
-    fn handle_hold_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
-        let space_gateway = self.get_space(
-            &msg.space_address.to_owned(),
-            &msg.provider_agent_id.to_owned(),
-        )?;
-        space_gateway
-            .publish(
-                span,
-                GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
-                    msg.entry.clone(),
-                )),
             )
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
@@ -785,10 +774,8 @@ pub fn handle_gossip_to<
             .serialize(&mut Serializer::new(&mut payload))
             .expect("P2pProtocol::Gossip serialization failed");
         // Forward gossip to the inner_transport
-        let msg = transport::protocol::RequestToChild::SendMessage {
-            uri: to_peer_name,
-            payload: payload.into(),
-        };
+        let msg =
+            transport::protocol::RequestToChild::create_send_message(to_peer_name, payload.into());
         gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
     }
     Ok(())
@@ -796,8 +783,12 @@ pub fn handle_gossip_to<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test};
+    use crate::{
+        dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
+        transport::memory_mock::memory_server,
+    };
     use holochain_tracing::test_span;
+    use lib3h_ghost_actor::wait_can_track_did_work;
     use lib3h_sodium::SodiumCryptoSystem;
     use std::path::PathBuf;
 
@@ -886,6 +877,38 @@ mod tests {
         assert_eq!(
             "Err(Lib3hError(Other(\"Not part of that space\")))",
             format!("{:?}", result)
+        );
+    }
+
+    // this test simulates an unbind happening in our transport layer
+    // i.e. we moved to a different cell tower, or someone turned off the
+    // networking interface
+    #[test]
+    fn test_ghost_engine_unbind() {
+        enable_logging_for_test(true);
+        let mut core = MockCore {
+            //        state: "".to_string(),
+        };
+        let network_name = "test_ghost_engine_unbind";
+        let mut engine = make_test_engine_wrapper(network_name);
+        let req_data = make_test_join_request();
+        let result = engine.as_mut().handle_join(test_span(""), &req_data);
+        assert!(result.is_ok());
+        let network = {
+            let mut verse = memory_server::get_memory_verse();
+            verse.get_network(network_name)
+        };
+
+        let my_url = &Lib3hUri::with_memory("addr_1");
+        //let my_url = &engine.as_ref().advertise();
+        assert!(network.lock().unwrap().unbind(my_url));
+        wait_can_track_did_work!(engine, core, false);
+        let mut msgs = engine.drain_messages();
+        println!("engine.drain() -> {:?}", msgs);
+        assert_eq!(msgs.len(), 3);
+        assert_eq!(
+            "Some(Unbound(UnboundData { uri: Lib3hUri(\"mem://addr_1/\") }))",
+            format!("{:?}", msgs[2].take_message())
         );
     }
 
@@ -982,62 +1005,6 @@ mod tests {
             "[GhostMessage {request_id: None, ..}]",
             format!("{:?}", msgs)
         ); */
-    }
-
-    #[test]
-    fn test_ghost_engine_hold() {
-        enable_logging_for_test(true);
-
-        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_hold");
-        let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
-        assert!(result.is_ok());
-
-        let mut core = MockCore {
-            //        state: "".to_string(),
-        };
-
-        let res = lib3h.process(&mut core);
-        println!("engine.process() -> {:?}", res);
-
-        let entry_data = make_test_entry();
-
-        println!("Before handle_hold_entry ---------------------------");
-
-        let result = lib3h.as_mut().handle_hold_entry(test_span(""), &entry_data);
-        assert!(result.is_ok());
-
-        /* what should we observe to know that the hold was published?
-        let space_gateway = lib3h
-            .as_mut()
-            .get_space(
-                &req_data.space_address.to_owned(),
-                &req_data.agent_id.to_owned(),
-            )
-            .unwrap();
-        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
-        assert_eq!(msgs.len(), 0);
-
-        {
-            lib3h.process(&mut core).unwrap();
-        }
-
-        let space_gateway = lib3h
-            .as_mut()
-            .get_space(
-                &req_data.space_address.to_owned(),
-                &req_data.agent_id.to_owned(),
-            )
-            .unwrap();
-
-        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
-        for mut msg in msgs {
-            let _payload = msg.take_message();
-            assert_eq!(
-                "dht publish",
-                format!("{:?}", payload)
-            );
-        }*/
     }
 
     fn make_test_query(space_address: Address) -> QueryEntryData {

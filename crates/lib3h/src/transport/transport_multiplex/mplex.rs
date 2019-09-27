@@ -191,7 +191,8 @@ impl<
     ) -> Lib3hResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
-            RequestToChild::SendMessage { uri, payload } => {
+            RequestToChild::SendMessage { uri, payload, .. } => {
+                debug!("handle_route_send to {}", uri.clone());
                 self.handle_route_send_message(msg, uri, payload)
             }
         }
@@ -246,7 +247,7 @@ impl<
         // forward the request to our inner_gateway
         self.inner_gateway.as_mut().request(
             Span::fixme(),
-            GatewayRequestToChild::Transport(RequestToChild::SendMessage { uri, payload }),
+            GatewayRequestToChild::Transport(RequestToChild::create_send_message(uri, payload)),
             Box::new(|_, response| {
                 let response = {
                     match response {
@@ -353,7 +354,7 @@ impl<
             for (route_spec, endpoint) in re.iter_mut() {
                 if let Err(e) = endpoint.process(self) {
                     match e.kind() {
-                        ErrorKind::EndpointDisconnected => {
+                        lib3h_ghost_actor::ErrorKind::EndpointDisconnected => {
                             disconnected_endpoints.push(route_spec.clone());
                             continue;
                         }

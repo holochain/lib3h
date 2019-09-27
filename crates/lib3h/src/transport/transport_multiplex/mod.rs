@@ -96,7 +96,7 @@ mod tests {
                                 RequestToChildResponse::Bind(BindResultData { bound_url: spec }),
                             )))?;
                         }
-                        RequestToChild::SendMessage { uri, payload } => {
+                        RequestToChild::SendMessage { uri, payload, .. } => {
                             self.mock_sender.send((uri, payload))?;
                             msg.respond(Ok(GatewayRequestToChildResponse::Transport(
                                 RequestToChildResponse::SendMessageSuccess,
@@ -154,10 +154,7 @@ mod tests {
         route_a
             .request(
                 Span::fixme(),
-                RequestToChild::SendMessage {
-                    uri: addr_none.clone(),
-                    payload: "hello-from-a".into(),
-                },
+                RequestToChild::create_send_message(addr_none.clone(), "hello-from-a".into()),
                 Box::new(|_, response| {
                     assert_eq!(&format!("{:?}", response), "");
                     Ok(())

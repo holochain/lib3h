@@ -103,6 +103,9 @@ impl MirrorDht {
     }
 
     fn get_peer(&self, peer_name: &Lib3hUri) -> Option<PeerData> {
+        if peer_name == &self.this_peer.peer_name {
+            return Some(self.this_peer.clone());
+        }
         let res = self.peer_map.get(peer_name);
         if let Some(pd) = res {
             return Some(pd.clone());
@@ -168,12 +171,12 @@ impl MirrorDht {
             self.timed_out_map.insert(peer_name, true);
         }
         // Check if must gossip self
-        trace!(
+        /*trace!(
             "@MirrorDht@ now: {} ; last_gossip: {} ({})",
             now,
             self.last_gossip_of_self,
             self.config.gossip_interval(),
-        );
+        );*/
         if now - self.last_gossip_of_self > self.config.gossip_interval() {
             self.last_gossip_of_self = now;
             let gossip_data = self.gossip_self(self.get_other_peer_list());
@@ -218,7 +221,10 @@ impl MirrorDht {
 
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
-        trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
+        debug!(
+            "@MirrorDht@ {:?} Adding peer: {:?}",
+            self.this_peer, peer_info
+        );
         let maybe_peer = self.peer_map.get_mut(&peer_info.peer_name);
         match maybe_peer {
             None => {
@@ -231,7 +237,10 @@ impl MirrorDht {
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
-                    debug!("@MirrorDht@ Adding peer - BAD");
+                    debug!(
+                        "@MirrorDht@ Adding peer - BAD {:?} has earlier timestamp than {:?}",
+                        peer_info.timestamp, peer.timestamp
+                    );
                     return false;
                 }
                 debug!(
@@ -339,10 +348,10 @@ impl
 impl MirrorDht {
     #[allow(irrefutable_let_patterns)]
     fn handle_request_from_parent(&mut self, mut request: DhtToChildMessage) -> Lib3hResult<()> {
-        debug!("@MirrorDht@ serving request: {:?}", request);
+        //debug!("@MirrorDht@ serving request: {:?}", request);
         let span = request.span().child("handle_request_from_parent");
         let msg = request.take_message().expect("exists");
-        debug!("@MirrorDht@ - request: {:?}", msg);
+        //debug!("@MirrorDht@ - request: {:?}", msg);
         match msg {
             // Received gossip from remote node. Bundle must be a serialized MirrorGossip
             DhtRequestToChild::HandleGossip(msg) => {

@@ -243,6 +243,7 @@ impl<'engine> GhostEngine<'engine> {
                                 return Err(e.into());
                             }
                             let p2p_msg = maybe_msg.unwrap();
+                            trace!("space_layer about to handle p2p_msg: {:?}", p2p_msg);
                             self.handle_p2p_protocol(
                                 span.child("handle_p2p_protocol"),
                                 &uri,
@@ -273,25 +274,30 @@ impl<'engine> GhostEngine<'engine> {
                             Lib3hToClientResponse::HandleSendDirectMessageResult(dm_data),
                         )) => {
                             let to_agent_id = dm_data.to_agent_id.clone();
-
                             let (space_gateway, payload) = match me.prepare_direct_peer_msg(
                                 dm_data.space_address.clone(),
                                 dm_data.from_agent_id.clone(),
                                 dm_data.to_agent_id.clone(),
-                                P2pProtocol::DirectMessageResult(dm_data),
+                                P2pProtocol::DirectMessageResult(dm_data.clone()),
                             ) {
                                 Ok(r) => r,
                                 Err(e) => panic!("{:?}", e),
                             };
+                            trace!(
+                                "handle_p2p_protocol: Got p2p_msg for {}: {:?}",
+                                to_agent_id.clone(),
+                                dm_data
+                            );
 
                             space_gateway.publish(
                                 Span::fixme(),
-                                GatewayRequestToChild::Transport(RequestToChild::SendMessage {
-                                    uri: Lib3hUri::with_agent_id(&to_agent_id),
-                                    payload,
-                                }),
+                                GatewayRequestToChild::Transport(
+                                    RequestToChild::create_send_message(
+                                        Lib3hUri::with_agent_id(&to_agent_id),
+                                        payload,
+                                    ),
+                                ),
                             )?;
-
                             Ok(())
                         }
                         _ => panic!("unhandled: {:?}", resp),
@@ -299,11 +305,24 @@ impl<'engine> GhostEngine<'engine> {
                 )?;
             }
             P2pProtocol::DirectMessageResult(dm_data) => {
+                trace!(
+                    "pending_client_messages: {:?}",
+                    self.pending_client_direct_messages
+                );
                 if let Some(msg) = self
                     .pending_client_direct_messages
                     .remove(&dm_data.request_id)
                 {
+                    trace!(
+                        "space_layer respond with send direct message result: {:?}",
+                        dm_data
+                    );
                     msg.respond(Ok(ClientToLib3hResponse::SendDirectMessageResult(dm_data)))?;
+                } else {
+                    error!(
+                        "space_layer couldn't find message with request_id sourced from {:?}",
+                        dm_data
+                    );
                 }
             }
             _ => panic!("can't handle space layer receive of {:?}", p2p_msg),

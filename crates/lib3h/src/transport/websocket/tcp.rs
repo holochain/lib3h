@@ -2,7 +2,7 @@
 //! TcpStream specific functions
 
 use crate::transport::{
-    error::TransportResult,
+    error::{ErrorKind, TransportError, TransportResult},
     websocket::{
         streams::{Acceptor, Bind, StreamManager},
         tls::TlsConfig,
@@ -33,7 +33,7 @@ impl StreamManager<std::net::TcpStream> {
         let host = url.host_str().expect("host name must be supplied");
         let port = url.port().unwrap_or(80); // TODO default or error here?
         let formatted_url = format!("{}:{}", host, port);
-        debug!("formatted url: {}", formatted_url);
+        trace!("websocket tcp_bind with url: {}", formatted_url);
         TcpListener::bind(formatted_url)
             .map_err(|err| err.into())
             .and_then(move |listener: TcpListener| {
@@ -47,9 +47,14 @@ impl StreamManager<std::net::TcpStream> {
                         let acceptor: Acceptor<TcpStream> = Box::new(move || {
                             listener
                                 .accept()
-                                .map_err(|err| {
-                                    error!("transport_wss::tcp accept error: {:?}", err);
-                                    err.into()
+                                .map_err(|err| match err.kind() {
+                                    std::io::ErrorKind::WouldBlock => {
+                                        TransportError::new_kind(ErrorKind::Ignore(err.to_string()))
+                                    }
+                                    _ => {
+                                        error!("transport_wss::tcp accept error: {:?}", err);
+                                        err.into()
+                                    }
                                 })
                                 .and_then(|(tcp_stream, socket_address)| {
                                     tcp_stream.set_nonblocking(true)?;
@@ -59,13 +64,13 @@ impl StreamManager<std::net::TcpStream> {
                                         socket_address.port()
                                     );
 
-                                    debug!(
+                                    trace!(
                                         "transport_wss::tcp v4 socket_address: {}",
                                         v4_socket_address
                                     );
                                     url::Url::parse(v4_socket_address.as_str())
                                         .map(|url| {
-                                            error!(
+                                            trace!(
                                                 "transport_wss::tcp accepted for url {}",
                                                 url.clone()
                                             );

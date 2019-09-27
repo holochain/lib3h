@@ -39,7 +39,7 @@ impl<'engine> GhostEngine<'engine> {
             self.multiplexer.request(
                 Span::fixme(),
                 GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage { uri: to, payload },
+                    transport::protocol::RequestToChild::create_send_message(to, payload),
                 ),
                 Box::new(move |_me, _response| Ok(())),
             )?;
@@ -76,10 +76,10 @@ impl<'engine> GhostEngine<'engine> {
                     self.name, peer_data.peer_name, peer_data.peer_location,
                 );
                 let cmd = GatewayRequestToChild::Transport(
-                    transport::protocol::RequestToChild::SendMessage {
-                        uri: peer_data.peer_location,
-                        payload: Opaque::new(),
-                    },
+                    transport::protocol::RequestToChild::create_send_message(
+                        peer_data.peer_location,
+                        Opaque::new(),
+                    ),
                 );
                 self.multiplexer
                     .publish(span.child("DhtRequestToParent::HoldPeerRequested"), cmd)?;
@@ -106,6 +106,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Handle a TransportRequestToParent sent to us by our network gateway
+    #[allow(irrefutable_let_patterns)]
     fn handle_network_transport_request(
         &mut self,
         span: Span,
@@ -118,15 +119,24 @@ impl<'engine> GhostEngine<'engine> {
         // Note: use same order as the enum
         match request {
             transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
-                self.network_connections.remove(uri);
-                error!("{} Network error from {} : {:?}", self.name, uri, error);
-                // Output a Lib3hToClient::Disconnected if it was the connection
-                if self.network_connections.is_empty() {
-                    let data = DisconnectedData {
-                        network_id: "FIXME".to_string(), // TODO #172
-                    };
+                if error.kind() == &transport::error::ErrorKind::Unbind {
+                    let data = UnboundData { uri: uri.clone() };
                     self.lib3h_endpoint
-                        .publish(Span::fixme(), Lib3hToClient::Disconnected(data))?;
+                        .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
+                } else {
+                    // FIXME #391
+                    error!("unhandled error {}", error);
+                    /*
+                    self.network_connections.remove(uri);
+                    error!("{} Network error from {} : {:?}", self.name, uri, error);
+                    // Output a Lib3hToClient::Disconnected if it was the connection
+                    if self.network_connections.is_empty() {
+                        let data = DisconnectedData {
+                            network_id: "FIXME".to_string(), // TODO #172
+                        };
+                        self.lib3h_endpoint
+                            .publish(Span::fixme(), Lib3hToClient::Disconnected(data))?;
+                    }*/
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {

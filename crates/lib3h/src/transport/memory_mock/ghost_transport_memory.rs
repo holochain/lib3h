@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::TransportError,
+    error::{ErrorKind, TransportError},
     memory_mock::memory_server::{self, *},
     protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
@@ -241,12 +241,26 @@ impl
                 for event in non_connect_events {
                     match event {
                         MemoryEvent::ReceivedData(from_addr, payload) => {
-                            trace!("RecivedData--- from:{:?} payload:{:?}", from_addr, payload);
+                            trace!(
+                                "MemoryEvent::RecivedData--- from:{:?} payload:{:?}",
+                                from_addr,
+                                payload
+                            );
                             self.endpoint_self.publish(
                                 Span::fixme(),
                                 RequestToParent::ReceivedData {
                                     uri: from_addr,
                                     payload,
+                                },
+                            )?;
+                        }
+                        MemoryEvent::Unbind(url) => {
+                            trace!("MemoryEvent::Unbind: {:?}", url);
+                            self.endpoint_self.publish(
+                                Span::fixme(),
+                                RequestToParent::ErrorOccured {
+                                    uri: url,
+                                    error: TransportError::new_kind(ErrorKind::Unbind),
                                 },
                             )?;
                         }
@@ -273,7 +287,7 @@ impl
                         bound_url: bound_url,
                     })))?;
                 }
-                RequestToChild::SendMessage { uri, payload } => {
+                RequestToChild::SendMessage { uri, payload, .. } => {
                     trace!("mem send: {:?}", payload);
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
@@ -296,24 +310,34 @@ impl
                                     continue;
                                 }
                                 Some(server) => {
-                                    // if not already connected, request a connections
-                                    if self.connections.get(&uri).is_none() {
-                                        match server.request_connect(&my_addr) {
-                                            Err(err) => {
-                                                msg.respond(Err(err))?;
-                                                continue;
-                                            }
-                                            Ok(()) => self.connections.insert(uri.clone()),
+                                    // first check to see if we are sending to self
+                                    if &uri == my_addr {
+                                        // if so we can add the message directly to our own inbox
+                                        trace!("Send-to-self: payload:{:?}", payload);
+                                        self.endpoint_self.publish(
+                                            Span::fixme(),
+                                            RequestToParent::ReceivedData { uri: uri, payload },
+                                        )?;
+                                    } else {
+                                        // if not already connected, request a connections
+                                        if self.connections.get(&uri).is_none() {
+                                            match server.request_connect(&my_addr) {
+                                                Err(err) => {
+                                                    msg.respond(Err(err))?;
+                                                    continue;
+                                                }
+                                                Ok(()) => self.connections.insert(uri.clone()),
+                                            };
                                         };
-                                    };
-                                    trace!(
-                                        "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
-                                        my_addr,
-                                        uri,
-                                        payload
-                                    );
-                                    // Send it data from us
-                                    server.post(&my_addr, &payload).unwrap();
+                                        trace!(
+                                            "(GhostTransportMemory).SendMessage from {} to  {} | {:?}",
+                                            my_addr,
+                                            uri,
+                                            payload
+                                        );
+                                        // Send it data from us
+                                        server.post(&my_addr, &payload).unwrap();
+                                    }
                                     msg.respond(Ok(SendMessageSuccess))?;
                                 }
                             }
@@ -448,10 +472,10 @@ mod tests {
         t1_endpoint
             .request(
                 test_span(""),
-                RequestToChild::SendMessage {
-                    uri: Lib3hUri::with_memory("addr_2"),
-                    payload: b"test message".to_vec().into(),
-                },
+                RequestToChild::create_send_message(
+                    Lib3hUri::with_memory("addr_2"),
+                    b"test message".to_vec().into(),
+                ),
                 Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
@@ -464,13 +488,13 @@ mod tests {
         t1_endpoint
             .request(
                 test_span(""),
-                RequestToChild::SendMessage {
-                    uri: Lib3hUri::with_memory("addr_3"),
-                    payload: b"test message".to_vec().into(),
-                },
+                RequestToChild::create_send_message (
+                    Lib3hUri::with_memory("addr_3"),
+                    b"test message".to_vec().into(),
+                ),
                 Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
-                    assert_eq!("Response(Err(TransportError(\"No Memory server at this uri: mem://addr_3/\")))", &format!("{:?}", r));
+                    assert_eq!("Response(Err(TransportError(Other(\"No Memory server at this uri: mem://addr_3/\"))))", &format!("{:?}", r));
                     Ok(())
                 }),
             )
@@ -506,4 +530,43 @@ mod tests {
             format!("{:?}", requests[2].take_message())
         );
     }
+
+    #[test]
+    fn test_gmem_transport_send_to_self() {
+        let (mut transport1, mut t1_endpoint) =
+            make_test_transport("1", "gmem_transport_send_to_self");
+        let mut bound_transport1_address = Lib3hUri::with_undefined();
+        do_bind(&mut t1_endpoint);
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
+
+        // send a message from transport1 to self over the bound addresses
+        t1_endpoint
+            .request(
+                test_span(""),
+                RequestToChild::SendMessage {
+                    uri: Lib3hUri::with_memory("addr_1"),
+                    payload: b"test message".to_vec().into(),
+                    attempt: 0,
+                },
+                Box::new(|_: &mut Lib3hUri, r| {
+                    // parent should see that the send request was OK
+                    assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
+
+        let mut requests = t1_endpoint.drain_messages();
+        assert_eq!(1, requests.len());
+        let msg = requests[0].take_message();
+        assert_eq!(
+            "Some(ReceivedData { uri: Lib3hUri(\"mem://addr_1/\"), payload: \"test message\" })",
+            format!("{:?}", msg)
+        );
+    }
+
 }

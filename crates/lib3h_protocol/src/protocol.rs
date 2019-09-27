@@ -39,8 +39,6 @@ pub enum ClientToLib3h {
     FetchEntry(FetchEntryData), // NOTE: MAY BE DEPRECATED
     /// Publish data to the dht (event)
     PublishEntry(ProvidedEntryData),
-    /// Tell Engine that Client is holding this entry (event)
-    HoldEntry(ProvidedEntryData),
     /// Request some info / data from a Entry
     QueryEntry(QueryEntryData),
 }
@@ -68,7 +66,7 @@ pub enum Lib3hToClient {
     /// Notification of successful connection to a network
     Connected(ConnectedData),
     /// Notification of disconnection from a network
-    Disconnected(DisconnectedData),
+    Unbound(UnboundData),
 
     // -- Direct Messaging -- //
     /// the response received from a previous `SendDirectMessage`
@@ -130,9 +128,6 @@ impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
             Lib3hClientProtocol::PublishEntry(provided_entry_data) => {
                 Ok(ClientToLib3h::PublishEntry(provided_entry_data))
             }
-            Lib3hClientProtocol::HoldEntry(provided_entry_data) => {
-                Ok(ClientToLib3h::HoldEntry(provided_entry_data))
-            }
             Lib3hClientProtocol::QueryEntry(query_entry_data) => {
                 Ok(ClientToLib3h::QueryEntry(query_entry_data))
             }
@@ -178,8 +173,10 @@ impl TryFrom<Lib3hServerProtocol> for Lib3hToClient {
             Lib3hServerProtocol::Connected(connected_data) => {
                 Ok(Lib3hToClient::Connected(connected_data))
             }
-            Lib3hServerProtocol::Disconnected(disconnected_data) => {
-                Ok(Lib3hToClient::Disconnected(disconnected_data))
+            Lib3hServerProtocol::Disconnected(_disconnected_data) => {
+                Ok(Lib3hToClient::Unbound(UnboundData {
+                    uri: Lib3hUri::with_undefined(),
+                }))
             }
             Lib3hServerProtocol::SendDirectMessageResult(direct_message_data) => {
                 Ok(Lib3hToClient::SendDirectMessageResult(direct_message_data))
@@ -253,9 +250,6 @@ impl From<ClientToLib3h> for Lib3hClientProtocol {
             ClientToLib3h::PublishEntry(provided_entry_data) => {
                 Lib3hClientProtocol::PublishEntry(provided_entry_data)
             }
-            ClientToLib3h::HoldEntry(provided_entry_data) => {
-                Lib3hClientProtocol::HoldEntry(provided_entry_data)
-            }
             ClientToLib3h::QueryEntry(query_entry_data) => {
                 Lib3hClientProtocol::QueryEntry(query_entry_data)
             }
@@ -292,8 +286,10 @@ impl From<Lib3hToClient> for Lib3hServerProtocol {
             Lib3hToClient::Connected(connected_data) => {
                 Lib3hServerProtocol::Connected(connected_data)
             }
-            Lib3hToClient::Disconnected(disconnected_data) => {
-                Lib3hServerProtocol::Disconnected(disconnected_data)
+            Lib3hToClient::Unbound(_unbound_data) => {
+                Lib3hServerProtocol::Disconnected(DisconnectedData {
+                    network_id: "".into(),
+                })
             }
             Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
                 Lib3hServerProtocol::SendDirectMessageResult(direct_message_data)
@@ -365,7 +361,7 @@ mod tests {
     fn test_translate_protocol() {
         let d = connect_data();
         let s = Lib3hClientProtocol::Connect(d.clone());
-        let to_c: ClientToLib3h = s.clone().try_into().expect("A ClientToLib3h protocol");;
+        let to_c: ClientToLib3h = s.clone().try_into().expect("A ClientToLib3h protocol");
         assert_eq!(
             to_c,
             ClientToLib3h::Bootstrap(BootstrapData {
