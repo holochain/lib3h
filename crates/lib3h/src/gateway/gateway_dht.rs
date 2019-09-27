@@ -60,11 +60,26 @@ impl P2pGateway {
             payload
         );
         match payload {
-            DhtRequestToParent::GossipTo(_data) => {
-                // no-op
+            DhtRequestToParent::GossipTo(data) => {
+                for peer in data.peer_name_list.iter() {
+                    debug!("Send GossipTo {:?} {:?}", peer, data.bundle);
+                    self.handle_transport_RequestToChild(
+                        Span::fixme(),
+                        transport::protocol::RequestToChild::SendMessage {
+                            uri: peer,
+                            payload: data.bundle.clone(),
+                            attempt: 0,
+                        },
+                        // TODO XXX FIXME - we need a gateway_transport
+                        // pub(crate) fn that will do the dht lookup + send
+                        // and takes the generic callback like send()
+                        // so we dont need a GhostMessage here:
+                        None,
+                    )?;
+                }
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
-                // no-op
+                unimplemented!();
             }
             DhtRequestToParent::HoldPeerRequested(peer_data) => {
                 // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.

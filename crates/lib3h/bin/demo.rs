@@ -17,6 +17,7 @@ use url::Url;
 static NET_ID: &'static str = "query-demo-network";
 static SPACE_ID: &'static str = "query-demo-space";
 static ENTRY_ADDR: &'static str = "query-demo-entry";
+static ASPECT_ADDR: &'static str = "query-demo-aspect";
 static A_1_ID: &'static str = "agent-1-id";
 static A_2_ID: &'static str = "agent-2-id";
 
@@ -163,12 +164,19 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                             request_id: "TEST_REQ_ID".to_string(),
                             requester_agent_id: A_1_ID.to_string().into(),
                             responder_agent_id: A_1_ID.to_string().into(),
-                            query_result: format!("echo: {}", String::from_utf8_lossy(&q_data.query))
-                                .into_bytes()
-                                .into(),
+                            query_result: format!(
+                                "echo: {}",
+                                String::from_utf8_lossy(&q_data.query)
+                            )
+                            .into_bytes()
+                            .into(),
                         },
                     )))
                     .unwrap();
+                }
+                Some(Lib3hToClient::HandleStoreEntryAspect(_a_data)) => {
+                    msg.respond(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult))
+                        .unwrap();
                 }
                 _ => (),
             }
@@ -222,6 +230,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             )
             .unwrap();
         self.process();
+        // send needs an extra 10 process calls
+        self.process();
     }
 
     pub fn query_1(&mut self) {
@@ -243,6 +253,37 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .unwrap();
         self.process();
     }
+
+    pub fn publish_1(&mut self) {
+        self.engine1
+            .publish(
+                Span::fixme(),
+                ClientToLib3h::PublishEntry(ProvidedEntryData {
+                    space_address: SPACE_ID.to_string().into(),
+                    provider_agent_id: A_1_ID.to_string().into(),
+                    entry: EntryData {
+                        entry_address: ENTRY_ADDR.to_string().into(),
+                        aspect_list: vec![EntryAspectData {
+                            aspect_address: ASPECT_ADDR.to_string().into(),
+                            type_hint: "test".to_string(),
+                            aspect: b"bob".to_vec().into(),
+                            publish_ts: 0,
+                        }],
+                    },
+                }),
+            )
+            .unwrap();
+        self.process();
+        // publish needs an extra 10 process calls
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+    }
 }
 
 fn init_setup() {
@@ -257,12 +298,16 @@ fn init_setup() {
 }
 
 fn usage() {
-    println!(r#"USAGE:
+    println!(
+        r#"USAGE:
   cargo run --bin demo -- --send          # demo direct send
   cargo run --bin demo -- --send --ws     # demo direct send (websocket)
   cargo run --bin demo -- --query         # demo query
   cargo run --bin demo -- --query --ws    # demo query (websocket)
-"#);
+  cargo run --bin demo -- --publish       # demo publish
+  cargo run --bin demo -- --publish --ws  # demo publish (websocket)
+"#
+    );
     std::process::exit(1);
 }
 
@@ -274,6 +319,7 @@ fn main() {
         DemoNone,
         DemoSend,
         DemoQuery,
+        DemoPublish,
     }
     use Demo::*;
 
@@ -285,6 +331,7 @@ fn main() {
             "--ws" => ws = true,
             "--send" => demo = DemoSend,
             "--query" => demo = DemoQuery,
+            "--publish" => demo = DemoPublish,
             _ => {
                 println!("unexpected {:?}", a);
                 usage();
@@ -301,13 +348,8 @@ fn main() {
 
     match demo {
         DemoNone => usage(),
-        DemoSend => {
-            engines.send_1_to_2();
-            engines.process()
-        }
-        DemoQuery => {
-            engines.query_1();
-            engines.process();
-        }
+        DemoSend => engines.send_1_to_2(),
+        DemoQuery => engines.query_1(),
+        DemoPublish => engines.publish_1(),
     }
 }
