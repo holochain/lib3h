@@ -487,7 +487,7 @@ mod tests {
             )
             .unwrap();
 
-        let port2 = get_available_port(1026).expect("Must be able to find free port");
+        let port2 = get_available_port(9000).expect("Must be able to find free port");
         let expected_transport2_address: Lib3hUri =
             Url::parse(&format!("wss://127.0.0.1:{}", port2))
                 .unwrap()
