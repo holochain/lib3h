@@ -103,6 +103,9 @@ impl MirrorDht {
     }
 
     fn get_peer(&self, peer_name: &Lib3hUri) -> Option<PeerData> {
+        if peer_name == &self.this_peer.peer_name {
+            return Some(self.this_peer.clone());
+        }
         let res = self.peer_map.get(peer_name);
         if let Some(pd) = res {
             return Some(pd.clone());
@@ -218,7 +221,10 @@ impl MirrorDht {
 
     /// Return true if new peer or updated peer
     fn add_peer(&mut self, peer_info: &PeerData) -> bool {
-        trace!("@MirrorDht@ Adding peer: {:?}", peer_info);
+        debug!(
+            "@MirrorDht@ {:?} Adding peer: {:?}",
+            self.this_peer, peer_info
+        );
         let maybe_peer = self.peer_map.get_mut(&peer_info.peer_name);
         match maybe_peer {
             None => {

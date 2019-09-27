@@ -118,6 +118,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         out.process();
         out.process();
         out.process();
+        out.process();
+        out.process();
         out.engine1
             .request(
                 Span::fixme(),
@@ -146,6 +148,9 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+        out.process();
+        out.process();
+        out.process();
         out.process();
         out.process();
         out.process();
@@ -204,6 +209,17 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         self.process();
         self.process();
         self.process();
+        self.process();
+        self.process();
+        self.process();
+        ::std::thread::sleep(::std::time::Duration::from_millis(10));
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
+        self.process();
     }
 }
 
@@ -238,6 +254,26 @@ pub fn main() {
     engines.process();
     engines.process();
     // now back to node 1?
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
+    engines.process();
     engines.process();
     engines.process();
     engines.process();

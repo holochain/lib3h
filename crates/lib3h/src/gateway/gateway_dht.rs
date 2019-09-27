@@ -54,9 +54,10 @@ impl P2pGateway {
     ) -> Lib3hResult<()> {
         let span = request.span().child("handle_dht_RequestToParent");
         let payload = request.take_message().expect("exists");
-        debug!(
+        trace!(
             "({}) Serving request from child dht: {:?}",
-            self.identifier.nickname, payload
+            self.identifier.nickname,
+            payload
         );
         match payload {
             DhtRequestToParent::GossipTo(_data) => {
