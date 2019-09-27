@@ -113,15 +113,12 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
         assert_eq!(response.request_id, req_id);
     });
-    // Extra processing required for auto-handshaking
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
-    billy.wait_until_no_work();
-    alex.wait_until_no_work();
-    billy.wait_until_no_work();
+    // Extra processing required for auto-handshaking
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -157,7 +154,6 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     );
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
-    // TODO Set this to correct value once test passes
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
 
     assert2_msg_matches!(alex, billy, expected);

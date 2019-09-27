@@ -237,7 +237,10 @@ impl MirrorDht {
             }
             Some(mut peer) => {
                 if peer_info.timestamp <= peer.timestamp {
-                    debug!("@MirrorDht@ Adding peer - BAD");
+                    debug!(
+                        "@MirrorDht@ Adding peer - BAD {:?} has earlier timestamp than {:?}",
+                        peer_info.timestamp, peer.timestamp
+                    );
                     return false;
                 }
                 debug!(

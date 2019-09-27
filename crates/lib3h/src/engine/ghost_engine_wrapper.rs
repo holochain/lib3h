@@ -209,10 +209,12 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            _ => {
-                trace!("posting unimplemented message: {:?}", client_msg);
-                unimplemented!()
-            }
+            Lib3hClientProtocol::FailureResult(data) => (
+                "".to_string(),
+                data.space_address.clone(),
+                data.to_agent_id.clone(),
+            ),
+            msg => unimplemented!("Handle this case: {:?}", msg),
         };
 
         let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();
@@ -229,9 +231,8 @@ where
             };
             result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         } else {
-            // TODO Handle errors better here!
-            let lib3h_to_client_response: Lib3hToClientResponse =
-                client_msg.clone().try_into().unwrap();
+            // TODO This will result will fail if its a failure result - what is proper error handling behavior?
+            let lib3h_to_client_response: Lib3hToClientResponse = client_msg.clone().try_into()?;
             debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
@@ -244,10 +245,8 @@ where
 
             // HACK: If it is send message result, put back the original request id.
             // TODO: consider this operation for all messages
-            let response;
-            if let Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) =
-                lib3h_to_client_response.clone()
-            {
+            let response = match lib3h_to_client_response.clone() {
+                Lib3hToClientResponse::HandleSendDirectMessageResult(mut data) => {
                 let result = self.request_id_map.remove(&request_id);
                 if let Some(request_id) = result {
                     trace!(
@@ -257,10 +256,10 @@ where
                     );
                     data.request_id = request_id.clone();
                 }
-                response = Lib3hToClientResponse::HandleSendDirectMessageResult(data);
-            } else {
-                response = lib3h_to_client_response.clone();
+                    Lib3hToClientResponse::HandleSendDirectMessageResult(data)
             }
+                _ => lib3h_to_client_response.clone(),
+            };
 
             ghost_mesage
                 .respond(Ok(response))
@@ -314,7 +313,6 @@ where
         match &mut msg {
             Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
             Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
-            Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
