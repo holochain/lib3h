@@ -256,18 +256,6 @@ where
                     }
                     Lib3hToClientResponse::HandleSendDirectMessageResult(data)
                 }
-                Lib3hToClientResponse::HandleQueryEntryResult(mut data) => {
-                    let result = self.request_id_map.remove(&request_id);
-                    if let Some(request_id) = result {
-                        trace!(
-                            "REPLACE request_id {:?} with {:?}",
-                            data.request_id,
-                            request_id
-                        );
-                        data.request_id = request_id.clone();
-                    }
-                    Lib3hToClientResponse::HandleQueryEntryResult(data)
-                }
                 _ => lib3h_to_client_response.clone(),
             };
 
@@ -324,14 +312,9 @@ where
         match &mut msg {
             Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
             Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
-            Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
-            Lib3hServerProtocol::HandleQueryEntry(data) => {
-                self.request_id_map
-                    .insert(request_id.clone(), data.request_id.clone());
-                data.request_id = request_id
-            }
+            Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleGetAuthoringEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleGetGossipingEntryList(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleSendDirectMessage(data) => {

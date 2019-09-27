@@ -251,39 +251,30 @@ impl<'engine> GhostEngine<'engine> {
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
                 let result = self
-                    .handle_join(span.follower("TODO name"), &data)
+                    .handle_join(span.follower("handle_join"), &data)
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::LeaveSpace(data) => {
                 trace!("ClientToLib3h::LeaveSpace: {:?}", data);
                 let result = self
-                    .handle_leave(span.follower("TODO name"), &data)
+                    .handle_leave(span.follower("handle_leave"), &data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("TODO name"), msg, data)
+                self.handle_direct_message(span.follower("handle_direct_message"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
                 trace!("ClientToLib3h::PublishEntry: {:?}", data);
-                self.handle_publish_entry(span.follower("TODO name"), &data)
-                    .map_err(|e| GhostError::from(e.to_string()))
-            }
-            ClientToLib3h::HoldEntry(data) => {
-                trace!(
-                    "[ghost_engine {}] ClientToLib3h::HoldEntry: {:?}",
-                    self.name,
-                    data
-                );
-                self.handle_hold_entry(span.follower("TODO name"), &data)
+                self.handle_publish_entry(span.follower("handle_publish_entry"), &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::QueryEntry(data) => {
                 trace!("ClientToLib3h::QueryEntry: {:?}", data);
-                self.handle_query_entry(span.follower("TODO name"), msg, data)
+                self.handle_query_entry(span.follower("handle_query_entry"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::FetchEntry(_) => panic!("FetchEntry Deprecated"),
@@ -689,21 +680,6 @@ impl<'engine> GhostEngine<'engine> {
             .map_err(|e| Lib3hError::new_other(&e.to_string()))
     }
 
-    fn handle_hold_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
-        let space_gateway = self.get_space(
-            &msg.space_address.to_owned(),
-            &msg.provider_agent_id.to_owned(),
-        )?;
-        space_gateway
-            .publish(
-                span,
-                GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
-                    msg.entry.clone(),
-                )),
-            )
-            .map_err(|e| Lib3hError::new_other(&e.to_string()))
-    }
-
     fn handle_query_entry(
         &mut self,
         span: Span,
@@ -1029,62 +1005,6 @@ mod tests {
             "[GhostMessage {request_id: None, ..}]",
             format!("{:?}", msgs)
         ); */
-    }
-
-    #[test]
-    fn test_ghost_engine_hold() {
-        enable_logging_for_test(true);
-
-        let mut lib3h = make_test_engine_wrapper("test_ghost_engine_hold");
-        let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
-        assert!(result.is_ok());
-
-        let mut core = MockCore {
-            //        state: "".to_string(),
-        };
-
-        let res = lib3h.process(&mut core);
-        println!("engine.process() -> {:?}", res);
-
-        let entry_data = make_test_entry();
-
-        println!("Before handle_hold_entry ---------------------------");
-
-        let result = lib3h.as_mut().handle_hold_entry(test_span(""), &entry_data);
-        assert!(result.is_ok());
-
-        /* what should we observe to know that the hold was published?
-        let space_gateway = lib3h
-            .as_mut()
-            .get_space(
-                &req_data.space_address.to_owned(),
-                &req_data.agent_id.to_owned(),
-            )
-            .unwrap();
-        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
-        assert_eq!(msgs.len(), 0);
-
-        {
-            lib3h.process(&mut core).unwrap();
-        }
-
-        let space_gateway = lib3h
-            .as_mut()
-            .get_space(
-                &req_data.space_address.to_owned(),
-                &req_data.agent_id.to_owned(),
-            )
-            .unwrap();
-
-        let msgs = space_gateway.as_mut().as_dht_mut().drain_messages();
-        for mut msg in msgs {
-            let _payload = msg.take_message();
-            assert_eq!(
-                "dht publish",
-                format!("{:?}", payload)
-            );
-        }*/
     }
 
     fn make_test_query(space_address: Address) -> QueryEntryData {

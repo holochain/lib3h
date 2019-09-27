@@ -7,18 +7,17 @@ pub type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
- //       (test_setup_only, true),
-//        (test_send_message, true),
- //       (test_send_message_fail, true),
+        (test_setup_only, true),
+        (test_send_message, true),
+        (test_send_message_fail, true),
 // TODO will comment out as they are fixed
-        (test_hold_entry, true),
-/*
         (test_author_no_aspect, true),
+/*
         (test_author_one_aspect, true),
-        (test_author_two_aspects, true),
-        (test_two_authors, true),
-*/
-    ];
+        (test_author_two_aspects, true),*/
+ /*       (test_two_authors, true),*/
+
+  ];
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -175,10 +174,8 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
     let entry = alex
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
 
+    wait2_engine_wrapper_until_no_work!(alex, billy);
     // #fullsync
     // Alex or Billy should receive the entry store request
     let store_result = billy.wait(Box::new(one_is!(
@@ -195,30 +192,6 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Billy asks for unknown entry
     // ============================
-    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
-    let res = alex.reply_to_HandleQueryEntry(&query_data);
-    println!("\nAlex gives response {:?}\n", res);
-    assert!(res.is_err());
-    let res_data: GenericResultData = res.err().unwrap();
-    let res_info = std::str::from_utf8(res_data.result_info.as_slice()).unwrap();
-    assert_eq!(res_info, "No entry found");
-}
-
-/// Test Hold & Query
-#[allow(dead_code)]
-fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
-    // Alex holds an entry
-    let entry = alex
-        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
-        .unwrap();
-
-    wait2_engine_wrapper_until_no_work!(alex, billy);
-
-    request_entry_ok(billy, &entry);
-
-    // Billy asks for unknown entry
-    // ============================
-    println!("\nBilly requesting unknown entry:\n");
     let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
     let res = alex.reply_to_HandleQueryEntry(&query_data);
     println!("\nAlex gives response {:?}\n", res);
