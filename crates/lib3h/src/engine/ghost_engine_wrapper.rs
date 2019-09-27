@@ -209,7 +209,10 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            _ => unimplemented!(),
+            _ => {
+                trace!("posting unimplemented message: {:?}", client_msg);
+                unimplemented!()
+            }
         };
 
         let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();

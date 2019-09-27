@@ -30,20 +30,21 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Reply to the publish_list request received from network module
     alex.reply_to_first_HandleGetAuthoringEntryList();
     let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
+    println!("srv_msg_list : {:?}", srv_msg_list);
+
     // Should receive a HandleFetchEntry request from network module after receiving list
     assert_eq!(srv_msg_list.len(), 1);
     // extract msg data
     let fetch_data = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::HandleFetchEntry);
+
     // Respond
     alex.reply_to_HandleFetchEntry(&fetch_data)
         .expect("Reply to HandleFetchEntry should work");
-    let (did_work, _srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
+    let (did_work, srv_msg_list) = alex.process().unwrap();
+    println!("srv_msg_list : {:?}", srv_msg_list);
 
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
     let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
 
     // Billy asks for that entry

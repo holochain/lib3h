@@ -433,7 +433,11 @@ impl NodeMock {
             return Err(msg_data);
         }
         let entry = maybe_entry.unwrap();
-        // println!("\n reply_to_HandleFetchEntry_inner({}) = {:?}\n", entry.aspect_list.len(), entry.clone());
+        println!(
+            "\n reply_to_HandleFetchEntry_inner({}) = {:?}\n",
+            entry.aspect_list.len(),
+            entry.clone()
+        );
         // Send EntryData as binary
         let fetch_result_data = FetchEntryResultData {
             space_address: fetch.space_address.clone(),
