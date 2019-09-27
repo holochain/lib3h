@@ -1,7 +1,7 @@
 use holochain_tracing::Span;
 use std::collections::HashMap;
 
-use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
+use crate::{ghost_error::ErrorKind, Backtwrap, GhostError, GhostResult, RequestId, WorkWasDone};
 
 const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20000); // TODO - should be 2000 or less but tests currently fail if below that
 
@@ -11,7 +11,7 @@ const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20
 #[derive(Debug, Clone)]
 pub enum GhostCallbackData<CbData: 'static, E: 'static> {
     Response(Result<CbData, E>),
-    Timeout(backtrace::Backtrace),
+    Timeout(Backtwrap),
 }
 
 /// definition for a ghost request callback
@@ -26,7 +26,7 @@ pub type GhostCallback<UserData, CbData, E> =
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<UserData, CbData: 'static, E: 'static> {
-    backtrace: backtrace::Backtrace,
+    backtrace: Backtwrap,
     expires: std::time::SystemTime,
     cb: GhostCallback<UserData, CbData, E>,
 }
@@ -141,7 +141,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
         self.pending.insert(
             request_id.clone(),
             GhostTrackerEntry {
-                backtrace: backtrace::Backtrace::new(),
+                backtrace: Backtwrap::new(),
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
