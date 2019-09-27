@@ -13,14 +13,16 @@ use BacktwrapCaptureStrategy::*;
 
 lazy_static! {
     static ref CAPTURE_STRATEGY: std::sync::Mutex<BacktwrapCaptureStrategy> = {
-        std::sync::Mutex::new(match std::env::var("BACKTRACE_STRATEGY") {
+        let out = std::sync::Mutex::new(match std::env::var("BACKTRACE_STRATEGY") {
             Ok(s) => match s.as_str() {
                 "CAPTURE_RESOLVED" => CaptureResolved,
                 "CAPTURE_UNRESOLVED" => CaptureUnresolved,
                 _ => DoNotCapture,
             },
             _ => DoNotCapture,
-        })
+        });
+        warn!("Using Backtrace Capture Strategy: {:?}", out);
+        out
     };
 }
 
