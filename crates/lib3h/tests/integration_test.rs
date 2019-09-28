@@ -200,7 +200,6 @@ fn test_two_memory_nodes_spaces_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_three_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
