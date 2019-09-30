@@ -29,7 +29,7 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     // =================================
     println!("\n Alex trying to send DirectMessage...\n");
     alex.send_direct_message(&BILLY_AGENT_ID, ASPECT_CONTENT_1.clone());
-    let (did_work, srv_msg_list) = alex.process().unwrap();
+    let (_did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 1);
     println!("response: {:?}", srv_msg_list);
     let msg_1 = &srv_msg_list[0];
@@ -54,7 +54,7 @@ pub fn test_leave_space(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex sends a message to self
     // ============================
     let req_id = alex.send_direct_message(&ALEX_AGENT_ID, ASPECT_CONTENT_1.clone());
-    let (did_work, srv_msg_list) = alex.process().unwrap();
+    let (_did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
     one_let!(Lib3hServerProtocol::FailureResult(response) = msg_1 {
@@ -128,8 +128,7 @@ pub fn test_multispace_send(alex: &mut NodeMock, billy: &mut NodeMock) {
     println!("\n Test send DirectMessage in space A...\n");
     alex.set_current_space(&SPACE_ADDRESS_A);
     billy.set_current_space(&SPACE_ADDRESS_A);
-    let req_id = alex.send_direct_message(&BILLY_AGENT_ID, "marco".as_bytes().to_vec());
-    // let expected = "None";
+    let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "marco".as_bytes().to_vec());
     let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_8\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"billy\"\\), result_info: ";
 
     let _results = assert2_msg_matches!(alex, billy, expected);

@@ -260,7 +260,7 @@ fn test_author_no_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 #[allow(dead_code)]
 fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Alex authors and broadcast an entry on the space
-    let entry = alex
+    let _entry = alex
         .author_entry(
             &ENTRY_ADDRESS_1,
             vec![ASPECT_CONTENT_1.clone(), ASPECT_CONTENT_2.clone()],
