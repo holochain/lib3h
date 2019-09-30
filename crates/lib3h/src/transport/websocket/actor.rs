@@ -398,6 +398,9 @@ impl GhostTransportWebsocket {
 
                     Some(Instant::now())
                 } else {
+                    if self.bound_url.is_none() {
+                        trace!("URL not bound yet.");
+                    }
                     self.last_discover
                 }
             }
@@ -453,6 +456,7 @@ impl
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // Periodic peer discovery
         self.try_discover();
+
         // process the self endpoint
         detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
             .process(self))?;
@@ -731,6 +735,11 @@ mod tests {
 
     #[test]
     fn should_invoke_drop() {
+        // TODO
+    }
+
+    #[test]
+    fn try_discover_test() {
         // TODO
     }
 
