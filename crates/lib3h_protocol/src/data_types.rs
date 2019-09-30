@@ -199,7 +199,6 @@ pub struct ConnectedData {
     pub request_id: String,
     /// The first uri we are connected to
     pub uri: Lib3hUri,
-    // TODO #172 - Add network_id? Or let local client figure it out with the request_id?
     // TODO #178 - Add some info on network state
     // pub peer_count: u32,
 }

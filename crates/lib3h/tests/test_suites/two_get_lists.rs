@@ -54,7 +54,7 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 pub fn hold_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Have alex hold some data
     let entry = alex
-        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
+        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()])
         .unwrap();
     // Alex: Look for the hold_list request received from network module and reply
     alex.reply_to_first_HandleGetGossipingEntryList();
@@ -131,7 +131,7 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_2.clone()], false)
         .unwrap();
-    alex.hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_3.clone()], false)
+    alex.hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_3.clone()])
         .unwrap();
     println!("\nAlex authored and stored Aspects \n");
     let (did_work, srv_msg_list) = alex.process().unwrap();
