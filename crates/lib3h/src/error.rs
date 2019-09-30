@@ -2,7 +2,7 @@
 
 use crate::transport::error::TransportError;
 use lib3h_crypto_api::CryptoError;
-use lib3h_ghost_actor::GhostError;
+use lib3h_ghost_actor::{Backtwrap, GhostError};
 use lib3h_protocol::error::{ErrorKind as Lib3hProtocolErrorKind, Lib3hProtocolError};
 use rmp_serde::decode::Error as RMPSerdeDecodeError;
 use std::{error::Error as StdError, fmt, io, result};
@@ -177,10 +177,10 @@ impl From<CryptoError> for Lib3hError {
 // TODO I'm not so sure about this...
 impl From<Lib3hError> for Lib3hProtocolError {
     fn from(err: Lib3hError) -> Self {
-        let bt = backtrace::Backtrace::new();
+        let bt = Backtwrap::new();
         Lib3hProtocolError::new(Lib3hProtocolErrorKind::Lib3hError(
             format!("lib3h internal: {:?}", err),
-            Some(bt),
+            bt.into(),
         ))
     }
 }
@@ -188,13 +188,17 @@ impl From<Lib3hError> for Lib3hProtocolError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lib3h_ghost_actor::BacktwrapCaptureStrategy;
 
     #[test]
     fn it_should_upgrade_and_backtrace_lib3h_protocol_errors() {
+        let store = Backtwrap::get_capture_strategy();
+        Backtwrap::set_capture_strategy(BacktwrapCaptureStrategy::CaptureResolved);
         let e: Lib3hProtocolError =
             Lib3hError::new(ErrorKind::Other("test-str-abcdefg".to_string())).into();
         let res = format!("{:?}", e);
         assert!(res.contains("test-str-abcdefg"));
         assert!(res.contains("it_should_upgrade_and_backtrace_lib3h_protocol_errors"));
+        Backtwrap::set_capture_strategy(store);
     }
 }

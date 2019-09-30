@@ -5,6 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use super::check_init;
 use lib3h_crypto_api::CryptoError;
+use std::isize;
 
 /// a trait for structures that can be used as a backing store for SecBuf
 pub trait Bufferable: Send {
@@ -153,21 +154,7 @@ pub struct SecBuf {
 
 impl Clone for SecBuf {
     fn clone(&self) -> Self {
-        let mut out = match self.t {
-            SecurityType::Insecure => SecBuf::with_insecure(self.len()),
-            SecurityType::Secure => SecBuf::with_secure(self.len()),
-        };
-        self.b.readable();
-        unsafe {
-            let mut out_lock = out.write_lock();
-            std::ptr::copy(
-                self.b.ref_().as_ptr(),
-                (**out_lock).as_mut_ptr(),
-                self.len(),
-            );
-        }
-        self.b.noaccess();
-        out
+        self.clone_partial(0, self.len())
     }
 }
 
@@ -178,6 +165,35 @@ impl std::fmt::Debug for SecBuf {
 }
 
 impl SecBuf {
+    /// Clones the SecurityType and part of the data of the origin SecBuf.  This allows us to safely
+    /// take apart a SecBuf into its constituent components (eg. ciphertext + nonce, key material +
+    /// nonce, etc.), without copying it into into intermediate buffers with lower security.  Caller
+    /// must ensure that the desired `siz` complies with the underlying Bufferable's valid size
+    /// restrictions.
+    pub fn clone_partial(&self, off: usize, siz: usize) -> SecBuf {
+        if off + siz > self.len() || off > (isize::MAX as usize) {
+            panic!(
+                "SecBuf attempting to clone {}-bytes segment from offset {}, beyond {}-byte extent of source SecBuf",
+                siz, off, self.len()
+            )
+        }
+        let mut out = match self.t {
+            SecurityType::Insecure => SecBuf::with_insecure(siz),
+            SecurityType::Secure => SecBuf::with_secure(siz),
+        };
+        self.b.readable();
+        unsafe {
+            let mut out_lock = out.write_lock();
+            std::ptr::copy(
+                self.b.ref_().as_ptr().add(off), // off confirmed valid as isize, & off+siz <= len()
+                (**out_lock).as_mut_ptr(),
+                siz,
+            );
+        }
+        self.b.noaccess();
+        out
+    }
+
     /// create a new SecBuf backed by insecure memory (for things like public keys)
     pub fn with_insecure(s: usize) -> Self {
         SecBuf {
@@ -203,6 +219,11 @@ impl SecBuf {
             b: RustBuf::from_string(s),
             p: ProtectState::NoAccess,
         }
+    }
+
+    /// whether or not the SecBuf is SecurityType::Secure
+    pub fn is_secure(&self) -> bool {
+        self.t == SecurityType::Secure
     }
 
     /// what is the current memory protection state of this SecBuf?
@@ -338,7 +359,7 @@ mod tests {
 
     #[test]
     fn it_should_create_secbuf_from_string() {
-        let b = SecBuf::with_insecure_from_string("zooooo".to_string());
+        let b = SecBuf::with_insecure_from_string("zooooom".to_string());
         assert_eq!(ProtectState::NoAccess, b.protect_state());
     }
 
@@ -381,23 +402,48 @@ mod tests {
     #[test]
     fn it_should_clone_insecure() {
         let mut b = SecBuf::with_insecure(16);
+        assert!(!b.is_secure());
         b.write(0, &[1, 2, 3]).unwrap();
         let mut c = b.clone();
+        assert!(!c.is_secure());
         {
-            let c = c.read_lock();
-            assert_eq!(&c[0..3], &[1, 2, 3]);
+            let c_r = c.read_lock();
+            assert_eq!(&c_r[0..3], &[1, 2, 3]);
+            assert_eq!(ProtectState::ReadOnly, c_r.protect_state());
         }
+        assert_eq!(ProtectState::NoAccess, c.protect_state());
+        // No restrictions on Bufferable size for Insecure SecBufs
+        let mut c_sub = b.clone_partial(1, b.len() - 2); // clone the middle of `b`
+        assert!(!c_sub.is_secure());
+        {
+            let c_sub_r = c_sub.read_lock();
+            assert_eq!(&c_sub_r[0..1], &[2]);
+        }
+        assert_eq!(ProtectState::NoAccess, c_sub.protect_state());
     }
 
     #[test]
     fn it_should_clone_secure() {
         let mut b = SecBuf::with_secure(16);
+        assert!(b.is_secure());
         b.write(0, &[1, 2, 3]).unwrap();
         let mut c = b.clone();
+        assert!(c.is_secure());
         {
-            let c = c.read_lock();
-            assert_eq!(&c[0..3], &[1, 2, 3]);
+            let c_r = c.read_lock();
+            assert_eq!(&c_r[0..3], &[1, 2, 3]);
+            assert_eq!(ProtectState::ReadOnly, c_r.protect_state());
         }
+
+        assert_eq!(ProtectState::NoAccess, c.protect_state());
+        // SecBufs with Secure security_type must have sizes modulo 8 bytes
+        let mut c_sub = b.clone_partial(1, 8); // clone the middle of `b`
+        assert!(c_sub.is_secure());
+        {
+            let c_sub_r = c_sub.read_lock();
+            assert_eq!(&c_sub_r[0..2], &[2, 3]);
+        }
+        assert_eq!(ProtectState::NoAccess, c_sub.protect_state());
     }
 
     #[test]

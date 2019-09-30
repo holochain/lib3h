@@ -10,15 +10,15 @@ lazy_static! {
         (test_setup_only, true),
         (test_send_message, true),
         (test_send_message_fail, true),
+        (test_send_message_self, true),
 // TODO will comment out as they are fixed
-/*
-        (test_hold_entry, true),
         (test_author_no_aspect, true),
+/*
         (test_author_one_aspect, true),
-        (test_author_two_aspects, true),
-        (test_two_authors, true),
-*/
-    ];
+        (test_author_two_aspects, true),*/
+ /*       (test_two_authors, true),*/
+
+  ];
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -49,16 +49,21 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     let enty_address_str = &entry.entry_address;
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let query_data = node.request_entry(entry.entry_address.clone());
-    let (did_work, srv_msg_list) = node.process().unwrap();
-    assert!(did_work);
-    println!("\n srv_msg_list: {:?}", srv_msg_list);
+    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
 
+    let srv_msg_list = assert_msg_matches!(node, expected);
+    trace!(
+        "\n{} [request_entry_ok] srv_msg_list: {:?}",
+        node.name(),
+        srv_msg_list
+    );
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request:\n", node.name());
+    trace!("\n{} reply to own request:\n", node.name());
+    wait_engine_wrapper_until_no_work!(node);
     let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
     let (did_work, srv_msg_list) = node.process().unwrap();
-    println!("\n{} gets own response {:?}\n", node.name(), srv_msg_list);
+    trace!("\n{} gets own response {:?}\n", node.name(), srv_msg_list);
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
     let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
@@ -102,11 +107,11 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
     one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
         assert_eq!(response.request_id, req_id);
     });
-    // Extra processing required for auto-handshaking
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -142,7 +147,6 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     );
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
-    // TODO Set this to correct value once test passes
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
 
     assert2_msg_matches!(alex, billy, expected);
@@ -151,16 +155,40 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 /// Test SendDirectMessage and response
 #[allow(dead_code)]
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
-    // Send to self
-    let _req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
-    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_3\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"alex\"\\), result_info: ";
-    assert_msg_matches!(alex, expected);
-
     trace!("[test_send_message_fail] alex send to camille");
     // Send to unknown
     let _req_id = alex.send_direct_message(&CAMILLE_AGENT_ID, "wah".as_bytes().to_vec());
 
-    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_4\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"camille\"\\), result_info: ";
+    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_3\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"camille\"\\), result_info: ";
+    assert_msg_matches!(alex, expected);
+}
+
+/// Test SendDirectMessage and response to self
+pub fn test_send_message_self(alex: &mut NodeMock, _billy: &mut NodeMock) {
+    // Send DM
+    let _req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
+
+    let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
+
+    let results = assert_msg_matches!(alex, expected);
+
+    let handle_send_direct_msg = results.first().unwrap();
+
+    let event = handle_send_direct_msg.events.first().unwrap();
+
+    let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
+
+    // Send response
+    let response_content = format!("echo: {}", "wah").as_bytes().to_vec();
+    trace!(
+        "alex send response with msg.request_id={:?}",
+        msg.request_id
+    );
+    alex.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
+
+    // TODO Set this to correct value once test passes
+    let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"echo: wah\" \\}\\)";
+
     assert_msg_matches!(alex, expected);
 }
 
@@ -171,10 +199,8 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
     let entry = alex
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 1);
 
+    wait2_engine_wrapper_until_no_work!(alex, billy);
     // #fullsync
     // Alex or Billy should receive the entry store request
     let store_result = billy.wait(Box::new(one_is!(
@@ -191,40 +217,6 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Billy asks for unknown entry
     // ============================
-    let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
-    let res = alex.reply_to_HandleQueryEntry(&query_data);
-    println!("\nAlex gives response {:?}\n", res);
-    assert!(res.is_err());
-    let res_data: GenericResultData = res.err().unwrap();
-    let res_info = std::str::from_utf8(res_data.result_info.as_slice()).unwrap();
-    assert_eq!(res_info, "No entry found");
-}
-
-/// Test Hold & Query
-#[allow(dead_code)]
-fn test_hold_entry(alex: &mut NodeMock, billy: &mut NodeMock) {
-    // Alex holds an entry
-    let entry = alex
-        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
-        .unwrap();
-    let (did_work, _srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-
-    // Process the HoldEntry generated from receiving HandleStoreEntryAspect
-    println!("\nBilly should receive entry from gossip and asks owner to validate it:\n");
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    println!("\n srv_msg_list: {:?}", srv_msg_list);
-    println!("\nBilly should process the HoldEntry from NodeMock auto-validation:\n");
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    println!("\n srv_msg_list: {:?}", srv_msg_list);
-    // Billy asks for that entry
-    request_entry_ok(billy, &entry);
-
-    // Billy asks for unknown entry
-    // ============================
-    println!("\nBilly requesting unknown entry:\n");
     let query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
     let res = alex.reply_to_HandleQueryEntry(&query_data);
     println!("\nAlex gives response {:?}\n", res);
