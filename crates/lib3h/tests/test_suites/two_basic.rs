@@ -268,8 +268,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
             true,
         )
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
+    let (_did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 2);
 
     // #fullsync
@@ -280,8 +279,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(store_result.is_some());
     println!("\n got HandleStoreEntryAspect: {:?}", store_result);
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    let (did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy asks for that entry
     request_entry_ok(billy, &entry);
@@ -295,8 +293,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
     let _ = alex
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
+    let (_did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
@@ -307,16 +304,14 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(store_result.is_some());
     println!("\n got HandleStoreEntryAspect: {:?}", store_result);
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    let (did_work, _srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
+    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy authors and broadcast second aspect
     // =========================================
     let _ = billy
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_2.clone()], true)
         .unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
+    let (_did_work, srv_msg_list) = billy.process().unwrap();
     assert_eq!(srv_msg_list.len(), 1);
 
     // #fullsync
@@ -327,8 +322,7 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(store_result.is_some());
     println!("\n got HandleStoreEntryAspect: {:?}", store_result);
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    let (did_work, _srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
+    let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
     // Alex asks for that entry
     let entry = NodeMock::form_EntryData(
