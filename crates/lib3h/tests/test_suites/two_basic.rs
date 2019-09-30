@@ -49,7 +49,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let mut query_data = node.request_entry(entry.entry_address.clone());
 
-    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), query: \"test_query\" \\}\\)";
+    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), query: \"test_query\" \\}\\)";
     let results = assert_msg_matches!(node, expected);
     println!("\n results: {:?}\n", results);
     let handle_query = &results[0].events[0];
@@ -135,7 +135,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send DM
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
 
-    let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"billy\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
+    let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"billy\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
 
     let results = assert2_msg_matches!(alex, billy, expected);
 
@@ -153,7 +153,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     );
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
-    let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"appA\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
+    let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
 
     assert2_msg_matches!(alex, billy, expected);
 }
@@ -206,7 +206,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
 
-    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"\\w+\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, billy, expected);
 
     // Billy asks for that entry
@@ -216,7 +216,7 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Billy asks for unknown entry
     // ============================
     let mut _query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
-    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_2\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
+    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_2\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
     let results = assert2_msg_matches!(alex, billy, expected);
     println!("\n results: {:?}\n", results);
     let handle_query = &results[0].events[0];

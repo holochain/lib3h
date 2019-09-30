@@ -73,7 +73,7 @@ impl<'engine> GhostEngine<'engine> {
                 dht_factory,
                 &dht_config,
             )),
-            "to_multiplexer_",
+            "engine_to_multiplexer_",
         ));
 
         // Bind & create this_net_peer
@@ -223,7 +223,7 @@ impl<'engine> GhostEngine<'engine> {
             ClientToLib3h::LeaveSpace(data) => {
                 trace!("ClientToLib3h::LeaveSpace: {:?}", data);
                 let result = self
-                    .handle_leave(span.follower("handle_leave"), &data)
+                    .handle_leave_space(span.follower("handle_leave"), &data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
@@ -508,10 +508,16 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     /// Destroy gateway for this agent in this space, if part of it.
-    fn handle_leave(&mut self, _span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
-        let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
+    fn handle_leave_space(&mut self, _span: Span, msg: &SpaceData) -> Lib3hResult<()> {
+        let chain_id = (msg.space_address.clone(), msg.agent_id.clone());
         match self.space_gateway_map.remove(&chain_id) {
-            Some(_) => Ok(()), //TODO is there shutdown code we need to call #421
+            Some(_space) => {
+                self.multiplexer
+                    .as_mut()
+                    .as_mut()
+                    .remove_agent_space_route(&msg.space_address, &msg.agent_id);
+                Ok(())
+            }
             None => Err(Lib3hError::new_other("Not part of that space")),
         }
     }
@@ -711,6 +717,7 @@ pub fn handle_GossipTo<
 >(
     gateway_identifier: Address,
     gateway: &mut GatewayParentWrapper<GhostEngine, G>,
+    from_peer_name: &Lib3hUri,
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
@@ -731,7 +738,7 @@ pub fn handle_GossipTo<
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
             space_address: gateway_identifier.clone(),
             to_peer_name: to_peer_name.clone(),
-            from_peer_name: Lib3hUri::with_undefined(), // Should be gateway.as_mut().as_mut().this_peer().peer_location,
+            from_peer_name: from_peer_name.clone(),
             bundle: gossip_data.bundle.clone(),
         });
         let mut payload = Vec::new();
@@ -836,9 +843,9 @@ mod tests {
         let req_data = make_test_join_request();
         let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
         assert!(result.is_ok());
-        let result = lib3h.as_mut().handle_leave(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_leave_space(test_span(""), &req_data);
         assert!(result.is_ok());
-        let result = lib3h.as_mut().handle_leave(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_leave_space(test_span(""), &req_data);
         assert_eq!(
             "Err(Lib3hError(Other(\"Not part of that space\")))",
             format!("{:?}", result)
