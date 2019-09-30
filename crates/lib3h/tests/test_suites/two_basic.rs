@@ -304,17 +304,6 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"[\\w\\d]+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"[\\w\\d\\-]+\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, billy, expected);
-    //
-    //    // #fullsync
-    //    // Alex or Billy should receive the entry store request
-    //    let store_result = alex.wait(Box::new(one_is!(
-    //        Lib3hServerProtocol::HandleStoreEntryAspect(_)
-    //    )));
-    //    assert!(store_result.is_some());
-    //    println!("\n got HandleStoreEntryAspect: {:?}", store_result);
-    //    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    //    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    //
 
     // Alex asks for that entry
     let entry = NodeMock::form_EntryData(
