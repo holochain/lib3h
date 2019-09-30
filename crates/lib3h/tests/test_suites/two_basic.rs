@@ -13,9 +13,8 @@ lazy_static! {
         (test_send_message_self, true),
         (test_author_no_aspect, true),
         (test_author_one_aspect, true),
-// TODO will comment out as they are fixed
-//        (test_author_two_aspects, true),
-//        (test_two_authors, true),
+        (test_author_two_aspects, true),
+        (test_two_authors, true),
     ];
 }
 
@@ -50,7 +49,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let mut query_data = node.request_entry(entry.entry_address.clone());
 
-    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
+    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), query: \"test_query\" \\}\\)";
     let results = assert_msg_matches!(node, expected);
     println!("\n results: {:?}\n", results);
     let handle_query = &results[0].events[0];
@@ -65,7 +64,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     println!("\n{} reply to own request: {:?}\n", node.name(), query_data);
     let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
 
-    let expected = "QueryEntryResult\\(QueryEntryResultData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), responder_agent_id: HashString\\(\"billy\"\\), query_result: ";
+    let expected = "QueryEntryResult\\(QueryEntryResultData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), responder_agent_id: HashString\\(\"[\\w\\d]+\"\\), query_result: ";
 
     let results = assert_msg_matches!(node, expected);
     println!("\n results: {:?}\n", results);
@@ -271,15 +270,11 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (_did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 2);
 
-    // #fullsync
-    // Alex or Billy should receive the entry store request
-    let store_result = billy.wait(Box::new(one_is!(
-        Lib3hServerProtocol::HandleStoreEntryAspect(_)
-    )));
-    assert!(store_result.is_some());
-    println!("\n got HandleStoreEntryAspect: {:?}", store_result);
-    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"[\\w\\d\\-]+\", publish_ts: \\d+ \\} \\}\\)";
+    let _results = assert2_msg_matches!(alex, billy, expected);
+    let mut entry = billy.get_entry(&ENTRY_ADDRESS_1).unwrap();
+    entry.aspect_list.sort();
+    assert_eq!(entry.aspect_list.len(), 2);
 
     // Billy asks for that entry
     request_entry_ok(billy, &entry);
@@ -296,15 +291,8 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (_did_work, srv_msg_list) = alex.process().unwrap();
     assert_eq!(srv_msg_list.len(), 1);
 
-    // #fullsync
-    // Alex or Billy should receive the entry store request
-    let store_result = billy.wait(Box::new(one_is!(
-        Lib3hServerProtocol::HandleStoreEntryAspect(_)
-    )));
-    assert!(store_result.is_some());
-    println!("\n got HandleStoreEntryAspect: {:?}", store_result);
-    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"[\\w\\d\\-]+\", publish_ts: \\d+ \\} \\}\\)";
+    let _results = assert2_msg_matches!(alex, billy, expected);
 
     // Billy authors and broadcast second aspect
     // =========================================
@@ -314,15 +302,19 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock) {
     let (_did_work, srv_msg_list) = billy.process().unwrap();
     assert_eq!(srv_msg_list.len(), 1);
 
-    // #fullsync
-    // Alex or Billy should receive the entry store request
-    let store_result = alex.wait(Box::new(one_is!(
-        Lib3hServerProtocol::HandleStoreEntryAspect(_)
-    )));
-    assert!(store_result.is_some());
-    println!("\n got HandleStoreEntryAspect: {:?}", store_result);
-    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"appA\"\\), provider_agent_id: HashString\\(\"[\\w\\d]+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"[\\w\\d\\-]+\", publish_ts: \\d+ \\} \\}\\)";
+    let _results = assert2_msg_matches!(alex, billy, expected);
+    //
+    //    // #fullsync
+    //    // Alex or Billy should receive the entry store request
+    //    let store_result = alex.wait(Box::new(one_is!(
+    //        Lib3hServerProtocol::HandleStoreEntryAspect(_)
+    //    )));
+    //    assert!(store_result.is_some());
+    //    println!("\n got HandleStoreEntryAspect: {:?}", store_result);
+    //    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
+    //    let (_did_work, _srv_msg_list) = alex.process().unwrap();
+    //
 
     // Alex asks for that entry
     let entry = NodeMock::form_EntryData(
