@@ -204,21 +204,15 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            Lib3hClientProtocol::HoldEntry(data) => (
-                "".to_string(),
-                data.space_address.clone(),
-                data.provider_agent_id.clone(),
-            ),
-            Lib3hClientProtocol::FailureResult(data) => (
-                "".to_string(),
-                data.space_address.clone(),
-                data.to_agent_id.clone(),
-            ),
+            Lib3hClientProtocol::FailureResult(data) => {
+                panic!("Received FailureResult: {:?}", data);
+            }
             msg => unimplemented!("Handle this case: {:?}", msg),
         };
 
         let maybe_client_to_lib3h: Result<ClientToLib3h, _> = client_msg.clone().try_into();
         if let Ok(client_to_lib3h) = maybe_client_to_lib3h {
+            debug!("client_to_lib3h: {:?}", client_to_lib3h);
             let result = if request_id == "" {
                 self.engine.publish(Span::fixme(), client_to_lib3h)
             } else {
@@ -232,6 +226,7 @@ where
         } else {
             // TODO This will result will fail if its a failure result - what is proper error handling behavior?
             let lib3h_to_client_response: Lib3hToClientResponse = client_msg.clone().try_into()?;
+            debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
             let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
@@ -268,8 +263,6 @@ where
     /// Process Lib3hClientProtocol message inbox and
     /// output a list of Lib3hServerProtocol messages for Core to handle
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        trace!("[legacy engine] process");
-
         let did_work = detach_run!(&mut self.engine, |engine| engine.process(self))
             .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))?;
         // get any "server" messages that came as responses to the client requests

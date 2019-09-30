@@ -699,8 +699,8 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
     set_b.is_subset(&set_a)
 }
-
-pub fn handle_gossip_to<
+#[allow(non_snake_case)]
+pub fn handle_GossipTo<
     G: GhostActor<
         GatewayRequestToParent,
         GatewayRequestToParentResponse,
@@ -714,7 +714,7 @@ pub fn handle_gossip_to<
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
-        "({}) handle_gossip_to: {:?}",
+        "({}) handle_GossipTo: {:?}",
         gateway_identifier, gossip_data,
     );
 
@@ -727,11 +727,11 @@ pub fn handle_gossip_to<
         //            }
         //            // TODO END
 
-        // Convert DHT Gossip to P2P Gossip
+        // Convert DHT *GossipTo* to P2P *Gossip*
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
             space_address: gateway_identifier.clone(),
             to_peer_name: to_peer_name.clone(),
-            from_peer_name: Lib3hUri::with_undefined(), // FIXME
+            from_peer_name: Lib3hUri::with_undefined(), // Should be gateway.as_mut().as_mut().this_peer().peer_location,
             bundle: gossip_data.bundle.clone(),
         });
         let mut payload = Vec::new();
