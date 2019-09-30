@@ -262,7 +262,7 @@ macro_rules! wait1_for_messages {
 #[macro_export]
 macro_rules! wait1_for_callback {
     ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr) => {{
-        $crate::wait1_for_callback!($actor, $request, $re, true)
+        $crate::wait1_for_callback!($actor, $ghost_can_track, $request, $re, true)
     }};
     ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr, $should_abort: expr) => {{
         let regex = regex::Regex::new($re.clone())
@@ -297,18 +297,17 @@ macro_rules! wait1_for_callback {
 
         let is_match = regex.is_match(actual.as_str());
 
-        if !$should_abort {
-            return is_match;
+        if $should_abort {
+            if is_match {
+                assert!(is_match);
+            } else {
+                assert_eq!($re, actual.as_str());
+            }
         }
-        if is_match {
-            assert!(is_match);
-        } else {
-            assert_eq!($re, actual.as_str());
-        }
-        return is_match;
+        is_match
     }};
 }
-
+/*
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait1_for_repeatable_callback {
@@ -331,7 +330,7 @@ macro_rules! wait1_for_repeatable_callback {
         return is_match;
     }};
 }
-
+*/
 #[cfg(test)]
 mod tests {
 
@@ -355,42 +354,66 @@ mod tests {
         }
     }
 
-    pub type UserData = DidWorkActor;
-    pub type Error = String;
-    pub type Callback = GhostCallback<UserData, RequestToOtherResponse, Error>;
-    pub type CallbackData = GhostCallbackData<RequestToOtherResponse, Error>;
-
+    #[derive(Debug, Clone)]
     pub enum RequestToOther {
         Ping,
-        Fail,
+        Retry,
     }
 
+    #[derive(Debug, Clone)]
     pub enum RequestToOtherResponse {
         Pong,
-        Fail,
+        Retry,
     }
+
+    #[derive(Debug)]
     struct DidWorkParentWrapper;
     impl DidWorkParentWrapper {
         pub fn process(&mut self, actor: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
             actor.process()
         }
+    }
 
+    pub type CallbackError = String;
+    pub type Callback = GhostCallback<Option<String>, RequestToOtherResponse, CallbackError>;
+    #[allow(dead_code)]
+    pub type CallbackData = GhostCallbackData<RequestToOtherResponse, CallbackError>;
+    //    #[derive(Debug)]
+    struct CallbackParentWrapper(pub Vec<(Callback, CallbackData)>);
+
+    pub type CallbackUserData = Option<String>;
+
+    impl CallbackParentWrapper {
         pub fn request(
             &mut self,
-            span: holochain_tracing::Span,
+            _span: holochain_tracing::Span,
             payload: &mut RequestToOther,
             cb: Callback,
         ) -> GhostResult<()> {
-            let user_data = ();
             let response = match payload {
                 RequestToOther::Ping => RequestToOtherResponse::Pong,
-                RequestToOther::Fail => RequestToOtherResponse::Fail,
+                RequestToOther::Retry => RequestToOtherResponse::Retry,
             };
 
             let cb_data = GhostCallbackData::Response(Ok(response));
-            let cb_result = (cb)((), cb_data);
-
+            self.0.push((cb, cb_data));
             Ok(())
+        }
+
+        pub fn process(
+            &mut self,
+            mut user_data: &mut CallbackUserData,
+        ) -> GhostResult<WorkWasDone> {
+            if let Some((cb, cb_data)) = self.0.pop() {
+                let _cb_result = (cb)(&mut user_data, cb_data);
+                Ok(true.into())
+            } else {
+                Ok(false.into())
+            }
+        }
+
+        pub fn new() -> Self {
+            CallbackParentWrapper(vec![])
         }
     }
 
@@ -451,14 +474,16 @@ mod tests {
 
     #[test]
     fn test_wait_for_callback() {
-        let parent = &mut DidWorkParentWrapper;
-        let mut actor = &mut DidWorkActor(2);
+        let parent = &mut CallbackParentWrapper::new();
+        let actor = &mut DidWorkActor(1);
 
-        let request = RequestToOther::Ping;
-        assert!(
-            wait1_for_callback!(actor, parent, request, "Ping", false),
-            "Expected Ping response in callback"
-        );
+        let request = &mut RequestToOther::Ping;
+        let is_match = wait1_for_callback!(actor, parent, request, "Pong", false);
+        assert!(is_match);
+
+        let request = &mut RequestToOther::Retry;
+        let is_match = wait1_for_callback!(actor, parent, request, "Pong", false);
+        assert!(!is_match);
     }
 
     #[test]
