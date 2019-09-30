@@ -22,10 +22,7 @@ use lib3h_protocol::{
     uri::Lib3hUri,
     Address,
 };
-use std::{
-    collections::HashSet,
-    time::Instant
-};
+use std::{collections::HashSet, time::Instant};
 
 // Use mDNS for bootstrapping
 use lib3h_mdns::{MulticastDns, MulticastDnsBuilder};
@@ -350,14 +347,61 @@ impl GhostTransportWebsocket {
     }
 
     /// Try to discover peers on the network using mDNS.
-    // fn try_discover(&mut self) -> TransportResult<Vec<Lib3hUri>> {
-    fn try_discover(&mut self) -> Vec<Lib3hUri> {
-        let uris = vec![];
+    fn try_discover(&mut self) {
+        self.last_discover = match self.last_discover {
+            None => Some(Instant::now()),
+            Some(last_discover) => {
+                // Let's check if it time to discover some peers, but only if we already
+                // did some url binding
+                if self.bound_url.is_none()
+                    && last_discover.elapsed().as_millis() > self.discover_interval_ms
+                {
+                    // Increase the time between two peer discovery to avoid unnecessary burden on
+                    // the network
+                    if self.discover_interval_ms < 30_000 {
+                        self.discover_interval_ms += 1_000;
+                    }
 
-        // Let's check if it time to discover some peers
+                    // Do the peer discovery
+                    if let Ok(machines) = self.discover() {
+                        if !machines.is_empty() {
+                            let my_addr = self.bound_url.as_ref().expect(
+                                "'bound_url' already checked earlier, so it should not be None.",
+                            );
 
+                            for found_uri in machines {
+                                if found_uri == *my_addr {
+                                    // Ignoring our own address
+                                    continue;
+                                } else {
+                                    // if not already connected, request a connections
+                                    if self.connections.get(&found_uri).is_none() {
+                                        self.connections.insert(found_uri.clone());
+                                        trace!(
+                                            "mDNS WSS Discovered {}, we are: {}",
+                                            &found_uri,
+                                            &my_addr
+                                        );
+                                        self.endpoint_self
+                                            .publish(
+                                                Span::fixme(),
+                                                RequestToParent::IncomingConnection {
+                                                    uri: found_uri.clone(),
+                                                },
+                                            )
+                                            .expect("should be able to publish");
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-        uris
+                    Some(Instant::now())
+                } else {
+                    self.last_discover
+                }
+            }
+        }
     }
 }
 
