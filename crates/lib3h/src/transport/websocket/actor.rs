@@ -351,9 +351,9 @@ impl GhostTransportWebsocket {
         self.last_discover = match self.last_discover {
             None => Some(Instant::now()),
             Some(last_discover) => {
-                // Let's check if it time to discover some peers, but only if we already
+                // Let's check if it's time to discover some peers, but only if we already
                 // did some url binding
-                if self.bound_url.is_none()
+                if self.bound_url.is_some()
                     && last_discover.elapsed().as_millis() > self.discover_interval_ms
                 {
                     // Increase the time between two peer discovery to avoid unnecessary burden on
