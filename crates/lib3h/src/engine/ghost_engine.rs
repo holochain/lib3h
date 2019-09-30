@@ -861,57 +861,6 @@ mod tests {
         // check that bootstrap nodes were connected to
     }
 
-    #[test]
-    fn discovery_bootstrap_in_memory_test() {
-        let netid = "discovery_bootstrap_in_memory_test";
-        let engine = make_test_engine(netid);
-        let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
-            GhostParentWrapper::new(engine, "test_inmem_engine");
-
-        // Manually do the binding here ?
-    }
-
-    fn make_wss_test_engine(_test_net: &str) -> GhostEngine<'static> {
-        let crypto = Box::new(SodiumCryptoSystem::new());
-        let netid = GatewayId {
-            nickname: "unit-discovery-wss-test-net".into(),
-            id: "Hc_fake_addr_for_test-net".into(),
-        };
-        let url: Lib3hUri = url::Url::parse("wss://127.0.0.1:87055").unwrap().into();
-        let tls_config = transport::websocket::tls::TlsConfig::Unencrypted;
-
-        let config = EngineConfig {
-            network_id: netid,
-            transport_configs: vec![TransportConfig::Websocket(tls_config)],
-            bootstrap_nodes: vec![],
-            work_dir: PathBuf::new(),
-            log_level: 'd',
-            bind_url: url,
-            dht_gossip_interval: 100,
-            dht_timeout_threshold: 1000,
-            dht_custom_config: vec![],
-        };
-        let dht_factory = MirrorDht::new_with_config;
-
-        let engine =
-            GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap();
-        engine
-    }
-
-    #[test]
-    #[ignore]
-    fn discovery_bootstrap_wss_test() {
-        let netid = "discovery_bootstrap_wss_test";
-        let engine = make_wss_test_engine(netid);
-
-        // Why do we need a wrapper here ?
-        let _lib3h: GhostEngineParentWrapper<MockCore, GhostEngine, Lib3hError> =
-            GhostParentWrapper::new(engine, "test_wss_engine");
-
-        // Manually do the binding here ? And how to do it ?
-        // engine.request();
-    }
-
     fn make_test_join_request() -> SpaceData {
         SpaceData {
             /// Identifier of this request
