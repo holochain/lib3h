@@ -326,15 +326,15 @@ macro_rules! wait1_for_repeatable_callback {
 
         let mut state = $init_value;
         for iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_RETRIES {
-            let (mut request, re, state_prime) = ($request_fn)(state);
+            let (request, re, state_prime) = ($request_fn)(state);
             state = state_prime;
             let should_abort =
                 $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_RETRIES - 1;
             is_match = $crate::wait1_for_callback!(
                 $actor,
                 $ghost_can_track,
-                &mut request,
-                re,
+                request,
+                re.as_str(),
                 should_abort
             );
             if is_match {
@@ -401,7 +401,7 @@ mod tests {
         pub fn request(
             &mut self,
             _span: holochain_tracing::Span,
-            payload: &mut RequestToOther,
+            payload: RequestToOther,
             cb: Callback,
         ) -> GhostResult<()> {
             let response = match payload {
@@ -491,11 +491,11 @@ mod tests {
         let parent = &mut CallbackParentWrapper::new();
         let actor = &mut DidWorkActor(1);
 
-        let request = &mut RequestToOther::Ping;
+        let request = RequestToOther::Ping;
         let is_match = wait1_for_callback!(actor, parent, request, "Pong", false);
         assert!(is_match);
 
-        let request = &mut RequestToOther::Retry;
+        let request = RequestToOther::Retry;
         let is_match = wait1_for_callback!(actor, parent, request, "Pong", false);
         assert!(!is_match);
     }
@@ -507,9 +507,9 @@ mod tests {
 
         let request_fn = Box::new(|retried| {
             if retried {
-                (RequestToOther::Ping, "Pong", true)
+                (RequestToOther::Ping, "Pong".to_string(), true)
             } else {
-                (RequestToOther::Retry, "Pong", true)
+                (RequestToOther::Retry, "Pong".to_string(), true)
             }
         });
 

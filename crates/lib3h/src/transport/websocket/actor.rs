@@ -411,7 +411,7 @@ mod tests {
 
     use super::*;
     use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
-    use lib3h_ghost_actor::{wait1_for_callback, wait_for_message};
+    use lib3h_ghost_actor::{wait1_for_repeatable_callback, wait_for_message};
     use std::net::TcpListener;
     use url::Url;
 
@@ -463,21 +463,38 @@ mod tests {
         assert_eq!(transport1.bound_url, None);
         assert_eq!(transport2.bound_url, None);
 
-        let port1 = get_available_port(1025).expect("Must be able to find free port");
-        let expected_transport1_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1))
-                .unwrap()
-                .into();
-        wait1_for_callback!(
-            transport1, t1_endpoint,
-            RequestToChild::Bind { spec: expected_transport1_address.clone()},
-            format!(
+        let init_transport1_address: Lib3hUri = Url::parse(&format!("wss://127.0.0.1:{}", 1024))
+            .unwrap()
+            .into();
+
+        let request_fn = Box::new(|transport1_address: Lib3hUri| {
+            let old_port = transport1_address.port().unwrap_or_else(|| 0);
+            let port = get_available_port(old_port + 1).expect("Must be able to find free port");
+            let expected_transport1_address: Lib3hUri =
+                Url::parse(&format!("wss://127.0.0.1:{}", port))
+                    .unwrap()
+                    .into();
+
+            let request = RequestToChild::Bind {
+                spec: expected_transport1_address.clone(),
+            };
+            let re = format!(
                 "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
-                port1.clone(),
-            ).as_str()
+                port.clone(),
+            );
+
+            (request.clone(), re, expected_transport1_address.clone())
+        });
+
+        let (_is_match, expected_transport1_address) = wait1_for_repeatable_callback!(
+            transport1,
+            t1_endpoint,
+            request_fn,
+            init_transport1_address
         );
 
-        let port2 = get_available_port(9000).expect("Must be able to find free port");
+        let port2 = get_available_port(expected_transport1_address.port().unwrap_or_else(|| 0))
+            .expect("Must be able to find free port");
         let expected_transport2_address: Lib3hUri =
             Url::parse(&format!("wss://127.0.0.1:{}", port2))
                 .unwrap()
