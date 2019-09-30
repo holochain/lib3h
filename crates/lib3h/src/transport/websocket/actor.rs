@@ -411,7 +411,7 @@ mod tests {
 
     use super::*;
     use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
-    use lib3h_ghost_actor::wait_for_message;
+    use lib3h_ghost_actor::{wait1_for_callback, wait_for_message};
     use std::net::TcpListener;
     use url::Url;
 
@@ -467,25 +467,14 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1))
                 .unwrap()
                 .into();
-        t1_endpoint
-            .request(
-                Span::fixme(),
-                RequestToChild::Bind {
-                    spec: expected_transport1_address.clone(),
-                },
-                Box::new(move |_: &mut (), r| {
-                    // parent should see the bind event
-                    assert_eq!(
-                        format!(
+        wait1_for_callback!(
+            transport1, t1_endpoint,
+            RequestToChild::Bind { spec: expected_transport1_address.clone()},
+            format!(
                             "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
                             port1.clone(),
-                        ),
-                        format!("{:?}", r)
-                    );
-                    Ok(())
-                }),
             )
-            .unwrap();
+        );
 
         let port2 = get_available_port(1026).expect("Must be able to find free port");
         let expected_transport2_address: Lib3hUri =
