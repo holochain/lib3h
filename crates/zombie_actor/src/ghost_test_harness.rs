@@ -7,8 +7,7 @@
 ///
 ///
 
-
-pub const DEFAULT_MAX_ITERS : u16 = 20;
+pub const DEFAULT_MAX_ITERS: u16 = 20;
 
 #[allow(unused_macros)]
 #[macro_export]
@@ -317,12 +316,12 @@ macro_rules! wait1_for_repeatable_callback {
         $crate::wait1_for_repeatable_callback!($actor, $ghost_can_track, $request_fn, $re, true);
     }};
     ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $re: expr, $should_abort: expr) => {{
-
         let mut is_match = false;
 
         for iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             let request = (request_fn)();
-            let should_abort = $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_ITERS-1;
+            let should_abort =
+                $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_ITERS - 1;
             is_match =
                 $crate::wait1_for_callback!($actor, $ghost_can_track, request, $re, should_abort);
             if is_match {
@@ -330,15 +329,13 @@ macro_rules! wait1_for_repeatable_callback {
             }
         }
         return is_match;
-
-    }}
-
+    }};
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{GhostResult, GhostCallback, GhostCallbackData, WorkWasDone};
+    use crate::{GhostCallback, GhostCallbackData, GhostResult, WorkWasDone};
 
     #[derive(Debug, Clone, PartialEq)]
     struct DidWorkActor(i8);
@@ -358,18 +355,19 @@ mod tests {
         }
     }
 
-
     pub type UserData = DidWorkActor;
     pub type Error = String;
     pub type Callback = GhostCallback<UserData, RequestToOtherResponse, Error>;
     pub type CallbackData = GhostCallbackData<RequestToOtherResponse, Error>;
 
     pub enum RequestToOther {
-        Ping, Fail
+        Ping,
+        Fail,
     }
 
     pub enum RequestToOtherResponse {
-        Pong, Fail
+        Pong,
+        Fail,
     }
     struct DidWorkParentWrapper;
     impl DidWorkParentWrapper {
@@ -377,21 +375,22 @@ mod tests {
             actor.process()
         }
 
-        pub fn request(&mut self,
-                       span: holochain_tracing::Span,
-                       payload: &mut RequestToOther,
-                       cb: Callback) -> GhostResult<()> {
+        pub fn request(
+            &mut self,
+            span: holochain_tracing::Span,
+            payload: &mut RequestToOther,
+            cb: Callback,
+        ) -> GhostResult<()> {
+            let user_data = ();
+            let response = match payload {
+                RequestToOther::Ping => RequestToOtherResponse::Pong,
+                RequestToOther::Fail => RequestToOtherResponse::Fail,
+            };
 
-                let user_data = ();
-                let response = match payload {
-                    RequestToOther::Ping => RequestToOtherResponse::Pong,
-                    RequestToOther::Fail => RequestToOtherResponse::Fail
-                };
+            let cb_data = GhostCallbackData::Response(Ok(response));
+            let cb_result = (cb)((), cb_data);
 
-                let cb_data = GhostCallbackData::Response(Ok(response));
-                let cb_result = (cb)((), cb_data);
-
-                Ok(())
+            Ok(())
         }
     }
 
@@ -463,8 +462,5 @@ mod tests {
     }
 
     #[test]
-    fn test_wait_for_repeatable_callback() {
-
-    }
+    fn test_wait_for_repeatable_callback() {}
 }
-
