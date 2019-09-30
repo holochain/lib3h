@@ -443,7 +443,7 @@ macro_rules! process_one_engine {
             .unwrap_or((false, vec![]));
         if events.is_empty() {
         } else {
-            trace!("[process_one_engine]: {:?}", events);
+            trace!("[process_one_engine] by {} {:?}", $engine.name(), events);
             let processor_result = $crate::utils::processor_harness::ProcessorResult {
                 did_work,
                 events,
@@ -623,18 +623,7 @@ macro_rules! wait_connect {
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
-        let re = regex::Regex::new("ConnectedData").expect("valid regex");
-        let assertion = Box::new(predicates::prelude::predicate::function(move |x| {
-            let to_match = format!("{:?}", x);
-            re.is_match(&to_match)
-        }));
-
-        let predicate: Box<dyn $crate::utils::processor_harness::Processor> = Box::new(
-            $crate::utils::processor_harness::Lib3hServerProtocolAssert(assertion),
-        );
-
-        let result = assert2_processed!($me, $other, predicate);
-        result
+        assert2_msg_matches!($me, $other, "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"transportid:Hc.*\"\\) \\}\\)");
     }};
 }
 
