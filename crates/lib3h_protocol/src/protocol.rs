@@ -39,8 +39,6 @@ pub enum ClientToLib3h {
     FetchEntry(FetchEntryData), // NOTE: MAY BE DEPRECATED
     /// Publish data to the dht (event)
     PublishEntry(ProvidedEntryData),
-    /// Tell Engine that Client is holding this entry (event)
-    HoldEntry(ProvidedEntryData),
     /// Request some info / data from a Entry
     QueryEntry(QueryEntryData),
 }
@@ -129,9 +127,6 @@ impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
             }
             Lib3hClientProtocol::PublishEntry(provided_entry_data) => {
                 Ok(ClientToLib3h::PublishEntry(provided_entry_data))
-            }
-            Lib3hClientProtocol::HoldEntry(provided_entry_data) => {
-                Ok(ClientToLib3h::HoldEntry(provided_entry_data))
             }
             Lib3hClientProtocol::QueryEntry(query_entry_data) => {
                 Ok(ClientToLib3h::QueryEntry(query_entry_data))
@@ -254,9 +249,6 @@ impl From<ClientToLib3h> for Lib3hClientProtocol {
             }
             ClientToLib3h::PublishEntry(provided_entry_data) => {
                 Lib3hClientProtocol::PublishEntry(provided_entry_data)
-            }
-            ClientToLib3h::HoldEntry(provided_entry_data) => {
-                Lib3hClientProtocol::HoldEntry(provided_entry_data)
             }
             ClientToLib3h::QueryEntry(query_entry_data) => {
                 Lib3hClientProtocol::QueryEntry(query_entry_data)
