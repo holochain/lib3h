@@ -126,17 +126,6 @@ impl<'engine> GhostEngine<'engine> {
                 } else {
                     // FIXME #391
                     error!("unhandled error {}", error);
-                    /*
-                    self.network_connections.remove(uri);
-                    error!("{} Network error from {} : {:?}", self.name, uri, error);
-                    // Output a Lib3hToClient::Disconnected if it was the connection
-                    if self.network_connections.is_empty() {
-                        let data = DisconnectedData {
-                            network_id: "FIXME".to_string(), // TODO #172
-                        };
-                        self.lib3h_endpoint
-                            .publish(Span::fixme(), Lib3hToClient::Disconnected(data))?;
-                    }*/
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
@@ -145,16 +134,6 @@ impl<'engine> GhostEngine<'engine> {
                     uri.clone(),
                 )?;
             }
-            //            TransportEvent::ConnectionClosed(id) => {
-            //                self.network_connections.remove(id);
-            //                // Output a Lib3hToClient::Disconnected if it was the last connection
-            //                if self.network_connections.is_empty() {
-            //                    let data = DisconnectedData {
-            //                        network_id: "FIXME".to_string(), // TODO #172
-            //                    };
-            //                    outbox.push(Lib3hToClient::Disconnected(data));
-            //                }
-            //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
                 // zero len() means its just a ping, no need to deserialize and handle
