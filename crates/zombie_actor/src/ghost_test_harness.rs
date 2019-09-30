@@ -7,7 +7,8 @@
 ///
 ///
 
-pub const DEFAULT_MAX_ITERS: u16 = 20;
+pub const DEFAULT_MAX_ITERS: u16 = 10;
+pub const DEFAULT_MAX_RETRIES: u16 = 3;
 
 #[allow(unused_macros)]
 #[macro_export]
@@ -307,30 +308,43 @@ macro_rules! wait1_for_callback {
         is_match
     }};
 }
-/*
+
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait1_for_repeatable_callback {
-    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $re: expr) => {{
-        $crate::wait1_for_repeatable_callback!($actor, $ghost_can_track, $request_fn, $re, true);
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $init_value: expr) => {{
+        $crate::wait1_for_repeatable_callback!(
+            $actor,
+            $ghost_can_track,
+            $request_fn,
+            $init_value,
+            true
+        )
     }};
-    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $re: expr, $should_abort: expr) => {{
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $init_value: expr, $should_abort: expr) => {{
         let mut is_match = false;
 
-        for iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
-            let request = (request_fn)();
+        let mut state = $init_value;
+        for iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_RETRIES {
+            let (mut request, re, state_prime) = ($request_fn)(state);
+            state = state_prime;
             let should_abort =
-                $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_ITERS - 1;
-            is_match =
-                $crate::wait1_for_callback!($actor, $ghost_can_track, request, $re, should_abort);
+                $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_RETRIES - 1;
+            is_match = $crate::wait1_for_callback!(
+                $actor,
+                $ghost_can_track,
+                &mut request,
+                re,
+                should_abort
+            );
             if is_match {
-                return is_match;
+                break;
             }
         }
-        return is_match;
+        (is_match, state)
     }};
 }
-*/
+
 #[cfg(test)]
 mod tests {
 
@@ -487,5 +501,21 @@ mod tests {
     }
 
     #[test]
-    fn test_wait_for_repeatable_callback() {}
+    fn test_wait_for_repeatable_callback() {
+        let parent = &mut CallbackParentWrapper::new();
+        let actor = &mut DidWorkActor(1);
+
+        let request_fn = Box::new(|retried| {
+            if retried {
+                (RequestToOther::Ping, "Pong", true)
+            } else {
+                (RequestToOther::Retry, "Pong", true)
+            }
+        });
+
+        let (is_match, retried) =
+            wait1_for_repeatable_callback!(actor, parent, request_fn, false, false);
+        assert!(is_match);
+        assert!(retried);
+    }
 }
