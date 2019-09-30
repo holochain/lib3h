@@ -312,23 +312,33 @@ impl predicates::reflection::PredicateReflection for Lib3hServerProtocolAssert {
 /// Asserts work was done
 #[allow(dead_code)]
 #[derive(PartialEq, Debug)]
-pub struct DidWorkAssert(pub String /* engine name */);
+pub struct DidWorkAssert {
+    pub engine_name: String,
+    pub should_assert: bool,
+}
+
 impl Processor for DidWorkAssert {
     fn test(&self, args: &ProcessorResult) {
-        assert!(args.engine_name == self.0);
-        assert!(args.did_work);
+        if self.should_assert {
+            assert!(args.engine_name == self.engine_name);
+            assert!(args.did_work);
+        }
     }
 }
 
 impl Predicate<ProcessorResult> for DidWorkAssert {
     fn eval(&self, args: &ProcessorResult) -> bool {
-        args.engine_name == self.0 && args.did_work
+        args.engine_name == self.engine_name && args.did_work
     }
 }
 
 impl std::fmt::Display for DidWorkAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?} did work", self.0)
+        write!(
+            f,
+            "{:?} did work (should_assert={:?})",
+            self.engine_name, self.should_assert
+        )
     }
 }
 
@@ -680,6 +690,52 @@ macro_rules! wait_engine_wrapper_until_no_work {
         let mut did_work;
         loop {
             did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
+            if !did_work {
+                break;
+            }
+        }
+        did_work
+    }};
+}
+
+/// Continues processing two engine wrappers until they both exhibit work.
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait2_engine_wrapper_did_work {
+    ($engine1: ident,
+     $engine2: ident,
+     $should_abort: expr
+    ) => {{
+        let processors = vec![
+            Box::new($crate::utils::processor_harness::DidWorkAssert {
+                engine_name: $engine1.name(),
+                should_assert: $should_abort,
+            }),
+            Box::new($crate::utils::processor_harness::DidWorkAssert {
+                engine_name: $engine2.name(),
+                should_assert: $should_abort,
+            }),
+        ];
+        $crate::assert2_processed_all!($engine1, $engine2, processors)
+    }};
+    ($engine1: ident,
+     $engine2: ident
+    ) => {{
+        $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, true)
+    }};
+}
+
+/// Continues processing the engine wrapper until nso more work is observed
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait2_engine_wrapper_until_no_work {
+    ($engine1: ident, $engine2: ident) => {{
+        let mut did_work;
+        loop {
+            did_work = $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, false)
+                .iter()
+                .find(|result| result.did_work)
+                .is_some();
             if !did_work {
                 break;
             }

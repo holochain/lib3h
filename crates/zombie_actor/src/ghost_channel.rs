@@ -1,5 +1,5 @@
 use crate::{
-    ghost_error::ErrorKind, GhostCallback, GhostError, GhostResult, GhostTracker,
+    ghost_error::ErrorKind, Backtwrap, GhostCallback, GhostError, GhostResult, GhostTracker,
     GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone,
 };
 use holochain_tracing::Span;
@@ -9,13 +9,13 @@ use holochain_tracing::Span;
 #[derive(Debug)]
 enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
-        requester_bt: backtrace::Backtrace,
+        requester_bt: Backtwrap,
         request_id: Option<RequestId>,
         payload: Request,
         span: Span,
     },
     Response {
-        responder_bt: backtrace::Backtrace,
+        responder_bt: Backtwrap,
         request_id: RequestId,
         payload: Result<Response, Error>,
         span: Span,
@@ -31,7 +31,7 @@ pub struct GhostMessage<
     MessageToSelfResponse: 'static,
     Error: 'static,
 > {
-    requester_bt: backtrace::Backtrace,
+    requester_bt: Backtwrap,
     request_id: Option<RequestId>,
     message: Option<MessageToSelf>,
     sender: crossbeam_channel::Sender<
@@ -61,7 +61,7 @@ impl<
     > GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
-        requester_bt: backtrace::Backtrace,
+        requester_bt: Backtwrap,
         request_id: Option<RequestId>,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
@@ -82,7 +82,7 @@ impl<
     pub fn test_constructor() -> (Self) {
         let (sender, _receiver) = crossbeam_channel::unbounded();
         Self {
-            requester_bt: backtrace::Backtrace::new(),
+            requester_bt: Backtwrap::new(),
             request_id: None,
             message: None,
             sender,
@@ -93,7 +93,7 @@ impl<
     /// create a request message
     #[allow(dead_code)]
     fn new_request(
-        requester_bt: backtrace::Backtrace,
+        requester_bt: Backtwrap,
         request_id: RequestId,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
@@ -107,7 +107,7 @@ impl<
     /// create an event message
     #[allow(dead_code)]
     fn new_event(
-        requester_bt: backtrace::Backtrace,
+        requester_bt: Backtwrap,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -131,7 +131,7 @@ impl<
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
             self.sender.send(GhostEndpointMessage::Response {
-                responder_bt: backtrace::Backtrace::new(),
+                responder_bt: Backtwrap::new(),
                 request_id: request_id.clone(),
                 payload,
                 span: self.span,
@@ -158,7 +158,7 @@ impl<
         &self.span
     }
 
-    pub fn backtrace(&self) -> &backtrace::Backtrace {
+    pub fn backtrace(&self) -> &Backtwrap {
         &self.requester_bt
     }
 }
@@ -408,7 +408,7 @@ impl<
         trace!("ghost_channel: send request {:?}", request_id);
         span.event(format!("ghost_channel: send request {:?}", request_id));
         self.sender.send(GhostEndpointMessage::Request {
-            requester_bt: backtrace::Backtrace::new(),
+            requester_bt: Backtwrap::new(),
             request_id: Some(request_id),
             payload,
             span: span.follower("send request"),
@@ -447,7 +447,7 @@ impl<
     fn publish(&mut self, mut span: Span, payload: RequestToOther) -> GhostResult<()> {
         span.event("GhostChannel::publish");
         self.sender.send(GhostEndpointMessage::Request {
-            requester_bt: backtrace::Backtrace::new(),
+            requester_bt: Backtwrap::new(),
             request_id: None,
             payload,
             span,
@@ -604,7 +604,7 @@ mod tests {
 
         let mut msg: GhostMessage<TestMsgIn, TestMsgOut, TestMsgInResponse, TestError> =
             GhostMessage::new_event(
-                backtrace::Backtrace::new(),
+                Backtwrap::new(),
                 TestMsgIn("this is an event message from an internal child".into()),
                 child_send,
                 test_span(""),
@@ -633,7 +633,7 @@ mod tests {
         let request_id = RequestId::new();
         let msg: GhostMessage<TestMsgIn, TestMsgOut, TestMsgInResponse, TestError> =
             GhostMessage::new_request(
-                backtrace::Backtrace::new(),
+                Backtwrap::new(),
                 request_id.clone(),
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
@@ -741,7 +741,7 @@ mod tests {
                 parent_side
                     .sender
                     .send(GhostEndpointMessage::Response {
-                        responder_bt: backtrace::Backtrace::new(),
+                        responder_bt: Backtwrap::new(),
                         request_id: request_id.unwrap(),
                         payload: Ok(TestMsgOutResponse("response from parent".into())),
                         span,
@@ -777,7 +777,7 @@ mod tests {
         parent_side
             .sender
             .send(GhostEndpointMessage::Request {
-                requester_bt: backtrace::Backtrace::new(),
+                requester_bt: Backtwrap::new(),
                 request_id: None,
                 payload: TestMsgIn("event from a parent".into()),
                 span: test_span(""),
