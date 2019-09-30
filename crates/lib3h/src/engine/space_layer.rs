@@ -3,7 +3,7 @@
 use super::RealEngineTrackerData;
 use crate::{
     dht::dht_protocol::*,
-    engine::{ghost_engine::handle_gossip_to, p2p_protocol::*, ChainId, GhostEngine},
+    engine::{ghost_engine::handle_GossipTo, p2p_protocol::*, ChainId, GhostEngine},
     error::*,
     gateway::{protocol::*, P2pGateway},
     transport::protocol::*,
@@ -108,7 +108,7 @@ impl<'engine> GhostEngine<'engine> {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_gossip_to(chain_id.0.clone(), space_gateway, gossip_data)
+                        handle_GossipTo(chain_id.0.clone(), space_gateway, gossip_data)
                             .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
@@ -327,7 +327,21 @@ impl<'engine> GhostEngine<'engine> {
                     );
                 }
             }
-            _ => panic!("can't handle space layer receive of {:?}", p2p_msg),
+            P2pProtocol::Gossip(gossip_data) => {
+                let remote_gossip = RemoteGossipBundleData {
+                    from_peer_name: gossip_data.from_peer_name.clone(),
+                    bundle: gossip_data.bundle.clone(),
+                };
+                let space_gateway =
+                    self.get_space(&gossip_data.space_address, &gossip_data.to_peer_name.into())?;
+                space_gateway.publish(
+                    span.follower("TODO"),
+                    GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(remote_gossip)),
+                )?;
+            }
+            _ => {
+                panic!("can't handle space layer receive of {:?}", p2p_msg);
+            }
         };
         Ok(())
     }

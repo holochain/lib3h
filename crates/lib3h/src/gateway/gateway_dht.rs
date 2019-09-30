@@ -59,27 +59,12 @@ impl P2pGateway {
             self.identifier.nickname,
             payload
         );
-        match payload {
-            DhtRequestToParent::GossipTo(data) => {
-                for peer in data.peer_name_list.iter() {
-                    debug!("Send GossipTo {:?} {:?}", peer, data.bundle);
-                    self.handle_transport_RequestToChild(
-                        Span::fixme(),
-                        transport::protocol::RequestToChild::SendMessage {
-                            uri: peer,
-                            payload: data.bundle.clone(),
-                            attempt: 0,
-                        },
-                        // TODO XXX FIXME - we need a gateway_transport
-                        // pub(crate) fn that will do the dht lookup + send
-                        // and takes the generic callback like send()
-                        // so we dont need a GhostMessage here:
-                        None,
-                    )?;
-                }
+        match payload.clone() {
+            DhtRequestToParent::GossipTo(_data) => {
+                // no-op
             }
             DhtRequestToParent::GossipUnreliablyTo(_data) => {
-                unimplemented!();
+                // no-op
             }
             DhtRequestToParent::HoldPeerRequested(peer_data) => {
                 // TODO #167 - hardcoded for MirrorDHT and thus should not appear here.
@@ -105,7 +90,7 @@ impl P2pGateway {
                 from_peer_name: _,
                 entry: _,
             } => {
-                unreachable!();
+                // no-op
             }
             DhtRequestToParent::EntryPruned(_) => {
                 unreachable!();
@@ -114,6 +99,10 @@ impl P2pGateway {
                 unreachable!();
             }
         }
+        // Forward to parent
+        self.endpoint_self
+            .publish(span, GatewayRequestToParent::Dht(payload))?;
+        // Done
         Ok(())
     }
 }

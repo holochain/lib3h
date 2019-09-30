@@ -228,7 +228,7 @@ impl P2pGateway {
             };
 
         trace!(
-            "({}).priv_low_level_send message from {} to {}",
+            "({}).priv_low_level_send message from '{}' to '{}'",
             self.identifier.nickname,
             self.this_peer.peer_name.clone(),
             uri.clone()
@@ -309,7 +309,7 @@ impl P2pGateway {
         self.priv_encoded_send(span, to_address, uri, payload, cb)
     }
 
-    const MAX_RETRY_ATTEMPTS: u8 = 5;
+    const MAX_RETRY_ATTEMPTS: u8 = 255;
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
         let pending: Vec<PendingOutgoingMessage> =
             self.pending_outgoing_messages.drain(..).collect();

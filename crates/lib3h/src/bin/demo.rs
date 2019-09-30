@@ -21,6 +21,10 @@ static ASPECT_ADDR: &'static str = "query-demo-aspect";
 static A_1_ID: &'static str = "agent-1-id";
 static A_2_ID: &'static str = "agent-2-id";
 
+fn print_result<D: std::fmt::Debug>(r: D) {
+    println!("-- begin result --\n{:#?}\n--  end result  --", r);
+}
+
 struct EngineContainer<
     E: GhostActor<
         Lib3hToClient,
@@ -174,10 +178,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     )))
                     .unwrap();
                 }
-                Some(Lib3hToClient::HandleStoreEntryAspect(_a_data)) => {
-                    msg.respond(Ok(Lib3hToClientResponse::HandleStoreEntryAspectResult))
-                        .unwrap();
-                }
+                Some(Lib3hToClient::HandleStoreEntryAspect(a_data)) => print_result(a_data),
                 _ => (),
             }
         }
@@ -199,6 +200,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     )))
                     .unwrap();
                 }
+                Some(Lib3hToClient::HandleStoreEntryAspect(a_data)) => print_result(a_data),
                 _ => (),
             }
         }
@@ -224,7 +226,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     content: b"bob".to_vec().into(),
                 }),
                 Box::new(|_, r| {
-                    println!("-- begin result --\n{:#?}\n--  end result  --", r);
+                    print_result(r);
                     Ok(())
                 }),
             )
@@ -246,7 +248,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     query: b"bob".to_vec().into(),
                 }),
                 Box::new(|_, r| {
-                    println!("-- begin result --\n{:#?}\n--  end result  --", r);
+                    print_result(r);
                     Ok(())
                 }),
             )
@@ -275,13 +277,6 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .unwrap();
         self.process();
         // publish needs an extra 10 process calls
-        self.process();
-        self.process();
-        self.process();
-        self.process();
-        self.process();
-        self.process();
-        self.process();
         self.process();
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     dht::dht_protocol::*,
-    engine::{ghost_engine::handle_gossip_to, p2p_protocol::P2pProtocol, GhostEngine},
+    engine::{ghost_engine::handle_GossipTo, p2p_protocol::P2pProtocol, GhostEngine},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
     transport,
@@ -58,7 +58,7 @@ impl<'engine> GhostEngine<'engine> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
-                handle_gossip_to(
+                handle_GossipTo(
                     self.config.network_id.id.clone(),
                     self.multiplexer.as_mut(),
                     gossip_data,
@@ -126,17 +126,6 @@ impl<'engine> GhostEngine<'engine> {
                 } else {
                     // FIXME #391
                     error!("unhandled error {}", error);
-                    /*
-                    self.network_connections.remove(uri);
-                    error!("{} Network error from {} : {:?}", self.name, uri, error);
-                    // Output a Lib3hToClient::Disconnected if it was the connection
-                    if self.network_connections.is_empty() {
-                        let data = DisconnectedData {
-                            network_id: "FIXME".to_string(), // TODO #172
-                        };
-                        self.lib3h_endpoint
-                            .publish(Span::fixme(), Lib3hToClient::Disconnected(data))?;
-                    }*/
                 }
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
@@ -145,16 +134,6 @@ impl<'engine> GhostEngine<'engine> {
                     uri.clone(),
                 )?;
             }
-            //            TransportEvent::ConnectionClosed(id) => {
-            //                self.network_connections.remove(id);
-            //                // Output a Lib3hToClient::Disconnected if it was the last connection
-            //                if self.network_connections.is_empty() {
-            //                    let data = DisconnectedData {
-            //                        network_id: "FIXME".to_string(), // TODO #172
-            //                    };
-            //                    outbox.push(Lib3hToClient::Disconnected(data));
-            //                }
-            //            }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
                 // zero len() means its just a ping, no need to deserialize and handle
@@ -169,6 +148,7 @@ impl<'engine> GhostEngine<'engine> {
                         return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
                     }
                     let p2p_msg = maybe_msg.unwrap();
+                    // debug!("p2p_msg: {:?}", p2p_msg);
                     self.serve_P2pProtocol(span.child("serve_P2pProtocol"), uri, p2p_msg)?;
                 }
             }

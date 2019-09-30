@@ -49,7 +49,3 @@ xoroshiro128 = "0.3.0"
 hexf = "0.1.0"
 rand = "0.7.0"
 tempfile = "=3.1.0"
-
-[[bin]]
-name = "demo"
-path = "bin/demo.rs"

@@ -175,43 +175,8 @@ impl<'engine> GhostEngine<'engine> {
     }
 }
 
-/// Drop
-impl<'engine> Drop for GhostEngine<'engine> {
-    fn drop(&mut self) {
-        self.shutdown().unwrap_or_else(|e| {
-            warn!("Graceful shutdown failed: {}", e);
-        });
-    }
-}
-
 /// Private
 impl<'engine> GhostEngine<'engine> {
-    /// Called on drop.
-    /// Close all connections gracefully
-    fn shutdown(&mut self) -> Lib3hResult<()> {
-        let /*mut*/ result: Lib3hResult<()> = Ok(());
-
-        // TODO: #328
-        //        for space_gatway in self.space_gateway_map.values_mut() {
-        //            let res = space_gatway.as_transport_mut().close_all();
-        //            // Continue closing connections even if some failed
-        //            if let Err(e) = res {
-        //                if result.is_ok() {
-        //                    result = Err(e.into());
-        //                }
-        //            }
-        //        }
-        //        self.multiplexer
-        //            .as_transport_mut()
-        //            .close_all()
-        //            .map_err(|e| {
-        //                error!("Closing of some connection failed: {:?}", e);
-        //                e
-        //            })?;
-
-        result
-    }
-
     /// Process connect events by sending them to the multiplexer
     fn handle_bootstrap(
         &mut self,
@@ -546,7 +511,7 @@ impl<'engine> GhostEngine<'engine> {
     fn handle_leave(&mut self, _span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id = (join_msg.space_address.clone(), join_msg.agent_id.clone());
         match self.space_gateway_map.remove(&chain_id) {
-            Some(_) => Ok(()), //TODO is there shutdown code we need to call
+            Some(_) => Ok(()), //TODO is there shutdown code we need to call #421
             None => Err(Lib3hError::new_other("Not part of that space")),
         }
     }
@@ -734,8 +699,8 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
     set_b.is_subset(&set_a)
 }
-
-pub fn handle_gossip_to<
+#[allow(non_snake_case)]
+pub fn handle_GossipTo<
     G: GhostActor<
         GatewayRequestToParent,
         GatewayRequestToParentResponse,
@@ -749,7 +714,7 @@ pub fn handle_gossip_to<
     gossip_data: GossipToData,
 ) -> Lib3hResult<()> {
     debug!(
-        "({}) handle_gossip_to: {:?}",
+        "({}) handle_GossipTo: {:?}",
         gateway_identifier, gossip_data,
     );
 
@@ -762,11 +727,11 @@ pub fn handle_gossip_to<
         //            }
         //            // TODO END
 
-        // Convert DHT Gossip to P2P Gossip
+        // Convert DHT *GossipTo* to P2P *Gossip*
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
             space_address: gateway_identifier.clone(),
             to_peer_name: to_peer_name.clone(),
-            from_peer_name: Lib3hUri::with_undefined(), // FIXME
+            from_peer_name: Lib3hUri::with_undefined(), // Should be gateway.as_mut().as_mut().this_peer().peer_location,
             bundle: gossip_data.bundle.clone(),
         });
         let mut payload = Vec::new();
