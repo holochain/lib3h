@@ -43,6 +43,12 @@ struct P2pMessage {
 
     msgQueryResponse @10 :MsgQuery;
     # dht query response
+
+    msgPing @11 :MsgPing;
+    # see if we are able to message remote node
+
+    msgPong @12 :MsgPong;
+    # respond to a ping from a remote node
   }
 
   # -- top-level Message Types -- #
@@ -127,6 +133,23 @@ struct P2pMessage {
 
     data @2 :Data;
     # the message content (either request or response)
+  }
+
+  struct MsgPing {
+    # see if we are able to message remote node
+
+    pingSendEpochMs @0 :UInt64;
+    # the epoch ms timestamp the origin node sent the ping
+  }
+
+  struct MsgPong {
+    # respond to a ping from a remote node
+
+    pingSendEpochMs @0 :UInt64;
+    # the epoch ms ping timestamp (copied) from the origin node
+
+    pingReceivedEpochMs @1 :UInt64;
+    # the epoch ms timestamp the target node received the ping
   }
 
   # -- additional data types -- #
