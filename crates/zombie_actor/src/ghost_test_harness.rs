@@ -4,6 +4,11 @@
 
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort
 /// is true
+///
+///
+
+pub const DEFAULT_MAX_ITERS: u16 = 20;
+
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait_did_work {
@@ -23,7 +28,7 @@ macro_rules! wait_did_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
 
-        for i in 0..20 {
+        for i in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             did_work = $ghost_actor
                 .process()
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
@@ -69,7 +74,7 @@ macro_rules! wait_can_track_did_work {
     ) => {{
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
-        for i in 0..20 {
+        for i in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             did_work = $ghost_can_track
                 .process(&mut $user_data)
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
@@ -257,12 +262,15 @@ macro_rules! wait1_for_messages {
 #[macro_export]
 macro_rules! wait1_for_callback {
     ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr) => {{
+        $crate::wait1_for_callback!($actor, $request, $re, true)
+    }};
+    ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr, $should_abort: expr) => {{
         let regex = regex::Regex::new($re.clone())
             .expect(format!("[wait1_for_callback] invalid regex: {:?}", $re).as_str());
 
         let mut user_data = None;
 
-        let f: GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
+        let f: $crate::GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
             user_data.replace(format!("{:?}", cb_data).to_string());
             Ok(())
         });
@@ -275,9 +283,8 @@ macro_rules! wait1_for_callback {
             )
             .unwrap();
 
-        let MAX_ITERS = 20;
         let mut work_to_do = true;
-        for _iter in 0..MAX_ITERS {
+        for _iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             work_to_do |= $crate::wait_until_no_work!($actor);
             work_to_do |= $crate::wait_until_no_work!($ghost_can_track, user_data);
             if !work_to_do {
@@ -290,18 +297,45 @@ macro_rules! wait1_for_callback {
 
         let is_match = regex.is_match(actual.as_str());
 
+        if !$should_abort {
+            return is_match;
+        }
         if is_match {
             assert!(is_match);
         } else {
             assert_eq!($re, actual.as_str());
         }
+        return is_match;
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_repeatable_callback {
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $re: expr) => {{
+        $crate::wait1_for_repeatable_callback!($actor, $ghost_can_track, $request_fn, $re, true);
+    }};
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $re: expr, $should_abort: expr) => {{
+        let mut is_match = false;
+
+        for iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
+            let request = (request_fn)();
+            let should_abort =
+                $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_ITERS - 1;
+            is_match =
+                $crate::wait1_for_callback!($actor, $ghost_can_track, request, $re, should_abort);
+            if is_match {
+                return is_match;
+            }
+        }
+        return is_match;
     }};
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{GhostResult, WorkWasDone};
+    use crate::{GhostCallback, GhostCallbackData, GhostResult, WorkWasDone};
 
     #[derive(Debug, Clone, PartialEq)]
     struct DidWorkActor(i8);
@@ -321,10 +355,42 @@ mod tests {
         }
     }
 
+    pub type UserData = DidWorkActor;
+    pub type Error = String;
+    pub type Callback = GhostCallback<UserData, RequestToOtherResponse, Error>;
+    pub type CallbackData = GhostCallbackData<RequestToOtherResponse, Error>;
+
+    pub enum RequestToOther {
+        Ping,
+        Fail,
+    }
+
+    pub enum RequestToOtherResponse {
+        Pong,
+        Fail,
+    }
     struct DidWorkParentWrapper;
     impl DidWorkParentWrapper {
-        pub fn process(&mut self, user_data: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
-            user_data.process()
+        pub fn process(&mut self, actor: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
+            actor.process()
+        }
+
+        pub fn request(
+            &mut self,
+            span: holochain_tracing::Span,
+            payload: &mut RequestToOther,
+            cb: Callback,
+        ) -> GhostResult<()> {
+            let user_data = ();
+            let response = match payload {
+                RequestToOther::Ping => RequestToOtherResponse::Pong,
+                RequestToOther::Fail => RequestToOtherResponse::Fail,
+            };
+
+            let cb_data = GhostCallbackData::Response(Ok(response));
+            let cb_result = (cb)((), cb_data);
+
+            Ok(())
         }
     }
 
@@ -383,4 +449,18 @@ mod tests {
         assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
     }
 
+    #[test]
+    fn test_wait_for_callback() {
+        let parent = &mut DidWorkParentWrapper;
+        let mut actor = &mut DidWorkActor(2);
+
+        let request = RequestToOther::Ping;
+        assert!(
+            wait1_for_callback!(actor, parent, request, "Ping", false),
+            "Expected Ping response in callback"
+        );
+    }
+
+    #[test]
+    fn test_wait_for_repeatable_callback() {}
 }
