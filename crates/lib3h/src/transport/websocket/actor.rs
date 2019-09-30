@@ -359,8 +359,8 @@ pub type GhostTransportWebsocketEndpointContext = GhostContextEndpoint<
     TransportError,
 >;
 
-pub type GhostTransportWebsocketEndpointContextParent = GhostContextEndpoint<
-    (),
+pub type GhostTransportWebsocketEndpointContextParent<T> = GhostContextEndpoint<
+    T,
     RequestToChild,
     RequestToChildResponse,
     RequestToParent,
@@ -411,7 +411,7 @@ mod tests {
 
     use super::*;
     use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
-    use lib3h_ghost_actor::wait_for_message;
+    use lib3h_ghost_actor::{wait1_for_callback, wait_for_message};
     use std::net::TcpListener;
     use url::Url;
 
@@ -427,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn test_websocket_transport() {
+    fn test_websocket_transport_send_direct_msg() {
         let networkid_address: Address = "wss-bootstapping-network-id1.holo.host".into();
 
         let machine_id1 = "fake_machine_id1".into();
@@ -437,12 +437,13 @@ mod tests {
             networkid_address.clone(),
         );
 
-        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
-            .take_parent_endpoint()
-            .expect("exists")
-            .as_context_endpoint_builder()
-            .request_id_prefix("twss_to_child1")
-            .build::<()>();
+        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent<Option<String>> =
+            transport1
+                .take_parent_endpoint()
+                .expect("exists")
+                .as_context_endpoint_builder()
+                .request_id_prefix("twss_to_child1")
+                .build::<Option<String>>();
 
         let machine_id2 = "fake_machine_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
@@ -467,14 +468,14 @@ mod tests {
             Url::parse(&format!("wss://127.0.0.1:{}", port1))
                 .unwrap()
                 .into();
-        /*wait1_for_callback!(
+        wait1_for_callback!(
             transport1, t1_endpoint,
             RequestToChild::Bind { spec: expected_transport1_address.clone()},
             format!(
-                            "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
-                            port1.clone(),
-            )
-        );*/
+                "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
+                port1.clone(),
+            ).as_str()
+        );
 
         let port2 = get_available_port(9000).expect("Must be able to find free port");
         let expected_transport2_address: Lib3hUri =
@@ -502,7 +503,7 @@ mod tests {
             .unwrap();
 
         transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut ());
+        let _ = t1_endpoint.process(&mut None);
 
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut ());
@@ -524,7 +525,7 @@ mod tests {
                     expected_transport2_address.clone(),
                     b"test message".to_vec().into(),
                 ),
-                Box::new(|_: &mut (), r| {
+                Box::new(|_: &mut _, r| {
                     // parent should see that the send request was OK
                     assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
                     Ok(())
@@ -535,7 +536,7 @@ mod tests {
         wait_for_message!(
             vec![&mut transport1, &mut transport2],
             t2_endpoint,
-(),
+            (),
             "ReceivedData \\{ uri: Lib3hUri\\(\"wss://127\\.0\\.0\\.1:\\d+/\"\\), payload: \"test message\" \\}"
         );
     }
@@ -553,7 +554,7 @@ mod tests {
             networkid_address.clone(),
         );
 
-        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
+        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent<_> = transport1
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
@@ -668,7 +669,7 @@ mod tests {
             TlsConfig::Unencrypted,
             networkid_address.clone(),
         );
-        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent = transport1
+        let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent<_> = transport1
             .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
