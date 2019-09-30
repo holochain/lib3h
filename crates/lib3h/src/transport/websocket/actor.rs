@@ -22,6 +22,10 @@ use lib3h_protocol::{
     uri::Lib3hUri,
     Address,
 };
+use std::{
+    collections::HashSet,
+    time::Instant
+};
 
 // Use mDNS for bootstrapping
 use lib3h_mdns::{MulticastDns, MulticastDnsBuilder};
@@ -38,7 +42,12 @@ pub struct GhostTransportWebsocket {
     streams: StreamManager<std::net::TcpStream>,
     bound_url: Option<Lib3hUri>,
     pending: Vec<Message>,
+
+    // mDNS specific variables
     mdns: Option<MulticastDns>,
+    connections: HashSet<Lib3hUri>,
+    last_discover: Option<Instant>,
+    discover_interval_ms: u128,
 }
 
 // Here we just need to use mDNS, but use it only once, with advertise probably, and that's all.
@@ -51,8 +60,6 @@ impl Discovery for GhostTransportWebsocket {
                 .clone()
                 .ok_or_else(|| DiscoveryError::new_other("Must bind URL before advertising."))?
                 .into();
-
-            // let uri: url::Url = uri.into();
 
             let netid: String = self.network_id_address.clone().into();
 
@@ -137,6 +144,9 @@ impl GhostTransportWebsocket {
             bound_url: None,
             pending: Vec::new(),
             mdns: None,
+            connections: HashSet::new(),
+            last_discover: None,
+            discover_interval_ms: 1_000,
         }
     }
 
@@ -338,6 +348,17 @@ impl GhostTransportWebsocket {
         self.pending = temp;
         Ok(())
     }
+
+    /// Try to discover peers on the network using mDNS.
+    // fn try_discover(&mut self) -> TransportResult<Vec<Lib3hUri>> {
+    fn try_discover(&mut self) -> Vec<Lib3hUri> {
+        let uris = vec![];
+
+        // Let's check if it time to discover some peers
+
+
+        uris
+    }
 }
 
 pub type UserData = GhostTransportWebsocket;
@@ -386,6 +407,8 @@ impl
     // BOILERPLATE END----------------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // Periodic peer discovery
+        self.try_discover();
         // process the self endpoint
         detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
             .process(self))?;
