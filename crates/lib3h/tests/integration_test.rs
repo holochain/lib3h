@@ -49,7 +49,8 @@ fn enable_logging_for_test(enable: bool) {
         std::env::set_var("RUST_LOG", "trace");
     }
     let _ = env_logger::builder()
-        .default_format_timestamp(false)
+        // .default_format_timestamp(false)
+        .default_format_timestamp_nanos(true)
         .default_format_module_path(false)
         .is_test(enable)
         .try_init();
