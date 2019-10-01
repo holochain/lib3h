@@ -98,6 +98,14 @@ pub struct EntryData {
 }
 
 impl EntryData {
+
+    pub fn new(address: &Address) -> Self {
+        EntryData {
+            entry_address: address.clone(),
+            aspect_list: Vec::new(),
+        }
+    }
+
     /// get an EntryAspectData from an EntryData
     pub fn get(&self, aspect_address: &Address) -> Option<EntryAspectData> {
         for aspect in self.aspect_list.iter() {

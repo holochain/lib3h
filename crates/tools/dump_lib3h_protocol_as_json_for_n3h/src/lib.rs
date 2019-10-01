@@ -28,13 +28,6 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         result_info: b"yo".to_vec().into(),
     }));
 
-    test_client(Lib3hClientProtocol::FailureResult(GenericResultData {
-        request_id: "rid".to_string(),
-        space_address: "adr".to_string().into(),
-        to_agent_id: "aid".to_string().into(),
-        result_info: b"yo".to_vec().into(),
-    }));
-
     test_client(Lib3hClientProtocol::Connect(ConnectData {
         request_id: "rid".to_string(),
         peer_location: url::Url::parse("hc:id").unwrap().into(),

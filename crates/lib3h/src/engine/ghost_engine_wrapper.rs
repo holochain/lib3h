@@ -204,9 +204,6 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            Lib3hClientProtocol::FailureResult(data) => {
-                panic!("Received FailureResult: {:?}", data);
-            }
             msg => unimplemented!("Handle this case: {:?}", msg),
         };
 

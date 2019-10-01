@@ -239,8 +239,10 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::QueryEntry(data) => {
                 trace!("ClientToLib3h::QueryEntry: {:?}", data);
-                self.handle_query_entry(span.follower("handle_query_entry"), msg, data)
-                    .map_err(|e| GhostError::from(e.to_string()))
+                let res = self.handle_query_entry(span.follower("handle_query_entry"), msg, data)
+                    .map_err(|e| GhostError::from(e.to_string()));
+                trace!("ClientToLib3h::QueryEntry: res = {:?}", res);
+                res
             }
             ClientToLib3h::FetchEntry(_) => panic!("FetchEntry Deprecated"),
         }
@@ -657,7 +659,7 @@ impl<'engine> GhostEngine<'engine> {
         msg: ClientToLib3hMessage,
         data: QueryEntryData,
     ) -> Lib3hResult<()> {
-        // TODO #169 reflecting for now...
+        // TODO #169 #fullsync - reflecting for now...
         // ultimately this should get forwarded to the
         // correct neighborhood
         self.lib3h_endpoint
