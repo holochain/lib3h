@@ -5,7 +5,7 @@ use crate::{
     engine::p2p_protocol::P2pProtocol,
     error::*,
     gateway::{
-        protocol::*, GatewayOutputWrapType, P2pGateway,
+        protocol::*, GatewayOutputWrapType, P2pGateway, send_data_types::*,
     },
     message_encoding::encoding_protocol,
     transport::{self, error::TransportResult},
@@ -61,15 +61,12 @@ impl P2pGateway {
                         our_peer_name,
                         uri,
                     );
-                    me.send(
-                        span.follower("TODO send"),
-                        // This is a little awkward. If we are in wrapping
-                        // mode, we still need this to be wrapped... but
-                        // the remote side will intercept this message before
-                        // it is sent up the chain, so it's ok this is blank.
-                        "".to_string().into(),
-                        uri.clone(),
-                        buf.into(),
+                    me.send_with_full_low_uri(
+                        SendWithFullLowUri {
+                            span: span.follower("TODO send"),
+                            full_low_uri: uri.clone(),
+                            payload: buf.into(),
+                        },
                         Box::new(|response| {
                             match response {
                                 Ok(GatewayRequestToChildResponse::Transport(
