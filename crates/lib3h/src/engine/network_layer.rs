@@ -59,9 +59,11 @@ impl<'engine> GhostEngine<'engine> {
         debug!("{} << handle_network_dht_request: {:?}", self.name, request);
         match request {
             DhtRequestToParent::GossipTo(gossip_data) => {
+                let from_peer_name = &self.this_net_peer.peer_name;
                 handle_GossipTo(
                     self.config.network_id.id.clone(),
                     self.multiplexer.as_mut(),
+                    from_peer_name,
                     gossip_data,
                 )
                 .expect("Failed to gossip with multiplexer");

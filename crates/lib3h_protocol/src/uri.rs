@@ -81,13 +81,49 @@ impl Lib3hUri {
 
     // -- Misc -- //
 
+    /// does this uri match the given scheme?
     pub fn is_scheme(&self, scheme: UriScheme) -> bool {
         let s: String = scheme.into();
         self.scheme() == s
     }
 
+    /// new uri from &str
     fn parse(url_str: &str) -> Url {
         Url::parse(url_str).unwrap_or_else(|_| panic!("Invalid url format: '{}'", url_str))
+    }
+
+    /// return port if we have one
+    pub fn port(&self) -> Option<u16> {
+        self.0.port()
+    }
+
+    /// set a higher-level agent_id i.e. ?a=agent_id
+    pub fn set_agent_id(&mut self, agent_id: &Address) {
+        self.0
+            .query_pairs_mut()
+            .clear()
+            .append_pair("a", &agent_id.to_string());
+    }
+
+    /// clear any higher-level agent_id
+    pub fn clear_agent_id(&mut self) {
+        self.0.set_query(None);
+    }
+
+    /// do we have a higher-level agent_id? i.e. ?a=agent_id
+    pub fn agent_id(&self) -> Option<Address> {
+        for (n, v) in self.0.query_pairs() {
+            if &n == "a" {
+                return Some(v.to_string().into());
+            }
+        }
+        None
+    }
+
+    /// get our lower component as an address
+    /// i.e. transportid:HcMyada would return HcMyada
+    pub fn lower_address(&self) -> Address {
+        self.0.path().into()
     }
 }
 
@@ -197,10 +233,19 @@ mod tests {
     fn test_uri_create_transport() {
         let transport_id: Address = "fake_transport_id".into();
         let agent_id: Address = "HcAfake_agent_id".into();
-        let uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
+        let mut uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
         assert_eq!(
             "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
         );
+        assert_eq!(
+            Some(Address::from("HcAfake_agent_id".to_string())),
+            uri.agent_id(),
+        );
+        uri.set_agent_id(&"bla".to_string().into());
+        assert_eq!(Some(Address::from("bla".to_string())), uri.agent_id());
+        assert_eq!(Address::from("fake_transport_id"), uri.lower_address());
+        uri.clear_agent_id();
+        assert_eq!(None, uri.agent_id());
     }
 }

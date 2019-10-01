@@ -311,6 +311,10 @@ impl MirrorDht {
             peer_name_list: self.get_other_peer_list(),
             bundle: buf.into(),
         };
+        debug!(
+            "@MirrorDht@ {:?} GossipTo: {:?}",
+            self.this_peer, gossip_evt,
+        );
         DhtRequestToParent::GossipTo(gossip_evt)
     }
 }

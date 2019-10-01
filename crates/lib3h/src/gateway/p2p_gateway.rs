@@ -58,7 +58,7 @@ impl P2pGateway {
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
             this_peer,
-            pending_outgoing_messages: Vec::new(),
+            pending_send_queue: Vec::new(),
         }
     }
 

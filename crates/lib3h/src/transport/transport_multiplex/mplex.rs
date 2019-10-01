@@ -98,6 +98,19 @@ impl<
         endpoint_parent
     }
 
+    /// Remove route
+    pub fn remove_agent_space_route(
+        &mut self,
+        space_address: &Address,
+        local_agent_id: &Address,
+    ) -> Option<TransportActorSelfEndpoint<TransportMultiplex<G>>> {
+        let route_spec = LocalRouteSpec {
+            space_address: space_address.clone(),
+            local_agent_id: local_agent_id.clone(),
+        };
+        self.route_endpoints.remove(&route_spec)
+    }
+
     /// The owner of this multiplex (real_engine) has received a DirectMessage
     /// these at this level are intended to be forwarded up to our routes.
     /// Collect all the un-packed info that will let us pass it back up the
@@ -115,7 +128,10 @@ impl<
         };
         let path = Lib3hUri::with_agent_id(remote_agent_id);
         match self.route_endpoints.get_mut(&route_spec) {
-            None => panic!("no such route"),
+            None => Err(Lib3hError::new_other(&format!(
+                "no such route: {:?}",
+                route_spec
+            ))),
             Some(ep) => {
                 ep.publish(
                     Span::fixme(),
@@ -124,9 +140,9 @@ impl<
                         payload: unpacked_payload,
                     },
                 )?;
+                Ok(())
             }
         }
-        Ok(())
     }
 
     /// private dispatcher for messages from our inner transport
@@ -310,10 +326,20 @@ impl<
                 }),
             )?;
         } else {
-            self.inner_gateway.as_mut().publish(
+            let orig_req = data.clone();
+            self.inner_gateway.as_mut().request(
                 msg.span()
                     .follower("TODO follower of message in handle_msg_from_parent"),
                 data,
+                Box::new(move |_, response| {
+                    match response {
+                        GhostCallbackData::Response(Ok(response)) => {
+                            trace!("mplex forward response: {:?} from {:?}", response, orig_req);
+                        }
+                        _ => error!("mplex bad forward: {:?} from {:?}", response, orig_req),
+                    }
+                    Ok(())
+                }),
             )?;
         }
 

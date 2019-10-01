@@ -2,7 +2,7 @@
 pub type GhostResult<T> = Result<T, GhostError>;
 
 /// GhostError used in GhostResult responses
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GhostError(Box<ErrorKind>);
 
 impl GhostError {
@@ -25,6 +25,8 @@ impl GhostError {
 /// The specific type of an error.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorKind {
+    /// If we have multiple sub-errors, we can represent them as a super-error
+    Multiple(Vec<GhostError>),
     /// returned on an attempt to handle an callback for a non-existent request
     RequestIdNotFound(String),
     /// Generic stringified errors
@@ -43,9 +45,7 @@ impl std::error::Error for GhostError {
     /// The lower-level source of this error, if any.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self.0 {
-            ErrorKind::RequestIdNotFound(ref _s) => None,
-            ErrorKind::Other(ref _s) => None,
-            _ => unreachable!(),
+            _ => None,
         }
     }
 }
@@ -53,10 +53,17 @@ impl std::error::Error for GhostError {
 impl std::fmt::Display for GhostError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self.0 {
+            ErrorKind::Multiple(ref s) => write!(f, "Multiple {{{:?}}}", s),
             ErrorKind::RequestIdNotFound(ref s) => write!(f, "RequestIdNotFound {{{:?}}}", s),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),
         }
+    }
+}
+
+impl From<Vec<GhostError>> for GhostError {
+    fn from(m: Vec<GhostError>) -> Self {
+        GhostError::new(ErrorKind::Multiple(m))
     }
 }
 

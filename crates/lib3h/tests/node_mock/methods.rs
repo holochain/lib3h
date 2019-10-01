@@ -230,6 +230,12 @@ impl NodeMock {
         }
     }
 
+    pub fn get_entry(&self, entry_address: &Address) -> Option<EntryData> {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let data_store = self.chain_store_list.get(&current_space)?;
+        data_store.get_entry(entry_address)
+    }
+
     ///
     pub fn author_entry(
         &mut self,
