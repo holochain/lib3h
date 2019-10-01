@@ -4,6 +4,12 @@
 
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort
 /// is true
+///
+///
+
+pub const DEFAULT_MAX_ITERS: u16 = 10;
+pub const DEFAULT_MAX_RETRIES: u16 = 3;
+
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait_did_work {
@@ -23,7 +29,7 @@ macro_rules! wait_did_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
 
-        for i in 0..20 {
+        for i in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             did_work = $ghost_actor
                 .process()
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
@@ -69,7 +75,7 @@ macro_rules! wait_can_track_did_work {
     ) => {{
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
-        for i in 0..20 {
+        for i in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             did_work = $ghost_can_track
                 .process(&mut $user_data)
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
@@ -257,12 +263,15 @@ macro_rules! wait1_for_messages {
 #[macro_export]
 macro_rules! wait1_for_callback {
     ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr) => {{
+        $crate::wait1_for_callback!($actor, $ghost_can_track, $request, $re, true)
+    }};
+    ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr, $should_abort: expr) => {{
         let regex = regex::Regex::new($re.clone())
             .expect(format!("[wait1_for_callback] invalid regex: {:?}", $re).as_str());
 
         let mut user_data = None;
 
-        let f: GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
+        let f: $crate::GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
             user_data.replace(format!("{:?}", cb_data).to_string());
             Ok(())
         });
@@ -275,9 +284,8 @@ macro_rules! wait1_for_callback {
             )
             .unwrap();
 
-        let MAX_ITERS = 20;
         let mut work_to_do = true;
-        for _iter in 0..MAX_ITERS {
+        for _iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_ITERS {
             work_to_do |= $crate::wait_until_no_work!($actor);
             work_to_do |= $crate::wait_until_no_work!($ghost_can_track, user_data);
             if !work_to_do {
@@ -290,18 +298,66 @@ macro_rules! wait1_for_callback {
 
         let is_match = regex.is_match(actual.as_str());
 
-        if is_match {
-            assert!(is_match);
-        } else {
-            assert_eq!($re, actual.as_str());
+        if $should_abort {
+            if is_match {
+                assert!(is_match);
+            } else {
+                assert_eq!($re, actual.as_str());
+            }
         }
+        is_match
+    }};
+}
+
+/// Similar to `wait1_for_callback!` but will invoke the callback multiple times until
+/// success. Users need provide a closure `$request_fn` that takes a user defined state and
+/// produces a triple of `(request_to_other, regex, new_state)`. If the request fails to produce
+/// the matching regex, the closure will be invoked again with `new_state` instead of `state`.
+/// This will continue until success or a finite number of failures has been reached.
+///
+/// If `$should_abort` is `false`, the function returns a tuple ``(is_match, final_state)` where
+/// `is_match` indicates whether the regexed match and `final_state` contains the final state produced
+/// by the closure.
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_repeatable_callback {
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $init_value: expr) => {{
+        $crate::wait1_for_repeatable_callback!(
+            $actor,
+            $ghost_can_track,
+            $request_fn,
+            $init_value,
+            true
+        )
+    }};
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $init_value: expr, $should_abort: expr) => {{
+        let mut is_match = false;
+
+        let mut state = $init_value;
+        for iter in 0..$crate::ghost_test_harness::DEFAULT_MAX_RETRIES {
+            let (request, re, state_prime) = ($request_fn)(state);
+            state = state_prime;
+            let should_abort =
+                $should_abort && iter == $crate::ghost_test_harness::DEFAULT_MAX_RETRIES - 1;
+            is_match = $crate::wait1_for_callback!(
+                $actor,
+                $ghost_can_track,
+                request,
+                re.as_str(),
+                should_abort
+            );
+            if is_match {
+                break;
+            }
+        }
+        (is_match, state)
     }};
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{GhostResult, WorkWasDone};
+    use crate::{GhostCallback, GhostCallbackData, GhostResult, WorkWasDone};
 
     #[derive(Debug, Clone, PartialEq)]
     struct DidWorkActor(i8);
@@ -321,10 +377,66 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Clone)]
+    pub enum RequestToOther {
+        Ping,
+        Retry,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum RequestToOtherResponse {
+        Pong,
+        Retry,
+    }
+
+    #[derive(Debug)]
     struct DidWorkParentWrapper;
     impl DidWorkParentWrapper {
-        pub fn process(&mut self, user_data: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
-            user_data.process()
+        pub fn process(&mut self, actor: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
+            actor.process()
+        }
+    }
+
+    pub type CallbackError = String;
+    pub type Callback = GhostCallback<Option<String>, RequestToOtherResponse, CallbackError>;
+    #[allow(dead_code)]
+    pub type CallbackData = GhostCallbackData<RequestToOtherResponse, CallbackError>;
+    //    #[derive(Debug)]
+    struct CallbackParentWrapper(pub Vec<(Callback, CallbackData)>);
+
+    pub type CallbackUserData = Option<String>;
+
+    impl CallbackParentWrapper {
+        pub fn request(
+            &mut self,
+            _span: holochain_tracing::Span,
+            payload: RequestToOther,
+            cb: Callback,
+        ) -> GhostResult<()> {
+            let response = match payload {
+                RequestToOther::Ping => RequestToOtherResponse::Pong,
+                RequestToOther::Retry => RequestToOtherResponse::Retry,
+            };
+
+            let cb_data = GhostCallbackData::Response(Ok(response));
+            self.0.push((cb, cb_data));
+            Ok(())
+        }
+
+        pub fn process(
+            &mut self,
+            mut user_data: &mut CallbackUserData,
+        ) -> GhostResult<WorkWasDone> {
+            if let Some((cb, cb_data)) = self.0.pop() {
+                let _cb_result = (cb)(&mut user_data, cb_data);
+                Ok(true.into())
+            } else {
+                Ok(false.into())
+            }
+        }
+
+        pub fn new() -> Self {
+            CallbackParentWrapper(vec![])
         }
     }
 
@@ -381,5 +493,38 @@ mod tests {
         wait_until_no_work!(parent, actor);
 
         assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
+    }
+
+    #[test]
+    fn test_wait_for_callback() {
+        let parent = &mut CallbackParentWrapper::new();
+        let actor = &mut DidWorkActor(1);
+
+        let request = RequestToOther::Ping;
+        let is_match = wait1_for_callback!(actor, parent, request, "Pong", false);
+        assert!(is_match);
+
+        let request = RequestToOther::Retry;
+        let is_match = wait1_for_callback!(actor, parent, request, "Pong", false);
+        assert!(!is_match);
+    }
+
+    #[test]
+    fn test_wait_for_repeatable_callback() {
+        let parent = &mut CallbackParentWrapper::new();
+        let actor = &mut DidWorkActor(1);
+
+        let request_fn = Box::new(|retried| {
+            if retried {
+                (RequestToOther::Ping, "Pong".to_string(), true)
+            } else {
+                (RequestToOther::Retry, "Pong".to_string(), true)
+            }
+        });
+
+        let (is_match, retried) =
+            wait1_for_repeatable_callback!(actor, parent, request_fn, false, false);
+        assert!(is_match);
+        assert!(retried);
     }
 }
