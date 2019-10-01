@@ -81,19 +81,23 @@ impl Lib3hUri {
 
     // -- Misc -- //
 
+    /// does this uri match the given scheme?
     pub fn is_scheme(&self, scheme: UriScheme) -> bool {
         let s: String = scheme.into();
         self.scheme() == s
     }
 
+    /// new uri from &str
     fn parse(url_str: &str) -> Url {
         Url::parse(url_str).unwrap_or_else(|_| panic!("Invalid url format: '{}'", url_str))
     }
 
+    /// return port if we have one
     pub fn port(&self) -> Option<u16> {
         self.0.port()
     }
 
+    /// set a higher-level agent_id i.e. ?a=agent_id
     pub fn set_agent_id(&mut self, agent_id: &Address) {
         self.0
             .query_pairs_mut()
@@ -101,10 +105,12 @@ impl Lib3hUri {
             .append_pair("a", &agent_id.to_string());
     }
 
+    /// clear any higher-level agent_id
     pub fn clear_agent_id(&mut self) {
         self.0.set_query(None);
     }
 
+    /// do we have a higher-level agent_id? i.e. ?a=agent_id
     pub fn agent_id(&self) -> Option<Address> {
         for (n, v) in self.0.query_pairs() {
             if &n == "a" {
@@ -114,6 +120,8 @@ impl Lib3hUri {
         None
     }
 
+    /// get our lower component as an address
+    /// i.e. transportid:HcMyada would return HcMyada
     pub fn lower_address(&self) -> Address {
         self.0.path().into()
     }

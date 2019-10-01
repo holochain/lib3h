@@ -102,14 +102,3 @@ pub(crate) mod send_data_types {
         dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static,
     >;
 }
-
-/*
-#[derive(Debug)]
-struct PendingOutgoingMessage {
-    span: Span,
-    uri: Lib3hUri,
-    payload: Opaque,
-    parent_request: GatewayToChildMessage,
-    attempt: u8,
-}
-*/

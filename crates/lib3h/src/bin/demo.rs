@@ -217,9 +217,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 
     pub fn process(&mut self) {
         self.priv_process();
-        // send retry interval is 20ms... this gives us ~50ms, so 2.5 attempts?
-        for _ in 0..10 {
-            std::thread::sleep(std::time::Duration::from_millis(5));
+        for _ in 0..20 {
+            std::thread::sleep(std::time::Duration::from_millis(2));
             self.priv_process();
         }
     }
