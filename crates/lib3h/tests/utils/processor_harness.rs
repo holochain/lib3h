@@ -623,7 +623,7 @@ macro_rules! wait_connect {
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
-        assert2_msg_matches!($me, $other, "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"transportid:Hc.*\"\\) \\}\\)");
+      $crate::assert2_msg_matches!($me, $other, "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"transportid:Hc.*\"\\) \\}\\)");
     }};
 }
 
