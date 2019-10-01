@@ -7,14 +7,14 @@ pub type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-//        (test_setup_only, true),
-//        (test_send_message, true),
-//        (test_send_message_fail, true),
-//        (test_send_message_self, true),
-//        (test_author_no_aspect, true),
+        (test_setup_only, true),
+        (test_send_message, true),
+        (test_send_message_fail, true),
+        (test_send_message_self, true),
+        (test_author_no_aspect, true),
         (test_author_one_aspect, true),
-//        (test_author_two_aspects, true),
-//        (test_two_authors, true),
+        (test_author_two_aspects, true),
+        (test_two_authors, true),
     ];
 }
 
