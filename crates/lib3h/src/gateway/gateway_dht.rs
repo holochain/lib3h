@@ -111,8 +111,9 @@ impl P2pGateway {
                     GhostCallbackData::Response(Err(e)) => {
                         panic!("Got error on GatewayRequest DHT: {:?} ", e);
                     }
-                    GhostCallbackData::Timeout(bt) => {
-                        panic!("Got timeout on GatewayRequest DHT: {:?}", bt);
+                    GhostCallbackData::Timeout(_bt) => {
+                        // Not all requests expects a response so timeouts are expected
+                        return Ok(());
                     }
                     _ => panic!("Got wrong response type"),
                 };
