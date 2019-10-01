@@ -467,6 +467,8 @@ mod tests {
             .unwrap()
             .into();
 
+        // closure for the wait1_for_repeatable_callback! that builds a new request with a different port number
+        // an a modified regular expression expectation to match
         let request_fn = Box::new(|transport1_address: Lib3hUri| {
             let old_port = transport1_address.port().unwrap_or_else(|| 0);
             let port = get_available_port(old_port + 1).expect("Must be able to find free port");
