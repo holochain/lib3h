@@ -1,4 +1,8 @@
-use crate::{node_mock::NodeMock, test_suites::two_basic::request_entry_ok, utils::constants::*};
+use crate::{
+    node_mock::{test_join_space, NodeMock},
+    test_suites::two_basic::request_entry_ok,
+    utils::constants::*,
+};
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 pub type ThreeNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock);
@@ -34,59 +38,17 @@ pub fn setup_three_nodes(
     // Connect Camille to Billy
     let connect_data = camille.connect_to(&billy.advertise()).unwrap();
     wait_connect!(camille, connect_data, billy);
-    // More process: Have Billy process P2p::PeerName of Camille
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
-    // More process so Camille can handshake with billy
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Space joining
     // =============
     // Alex joins space
-    println!("\n Alex joins space \n");
-    let req_id = alex.join_space(&SPACE_ADDRESS_A, true).unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
-    // Extra processing required for auto-handshaking
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
+    test_join_space(alex, &SPACE_ADDRESS_A);
 
     // Billy joins space
-    println!("\n Billy joins space \n");
-    let req_id = billy.join_space(&SPACE_ADDRESS_A, true).unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
-    // Extra processing required for auto-handshaking
-    let (_did_work, _srv_msg_list) = alex.process().unwrap();
-    let (_did_work, _srv_msg_list) = camille.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
+    test_join_space(billy, &SPACE_ADDRESS_A);
 
     // Camille joins space
-    println!("\n Camille joins space \n");
-    let req_id = camille.join_space(&SPACE_ADDRESS_A, true).unwrap();
-    let (did_work, srv_msg_list) = camille.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    test_join_space(camille, &SPACE_ADDRESS_A);
 
     // Extra processing required for auto-handshaking
     wait_engine_wrapper_until_no_work!(alex);
@@ -157,6 +119,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
         "billy send response with msg.request_id={:?}",
         msg.request_id
     );
+
     alex.send_response(
         &msg.request_id,
         &camille.agent_id(),
@@ -167,6 +130,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
 }
 
 /// Test publish, Store, Query
+#[allow(dead_code)]
 fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock) {
     // Hold an entry without publishing it
     println!("\n Alex broadcasts entry via GossipingList...\n");

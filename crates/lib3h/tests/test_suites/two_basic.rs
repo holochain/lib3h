@@ -1,4 +1,7 @@
-use crate::{node_mock::NodeMock, utils::constants::*};
+use crate::{
+    node_mock::{test_join_space, NodeMock},
+    utils::constants::*,
+};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
@@ -81,8 +84,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     assert_eq!(&found_entry, entry);
 }
 
-///
-#[allow(dead_code)]
+// setup for two nodes joining the same space
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
     println!(
         "\ntwo_join_space ({},{}) -> {}\n",
@@ -91,27 +93,12 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
         space_address
     );
     // Alex joins space
-    let req_id = alex.join_space(&space_address, true).unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    test_join_space(alex, space_address);
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space
-    println!("\n {} joins {}\n", billy.name(), space_address);
-    let req_id = billy.join_space(&space_address, true).unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    test_join_space(billy, space_address);
 
     // Extra processing required for auto-handshaking
     wait_engine_wrapper_until_no_work!(alex);
@@ -137,10 +124,8 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"billy\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
     let results = assert2_msg_matches!(alex, billy, expected);
-
     let handle_send_direct_msg = results.first().unwrap();
     let event = handle_send_direct_msg.events.first().unwrap();
-
     let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
 
     // Send response
@@ -155,7 +140,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert2_msg_matches!(alex, billy, expected);
 }
 
-/// Test SendDirectMessage and response
+/// Test SendDirectMessage and response failure
 #[allow(dead_code)]
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
     trace!("[test_send_message_fail] alex send to camille");
