@@ -3,9 +3,7 @@ use crate::{
     test_suites::two_basic::{request_entry_ok, TwoNodesTestFn},
     utils::constants::*,
 };
-use lib3h_protocol::{data_types::EntryData, protocol_server::Lib3hServerProtocol};
-use rmp_serde::Deserializer;
-use serde::Deserialize;
+use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 lazy_static! {
     pub static ref TWO_NODES_GET_LISTS_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
@@ -90,7 +88,7 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Billy asks for unpublished data.
     println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name());
-    let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
+    let _query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
 
     // Receives back the HandleQuery
     let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
