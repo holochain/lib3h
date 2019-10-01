@@ -104,6 +104,8 @@ pub fn test_multispace_send(alex: &mut NodeMock, billy: &mut NodeMock) {
     println!("\n Alex and Billy joins other spaces...\n");
     two_join_space(alex, billy, &SPACE_ADDRESS_B);
     two_join_space(alex, billy, &SPACE_ADDRESS_C);
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
 
     // Send messages on SPACE B
     // ========================

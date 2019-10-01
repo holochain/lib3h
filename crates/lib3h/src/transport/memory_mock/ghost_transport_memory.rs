@@ -242,7 +242,7 @@ impl
                     match event {
                         MemoryEvent::ReceivedData(from_addr, payload) => {
                             trace!(
-                                "MemoryEvent::RecivedData--- from:{:?} payload:{:?}",
+                                "MemoryEvent::ReceivedData --- from:{:?} payload:{:?}",
                                 from_addr,
                                 payload
                             );

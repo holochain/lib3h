@@ -97,36 +97,38 @@ impl P2pGateway {
                 unreachable!();
             }
             DhtRequestToParent::RequestEntry(_) => {
-                // no-op
+                self.endpoint_self.request(
+                    span,
+                    GatewayRequestToParent::Dht(payload),
+                    Box::new(|me, response| {
+                        trace!("Received requestEntry response in Gateway");
+                        let dht_response = match response {
+                            GhostCallbackData::Response(Ok(
+                                GatewayRequestToParentResponse::Dht(d),
+                            )) => d,
+                            GhostCallbackData::Response(Err(e)) => {
+                                panic!("Got error on GatewayRequest DHT: {:?} ", e);
+                            }
+                            GhostCallbackData::Timeout(bt) => {
+                                panic!("Got timeout on GatewayRequest DHT: {:?}", bt);
+                            }
+                            _ => panic!("Got wrong response type"),
+                        };
+                        // #fullsync - received entry response after request from gossip list handling,
+                        // treat it as an erntry from author list handling.
+                        if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
+                            me.inner_dht
+                                .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
+                        }
+                        Ok(())
+                    }),
+                )?;
+                return Ok(());
             }
         }
         // Forward to parent
-        self.endpoint_self.request(
-            span,
-            GatewayRequestToParent::Dht(payload),
-            Box::new(|me, response| {
-                trace!("Received requestEntry response in Gateway");
-                let dht_response = match response {
-                    GhostCallbackData::Response(Ok(GatewayRequestToParentResponse::Dht(d))) => d,
-                    GhostCallbackData::Response(Err(e)) => {
-                        panic!("Got error on GatewayRequest DHT: {:?} ", e);
-                    }
-                    GhostCallbackData::Timeout(_bt) => {
-                        // Not all requests expects a response so timeouts are expected
-                        return Ok(());
-                    }
-                    _ => panic!("Got wrong response type"),
-                };
-                // #fullsync - received entry response after request from gossip list handling,
-                // treat it as an erntry from author list handling.
-                if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
-                    me.inner_dht
-                        .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
-                }
-                Ok(())
-            }),
-        )?;
-
+        self.endpoint_self
+            .publish(span, GatewayRequestToParent::Dht(payload))?;
         // Done
         Ok(())
     }
