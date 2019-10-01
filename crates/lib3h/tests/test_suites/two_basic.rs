@@ -136,11 +136,9 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
 
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"billy\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
-
     let results = assert2_msg_matches!(alex, billy, expected);
 
     let handle_send_direct_msg = results.first().unwrap();
-
     let event = handle_send_direct_msg.events.first().unwrap();
 
     let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
@@ -154,7 +152,6 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
-
     assert2_msg_matches!(alex, billy, expected);
 }
 
