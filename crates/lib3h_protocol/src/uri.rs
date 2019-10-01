@@ -89,6 +89,10 @@ impl Lib3hUri {
     fn parse(url_str: &str) -> Url {
         Url::parse(url_str).unwrap_or_else(|_| panic!("Invalid url format: '{}'", url_str))
     }
+
+    pub fn port(&self) -> Option<u16> {
+        self.0.port()
+    }
 }
 
 // -- Converters -- //
