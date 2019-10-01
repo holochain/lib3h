@@ -90,27 +90,40 @@ impl Lib3hUri {
         Url::parse(url_str).unwrap_or_else(|_| panic!("Invalid url format: '{}'", url_str))
     }
 
+    /// The port portion of the url, if present.
     pub fn port(&self) -> Option<u16> {
         self.0.port()
     }
 
+    /// The host portion of the url, if present.
     pub fn host(&self) -> Option<url::Host<&str>> {
         self.0.host()
     }
 
-    pub fn hostname(&self) -> Option<String> {
-        self.host().map(|host| host.to_string()) 
+    /// The raw scheme name of the url as string. Eg. `mem` or `wss`.
+    pub fn raw_scheme(&self) -> &str {
+        self.0.scheme()
     }
 
+    /// The hostname portion of the url (eg. `127.0.0.1` or `foo.com`), if present.
+    pub fn hostname(&self) -> Option<String> {
+        self.host().map(|host| host.to_string())
+    }
 }
 
-
-pub struct Builder { scheme:Option<String>, host:String, port:Option<u16> }
+pub struct Builder {
+    scheme: Option<String>,
+    host: String,
+    port: Option<u16>,
+}
 
 impl Builder {
-
     pub fn with_host(host: &str) -> Self {
-        Self { scheme: None, host: host.into(), port: None }
+        Self {
+            scheme: None,
+            host: host.into(),
+            port: None,
+        }
     }
 
     pub fn with_scheme(&mut self, scheme: &str) -> &mut Self {
@@ -124,16 +137,21 @@ impl Builder {
     }
 
     pub fn build(&self) -> Result<Lib3hUri, Lib3hProtocolError> {
-
-        let scheme = self.scheme.as_ref().map(|scheme| format!("{}://", scheme))
+        let scheme = self
+            .scheme
+            .as_ref()
+            .map(|scheme| format!("{}://", scheme))
             .unwrap_or_else(|| "".to_string());
-        let port = self.port.map(|port| format!(":{}", port))
+        let port = self
+            .port
+            .map(|port| format!(":{}", port))
             .unwrap_or_else(|| "".to_string());
         let host = &self.host;
 
         format!("{}{}{}/", scheme, host, port).as_str().try_into()
     }
 }
+
 // -- Converters -- //
 
 impl From<Lib3hUri> for Address {
@@ -245,5 +263,19 @@ mod tests {
             "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
         );
+    }
+
+    #[test]
+    fn test_uri_builder() {
+        let scheme = "wss";
+        let host = "127.0.0.1";
+        let port = 900;
+        let result = Builder::with_host(host)
+            .with_scheme(scheme)
+            .with_port(port)
+            .build();
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), "wss://127.0.0.1:900/");
     }
 }
