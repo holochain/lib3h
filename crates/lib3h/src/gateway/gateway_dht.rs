@@ -74,10 +74,12 @@ impl P2pGateway {
                     self.identifier.nickname, peer_data.peer_name, peer_data.peer_location,
                 );
                 // Send phony SendMessage request so we connect to it
+                let mut uri = peer_data.peer_location.clone();
+                uri.set_agent_id(&peer_data.peer_name.lower_address());
                 self.send_with_full_low_uri(
                     SendWithFullLowUri {
                         span: span.follower("DhtRequestToParent::HoldPeerRequested"),
-                        full_low_uri: peer_data.peer_location,
+                        full_low_uri: uri,
                         payload: Opaque::new(), // TODO - replace with ping
                     },
                     Box::new(|_| Ok(())),

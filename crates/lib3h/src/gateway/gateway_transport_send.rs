@@ -11,7 +11,7 @@ use lib3h_protocol::data_types::*;
 use rmp_serde::Serializer;
 use serde::Serialize;
 
-const SEND_RETRY_INTERVAL_MS: u64 = 200;
+const SEND_RETRY_INTERVAL_MS: u64 = 20;
 const SEND_RETRY_TIMEOUT_MS: u64 = 2000;
 
 /// Private internals
@@ -126,8 +126,8 @@ impl P2pGateway {
                         Some(peer_data),
                     ))) => {
                         // hey, we got a low-level uri, let's process it
-                        let uri = peer_data.peer_location.clone();
-                        error!("IS THIS FULLY QUALIFIED?? {:?}", uri);
+                        let mut uri = peer_data.peer_location.clone();
+                        uri.set_agent_id(&peer_data.peer_name.lower_address());
                         me.priv_send_with_full_low_uri(
                             SendWithFullLowUri {
                                 span: Span::fixme(),
@@ -216,7 +216,10 @@ impl P2pGateway {
         expires_at: std::time::Instant,
         cb: SendCallback,
     ) -> GhostResult<()> {
-        let to_agent_id = send_data.full_low_uri.agent_id();
+        let to_agent_id = match send_data.full_low_uri.agent_id() {
+            Some(agent_id) => agent_id,
+            None => "".to_string().into(), // TODO - is this correct?
+        };
 
         let payload =
             if let GatewayOutputWrapType::WrapOutputWithP2pDirectMessage = self.wrap_output_type {

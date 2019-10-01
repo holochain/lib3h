@@ -94,13 +94,24 @@ impl Lib3hUri {
         self.0.port()
     }
 
-    pub fn agent_id(&self) -> Address {
+    pub fn set_agent_id(&mut self, agent_id: &Address) {
+        self.0
+            .query_pairs_mut()
+            .clear()
+            .append_pair("a", &agent_id.to_string());
+    }
+
+    pub fn agent_id(&self) -> Option<Address> {
         for (n, v) in self.0.query_pairs() {
             if &n == "a" {
-                return v.to_string().into();
+                return Some(v.to_string().into());
             }
         }
-        panic!("could not find agent id in {}", self.0);
+        None
+    }
+
+    pub fn lower_address(&self) -> Address {
+        self.0.path().into()
     }
 }
 
@@ -210,14 +221,17 @@ mod tests {
     fn test_uri_create_transport() {
         let transport_id: Address = "fake_transport_id".into();
         let agent_id: Address = "HcAfake_agent_id".into();
-        let uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
+        let mut uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
         assert_eq!(
             "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
         );
         assert_eq!(
-            Address::from("HcAfake_agent_id".to_string()),
+            Some(Address::from("HcAfake_agent_id".to_string())),
             uri.agent_id(),
         );
+        uri.set_agent_id(&"bla".to_string().into());
+        assert_eq!(Some(Address::from("bla".to_string())), uri.agent_id(),);
+        assert_eq!(Address::from("fake_transport_id"), uri.lower_address(),);
     }
 }
