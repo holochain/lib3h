@@ -5,7 +5,7 @@ use crate::{
     engine::p2p_protocol::P2pProtocol,
     error::*,
     gateway::{
-        protocol::*, GatewayOutputWrapType, P2pGateway, PendingOutgoingMessage, SendCallback,
+        protocol::*, GatewayOutputWrapType, P2pGateway,
     },
     message_encoding::encoding_protocol,
     transport::{self, error::TransportResult},
@@ -179,6 +179,7 @@ impl P2pGateway {
         Ok(())
     }
 
+    /*
     fn priv_encoded_send(
         &mut self,
         span: Span,
@@ -360,6 +361,7 @@ impl P2pGateway {
             Some(parent_request)
         }
     }
+    */
 
     /// Handle Transport request sent to use by our parent
     pub(crate) fn handle_transport_RequestToChild(
