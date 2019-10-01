@@ -116,7 +116,7 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
     println!("\n Alex responds to Camille...\n");
     let response_content = format!("echo: {}", content).as_bytes().to_vec();
     trace!(
-        "billy send response with msg.request_id={:?}",
+        "alex send response with msg.request_id={:?}",
         msg.request_id
     );
 
