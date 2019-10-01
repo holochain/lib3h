@@ -110,20 +110,6 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         },
     }));
 
-    test_client(Lib3hClientProtocol::HoldEntry(ProvidedEntryData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        entry: EntryData {
-            entry_address: "adr".to_string().into(),
-            aspect_list: vec![EntryAspectData {
-                aspect_address: "adr".to_string().into(),
-                type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec().into(),
-                publish_ts: 42,
-            }],
-        },
-    }));
-
     test_client(Lib3hClientProtocol::QueryEntry(QueryEntryData {
         space_address: "adr".to_string().into(),
         entry_address: "adr".to_string().into(),
