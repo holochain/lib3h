@@ -34,6 +34,17 @@ impl P2pGateway {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
+                    // once we have the peer info from the other side, bubble the incoming connection
+                    // to the network layer
+                    me.endpoint_self.publish(
+                        Span::fixme(),
+                        GatewayRequestToParent::Transport(
+                            transport::protocol::RequestToParent::IncomingConnection {
+                                uri: this_peer.peer_name.clone(),
+                            },
+                        ),
+                    )?;
+
                     // Send to other node our PeerName
                     let our_peer_name = P2pProtocol::PeerName(
                         me.identifier.id.to_owned().into(),
