@@ -426,6 +426,37 @@ mod tests {
         (start..65535).find(|port| port_is_available(*port))
     }
 
+    #[macro_export]
+    macro_rules! make_bind_request_fn {
+        {
+            port: expr
+        } => {{
+            let init_transport1_address: Lib3hUri = Url::parse(&format!("wss://127.0.0.1:{}", port))
+                .unwrap()
+                .into();
+
+            let request_fn = Box::new(|transport1_address: Lib3hUri| {
+                let old_port = transport1_address.port().unwrap_or_else(|| 0);
+                let port = get_available_port(old_port + 1).expect("Must be able to find free port");
+                let expected_transport1_address: Lib3hUri =
+                    Url::parse(&format!("wss://127.0.0.1:{}", port))
+                    .unwrap()
+                    .into();
+
+                let request = RequestToChild::Bind {
+                    spec: expected_transport1_address.clone(),
+                };
+                let re = format!(
+                    "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
+                    port.clone(),
+                );
+
+                (request.clone(), re, expected_transport1_address.clone())
+            });
+            request_fn
+        }}
+    }
+
     #[test]
     fn test_websocket_transport_send_direct_msg() {
         let networkid_address: Address = "wss-bootstapping-network-id1.holo.host".into();

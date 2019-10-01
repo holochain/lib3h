@@ -345,6 +345,39 @@ macro_rules! wait1_for_repeatable_callback {
     }};
 }
 
+#[allow(dead_code)]
+const DEFAULT_PORT : u16 = 0;
+
+#[macro_export]
+macro_rules! wait_for_bind_result {
+        {
+            url: expr
+        } => {{
+            let init_transport1_address: Lib3hUri = url.into();
+
+            let request_fn = Box::new(|transport1_address: Lib3hUri| {
+                let old_port = transport1_address.port().unwrap_or_else(|| $crate::ghost_test_harness::DEFAULT_PORT);
+                let port = get_available_port(old_port + 1).expect("Must be able to find free port");
+                let expected_transport1_address: Lib3hUri =
+                    Url::parse(&format!("wss://127.0.0.1:{}", port))
+                    .unwrap()
+                    .into();
+
+                let request = RequestToChild::Bind {
+                    spec: expected_transport1_address.clone(),
+                };
+                let re = format!(
+                    "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
+                    port.clone(),
+                );
+
+                (request.clone(), re, expected_transport1_address.clone())
+            });
+            request_fn
+        }}
+    }
+
+ 
 #[cfg(test)]
 mod tests {
 
@@ -392,7 +425,7 @@ mod tests {
     pub type Callback = GhostCallback<Option<String>, RequestToOtherResponse, CallbackError>;
     #[allow(dead_code)]
     pub type CallbackData = GhostCallbackData<RequestToOtherResponse, CallbackError>;
-    //    #[derive(Debug)]
+    
     struct CallbackParentWrapper(pub Vec<(Callback, CallbackData)>);
 
     pub type CallbackUserData = Option<String>;

@@ -1,5 +1,5 @@
 use crate::{error::Lib3hProtocolError, Address};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use url::Url;
 
 //--------------------------------------------------------------------------------------------------
@@ -93,8 +93,47 @@ impl Lib3hUri {
     pub fn port(&self) -> Option<u16> {
         self.0.port()
     }
+
+    pub fn host(&self) -> Option<url::Host<&str>> {
+        self.0.host()
+    }
+
+    pub fn hostname(&self) -> Option<String> {
+        self.host().map(|host| host.to_string()) 
+    }
+
 }
 
+
+pub struct Builder { scheme:Option<String>, host:String, port:Option<u16> }
+
+impl Builder {
+
+    pub fn with_host(host: &str) -> Self {
+        Self { scheme: None, host: host.into(), port: None }
+    }
+
+    pub fn with_scheme(&mut self, scheme: &str) -> &mut Self {
+        self.scheme = Some(scheme.into());
+        self
+    }
+
+    pub fn with_port(&mut self, port: u16) -> &mut Self {
+        self.port = Some(port);
+        self
+    }
+
+    pub fn build(&self) -> Result<Lib3hUri, Lib3hProtocolError> {
+
+        let scheme = self.scheme.as_ref().map(|scheme| format!("{}://", scheme))
+            .unwrap_or_else(|| "".to_string());
+        let port = self.port.map(|port| format!(":{}", port))
+            .unwrap_or_else(|| "".to_string());
+        let host = &self.host;
+
+        format!("{}{}{}/", scheme, host, port).as_str().try_into()
+    }
+}
 // -- Converters -- //
 
 impl From<Lib3hUri> for Address {
