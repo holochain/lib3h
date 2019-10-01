@@ -9,6 +9,7 @@ use crate::{
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
+use lib3h_p2p_protocol::p2p::P2pMessage;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -319,6 +320,16 @@ impl<'engine> GhostEngine<'engine> {
                                 peer_data.clone(),
                             )),
                         )?;
+                    }
+                }
+            }
+            P2pProtocol::CapnProtoMessage(bytes) => {
+                match P2pMessage::from_bytes(bytes)? {
+                    P2pMessage::MsgPing(ping) => {
+                        unimplemented!();
+                    }
+                    P2pMessage::MsgPong(pong) => {
+                        unimplemented!();
                     }
                 }
             }

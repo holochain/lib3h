@@ -22,6 +22,11 @@ pub enum P2pProtocol {
     BroadcastJoinSpace(SpaceAddress, PeerData),
     /// For sending a peer's 'JoinSpace' info to a newly connected peer
     AllJoinedSpaceList(Vec<(SpaceAddress, PeerData)>),
+    /// We would like to transition to using our capnproto p2p protocol
+    /// during the transition phase, capnproto messages will be
+    /// doubly encoded in this P2pProtocol enum variant,
+    /// once all messages have transitioned, we can drop this layer
+    CapnProtoMessage(Vec<u8>),
 }
 
 /// DHT gossip data

@@ -6,6 +6,7 @@ extern crate detach;
 extern crate hcid;
 extern crate lib3h_crypto_api;
 extern crate lib3h_protocol;
+extern crate lib3h_p2p_protocol;
 extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 extern crate nanoid;
 extern crate native_tls;

@@ -19,4 +19,5 @@ mod p2p_capnp;
 #[rustfmt::skip]
 mod transit_encoding_capnp;
 
+pub mod error;
 pub mod p2p;
