@@ -49,7 +49,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let mut query_data = node.request_entry(entry.entry_address.clone());
 
-    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), query: \"test_query\" \\}\\)";
+    let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"[\\w\\d_~]+\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), query: \"test_query\" \\}\\)";
     let results = assert_msg_matches!(node, expected);
     println!("\n results: {:?}\n", results);
     let handle_query = &results[0].events[0];
@@ -64,7 +64,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     println!("\n{} reply to own request: {:?}\n", node.name(), query_data);
     let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
 
-    let expected = "QueryEntryResult\\(QueryEntryResultData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), responder_agent_id: HashString\\(\"[\\w\\d]+\"\\), query_result: ";
+    let expected = "QueryEntryResult\\(QueryEntryResultData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"[\\w\\d_~]+\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"[\\w\\d]+\"\\), responder_agent_id: HashString\\(\"[\\w\\d]+\"\\), query_result: ";
 
     let results = assert_msg_matches!(node, expected);
     println!("\n results: {:?}\n", results);

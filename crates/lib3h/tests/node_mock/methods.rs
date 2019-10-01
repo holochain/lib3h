@@ -371,7 +371,9 @@ impl NodeMock {
             aspect_address_list: None,
         };
         // HandleFetchEntry
-        let fetch_res = self.reply_to_HandleFetchEntry_inner(&fetch).expect("Should work");
+        let fetch_res = self
+            .reply_to_HandleFetchEntry_inner(&fetch)
+            .expect("Should work");
         // Convert query to fetch
         let mut query_result = Vec::new();
         fetch_res

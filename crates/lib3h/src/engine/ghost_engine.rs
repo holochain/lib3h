@@ -239,7 +239,8 @@ impl<'engine> GhostEngine<'engine> {
             }
             ClientToLib3h::QueryEntry(data) => {
                 trace!("ClientToLib3h::QueryEntry: {:?}", data);
-                let res = self.handle_query_entry(span.follower("handle_query_entry"), msg, data)
+                let res = self
+                    .handle_query_entry(span.follower("handle_query_entry"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()));
                 trace!("ClientToLib3h::QueryEntry: res = {:?}", res);
                 res

@@ -100,6 +100,7 @@ impl<'engine> GhostEngine<'engine> {
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
         let payload = request.take_message().expect("exists");
+        debug!("  ->  request = {:?}", payload);
         match payload {
             // Handle Space's DHT request
             // ==========================

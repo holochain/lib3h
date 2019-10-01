@@ -9,10 +9,10 @@ use serde::Deserialize;
 
 lazy_static! {
     pub static ref TWO_NODES_GET_LISTS_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
-//        (author_list_test, true),
-//        (hold_list_test, true),
-//       (empty_author_list_test, true),
-//        (author_list_known_entry_test, true),
+        (author_list_test, true),
+        (hold_list_test, true),
+        (empty_author_list_test, true),
+        (author_list_known_entry_test, true),
         (many_aspects_test, true),
     ];
 }
@@ -40,9 +40,6 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Respond
     alex.reply_to_HandleFetchEntry(&fetch_data)
         .expect("Reply to HandleFetchEntry should work");
-
-//    let (did_work, _srv_msg_list) = alex.process().unwrap();
-//    assert!(did_work);
 
     // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"\\w+\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
@@ -97,19 +94,22 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Receives back the HandleQuery
     let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
-    let _results = assert2_msg_matches!(alex, billy, expected);
-
-    // TODO - figure out what to respond to unknown data request
-
+    let results = assert2_msg_matches!(alex, billy, expected);
+    let query_event = &results[0].events[0];
+    // extract msg data
+    let query_data = unwrap_to!(query_event => Lib3hServerProtocol::HandleQueryEntry);
+    println!("query_data: {:?}", query_data);
     // #fullsync
-    // Alex sends back a failureResult response to the network
+    // Alex sends back an empty response to the network
     println!("\n{} looking for HandleQueryEntry\n", billy.name());
-    let res = billy.reply_to_HandleQueryEntry(&query_data);
+    let res = billy.reply_to_HandleQueryEntry(query_data);
     println!("\n{} found: {:?}\n", billy.name(), res);
-    assert!(res.is_err());
-    let result_data = res.err().unwrap();
-    let info = std::string::String::from_utf8_lossy(&result_data.result_info).to_string();
-    assert_eq!(info, "No entry found");
+    assert!(res.is_ok());
+    let result_data = res.unwrap();
+    assert_eq!(result_data.entry_address, *ENTRY_ADDRESS_1);
+    let opaque_result: Vec<u8> = result_data.query_result.into();
+    let expected: Vec<u8> = [146, 145, 172, 101, 110, 116, 114, 121, 95, 97, 100, 100, 114, 95, 49, 144].to_vec();
+    assert_eq!(opaque_result, expected);
 }
 
 /// Return author_list with already known entry
@@ -119,7 +119,6 @@ pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"\\w+\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, billy, expected);
-
 
     alex.reply_to_first_HandleGetAuthoringEntryList();
     // Should not receive a HandleFetchEntry request from network module after receiving list
@@ -137,9 +136,11 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_2.clone()], false)
         .unwrap();
-    /*let entry_1 =*/ alex.hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_3.clone()])
+    alex
+        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_3.clone()])
         .unwrap();
-    let entry_2 = alex.hold_entry(&ENTRY_ADDRESS_2, vec![ASPECT_CONTENT_4.clone()])
+    let entry_2 = alex
+        .hold_entry(&ENTRY_ADDRESS_2, vec![ASPECT_CONTENT_4.clone()])
         .unwrap();
     println!("\nAlex authored and stored Aspects \n");
 
@@ -147,7 +148,6 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     let _results = assert2_msg_matches!(alex, billy, expected);
     wait_engine_wrapper_until_no_work!(alex);
     wait_engine_wrapper_until_no_work!(billy);
-
 
     // Send AuthoringList
     // ==================
@@ -176,19 +176,23 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     // Send HoldingEntryList and should receive a HandleFetchEntry request from network module
     println!("\nAlex sends GossipingEntryList\n");
     alex.reply_to_first_HandleGetGossipingEntryList();
-//    let (did_work, _srv_msg_list) = alex.process().unwrap();
-//    assert!(did_work);
-//    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
-//    let (did_work, _srv_msg_list) = billy.process().unwrap();
-//    assert!(did_work);
-//    println!("\nBilly srv_msg_list = {:?}\n", srv_msg_list);
 
     // Should receive a HandleFetchEntry request from network module after receiving list
-    let expected = "HandleFetchEntry\\(FetchEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", provider_agent_id: HashString\\(\"alex\"\\), aspect_address_list: None \\}\\)";
+    let expected = "HandleFetchEntry\\(FetchEntryData \\{ space_address: HashString\\(\"appA\"\\), entry_address: HashString\\(\"entry_addr_2\"\\), request_id: \"[\\w\\d_~]+\", provider_agent_id: HashString\\(\"alex\"\\), aspect_address_list: None \\}\\)";
     let results = assert2_msg_matches!(alex, billy, expected);
-    let fetch_event = &results[0].events[0];
-    // extract msg data
-    let fetch_data = unwrap_to!(fetch_event => Lib3hServerProtocol::HandleFetchEntry);
+    println!("results: {:?}", results);
+    // Get FetchEntryData for ENTRY_ADDRESS_2
+    let mut maybe_fetch_data = None;
+    for process_result in results {
+        for event in process_result.events {
+            let temp_fetch_data = unwrap_to!(event => Lib3hServerProtocol::HandleFetchEntry);
+            if temp_fetch_data.entry_address == *ENTRY_ADDRESS_2 {
+                maybe_fetch_data = Some(temp_fetch_data.clone());
+                break;
+            }
+        }
+    }
+    let fetch_data = maybe_fetch_data.unwrap();
     println!("fetch_data: {:?}", fetch_data);
 
     // #fullsync - mirrorDht will ask for content right away
@@ -202,44 +206,5 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     let _results = assert2_msg_matches!(alex, billy, expected);
 
     // Billy asks for that entry
-    //request_entry_ok(billy, &entry_2);
-
-//
-//    // Billy asks for the entry
-//    // ========================
-//    println!("\n{} requesting entry: ENTRY_ADDRESS_1\n", billy.name());
-//    let query_data = billy.request_entry(ENTRY_ADDRESS_1.clone());
-//    let (did_work, _srv_msg_list) = billy.process().unwrap();
-//    assert!(did_work);
-//
-//    // #fullsync
-//    // Billy sends that data back to the network
-//    println!("\n{} reply to own request:\n", billy.name());
-//    let _ = billy.reply_to_HandleQueryEntry(&query_data).unwrap();
-//    let (did_work, srv_msg_list) = billy.process().unwrap();
-//    assert!(did_work);
-//    assert_eq!(srv_msg_list.len(), 1, "{:?}", srv_msg_list);
-//    let msg = unwrap_to!(srv_msg_list[0] => Lib3hServerProtocol::QueryEntryResult);
-//    assert_eq!(&msg.entry_address, &*ENTRY_ADDRESS_1);
-//    let mut de = Deserializer::new(&msg.query_result[..]);
-//    let maybe_entry: Result<EntryData, rmp_serde::decode::Error> =
-//        Deserialize::deserialize(&mut de);
-//    let query_result = maybe_entry.unwrap();
-//    assert_eq!(query_result.entry_address, ENTRY_ADDRESS_1.clone());
-//    assert_eq!(query_result.aspect_list.len(), 3);
-//    assert!(
-//        query_result.aspect_list[0].aspect_address.clone() == *ASPECT_ADDRESS_1
-//            || query_result.aspect_list[0].aspect_address.clone() == *ASPECT_ADDRESS_2
-//            || query_result.aspect_list[0].aspect_address.clone() == *ASPECT_ADDRESS_3
-//    );
-//    assert!(
-//        query_result.aspect_list[1].aspect_address.clone() == *ASPECT_ADDRESS_1
-//            || query_result.aspect_list[1].aspect_address.clone() == *ASPECT_ADDRESS_2
-//            || query_result.aspect_list[1].aspect_address.clone() == *ASPECT_ADDRESS_3
-//    );
-//    assert!(
-//        query_result.aspect_list[2].aspect_address.clone() == *ASPECT_ADDRESS_1
-//            || query_result.aspect_list[2].aspect_address.clone() == *ASPECT_ADDRESS_2
-//            || query_result.aspect_list[2].aspect_address.clone() == *ASPECT_ADDRESS_3
-//    );
+    request_entry_ok(billy, &entry_2);
 }
