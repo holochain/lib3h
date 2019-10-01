@@ -98,7 +98,6 @@ pub struct EntryData {
 }
 
 impl EntryData {
-
     pub fn new(address: &Address) -> Self {
         EntryData {
             entry_address: address.clone(),

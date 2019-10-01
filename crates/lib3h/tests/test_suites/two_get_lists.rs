@@ -108,7 +108,10 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     let result_data = res.unwrap();
     assert_eq!(result_data.entry_address, *ENTRY_ADDRESS_1);
     let opaque_result: Vec<u8> = result_data.query_result.into();
-    let expected: Vec<u8> = [146, 145, 172, 101, 110, 116, 114, 121, 95, 97, 100, 100, 114, 95, 49, 144].to_vec();
+    let expected: Vec<u8> = [
+        146, 145, 172, 101, 110, 116, 114, 121, 95, 97, 100, 100, 114, 95, 49, 144,
+    ]
+    .to_vec();
     assert_eq!(opaque_result, expected);
 }
 
@@ -136,8 +139,7 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
         .unwrap();
     alex.author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_2.clone()], false)
         .unwrap();
-    alex
-        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_3.clone()])
+    alex.hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_3.clone()])
         .unwrap();
     let entry_2 = alex
         .hold_entry(&ENTRY_ADDRESS_2, vec![ASPECT_CONTENT_4.clone()])
