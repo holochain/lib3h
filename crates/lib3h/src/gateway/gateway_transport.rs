@@ -320,7 +320,7 @@ impl P2pGateway {
         self.priv_encoded_send(span, to_address, uri, payload, cb)
     }
 
-    const MAX_RETRY_ATTEMPTS: u8 = 50;
+    const MAX_RETRY_ATTEMPTS: u8 = 99;
     pub(crate) fn handle_transport_pending_outgoing_messages(&mut self) -> GhostResult<()> {
         let pending: Vec<PendingOutgoingMessage> =
             self.pending_outgoing_messages.drain(..).collect();

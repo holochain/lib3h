@@ -326,10 +326,20 @@ impl<
                 }),
             )?;
         } else {
-            self.inner_gateway.as_mut().publish(
+            let orig_req = data.clone();
+            self.inner_gateway.as_mut().request(
                 msg.span()
                     .follower("TODO follower of message in handle_msg_from_parent"),
                 data,
+                Box::new(move |_, response| {
+                    match response {
+                        GhostCallbackData::Response(Ok(response)) => {
+                            trace!("mplex forward response: {:?} from {:?}", response, orig_req);
+                        }
+                        _ => error!("mplex bad forward: {:?} from {:?}", response, orig_req),
+                    }
+                    Ok(())
+                })
             )?;
         }
 

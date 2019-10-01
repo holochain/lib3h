@@ -107,6 +107,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         };
 
         out.process();
+        out.process();
+
         out.engine1
             .request(
                 Span::fixme(),
@@ -120,7 +122,10 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+
         out.process();
+        out.process();
+
         out.engine1
             .request(
                 Span::fixme(),
@@ -135,6 +140,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+
         out.engine2
             .request(
                 Span::fixme(),
@@ -149,7 +155,10 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+
         out.process();
+        out.process();
+
         out
     }
 
@@ -209,7 +218,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
     pub fn process(&mut self) {
         self.priv_process();
         for _ in 0..10 {
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            std::thread::sleep(std::time::Duration::from_millis(20));
             self.priv_process();
         }
     }
@@ -232,7 +241,11 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             )
             .unwrap();
         self.process();
-        // send needs an extra 10 process calls
+        // send needs extra process calls
+        self.process();
+        self.process();
+        self.process();
+        self.process();
         self.process();
     }
 
