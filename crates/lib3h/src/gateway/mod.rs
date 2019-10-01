@@ -98,8 +98,9 @@ pub(crate) mod send_data_types {
     }
 
     /// internal callback type for send results
-    pub(crate) type SendCallback =
-        Box<dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static>;
+    pub(crate) type SendCallback = Box<
+        dyn FnOnce(TransportResult<GatewayRequestToChildResponse>) -> GhostResult<()> + 'static,
+    >;
 }
 
 /*

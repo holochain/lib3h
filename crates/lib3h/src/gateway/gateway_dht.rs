@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_protocol::*,
     error::*,
-    gateway::{protocol::*, P2pGateway, send_data_types::*},
+    gateway::{protocol::*, send_data_types::*, P2pGateway},
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
