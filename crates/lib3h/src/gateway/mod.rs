@@ -2,6 +2,7 @@
 pub mod gateway_actor;
 pub mod gateway_dht;
 pub mod gateway_transport;
+pub mod gateway_transport_send;
 pub mod p2p_gateway;
 pub mod protocol;
 

@@ -93,6 +93,15 @@ impl Lib3hUri {
     pub fn port(&self) -> Option<u16> {
         self.0.port()
     }
+
+    pub fn agent_id(&self) -> Address {
+        for (n, v) in self.0.query_pairs() {
+            if &n == "a" {
+                return v.to_string().into();
+            }
+        }
+        panic!("could not find agent id in {}", self.0);
+    }
 }
 
 // -- Converters -- //
@@ -205,6 +214,10 @@ mod tests {
         assert_eq!(
             "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
+        );
+        assert_eq!(
+            Address::from("HcAfake_agent_id".to_string()),
+            uri.agent_id(),
         );
     }
 }
