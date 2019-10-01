@@ -191,7 +191,6 @@ fn test_two_memory_nodes_get_lists_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_two_memory_nodes_spaces_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_SPACES_TEST_FNS.iter() {

@@ -59,7 +59,7 @@ impl P2pGateway {
             self.identifier.nickname,
             payload
         );
-        match payload {
+        match payload.clone() {
             DhtRequestToParent::GossipTo(_data) => {
                 // no-op
             }
@@ -90,7 +90,7 @@ impl P2pGateway {
                 from_peer_name: _,
                 entry: _,
             } => {
-                unreachable!();
+                // no-op
             }
             DhtRequestToParent::EntryPruned(_) => {
                 unreachable!();
@@ -99,6 +99,10 @@ impl P2pGateway {
                 unreachable!();
             }
         }
+        // Forward to parent
+        self.endpoint_self
+            .publish(span, GatewayRequestToParent::Dht(payload))?;
+        // Done
         Ok(())
     }
 }

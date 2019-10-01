@@ -230,6 +230,12 @@ impl NodeMock {
         }
     }
 
+    pub fn get_entry(&self, entry_address: &Address) -> Option<EntryData> {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let data_store = self.chain_store_list.get(&current_space)?;
+        data_store.get_entry(entry_address)
+    }
+
     ///
     pub fn author_entry(
         &mut self,
@@ -278,7 +284,6 @@ impl NodeMock {
         &mut self,
         entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
-        can_tell_engine: bool,
     ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         trace!(
@@ -305,15 +310,6 @@ impl NodeMock {
             if !success {
                 return Err(Lib3hError::new_other("Storing of aspects failed."));
             }
-        }
-        if can_tell_engine {
-            let msg_data = ProvidedEntryData {
-                space_address: current_space,
-                provider_agent_id: self.agent_id.clone(),
-                entry: entry.clone(),
-            };
-            self.engine
-                .post(Lib3hClientProtocol::HoldEntry(msg_data).into())?;
         }
         trace!(
             "[NodeMock {:?}] hold_entry end: entry={:?}",
@@ -804,17 +800,6 @@ impl NodeMock {
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
                     );
-                    let provided_entry = ProvidedEntryData {
-                        space_address: msg.space_address.clone(),
-                        provider_agent_id: msg.provider_agent_id.clone(),
-                        entry: EntryData {
-                            entry_address: msg.entry_address.clone(),
-                            aspect_list: vec![msg.entry_aspect.clone()],
-                        },
-                    };
-                    self.engine
-                        .post(Lib3hClientProtocol::HoldEntry(provided_entry))
-                        .expect("Engine.post() can't fail");
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {

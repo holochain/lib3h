@@ -166,7 +166,7 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     // Hold an entry without publishing it
     println!("\nAlex broadcasts entry via GossipingList...\n");
     let entry_1 = alex
-        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], false)
+        .hold_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()])
         .unwrap();
     // Reply to the GetList request received from network module
     alex.reply_to_first_HandleGetGossipingEntryList();
