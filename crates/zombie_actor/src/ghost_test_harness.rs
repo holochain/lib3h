@@ -309,6 +309,15 @@ macro_rules! wait1_for_callback {
     }};
 }
 
+/// Similar to `wait1_for_callback!` but will invoke the callback multiple times until
+/// success. Users need provide a closure `$request_fn` that takes a user defined state and
+/// produces a triple of `(request_to_other, regex, new_state)`. If the request fails to produce
+/// the matching regex, the closure will be invoked again with `new_state` instead of `state`.
+/// This will continue until success or a finite number of failures has been reached.
+///
+/// If `$should_abort` is `false`, the function returns a tuple ``(is_match, final_state)` where
+/// `is_match` indicates whether the regexed match and `final_state` contains the final state produced
+/// by the closure.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait1_for_repeatable_callback {
