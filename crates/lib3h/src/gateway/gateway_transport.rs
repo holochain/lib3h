@@ -239,7 +239,7 @@ impl P2pGateway {
             };
 
         trace!(
-            "({}).priv_low_level_send message from {} to {}",
+            "({}).priv_low_level_send message from '{}' to '{}'",
             self.identifier.nickname,
             self.this_peer.peer_name.clone(),
             uri.clone()
