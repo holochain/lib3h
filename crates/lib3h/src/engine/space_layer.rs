@@ -106,8 +106,14 @@ impl<'engine> GhostEngine<'engine> {
             GatewayRequestToParent::Dht(dht_request) => {
                 match dht_request {
                     DhtRequestToParent::GossipTo(gossip_data) => {
-                        handle_GossipTo(chain_id.0.clone(), space_gateway, gossip_data)
-                            .expect("Failed to gossip with space_gateway");
+                        let from_peer_name = &space_gateway.as_mut().as_mut().this_peer().peer_name;
+                        handle_GossipTo(
+                            chain_id.0.clone(),
+                            space_gateway,
+                            from_peer_name,
+                            gossip_data,
+                        )
+                        .expect("Failed to gossip with space_gateway");
                     }
                     DhtRequestToParent::GossipUnreliablyTo(_data) => {
                         // n/a - should have been handled by gateway
