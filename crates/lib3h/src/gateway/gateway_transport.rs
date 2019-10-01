@@ -40,7 +40,7 @@ impl P2pGateway {
                         Span::fixme(),
                         GatewayRequestToParent::Transport(
                             transport::protocol::RequestToParent::IncomingConnection {
-                                uri: this_peer.clone().peer_name.into(),
+                                uri: this_peer.peer_name.clone(),
                             },
                         ),
                     )?;
