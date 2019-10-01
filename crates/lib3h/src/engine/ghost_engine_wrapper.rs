@@ -305,6 +305,7 @@ where
         match &mut msg {
             Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
             Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,

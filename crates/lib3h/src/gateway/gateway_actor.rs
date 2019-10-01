@@ -22,7 +22,7 @@ impl
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
         // process inbox from parent & handle requests
-        detach_run!(&mut self.endpoint_self, |es| es.process(&mut ()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for request in self.endpoint_self.as_mut().drain_messages() {
             self.handle_RequestToChild(request)?;
         }

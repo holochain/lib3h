@@ -42,7 +42,7 @@ pub struct P2pGateway {
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,
-    endpoint_self: Detach<GatewaySelfEndpoint<()>>,
+    endpoint_self: Detach<GatewaySelfEndpoint<P2pGateway>>,
     /// cached data from inner dht
     this_peer: PeerData,
 

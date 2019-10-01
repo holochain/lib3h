@@ -40,7 +40,7 @@ pub struct MirrorDht {
 
     /// ghost stuff
     endpoint_parent: Option<DhtEndpoint>,
-    endpoint_self: Detach<DhtEndpointWithContext<()>>,
+    endpoint_self: Detach<DhtEndpointWithContext<Self>>,
 }
 
 /// Constructors
@@ -330,7 +330,7 @@ impl
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        detach_run!(&mut self.endpoint_self, |es| es.process(&mut ()))?;
+        detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
         for request in self.endpoint_self.as_mut().drain_messages() {
             //debug!("@MirrorDht@ serving request: {:?}", request);
             self.handle_request_from_parent(request)
@@ -366,6 +366,7 @@ impl MirrorDht {
                 // Handle gossiped data
                 match maybe_gossip.unwrap() {
                     MirrorGossip::Entry(entry) => {
+                        trace!("DhtRequestToChild::HandleGossip: Entry = {:?}", entry);
                         let diff = self.diff_aspects(&entry);
                         if diff.len() > 0 {
                             self.endpoint_self.publish(
@@ -378,6 +379,10 @@ impl MirrorDht {
                         }
                     }
                     MirrorGossip::Peer(gossiped_peer) => {
+                        trace!(
+                            "DhtRequestToChild::HandleGossip: Peer = {:?}",
+                            gossiped_peer
+                        );
                         let maybe_known_peer = self.get_peer(&gossiped_peer.peer_name);
                         match maybe_known_peer {
                             None => {
@@ -448,6 +453,46 @@ impl MirrorDht {
             // Ask for its data and broadcast it because we want fullsync.
             DhtRequestToChild::HoldEntryAspectAddress(entry) => {
                 trace!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
+                // if its shallow, ask for actual data
+                if entry.aspect_list.len() > 0 && entry.aspect_list[0].aspect.len() == 0 {
+                    self.endpoint_self.publish(
+                        span.follower("DhtRequestToChild::HoldEntryAspectAddress"),
+                        DhtRequestToParent::RequestEntry(entry.entry_address.clone()),
+                    )?;
+                    //                    self.endpoint_self.request(
+                    //                        span.follower("DhtRequestToChild::HoldEntryAspectAddress"),
+                    //                        DhtRequestToParent::RequestEntry(entry.entry_address.clone()),
+                    //                        Box::new(move |me, response| {
+                    //                            trace!("Received Gossiping list requestEntry response");
+                    //                            let response_entry = match response {
+                    //                                GhostCallbackData::Response(Ok(DhtRequestToParentResponse::RequestEntry(e))) => {
+                    //                                    e
+                    //                                }
+                    //                                GhostCallbackData::Response(Err(e)) => {
+                    //                                    panic!("Got error on RequestEntry: {:?} ", e);
+                    //                                }
+                    //                                GhostCallbackData::Timeout(bt) => {
+                    //                                    panic!("Got timeout on RequestEntry: {:?}", bt);
+                    //                                }
+                    //                            };
+                    //                            // Check if all aspects for this entry are already known
+                    //                            let received_new_content = me.add_entry_aspects(&response_entry);
+                    //                            if !received_new_content {
+                    //                                trace!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");
+                    //                                return Ok(());
+                    //                            }
+                    //                            // broadcast it by gossiping it to every known peer
+                    //                            let gossip_evt = me.gossip_entry(&response_entry);
+                    //                            me.endpoint_self.publish(
+                    //                                span.follower("DhtRequestToChild::HoldEntryAspectAddress"),
+                    //                                gossip_evt,
+                    //                            )?;
+                    //                            Ok(())
+                    //                        }),
+                    //                    )?;
+                    return Ok(());
+                }
+                // Check if all aspects for this entry are already known
                 let received_new_content = self.add_entry_aspects(&entry);
                 if !received_new_content {
                     trace!("DhtRequestToChild::HoldEntryAspectAddress: known - skipping");

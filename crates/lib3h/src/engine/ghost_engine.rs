@@ -429,8 +429,8 @@ impl<'engine> GhostEngine<'engine> {
                 };
                 aspect_list.push(fake_aspect);
             }
-            // Create "shallow" entry, in the sense an entry with no actual aspect content,
-            // but valid addresses.
+            // Create "shallow" entry, i.e.
+            // an entry with valid aspect addresses but no actual aspect content.
             let shallow_entry = EntryData {
                 entry_address: entry_address.clone(),
                 aspect_list,
@@ -616,7 +616,7 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     fn handle_publish_entry(&mut self, span: Span, msg: &ProvidedEntryData) -> Lib3hResult<()> {
-        // MIRROR - reflecting hold for now
+        // #fullsync - reflecting hold for now
         for aspect in &msg.entry.aspect_list {
             let data = StoreEntryAspectData {
                 request_id: self.request_track.reserve(),
@@ -705,6 +705,7 @@ fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
     set_b.is_subset(&set_a)
 }
+
 #[allow(non_snake_case)]
 pub fn handle_GossipTo<
     G: GhostActor<
