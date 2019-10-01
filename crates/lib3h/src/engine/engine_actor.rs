@@ -61,7 +61,7 @@ impl<'engine>
         did_work = did_work || self.process_space_gateways()?;
 
         // Done
-        trace!("({}).process_concrete() did_work = {}", self.name, did_work);
+        // trace!("({}).process_concrete() did_work = {}", self.name, did_work);
         Ok(did_work.into())
     }
 }
