@@ -4,15 +4,13 @@ use crate::{
     dht::dht_protocol::*,
     engine::p2p_protocol::P2pProtocol,
     error::*,
-    gateway::{
-        protocol::*, GatewayOutputWrapType, P2pGateway, PendingOutgoingMessage, SendCallback,
-    },
+    gateway::{protocol::*, send_data_types::*, P2pGateway},
     message_encoding::encoding_protocol,
     transport::{self, error::TransportResult},
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, uri::Lib3hUri, Address};
+use lib3h_protocol::{data_types::*, uri::Lib3hUri};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -61,15 +59,12 @@ impl P2pGateway {
                         our_peer_name,
                         uri,
                     );
-                    me.send(
-                        span.follower("TODO send"),
-                        // This is a little awkward. If we are in wrapping
-                        // mode, we still need this to be wrapped... but
-                        // the remote side will intercept this message before
-                        // it is sent up the chain, so it's ok this is blank.
-                        "".to_string().into(),
-                        uri.clone(),
-                        buf.into(),
+                    me.send_with_full_low_uri(
+                        SendWithFullLowUri {
+                            span: span.follower("TODO send"),
+                            full_low_uri: uri.clone(),
+                            payload: buf.into(),
+                        },
                         Box::new(|response| {
                             match response {
                                 Ok(GatewayRequestToChildResponse::Transport(
@@ -179,6 +174,7 @@ impl P2pGateway {
         Ok(())
     }
 
+    /*
     fn priv_encoded_send(
         &mut self,
         span: Span,
@@ -360,6 +356,7 @@ impl P2pGateway {
             Some(parent_request)
         }
     }
+    */
 
     /// Handle Transport request sent to use by our parent
     pub(crate) fn handle_transport_RequestToChild(
@@ -393,15 +390,23 @@ impl P2pGateway {
                     }),
                 );
             }
-            transport::protocol::RequestToChild::SendMessage {
-                uri,
-                payload,
-                attempt,
-            } => {
+            transport::protocol::RequestToChild::SendMessage { uri, payload } => {
                 debug!(
                     "gateway_transport: SendMessage, first resolving address {:?}",
                     uri.clone()
                 );
+                self.send_with_partial_high_uri(
+                    SendWithPartialHighUri {
+                        span: span.child("send_with_partial_high_uri"),
+                        partial_high_uri: uri.clone(),
+                        payload,
+                    },
+                    Box::new(|response| {
+                        parent_request
+                            .respond(response.map_err(|transport_error| transport_error.into()))
+                    }),
+                )?;
+                /*
                 // uri is actually a dht peerKey
                 // get actual uri from the inner dht before sending
                 self.inner_dht.request(
@@ -457,6 +462,7 @@ impl P2pGateway {
                         Ok(())
                     }),
                 )?;
+                */
             }
         }
         // Done

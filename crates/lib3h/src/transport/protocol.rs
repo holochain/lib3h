@@ -11,23 +11,13 @@ pub struct BindResultData {
 /// Transport protocol enums for use with GhostActor implementation
 #[derive(Debug, Clone)]
 pub enum RequestToChild {
-    Bind {
-        spec: Lib3hUri,
-    }, // wss://0.0.0.0:0 -> all network interfaces first available port
-    SendMessage {
-        uri: Lib3hUri,
-        payload: Opaque,
-        attempt: u8,
-    },
+    Bind { spec: Lib3hUri }, // wss://0.0.0.0:0 -> all network interfaces first available port
+    SendMessage { uri: Lib3hUri, payload: Opaque },
 }
 
 impl RequestToChild {
     pub fn create_send_message(uri: Lib3hUri, payload: Opaque) -> Self {
-        RequestToChild::SendMessage {
-            uri,
-            payload,
-            attempt: 0,
-        }
+        RequestToChild::SendMessage { uri, payload }
     }
 }
 

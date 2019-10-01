@@ -1,7 +1,7 @@
 use crate::{
     dht::dht_protocol::*,
     error::*,
-    gateway::{protocol::*, P2pGateway},
+    gateway::{protocol::*, send_data_types::*, P2pGateway},
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
@@ -35,7 +35,7 @@ impl
 
         detach_run!(&mut self.message_encoding, |enc| { enc.process(self) })?;
 
-        self.handle_transport_pending_outgoing_messages()?;
+        self.process_transport_pending_sends()?;
 
         // Update this_peer cache
         self.inner_dht.request(
@@ -93,12 +93,12 @@ impl P2pGateway {
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
-                self.send(
-                    span,
-                    // this will be fixed when we get Ping working
-                    "".to_string().into(),
-                    data.bootstrap_uri.clone(),
-                    Opaque::new(),
+                self.send_with_full_low_uri(
+                    SendWithFullLowUri {
+                        span,
+                        full_low_uri: data.bootstrap_uri.clone(),
+                        payload: Opaque::new(), // TODO - implement ping
+                    },
                     Box::new(move |response| {
                         if response.is_ok() {
                             msg.respond(Ok(GatewayRequestToChildResponse::BootstrapSuccess))?;
@@ -127,11 +127,14 @@ impl P2pGateway {
                                 DhtRequestToChildResponse::RequestPeerList(peer_list),
                             )) => {
                                 for peer in peer_list {
-                                    me.send(
-                                        Span::fixme(),
-                                        peer.peer_name.clone().into(),
-                                        peer.peer_location.clone(),
-                                        payload.clone().into(),
+                                    let mut uri = peer.peer_location.clone();
+                                    uri.set_agent_id(&peer.peer_name.lower_address());
+                                    me.send_with_full_low_uri(
+                                        SendWithFullLowUri {
+                                            span: Span::fixme(),
+                                            full_low_uri: uri,
+                                            payload: payload.clone().into(),
+                                        },
                                         Box::new(move |response| {
                                             debug!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
@@ -142,7 +145,7 @@ impl P2pGateway {
                                     )?;
                                 }
                             }
-                            _ => panic!("Whatever"),
+                            _ => panic!("unexpected {:?}", response),
                         }
                         Ok(())
                     }),
