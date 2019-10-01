@@ -101,6 +101,10 @@ impl Lib3hUri {
             .append_pair("a", &agent_id.to_string());
     }
 
+    pub fn clear_agent_id(&mut self) {
+        self.0.set_query(None);
+    }
+
     pub fn agent_id(&self) -> Option<Address> {
         for (n, v) in self.0.query_pairs() {
             if &n == "a" {
@@ -231,7 +235,9 @@ mod tests {
             uri.agent_id(),
         );
         uri.set_agent_id(&"bla".to_string().into());
-        assert_eq!(Some(Address::from("bla".to_string())), uri.agent_id(),);
-        assert_eq!(Address::from("fake_transport_id"), uri.lower_address(),);
+        assert_eq!(Some(Address::from("bla".to_string())), uri.agent_id());
+        assert_eq!(Address::from("fake_transport_id"), uri.lower_address());
+        uri.clear_agent_id();
+        assert_eq!(None, uri.agent_id());
     }
 }

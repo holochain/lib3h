@@ -12,7 +12,7 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 
 const SEND_RETRY_INTERVAL_MS: u64 = 20;
-const SEND_RETRY_TIMEOUT_MS: u64 = 2000;
+const SEND_RETRY_TIMEOUT_MS: u64 = 20000;
 
 /// Private internals
 impl P2pGateway {
@@ -115,6 +115,7 @@ impl P2pGateway {
         let last_attempt = std::time::Instant::now();
 
         let uri = send_data.partial_high_uri.clone();
+        trace!("want send to {}", uri);
 
         // ask our inner_dht for the low-level id
         self.inner_dht.request(
@@ -128,6 +129,7 @@ impl P2pGateway {
                         // hey, we got a low-level uri, let's process it
                         let mut uri = peer_data.peer_location.clone();
                         uri.set_agent_id(&peer_data.peer_name.lower_address());
+                        trace!("send to {}", uri);
                         me.priv_send_with_full_low_uri(
                             SendWithFullLowUri {
                                 span: Span::fixme(),
@@ -139,6 +141,8 @@ impl P2pGateway {
                         )?;
                     }
                     _ => {
+                        debug!("could not send {:?}", resp);
+
                         // could not get low-level uri, try again later
                         me.priv_send_queue_pending(SendMetaData {
                             send_data: SendData::WithPartialHighUri(send_data),
@@ -240,7 +244,10 @@ impl P2pGateway {
                 encoded_payload
             };
 
-        let uri = send_data.full_low_uri.clone();
+        let mut uri = send_data.full_low_uri.clone();
+
+        // at last, we need to drop the high-level agent id
+        uri.clear_agent_id();
 
         self.inner_transport.request(
             Span::fixme(),

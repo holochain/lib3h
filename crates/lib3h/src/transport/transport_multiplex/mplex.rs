@@ -339,7 +339,7 @@ impl<
                         _ => error!("mplex bad forward: {:?} from {:?}", response, orig_req),
                     }
                     Ok(())
-                })
+                }),
             )?;
         }
 

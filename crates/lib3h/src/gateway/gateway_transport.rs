@@ -89,7 +89,6 @@ impl P2pGateway {
         Ok(())
     }
 
-    #[allow(dead_code)]
     fn priv_decode_on_receive(
         &mut self,
         span: Span,
@@ -120,7 +119,6 @@ impl P2pGateway {
         )
     }
 
-    #[allow(dead_code)]
     fn priv_on_receive(&mut self, span: Span, uri: Lib3hUri, payload: Opaque) -> GhostResult<()> {
         let mut de = Deserializer::new(&payload[..]);
         let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
@@ -128,22 +126,23 @@ impl P2pGateway {
 
         match maybe_p2p_msg {
             Ok(P2pProtocol::PeerName(gateway_id, peer_name, timestamp)) => {
-                debug!(
-                    "Received PeerName: {} | {} ({})",
-                    peer_name, gateway_id, self.identifier.nickname
-                );
-                if self.identifier.id == gateway_id.into() {
-                    let peer = PeerData {
-                        peer_name,
-                        peer_location: uri.clone(),
-                        timestamp,
-                    };
-                    // HACK
-                    self.inner_dht.publish(
-                        span.follower("transport::protocol::RequestToParent::ReceivedData"),
-                        DhtRequestToChild::HoldPeer(peer),
-                    )?;
+                if self.identifier.id != gateway_id.clone().into() {
+                    panic!("BAD gateway {:?} != {:?}", self.identifier.id, gateway_id);
                 }
+                let peer = PeerData {
+                    peer_name,
+                    peer_location: uri.clone(),
+                    timestamp,
+                };
+                debug!(
+                    "{:?} Received PeerName: ({}) {} : {:?}",
+                    self.this_peer, self.identifier.nickname, gateway_id, peer,
+                );
+                // HACK
+                self.inner_dht.publish(
+                    span.follower("transport::protocol::RequestToParent::ReceivedData"),
+                    DhtRequestToChild::HoldPeer(peer),
+                )?;
             }
             Ok(_) => {
                 // TODO XXX - nope!

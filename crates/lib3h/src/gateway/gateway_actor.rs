@@ -112,6 +112,7 @@ impl P2pGateway {
                 Ok(())
             }
             GatewayRequestToChild::SendAll(payload) => {
+                trace!("send all: {:?}", String::from_utf8_lossy(&payload));
                 self.inner_dht.request(
                     Span::fixme(),
                     DhtRequestToChild::RequestPeerList,
@@ -136,9 +137,10 @@ impl P2pGateway {
                                             payload: payload.clone().into(),
                                         },
                                         Box::new(move |response| {
-                                            debug!(
+                                            trace!(
                                                 "P2pGateway::SendAll to {:?} response: {:?}",
-                                                peer.peer_location, response
+                                                peer.peer_location,
+                                                response
                                             );
                                             Ok(())
                                         }),
