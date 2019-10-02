@@ -109,16 +109,10 @@ impl P2pGateway {
                             GhostCallbackData::Response(Ok(
                                 GatewayRequestToParentResponse::Dht(d),
                             )) => d,
-                            GhostCallbackData::Response(Err(e)) => {
-                                panic!("Got error on GatewayRequest DHT: {:?} ", e);
-                            }
-                            GhostCallbackData::Timeout(bt) => {
-                                panic!("Got timeout on GatewayRequest DHT: {:?}", bt);
-                            }
-                            _ => panic!("Got wrong response type"),
+                            _ => panic!("invalid response type: {:?}", response),
                         };
                         // #fullsync - received entry response after request from gossip list handling,
-                        // treat it as an erntry from author list handling.
+                        // treat it as an entry from author list handling.
                         if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
                             me.inner_dht
                                 .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;

@@ -39,7 +39,7 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock) {
     alex.reply_to_HandleFetchEntry(&fetch_data)
         .expect("Reply to HandleFetchEntry should work");
 
-    // Process the HoldEntry generated from receiving the HandleStoreEntryAspect
+    // Expecting a HandleStoreEntryAspect
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"\\w+\"\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, billy, expected);
 
@@ -173,7 +173,6 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Send GossipingList
     // ==================
-    // Send HoldingEntryList and should receive a HandleFetchEntry request from network module
     println!("\nAlex sends GossipingEntryList\n");
     alex.reply_to_first_HandleGetGossipingEntryList();
 
