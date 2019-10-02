@@ -63,7 +63,7 @@ fn test_mirror(nodes: &mut Vec<NodeMock>) {
     };
 
     for _i in 0..20 {
-        proc(nodes);
+        process_nodes(nodes);
     }
 
     for node in nodes {
@@ -71,7 +71,7 @@ fn test_mirror(nodes: &mut Vec<NodeMock>) {
     }
 }
 
-fn proc(nodes: &mut Vec<NodeMock>) {
+fn process_nodes(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
         let _result = node.process();
     }
