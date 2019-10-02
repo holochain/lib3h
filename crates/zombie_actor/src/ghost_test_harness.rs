@@ -12,8 +12,8 @@ pub const DEFAULT_MAX_RETRIES: u64 = 5;
 pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
 pub const DEFAULT_TIMEOUT_MS: u64 = 2000;
 pub const DEFAULT_SHOULD_ABORT: bool = true;
-pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 1;
-pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 10;
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 5;
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 5;
 
 /// All configurable parameters when processing an actor.
 #[derive(Clone, Debug)]
@@ -152,12 +152,25 @@ macro_rules! wait_until_no_work {
             ..options
         };
 
-        for _i in 0..options.max_iters {
+        
+        let clock = std::time::SystemTime::now();
+
+        let timeout = std::time::Duration::from_millis(options.timeout_ms);
+
+ 
+        for i in 0..options.max_iters {
             did_work = $crate::wait_did_work!($ghost_actor, wait_options);
+
             if !did_work {
                 break;
             }
-        }
+            
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!("[epoch {}] wait_until_no_work timeout", i);
+                break;
+            }
+         }
         did_work
     }};
     ($ghost_can_track: ident, $user_data: ident) => {{
@@ -168,13 +181,24 @@ macro_rules! wait_until_no_work {
             timeout_ms: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
             ..options
         };
+ 
+        let clock = std::time::SystemTime::now();
 
-        for _i in 0..options.max_iters {
+        let timeout = std::time::Duration::from_millis(options.timeout_ms);
+
+        for i in 0..options.max_iters {
             did_work = $crate::wait_can_track_did_work!($ghost_can_track, $user_data, wait_options);
             if !did_work {
                 break;
             }
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!("[epoch {}] wait_until_no_work timeout", i);
+                break;
+            }
+
         }
+
         did_work
     }};
 }
