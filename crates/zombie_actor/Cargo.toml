@@ -12,7 +12,7 @@ documentation = "https://docs.rs/lib3h_ghost_actor"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-backtrace = "=0.3.14"
+backtrace = "=0.3.27"
 crossbeam-channel = "=0.3.8"
 detach = { version = "=0.0.11", path = "../detach" }
 holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/holochain-tracing" }
