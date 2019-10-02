@@ -6,11 +6,11 @@ use crate::{
 pub type MultiNodeTestFn = fn(nodes: &mut Vec<NodeMock>);
 
 lazy_static! {
-    pub static ref MIRROR_TEST_FNS: Vec<(MultiNodeTestFn, bool)> =
-        vec![(test_setup_only, true),
-             (test_mirror_from_center, true),
-             (test_mirror_from_edge, true),
-        ];
+    pub static ref MIRROR_TEST_FNS: Vec<(MultiNodeTestFn, bool)> = vec![
+        (test_setup_only, true),
+        (test_mirror_from_center, true),
+        (test_mirror_from_edge, true),
+    ];
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -19,15 +19,14 @@ lazy_static! {
 
 #[allow(dead_code)]
 pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>) {
-    // Connect nodes
-    assert!(nodes.len() > 0);
+    // Wait for nodes to auto-connect with Discovery
+    assert!(nodes.len() > 1);
     let mut node0 = nodes.remove(0);
-    for node in nodes.iter_mut() {
-        let connect_data = node.connect_to(&node0.advertise()).unwrap();
-        wait_connect!(node, connect_data, node0);
-        node.wait_until_no_work();
-    }
-    node0.wait_until_no_work();
+    let mut node1 = nodes.remove(0);
+    let expected = "Connected\\(ConnectedData \\{ request_id: \"[\\w\\d_~]+\", uri: Lib3hUri\\(\".*\"\\) \\}\\)";
+    let _results = assert_msg_matches!(node1, expected);
+    wait_engine_wrapper_until_no_work!(node0);
+    nodes.insert(0, node1);
     nodes.insert(0, node0);
 
     nodes_join_space(nodes);

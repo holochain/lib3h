@@ -31,6 +31,15 @@ pub struct GatewayId {
     pub id: Address,
 }
 
+impl GatewayId {
+    pub fn fake_new(nickname: &str) -> Self {
+        GatewayId {
+            nickname: nickname.to_string(),
+            id: format!("HcFake_{}", nickname).into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 enum RealEngineTrackerData {

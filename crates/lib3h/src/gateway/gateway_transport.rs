@@ -18,14 +18,11 @@ use serde::{Deserialize, Serialize};
 impl P2pGateway {
     /// Handle IncomingConnection event from child transport
     fn handle_incoming_connection(&mut self, span: Span, uri: Lib3hUri) -> TransportResult<()> {
-
         // TODO: This is prbably wrong in that a different level of URI should be being bubbled up.
         self.endpoint_self.publish(
             Span::fixme(),
             GatewayRequestToParent::Transport(
-                transport::protocol::RequestToParent::IncomingConnection {
-                    uri: uri.clone(),
-                },
+                transport::protocol::RequestToParent::IncomingConnection { uri: uri.clone() },
             ),
         )?;
 
@@ -43,7 +40,6 @@ impl P2pGateway {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
-
                     // Send to other node our PeerName
                     let our_peer_name = P2pProtocol::PeerName(
                         me.identifier.id.to_owned().into(),

@@ -774,10 +774,7 @@ mod tests {
 
     // Real test network-id should be a hc version of sha256 of a string
     fn test_network_id() -> GatewayId {
-        GatewayId {
-            nickname: "unit-test-test-net".into(),
-            id: "Hc_fake_addr_for_test-net".into(),
-        }
+        GatewayId::fake_new("unit-test-test-net")
     }
 
     fn make_test_engine(test_net: &str) -> GhostEngine<'static> {

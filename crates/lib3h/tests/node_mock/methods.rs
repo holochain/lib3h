@@ -101,7 +101,7 @@ impl NodeMock {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
             peer_location: uri.clone(),
-            network_id: NETWORK_A_ID.clone(),
+            network_id: NETWORK_A_ID.id.clone(),
         };
         self.connected_list.insert(uri.clone());
         return self

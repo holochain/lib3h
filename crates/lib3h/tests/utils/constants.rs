@@ -1,11 +1,13 @@
 use holochain_persistence_api::hash::HashString;
+use lib3h::engine::GatewayId;
 use lib3h_protocol::Address;
 use multihash::Hash;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
     /// Networks
-    pub static ref NETWORK_A_ID: String = "net_A".to_string();
+    pub static ref NETWORK_A_ID_STR: String = "net_A".to_string();
+    pub static ref NETWORK_A_ID: GatewayId = GatewayId::fake_new(&*NETWORK_A_ID_STR);
     /// Agents
     pub static ref ALEX_AGENT_ID: Address = "alex".into();
     pub static ref BILLY_AGENT_ID: Address = "billy".into();
@@ -31,7 +33,7 @@ lazy_static! {
     // TODO use port 0 and have transport wss return back actually bound port
     static ref PORT: Arc<Mutex<u32>> = Arc::new(Mutex::new(64528));
 
-    pub static ref MIRROR_NODES_COUNT: u8 = 10;
+    pub static ref MIRROR_NODES_COUNT: u8 = 2;
 
 }
 
