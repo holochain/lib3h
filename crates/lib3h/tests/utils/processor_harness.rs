@@ -677,10 +677,18 @@ macro_rules! wait_engine_wrapper_did_work {
 macro_rules! wait_engine_wrapper_until_no_work {
     ($engine: ident) => {{
         let mut did_work;
+        let start = std::time::SystemTime::now();
         loop {
             did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
             if !did_work {
                 break;
+            }
+            let elapsed = start.elapsed().expect("SystemTime failed");
+            if elapsed.as_secs() > 1 {
+                println!("elapsed = {:?}", elapsed.as_secs());
+                if elapsed.as_secs() > 60 {
+                    break;
+                }
             }
         }
         did_work
