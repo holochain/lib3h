@@ -40,7 +40,6 @@ fn test_setup_only(_nodes: &mut Vec<NodeMock>) {
 }
 
 fn test_mirror(nodes: &mut Vec<NodeMock>) {
-    println!("SIZE: {}", nodes.len());
     let entry = {
         let mut node0 = nodes.remove(0);
         let mut node1 = nodes.remove(0);
@@ -75,7 +74,7 @@ fn process_nodes(nodes: &mut Vec<NodeMock>) {
 }
 fn process_nodes_inner(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
-        //        wait_engine_wrapper_until_no_work!(node);
-        let _result = node.process();
+        wait_engine_wrapper_until_no_work!(node);
+        //let _result = node.process();
     }
 }
