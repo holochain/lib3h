@@ -7,7 +7,10 @@ pub type MultiNodeTestFn = fn(nodes: &mut Vec<NodeMock>);
 
 lazy_static! {
     pub static ref MIRROR_TEST_FNS: Vec<(MultiNodeTestFn, bool)> =
-        vec![(test_setup_only, true), (test_mirror, true),];
+        vec![(test_setup_only, true),
+             (test_mirror_from_center, true),
+             (test_mirror_from_edge, true),
+        ];
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -53,7 +56,7 @@ fn test_setup_only(_nodes: &mut Vec<NodeMock>) {
     // n/a
 }
 
-fn test_mirror(nodes: &mut Vec<NodeMock>) {
+fn test_mirror_from_center(nodes: &mut Vec<NodeMock>) {
     let entry = {
         let mut node0 = nodes.remove(0);
         let mut node1 = nodes.remove(0);
@@ -75,7 +78,35 @@ fn test_mirror(nodes: &mut Vec<NodeMock>) {
     process_nodes(nodes);
 
     for node in nodes {
-        println!("cheking if {} has entry...", node.name());
+        println!("checking if {} has entry...", node.name());
+        assert_eq!(entry, node.get_entry(&ENTRY_ADDRESS_1).unwrap());
+        println!("yes!");
+    }
+}
+
+fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>) {
+    let entry = {
+        let mut node0 = nodes.remove(0);
+        let mut noden = nodes.pop().unwrap();
+        // node0 publishes data on the network
+        let entry = noden
+            .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
+            .unwrap();
+
+        let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"\\w+\"\\), provider_agent_id: HashString\\(\"mirror_node0\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
+
+        let _results = assert2_msg_matches!(node0, noden, expected);
+
+        assert_eq!(entry, node0.get_entry(&ENTRY_ADDRESS_1).unwrap());
+        nodes.push(noden);
+        nodes.insert(0, node0);
+        entry
+    };
+
+    process_nodes(nodes);
+
+    for node in nodes {
+        println!("checking if {} has entry...", node.name());
         assert_eq!(entry, node.get_entry(&ENTRY_ADDRESS_1).unwrap());
         println!("yes!");
     }
