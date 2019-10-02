@@ -21,7 +21,8 @@ lazy_static! {
 pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>) {
     assert!(nodes.len() > 0);
 
-    let mut node0 = nodes.remove(0);
+
+/*    let mut node0 = nodes.remove(0);
 
     // Connect nodes
     for node in nodes.iter_mut() {
@@ -32,6 +33,7 @@ pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>) {
 
     node0.wait_until_no_work();
     nodes.insert(0, node0);
+     */
 
     nodes_join_space(nodes);
     process_nodes(nodes);
