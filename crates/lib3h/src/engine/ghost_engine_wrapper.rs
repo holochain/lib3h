@@ -468,7 +468,7 @@ mod tests {
         let data = ConnectData {
             request_id: "foo_request_id".into(),
             peer_location: Url::parse("mocknet://t1").expect("can parse url").into(),
-            network_id: "fake_id".to_string(),
+            network_id: "fake_id".into(),
         };
 
         assert!(legacy.post(Lib3hClientProtocol::Connect(data)).is_ok());

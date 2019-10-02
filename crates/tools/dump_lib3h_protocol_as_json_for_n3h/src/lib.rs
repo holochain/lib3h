@@ -31,7 +31,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
     test_client(Lib3hClientProtocol::Connect(ConnectData {
         request_id: "rid".to_string(),
         peer_location: url::Url::parse("hc:id").unwrap().into(),
-        network_id: "nid".to_string(),
+        network_id: "nid".into(),
     }));
 
     test_client(Lib3hClientProtocol::JoinSpace(SpaceData {
