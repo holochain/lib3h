@@ -283,8 +283,9 @@ fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), (
 
     // Setup
     let mut nodes = Vec::new();
-    for i in 1..*MIRROR_NODES_COUNT {
+    for i in 0..*MIRROR_NODES_COUNT {
         let node_name = format!("mirror_node{}", i);
+        println!("making engine: {}", node_name);
         let node = setup_memory_node(&node_name.clone(), node_name.into(), &fn_name(test_fn_ptr));
         nodes.push(node);
     }
