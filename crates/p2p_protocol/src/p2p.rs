@@ -1,22 +1,31 @@
 use crate::{error::P2pResult, p2p_capnp};
 
+/// a message used to verify connectivity with a remote node
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MsgPing {
+    /// set the milliseconds since unix epoch when sending this message
     pub ping_send_epoch_ms: u64,
 }
 
+/// a response to a ping message
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MsgPong {
+    /// copy the milliseconds since unix epoch from the triggering ping
     pub ping_send_epoch_ms: u64,
+    /// set our own machine milliseconds since unix epoch here
+    /// can be used for heuristics about relative clock skew
     pub ping_received_epoch_ms: u64,
 }
 
+/// an enum representing the various p2p message types that can be sent
+/// between lib3h nodes
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum P2pMessage {
     MsgPing(MsgPing),
     MsgPong(MsgPong),
 }
 
+/// get the current system milliseconds since unix epoch
 fn now_ms() -> u64 {
     let out = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -25,6 +34,8 @@ fn now_ms() -> u64 {
 }
 
 impl P2pMessage {
+    /// create a new ping message
+    /// if `send_epoch_ms` is None, will be set to now
     pub fn create_ping(mut send_epoch_ms: Option<u64>) -> Self {
         if send_epoch_ms.is_none() {
             send_epoch_ms = Some(now_ms());
@@ -34,6 +45,8 @@ impl P2pMessage {
         })
     }
 
+    /// create a new pong message
+    /// if `recv_epoch_ms` is None, will be set to now
     pub fn create_pong(send_epoch_ms: u64, mut recv_epoch_ms: Option<u64>) -> Self {
         if recv_epoch_ms.is_none() {
             recv_epoch_ms = Some(now_ms());
@@ -44,6 +57,7 @@ impl P2pMessage {
         })
     }
 
+    /// parse raw bytes into a P2pMessage enum instance
     pub fn from_bytes(bytes: Vec<u8>) -> P2pResult<Self> {
         let message = capnp::serialize_packed::read_message(
             &mut std::io::Cursor::new(bytes),
@@ -66,6 +80,7 @@ impl P2pMessage {
         }
     }
 
+    /// generate encoded bytes for this P2pMessage enum instance
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut message = capnp::message::Builder::new_default();
         {
@@ -92,6 +107,7 @@ impl P2pMessage {
         bytes
     }
 
+    /// convert this P2pMessage enum instance into encoded bytes
     pub fn into_bytes(self) -> Vec<u8> {
         self.to_bytes()
     }

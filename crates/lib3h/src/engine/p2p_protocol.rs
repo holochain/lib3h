@@ -41,17 +41,20 @@ pub struct GossipData {
 }
 
 impl P2pProtocol {
+    /// rust messagepack decode these bytes into a P2pProtocol instance
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, rmp_serde::decode::Error> {
         let mut de = Deserializer::new(&bytes[..]);
         Deserialize::deserialize(&mut de)
     }
 
+    /// encode this P2pProtocol instance as rust messagepack bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         self.serialize(&mut Serializer::new(&mut out)).unwrap();
         out
     }
 
+    /// convert this P2pProtocol instance into rust messagepack bytes
     pub fn into_bytes(self) -> Vec<u8> {
         self.to_bytes()
     }
