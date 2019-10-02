@@ -413,7 +413,7 @@ mod tests {
     use crate::{
         tests::enable_logging_for_test, transport::websocket::tls::TlsConfig, wait_for_bind_result,
     };
-    use lib3h_ghost_actor::{wait_until_no_work, wait_for_message, wait1_for_callback};
+    use lib3h_ghost_actor::{wait1_for_callback, wait_for_message, wait_until_no_work};
     use std::net::TcpListener;
     use url::Url;
 
@@ -542,7 +542,6 @@ mod tests {
                 .with_port(port1)
                 .build();
 
-
         let (_is_match, expected_transport1_address) =
             wait_for_bind_result!(transport1, t1_endpoint, init_transport1_address);
 
@@ -574,7 +573,7 @@ mod tests {
                     Url::parse(&format!("wss://127.0.0.1:{}", port2))
                         .unwrap()
                         .into();
-                let (_is_match, expected_transport2_address) = 
+                let (_is_match, expected_transport2_address) =
                     wait_for_bind_result!(transport2, t2_endpoint, init_transport2_address);
 
                 assert_eq!(
@@ -582,21 +581,24 @@ mod tests {
                     Some(expected_transport2_address.clone())
                 );
 
-               
-                let wait_callback_options = crate::lib3h_ghost_actor::ghost_test_harness::ProcessingOptions {
-                    // TODO set this to true
-                    should_abort: false,
-                    max_iters:1,
-                    ..Default::default()
-                };
+                let wait_callback_options =
+                    crate::lib3h_ghost_actor::ghost_test_harness::ProcessingOptions {
+                        // TODO set this to true
+                        should_abort: false,
+                        max_iters: 1,
+                        ..Default::default()
+                    };
 
-                wait1_for_callback!(transport1, t1_endpoint, 
+                wait1_for_callback!(
+                    transport1,
+                    t1_endpoint,
                     RequestToChild::create_send_message(
                         expected_transport2_address.clone(),
                         b"test message".to_vec().into(),
                     ),
                     "Response(Ok(SendMessageSuccess))",
-                wait_callback_options);
+                    wait_callback_options
+                );
 
                 wait_for_message!(
                     vec![&mut transport1, &mut transport2],

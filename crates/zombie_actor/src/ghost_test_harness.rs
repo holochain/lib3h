@@ -152,25 +152,23 @@ macro_rules! wait_until_no_work {
             ..options
         };
 
-        
         let clock = std::time::SystemTime::now();
 
         let timeout = std::time::Duration::from_millis(options.timeout_ms);
 
- 
         for i in 0..options.max_iters {
             did_work = $crate::wait_did_work!($ghost_actor, wait_options);
 
             if !did_work {
                 break;
             }
-            
+
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
                 trace!("[epoch {}] wait_until_no_work timeout", i);
                 break;
             }
-         }
+        }
         did_work
     }};
     ($ghost_can_track: ident, $user_data: ident) => {{
@@ -181,7 +179,7 @@ macro_rules! wait_until_no_work {
             timeout_ms: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
             ..options
         };
- 
+
         let clock = std::time::SystemTime::now();
 
         let timeout = std::time::Duration::from_millis(options.timeout_ms);
@@ -196,7 +194,6 @@ macro_rules! wait_until_no_work {
                 trace!("[epoch {}] wait_until_no_work timeout", i);
                 break;
             }
-
         }
 
         did_work
