@@ -5,9 +5,10 @@ pub mod memory_mock;
 pub mod protocol;
 pub mod websocket;
 
-mod transport_test_harness;
+#[macro_use]
+pub mod transport_test_harness;
 
-mod transport_multiplex;
+pub mod transport_multiplex;
 pub use transport_multiplex::TransportMultiplex;
 
 // FIXME

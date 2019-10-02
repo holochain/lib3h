@@ -410,10 +410,10 @@ impl
 mod tests {
 
     use super::*;
-    use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
-    use lib3h_ghost_actor::{wait1_for_repeatable_callback, wait_for_message};
+    use crate::{tests::enable_logging_for_test, wait_for_bind_result, transport::websocket::tls::TlsConfig};
     use std::net::TcpListener;
     use url::Url;
+    use lib3h_ghost_actor::wait_for_message;
 
     fn port_is_available(port: u16) -> bool {
         match TcpListener::bind(("127.0.0.1", port)) {
@@ -424,37 +424,6 @@ mod tests {
 
     fn get_available_port(start: u16) -> Option<u16> {
         (start..65535).find(|port| port_is_available(*port))
-    }
-
-    #[macro_export]
-    macro_rules! make_bind_request_fn {
-        {
-            port: expr
-        } => {{
-            let init_transport1_address: Lib3hUri = Url::parse(&format!("wss://127.0.0.1:{}", port))
-                .unwrap()
-                .into();
-
-            let request_fn = Box::new(|transport1_address: Lib3hUri| {
-                let old_port = transport1_address.port().unwrap_or_else(|| 0);
-                let port = get_available_port(old_port + 1).expect("Must be able to find free port");
-                let expected_transport1_address: Lib3hUri =
-                    Url::parse(&format!("wss://127.0.0.1:{}", port))
-                    .unwrap()
-                    .into();
-
-                let request = RequestToChild::Bind {
-                    spec: expected_transport1_address.clone(),
-                };
-                let re = format!(
-                    "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
-                    port.clone(),
-                );
-
-                (request.clone(), re, expected_transport1_address.clone())
-            });
-            request_fn
-        }}
     }
 
     #[test]
@@ -498,31 +467,9 @@ mod tests {
             .unwrap()
             .into();
 
-        // closure for the wait1_for_repeatable_callback! that builds a new request with a different port number
-        // an a modified regular expression expectation to match
-        let request_fn = Box::new(|transport1_address: Lib3hUri| {
-            let old_port = transport1_address.port().unwrap_or_else(|| 0);
-            let port = get_available_port(old_port + 1).expect("Must be able to find free port");
-            let expected_transport1_address: Lib3hUri =
-                Url::parse(&format!("wss://127.0.0.1:{}", port))
-                    .unwrap()
-                    .into();
-
-            let request = RequestToChild::Bind {
-                spec: expected_transport1_address.clone(),
-            };
-            let re = format!(
-                "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
-                port.clone(),
-            );
-
-            (request.clone(), re, expected_transport1_address.clone())
-        });
-
-        let (_is_match, expected_transport1_address) = wait1_for_repeatable_callback!(
+        let (_is_match, expected_transport1_address) = wait_for_bind_result!(
             transport1,
             t1_endpoint,
-            request_fn,
             init_transport1_address
         );
 
