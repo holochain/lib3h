@@ -7,7 +7,7 @@
 ///
 ///
 
-pub const DEFAULT_MAX_ITERS: u64 = 20;
+pub const DEFAULT_MAX_ITERS: u64 = 100;
 pub const DEFAULT_MAX_RETRIES: u64 = 5;
 pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
 pub const DEFAULT_TIMEOUT_MS: u64 = 2000;
