@@ -37,7 +37,8 @@ pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
     two_join_space(&mut alex, &mut billy, &SPACE_ADDRESS_A);
 
     println!(
-        "DONE setup_two_nodes() DONE \n\n ------------------------------------------------ \n");
+        "DONE setup_two_nodes() DONE \n\n ------------------------------------------------ \n"
+    );
 }
 
 //--------------------------------------------------------------------------------------------------
