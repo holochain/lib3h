@@ -1,5 +1,7 @@
-use crate::{node_mock::NodeMock, utils::constants::*};
-use lib3h_protocol::protocol_server::Lib3hServerProtocol;
+use crate::{
+    node_mock::{test_join_space, NodeMock},
+    utils::constants::*,
+};
 
 pub type MultiNodeTestFn = fn(nodes: &mut Vec<NodeMock>);
 
@@ -14,22 +16,19 @@ lazy_static! {
 
 #[allow(dead_code)]
 pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>) {
-    let space_address = &SPACE_ADDRESS_A;
+    nodes_join_space(nodes);
     for node in nodes {
-        println!("\n {} joins {:?}\n", node.name(), *SPACE_ADDRESS_A);
-        let req_id = node.join_space(&space_address, true).unwrap();
-        let (did_work, srv_msg_list) = node.process().unwrap();
-        assert!(did_work);
-        assert_eq!(srv_msg_list.len(), 3);
-        let msg_1 = &srv_msg_list[0];
-        one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-            assert_eq!(response.request_id, req_id);
-        });
         wait_engine_wrapper_until_no_work!(node);
     }
     println!(
         "DONE setup_mirror_nodes() DONE \n\n =================================================\n"
     );
+}
+
+fn nodes_join_space(nodes: &mut Vec<NodeMock>) {
+    for node in nodes {
+        test_join_space(node, &SPACE_ADDRESS_A);
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -47,7 +46,7 @@ fn test_mirror(nodes: &mut Vec<NodeMock>) {
         let mut node1 = nodes.pop().unwrap();
         let mut node2 = nodes.pop().unwrap();
 
-            // node1 publishes data on the network
+        // node1 publishes data on the network
         let entry = node1
             .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
             .unwrap();
