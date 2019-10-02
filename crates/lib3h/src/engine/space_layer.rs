@@ -102,6 +102,7 @@ impl<'engine> GhostEngine<'engine> {
             .get_mut(chain_id)
             .expect("Should have the space gateway we receive an event from.");
         let payload = request.take_message().expect("exists");
+        debug!("  ->  request = {:?}", payload);
         match payload {
             // Handle Space's DHT request
             // ==========================
@@ -211,6 +212,7 @@ impl<'engine> GhostEngine<'engine> {
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
+                                            trace!("Received HandleFetchEntryResult response | {}", is_data_for_author_list);
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
                                                     Span::fixme(),

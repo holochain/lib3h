@@ -49,6 +49,7 @@ impl P2pGateway {
     }
 
     /// Handle a request sent to us by our child DHT
+    #[allow(irrefutable_let_patterns)]
     pub(crate) fn handle_dht_RequestToParent(
         &mut self,
         mut request: DhtToParentMessage,
@@ -104,7 +105,27 @@ impl P2pGateway {
                 unreachable!();
             }
             DhtRequestToParent::RequestEntry(_) => {
-                unreachable!();
+                self.endpoint_self.request(
+                    span,
+                    GatewayRequestToParent::Dht(payload),
+                    Box::new(|me, response| {
+                        trace!("Received requestEntry response in Gateway");
+                        let dht_response = match response {
+                            GhostCallbackData::Response(Ok(
+                                GatewayRequestToParentResponse::Dht(d),
+                            )) => d,
+                            _ => panic!("invalid response type: {:?}", response),
+                        };
+                        // #fullsync - received entry response after request from gossip list handling,
+                        // treat it as an entry from author list handling.
+                        if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
+                            me.inner_dht
+                                .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
+                        }
+                        Ok(())
+                    }),
+                )?;
+                return Ok(());
             }
         }
         // Forward to parent

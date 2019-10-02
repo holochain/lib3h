@@ -1,6 +1,6 @@
 use lib3h_protocol::uri::Lib3hUri;
 
-pub const DEFAULT_GOSSIP_INTERVAL_MS: u64 = 1000;
+pub const DEFAULT_GOSSIP_INTERVAL_MS: u64 = 2000;
 pub const DEFAULT_TIMEOUT_THRESHOLD_MS: u64 = 60000;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
