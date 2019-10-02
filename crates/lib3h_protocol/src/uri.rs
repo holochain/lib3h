@@ -149,7 +149,7 @@ impl Lib3hUri {
 }
 
 /// Eases building of a `Lib3hUri` with a fluent api. Users need not
-/// eve: mutate a `Lib3hUri` directly except for efficiency purposes. Instead,
+/// ever mutate a `Lib3hUri` directly except for efficiency purposes. Instead,
 /// let this builder be the only place where urls are manipulated.
 #[derive(Debug, Clone)]
 pub struct Builder {
