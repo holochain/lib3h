@@ -3,6 +3,7 @@ use lib3h_protocol::Address;
 use multihash::Hash;
 use std::sync::{Arc, Mutex};
 
+
 lazy_static! {
     /// Networks
     pub static ref NETWORK_A_ID: String = "net_A".to_string();
@@ -28,6 +29,9 @@ lazy_static! {
 
     // TODO use port 0 and have transport wss return back actually bound port
     static ref PORT: Arc<Mutex<u32>> = Arc::new(Mutex::new(64528));
+
+    pub static ref MIRROR_NODES_COUNT: u8 = 10;
+
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -29,7 +29,7 @@ use lib3h_protocol::{uri::Lib3hUri, Address};
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
-    three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
+    three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*, mirror::*
 };
 use url::Url;
 use utils::{constants::*, test_network_id};
@@ -262,6 +262,43 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
     // Wrap-up test
     println!("==========================");
     print_test_name("IN-MEMORY THREE NODES TEST END: ", test_fn_ptr);
+
+    // Done
+    Ok(())
+}
+
+#[test]
+fn test_mirror_suite() {
+    enable_logging_for_test(true);
+    for (test_fn, can_setup) in MIRROR_TEST_FNS.iter() {
+        launch_mirror_test(*test_fn, *can_setup).unwrap();
+    }
+}
+
+// Do general test with config
+fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), ()> {
+    let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
+    println!("");
+    print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
+    println!("==========================");
+
+    // Setup
+    let mut nodes = Vec::new();
+    for i in 1..*MIRROR_NODES_COUNT {
+        let node_name = format!("mirror_node{}",i);
+        let node = setup_memory_node(&node_name.clone(), node_name.into(), &fn_name(test_fn_ptr));
+        nodes.push(node);
+    }
+    if can_setup {
+        setup_mirror_nodes(&mut nodes);
+    }
+
+    // Execute test
+    test_fn(&mut nodes);
+
+    // Wrap-up test
+    println!("==========================");
+    print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
 
     // Done
     Ok(())
