@@ -410,10 +410,12 @@ impl
 mod tests {
 
     use super::*;
-    use crate::{tests::enable_logging_for_test, wait_for_bind_result, transport::websocket::tls::TlsConfig};
+    use crate::{
+        tests::enable_logging_for_test, transport::websocket::tls::TlsConfig, wait_for_bind_result,
+    };
+    use lib3h_ghost_actor::wait_for_message;
     use std::net::TcpListener;
     use url::Url;
-    use lib3h_ghost_actor::wait_for_message;
 
     fn port_is_available(port: u16) -> bool {
         match TcpListener::bind(("127.0.0.1", port)) {
@@ -467,11 +469,8 @@ mod tests {
             .unwrap()
             .into();
 
-        let (_is_match, expected_transport1_address) = wait_for_bind_result!(
-            transport1,
-            t1_endpoint,
-            init_transport1_address
-        );
+        let (_is_match, expected_transport1_address) =
+            wait_for_bind_result!(transport1, t1_endpoint, init_transport1_address);
 
         let port2 = get_available_port(expected_transport1_address.port().unwrap_or_else(|| 0))
             .expect("Must be able to find free port");
