@@ -117,6 +117,35 @@ impl Lib3hUri {
     pub fn with_port(&self, port: u16) -> Self {
         Builder::with_url(self.clone()).with_port(port).build()
     }
+
+    /// set a higher-level agent_id i.e. ?a=agent_id
+    pub fn set_agent_id(&mut self, agent_id: &Address) {
+        self.0
+            .query_pairs_mut()
+            .clear()
+            .append_pair("a", &agent_id.to_string());
+    }
+
+    /// clear any higher-level agent_id
+    pub fn clear_agent_id(&mut self) {
+        self.0.set_query(None);
+    }
+
+    /// do we have a higher-level agent_id? i.e. ?a=agent_id
+    pub fn agent_id(&self) -> Option<Address> {
+        for (n, v) in self.0.query_pairs() {
+            if &n == "a" {
+                return Some(v.to_string().into());
+            }
+        }
+        None
+    }
+
+    /// get our lower component as an address
+    /// i.e. transportid:HcMyada would return HcMyada
+    pub fn lower_address(&self) -> Address {
+        self.0.path().into()
+    }
 }
 
 /// Eases building of a `Lib3hUri` with a fluent api. Users need not
@@ -169,35 +198,6 @@ impl Builder {
 
     pub fn build(&self) -> Lib3hUri {
         self.url.clone().into()
-=======
-    /// set a higher-level agent_id i.e. ?a=agent_id
-    pub fn set_agent_id(&mut self, agent_id: &Address) {
-        self.0
-            .query_pairs_mut()
-            .clear()
-            .append_pair("a", &agent_id.to_string());
-    }
-
-    /// clear any higher-level agent_id
-    pub fn clear_agent_id(&mut self) {
-        self.0.set_query(None);
-    }
-
-    /// do we have a higher-level agent_id? i.e. ?a=agent_id
-    pub fn agent_id(&self) -> Option<Address> {
-        for (n, v) in self.0.query_pairs() {
-            if &n == "a" {
-                return Some(v.to_string().into());
-            }
-        }
-        None
-    }
-
-    /// get our lower component as an address
-    /// i.e. transportid:HcMyada would return HcMyada
-    pub fn lower_address(&self) -> Address {
-        self.0.path().into()
->>>>>>> cffa727668383387384e8b6d67263fab849b6c0f
     }
 }
 
