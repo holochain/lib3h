@@ -109,46 +109,64 @@ impl Lib3hUri {
     pub fn hostname(&self) -> Option<String> {
         self.host().map(|host| host.to_string())
     }
+
+    /// Produces a copy of this `Lib3hUri` with the given port set.
+    /// Panics for out of range port values.
+    pub fn with_port(&self, port: u16) -> Self {
+        Builder::with_url(self.clone()).with_port(port).build()
+    }
 }
 
+/// Eases building of a `Lib3hUri` with a fluent api. Users need not
+/// eve: mutate a `Lib3hUri` directly except for efficiency purposes. Instead,
+/// let this builder be the only place where urls are manipulated.
+#[derive(Debug, Clone)]
 pub struct Builder {
-    scheme: Option<String>,
-    host: String,
-    port: Option<u16>,
+    url: url::Url,
 }
 
 impl Builder {
-    pub fn with_host(host: &str) -> Self {
+    pub fn new() -> Self {
         Self {
-            scheme: None,
-            host: host.into(),
-            port: None,
+            url: Lib3hUri::with_undefined().into(),
         }
     }
 
+    /// Primes a builder with the given url.
+    pub fn with_url<T: Into<Lib3hUri>>(url: T) -> Self {
+        let builder = Builder { url: url.into().0 };
+        builder
+    }
+
+    /// Primes a builder with a raw url (such as a string).
+    pub fn with_raw_url<T: TryInto<Lib3hUri>>(url: T) -> Result<Self, T::Error> {
+        url.try_into().map(|url| Builder { url: url.0 })
+    }
+
+    pub fn with_host(&mut self, host: &str) -> &mut Self {
+        self.url
+            .set_host(Some(host))
+            .unwrap_or_else(|e| panic!("Error setting host {:?}: {:?}", host, e));
+        self
+    }
+
     pub fn with_scheme(&mut self, scheme: &str) -> &mut Self {
-        self.scheme = Some(scheme.into());
+        self.url
+            .set_scheme(scheme)
+            .unwrap_or_else(|e| panic!("Error setting scheme {:?}: {:?}", scheme, e));
         self
     }
 
+    /// Sets the port. Will panic for out of range ports.
     pub fn with_port(&mut self, port: u16) -> &mut Self {
-        self.port = Some(port);
+        self.url
+            .set_port(Some(port))
+            .unwrap_or_else(|e| panic!("Error setting port {:?}: {:?}", port, e));
         self
     }
 
-    pub fn build(&self) -> Result<Lib3hUri, Lib3hProtocolError> {
-        let scheme = self
-            .scheme
-            .as_ref()
-            .map(|scheme| format!("{}://", scheme))
-            .unwrap_or_else(|| "".to_string());
-        let port = self
-            .port
-            .map(|port| format!(":{}", port))
-            .unwrap_or_else(|| "".to_string());
-        let host = &self.host;
-
-        format!("{}{}{}/", scheme, host, port).as_str().try_into()
+    pub fn build(&self) -> Lib3hUri {
+        self.url.clone().into()
     }
 }
 
@@ -268,14 +286,15 @@ mod tests {
     #[test]
     fn test_uri_builder() {
         let scheme = "wss";
-        let host = "127.0.0.1";
-        let port = 900;
-        let result = Builder::with_host(host)
+        let host = "ws1://127.0.0.1/";
+        let port = 9000;
+        let url = Builder::with_raw_url(host)
+            .unwrap_or_else(|e| panic!("with_raw_url: {:?}", e))
+            //            .with_host(host)
             .with_scheme(scheme)
             .with_port(port)
             .build();
 
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().to_string(), "wss://127.0.0.1:900/");
+        assert_eq!(url.to_string(), "wss://127.0.0.1:9000/");
     }
 }

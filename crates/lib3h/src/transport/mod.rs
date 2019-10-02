@@ -5,10 +5,13 @@ pub mod memory_mock;
 pub mod protocol;
 pub mod websocket;
 
+mod transport_test_harness;
+
 mod transport_multiplex;
 pub use transport_multiplex::TransportMultiplex;
 
 // FIXME
+// TODO do we still really need these tests?
 //#[cfg(test)]
 //pub mod tests {
 //    #![allow(non_snake_case)]
