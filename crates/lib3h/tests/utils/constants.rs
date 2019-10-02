@@ -22,9 +22,11 @@ lazy_static! {
     pub static ref ASPECT_CONTENT_1: Vec<u8> = "hello-1".as_bytes().to_vec();
     pub static ref ASPECT_CONTENT_2: Vec<u8> = "l-2".as_bytes().to_vec();
     pub static ref ASPECT_CONTENT_3: Vec<u8> = "ChainHeader-3".as_bytes().to_vec();
+    pub static ref ASPECT_CONTENT_4: Vec<u8> = "other-4".as_bytes().to_vec();
     pub static ref ASPECT_ADDRESS_1: Address = generate_address(&*ASPECT_CONTENT_1);
     pub static ref ASPECT_ADDRESS_2: Address = generate_address(&*ASPECT_CONTENT_2);
     pub static ref ASPECT_ADDRESS_3: Address = generate_address(&*ASPECT_CONTENT_3);
+    pub static ref ASPECT_ADDRESS_4: Address = generate_address(&*ASPECT_CONTENT_4);
 
     // TODO use port 0 and have transport wss return back actually bound port
     static ref PORT: Arc<Mutex<u32>> = Arc::new(Mutex::new(64528));

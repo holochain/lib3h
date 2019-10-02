@@ -50,6 +50,7 @@ fn enable_logging_for_test(enable: bool) {
     }
     let _ = env_logger::builder()
         .default_format_timestamp(false)
+        //.default_format_timestamp_nanos(true)
         .default_format_module_path(false)
         .is_test(enable)
         .try_init();
@@ -110,8 +111,8 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
-        dht_gossip_interval: 500,
-        dht_timeout_threshold: 3000,
+        dht_gossip_interval: 1500,
+        dht_timeout_threshold: 5000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -182,7 +183,6 @@ fn test_two_memory_nodes_basic_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_two_memory_nodes_get_lists_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_GET_LISTS_TEST_FNS.iter() {
@@ -199,7 +199,6 @@ fn test_two_memory_nodes_spaces_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_three_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
