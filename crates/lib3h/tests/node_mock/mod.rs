@@ -84,3 +84,16 @@ impl NodeMock {
         }
     }
 }
+
+// utility function for tests that rely on nodes joining a space
+pub fn test_join_space(node: &mut NodeMock, space_address: &Address) {
+    println!("\n {} joins {}\n", node.name(), space_address);
+    let req_id = node.join_space(&space_address, true).unwrap();
+    let (did_work, srv_msg_list) = node.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 3);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
+}

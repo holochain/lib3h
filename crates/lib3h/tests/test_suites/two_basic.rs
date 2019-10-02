@@ -1,4 +1,7 @@
-use crate::{node_mock::NodeMock, utils::constants::*};
+use crate::{
+    node_mock::{test_join_space, NodeMock},
+    utils::constants::*,
+};
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
@@ -81,8 +84,7 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
     assert_eq!(&found_entry, entry);
 }
 
-///
-#[allow(dead_code)]
+// setup for two nodes joining the same space
 pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &Address) {
     println!(
         "\ntwo_join_space ({},{}) -> {}\n",
@@ -91,27 +93,12 @@ pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: 
         space_address
     );
     // Alex joins space
-    let req_id = alex.join_space(&space_address, true).unwrap();
-    let (did_work, srv_msg_list) = alex.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    test_join_space(alex, space_address);
     // Extra processing required for auto-handshaking
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
 
     // Billy joins space
-    println!("\n {} joins {}\n", billy.name(), space_address);
-    let req_id = billy.join_space(&space_address, true).unwrap();
-    let (did_work, srv_msg_list) = billy.process().unwrap();
-    assert!(did_work);
-    assert_eq!(srv_msg_list.len(), 3);
-    let msg_1 = &srv_msg_list[0];
-    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
-        assert_eq!(response.request_id, req_id);
-    });
+    test_join_space(billy, space_address);
 
     // Extra processing required for auto-handshaking
     wait_engine_wrapper_until_no_work!(alex);
@@ -136,13 +123,9 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
 
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"billy\"\\), from_agent_id: HashString\\(\"alex\"\\), content: \"wah\" \\}\\)";
-
     let results = assert2_msg_matches!(alex, billy, expected);
-
     let handle_send_direct_msg = results.first().unwrap();
-
     let event = handle_send_direct_msg.events.first().unwrap();
-
     let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
 
     // Send response
@@ -154,11 +137,10 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock) {
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
-
     assert2_msg_matches!(alex, billy, expected);
 }
 
-/// Test SendDirectMessage and response
+/// Test SendDirectMessage and response failure
 #[allow(dead_code)]
 fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock) {
     trace!("[test_send_message_fail] alex send to camille");
@@ -215,25 +197,29 @@ pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock) {
 
     // Billy asks for unknown entry
     // ============================
-    let mut _query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
+    let mut query_data = billy.request_entry(ENTRY_ADDRESS_2.clone());
     let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: HashString\\(\"\\w+\"\\), entry_address: HashString\\(\"entry_addr_2\"\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: HashString\\(\"billy\"\\), query: \"test_query\" \\}\\)";
     let results = assert2_msg_matches!(alex, billy, expected);
     println!("\n results: {:?}\n", results);
     let handle_query = &results[0].events[0];
-    println!("\n query_data: {:?}\n", _query_data);
+    println!("\n query_data: {:?}\n", query_data);
     println!("\n handle_query_data: {:?}\n", handle_query);
     if let Lib3hServerProtocol::HandleQueryEntry(h_query_data) = handle_query {
-        _query_data = h_query_data.to_owned();
+        query_data = h_query_data.to_owned();
     }
 
-    // TODO #423 - currently generates a FailureResult as excepted but is not handled by ghost_engine_wrapper
-    // Maybe the workflow for this changed?
-    //    let res = billy.reply_to_HandleQueryEntry(&query_data);
-    //    println!("\n billy gives response {:?}\n", res);
-    //    assert!(res.is_err());
-    //    let res_data: GenericResultData = res.err().unwrap();
-    //    let res_info = std::str::from_utf8(res_data.result_info.as_slice()).unwrap();
-    //    assert_eq!(res_info, "No entry found");
+    // Expecting an empty entry
+    let res = billy.reply_to_HandleQueryEntry(&query_data);
+    println!("\n billy gives response {:?}\n", res);
+    assert!(res.is_ok());
+    let result_data = res.unwrap();
+    assert_eq!(result_data.entry_address, *ENTRY_ADDRESS_2);
+    let opaque_result: Vec<u8> = result_data.query_result.into();
+    let expected: Vec<u8> = [
+        146, 145, 172, 101, 110, 116, 114, 121, 95, 97, 100, 100, 114, 95, 50, 144,
+    ]
+    .to_vec();
+    assert_eq!(opaque_result, expected);
 }
 
 /// Entry with no Aspect case: Should no-op

@@ -49,8 +49,8 @@ fn enable_logging_for_test(enable: bool) {
         std::env::set_var("RUST_LOG", "trace");
     }
     let _ = env_logger::builder()
-        // .default_format_timestamp(false)
-        .default_format_timestamp_nanos(true)
+        .default_format_timestamp(false)
+        //.default_format_timestamp_nanos(true)
         .default_format_module_path(false)
         .is_test(enable)
         .try_init();
@@ -199,7 +199,6 @@ fn test_two_memory_nodes_spaces_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_three_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {

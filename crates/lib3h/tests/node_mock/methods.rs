@@ -474,6 +474,17 @@ impl NodeMock {
         to_agent_id: &Address,
         response_content: Vec<u8>,
     ) {
+        self.send_response_inner(request_id, to_agent_id, response_content)
+            .expect("Posting HandleSendMessageResult failed");
+    }
+
+    // inner fn with error
+    pub fn send_response_inner(
+        &mut self,
+        request_id: &str,
+        to_agent_id: &Address,
+        response_content: Vec<u8>,
+    ) -> Result<(), lib3h_protocol::error::Lib3hProtocolError> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let response = DirectMessageData {
             space_address: current_space.clone(),
@@ -484,7 +495,6 @@ impl NodeMock {
         };
         self.engine
             .post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
-            .expect("Posting HandleSendMessageResult failed");
     }
 }
 
