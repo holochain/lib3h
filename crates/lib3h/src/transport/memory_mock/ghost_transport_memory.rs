@@ -547,7 +547,6 @@ mod tests {
                 RequestToChild::SendMessage {
                     uri: Lib3hUri::with_memory("addr_1"),
                     payload: b"test message".to_vec().into(),
-                    attempt: 0,
                 },
                 Box::new(|_: &mut Lib3hUri, r| {
                     // parent should see that the send request was OK
