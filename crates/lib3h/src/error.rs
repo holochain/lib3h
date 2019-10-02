@@ -3,8 +3,8 @@
 use crate::transport::error::TransportError;
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{Backtwrap, GhostError};
-use lib3h_protocol::error::{ErrorKind as Lib3hProtocolErrorKind, Lib3hProtocolError};
 use lib3h_p2p_protocol::error::P2pError;
+use lib3h_protocol::error::{ErrorKind as Lib3hProtocolErrorKind, Lib3hProtocolError};
 use rmp_serde::decode::Error as RMPSerdeDecodeError;
 use std::{error::Error as StdError, fmt, io, result};
 

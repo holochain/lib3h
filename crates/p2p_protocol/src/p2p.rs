@@ -17,7 +17,33 @@ pub enum P2pMessage {
     MsgPong(MsgPong),
 }
 
+fn now_ms() -> u64 {
+    let out = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("duration since unix epoch");
+    out.as_secs() * 1000 + u64::from(out.subsec_nanos()) / 1_000_000
+}
+
 impl P2pMessage {
+    pub fn create_ping(mut send_epoch_ms: Option<u64>) -> Self {
+        if send_epoch_ms.is_none() {
+            send_epoch_ms = Some(now_ms());
+        }
+        P2pMessage::MsgPing(MsgPing {
+            ping_send_epoch_ms: send_epoch_ms.unwrap(),
+        })
+    }
+
+    pub fn create_pong(send_epoch_ms: u64, mut recv_epoch_ms: Option<u64>) -> Self {
+        if recv_epoch_ms.is_none() {
+            recv_epoch_ms = Some(now_ms());
+        }
+        P2pMessage::MsgPong(MsgPong {
+            ping_send_epoch_ms: send_epoch_ms,
+            ping_received_epoch_ms: recv_epoch_ms.unwrap(),
+        })
+    }
+
     pub fn from_bytes(bytes: Vec<u8>) -> P2pResult<Self> {
         let message = capnp::serialize_packed::read_message(
             &mut std::io::Cursor::new(bytes),

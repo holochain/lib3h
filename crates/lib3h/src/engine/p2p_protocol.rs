@@ -4,6 +4,8 @@ use lib3h_protocol::{
     uri::Lib3hUri,
     Address,
 };
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 pub type SpaceAddress = String;
 pub type GatewayId = String;
@@ -36,4 +38,21 @@ pub struct GossipData {
     pub to_peer_name: Lib3hUri,
     pub from_peer_name: Lib3hUri,
     pub bundle: Opaque,
+}
+
+impl P2pProtocol {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, rmp_serde::decode::Error> {
+        let mut de = Deserializer::new(&bytes[..]);
+        Deserialize::deserialize(&mut de)
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        self.serialize(&mut Serializer::new(&mut out)).unwrap();
+        out
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.to_bytes()
+    }
 }

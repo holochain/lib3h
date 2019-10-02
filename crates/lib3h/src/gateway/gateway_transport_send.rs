@@ -176,6 +176,21 @@ impl P2pGateway {
         expires_at: std::time::Instant,
         cb: SendCallback,
     ) -> GhostResult<()> {
+        if !self.message_encoding.is_attached() {
+            // we must be in a call chain resulting from an incoming message
+            // we need to wait for the next process() call to continue
+            return self.priv_send_queue_pending(SendMetaData {
+                send_data: SendData::WithFullLowUri(send_data),
+                // we want to invoke this on the very next process call
+                // set our last_attempt back far enough to ensure this
+                last_attempt: std::time::Instant::now()
+                    .checked_sub(std::time::Duration::from_millis(SEND_RETRY_INTERVAL_MS * 2))
+                    .expect("can subtract duration"),
+                expires_at,
+                cb,
+            });
+        }
+
         // capture this first so our interval doesn't drift too much
         let last_attempt = std::time::Instant::now();
 
