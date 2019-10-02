@@ -88,7 +88,7 @@ fn process_nodes(nodes: &mut Vec<NodeMock>) {
 }
 fn process_nodes_inner(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
-        wait_engine_wrapper_until_no_work!(node);
-        //let _result = node.process();
+        //wait_engine_wrapper_until_no_work!(node);
+        let _result = node.process();
     }
 }
