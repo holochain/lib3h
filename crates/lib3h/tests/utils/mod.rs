@@ -32,10 +32,12 @@ macro_rules! assert_process_success {
     };
 }
 
+use constants::NETWORK_A_ID;
+
 // Real test network-id should be a hc version of sha256 of a string
 pub fn test_network_id() -> GatewayId {
     GatewayId {
         nickname: "test-net".into(),
-        id: "Hc_fake_addr_for_test-net".into(),
+        id: NETWORK_A_ID.clone().into(),
     }
 }
