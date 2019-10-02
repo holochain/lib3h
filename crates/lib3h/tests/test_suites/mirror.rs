@@ -16,6 +16,20 @@ lazy_static! {
 
 #[allow(dead_code)]
 pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>) {
+    assert!(nodes.len() > 0);
+
+    let mut node0 = nodes.remove(0);
+
+    // Connect nodes
+    for node in nodes.iter_mut() {
+        let connect_data = node.connect_to(&node0.advertise()).unwrap();
+        wait_connect!(node, connect_data, node0);
+        node.wait_until_no_work();
+    }
+
+    node0.wait_until_no_work();
+    nodes.insert(0, node0);
+
     nodes_join_space(nodes);
     process_nodes(nodes);
     println!(
@@ -69,7 +83,7 @@ fn test_mirror(nodes: &mut Vec<NodeMock>) {
 }
 
 fn process_nodes(nodes: &mut Vec<NodeMock>) {
-    for _i in 0..*MIRROR_NODES_COUNT {
+    for _i in 0..20 {
         process_nodes_inner(nodes);
     }
 }
