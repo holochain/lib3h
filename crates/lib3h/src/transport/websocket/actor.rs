@@ -481,13 +481,6 @@ mod tests {
 
         let (_is_match, expected_transport2_address) =
             wait_for_bind_result!(transport2, t2_endpoint, init_transport2_address);
-
-        transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut None);
-
-        transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut None);
-
         assert_eq!(
             transport1.bound_url(),
             Some(expected_transport1_address.clone())

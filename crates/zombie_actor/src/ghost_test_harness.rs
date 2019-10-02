@@ -7,11 +7,13 @@
 ///
 ///
 
-pub const DEFAULT_MAX_ITERS: u64 = 10;
+pub const DEFAULT_MAX_ITERS: u64 = 20;
 pub const DEFAULT_MAX_RETRIES: u64 = 5;
 pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
-pub const DEFAULT_TIMEOUT_MS: u64 = 10000;
+pub const DEFAULT_TIMEOUT_MS: u64 = 2000;
 pub const DEFAULT_SHOULD_ABORT: bool = true;
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 1;
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 10;
 
 /// All configurable parameters when processing an actor.
 #[derive(Clone, Debug)]
@@ -24,6 +26,14 @@ pub struct ProcessingOptions {
 }
 
 impl ProcessingOptions {
+    pub fn wait_did_work_defaults() -> Self {
+        Self {
+            max_iters: DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..Default::default()
+        }
+    }
+
     pub fn with_should_abort(should_abort: bool) -> Self {
         let options = Self {
             should_abort,
@@ -49,7 +59,7 @@ impl Default for ProcessingOptions {
 #[macro_export]
 macro_rules! wait_did_work {
     ($ghost_actor:ident) => {{
-        let options: $crate::ghost_test_harness::ProcessingOptions = Default::default();
+        let options = $crate::ghost_test_harness::ProcessingOptions::wait_did_work_defaults();
         $crate::wait_did_work!($ghost_actor, options);
     }};
     ($ghost_actor: ident,
@@ -71,14 +81,16 @@ macro_rules! wait_did_work {
             }
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
+                trace!("[epoch {}] wait_did_work timeout", i);
                 break;
             }
-            trace!("[{}] wait_did_work", i);
             std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
         }
         if $options.should_abort {
             assert!(did_work);
         }
+        trace!("wait_did_work returning: {:?}", did_work);
+
         did_work
     }};
 }
@@ -90,7 +102,7 @@ macro_rules! wait_can_track_did_work {
     ($ghost_can_track: ident,
      $user_data: expr
     ) => {
-        let options: $crate::ghost_test_harness::ProcessingOptions = Default::default();
+        let options = $crate::ghost_test_harness::ProcessingOptions::wait_did_work_defaults();
         wait_can_track_did_work!($ghost_can_track, $user_data, options)
     };
     ($ghost_can_track: ident,
@@ -111,14 +123,16 @@ macro_rules! wait_can_track_did_work {
             }
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
+                trace!("[{}] wait_can_track_did_work timeout", i);
                 break;
             }
-            trace!("[{}] wait_did_work", i);
             std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
         }
         if $options.should_abort {
             assert!(did_work);
         }
+        trace!("wait_can_track_did_work returning {:?}", did_work);
+
         did_work
     }};
 }
@@ -132,8 +146,14 @@ macro_rules! wait_until_no_work {
         let mut did_work = false;
         let options = $crate::ghost_test_harness::ProcessingOptions::with_should_abort(false);
 
+        let wait_options = $crate::ghost_test_harness::ProcessingOptions {
+            max_iters: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..options
+        };
+
         for _i in 0..options.max_iters {
-            did_work = $crate::wait_did_work!($ghost_actor, options);
+            did_work = $crate::wait_did_work!($ghost_actor, wait_options);
             if !did_work {
                 break;
             }
@@ -143,8 +163,14 @@ macro_rules! wait_until_no_work {
     ($ghost_can_track: ident, $user_data: ident) => {{
         let mut did_work = false;
         let options = $crate::ghost_test_harness::ProcessingOptions::with_should_abort(false);
+        let wait_options = $crate::ghost_test_harness::ProcessingOptions {
+            max_iters: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..options
+        };
+
         for _i in 0..options.max_iters {
-            did_work = $crate::wait_can_track_did_work!($ghost_can_track, $user_data, options);
+            did_work = $crate::wait_can_track_did_work!($ghost_can_track, $user_data, wait_options);
             if !did_work {
                 break;
             }
@@ -184,11 +210,7 @@ macro_rules! wait_for_messages {
             actors = actors
                 .into_iter()
                 .map(|mut actor| {
-                    let wait_options = $crate::ghost_test_harness::ProcessingOptions {
-                        should_abort: false,
-                        ..$options
-                    };
-                    let _ = $crate::wait_did_work!(actor, wait_options);
+                    let _ = $crate::wait_until_no_work!(actor);
                     actor
                 })
                 .collect::<Vec<_>>();
