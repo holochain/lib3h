@@ -40,7 +40,7 @@ fn test_setup_only(_nodes: &mut Vec<NodeMock>) {
 }
 
 fn test_mirror(nodes: &mut Vec<NodeMock>) {
-    println!("SIZE: {}",  nodes.len());
+    println!("SIZE: {}", nodes.len());
     let entry = {
         let mut node0 = nodes.remove(0);
         let mut node1 = nodes.remove(0);
@@ -54,15 +54,15 @@ fn test_mirror(nodes: &mut Vec<NodeMock>) {
         let _results = assert2_msg_matches!(node0, node1, expected);
 
         assert_eq!(entry, node0.get_entry(&ENTRY_ADDRESS_1).unwrap());
-        nodes.insert(0,node1);
-        nodes.insert(0,node0);
+        nodes.insert(0, node1);
+        nodes.insert(0, node0);
         entry
     };
 
     process_nodes(nodes);
 
     for node in nodes {
-        println!("cheking if {} has entry...",node.name());
+        println!("cheking if {} has entry...", node.name());
         assert_eq!(entry, node.get_entry(&ENTRY_ADDRESS_1).unwrap());
         println!("yes!");
     }
@@ -75,7 +75,7 @@ fn process_nodes(nodes: &mut Vec<NodeMock>) {
 }
 fn process_nodes_inner(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
-//        wait_engine_wrapper_until_no_work!(node);
+        //        wait_engine_wrapper_until_no_work!(node);
         let _result = node.process();
     }
 }
