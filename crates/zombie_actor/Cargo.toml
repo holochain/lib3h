@@ -19,7 +19,7 @@ holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/ho
 nanoid = "=0.2.0"
 shrinkwraprs = "=0.2.1"
 log = "=0.4.8"
-predicates = "=1.0.0"
+predicates = "=1.0.1"
 lazy_static = "=1.2.0"
 regex = "=1.1.2"
 [dev-dependencies]
