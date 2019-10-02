@@ -3,7 +3,6 @@ use lib3h_protocol::Address;
 use multihash::Hash;
 use std::sync::{Arc, Mutex};
 
-
 lazy_static! {
     /// Networks
     pub static ref NETWORK_A_ID: String = "net_A".to_string();

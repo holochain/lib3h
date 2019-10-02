@@ -29,7 +29,7 @@ use lib3h_protocol::{uri::Lib3hUri, Address};
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
-    three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*, mirror::*
+    mirror::*, three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
 use utils::{constants::*, test_network_id};
@@ -285,7 +285,7 @@ fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), (
     // Setup
     let mut nodes = Vec::new();
     for i in 1..*MIRROR_NODES_COUNT {
-        let node_name = format!("mirror_node{}",i);
+        let node_name = format!("mirror_node{}", i);
         let node = setup_memory_node(&node_name.clone(), node_name.into(), &fn_name(test_fn_ptr));
         nodes.push(node);
     }

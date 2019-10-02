@@ -1,18 +1,12 @@
-use crate::{node_mock::NodeMock,
-            utils::constants::*
-};
+use crate::{node_mock::NodeMock, utils::constants::*};
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 pub type MultiNodeTestFn = fn(nodes: &mut Vec<NodeMock>);
 
 lazy_static! {
-    pub static ref MIRROR_TEST_FNS: Vec<(MultiNodeTestFn, bool)> = vec![
-        (test_setup_only, true),
-        (test_mirror, true),
-    ];
+    pub static ref MIRROR_TEST_FNS: Vec<(MultiNodeTestFn, bool)> =
+        vec![(test_setup_only, true), (test_mirror, true),];
 }
-
-
 
 //--------------------------------------------------------------------------------------------------
 // Test setup
@@ -43,21 +37,19 @@ pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>) {
 //--------------------------------------------------------------------------------------------------
 
 /// Empty function that triggers the test suite
-    #[allow(dead_code)]
+#[allow(dead_code)]
 fn test_setup_only(_nodes: &mut Vec<NodeMock>) {
     // n/a
 }
 
 fn test_mirror(nodes: &mut Vec<NodeMock>) {
-
     let mut node1 = nodes.pop().unwrap();
     let mut node2 = nodes.pop().unwrap();
     {
-
-    // node1 publishes data on the network
-    let _entry = node1
-        .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
-        .unwrap();
+        // node1 publishes data on the network
+        let _entry = node1
+            .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
+            .unwrap();
     }
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: HashString\\(\"\\w+\"\\), provider_agent_id: HashString\\(\"mirror_node9\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
 
