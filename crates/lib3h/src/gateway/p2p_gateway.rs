@@ -1,60 +1,65 @@
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    gateway::P2pGateway,
+    engine::GatewayId,
+    gateway::{GatewayOutputWrapType, P2pGateway},
+    message_encoding::*,
     transport,
 };
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::Address;
-use url::Url;
+use lib3h_protocol::uri::{Lib3hUri, UriScheme};
 
 //--------------------------------------------------------------------------------------------------
 // Constructors
 //--------------------------------------------------------------------------------------------------
 
-/// P2pGateway Constructors
 impl P2pGateway {
-    /// Constructor
-    /// Bind and set advertise on construction by using the name as URL.
     pub fn new(
-        identifier: &str,
+        wrap_output_type: GatewayOutputWrapType,
+        identifier: GatewayId,
+        this_peer_location: Lib3hUri,
         inner_transport: transport::protocol::DynTransportActor,
         dht_factory: DhtFactory,
         dht_config: &DhtConfig,
     ) -> Self {
-        let dht = dht_factory(dht_config).expect("Failed to construct DHT");
+        // Create this_peer
+        let this_peer = PeerData {
+            peer_name: dht_config.this_peer_name(),
+            peer_location: this_peer_location.clone(),
+            timestamp: crate::time::since_epoch_ms(),
+        };
+        let maybe_this_peer = if this_peer_location.is_scheme(UriScheme::Undefined) {
+            None
+        } else {
+            Some(this_peer.clone())
+        };
+        // Create dht actor
+        let dht = dht_factory(dht_config, maybe_this_peer).expect("Failed to construct DHT");
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_self = Detach::new(
             endpoint_self
                 .as_context_endpoint_builder()
-                .request_id_prefix(&format!("{}_to_parent_", identifier))
+                .request_id_prefix(&format!("{}_to_parent_", identifier.nickname))
                 .build(),
         );
+        // create gateway
         P2pGateway {
-            identifier: identifier.to_owned(),
+            wrap_output_type,
+            identifier: identifier,
             inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
                 inner_transport,
                 "to_child_transport_",
             )),
-            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht")),
+            inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
+            message_encoding: Detach::new(GhostParentWrapper::new(
+                MessageEncoding::new(),
+                "to_message_encoding_",
+            )),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
-            this_peer: PeerData {
-                peer_address: dht_config.this_peer_address(),
-                peer_uri: Url::parse("none:").unwrap(),
-                timestamp: 0, // FIXME
-            },
+            this_peer,
+            pending_send_queue: Vec::new(),
         }
-    }
-    /// Helper Ctor
-    pub fn new_with_space(
-        space_address: &Address,
-        inner_transport: transport::protocol::DynTransportActor,
-        dht_factory: DhtFactory,
-        dht_config: &DhtConfig,
-    ) -> Self {
-        let identifier: String = space_address.clone().into();
-        P2pGateway::new(&identifier, inner_transport, dht_factory, dht_config)
     }
 
     pub fn this_peer(&self) -> PeerData {

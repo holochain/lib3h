@@ -1,16 +1,16 @@
-use crate::dht::PeerAddress;
 use lib3h_protocol::{
     data_types::{EntryData, Opaque},
+    uri::Lib3hUri,
     Address,
 };
-use url::Url;
 
 use crate::{dht::dht_config::DhtConfig, error::*};
 use lib3h_ghost_actor::prelude::*;
 
-pub type FromPeerAddress = PeerAddress;
+pub type FromPeerName = Lib3hUri;
 
-pub type DhtFactory = fn(config: &DhtConfig) -> Lib3hResult<Box<DhtActor>>;
+pub type DhtFactory =
+    fn(config: &DhtConfig, maybe_this_peer: Option<PeerData>) -> Lib3hResult<Box<DhtActor>>;
 
 pub type DhtActor = dyn GhostActor<
     DhtRequestToParent,
@@ -49,7 +49,7 @@ pub type DhtToChildMessage =
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.
@@ -65,11 +65,11 @@ pub enum DhtRequestToChild {
     DropEntryAddress(Address),
 
     /// Parent notifies us that the binding changed
-    UpdateAdvertise(Url),
+    UpdateAdvertise(Lib3hUri),
 
     /// Requests
     /// Parent wants PeerData for a specific Peer
-    RequestPeer(String),
+    RequestPeer(Lib3hUri),
     /// Parent wants the list of peers we are holding
     RequestPeerList,
     /// Parent wants PeerData of this entity
@@ -105,9 +105,12 @@ pub enum DhtRequestToParent {
     /// Notify owner that gossip is requesting we hold a peer discovery data item.
     HoldPeerRequested(PeerData),
     /// Notify owner that we believe a peer has dropped
-    PeerTimedOut(PeerAddress),
+    PeerTimedOut(Lib3hUri),
     /// Notify owner that gossip is requesting we hold an entry.
-    HoldEntryRequested { from_peer: String, entry: EntryData },
+    HoldEntryRequested {
+        from_peer_name: Lib3hUri,
+        entry: EntryData,
+    },
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
     EntryPruned(Address),
@@ -128,21 +131,20 @@ pub enum DhtRequestToParentResponse {
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct RemoteGossipBundleData {
-    pub from_peer_address: PeerAddress,
+    pub from_peer_name: Lib3hUri,
     pub bundle: Opaque,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct GossipToData {
-    pub peer_address_list: Vec<PeerAddress>,
+    pub peer_name_list: Vec<Lib3hUri>,
     pub bundle: Opaque,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct PeerData {
-    pub peer_address: PeerAddress,
-    #[serde(with = "url_serde")]
-    pub peer_uri: Url,
+    pub peer_name: Lib3hUri,
+    pub peer_location: Lib3hUri,
     pub timestamp: u64,
 }
 

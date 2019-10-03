@@ -1,10 +1,9 @@
 use crate::transport::error::{TransportError, TransportResult};
-use lib3h_protocol::{data_types::Opaque, DidWork};
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address, DidWork};
 use std::{
-    collections::{HashMap, VecDeque},
-    sync::{Arc, Mutex, RwLock},
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{Arc, Mutex, MutexGuard},
 };
-use url::Url;
 
 //--------------------------------------------------------------------------------------------------
 // Memory Server protocol
@@ -14,11 +13,13 @@ use url::Url;
 #[derive(Debug, PartialEq, Clone)]
 pub enum MemoryEvent {
     /// we have received an incoming connection
-    IncomingConnectionEstablished(Url),
+    IncomingConnectionEstablished(Lib3hUri),
     /// We have received data from a connection
-    ReceivedData(Url, Opaque),
+    ReceivedData(Lib3hUri, Opaque),
     /// A connection closed for whatever reason
-    ConnectionClosed(Url),
+    ConnectionClosed(Lib3hUri),
+    /// Simulates network unbinding
+    Unbind(Lib3hUri),
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -26,45 +27,84 @@ pub enum MemoryEvent {
 //--------------------------------------------------------------------------------------------------
 
 /// Type for holding a map of 'url -> InMemoryServer'
-type MemoryServerMap = HashMap<Url, Mutex<MemoryServer>>;
+pub struct MemoryNet {
+    name: String,
+    pub server_map: HashMap<Lib3hUri, MemoryServer>,
+    url_count: u32,
+    advertised_machines: HashSet<(Lib3hUri, Address)>,
+}
+
+impl MemoryNet {
+    pub fn new(name: &str) -> Self {
+        MemoryNet {
+            name: name.into(),
+            server_map: HashMap::new(),
+            url_count: 0,
+            advertised_machines: HashSet::new(),
+        }
+    }
+    pub fn advertise(&mut self, uri: Lib3hUri, transport_id: Address) {
+        self.advertised_machines.insert((uri, transport_id));
+    }
+    pub fn discover(&mut self) -> Vec<(Lib3hUri, Address)> {
+        self.advertised_machines.iter().cloned().collect()
+    }
+    pub fn new_url(&mut self) -> Lib3hUri {
+        self.url_count += 1;
+        Lib3hUri::with_memory(&format!("addr_{}", self.url_count).as_str())
+    }
+    pub fn get_server(&mut self, url: &Lib3hUri) -> Option<&mut MemoryServer> {
+        self.server_map.get_mut(url)
+    }
+    pub fn bind(&mut self) -> Lib3hUri {
+        let binding = self.new_url();
+        trace!("In Memory bind for {}, url:{}", self.name, binding);
+        self.server_map
+            .entry(binding.clone())
+            .or_insert_with(|| MemoryServer::new(&binding));
+        binding
+    }
+    pub fn unbind(&mut self, url: &Lib3hUri) -> bool {
+        if let Some(server) = self.get_server(url) {
+            server.close();
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// Holds a universe of memory networks so we can run tests in separate universes
+pub struct MemoryVerse {
+    server_maps: HashMap<String, Arc<Mutex<MemoryNet>>>,
+}
+impl MemoryVerse {
+    pub fn new() -> Self {
+        MemoryVerse {
+            server_maps: HashMap::new(),
+        }
+    }
+    pub fn get_network(&mut self, network_name: &str) -> Arc<Mutex<MemoryNet>> {
+        self.server_maps
+            .entry(network_name.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(MemoryNet::new(network_name))))
+            .clone()
+    }
+}
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
-    pub(crate) static ref MEMORY_SERVER_MAP: RwLock<MemoryServerMap> = RwLock::new(HashMap::new());
-    static ref URL_COUNT: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+    pub static ref MEMORY_VERSE: Mutex<MemoryVerse> = Mutex::new(MemoryVerse::new());
 }
 
-pub fn new_url() -> Url {
-    let mut tc = URL_COUNT
-        .lock()
-        .expect("could not lock transport count mutex");
-    *tc += 1;
-    Url::parse(&format!("mem://addr_{}", *tc).as_str()).unwrap()
-}
-
-/// Add new MemoryServer to the global server map
-pub fn set_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::set_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if server_map.contains_key(uri) {
-        return Ok(());
+pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
+    for _ in 0..10 {
+        match MEMORY_VERSE.try_lock() {
+            Ok(l) => return l,
+            _ => std::thread::sleep(std::time::Duration::from_millis(1)),
+        }
     }
-    let server = MemoryServer::new(uri);
-    server_map.insert(uri.clone(), Mutex::new(server));
-    Ok(())
-}
-
-/// Remove a MemoryServer from the global server map
-pub fn unset_server(uri: &Url) -> TransportResult<()> {
-    debug!("MemoryServer::unset_server: {}", uri);
-    // Create server with that name if it doesn't already exist
-    let mut server_map = MEMORY_SERVER_MAP.write().unwrap();
-    if !server_map.contains_key(uri) {
-        return Err(TransportError::new("Server doesn't exist".to_string()));
-    }
-    server_map.remove(uri);
-    Ok(())
+    panic!("unable to obtain mutex lock on MEMORY_VERSE");
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -74,12 +114,13 @@ pub fn unset_server(uri: &Url) -> TransportResult<()> {
 #[derive(Debug)]
 pub struct MemoryServer {
     /// Address of this server
-    this_uri: Url,
+    this_uri: Lib3hUri,
     /// Inboxes for payloads from each of its connections.
-    inbox_map: HashMap<Url, VecDeque<Vec<u8>>>,
+    inbox_map: HashMap<Lib3hUri, VecDeque<Vec<u8>>>,
     /// Inbox of connection state change requests
     /// (true = incoming connection, false = connection closed)
-    connection_inbox: Vec<(Url, bool)>,
+    connection_inbox: Vec<(Lib3hUri, bool)>,
+    state: State,
 }
 
 impl Drop for MemoryServer {
@@ -88,25 +129,38 @@ impl Drop for MemoryServer {
     }
 }
 
+#[derive(PartialEq, Debug)]
+enum State {
+    Running,
+    Closing,
+    Closed,
+}
+
 impl MemoryServer {
     /// Constructor
-    pub fn new(uri: &Url) -> Self {
+    pub fn new(uri: &Lib3hUri) -> Self {
         MemoryServer {
             this_uri: uri.clone(),
             inbox_map: HashMap::new(),
             connection_inbox: Vec::new(),
+            state: State::Running,
         }
     }
 
-    pub fn is_connected_to(&self, uri: &Url) -> bool {
+    // shut down the server (simulates unbinding)
+    pub fn close(&mut self) {
+        self.state = State::Closing;
+    }
+
+    pub fn is_connected_to(&self, uri: &Lib3hUri) -> bool {
         self.inbox_map.contains_key(uri)
     }
 
     /// Another node requested to connect with us.
     /// This creates a new connection: An inbox is created for receiving payloads from this requester.
     /// This also generates a request for us to connect to the other node in the other way.
-    pub fn request_connect(&mut self, other_uri: &Url) -> TransportResult<()> {
-        info!(
+    pub fn request_connect(&mut self, other_uri: &Lib3hUri) -> TransportResult<()> {
+        debug!(
             "(MemoryServer) {} creates inbox for {}",
             self.this_uri, other_uri
         );
@@ -132,8 +186,8 @@ impl MemoryServer {
     }
 
     /// Another node closes its connection with us
-    pub fn request_close(&mut self, other_uri: &Url) -> TransportResult<()> {
-        info!("(MemoryServer {}).close({})", self.this_uri, other_uri);
+    pub fn request_close(&mut self, other_uri: &Lib3hUri) -> TransportResult<()> {
+        debug!("(MemoryServer {}).close({})", self.this_uri, other_uri);
         // delete this uri's inbox
         let res = self.inbox_map.remove(other_uri);
         if res.is_none() {
@@ -150,7 +204,7 @@ impl MemoryServer {
     }
 
     /// Receive payload from another node, i.e. fill our inbox for that uri
-    pub fn post(&mut self, from_uri: &Url, payload: &[u8]) -> TransportResult<()> {
+    pub fn post(&mut self, from_uri: &Lib3hUri, payload: &[u8]) -> TransportResult<()> {
         let maybe_inbox = self.inbox_map.get_mut(from_uri);
         if let None = maybe_inbox {
             return Err(TransportError::new(format!(
@@ -167,6 +221,9 @@ impl MemoryServer {
     /// a TransportEvent::IncomingConnectionEstablished for each incoming connection.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<MemoryEvent>)> {
         trace!("(MemoryServer {}).process()", self.this_uri);
+        if self.state == State::Closed {
+            return Ok((false, Vec::new()));
+        }
         let mut outbox = Vec::new();
         let mut did_work = false;
         // Process connection inbox
@@ -196,7 +253,7 @@ impl MemoryServer {
                 };
                 did_work = true;
                 trace!(
-                    "(MemoryServer {}) received: {} (from {})",
+                    "(MemoryServer {}) received: {} Bytes (from {})",
                     self.this_uri,
                     payload.len(),
                     uri
@@ -204,6 +261,12 @@ impl MemoryServer {
                 let evt = MemoryEvent::ReceivedData(uri.clone(), payload.into());
                 outbox.push(evt);
             }
+        }
+        if self.state == State::Closing {
+            trace!("(MemoryServer {}).closing", self.this_uri);
+            outbox.push(MemoryEvent::Unbind(self.this_uri.clone()));
+            self.state = State::Closed;
+            did_work = true;
         }
         Ok((did_work, outbox))
     }

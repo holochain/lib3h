@@ -5,10 +5,10 @@ extern crate lazy_static;
 extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 use detach::prelude::*;
+use holochain_tracing::{test_span, Span};
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
-use lib3h_tracing::{test_span, Lib3hSpan};
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 use std::{
     collections::{HashMap, HashSet},
     sync::RwLock,
@@ -18,16 +18,16 @@ use url::Url;
 // We need an "internet" that a transport can bind to that will
 // deliver messages to bound transports, we'll call it the Mockernet
 pub struct Mockernet {
-    bindings: HashMap<Url, Tube>,
-    connections: HashMap<Url, HashSet<Url>>,
-    errors: Vec<(Url, String)>,
+    bindings: HashMap<Lib3hUri, Tube>,
+    connections: HashMap<Lib3hUri, HashSet<Lib3hUri>>,
+    errors: Vec<(Lib3hUri, String)>,
 }
 
 // These are the events that the mockernet can generate that must by handled
 // by any mockernet client.
 pub enum MockernetEvent {
-    Connection { from: Url },
-    Message { from: Url, payload: Opaque },
+    Connection { from: Lib3hUri },
+    Message { from: Lib3hUri, payload: Opaque },
     Error(String),
 }
 
@@ -35,12 +35,12 @@ pub enum MockernetEvent {
 // sets of crossbeam channels in the bindings that mockernet shuttles
 // data between.
 pub struct Tube {
-    sender: crossbeam_channel::Sender<(Url, Opaque)>,
-    receiver: crossbeam_channel::Receiver<(Url, Opaque)>,
+    sender: crossbeam_channel::Sender<(Lib3hUri, Opaque)>,
+    receiver: crossbeam_channel::Receiver<(Lib3hUri, Opaque)>,
 }
 impl Tube {
     pub fn new() -> Self {
-        let (sender, receiver) = crossbeam_channel::unbounded::<(Url, Opaque)>();
+        let (sender, receiver) = crossbeam_channel::unbounded::<(Lib3hUri, Opaque)>();
         Tube { sender, receiver }
     }
 }
@@ -54,17 +54,17 @@ impl Mockernet {
     }
 
     /// create a binding to the mockernet, without one you can't send or receive
-    pub fn bind(&mut self, url: Url) -> bool {
+    pub fn bind(&mut self, url: Lib3hUri) -> bool {
         if self.bindings.contains_key(&url) {
             false
         } else {
-            self.bindings.insert(url, Tube::new());
+            self.bindings.insert(url.into(), Tube::new());
             true
         }
     }
 
     /// remove a binding, this is should trigger an error event
-    pub fn unbind(&mut self, url: Url) {
+    pub fn unbind(&mut self, url: Lib3hUri) {
         if self.bindings.contains_key(&url) {
             self.bindings.remove(&url);
             self.errors
@@ -73,7 +73,7 @@ impl Mockernet {
     }
 
     /// send a message to anyone on the Mockernet
-    pub fn send_to(&mut self, to: Url, from: Url, payload: Opaque) -> Result<(), String> {
+    pub fn send_to(&mut self, to: Lib3hUri, from: Lib3hUri, payload: Opaque) -> Result<(), String> {
         {
             let _src = self
                 .bindings
@@ -89,7 +89,7 @@ impl Mockernet {
     }
 
     /// check to see, for a given Url, if there are any events waiting
-    pub fn process_for(&mut self, address: Url) -> Result<Vec<MockernetEvent>, String> {
+    pub fn process_for(&mut self, address: Lib3hUri) -> Result<Vec<MockernetEvent>, String> {
         let mut events = Vec::new();
 
         // push any errors for this url into the events
@@ -128,7 +128,7 @@ impl Mockernet {
     }
 
     /// record a connection
-    pub fn connect(&mut self, from: Url, to: Url) {
+    pub fn connect(&mut self, from: Lib3hUri, to: Lib3hUri) {
         if let Some(cmap) = self.connections.get_mut(&from) {
             cmap.insert(to);
         } else {
@@ -139,7 +139,7 @@ impl Mockernet {
     }
 
     /// check to see if two nodes are connected
-    pub fn are_connected(&self, from: &Url, to: &Url) -> bool {
+    pub fn are_connected(&self, from: &Lib3hUri, to: &Lib3hUri) -> bool {
         match self.connections.get(from) {
             None => return false,
             Some(cmap) => cmap.contains(to),
@@ -155,7 +155,7 @@ struct TestTransport {
     // instance name of this transport
     name: String,
     // our parent channel endpoint
-    bound_url: Option<Url>,
+    bound_url: Option<Lib3hUri>,
     endpoint_parent: Option<TransportActorParentEndpoint>,
     // our self channel endpoint
     endpoint_self: Detach<
@@ -230,7 +230,7 @@ impl TestTransport {
                 self.bound_url = Some(spec);
                 msg.respond(response)?;
             }
-            RequestToChild::SendMessage { uri, payload } => {
+            RequestToChild::SendMessage { uri, payload, .. } => {
                 if self.bound_url.is_none() {
                     msg.respond(Err(TransportError::new(format!("{} not bound", self.name))))?;
                 } else {
@@ -256,7 +256,7 @@ impl TestTransport {
         let our_url = self.bound_url.as_ref().unwrap();
         if let Ok(events) = mockernet.process_for(our_url.clone()) {
             for e in events {
-                let span = Lib3hSpan::fixme();
+                let span = Span::fixme();
                 match e {
                     MockernetEvent::Message { from, payload } => {
                         self.endpoint_self
@@ -315,7 +315,7 @@ fn ghost_transport() {
     t1.request(
         test_span(""),
         RequestToChild::Bind {
-            spec: Url::parse("mocknet://t1").expect("can parse url"),
+            spec: Url::parse("mocknet://t1").expect("can parse url").into(),
         },
         // callback should simply log the response
         Box::new(|owner, response| {
@@ -326,7 +326,7 @@ fn ghost_transport() {
     .unwrap();
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t1/\\\" })))\"",
+        "\"Response(Ok(Bind(BindResultData { bound_url: Lib3hUri(\\\"mocknet://t1/\\\") })))\"",
         format!("{:?}", owner.log[0])
     );
 
@@ -334,10 +334,10 @@ fn ghost_transport() {
     // to someone not bount to the network
     t1.request(
         test_span(""),
-        RequestToChild::SendMessage {
-            uri: Url::parse("mocknet://t2").expect("can parse url"),
-            payload: "won't be received!".into(),
-        },
+        RequestToChild::create_send_message(
+            Url::parse("mocknet://t2").expect("can parse url").into(),
+            "won't be received!".into(),
+        ),
         // callback should simply log the response
         Box::new(|owner, response| {
             owner.log.push(format!("{:?}", response));
@@ -348,7 +348,7 @@ fn ghost_transport() {
 
     t1.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Err(TransportError(\\\"mocknet://t2/ not bound\\\")))\"",
+        "\"Response(Err(TransportError(Other(\\\"mocknet://t2/ not bound\\\"))))\"",
         format!("{:?}", owner.log[1])
     );
 
@@ -356,7 +356,7 @@ fn ghost_transport() {
     t2.request(
         test_span(""),
         RequestToChild::Bind {
-            spec: Url::parse("mocknet://t2").expect("can parse url"),
+            spec: Url::parse("mocknet://t2").expect("can parse url").into(),
         },
         // callback should simply log the response
         Box::new(|owner, response| {
@@ -367,16 +367,16 @@ fn ghost_transport() {
     .unwrap();
     t2.process(&mut owner).expect("should process");
     assert_eq!(
-        "\"Response(Ok(Bind(BindResultData { bound_url: \\\"mocknet://t2/\\\" })))\"",
+        "\"Response(Ok(Bind(BindResultData { bound_url: Lib3hUri(\\\"mocknet://t2/\\\") })))\"",
         format!("{:?}", owner.log[2])
     );
 
     t1.request(
         test_span(""),
-        RequestToChild::SendMessage {
-            uri: Url::parse("mocknet://t2").expect("can parse url"),
-            payload: "foo".into(),
-        },
+        RequestToChild::create_send_message(
+            Url::parse("mocknet://t2").expect("can parse url").into(),
+            "foo".into(),
+        ),
         // callback should simply log the response
         Box::new(|owner, response| {
             owner.log.push(format!("{:?}", response));
@@ -398,23 +398,23 @@ fn ghost_transport() {
     let mut messages = t2.drain_messages();
     assert_eq!(messages.len(), 2);
     assert_eq!(
-        "IncomingConnection { uri: \"mocknet://t1/\" }",
+        "IncomingConnection { uri: Lib3hUri(\"mocknet://t1/\") }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
     assert_eq!(
-        "ReceivedData { uri: \"mocknet://t1/\", payload: \"foo\" }",
+        "ReceivedData { uri: Lib3hUri(\"mocknet://t1/\"), payload: \"foo\" }",
         format!("{:?}", messages[1].take_message().expect("exists"))
     );
 
     {
         let mut mockernet = MOCKERNET.write().unwrap();
-        mockernet.unbind(Url::parse("mocknet://t1").expect("can parse url"));
+        mockernet.unbind(Url::parse("mocknet://t1").expect("can parse url").into());
     }
     t1.process(&mut owner).expect("should process");
     let mut messages = t1.drain_messages();
     assert_eq!(messages.len(), 1);
     assert_eq!(
-        "ErrorOccured { uri: \"mocknet://t1/\", error: TransportError(\"mocknet://t1/ has become unbound\") }",
+        "ErrorOccured { uri: Lib3hUri(\"mocknet://t1/\"), error: TransportError(Other(\"mocknet://t1/ has become unbound\")) }",
         format!("{:?}", messages[0].take_message().expect("exists"))
     );
 }

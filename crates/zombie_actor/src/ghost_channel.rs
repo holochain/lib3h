@@ -1,22 +1,24 @@
 use crate::{
-    GhostCallback, GhostResult, GhostTracker, GhostTrackerBookmarkOptions, GhostTrackerBuilder,
-    RequestId, WorkWasDone,
+    ghost_error::ErrorKind, Backtwrap, GhostCallback, GhostError, GhostResult, GhostTracker,
+    GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone,
 };
-use lib3h_tracing::Lib3hSpan;
+use holochain_tracing::Span;
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
 #[derive(Debug)]
 enum GhostEndpointMessage<Request: 'static, Response: 'static, Error: 'static> {
     Request {
+        requester_bt: Backtwrap,
         request_id: Option<RequestId>,
         payload: Request,
-        span: Lib3hSpan,
+        span: Span,
     },
     Response {
+        responder_bt: Backtwrap,
         request_id: RequestId,
         payload: Result<Response, Error>,
-        span: Lib3hSpan,
+        span: Span,
     },
 }
 
@@ -29,12 +31,13 @@ pub struct GhostMessage<
     MessageToSelfResponse: 'static,
     Error: 'static,
 > {
+    requester_bt: Backtwrap,
     request_id: Option<RequestId>,
     message: Option<MessageToSelf>,
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<MessageToOther, MessageToSelfResponse, Error>,
     >,
-    span: Lib3hSpan,
+    span: Span,
 }
 
 impl<
@@ -54,18 +57,20 @@ impl<
         RequestToSelf: 'static,
         RequestToOther: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     > GhostMessage<RequestToSelf, RequestToOther, RequestToSelfResponse, Error>
 {
     fn new(
+        requester_bt: Backtwrap,
         request_id: Option<RequestId>,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
-        span: Lib3hSpan,
+        span: Span,
     ) -> Self {
         Self {
+            requester_bt,
             request_id,
             message: Some(message),
             sender,
@@ -73,29 +78,43 @@ impl<
         }
     }
 
+    //#[cfg(test)]
+    pub fn test_constructor() -> (Self) {
+        let (sender, _receiver) = crossbeam_channel::unbounded();
+        Self {
+            requester_bt: Backtwrap::new(),
+            request_id: None,
+            message: None,
+            sender,
+            span: Span::fixme(),
+        }
+    }
+
     /// create a request message
     #[allow(dead_code)]
     fn new_request(
+        requester_bt: Backtwrap,
         request_id: RequestId,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
-        span: Lib3hSpan,
+        span: Span,
     ) -> Self {
-        GhostMessage::new(Some(request_id), message, sender, span)
+        GhostMessage::new(requester_bt, Some(request_id), message, sender, span)
     }
 
     /// create an event message
     #[allow(dead_code)]
     fn new_event(
+        requester_bt: Backtwrap,
         message: RequestToSelf,
         sender: crossbeam_channel::Sender<
             GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
         >,
-        span: Lib3hSpan,
+        span: Span,
     ) -> Self {
-        GhostMessage::new(None, message, sender, span)
+        GhostMessage::new(requester_bt, None, message, sender, span)
     }
 
     /// most often you will want to consume the contents of the request
@@ -104,14 +123,29 @@ impl<
         std::mem::replace(&mut self.message, None)
     }
 
+    pub fn put_message(&mut self, msg: RequestToSelf) {
+        self.message = Some(msg);
+    }
+
     /// send a response back to the origin of this request
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
             self.sender.send(GhostEndpointMessage::Response {
+                responder_bt: Backtwrap::new(),
                 request_id: request_id.clone(),
                 payload,
                 span: self.span,
             })?;
+        } else {
+            // if the user is sending back an error
+            // it could get lost here... we are going to panic
+            if let Err(e) = payload {
+                panic!(
+                    "Unhandled publish error: {:?}. You should convert this to a request. BACKTRACE: {:?}",
+                    e,
+                    self.requester_bt,
+                );
+            }
         }
         Ok(())
     }
@@ -120,8 +154,12 @@ impl<
         self.request_id.is_some()
     }
 
-    pub fn span(&self) -> &Lib3hSpan {
+    pub fn span(&self) -> &Span {
         &self.span
+    }
+
+    pub fn backtrace(&self) -> &Backtwrap {
+        &self.requester_bt
     }
 }
 
@@ -135,7 +173,7 @@ pub struct GhostEndpoint<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -150,7 +188,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostEndpoint<
         RequestToOther,
@@ -199,7 +237,7 @@ pub struct GhostContextEndpointBuilder<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -215,7 +253,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostContextEndpointBuilder<
         RequestToOther,
@@ -279,17 +317,17 @@ pub trait GhostCanTrack<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, span: Lib3hSpan, payload: RequestToOther) -> GhostResult<()>;
+    fn publish(&mut self, span: Span, payload: RequestToOther) -> GhostResult<()>;
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked.
     fn request(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()>;
@@ -298,7 +336,7 @@ pub trait GhostCanTrack<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        span: Lib3hSpan,
+        span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -321,7 +359,7 @@ pub struct GhostContextEndpoint<
     RequestToOtherResponse: 'static,
     RequestToSelf: 'static,
     RequestToSelfResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 > {
     sender: crossbeam_channel::Sender<
         GhostEndpointMessage<RequestToOther, RequestToSelfResponse, Error>,
@@ -340,7 +378,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostContextEndpoint<
         UserData,
@@ -353,7 +391,7 @@ impl<
 {
     fn priv_request(
         &mut self,
-        mut span: Lib3hSpan,
+        mut span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -367,9 +405,10 @@ impl<
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
-        trace!("ghost_channel: send request (id={:?})", request_id);
-        span.event(format!("ghost_channel: send request (id={:?})", request_id));
+        // trace!("ghost_channel: send request {:?}", request_id);
+        span.event(format!("ghost_channel: send request {:?}", request_id));
         self.sender.send(GhostEndpointMessage::Request {
+            requester_bt: Backtwrap::new(),
             request_id: Some(request_id),
             payload,
             span: span.follower("send request"),
@@ -385,7 +424,7 @@ impl<
         RequestToOtherResponse: 'static,
         RequestToSelf: 'static,
         RequestToSelfResponse: 'static,
-        Error: 'static,
+        Error: 'static + std::fmt::Debug,
     >
     GhostCanTrack<
         UserData,
@@ -405,9 +444,10 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, mut span: Lib3hSpan, payload: RequestToOther) -> GhostResult<()> {
+    fn publish(&mut self, mut span: Span, payload: RequestToOther) -> GhostResult<()> {
         span.event("GhostChannel::publish");
         self.sender.send(GhostEndpointMessage::Request {
+            requester_bt: Backtwrap::new(),
             request_id: None,
             payload,
             span,
@@ -419,7 +459,7 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        mut span: Lib3hSpan,
+        mut span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
@@ -436,7 +476,7 @@ impl<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        mut span: Lib3hSpan,
+        mut span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
@@ -464,11 +504,13 @@ impl<
                 Ok(channel_message) => {
                     match channel_message {
                         GhostEndpointMessage::Request {
+                            requester_bt,
                             request_id,
                             payload,
                             span,
                         } => {
                             self.outbox_messages_to_self.push(GhostMessage::new(
+                                requester_bt,
                                 request_id,
                                 payload,
                                 self.sender.clone(),
@@ -476,6 +518,7 @@ impl<
                             ));
                         }
                         GhostEndpointMessage::Response {
+                            responder_bt: _,
                             request_id,
                             payload,
                             span: _,
@@ -491,7 +534,7 @@ impl<
                         break;
                     }
                     crossbeam_channel::TryRecvError::Disconnected => {
-                        return Err("disconnected GhostActor Endpoint".into());
+                        return Err(GhostError::new(ErrorKind::EndpointDisconnected));
                     }
                 },
             }
@@ -509,7 +552,7 @@ pub fn create_ghost_channel<
     RequestToParentResponse: 'static,
     RequestToChild: 'static,
     RequestToChildResponse: 'static,
-    Error: 'static,
+    Error: 'static + std::fmt::Debug,
 >() -> (
     GhostEndpoint<
         RequestToChild,
@@ -541,7 +584,7 @@ pub fn create_ghost_channel<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
     type TestError = String;
 
     #[derive(Debug)]
@@ -561,6 +604,7 @@ mod tests {
 
         let mut msg: GhostMessage<TestMsgIn, TestMsgOut, TestMsgInResponse, TestError> =
             GhostMessage::new_event(
+                Backtwrap::new(),
                 TestMsgIn("this is an event message from an internal child".into()),
                 child_send,
                 test_span(""),
@@ -589,6 +633,7 @@ mod tests {
         let request_id = RequestId::new();
         let msg: GhostMessage<TestMsgIn, TestMsgOut, TestMsgInResponse, TestError> =
             GhostMessage::new_request(
+                Backtwrap::new(),
                 request_id.clone(),
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
@@ -601,6 +646,7 @@ mod tests {
         let response = child_as_parent_recv.recv();
         match response {
             Ok(GhostEndpointMessage::Response {
+                responder_bt: _,
                 request_id: req_id,
                 payload,
                 span: _,
@@ -654,6 +700,7 @@ mod tests {
         let msg = parent_side.receiver.recv();
         match msg {
             Ok(GhostEndpointMessage::Request {
+                requester_bt: _,
                 request_id,
                 payload,
                 span: _,
@@ -679,6 +726,7 @@ mod tests {
         let msg = parent_side.receiver.recv();
         match msg {
             Ok(GhostEndpointMessage::Request {
+                requester_bt: _,
                 request_id,
                 payload,
                 span,
@@ -693,6 +741,7 @@ mod tests {
                 parent_side
                     .sender
                     .send(GhostEndpointMessage::Response {
+                        responder_bt: Backtwrap::new(),
                         request_id: request_id.unwrap(),
                         payload: Ok(TestMsgOutResponse("response from parent".into())),
                         span,
@@ -722,12 +771,13 @@ mod tests {
         // wait 1 ms for the callback to have expired
         std::thread::sleep(std::time::Duration::from_millis(1));
         assert!(endpoint.process(fake_dyn_actor).is_ok());
-        assert_eq!("Timeout", fake_dyn_actor.0);
+        assert_eq!("Timeout", &fake_dyn_actor.0[..7]);
 
         // now lets simulate sending an event from the parent
         parent_side
             .sender
             .send(GhostEndpointMessage::Request {
+                requester_bt: Backtwrap::new(),
                 request_id: None,
                 payload: TestMsgIn("event from a parent".into()),
                 span: test_span(""),

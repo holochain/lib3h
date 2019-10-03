@@ -1,356 +1,76 @@
-use crate::GhostCallbackData;
 /// A test harness for ghost actors. Provides specialized assertion functions
 /// to verify predicates have passed, calling the GhostActor or GhostCanTrack process function as many
 /// times a necessary until success (up to a hard coded number of iterations, currently).
-use predicates::prelude::*;
-
-/// Represents all useful state after a single call to an ghost_actor' process function
-#[derive(Debug, Clone)]
-pub struct ProcessorResult<Cb: 'static, E: 'static> {
-    /// Whether the ghost_actor reported doing work or not
-    pub did_work: bool,
-    /// All events produced by the last call to process for ghost_actor
-    pub callback_data: Option<GhostCallbackData<Cb, E>>,
-}
-
-/// An assertion style processor which provides a
-/// predicate over ProcessorResult (the eval function) and a
-/// test function which will break control flow similar to
-/// how calling assert! or assert_eq! would.
-pub trait Processor<Cb: 'static, E: 'static>: Predicate<ProcessorResult<Cb, E>> {
-    /// Processor name, for debugging and mapping purposes
-    fn name(&self) -> String {
-        "default_processor".into()
-    }
-
-    /// Test the predicate function. Should interrupt control
-    /// flow with a useful error if self.eval(args) is false.
-    fn test(&self, args: &ProcessorResult<Cb, E>);
-}
-
-/// Asserts some extracted data from ProcessorResult is equal to an expected instance.
-pub trait AssertEquals<Cb: 'static, E: 'static, T: PartialEq + std::fmt::Debug> {
-    /// User defined function for extracting a collection data of a specific
-    /// type from the proessor arguments
-    fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a T>;
-
-    /// The expected value to compare to the actual value to
-    fn expected(&self) -> &T;
-}
-
-impl<Cb: 'static, E: 'static, T: PartialEq + std::fmt::Debug> std::fmt::Display
-    for dyn AssertEquals<Cb, E, T>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "assert_equals")
-    }
-}
-
-impl<Cb: 'static, E: 'static, T> predicates::reflection::PredicateReflection
-    for dyn AssertEquals<Cb, E, T>
-where
-    T: PartialEq + std::fmt::Debug,
-{
-}
-
-impl<Cb: 'static, E: 'static, T> Predicate<ProcessorResult<Cb, E>> for dyn AssertEquals<Cb, E, T>
-where
-    T: PartialEq + std::fmt::Debug,
-{
-    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
-        self.extracted(args)
-            .map(|actual| actual == self.expected())
-            .unwrap_or(false)
-    }
-}
-
-/// Asserts some extracted data from ProcessorResult passes a predicate.
-pub trait Assert<Cb: 'static, E: 'static, T> {
-    fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a T>;
-
-    fn assert_inner(&self, args: &T) -> bool;
-}
-
-/// Asserts that the actual callback data is equal to the given expected
-#[derive(PartialEq, Debug)]
-pub struct CallbackDataEquals<Cb, E>(pub Cb, pub std::marker::PhantomData<E>);
-
-impl<Cb, E: 'static> predicates::Predicate<ProcessorResult<Cb, E>> for CallbackDataEquals<Cb, E>
-where
-    Cb: PartialEq + std::fmt::Debug + 'static,
-{
-    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
-        self.extracted(args)
-            .map(|actual| actual == self.expected())
-            .unwrap_or(false)
-    }
-}
-
-impl<Cb, E: 'static> AssertEquals<Cb, E, Cb> for CallbackDataEquals<Cb, E>
-where
-    Cb: PartialEq + std::fmt::Debug + 'static,
-{
-    fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a Cb> {
-        match &args.callback_data {
-            Some(GhostCallbackData::Response(Ok(cb))) => Some(cb),
-            _ => None,
-        }
-    }
-    fn expected(&self) -> &Cb {
-        &self.0
-    }
-}
-
-impl<Cb, E> std::fmt::Display for CallbackDataEquals<Cb, E>
-where
-    Cb: PartialEq + std::fmt::Debug + 'static,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl<Cb, E: 'static> Processor<Cb, E> for CallbackDataEquals<Cb, E>
-where
-    Cb: std::fmt::Debug + 'static + PartialEq,
-{
-    fn test(&self, args: &ProcessorResult<Cb, E>) {
-        let actual = self.extracted(args);
-        assert_eq!(Some(self.expected()), actual);
-    }
-
-    fn name(&self) -> String {
-        format!("{:?}", self.0).to_string()
-    }
-}
-
-impl<Cb, E: 'static> predicates::reflection::PredicateReflection for CallbackDataEquals<Cb, E> where
-    Cb: std::fmt::Debug + 'static + PartialEq
-{
-}
-
-/// Asserts using an arbitrary predicate over a lib3h server protocol event
-pub struct CallbackDataAssert<Cb, E>(pub Box<dyn Predicate<Cb>>, std::marker::PhantomData<E>);
-
-impl<Cb: 'static, E: 'static> Assert<Cb, E, Cb> for CallbackDataAssert<Cb, E> {
-    fn extracted<'a>(&self, args: &'a ProcessorResult<Cb, E>) -> Option<&'a Cb> {
-        match &args.callback_data {
-            Some(GhostCallbackData::Response(Ok(cb))) => Some(cb),
-            _ => None,
-        }
-    }
-
-    fn assert_inner(&self, cb: &Cb) -> bool {
-        self.0.eval(&cb)
-    }
-}
-
-impl<Cb: 'static, E: 'static> Processor<Cb, E> for CallbackDataAssert<Cb, E> {
-    fn test(&self, args: &ProcessorResult<Cb, E>) {
-        let actual = self.extracted(args);
-
-        if let Some(actual) = actual {
-            assert!(self.assert_inner(&actual));
-        } else {
-            assert!(actual.is_some());
-        }
-    }
-
-    fn name(&self) -> String {
-        "CallbackDataAssert".to_string()
-    }
-}
-
-impl<Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for CallbackDataAssert<Cb, E> {
-    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
-        self.extracted(args)
-            .map(|actual| self.assert_inner(&actual))
-            .unwrap_or(false)
-    }
-}
-
-impl<Cb, E: 'static> std::fmt::Display for CallbackDataAssert<Cb, E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "callback data assertion")
-    }
-}
-
-impl<Cb, E: 'static> predicates::reflection::PredicateReflection for CallbackDataAssert<Cb, E> {}
-
-/// Asserts work was done
-#[derive(PartialEq, Debug)]
-pub struct DidWorkAssert<Cb, E>(std::marker::PhantomData<Cb>, std::marker::PhantomData<E>);
-
-impl<Cb: 'static, E: 'static> Processor<Cb, E> for DidWorkAssert<Cb, E> {
-    fn test(&self, args: &ProcessorResult<Cb, E>) {
-        assert!(args.did_work);
-    }
-
-    fn name(&self) -> String {
-        format!("{:?}", "DidWorkAssert").to_string()
-    }
-}
-
-impl<Cb: 'static, E: 'static> Predicate<ProcessorResult<Cb, E>> for DidWorkAssert<Cb, E> {
-    fn eval(&self, args: &ProcessorResult<Cb, E>) -> bool {
-        args.did_work
-    }
-}
-
-impl<Cb: 'static, E: 'static> std::fmt::Display for DidWorkAssert<Cb, E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?} did work", self.name())
-    }
-}
-
-impl<Cb: 'static, E: 'static> predicates::reflection::PredicateReflection for DidWorkAssert<Cb, E> {}
-
-#[allow(unused_macros)]
-#[macro_export]
-/// Convenience function that asserts only one particular equality predicate
-/// passes for a GhostCanTrack. See assert_callback_processed for more details.
-macro_rules! assert_callback_eq {
-    ($ghost_can_track: ident,
-     $user_data: ident,
-     $request_to_child: ident,
-     $equal_to: ident,
-     $e_type:tt
-    ) => {{
-        let processor = Box::new($crate::ghost_test_harness::CallbackDataEquals(
-            $equal_to,
-            std::marker::PhantomData,
-        ));
-        assert_callback_processed!(
-            $ghost_can_track,
-            $user_data,
-            $request_to_child,
-            $e_type,
-            processor
-        )
-    }};
-}
-
-#[allow(unused_macros)]
-macro_rules! process_one {
-    ($ghost_can_track: ident,
-     $user_data: ident,
-     $callback_data: ident,
-     $errors: ident
-    ) => {{
-        let did_work = $ghost_can_track
-            .process(&mut $user_data)
-            .map_err(|err| dbg!(err))
-            .map(|did_work| did_work.into())
-            .unwrap_or(false);
-        if !did_work {
-        } else {
-            let processor_result: $crate::ghost_test_harness::ProcessorResult<_, _> =
-                $crate::ghost_test_harness::ProcessorResult {
-                    did_work,
-                    callback_data: $callback_data.clone(), //.as_ref(),
-                };
-            let mut failed = Vec::new();
-
-            for (processor, _orig_processor_result) in $errors.drain(..) {
-                let result = processor.eval(&processor_result);
-                if result {
-                    // Simulate the succesful assertion behavior
-                    processor.test(&processor_result.clone());
-                // processor passed!
-                } else {
-                    // Cache the assertion error and trigger it later if we never
-                    // end up passing
-                    failed.push((processor, Some(processor_result.clone())));
-                }
-            }
-            $errors.append(&mut failed);
-        }
-    }};
-}
-
-/// Asserts that a collection of GhostCanTrack trait objects produce events
-/// matching a set of predicate functions. For the program
-/// to continue executing all processors must pass.
-///
-/// Multiple calls to process() will be made as needed for
-/// the passed in processors to pass. It will fail after
-/// 20 iterations.
-///
-/// Returns all observed processor results for use by
-/// subsequent tests.
-#[allow(unused_macros)]
-macro_rules! assert_callback_processed {
-    ($ghost_can_track:ident,
-     $user_data:ident,
-     $request_to_child:ident,
-     $e_type:tt,
-     $processor:ident
- ) => {{
-        let mut errors /*: Vec<(
-                                    Box<dyn $crate::ghost_test_harness::Processor<_, $e_type>>,
-                                    Option<$crate::ghost_test_harness::ProcessorResult<_, $e_type>>,
-                                )> */ = Vec::new();
-
-        let mut callback_data = None; // = Box::new(None);
-        let cb: $crate::ghost_actor::GhostCallback<_, _, _> = Box::new(|_user_data, cb| {
-            callback_data = Some(cb.clone());
-            Ok(())
-        });
-
-        let span = $crate::lib3h_tracing::test_span("assert_callback_processed!");
-
-        $ghost_can_track
-            .request(span, $request_to_child, cb)
-            .expect("request to ghost_can_track");
-
-        //       for p in vec![$processor] {
-        errors.push(($processor, None));
-        //     }
-
-        for epoch in 0..20 {
-            trace!("[{:?}]", epoch);
-
-            process_one!($ghost_can_track, $user_data, callback_data, errors);
-            if errors.is_empty() {
-                break;
-            }
-        }
-
-        for (p, args) in errors {
-            if let Some(args) = args {
-                p.test(&args)
-            } else {
-                // Make degenerate result which should fail
-                p.test(&$crate::ghost_test_harness::ProcessorResult {
-                    callback_data: None,
-                    did_work: false,
-                })
-            }
-        }
-    }};
-}
 
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort
 /// is true
+///
+///
+
+pub const DEFAULT_MAX_ITERS: u64 = 100;
+pub const DEFAULT_MAX_RETRIES: u64 = 5;
+pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
+pub const DEFAULT_TIMEOUT_MS: u64 = 2000;
+pub const DEFAULT_SHOULD_ABORT: bool = true;
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 5;
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 5;
+
+/// All configurable parameters when processing an actor.
+#[derive(Clone, Debug)]
+pub struct ProcessingOptions {
+    pub max_iters: u64,
+    pub max_retries: u64,
+    pub delay_interval_ms: u64,
+    pub timeout_ms: u64,
+    pub should_abort: bool,
+}
+
+impl ProcessingOptions {
+    pub fn wait_did_work_defaults() -> Self {
+        Self {
+            max_iters: DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_should_abort(should_abort: bool) -> Self {
+        let options = Self {
+            should_abort,
+            ..Default::default()
+        };
+        options
+    }
+}
+
+impl Default for ProcessingOptions {
+    fn default() -> Self {
+        Self {
+            max_iters: DEFAULT_MAX_ITERS,
+            max_retries: DEFAULT_MAX_RETRIES,
+            delay_interval_ms: DEFAULT_DELAY_INTERVAL_MS,
+            timeout_ms: DEFAULT_TIMEOUT_MS,
+            should_abort: DEFAULT_SHOULD_ABORT,
+        }
+    }
+}
+
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_did_work {
-    ($ghost_actor: ident,
-     $should_abort: expr
-    ) => {{
-        let timeout = std::time::Duration::from_millis(2000);
-        wait_did_work!($ghost_actor, $should_abort, timeout)
+    ($ghost_actor:ident) => {{
+        let options = $crate::ghost_test_harness::ProcessingOptions::wait_did_work_defaults();
+        $crate::wait_did_work!($ghost_actor, options);
     }};
-    ($ghost_actor:ident) => {
-        wait_did_work!($ghost_actor, true)
-    };
     ($ghost_actor: ident,
-     $should_abort: expr,
-     $timeout : expr
-      ) => {{
+     $options: expr
+    ) => {{
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
 
-        for i in 0..20 {
+        let timeout = std::time::Duration::from_millis($options.timeout_ms);
+
+        for i in 0..$options.max_iters {
             did_work = $ghost_actor
                 .process()
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
@@ -360,42 +80,39 @@ macro_rules! wait_did_work {
                 break;
             }
             let elapsed = clock.elapsed().unwrap();
-            if elapsed > $timeout {
+            if elapsed > timeout {
+                trace!("[epoch {}] wait_did_work timeout", i);
                 break;
             }
-            trace!("[{}] wait_did_work", i);
-            std::thread::sleep(std::time::Duration::from_millis(1))
+            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
         }
-        if $should_abort {
+        if $options.should_abort {
             assert!(did_work);
         }
+        trace!("wait_did_work returning: {:?}", did_work);
+
         did_work
     }};
 }
 
 /// Waits until a GhostCanTrack process has been invoked and work was done.
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_can_track_did_work {
     ($ghost_can_track: ident,
-     $user_data: ident,
-     $should_abort: expr
-    ) => {{
-        let duration = std::time::Duration::from_millis(2000);
-        wait_can_track_did_work!($ghost_can_track, $user_data, $should_abort, duration)
-    }};
-    ($ghost_can_track: ident,
-     $user_data: ident
+     $user_data: expr
     ) => {
-        wait_can_track_did_work!($ghost_can_track, $user_data, true)
+        let options = $crate::ghost_test_harness::ProcessingOptions::wait_did_work_defaults();
+        wait_can_track_did_work!($ghost_can_track, $user_data, options)
     };
     ($ghost_can_track: ident,
-     $user_data: ident,
-     $should_abort: expr,
-     $timeout: expr
+     $user_data: expr,
+     $options: expr
     ) => {{
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
-        for i in 0..20 {
+        let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        for i in 0..$options.max_iters {
             did_work = $ghost_can_track
                 .process(&mut $user_data)
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
@@ -405,50 +122,310 @@ macro_rules! wait_can_track_did_work {
                 break;
             }
             let elapsed = clock.elapsed().unwrap();
-            if elapsed > $timeout {
+            if elapsed > timeout {
+                trace!("[{}] wait_can_track_did_work timeout", i);
                 break;
             }
-            trace!("[{}] wait_did_work", i);
-            std::thread::sleep(std::time::Duration::from_millis(1))
+            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
         }
-        if $should_abort {
+        if $options.should_abort {
             assert!(did_work);
         }
+        trace!("wait_can_track_did_work returning {:?}", did_work);
+
         did_work
     }};
 }
 
-/// Continues processing the GhostActor trait until no work is being done.
+/// Continues processing the GhostActor or GhostCanTrack trait
+/// until no work is being done.
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! wait_until_no_work {
     ($ghost_actor: ident) => {{
-        let mut did_work;
-        loop {
-            did_work = wait_did_work!($ghost_actor, false);
+        let mut did_work = false;
+        let options = $crate::ghost_test_harness::ProcessingOptions::with_should_abort(false);
+
+        let wait_options = $crate::ghost_test_harness::ProcessingOptions {
+            max_iters: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..options
+        };
+
+        let clock = std::time::SystemTime::now();
+
+        let timeout = std::time::Duration::from_millis(options.timeout_ms);
+
+        for i in 0..options.max_iters {
+            did_work = $crate::wait_did_work!($ghost_actor, wait_options);
+
             if !did_work {
+                break;
+            }
+
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!("[epoch {}] wait_until_no_work timeout", i);
                 break;
             }
         }
         did_work
     }};
     ($ghost_can_track: ident, $user_data: ident) => {{
-        let mut did_work;
-        loop {
-            did_work = wait_can_track_did_work!($ghost_can_track, $user_data, false);
+        let mut did_work = false;
+        let options = $crate::ghost_test_harness::ProcessingOptions::with_should_abort(false);
+        let wait_options = $crate::ghost_test_harness::ProcessingOptions {
+            max_iters: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: $crate::ghost_test_harness::DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..options
+        };
+
+        let clock = std::time::SystemTime::now();
+
+        let timeout = std::time::Duration::from_millis(options.timeout_ms);
+
+        for i in 0..options.max_iters {
+            did_work = $crate::wait_can_track_did_work!($ghost_can_track, $user_data, wait_options);
             if !did_work {
                 break;
             }
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!("[epoch {}] wait_until_no_work timeout", i);
+                break;
+            }
         }
+
         did_work
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_for_messages {
+    ($ghost_actors: expr,
+     $endpoint: ident,
+     $user_data: expr,
+     $regexes: expr) => {{
+        let options: $crate::ghost_test_harness::ProcessingOptions = Default::default();
+        $crate::wait_for_messages!($ghost_actors, $endpoint, $user_data, $regexes, options)
+    }};
+    (
+        $ghost_actors: expr,
+        $endpoint: ident,
+        $user_data: expr,
+        $regexes: expr,
+        $options: expr
+    ) => {{
+        let mut message_regexes: Vec<regex::Regex> = $regexes
+            .into_iter()
+            .map(|re| {
+                regex::Regex::new(re)
+                    .expect(format!("Regex must be syntactically correct: {:?}", re).as_str())
+            })
+            .collect();
+
+        let mut actors = $ghost_actors;
+        for tries in 0..$options.max_iters {
+            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms));
+            actors = actors
+                .into_iter()
+                .map(|mut actor| {
+                    let _ = $crate::wait_until_no_work!(actor);
+                    actor
+                })
+                .collect::<Vec<_>>();
+            let _ = $endpoint.process(&mut $user_data);
+            for mut message in $endpoint.drain_messages() {
+                let message_regexes2 = message_regexes.clone();
+                message_regexes = message
+                    .take_message()
+                    .map(|message| {
+                        let message_string = &format!("{:?}", message);
+                        trace!("[wait_for_messsages] drained {:?}", message_string);
+                        message_regexes
+                            .into_iter()
+                            .filter(|message_regex| !message_regex.is_match(message_string))
+                            .collect()
+                    })
+                    .unwrap_or(message_regexes2);
+                if message_regexes.is_empty() {
+                    break;
+                }
+            }
+
+            if message_regexes.is_empty()
+                || tries > $options.timeout_ms / $options.delay_interval_ms
+            {
+                break;
+            }
+        }
+        let is_empty = message_regexes.is_empty();
+
+        if $options.should_abort {
+            assert!(
+                is_empty,
+                "Did not receive a message matching the provided regexes"
+            );
+        }
+        is_empty
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait_for_message {
+    ($ghost_actors: expr, $endpoint: ident, $user_data: expr, $regex: expr) => {{
+        let options: $crate::ghost_test_harness::ProcessingOptions = Default::default();
+        $crate::wait_for_message!($ghost_actors, $endpoint, $user_data, $regex, options)
+    }};
+    (
+        $ghost_actors: expr,
+        $endpoint: ident,
+        $user_data: expr,
+        $regex: expr,
+        $options: expr
+    ) => {{
+        let regexes = vec![$regex];
+        $crate::wait_for_messages!($ghost_actors, $endpoint, $user_data, regexes, $options)
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_message {
+    ($ghost_actor: expr, $endpoint: ident, $regex: expr) => {{
+        let actors = vec![&mut $ghost_actor];
+        $crate::wait_for_message!(actors, $endpoint, $regex)
+    }};
+    ($ghost_actor: expr, $endpoint: ident, $regex: expr, $options: expr) => {{
+        let actors = vec![&mut $ghost_actor];
+        $crate::wait_for_message!(actors, $endpoint, $regex, $options)
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_messages {
+    ($ghost_actor: expr, $endpoint: ident, $user_data: expr, $regexes: expr) => {{
+        let actors = vec![&mut $ghost_actor];
+        $crate::wait_for_messages!(actors, $endpoint, $user_data, $regexes)
+    }};
+    ($ghost_actor: expr, $endpoint: ident, $user_data: expr, $regexes: expr, $options: expr) => {{
+        let actors = vec![&mut $ghost_actor];
+        $crate::wait_for_messages!(actors, $endpoint, $user_data, $regexes, $options)
+    }};
+}
+
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_callback {
+    ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr) => {{
+        let options: $crate::ghost_test_harness::ProcessingOptions = Default::default();
+        $crate::wait1_for_callback!($actor, $ghost_can_track, $request, $re, options)
+    }};
+    ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr, $options: expr) => {{
+        let regex = regex::Regex::new($re.clone())
+            .expect(format!("[wait1_for_callback] invalid regex: {:?}", $re).as_str());
+
+        let mut user_data = None;
+
+        let f: $crate::GhostCallback<Option<String>, _, _> = Box::new(|user_data, cb_data| {
+            user_data.replace(format!("{:?}", cb_data).to_string());
+            Ok(())
+        });
+
+        $ghost_can_track
+            .request(
+                holochain_tracing::test_span("wait1_for_callback"),
+                $request,
+                f,
+            )
+            .unwrap();
+
+        let mut work_to_do = true;
+        for iter in 0..$options.max_iters {
+            work_to_do |= $crate::wait_until_no_work!($actor);
+            work_to_do |= $crate::wait_until_no_work!($ghost_can_track, user_data);
+            if !work_to_do {
+                break;
+            }
+
+            if iter > $options.timeout_ms / $options.delay_interval_ms {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
+        }
+
+        let actual = user_data.unwrap_or("Callback not triggered".to_string());
+
+        let is_match = regex.is_match(actual.as_str());
+
+        if $options.should_abort {
+            if is_match {
+                assert!(is_match);
+            } else {
+                assert_eq!($re, actual.as_str());
+            }
+        }
+        is_match
+    }};
+}
+
+/// Similar to `wait1_for_callback!` but will invoke the callback multiple times until
+/// success. Users need provide a closure `$request_fn` that takes a user defined state and
+/// produces a triple of `(request_to_other, regex, new_state)`. If the request fails to produce
+/// the matching regex, the closure will be invoked again with `new_state` instead of `state`.
+/// This will continue until success or a finite number of failures has been reached.
+///
+/// If `$should_abort` is `false`, the function returns a tuple ``(is_match, final_state)` where
+/// `is_match` indicates whether the regexed match and `final_state` contains the final state produced
+/// by the closure.
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! wait1_for_repeatable_callback {
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $init_value: expr) => {{
+        $crate::wait1_for_repeatable_callback!(
+            $actor,
+            $ghost_can_track,
+            $request_fn,
+            $init_value,
+            $crate::ghost_test_harness::ProcessingOptions::default()
+        )
+    }};
+    ($actor: ident, $ghost_can_track: ident, $request_fn: expr, $init_value: expr, $options: expr) => {{
+        let mut is_match = false;
+
+        let mut state = $init_value;
+
+        for iter in 0..$options.max_retries {
+            let (request, re, state_prime) = ($request_fn)(state);
+            state = state_prime;
+            let should_abort = $options.should_abort && iter == $options.max_retries;
+            let wait_options = $crate::ghost_test_harness::ProcessingOptions {
+                should_abort: should_abort,
+                ..$options
+            };
+            is_match = $crate::wait1_for_callback!(
+                $actor,
+                $ghost_can_track,
+                request,
+                re.as_str(),
+                wait_options
+            );
+            if is_match {
+                break;
+            }
+        }
+        (is_match, state)
     }};
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::*;
-    use crate::{GhostResult, WorkWasDone};
-
+    use super::ProcessingOptions;
+    use crate::{GhostCallback, GhostCallbackData, GhostResult, WorkWasDone};
     #[derive(Debug, Clone, PartialEq)]
     struct DidWorkActor(i8);
 
@@ -467,10 +444,66 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Clone)]
+    pub enum RequestToOther {
+        Ping,
+        Retry,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum RequestToOtherResponse {
+        Pong,
+        Retry,
+    }
+
+    #[derive(Debug)]
     struct DidWorkParentWrapper;
     impl DidWorkParentWrapper {
-        pub fn process(&mut self, user_data: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
-            user_data.process()
+        pub fn process(&mut self, actor: &mut DidWorkActor) -> GhostResult<WorkWasDone> {
+            actor.process()
+        }
+    }
+
+    pub type CallbackError = String;
+    pub type Callback = GhostCallback<Option<String>, RequestToOtherResponse, CallbackError>;
+    #[allow(dead_code)]
+    pub type CallbackData = GhostCallbackData<RequestToOtherResponse, CallbackError>;
+
+    struct CallbackParentWrapper(pub Vec<(Callback, CallbackData)>);
+
+    pub type CallbackUserData = Option<String>;
+
+    impl CallbackParentWrapper {
+        pub fn request(
+            &mut self,
+            _span: holochain_tracing::Span,
+            payload: RequestToOther,
+            cb: Callback,
+        ) -> GhostResult<()> {
+            let response = match payload {
+                RequestToOther::Ping => RequestToOtherResponse::Pong,
+                RequestToOther::Retry => RequestToOtherResponse::Retry,
+            };
+
+            let cb_data = GhostCallbackData::Response(Ok(response));
+            self.0.push((cb, cb_data));
+            Ok(())
+        }
+
+        pub fn process(
+            &mut self,
+            mut user_data: &mut CallbackUserData,
+        ) -> GhostResult<WorkWasDone> {
+            if let Some((cb, cb_data)) = self.0.pop() {
+                let _cb_result = (cb)(&mut user_data, cb_data);
+                Ok(true.into())
+            } else {
+                Ok(false.into())
+            }
+        }
+
+        pub fn new() -> Self {
+            CallbackParentWrapper(vec![])
         }
     }
 
@@ -480,15 +513,22 @@ mod tests {
 
         wait_did_work!(actor);
 
-        assert_eq!(false, wait_did_work!(actor, false));
+        assert_eq!(
+            false,
+            wait_did_work!(actor, ProcessingOptions::with_should_abort(false))
+        );
     }
 
     #[test]
     fn test_wait_did_work_timeout() {
         let actor = &mut DidWorkActor(-1);
 
-        let timeout = std::time::Duration::from_millis(0);
-        let did_work: bool = wait_did_work!(actor, false, timeout);
+        let options = ProcessingOptions {
+            should_abort: false,
+            timeout_ms: 0,
+            ..Default::default()
+        };
+        let did_work: bool = wait_did_work!(actor, options);
         assert_eq!(false, did_work);
     }
 
@@ -497,8 +537,12 @@ mod tests {
         let parent = &mut DidWorkParentWrapper;
         let mut actor = &mut DidWorkActor(-1);
 
-        let timeout = std::time::Duration::from_millis(0);
-        let did_work: bool = wait_can_track_did_work!(parent, actor, false, timeout);
+        let options = ProcessingOptions {
+            should_abort: false,
+            timeout_ms: 0,
+            ..Default::default()
+        };
+        let did_work: bool = wait_can_track_did_work!(parent, actor, options);
         assert_eq!(false, did_work);
     }
 
@@ -508,7 +552,10 @@ mod tests {
         let mut actor = &mut DidWorkActor(1);
         wait_can_track_did_work!(parent, actor);
 
-        assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
+        assert_eq!(
+            false,
+            wait_can_track_did_work!(parent, actor, ProcessingOptions::with_should_abort(false))
+        );
     }
 
     #[test]
@@ -517,7 +564,10 @@ mod tests {
 
         wait_until_no_work!(actor);
 
-        assert_eq!(false, wait_did_work!(actor, false));
+        assert_eq!(
+            false,
+            wait_did_work!(actor, ProcessingOptions::with_should_abort(false))
+        );
     }
 
     #[test]
@@ -526,13 +576,62 @@ mod tests {
         let mut actor = &mut DidWorkActor(2);
         wait_until_no_work!(parent, actor);
 
-        assert_eq!(false, wait_can_track_did_work!(parent, actor, false));
+        assert_eq!(
+            false,
+            wait_can_track_did_work!(parent, actor, ProcessingOptions::with_should_abort(false))
+        );
     }
 
     #[test]
-    fn test_callback_equals_as_processor_trait() {
-        let callback_equals: CallbackDataEquals<String, _> =
-            CallbackDataEquals("abc".into(), std::marker::PhantomData);
-        let _as_processor: Box<dyn Processor<String, String>> = Box::new(callback_equals);
+    fn test_wait_for_callback() {
+        let parent = &mut CallbackParentWrapper::new();
+        let actor = &mut DidWorkActor(1);
+
+        let request = RequestToOther::Ping;
+        let is_match = wait1_for_callback!(
+            actor,
+            parent,
+            request,
+            "Pong",
+            ProcessingOptions::with_should_abort(false)
+        );
+        assert!(is_match);
+
+        let request = RequestToOther::Retry;
+        let is_match = wait1_for_callback!(
+            actor,
+            parent,
+            request,
+            "Pong",
+            ProcessingOptions::with_should_abort(false)
+        );
+        assert!(!is_match);
     }
+
+    #[test]
+    fn test_wait_for_repeatable_callback() {
+        let parent = &mut CallbackParentWrapper::new();
+        let actor = &mut DidWorkActor(1);
+
+        let request_fn = Box::new(|retried| {
+            if retried {
+                // Test should succeed with these inputs
+                (RequestToOther::Ping, "Pong".to_string(), true)
+            } else {
+                // Purposely cause the callback to be triggered again
+                (RequestToOther::Retry, "Pong".to_string(), true)
+            }
+        });
+
+        let (is_match, retried) = wait1_for_repeatable_callback!(
+            actor,
+            parent,
+            request_fn,
+            false,
+            ProcessingOptions::with_should_abort(false)
+        );
+        assert!(is_match);
+        assert!(retried);
+    }
+
 }

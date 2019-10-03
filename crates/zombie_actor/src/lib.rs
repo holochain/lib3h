@@ -1,9 +1,11 @@
-#![feature(rustc_private)]
+extern crate backtrace;
 extern crate crossbeam_channel;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate detach;
-extern crate lib3h_tracing;
+extern crate holochain_tracing;
+#[macro_use]
+extern crate lazy_static;
 extern crate nanoid;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -13,6 +15,9 @@ extern crate log;
 
 #[macro_use]
 pub mod ghost_test_harness;
+
+mod backtwrap;
+pub use backtwrap::{Backtwrap, BacktwrapCaptureStrategy};
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
@@ -63,7 +68,7 @@ impl From<RequestId> for String {
 }
 
 mod ghost_error;
-pub use ghost_error::{GhostError, GhostResult};
+pub use ghost_error::{ErrorKind, GhostError, GhostResult};
 
 mod ghost_tracker;
 pub use ghost_tracker::{
@@ -82,10 +87,10 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 
 pub mod prelude {
     pub use super::{
-        create_ghost_channel, GhostActor, GhostCallback, GhostCallbackData, GhostCanTrack,
-        GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostParentWrapper,
-        GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions, GhostTracker,
-        GhostTrackerBookmarkOptions, WorkWasDone,
+        create_ghost_channel, ghost_error::ErrorKind, GhostActor, GhostCallback, GhostCallbackData,
+        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
+        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
+        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
@@ -93,7 +98,7 @@ pub mod prelude {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
 
     type FakeError = String;
 
@@ -357,7 +362,7 @@ mod tests {
                             Box::new(move |_m:&mut GatewayTransport, response| {
 
                                 // got a timeout error
-                                if let GhostCallbackData::Timeout = response {
+                                if let GhostCallbackData::Timeout(_) = response {
                                     msg.respond(Err("Timeout".into()))?;
                                     return Ok(());
                                 }

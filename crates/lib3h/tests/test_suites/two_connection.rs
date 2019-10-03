@@ -54,7 +54,7 @@ fn test_two_gossip_self(alex: &mut NodeMock, billy: &mut NodeMock) {
     assert!(did_work);
     assert_eq!(srv_msg_list.len(), 0);
 
-    // More process: Have Billy process P2p::PeerAddress of alex
+    // More process: Have Billy process P2p::PeerName of alex
     let (_did_work, _srv_msg_list) = billy.process().unwrap();
     let (_did_work, _srv_msg_list) = alex.process().unwrap();
 
@@ -84,7 +84,7 @@ fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock) {
             network_id: "FIXME".into(), // TODO
         }),
     ));
-    assert_one_processed!(alex, billy, processor);
+    assert2_processed!(alex, billy, processor);
 }
 
 /// Wait for peer timeout than reconnect
@@ -106,8 +106,8 @@ fn test_two_peer_timeout_reconnect(
             network_id: "FIXME".into(), // TODO
         }),
     ));
-    assert_one_processed!(billy, alex, disconnect1);
-    assert_one_processed!(billy, alex, disconnect2);
+    assert2_processed!(billy, alex, disconnect1);
+    assert2_processed!(billy, alex, disconnect2);
 
     println!("\n Reconnecting Alex...\n");
     let connect_data = alex.reconnect().expect("Reconnection failed");

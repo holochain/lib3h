@@ -4,11 +4,10 @@ use crate::{
     transport::{error::*, protocol::*},
 };
 use detach::prelude::*;
+use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, Address};
-use lib3h_tracing::Lib3hSpan;
+use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address};
 use std::collections::HashMap;
-use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct LocalRouteSpec {
@@ -56,8 +55,10 @@ impl<
                 .request_id_prefix("mplex_to_parent_")
                 .build(),
         );
-        let inner_gateway =
-            Detach::new(GatewayParentWrapper::new(inner_gateway, "mplex_to_inner_"));
+        let inner_gateway = Detach::new(GatewayParentWrapper::new(
+            inner_gateway,
+            "mplex_to_inner_gateway_",
+        ));
         Self {
             endpoint_parent,
             endpoint_self,
@@ -97,6 +98,19 @@ impl<
         endpoint_parent
     }
 
+    /// Remove route
+    pub fn remove_agent_space_route(
+        &mut self,
+        space_address: &Address,
+        local_agent_id: &Address,
+    ) -> Option<TransportActorSelfEndpoint<TransportMultiplex<G>>> {
+        let route_spec = LocalRouteSpec {
+            space_address: space_address.clone(),
+            local_agent_id: local_agent_id.clone(),
+        };
+        self.route_endpoints.remove(&route_spec)
+    }
+
     /// The owner of this multiplex (real_engine) has received a DirectMessage
     /// these at this level are intended to be forwarded up to our routes.
     /// Collect all the un-packed info that will let us pass it back up the
@@ -106,31 +120,29 @@ impl<
         space_address: &Address,
         local_agent_id: &Address,
         remote_agent_id: &Address,
-        remote_machine_id: &Address,
         unpacked_payload: Opaque,
     ) -> Lib3hResult<()> {
         let route_spec = LocalRouteSpec {
             space_address: space_address.clone(),
             local_agent_id: local_agent_id.clone(),
         };
-        let path = Url::parse(&format!(
-            "transportId:{}?a={}",
-            remote_machine_id, remote_agent_id
-        ))
-        .expect("can parse url");
+        let path = Lib3hUri::with_agent_id(remote_agent_id);
         match self.route_endpoints.get_mut(&route_spec) {
-            None => panic!("no such route"),
+            None => Err(Lib3hError::new_other(&format!(
+                "no such route: {:?}",
+                route_spec
+            ))),
             Some(ep) => {
                 ep.publish(
-                    Lib3hSpan::fixme(),
+                    Span::fixme(),
                     RequestToParent::ReceivedData {
                         uri: path,
                         payload: unpacked_payload,
                     },
                 )?;
+                Ok(())
             }
         }
-        Ok(())
     }
 
     /// private dispatcher for messages from our inner transport
@@ -150,31 +162,36 @@ impl<
             self.handle_received_data(uri, payload)?;
             Ok(())
         } else {
-            self.endpoint_self.request(
-                Lib3hSpan::fixme(),
-                data,
-                Box::new(move |_, response| {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
-                        }
-                        GhostCallbackData::Response(response) => {
-                            msg.respond(response)?;
-                        }
-                    };
-                    Ok(())
-                }),
-            )?;
+            if msg.is_request() {
+                self.endpoint_self.request(
+                    Span::fixme(),
+                    data,
+                    Box::new(move |_, response| {
+                        match response {
+                            GhostCallbackData::Timeout(bt) => {
+                                msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => {
+                                msg.respond(response)?;
+                            }
+                        };
+                        Ok(())
+                    }),
+                )?;
+            } else {
+                self.endpoint_self.publish(Span::fixme(), data)?;
+            }
+
             Ok(())
         }
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, uri: Url, payload: Opaque) -> Lib3hResult<()> {
+    fn handle_received_data(&mut self, uri: Lib3hUri, payload: Opaque) -> Lib3hResult<()> {
         // forward
         self.endpoint_self.publish(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }),
         )?;
         Ok(())
@@ -192,7 +209,8 @@ impl<
     ) -> Lib3hResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Bind { spec } => self.handle_route_bind(msg, spec),
-            RequestToChild::SendMessage { uri, payload } => {
+            RequestToChild::SendMessage { uri, payload, .. } => {
+                debug!("handle_route_send to {}", uri.clone());
                 self.handle_route_send_message(msg, uri, payload)
             }
         }
@@ -202,17 +220,17 @@ impl<
     fn handle_route_bind(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        spec: Url,
+        spec: Lib3hUri,
     ) -> Lib3hResult<()> {
         // forward the bind to our inner_gateway
         self.inner_gateway.as_mut().request(
-            Lib3hSpan::fixme(),
+            Span::fixme(),
             GatewayRequestToChild::Transport(RequestToChild::Bind { spec }),
             Box::new(|_, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                        GhostCallbackData::Timeout(bt) => {
+                            msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => match response {
@@ -241,18 +259,18 @@ impl<
     fn handle_route_send_message(
         &mut self,
         msg: GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, TransportError>,
-        uri: Url,
+        uri: Lib3hUri,
         payload: Opaque,
     ) -> Lib3hResult<()> {
         // forward the request to our inner_gateway
         self.inner_gateway.as_mut().request(
-            Lib3hSpan::fixme(),
-            GatewayRequestToChild::Transport(RequestToChild::SendMessage { uri, payload }),
+            Span::fixme(),
+            GatewayRequestToChild::Transport(RequestToChild::create_send_message(uri, payload)),
             Box::new(|_, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
+                        GhostCallbackData::Timeout(bt) => {
+                            msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
                             return Ok(());
                         }
                         GhostCallbackData::Response(response) => match response {
@@ -288,24 +306,43 @@ impl<
         >,
     ) -> Lib3hResult<()> {
         let data = msg.take_message().expect("exists");
-        self.inner_gateway.as_mut().request(
-            msg.span()
-                .follower("TODO follower of message in handle_msg_from_parent"),
-            data,
-            Box::new(move |_, response| {
-                let response = {
-                    match response {
-                        GhostCallbackData::Timeout => {
-                            msg.respond(Err("timeout".into()))?;
-                            return Ok(());
+        if msg.is_request() {
+            self.inner_gateway.as_mut().request(
+                msg.span()
+                    .follower("TODO follower of message in handle_msg_from_parent"),
+                data,
+                Box::new(move |_, response| {
+                    let response = {
+                        match response {
+                            GhostCallbackData::Timeout(bt) => {
+                                msg.respond(Err(format!("timeout: {:?}", bt).into()))?;
+                                return Ok(());
+                            }
+                            GhostCallbackData::Response(response) => response,
                         }
-                        GhostCallbackData::Response(response) => response,
+                    };
+                    msg.respond(response)?;
+                    Ok(())
+                }),
+            )?;
+        } else {
+            let orig_req = data.clone();
+            self.inner_gateway.as_mut().request(
+                msg.span()
+                    .follower("TODO follower of message in handle_msg_from_parent"),
+                data,
+                Box::new(move |_, response| {
+                    match response {
+                        GhostCallbackData::Response(Ok(response)) => {
+                            trace!("mplex forward response: {:?} from {:?}", response, orig_req);
+                        }
+                        _ => error!("mplex bad forward: {:?} from {:?}", response, orig_req),
                     }
-                };
-                msg.respond(response)?;
-                Ok(())
-            }),
-        )?;
+                    Ok(())
+                }),
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -341,9 +378,16 @@ impl<
             self.handle_msg_from_inner(msg)?;
         }
         detach_run!(&mut self.route_endpoints, |re| {
-            for (_route_spec, endpoint) in re.iter_mut() {
+            let mut disconnected_endpoints = Vec::new();
+            for (route_spec, endpoint) in re.iter_mut() {
                 if let Err(e) = endpoint.process(self) {
-                    return Err(TransportError::from(e));
+                    match e.kind() {
+                        lib3h_ghost_actor::ErrorKind::EndpointDisconnected => {
+                            disconnected_endpoints.push(route_spec.clone());
+                            continue;
+                        }
+                        _ => return Err(TransportError::from(e)),
+                    }
                 }
                 for msg in endpoint.drain_messages() {
                     if let Err(e) = self.handle_msg_from_route(msg) {
@@ -351,6 +395,9 @@ impl<
                     }
                 }
             }
+            disconnected_endpoints.iter().for_each(|e| {
+                re.remove(e);
+            });
             Ok(())
         })?;
         Ok(false.into())

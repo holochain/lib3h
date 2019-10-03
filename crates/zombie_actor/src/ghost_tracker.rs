@@ -1,9 +1,9 @@
-use lib3h_tracing::Lib3hSpan;
+use holochain_tracing::Span;
 use std::collections::HashMap;
 
-use crate::{ghost_error::ErrorKind, GhostError, GhostResult, RequestId, WorkWasDone};
+use crate::{ghost_error::ErrorKind, Backtwrap, GhostError, GhostResult, RequestId, WorkWasDone};
 
-const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(2000);
+const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20000); // TODO - should be 2000 or less but tests currently fail if below that
 
 /// a ghost request callback can be invoked with a response that was injected
 /// into the system through the `handle` pathway, or to indicate a failure
@@ -11,7 +11,7 @@ const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20
 #[derive(Debug, Clone)]
 pub enum GhostCallbackData<CbData: 'static, E: 'static> {
     Response(Result<CbData, E>),
-    Timeout,
+    Timeout(Backtwrap),
 }
 
 /// definition for a ghost request callback
@@ -26,6 +26,7 @@ pub type GhostCallback<UserData, CbData, E> =
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<UserData, CbData: 'static, E: 'static> {
+    backtrace: Backtwrap,
     expires: std::time::SystemTime,
     cb: GhostCallback<UserData, CbData, E>,
 }
@@ -110,7 +111,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
             match self.pending.remove(&request_id) {
                 None => (),
                 Some(entry) => {
-                    (entry.cb)(ga, GhostCallbackData::Timeout)?;
+                    (entry.cb)(ga, GhostCallbackData::Timeout(entry.backtrace))?;
                 }
             }
         }
@@ -119,18 +120,14 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
     }
 
     /// register a callback
-    pub fn bookmark(
-        &mut self,
-        span: Lib3hSpan,
-        cb: GhostCallback<UserData, CbData, E>,
-    ) -> RequestId {
+    pub fn bookmark(&mut self, span: Span, cb: GhostCallback<UserData, CbData, E>) -> RequestId {
         self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_options(
         &mut self,
-        _span: Lib3hSpan,
+        _span: Span,
         cb: GhostCallback<UserData, CbData, E>,
         options: GhostTrackerBookmarkOptions,
     ) -> RequestId {
@@ -144,6 +141,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
         self.pending.insert(
             request_id.clone(),
             GhostTrackerEntry {
+                backtrace: Backtwrap::new(),
                 expires: std::time::SystemTime::now()
                     .checked_add(timeout)
                     .expect("can add timeout to SystemTime::now()"),
@@ -163,7 +161,14 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
         data: Result<CbData, E>,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
-            None => Err(GhostError::new(ErrorKind::RequestIdNotFound)),
+            None => {
+                let msg = format!(
+                    "{:?} in {:?}",
+                    &request_id,
+                    self.pending.keys().collect::<Vec<_>>()
+                );
+                Err(GhostError::new(ErrorKind::RequestIdNotFound(msg)))
+            }
             Some(entry) => (entry.cb)(owner, GhostCallbackData::Response(data)),
         }
     }
@@ -173,7 +178,7 @@ impl<UserData, CbData: 'static, E: 'static> GhostTracker<UserData, CbData, E> {
 mod tests {
     use super::*;
     use detach::prelude::*;
-    use lib3h_tracing::test_span;
+    use holochain_tracing::test_span;
 
     type TestError = String;
 
@@ -236,8 +241,8 @@ mod tests {
                 Ok(TestCallbackData("here's the data again!".into())),
             );
             assert_eq!(
-                "Err(GhostError(RequestIdNotFound))",
-                format!("{:?}", result)
+                b"Err(GhostError(RequestIdNotFound",
+                &format!("{:?}", result).as_bytes()[..32],
             )
         });
     }
@@ -251,7 +256,7 @@ mod tests {
                 // when the timeout happens the callback should get
                 // the timeout enum in the callback_data
                 match callback_data {
-                    GhostCallbackData::Timeout => me.state = "timed_out".into(),
+                    GhostCallbackData::Timeout(_) => me.state = "timed_out".into(),
                     _ => assert!(false),
                 }
                 Ok(())

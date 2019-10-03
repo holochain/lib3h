@@ -12,14 +12,16 @@ documentation = "https://docs.rs/lib3h_ghost_actor"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
+backtrace = "=0.3.27"
 crossbeam-channel = "=0.3.8"
 detach = { version = "=0.0.10", path = "../detach" }
-lib3h_tracing = { version = "=0.0.1", path = "../tracing" }
+holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/holochain-tracing" }
 nanoid = "=0.2.0"
 shrinkwraprs = "=0.2.1"
 log = "=0.4.8"
 predicates = "=1.0.0"
-
+lazy_static = "=1.2.0"
+regex = "=1.1.2"
 [dev-dependencies]
 env_logger = "=0.6.1"
 

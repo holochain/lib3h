@@ -28,16 +28,9 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
         result_info: b"yo".to_vec().into(),
     }));
 
-    test_client(Lib3hClientProtocol::FailureResult(GenericResultData {
-        request_id: "rid".to_string(),
-        space_address: "adr".to_string().into(),
-        to_agent_id: "aid".to_string().into(),
-        result_info: b"yo".to_vec().into(),
-    }));
-
     test_client(Lib3hClientProtocol::Connect(ConnectData {
         request_id: "rid".to_string(),
-        peer_uri: url::Url::parse("hc:id").unwrap(),
+        peer_location: url::Url::parse("hc:id").unwrap().into(),
         network_id: "nid".to_string(),
     }));
 
@@ -97,20 +90,6 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
     ));
 
     test_client(Lib3hClientProtocol::PublishEntry(ProvidedEntryData {
-        space_address: "adr".to_string().into(),
-        provider_agent_id: "aid".to_string().into(),
-        entry: EntryData {
-            entry_address: "adr".to_string().into(),
-            aspect_list: vec![EntryAspectData {
-                aspect_address: "adr".to_string().into(),
-                type_hint: "hint".to_string(),
-                aspect: b"yo".to_vec().into(),
-                publish_ts: 42,
-            }],
-        },
-    }));
-
-    test_client(Lib3hClientProtocol::HoldEntry(ProvidedEntryData {
         space_address: "adr".to_string().into(),
         provider_agent_id: "aid".to_string().into(),
         entry: EntryData {
@@ -189,7 +168,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
 
     test_server(Lib3hServerProtocol::Connected(ConnectedData {
         request_id: "rid".to_string(),
-        uri: url::Url::parse("hc:id").unwrap(),
+        uri: url::Url::parse("hc:id").unwrap().into(),
     }));
 
     test_server(Lib3hServerProtocol::Disconnected(DisconnectedData {
