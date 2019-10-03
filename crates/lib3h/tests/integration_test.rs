@@ -111,8 +111,8 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
-        dht_gossip_interval: 1500,
-        dht_timeout_threshold: 5000,
+        dht_gossip_interval: 5000,
+        dht_timeout_threshold: 20000,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
