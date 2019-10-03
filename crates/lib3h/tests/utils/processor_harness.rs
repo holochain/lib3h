@@ -509,16 +509,16 @@ macro_rules! assert2_processed_all {
                 .expect("could not acquire lock on boolean prng")
                 .next()
                 .expect("could not generate a new seeded prng value");
-            trace!(
-                "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
-                $crate::utils::processor_harness::BOOLEAN_PRNG
-                    .lock()
-                    .expect("could not acquire lock on boolean prng")
-                    .seed,
-                epoc,
-                b,
-                previous
-            );
+            //            trace!(
+            //                "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
+            //                $crate::utils::processor_harness::BOOLEAN_PRNG
+            //                    .lock()
+            //                    .expect("could not acquire lock on boolean prng")
+            //                    .seed,
+            //                epoc,
+            //                b,
+            //                previous
+            //            );
 
             // pick either engine1 or engine2 with equal probability
             if b {
@@ -530,7 +530,7 @@ macro_rules! assert2_processed_all {
                 break;
             }
             // Simulate slow machine
-            // ::std::thread::sleep(::std::time::Duration::from_millis(100));
+            ::std::thread::sleep(::std::time::Duration::from_millis(100));
         }
 
         for (p, args) in errors {
@@ -663,7 +663,7 @@ macro_rules! wait_engine_wrapper_did_work {
             if elapsed > $timeout {
                 break;
             }
-            trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
+            //trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
             std::thread::sleep(std::time::Duration::from_millis(1))
         }
         if $should_abort {
