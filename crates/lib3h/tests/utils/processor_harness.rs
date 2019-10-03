@@ -649,7 +649,7 @@ macro_rules! assert2_processed {
 ///
 /// Multiple calls to process() will be made as needed for
 /// the passed in processors to pass. It will failure after
-/// MAX_PROCESSING_LOOPS iterations regardless.
+/// ``$options.max_iters` iterations regardless.
 ///
 /// Returns all observed processor results for use by
 /// subsequent tests.
@@ -677,7 +677,7 @@ macro_rules! assert_processed_all {
 ///
 /// Multiple calls to process() will be made as needed for
 /// the passed in processors to pass. It will failure after
-/// MAX_PROCESSING_LOOPS iterations regardless.
+/// `$options.max_iters` iterations regardless.
 ///
 /// Returns all observed processor results for use by
 /// subsequent tests.
@@ -730,6 +730,8 @@ macro_rules! wait_engine_wrapper_did_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
         let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
+
         for epoc in 0..$options.max_iters {
             let (did_work_now, results) = $engine
                 .process()
@@ -750,7 +752,7 @@ macro_rules! wait_engine_wrapper_did_work {
                 break;
             }
             trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
-            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
+            std::thread::sleep(delay_interval)
         }
         if $options.should_abort {
             assert!(did_work);
@@ -771,6 +773,7 @@ macro_rules! wait_engine_wrapper_until_no_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
         let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
 
         let did_work_options = $crate::utils::processor_harness::ProcessingOptions {
             should_abort: false,
@@ -791,7 +794,7 @@ macro_rules! wait_engine_wrapper_until_no_work {
                 );
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
+            std::thread::sleep(delay_interval)
         }
         did_work
     }};
@@ -837,6 +840,7 @@ macro_rules! wait2_engine_wrapper_until_no_work {
         let mut did_work;
         let clock = SystemTime::now();
         let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
         for i in 0..$options.max_iters {
             let did_work_options = ProcessingOptions {
                 should_abort: false,
@@ -857,7 +861,7 @@ macro_rules! wait2_engine_wrapper_until_no_work {
                 );
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
+            std::thread::sleep(delay_interval)
         }
         did_work
     }};
