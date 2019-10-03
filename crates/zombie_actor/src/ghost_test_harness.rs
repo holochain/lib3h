@@ -10,10 +10,10 @@
 pub const DEFAULT_MAX_ITERS: u64 = 100;
 pub const DEFAULT_MAX_RETRIES: u64 = 5;
 pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
-pub const DEFAULT_TIMEOUT_MS: u64 = 2000;
+pub const DEFAULT_TIMEOUT_MS: u64 = 10;
 pub const DEFAULT_SHOULD_ABORT: bool = true;
-pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 5;
-pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 5;
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 1;
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 1;
 
 /// All configurable parameters when processing an actor.
 #[derive(Clone, Debug)]
@@ -77,6 +77,7 @@ macro_rules! wait_did_work {
                 .map(|work_was_done| work_was_done.into())
                 .unwrap_or(did_work);
             if did_work {
+                trace!("[epoch {:?}] wait_did_work returning true", i);
                 break;
             }
             let elapsed = clock.elapsed().unwrap();
@@ -89,7 +90,6 @@ macro_rules! wait_did_work {
         if $options.should_abort {
             assert!(did_work);
         }
-        trace!("wait_did_work returning: {:?}", did_work);
 
         did_work
     }};
@@ -119,6 +119,7 @@ macro_rules! wait_can_track_did_work {
                 .map(|work_was_done| work_was_done.into())
                 .unwrap_or(did_work);
             if did_work {
+                trace!("[{}] wait_can_track_did_work returning true", i);
                 break;
             }
             let elapsed = clock.elapsed().unwrap();
@@ -131,8 +132,6 @@ macro_rules! wait_can_track_did_work {
         if $options.should_abort {
             assert!(did_work);
         }
-        trace!("wait_can_track_did_work returning {:?}", did_work);
-
         did_work
     }};
 }
@@ -327,6 +326,8 @@ macro_rules! wait1_for_callback {
     ($actor: ident, $ghost_can_track: ident, $request: expr, $re: expr, $options: expr) => {{
         let regex = regex::Regex::new($re.clone())
             .expect(format!("[wait1_for_callback] invalid regex: {:?}", $re).as_str());
+
+        trace!("wait1_for_callback: regex={:?}", regex);
 
         let mut user_data = None;
 
