@@ -529,6 +529,7 @@ macro_rules! assert2_processed_all {
             if errors.is_empty() {
                 break;
             }
+            ::std::thread::sleep(::std::time::Duration::from_millis(100));
         }
 
         for (p, args) in errors {
