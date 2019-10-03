@@ -52,6 +52,8 @@ fn test_setup_only(_nodes: &mut Vec<NodeMock>) {
     // n/a
 }
 
+// test using node0, the one all the other nodes connected to
+// as the publisher of the entry
 fn test_mirror_from_center(nodes: &mut Vec<NodeMock>) {
     let entry = {
         let mut node0 = nodes.remove(0);
@@ -80,6 +82,8 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>) {
     }
 }
 
+// test using nodeN, NOT the one all the other nodes connected to
+// as the publisher of the entry
 fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>) {
     let entry = {
         let mut node0 = nodes.remove(0);

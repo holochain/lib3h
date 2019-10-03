@@ -33,7 +33,7 @@ lazy_static! {
     // TODO use port 0 and have transport wss return back actually bound port
     static ref PORT: Arc<Mutex<u32>> = Arc::new(Mutex::new(64528));
 
-    pub static ref MIRROR_NODES_COUNT: u8 = 2;
+    pub static ref MIRROR_NODES_COUNT: u8 = 10;
 
 }
 
