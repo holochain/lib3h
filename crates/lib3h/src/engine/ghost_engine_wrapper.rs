@@ -115,7 +115,21 @@ where
                             ClientToLib3hResponse::LeaveSpaceResult => {
                                 server_success(request_id.clone(), space_addr, agent)
                             }
-                            _ => rsp.into(),
+                            ClientToLib3hResponse::SendDirectMessageResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::SendDirectMessageResult(data)
+                            }
+                            ClientToLib3hResponse::FetchEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::FetchEntryResult(data)
+                            }
+                            ClientToLib3hResponse::QueryEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::QueryEntryResult(data)
+                            }
                         };
                         me.client_request_responses.push(response)
                     }
