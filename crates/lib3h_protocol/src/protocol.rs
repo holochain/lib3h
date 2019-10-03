@@ -111,7 +111,7 @@ impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
         match c {
             Lib3hClientProtocol::Connect(connect_data) => {
                 Ok(ClientToLib3h::Bootstrap(BootstrapData {
-                    space_address: connect_data.network_id.into(),
+                    space_address: connect_data.network_id,
                     bootstrap_uri: connect_data.peer_location,
                 }))
             }
@@ -237,7 +237,7 @@ impl From<ClientToLib3h> for Lib3hClientProtocol {
             ClientToLib3h::Bootstrap(bootstrap_data) => Lib3hClientProtocol::Connect(ConnectData {
                 request_id: "".to_string(),
                 peer_location: bootstrap_data.bootstrap_uri,
-                network_id: bootstrap_data.space_address.into(),
+                network_id: bootstrap_data.space_address,
             }),
             ClientToLib3h::JoinSpace(space_data) => Lib3hClientProtocol::JoinSpace(space_data),
             ClientToLib3h::LeaveSpace(space_data) => Lib3hClientProtocol::LeaveSpace(space_data),
