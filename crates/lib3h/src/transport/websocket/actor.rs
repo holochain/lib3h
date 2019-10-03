@@ -410,8 +410,10 @@ impl
 mod tests {
 
     use super::*;
-    use crate::{tests::enable_logging_for_test, transport::websocket::tls::TlsConfig};
-    use lib3h_ghost_actor::{wait1_for_repeatable_callback, wait_for_message};
+    use crate::{
+        tests::enable_logging_for_test, transport::websocket::tls::TlsConfig, wait_for_bind_result,
+    };
+    use lib3h_ghost_actor::{wait1_for_callback, wait_for_message, wait_until_no_work};
     use std::net::TcpListener;
     use url::Url;
 
@@ -457,76 +459,28 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("twss_to_child2")
-            .build::<()>();
+            .build::<Option<String>>();
 
         // create two memory bindings so that we have addresses
         assert_eq!(transport1.bound_url, None);
         assert_eq!(transport2.bound_url, None);
 
-        let init_transport1_address: Lib3hUri = Url::parse(&format!("wss://127.0.0.1:{}", 1024))
-            .unwrap()
-            .into();
+        let init_transport1_address: Lib3hUri =
+            lib3h_protocol::uri::Builder::with_raw_url("wss://127.0.0.1/")
+                .unwrap()
+                .with_port(1024)
+                .build();
 
-        // closure for the wait1_for_repeatable_callback! that builds a new request with a different port number
-        // an a modified regular expression expectation to match
-        let request_fn = Box::new(|transport1_address: Lib3hUri| {
-            let old_port = transport1_address.port().unwrap_or_else(|| 0);
-            let port = get_available_port(old_port + 1).expect("Must be able to find free port");
-            let expected_transport1_address: Lib3hUri =
-                Url::parse(&format!("wss://127.0.0.1:{}", port))
-                    .unwrap()
-                    .into();
-
-            let request = RequestToChild::Bind {
-                spec: expected_transport1_address.clone(),
-            };
-            let re = format!(
-                "Response\\(Ok\\(Bind\\(BindResultData \\{{ bound_url: Lib3hUri\\(\"wss://127.0.0.1:{}/\"\\) \\}}\\)\\)\\)",
-                port.clone(),
-            );
-
-            (request.clone(), re, expected_transport1_address.clone())
-        });
-
-        let (_is_match, expected_transport1_address) = wait1_for_repeatable_callback!(
-            transport1,
-            t1_endpoint,
-            request_fn,
-            init_transport1_address
-        );
+        let (_is_match, expected_transport1_address) =
+            wait_for_bind_result!(transport1, t1_endpoint, init_transport1_address);
 
         let port2 = get_available_port(expected_transport1_address.port().unwrap_or_else(|| 0))
             .expect("Must be able to find free port");
-        let expected_transport2_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port2))
-                .unwrap()
-                .into();
-        t2_endpoint
-            .request(
-                Span::fixme(),
-                RequestToChild::Bind {
-                    spec: expected_transport2_address.clone(),
-                },
-                Box::new(move |_: &mut (), r| {
-                    // parent should see the bind event
-                    assert_eq!(
-                        &format!(
-                            "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://127.0.0.1:{}/\") }})))",
-                            port2.clone(),
-                        ),
-                        &format!("{:?}", r)
-                    );
-                    Ok(())
-                }),
-            )
-            .unwrap();
 
-        transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut None);
+        let init_transport2_address: Lib3hUri = expected_transport1_address.with_port(port2);
 
-        transport2.process().unwrap();
-        let _ = t2_endpoint.process(&mut ());
-
+        let (_is_match, expected_transport2_address) =
+            wait_for_bind_result!(transport2, t2_endpoint, init_transport2_address);
         assert_eq!(
             transport1.bound_url(),
             Some(expected_transport1_address.clone())
@@ -555,7 +509,7 @@ mod tests {
         wait_for_message!(
             vec![&mut transport1, &mut transport2],
             t2_endpoint,
-            (),
+            None,
             "ReceivedData \\{ uri: Lib3hUri\\(\"wss://127\\.0\\.0\\.1:\\d+/\"\\), payload: \"test message\" \\}"
         );
     }
@@ -578,25 +532,18 @@ mod tests {
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("twss_to_child1")
-            .build::<()>();
+            .build::<Option<String>>();
 
         let port1 = get_available_port(2025).expect("Must be able to find free port");
-        let expected_transport1_address: Lib3hUri =
-            Url::parse(&format!("wss://127.0.0.1:{}", port1))
-                .unwrap()
-                .into();
-        t1_endpoint
-            .request(
-                Span::fixme(),
-                RequestToChild::Bind {
-                    spec: expected_transport1_address.clone(),
-                },
-                Box::new(|_: &mut (), _| Ok(())),
-            )
-            .unwrap();
 
-        transport1.process().unwrap();
-        let _ = t1_endpoint.process(&mut ());
+        let init_transport1_address: Lib3hUri =
+            lib3h_protocol::uri::Builder::with_raw_url("wss://127.0.0.1/")
+                .unwrap()
+                .with_port(port1)
+                .build();
+
+        let (_is_match, expected_transport1_address) =
+            wait_for_bind_result!(transport1, t1_endpoint, init_transport1_address);
 
         assert_eq!(
             transport1.bound_url(),
@@ -606,7 +553,7 @@ mod tests {
         let port2 = get_available_port(2026).expect("Must be able to find free port");
 
         for index in 1..10 {
-            transport1.process().unwrap();
+            wait_until_no_work!(transport1);
             {
                 let machine_id2 = "fake_machine_id2".into();
                 let mut transport2 = GhostTransportWebsocket::new(
@@ -620,49 +567,43 @@ mod tests {
                     .expect("exists")
                     .as_context_endpoint_builder()
                     .request_id_prefix("twss_to_child2")
-                    .build::<()>();
+                    .build::<Option<String>>();
 
-                let expected_transport2_address: Lib3hUri =
+                let init_transport2_address: Lib3hUri =
                     Url::parse(&format!("wss://127.0.0.1:{}", port2))
                         .unwrap()
                         .into();
-                t2_endpoint
-                    .request(
-                        Span::fixme(),
-                        RequestToChild::Bind {
-                            spec: expected_transport2_address.clone(),
-                        },
-                        Box::new(|_: &mut (), _| Ok(())),
-                    )
-                    .unwrap();
-                transport2.process().unwrap();
-                let _ = t2_endpoint.process(&mut ());
+                let (_is_match, expected_transport2_address) =
+                    wait_for_bind_result!(transport2, t2_endpoint, init_transport2_address);
 
                 assert_eq!(
                     transport2.bound_url(),
                     Some(expected_transport2_address.clone())
                 );
 
-                // now send a message from transport1 to transport2 over the bound addresses
-                t1_endpoint
-                    .request(
-                        Span::fixme(),
-                        RequestToChild::create_send_message(
-                            expected_transport2_address.clone(),
-                            b"test message".to_vec().into(),
-                        ),
-                        Box::new(|_: &mut (), r| {
-                            // parent should see that the send request was OK
-                            assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
-                            Ok(())
-                        }),
-                    )
-                    .unwrap();
+                let wait_callback_options =
+                    crate::lib3h_ghost_actor::ghost_test_harness::ProcessingOptions {
+                        // TODO set this to true
+                        should_abort: false,
+                        max_iters: 1,
+                        ..Default::default()
+                    };
+
+                wait1_for_callback!(
+                    transport1,
+                    t1_endpoint,
+                    RequestToChild::create_send_message(
+                        expected_transport2_address.clone(),
+                        b"test message".to_vec().into(),
+                    ),
+                    "Response(Ok(SendMessageSuccess))",
+                    wait_callback_options
+                );
 
                 wait_for_message!(
                     vec![&mut transport1, &mut transport2],
                     t2_endpoint,
-(),
+                    None,
                     "ReceivedData \\{ uri: Lib3hUri\\(\"wss://127\\.0\\.0\\.1:\\d+/\"\\), payload: \"test message\" \\}"
                 );
             }
