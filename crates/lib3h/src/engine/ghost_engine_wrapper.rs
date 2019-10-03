@@ -115,7 +115,21 @@ where
                             ClientToLib3hResponse::LeaveSpaceResult => {
                                 server_success(request_id.clone(), space_addr, agent)
                             }
-                            _ => rsp.into(),
+                            ClientToLib3hResponse::SendDirectMessageResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::SendDirectMessageResult(data)
+                            }
+                            ClientToLib3hResponse::FetchEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::FetchEntryResult(data)
+                            }
+                            ClientToLib3hResponse::QueryEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::QueryEntryResult(data)
+                            }
                         };
                         me.client_request_responses.push(response)
                     }
@@ -468,7 +482,7 @@ mod tests {
         let data = ConnectData {
             request_id: "foo_request_id".into(),
             peer_location: Url::parse("mocknet://t1").expect("can parse url").into(),
-            network_id: "fake_id".to_string(),
+            network_id: "fake_id".into(),
         };
 
         assert!(legacy.post(Lib3hClientProtocol::Connect(data)).is_ok());
