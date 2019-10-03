@@ -49,7 +49,7 @@ pub type DhtToChildMessage =
 pub type DhtToParentMessage =
     GhostMessage<DhtRequestToParent, DhtRequestToChild, DhtRequestToParentResponse, Lib3hError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DhtRequestToChild {
     /// Commands
     /// Parent received a gossip bundle from a remote peer, and asks us to handle it.

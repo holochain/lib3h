@@ -3,7 +3,7 @@
 use crate::{
     dht::dht_protocol::*,
     error::*,
-    gateway::{protocol::*, P2pGateway},
+    gateway::{protocol::*, send_data_types::*, P2pGateway},
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
@@ -48,6 +48,7 @@ impl P2pGateway {
     }
 
     /// Handle a request sent to us by our child DHT
+    #[allow(irrefutable_let_patterns)]
     pub(crate) fn handle_dht_RequestToParent(
         &mut self,
         mut request: DhtToParentMessage,
@@ -74,11 +75,14 @@ impl P2pGateway {
                     self.identifier.nickname, peer_data.peer_name, peer_data.peer_location,
                 );
                 // Send phony SendMessage request so we connect to it
-                self.send(
-                    span.follower("DhtRequestToParent::HoldPeerRequested"),
-                    peer_data.peer_name.clone().into(),
-                    peer_data.peer_location,
-                    Opaque::new(),
+                let mut uri = peer_data.peer_location.clone();
+                uri.set_agent_id(&peer_data.peer_name.lower_address());
+                self.send_with_full_low_uri(
+                    SendWithFullLowUri {
+                        span: span.follower("DhtRequestToParent::HoldPeerRequested"),
+                        full_low_uri: uri,
+                        payload: Opaque::new(), // TODO - replace with ping
+                    },
                     Box::new(|_| Ok(())),
                 )?;
             }
@@ -96,7 +100,27 @@ impl P2pGateway {
                 unreachable!();
             }
             DhtRequestToParent::RequestEntry(_) => {
-                unreachable!();
+                self.endpoint_self.request(
+                    span,
+                    GatewayRequestToParent::Dht(payload),
+                    Box::new(|me, response| {
+                        trace!("Received requestEntry response in Gateway");
+                        let dht_response = match response {
+                            GhostCallbackData::Response(Ok(
+                                GatewayRequestToParentResponse::Dht(d),
+                            )) => d,
+                            _ => panic!("invalid response type: {:?}", response),
+                        };
+                        // #fullsync - received entry response after request from gossip list handling,
+                        // treat it as an entry from author list handling.
+                        if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
+                            me.inner_dht
+                                .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
+                        }
+                        Ok(())
+                    }),
+                )?;
+                return Ok(());
             }
         }
         // Forward to parent

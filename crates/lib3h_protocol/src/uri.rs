@@ -1,5 +1,5 @@
 use crate::{error::Lib3hProtocolError, Address};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use url::Url;
 
 //--------------------------------------------------------------------------------------------------
@@ -81,17 +81,123 @@ impl Lib3hUri {
 
     // -- Misc -- //
 
+    /// does this uri match the given scheme?
     pub fn is_scheme(&self, scheme: UriScheme) -> bool {
         let s: String = scheme.into();
         self.scheme() == s
     }
 
+    /// new uri from &str
     fn parse(url_str: &str) -> Url {
         Url::parse(url_str).unwrap_or_else(|_| panic!("Invalid url format: '{}'", url_str))
     }
 
+    /// The port portion of the url, if present.
     pub fn port(&self) -> Option<u16> {
         self.0.port()
+    }
+
+    /// The host portion of the url, if present.
+    pub fn host(&self) -> Option<url::Host<&str>> {
+        self.0.host()
+    }
+
+    /// The raw scheme name of the url as string. Eg. `mem` or `wss`.
+    pub fn raw_scheme(&self) -> &str {
+        self.0.scheme()
+    }
+
+    /// The hostname portion of the url (eg. `127.0.0.1` or `foo.com`), if present.
+    pub fn hostname(&self) -> Option<String> {
+        self.host().map(|host| host.to_string())
+    }
+
+    /// Produces a copy of this `Lib3hUri` with the given port set.
+    /// Panics for out of range port values.
+    pub fn with_port(&self, port: u16) -> Self {
+        Builder::with_url(self.clone()).with_port(port).build()
+    }
+
+    /// set a higher-level agent_id i.e. ?a=agent_id
+    pub fn set_agent_id(&mut self, agent_id: &Address) {
+        self.0
+            .query_pairs_mut()
+            .clear()
+            .append_pair("a", &agent_id.to_string());
+    }
+
+    /// clear any higher-level agent_id
+    pub fn clear_agent_id(&mut self) {
+        self.0.set_query(None);
+    }
+
+    /// do we have a higher-level agent_id? i.e. ?a=agent_id
+    pub fn agent_id(&self) -> Option<Address> {
+        for (n, v) in self.0.query_pairs() {
+            if &n == "a" {
+                return Some(v.to_string().into());
+            }
+        }
+        None
+    }
+
+    /// get our lower component as an address
+    /// i.e. transportid:HcMyada would return HcMyada
+    pub fn lower_address(&self) -> Address {
+        self.0.path().into()
+    }
+}
+
+/// Eases building of a `Lib3hUri` with a fluent api. Users need not
+/// ever mutate a `Lib3hUri` directly except for efficiency purposes. Instead,
+/// let this builder be the only place where urls are manipulated.
+#[derive(Debug, Clone)]
+pub struct Builder {
+    url: url::Url,
+}
+
+impl Builder {
+    pub fn new() -> Self {
+        Self {
+            url: Lib3hUri::with_undefined().into(),
+        }
+    }
+
+    /// Primes a builder with the given url.
+    pub fn with_url<T: Into<Lib3hUri>>(url: T) -> Self {
+        let builder = Builder { url: url.into().0 };
+        builder
+    }
+
+    /// Primes a builder with a raw url (such as a string).
+    pub fn with_raw_url<T: TryInto<Lib3hUri>>(url: T) -> Result<Self, T::Error> {
+        url.try_into().map(|url| Builder { url: url.0 })
+    }
+
+    pub fn with_host(&mut self, host: &str) -> &mut Self {
+        self.url
+            .set_host(Some(host))
+            .unwrap_or_else(|e| panic!("Error setting host {:?}: {:?}", host, e));
+        self
+    }
+
+    pub fn with_scheme(&mut self, scheme: &str) -> &mut Self {
+        self.url
+            .set_scheme(scheme)
+            .unwrap_or_else(|e| panic!("Error setting scheme {:?}: {:?}", scheme, e));
+        self
+    }
+
+    /// Sets the port. Will panic for out of range ports.
+    pub fn with_port(&mut self, port: u16) -> &mut Self {
+        self.url
+            .set_port(Some(port))
+            .unwrap_or_else(|e| panic!("Error setting port {:?}: {:?}", port, e));
+        self
+    }
+
+    pub fn build(&self) -> Lib3hUri {
+        self.url.clone().into()
     }
 }
 
@@ -201,10 +307,34 @@ mod tests {
     fn test_uri_create_transport() {
         let transport_id: Address = "fake_transport_id".into();
         let agent_id: Address = "HcAfake_agent_id".into();
-        let uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
+        let mut uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
         assert_eq!(
             "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
         );
+        assert_eq!(
+            Some(Address::from("HcAfake_agent_id".to_string())),
+            uri.agent_id(),
+        );
+        uri.set_agent_id(&"bla".to_string().into());
+        assert_eq!(Some(Address::from("bla".to_string())), uri.agent_id());
+        assert_eq!(Address::from("fake_transport_id"), uri.lower_address());
+        uri.clear_agent_id();
+        assert_eq!(None, uri.agent_id());
+    }
+
+    #[test]
+    fn test_uri_builder() {
+        let scheme = "wss";
+        let host = "ws1://127.0.0.1/";
+        let port = 9000;
+        let url = Builder::with_raw_url(host)
+            .unwrap_or_else(|e| panic!("with_raw_url: {:?}", e))
+            //            .with_host(host)
+            .with_scheme(scheme)
+            .with_port(port)
+            .build();
+
+        assert_eq!(url.to_string(), "wss://127.0.0.1:9000/");
     }
 }
