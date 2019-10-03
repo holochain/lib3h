@@ -9,7 +9,6 @@ use crate::utils::seeded_prng::SeededBooleanPrng;
 
 use std::sync::Mutex;
 
-
 lazy_static! {
 pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
 
@@ -587,8 +586,11 @@ macro_rules! assert2_processed_all {
             }
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
-                trace!("[process_harness] epoc:{:?} timed out, elapsed {:?} ", epoc,
-                    elapsed.as_millis());
+                trace!(
+                    "[process_harness] epoc:{:?} timed out, elapsed {:?} ",
+                    epoc,
+                    elapsed.as_millis()
+                );
                 break;
             }
             std::thread::sleep(delay_interval)
@@ -666,8 +668,7 @@ macro_rules! assert_processed_all {
     ) => {{
         let options = $crate::utils::processor_harness::ProcessingOptions::default();
         $crate::assert_processed_all!($engine, $processors, options)
-    }}
- 
+    }};
 }
 
 /// Asserts that one engine produces events
@@ -695,8 +696,7 @@ macro_rules! assert_processed {
     ) => {{
         let options = $crate::utils::processor_harness::ProcessingOptions::default();
         $crate::assert_processed!($engine, $processor, options)
-     
-    }}
+    }};
 }
 
 /// `wait_connect!(a, connect_data, b)` waits until engine w4rapper `a` connects
@@ -741,8 +741,12 @@ macro_rules! wait_engine_wrapper_did_work {
             }
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
-                trace!("[{}] wait_engine_wrapper_did_work: timeout elapsed={:?}, results={:?}", epoc,
-                    elapsed.as_millis(), results);
+                trace!(
+                    "[{}] wait_engine_wrapper_did_work: timeout elapsed={:?}, results={:?}",
+                    epoc,
+                    elapsed.as_millis(),
+                    results
+                );
                 break;
             }
             trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
@@ -780,8 +784,11 @@ macro_rules! wait_engine_wrapper_until_no_work {
             }
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
-                trace!("[{:?}] wait_engine_wrapper_until_no_work timeout elapsed = {:?}",
-                    i, elapsed.as_millis());
+                trace!(
+                    "[{:?}] wait_engine_wrapper_until_no_work timeout elapsed = {:?}",
+                    i,
+                    elapsed.as_millis()
+                );
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
@@ -844,7 +851,10 @@ macro_rules! wait2_engine_wrapper_until_no_work {
             }
             let elapsed = clock.elapsed().unwrap();
             if elapsed > timeout {
-                trace!("wait2_engine_Wrapper_until_no_work: timed out (over {:?} ms)", $options.timeout_ms);
+                trace!(
+                    "wait2_engine_Wrapper_until_no_work: timed out (over {:?} ms)",
+                    $options.timeout_ms
+                );
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis($options.delay_interval_ms))
