@@ -764,7 +764,7 @@ mod tests {
         transport::memory_mock::memory_server,
     };
     use holochain_tracing::test_span;
-    use lib3h_ghost_actor::wait_can_track_did_work;
+    use lib3h_ghost_actor::{ghost_test_harness::ProcessingOptions, wait_can_track_did_work};
     use lib3h_sodium::SodiumCryptoSystem;
     use std::path::PathBuf;
 
@@ -878,7 +878,7 @@ mod tests {
         let my_url = &Lib3hUri::with_memory("addr_1");
         //let my_url = &engine.as_ref().advertise();
         assert!(network.lock().unwrap().unbind(my_url));
-        wait_can_track_did_work!(engine, core, false);
+        wait_can_track_did_work!(engine, core, ProcessingOptions::with_should_abort(false));
         let mut msgs = engine.drain_messages();
         println!("engine.drain() -> {:?}", msgs);
         assert_eq!(msgs.len(), 3);
