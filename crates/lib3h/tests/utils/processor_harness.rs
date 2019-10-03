@@ -503,7 +503,7 @@ macro_rules! assert2_processed_all {
         }
 
         // each epoc represents one "random" engine processing once
-        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+        for _epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
             let b = $crate::utils::processor_harness::BOOLEAN_PRNG
                 .lock()
                 .expect("could not acquire lock on boolean prng")
@@ -530,7 +530,7 @@ macro_rules! assert2_processed_all {
                 break;
             }
             // Simulate slow machine
-            ::std::thread::sleep(::std::time::Duration::from_millis(100));
+            // ::std::thread::sleep(::std::time::Duration::from_millis(100));
         }
 
         for (p, args) in errors {
@@ -650,8 +650,8 @@ macro_rules! wait_engine_wrapper_did_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
 
-        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
-            let (did_work_now, results) = $engine
+        for _epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+            let (did_work_now, _results) = $engine
                 .process()
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
                 .unwrap_or((false, vec![]));
