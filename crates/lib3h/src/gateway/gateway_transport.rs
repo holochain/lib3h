@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 impl P2pGateway {
     /// Handle IncomingConnection event from child transport
     fn handle_incoming_connection(&mut self, span: Span, uri: Lib3hUri) -> TransportResult<()> {
-        // TODO: This is prbably wrong in that a different level of URI should be being bubbled up.
+        // TODO #199: This is prbably wrong in that a different level of URI should be being bubbled up.
+        // depends on how & what we decide to send up to the client.
         self.endpoint_self.publish(
             Span::fixme(),
             GatewayRequestToParent::Transport(
