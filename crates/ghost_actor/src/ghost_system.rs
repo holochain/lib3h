@@ -116,7 +116,13 @@ impl<'lt> GhostSystemRef<'lt> {
     }
 
     /// spawn / manage a new actor
-    pub fn spawn<'a, X: 'lt + Send + Sync, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, H: GhostHandler<'lt, X, P>>(
+    pub fn spawn<
+        'a,
+        X: 'lt + Send + Sync,
+        P: GhostProtocol,
+        A: 'lt + GhostActor<'lt, P, A>,
+        H: GhostHandler<'lt, X, P>,
+    >(
         &'a mut self,
         user_data: Weak<Mutex<X>>,
         actor: A,
@@ -279,7 +285,12 @@ pub type RequestId = String;
 
 use std::collections::HashMap;
 
-struct GhostEndpointRefInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol, H: GhostHandler<'lt, X, P>> {
+struct GhostEndpointRefInner<
+    'lt,
+    X: 'lt + Send + Sync,
+    P: GhostProtocol,
+    H: GhostHandler<'lt, X, P>,
+> {
     pub phantom_x: std::marker::PhantomData<&'lt X>,
     pub phantom_p: std::marker::PhantomData<&'lt P>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -288,7 +299,13 @@ struct GhostEndpointRefInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol, H: Gho
     handler: H,
 }
 
-pub struct GhostEndpointRef<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X, P>> {
+pub struct GhostEndpointRef<
+    'lt,
+    X: 'lt + Send + Sync,
+    A: 'lt,
+    P: GhostProtocol,
+    H: GhostHandler<'lt, X, P>,
+> {
     inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
     phantom_a: std::marker::PhantomData<&'lt A>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -298,7 +315,9 @@ pub struct GhostEndpointRef<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol,
     _a_ref: Arc<Mutex<A>>,
 }
 
-impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X, P>> GhostEndpointRef<'lt, X, A, P, H> {
+impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X, P>>
+    GhostEndpointRef<'lt, X, A, P, H>
+{
     fn new(
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -357,8 +376,8 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X
     }
 }
 
-impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X, P>> GhostEndpoint<'lt, X, P>
-    for GhostEndpointRef<'lt, X, A, P, H>
+impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X, P>>
+    GhostEndpoint<'lt, X, P> for GhostEndpointRef<'lt, X, A, P, H>
 {
     fn send_protocol(
         &mut self,
@@ -413,7 +432,10 @@ pub trait TestActorRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, Fake> {
     }
 }
 
-impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, Fake>> TestActorRef<'lt, X> for GhostEndpointRef<'lt, X, A, Fake, H> {}
+impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, Fake>> TestActorRef<'lt, X>
+    for GhostEndpointRef<'lt, X, A, Fake, H>
+{
+}
 
 pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, Fake> {
     fn event_to_owner_print(&mut self, message: String) -> GhostResult<()> {
@@ -440,7 +462,10 @@ pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, Fake> {
     }
 }
 
-impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, Fake>> TestOwnerRef<'lt, X> for GhostEndpointRef<'lt, X, A, Fake, H> {}
+impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, Fake>> TestOwnerRef<'lt, X>
+    for GhostEndpointRef<'lt, X, A, Fake, H>
+{
+}
 
 pub struct GhostInflator<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     phantom_a: std::marker::PhantomData<&'a P>,
@@ -469,10 +494,7 @@ impl<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> GhostInflator<'a, 'lt, X, 
 }
 
 pub trait GhostActor<'lt, P: GhostProtocol, X: 'lt + Send + Sync>: Send + Sync {
-    fn actor_init<'a>(
-        &'a mut self,
-        inflator: GhostInflator<'a, 'lt, X, P>,
-    ) -> GhostResult<()>;
+    fn actor_init<'a>(&'a mut self, inflator: GhostInflator<'a, 'lt, X, P>) -> GhostResult<()>;
     fn process(&mut self) -> GhostResult<()>;
 }
 
@@ -499,18 +521,16 @@ mod tests {
             &'a mut self,
             inflator: GhostInflator<'a, 'lt, TestActor<'lt>, Fake>,
         ) -> GhostResult<()> {
-            let (system_ref, mut owner_ref) = inflator.inflate(
-                TestActorHandler {
-                    phantom: std::marker::PhantomData,
-                    handle_event_to_actor_print: Box::new(|_me: &mut TestActor<'lt>, message| {
-                        println!("actor print: {}", message);
-                        Ok(())
-                    }),
-                    handle_request_to_actor_add_1: Box::new(
-                        |_me: &mut TestActor<'lt>, message, cb| cb(Ok(message + 1)),
-                    ),
-                },
-            )?;
+            let (system_ref, mut owner_ref) = inflator.inflate(TestActorHandler {
+                phantom: std::marker::PhantomData,
+                handle_event_to_actor_print: Box::new(|_me: &mut TestActor<'lt>, message| {
+                    println!("actor print: {}", message);
+                    Ok(())
+                }),
+                handle_request_to_actor_add_1: Box::new(|_me: &mut TestActor<'lt>, message, cb| {
+                    cb(Ok(message + 1))
+                }),
+            })?;
             owner_ref.event_to_owner_print("message from actor".to_string())?;
             owner_ref.request_to_owner_sub_1(
                 42,
@@ -541,16 +561,18 @@ mod tests {
         let my_context_weak = Arc::downgrade(&my_context);
 
         let mut actor_ref = system_ref
-            .spawn::<MyContext, Fake, TestActor, TestOwnerHandler<MyContext>>(my_context_weak, TestActor::new(), TestOwnerHandler {
-                phantom: std::marker::PhantomData,
-                handle_event_to_owner_print: Box::new(|_me, message| {
-                    println!("owner got: {}", message);
-                    Ok(())
-                }),
-                handle_request_to_owner_sub_1: Box::new(|_me, message, cb| {
-                    cb(Ok(message - 1))
-                }),
-            })
+            .spawn::<MyContext, Fake, TestActor, TestOwnerHandler<MyContext>>(
+                my_context_weak,
+                TestActor::new(),
+                TestOwnerHandler {
+                    phantom: std::marker::PhantomData,
+                    handle_event_to_owner_print: Box::new(|_me, message| {
+                        println!("owner got: {}", message);
+                        Ok(())
+                    }),
+                    handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
+                },
+            )
             .unwrap();
 
         actor_ref
