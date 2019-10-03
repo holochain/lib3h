@@ -31,6 +31,7 @@ pub mod keystore;
 pub mod message_encoding;
 pub mod time;
 pub mod track;
+#[macro_use]
 pub mod transport;
 // FIXME
 // pub mod transport_wss;
