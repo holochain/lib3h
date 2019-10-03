@@ -31,19 +31,19 @@ pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
 }
 
 #[allow(dead_code)]
-pub const DEFAULT_MAX_ITERS: u64 = 100;
+pub const DEFAULT_MAX_ITERS: u64 = 1000;
 #[allow(dead_code)]
 pub const DEFAULT_MAX_RETRIES: u64 = 5;
 #[allow(dead_code)]
 pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
 #[allow(dead_code)]
-pub const DEFAULT_TIMEOUT_MS: u64 = 2000;
+pub const DEFAULT_TIMEOUT_MS: u64 = 1000;
 #[allow(dead_code)]
 pub const DEFAULT_SHOULD_ABORT: bool = true;
 #[allow(dead_code)]
-pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 5;
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 1;
 #[allow(dead_code)]
-pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 5;
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 1;
 
 /// All configurable parameters when processing an actor.
 #[derive(Clone, Debug)]
