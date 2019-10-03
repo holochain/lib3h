@@ -503,22 +503,22 @@ macro_rules! assert2_processed_all {
         }
 
         // each epoc represents one "random" engine processing once
-        for _epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
             let b = $crate::utils::processor_harness::BOOLEAN_PRNG
                 .lock()
                 .expect("could not acquire lock on boolean prng")
                 .next()
                 .expect("could not generate a new seeded prng value");
-            //            trace!(
-            //                "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
-            //                $crate::utils::processor_harness::BOOLEAN_PRNG
-            //                    .lock()
-            //                    .expect("could not acquire lock on boolean prng")
-            //                    .seed,
-            //                epoc,
-            //                b,
-            //                previous
-            //            );
+            trace!(
+                "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
+                $crate::utils::processor_harness::BOOLEAN_PRNG
+                    .lock()
+                    .expect("could not acquire lock on boolean prng")
+                    .seed,
+                epoc,
+                b,
+                previous
+            );
 
             // pick either engine1 or engine2 with equal probability
             if b {
@@ -650,8 +650,8 @@ macro_rules! wait_engine_wrapper_did_work {
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
 
-        for _epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
-            let (did_work_now, _results) = $engine
+        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+            let (did_work_now, results) = $engine
                 .process()
                 .map_err(|e| error!("ghost actor processing error: {:?}", e))
                 .unwrap_or((false, vec![]));
@@ -663,7 +663,7 @@ macro_rules! wait_engine_wrapper_did_work {
             if elapsed > $timeout {
                 break;
             }
-            //trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
+            trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
             std::thread::sleep(std::time::Duration::from_millis(1))
         }
         if $should_abort {
