@@ -111,7 +111,8 @@ impl NodeMock {
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        debug!("\n\n({}).process() START", self.name);
+        debug!("\n");
+        debug!("({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
         debug!(
             "({}).process() END - {}",
