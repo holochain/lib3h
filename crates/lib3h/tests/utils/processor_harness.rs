@@ -399,16 +399,24 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 /// Convenience function that asserts only one particular equality predicate
 /// (over a lib3h server protocol message)
 /// passes for two engine wrappers. See `assert2_processed` for more information.
-/// `equal_to` is compared to the actual and aborts if not actual.
+/// `equal_to` is compared to the actual and aborts if not actual by default.
 macro_rules! assert2_msg_eq {
     ($engine1:ident,
      $engine2:ident,
      $equal_to:expr
     ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        assert2_msg_eq!($engine1, $engine2, $equal_to, options)
+    }};
+    ($engine1:ident,
+     $engine2:ident,
+     $equal_to:expr,
+     $options:expr
+    ) => {{
         let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals(
             $equal_to,
         ));
-        assert2_processed!($engine1, $engine2, p)
+        assert2_processed!($engine1, $engine2, p, $options)
     }};
 }
 
@@ -417,17 +425,26 @@ macro_rules! assert2_msg_eq {
 /// Convenience function that asserts only one particular equality predicate
 /// (over a lib3h server protocol message)
 /// passes for two engine wrappers. See `assert_processed` for
-/// more information. `regex` is matched against the actual value and aborts if not present
+/// more information. `regex` is matched against the actual value and aborts if not present by
+/// default
 macro_rules! assert2_msg_matches {
-    ($engine1:ident,
-     $engine2:ident,
-     $regex:expr
+    ($engine1: ident,
+     $engine2: ident,
+     $regex: expr
+    ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::assert2_msg_matches!($engine1, $engine2, $regex, options)
+    }};
+    ($engine1: ident,
+     $engine2: ident,
+     $regex: expr,
+     $options: expr
     ) => {{
         let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
-            regex::Regex::new($regex)
+                regex::Regex::new($regex)
                 .expect(format!("[assert2_msg_matches] Invalid regex: {:?}", $regex).as_str()),
         ));
-        $crate::assert2_processed!($engine1, $engine2, p)
+        $crate::assert2_processed!($engine1, $engine2, p, $options)
     }};
 }
 
@@ -437,8 +454,15 @@ macro_rules! assert2_msg_matches {
 /// a regular expression over a lib3h server protocol message.
 /// This is a simplified version of `assert2_msg_matches` for one engine only.
 macro_rules! assert_msg_matches {
-    ($engine:ident,
-     $regex:expr
+    ($engine: ident,
+     $regex: expr,
+     $options: expr
+    ) => {
+        // TODO Hack make a single engine version
+        $crate::assert2_msg_matches!($engine, $engine, $regex, $options)
+    };
+    ($engine: ident,
+     $regex: expr
     ) => {
         // TODO Hack make a single engine version
         $crate::assert2_msg_matches!($engine, $engine, $regex)
@@ -472,11 +496,18 @@ macro_rules! assert2_msg_matches_all {
 /// Convenience function that asserts all regular expressions match
 /// over a set of lib3h server protocol messages for one engine wrapper.
 macro_rules! assert_msg_matches_all {
-    ($engine:ident,
-     $regexes:expr
+    ($engine: ident,
+     $regexes: expr
     ) => {
-        $crate: utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
+        $crate:utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
     };
+    ($engine: ident,
+     $regexes: expr,
+     $options: expr
+    ) => {
+        $crate:utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes, $options)
+    };
+
 }
 
 /// Internal function to process one engine of a possibly
@@ -508,7 +539,7 @@ macro_rules! process_one_engine {
                 if result {
                     // Simulate the succesful assertion behavior
                     processor.test(&processor_result.clone());
-                // processor passed!
+                    // processor passed!
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing

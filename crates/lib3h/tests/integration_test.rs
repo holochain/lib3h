@@ -32,7 +32,23 @@ use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
-use utils::{constants::*, test_network_id};
+use utils::{constants::*, test_network_id, processor_harness::ProcessingOptions};
+
+const TWO_MEMORY_NODES_PROCESSING_OPTIONS : ProcessingOptions = ProcessingOptions {
+    max_iters:20000,
+    delay_interval_ms:1,
+    timeout_ms:20000,
+    max_retries:3,
+    should_abort:true
+};
+
+const TWO_WSS_NODES_PROCESSING_OPTIONS : ProcessingOptions = ProcessingOptions {
+    max_iters:10000,
+    delay_interval_ms:5,
+    timeout_ms:10000,
+    max_retries:3,
+    should_abort:true
+};
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -230,7 +246,7 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy);
+    test_fn(&mut alex, &mut billy, &TWO_MEMORY_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
     println!("========================");
@@ -391,7 +407,7 @@ fn launch_two_wss_nodes_test(
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy);
+    test_fn(&mut alex, &mut billy, &TWO_WSS_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
     println!("========================");
