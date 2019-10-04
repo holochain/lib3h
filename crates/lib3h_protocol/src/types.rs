@@ -1,5 +1,5 @@
 use holochain_persistence_api::hash::HashString;
-use std::{convert::TryInto, fmt};
+use std::fmt;
 
 //--------------------------------------------------------------------------------------------------
 // SpaceHash: newtype for HashString
@@ -38,38 +38,8 @@ impl<'a> From<&'a str> for SpaceHash {
     }
 }
 
-//impl<'a> From<&Vec<u8>> for SpaceHash {
-//    fn from(v: &Vec<u8>) -> SpaceHash {
-//        HashString::from(v.clone())
-//    }
-//}
-//
-//impl From<Vec<u8>> for SpaceHash {
-//    fn from(v: Vec<u8>) -> SpaceHash {
-//        HashString::from(v.to_base58())
-//    }
-//}
-//
-//impl TryInto<Vec<u8>> for SpaceHash {
-//    type Error = rust_base58::base58::FromBase58Error;
-//    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-//        self.0.from_base58()
-//    }
-//}
-//
-//impl<'a> TryInto<Vec<u8>> for &'a SpaceHash {
-//    type Error = rust_base58::base58::FromBase58Error;
-//    fn try_into(self) -> Result<Vec<u8>, Self::Error> {
-//        self.clone().try_into()
-//    }
-//}
-
 impl SpaceHash {
     pub fn new() -> SpaceHash {
         SpaceHash(HashString::new())
     }
 }
-
-//--------------------------------------------------------------------------------------------------
-// EntryHash
-//--------------------------------------------------------------------------------------------------

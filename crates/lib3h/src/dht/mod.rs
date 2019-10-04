@@ -16,7 +16,6 @@ pub mod tests {
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
-        types::*,
         uri::Lib3hUri,
         Address,
     };
