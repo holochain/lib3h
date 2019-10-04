@@ -2,6 +2,7 @@
 
 extern crate capnp;
 extern crate serde;
+#[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 
@@ -17,3 +18,6 @@ mod p2p_capnp;
 #[allow(clippy::all)]
 #[rustfmt::skip]
 mod transit_encoding_capnp;
+
+pub mod error;
+pub mod p2p;

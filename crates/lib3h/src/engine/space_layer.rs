@@ -241,7 +241,7 @@ impl<'engine> GhostEngine<'engine> {
                     }
                     RequestToParent::ReceivedData { uri, payload } => {
                         if payload.len() == 0 {
-                            debug!("Implement Ping!");
+                            panic!("We should no longer ever be sending zero length messages");
                         } else {
                             let mut de = Deserializer::new(&payload[..]);
                             let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
