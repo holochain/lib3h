@@ -154,6 +154,11 @@ impl<T> Detach<T> {
         self.0.expect("detach exists-to_inner")
     }
 
+    /// returns true if this instance contains `Some` value.
+    pub fn is_attached(&self) -> bool {
+        self.0.is_some()
+    }
+
     /// take the owned inner instance (without droping the container)
     pub fn take(&mut self) -> T {
         std::mem::replace(&mut self.0, None).expect("detach exists-take")

@@ -66,7 +66,6 @@ impl<'engine> GhostEngine<'engine> {
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             space_gateway.process(self)?;
             let request_list = space_gateway.drain_messages();
-            debug!("drained: {:?}", request_list);
             did_work = did_work || request_list.len() > 0;
             space_outbox_map.insert(chain_id.clone(), request_list);
             self.space_gateway_map.insert(chain_id, space_gateway);
@@ -74,7 +73,6 @@ impl<'engine> GhostEngine<'engine> {
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
             for request in request_list {
-                debug!("process {:?} {:?}", chain_id, request);
                 self.handle_space_request(
                     request.span().child("handle_space_request"),
                     &chain_id,
@@ -243,7 +241,7 @@ impl<'engine> GhostEngine<'engine> {
                     }
                     RequestToParent::ReceivedData { uri, payload } => {
                         if payload.len() == 0 {
-                            debug!("Implement Ping!");
+                            panic!("We should no longer ever be sending zero length messages");
                         } else {
                             let mut de = Deserializer::new(&payload[..]);
                             let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =

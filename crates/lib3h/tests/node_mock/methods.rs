@@ -111,7 +111,8 @@ impl NodeMock {
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        debug!("\n\n({}).process() START", self.name);
+        debug!("\n");
+        debug!("({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
         debug!(
             "({}).process() END - {}",
@@ -692,9 +693,9 @@ impl NodeMock {
     }
 
     /// Waits for work to be done
-    pub fn wait_did_work(&mut self, should_abort: bool) -> bool {
+    pub fn wait_did_work(&mut self) -> bool {
         let me = self;
-        wait_engine_wrapper_did_work!(me, should_abort)
+        wait_engine_wrapper_did_work!(me)
     }
 
     /// Continues processing the engine until no work is being done.

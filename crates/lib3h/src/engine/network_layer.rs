@@ -138,9 +138,8 @@ impl<'engine> GhostEngine<'engine> {
             }
             transport::protocol::RequestToParent::ReceivedData { uri, payload } => {
                 debug!("Received message from: {} | size: {}", uri, payload.len());
-                // zero len() means its just a ping, no need to deserialize and handle
                 if payload.len() == 0 {
-                    debug!("Implement Ping!");
+                    panic!("We should no longer ever be sending zero length messages");
                 } else {
                     let mut de = Deserializer::new(&payload[..]);
                     let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
@@ -323,6 +322,9 @@ impl<'engine> GhostEngine<'engine> {
                         )?;
                     }
                 }
+            }
+            P2pProtocol::CapnProtoMessage(_) => {
+                panic!("Gateway should handle this case and NOT pass it to us");
             }
         };
         Ok(())

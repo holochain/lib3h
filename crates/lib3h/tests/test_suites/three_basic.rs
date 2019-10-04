@@ -54,6 +54,9 @@ pub fn setup_three_nodes(
     wait_engine_wrapper_until_no_work!(alex);
     wait_engine_wrapper_until_no_work!(billy);
     wait_engine_wrapper_until_no_work!(camille);
+    wait_engine_wrapper_until_no_work!(alex);
+    wait_engine_wrapper_until_no_work!(billy);
+    wait_engine_wrapper_until_no_work!(camille);
 
     println!("DONE setup_three_nodes() DONE \n\n ============================================ \n");
 }

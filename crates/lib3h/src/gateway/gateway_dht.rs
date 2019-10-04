@@ -2,12 +2,13 @@
 
 use crate::{
     dht::dht_protocol::*,
+    engine::p2p_protocol::P2pProtocol,
     error::*,
     gateway::{protocol::*, send_data_types::*, P2pGateway},
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_p2p_protocol::p2p::P2pMessage;
 
 impl P2pGateway {
     /// Handle a request sent to us by our parent
@@ -74,14 +75,18 @@ impl P2pGateway {
                     "{} auto-connect to peer: {} ({})",
                     self.identifier.nickname, peer_data.peer_name, peer_data.peer_location,
                 );
-                // Send phony SendMessage request so we connect to it
+                // Send Ping so we connect to it
+                let payload =
+                    P2pProtocol::CapnProtoMessage(P2pMessage::create_ping(None).into_bytes())
+                        .into_bytes()
+                        .into();
                 let mut uri = peer_data.peer_location.clone();
                 uri.set_agent_id(&peer_data.peer_name.lower_address());
                 self.send_with_full_low_uri(
                     SendWithFullLowUri {
                         span: span.follower("DhtRequestToParent::HoldPeerRequested"),
                         full_low_uri: uri,
-                        payload: Opaque::new(), // TODO - replace with ping
+                        payload,
                     },
                     Box::new(|_| Ok(())),
                 )?;
