@@ -75,7 +75,7 @@ impl P2pGateway {
                     "{} auto-connect to peer: {} ({})",
                     self.identifier.nickname, peer_data.peer_name, peer_data.peer_location,
                 );
-                // Send phony SendMessage request so we connect to it
+                // Send Ping so we connect to it
                 let payload =
                     P2pProtocol::CapnProtoMessage(P2pMessage::create_ping(None).into_bytes())
                         .into_bytes()
