@@ -29,7 +29,7 @@ impl<'engine> GhostEngine<'engine> {
             .map(|(id, _)| id.clone())
             .collect();
         for chainId in chain_id_list {
-            let space_address: SpaceHash = chainId.0.clone().into();
+            let space_address: SpaceHash = chainId.0.clone();
             result.push((
                 space_address,
                 self.this_space_peer(chainId.clone())
@@ -46,7 +46,7 @@ impl<'engine> GhostEngine<'engine> {
         space_address: &SpaceHash,
     ) -> Option<&mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
-            let current_space_address: SpaceHash = chainId.0.clone().into();
+            let current_space_address: SpaceHash = chainId.0.clone();
             if &current_space_address == space_address {
                 return Some(space_gateway);
             }

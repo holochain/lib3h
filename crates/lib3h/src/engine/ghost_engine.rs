@@ -302,7 +302,7 @@ impl<'engine> GhostEngine<'engine> {
     ) -> GhostResult<()> {
         // TODO #150 - Send JoinSpace to all known peers
         let mut payload = Vec::new();
-        let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone().into(), peer.clone());
+        let p2p_msg = P2pProtocol::BroadcastJoinSpace(space_address.clone(), peer.clone());
         p2p_msg
             .serialize(&mut Serializer::new(&mut payload))
             .unwrap();
