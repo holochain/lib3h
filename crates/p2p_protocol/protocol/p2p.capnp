@@ -138,7 +138,7 @@ struct P2pMessage {
   struct MsgPing {
     # see if we are able to message remote node
 
-    pingSendEpochMs @0 :UInt64;
+    sendEpochMs @0 :UInt64;
     # the epoch ms timestamp the origin node sent the ping
   }
 

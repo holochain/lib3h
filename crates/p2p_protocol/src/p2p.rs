@@ -4,7 +4,7 @@ use crate::{error::P2pResult, p2p_capnp};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MsgPing {
     /// set the milliseconds since unix epoch when sending this message
-    pub ping_send_epoch_ms: u64,
+    pub send_epoch_ms: u64,
 }
 
 /// a response to a ping message
@@ -36,24 +36,18 @@ fn now_ms() -> u64 {
 impl P2pMessage {
     /// create a new ping message
     /// if `send_epoch_ms` is None, will be set to now
-    pub fn create_ping(mut send_epoch_ms: Option<u64>) -> Self {
-        if send_epoch_ms.is_none() {
-            send_epoch_ms = Some(now_ms());
-        }
+    pub fn create_ping(send_epoch_ms: Option<u64>) -> Self {
         P2pMessage::MsgPing(MsgPing {
-            ping_send_epoch_ms: send_epoch_ms.unwrap(),
+            send_epoch_ms: send_epoch_ms.unwrap_or_else(now_ms),
         })
     }
 
     /// create a new pong message
     /// if `recv_epoch_ms` is None, will be set to now
-    pub fn create_pong(send_epoch_ms: u64, mut recv_epoch_ms: Option<u64>) -> Self {
-        if recv_epoch_ms.is_none() {
-            recv_epoch_ms = Some(now_ms());
-        }
+    pub fn create_pong(send_epoch_ms: u64, recv_epoch_ms: Option<u64>) -> Self {
         P2pMessage::MsgPong(MsgPong {
             ping_send_epoch_ms: send_epoch_ms,
-            ping_received_epoch_ms: recv_epoch_ms.unwrap(),
+            ping_received_epoch_ms: recv_epoch_ms.unwrap_or_else(now_ms),
         })
     }
 
@@ -70,7 +64,7 @@ impl P2pMessage {
 
         match message.which() {
             Ok(p2p_capnp::p2p_message::MsgPing(Ok(ping))) => Ok(P2pMessage::MsgPing(MsgPing {
-                ping_send_epoch_ms: ping.get_ping_send_epoch_ms(),
+                send_epoch_ms: ping.get_send_epoch_ms(),
             })),
             Ok(p2p_capnp::p2p_message::MsgPong(Ok(pong))) => Ok(P2pMessage::MsgPong(MsgPong {
                 ping_send_epoch_ms: pong.get_ping_send_epoch_ms(),
@@ -90,7 +84,7 @@ impl P2pMessage {
                         .init_root::<p2p_capnp::p2p_message::Builder>()
                         .init_msg_ping();
 
-                    message.set_ping_send_epoch_ms(ping.ping_send_epoch_ms);
+                    message.set_send_epoch_ms(ping.send_epoch_ms);
                 }
                 P2pMessage::MsgPong(pong) => {
                     let mut message = message
@@ -119,9 +113,7 @@ mod tests {
 
     #[test]
     fn it_can_encode_decode_ping() {
-        let message = P2pMessage::MsgPing(MsgPing {
-            ping_send_epoch_ms: 42,
-        });
+        let message = P2pMessage::MsgPing(MsgPing { send_epoch_ms: 42 });
 
         let bytes = message.into_bytes();
 
@@ -132,7 +124,7 @@ mod tests {
 
         match P2pMessage::from_bytes(bytes).unwrap() {
             P2pMessage::MsgPing(ping) => {
-                assert_eq!(42_u64, ping.ping_send_epoch_ms);
+                assert_eq!(42_u64, ping.send_epoch_ms);
             }
             _ => panic!("unexpected msg type"),
         }

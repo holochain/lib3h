@@ -142,7 +142,7 @@ impl P2pGateway {
                     Ok(P2pMessage::MsgPing(ping)) => {
                         debug!("got ping from {} {:?}", uri, ping);
                         let pong = P2pProtocol::CapnProtoMessage(
-                            P2pMessage::create_pong(ping.ping_send_epoch_ms, None).into_bytes(),
+                            P2pMessage::create_pong(ping.send_epoch_ms, None).into_bytes(),
                         )
                         .into_bytes()
                         .into();

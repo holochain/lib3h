@@ -14,6 +14,14 @@ use serde::Serialize;
 const SEND_RETRY_INTERVAL_MS: u64 = 20;
 const SEND_RETRY_TIMEOUT_MS: u64 = 20000;
 
+/// we want to invoke this on the very next process call
+/// set our last_attempt back far enough to ensure this
+fn last_attempt_run_on_next_process() -> std::time::Instant {
+    std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_millis(SEND_RETRY_INTERVAL_MS * 2))
+        .expect("can subtract duration")
+}
+
 /// Private internals
 impl P2pGateway {
     /// check / dispatch all pending sends
@@ -181,11 +189,7 @@ impl P2pGateway {
             // we need to wait for the next process() call to continue
             return self.priv_send_queue_pending(SendMetaData {
                 send_data: SendData::WithFullLowUri(send_data),
-                // we want to invoke this on the very next process call
-                // set our last_attempt back far enough to ensure this
-                last_attempt: std::time::Instant::now()
-                    .checked_sub(std::time::Duration::from_millis(SEND_RETRY_INTERVAL_MS * 2))
-                    .expect("can subtract duration"),
+                last_attempt: last_attempt_run_on_next_process(),
                 expires_at,
                 cb,
             });
