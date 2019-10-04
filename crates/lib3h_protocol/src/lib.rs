@@ -15,6 +15,7 @@ pub mod network_engine;
 pub mod protocol;
 pub mod protocol_client;
 pub mod protocol_server;
+pub mod types;
 pub mod uri;
 
 /// string encoded address type

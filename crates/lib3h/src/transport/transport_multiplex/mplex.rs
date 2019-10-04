@@ -6,12 +6,12 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address};
+use lib3h_protocol::{data_types::Opaque, types::SpaceHash, uri::Lib3hUri, Address};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct LocalRouteSpec {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub local_agent_id: Address,
 }
 
@@ -73,7 +73,7 @@ impl<
     /// for this function are the higher-level notions for the AgentSpaceGateway
     pub fn create_agent_space_route(
         &mut self,
-        space_address: &Address,
+        space_address: &SpaceHash,
         local_agent_id: &Address,
     ) -> TransportActorParentEndpoint {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
@@ -101,7 +101,7 @@ impl<
     /// Remove route
     pub fn remove_agent_space_route(
         &mut self,
-        space_address: &Address,
+        space_address: &SpaceHash,
         local_agent_id: &Address,
     ) -> Option<TransportActorSelfEndpoint<TransportMultiplex<G>>> {
         let route_spec = LocalRouteSpec {
@@ -117,7 +117,7 @@ impl<
     /// tree.
     pub fn received_data_for_agent_space_route(
         &mut self,
-        space_address: &Address,
+        space_address: &SpaceHash,
         local_agent_id: &Address,
         remote_agent_id: &Address,
         unpacked_payload: Opaque,
