@@ -32,22 +32,22 @@ use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
-use utils::{constants::*, test_network_id, processor_harness::ProcessingOptions};
+use utils::{constants::*, processor_harness::ProcessingOptions, test_network_id};
 
-const TWO_MEMORY_NODES_PROCESSING_OPTIONS : ProcessingOptions = ProcessingOptions {
-    max_iters:10000,
-    delay_interval_ms:1,
-    timeout_ms:1000,
-    max_retries:3,
-    should_abort:true
+const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
+    max_iters: 10000,
+    delay_interval_ms: 1,
+    timeout_ms: 1000,
+    max_retries: 3,
+    should_abort: true,
 };
 
-const TWO_WSS_NODES_PROCESSING_OPTIONS : ProcessingOptions = ProcessingOptions {
-    max_iters:10000,
-    delay_interval_ms:5,
-    timeout_ms:5000,
-    max_retries:3,
-    should_abort:true
+const TWO_WSS_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
+    max_iters: 10000,
+    delay_interval_ms: 5,
+    timeout_ms: 5000,
+    max_retries: 3,
+    should_abort: true,
 };
 
 //--------------------------------------------------------------------------------------------------

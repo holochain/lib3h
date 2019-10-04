@@ -441,7 +441,7 @@ macro_rules! assert2_msg_matches {
      $options: expr
     ) => {{
         let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
-                regex::Regex::new($regex)
+            regex::Regex::new($regex)
                 .expect(format!("[assert2_msg_matches] Invalid regex: {:?}", $regex).as_str()),
         ));
         $crate::assert2_processed!($engine1, $engine2, p, $options)
@@ -499,15 +499,15 @@ macro_rules! assert_msg_matches_all {
     ($engine: ident,
      $regexes: expr
     ) => {
-        $crate:utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
+        $crate: utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
     };
     ($engine: ident,
      $regexes: expr,
      $options: expr
     ) => {
-        $crate:utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes, $options)
+        $crate:
+            utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes, $options)
     };
-
 }
 
 /// Internal function to process one engine of a possibly
@@ -539,7 +539,7 @@ macro_rules! process_one_engine {
                 if result {
                     // Simulate the succesful assertion behavior
                     processor.test(&processor_result.clone());
-                    // processor passed!
+                // processor passed!
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing

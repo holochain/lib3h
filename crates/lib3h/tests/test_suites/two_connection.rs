@@ -82,9 +82,10 @@ fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pr
     std::thread::sleep(std::time::Duration::from_millis(2100));
     // Billy SHOULD send a PeerTimedOut message ...
 
-    let equal_to = Lib3hServerProtocol::Disconnected(lib3h_protocol::data_types::DisconnectedData {
-        network_id: "FIXME".into(), // TODO
-    });
+    let equal_to =
+        Lib3hServerProtocol::Disconnected(lib3h_protocol::data_types::DisconnectedData {
+            network_id: "FIXME".into(), // TODO
+        });
 
     assert2_msg_eq!(alex, billy, equal_to, options);
 }
@@ -94,7 +95,7 @@ fn test_two_peer_timeout(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pr
 fn test_two_peer_timeout_reconnect(
     alex: &mut NodeMock,
     billy: &mut NodeMock,
-    options: &ProcessingOptions
+    options: &ProcessingOptions,
 ) {
     // Wait past peer Timeout threshold
     // TODO make this timeout much faster or mock time

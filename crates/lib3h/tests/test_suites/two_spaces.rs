@@ -3,7 +3,7 @@ use crate::{
     test_suites::two_basic::{
         test_author_one_aspect, test_send_message, two_join_space, TwoNodesTestFn,
     },
-    utils::{processor_harness::ProcessingOptions, constants::*},
+    utils::{constants::*, processor_harness::ProcessingOptions},
 };
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
@@ -94,7 +94,11 @@ pub fn test_rejoining(alex: &mut NodeMock, billy: &mut NodeMock, options: &Proce
 }
 
 /// Sending a Message before doing a 'TrackDna' should fail
-pub fn test_multispace_send(alex: &mut NodeMock, billy: &mut NodeMock, options: &ProcessingOptions) {
+pub fn test_multispace_send(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Alex LeaveSpace
     let req_id = alex
         .leave_current_space()

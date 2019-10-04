@@ -1,7 +1,7 @@
 use crate::{
     node_mock::NodeMock,
     test_suites::two_basic::{request_entry_ok, TwoNodesTestFn},
-    utils::{processor_harness::ProcessingOptions, constants::*},
+    utils::{constants::*, processor_harness::ProcessingOptions},
 };
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
@@ -79,7 +79,11 @@ pub fn hold_list_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &Proce
 }
 
 ///
-pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &ProcessingOptions) {
+pub fn empty_author_list_test(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Alex replies an empty list to the initial HandleGetAuthoringEntryList
     alex.reply_to_first_HandleGetAuthoringEntryList();
 
@@ -114,7 +118,11 @@ pub fn empty_author_list_test(alex: &mut NodeMock, billy: &mut NodeMock, options
 }
 
 /// Return author_list with already known entry
-pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &ProcessingOptions) {
+pub fn author_list_known_entry_test(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     let entry = alex
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
         .unwrap();
@@ -124,7 +132,11 @@ pub fn author_list_known_entry_test(alex: &mut NodeMock, billy: &mut NodeMock, o
     alex.reply_to_first_HandleGetAuthoringEntryList();
     // Should not receive a HandleFetchEntry request from network module after receiving list
     let expected = "None";
-    let fast_timeout_options = ProcessingOptions { max_iters:5, timeout_ms:5, ..options.clone() };
+    let fast_timeout_options = ProcessingOptions {
+        max_iters: 5,
+        timeout_ms: 5,
+        ..options.clone()
+    };
     let _results = assert2_msg_matches!(alex, billy, expected, fast_timeout_options);
 
     // Billy asks for that entry

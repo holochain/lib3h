@@ -1,13 +1,13 @@
 use crate::{
     node_mock::{test_join_space, NodeMock},
-    utils::constants::*,
-    utils::processor_harness::ProcessingOptions
+    utils::{constants::*, processor_harness::ProcessingOptions},
 };
 use lib3h_protocol::{data_types::*, protocol_server::Lib3hServerProtocol, Address};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 
-pub type TwoNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock, options: &ProcessingOptions);
+pub type TwoNodesTestFn =
+    fn(alex: &mut NodeMock, billy: &mut NodeMock, options: &ProcessingOptions);
 
 lazy_static! {
     pub static ref TWO_NODES_BASIC_TEST_FNS: Vec<(TwoNodesTestFn, bool)> = vec![
@@ -154,7 +154,11 @@ fn test_send_message_fail(alex: &mut NodeMock, _billy: &mut NodeMock, options: &
 }
 
 /// Test SendDirectMessage and response to self
-pub fn test_send_message_self(alex: &mut NodeMock, _billy: &mut NodeMock, options: &ProcessingOptions) {
+pub fn test_send_message_self(
+    alex: &mut NodeMock,
+    _billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Send DM
     let _req_id = alex.send_direct_message(&ALEX_AGENT_ID, "wah".as_bytes().to_vec());
 
@@ -184,7 +188,11 @@ pub fn test_send_message_self(alex: &mut NodeMock, _billy: &mut NodeMock, option
 
 /// Test publish, Store, Query
 #[allow(dead_code)]
-pub fn test_author_one_aspect(alex: &mut NodeMock, billy: &mut NodeMock, options: &ProcessingOptions) {
+pub fn test_author_one_aspect(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Alex publish data on the network
     let entry = alex
         .author_entry(&ENTRY_ADDRESS_1, vec![ASPECT_CONTENT_1.clone()], true)
