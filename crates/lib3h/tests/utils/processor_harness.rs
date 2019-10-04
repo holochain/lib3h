@@ -41,9 +41,9 @@ pub const DEFAULT_TIMEOUT_MS: u64 = 1000;
 #[allow(dead_code)]
 pub const DEFAULT_SHOULD_ABORT: bool = true;
 #[allow(dead_code)]
-pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 1;
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 10;
 #[allow(dead_code)]
-pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 1;
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 10;
 
 /// All configurable parameters when processing an actor.
 #[derive(Clone, Debug)]
