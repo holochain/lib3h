@@ -16,7 +16,7 @@ use detach::Detach;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, Address};
+use lib3h_protocol::{data_types::*, protocol::*, types::SpaceHash, uri::Lib3hUri, Address};
 use rmp_serde::Serializer;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -252,9 +252,9 @@ impl<'engine> GhostEngine<'engine> {
     /// create a new gateway and add it to our gateway map
     fn add_gateway(
         &mut self,
-        space_address: Address,
+        space_address: SpaceHash,
         agent_id: Address,
-    ) -> Lib3hResult<(Address, Address)> {
+    ) -> Lib3hResult<(SpaceHash, Address)> {
         let chain_id = (space_address.clone(), agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
             return Err(Lib3hError::new_other("Already joined space"));
@@ -271,7 +271,7 @@ impl<'engine> GhostEngine<'engine> {
         );
 
         let gateway_id = GatewayId {
-            id: space_address.clone(),
+            id: space_address.clone().into(),
             nickname: format!(
                 "{}_{}",
                 space_address.to_string().split_at(4).0,
@@ -297,7 +297,7 @@ impl<'engine> GhostEngine<'engine> {
     fn broadcast_join(
         &mut self,
         span: Span,
-        space_address: Address,
+        space_address: SpaceHash,
         peer: PeerData,
     ) -> GhostResult<()> {
         // TODO #150 - Send JoinSpace to all known peers
@@ -527,7 +527,7 @@ impl<'engine> GhostEngine<'engine> {
 
     pub(crate) fn prepare_direct_peer_msg(
         &mut self,
-        space_address: Address,
+        space_address: SpaceHash,
         from_agent_id: Address,
         _to_agent_id: Address,
         net_msg: P2pProtocol,
@@ -690,7 +690,7 @@ impl<'engine> GhostEngine<'engine> {
     /// If agent did not join that space, construct error
     pub fn get_space(
         &mut self,
-        space_address: &Address,
+        space_address: &SpaceHash,
         agent_id: &Address,
     ) -> Lib3hResult<&mut Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>> {
         self.space_gateway_map
@@ -740,7 +740,7 @@ pub fn handle_GossipTo<
 
         // Convert DHT *GossipTo* to P2P *Gossip*
         let p2p_gossip = P2pProtocol::Gossip(GossipData {
-            space_address: gateway_identifier.clone(),
+            space_address: gateway_identifier.clone().into(),
             to_peer_name: to_peer_name.clone(),
             from_peer_name: from_peer_name.clone(),
             bundle: gossip_data.bundle.clone(),
@@ -983,7 +983,7 @@ mod tests {
         ); */
     }
 
-    fn make_test_query(space_address: Address) -> QueryEntryData {
+    fn make_test_query(space_address: SpaceHash) -> QueryEntryData {
         QueryEntryData {
             space_address: space_address,
             entry_address: "fake_entry_address".into(),

@@ -1,5 +1,6 @@
 use lib3h_protocol::{
     data_types::{EntryData, Opaque},
+    types::*,
     uri::Lib3hUri,
     Address,
 };
