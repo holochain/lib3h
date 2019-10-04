@@ -22,3 +22,13 @@ From the capnp_build crate directory:
 ```
 cargo run
 ```
+
+## Linux Usage
+
+If you're on linux, and don't want to install capnp to your system, you can use the bash source script to download and build capnp, temporarily adding the binary path to your current shell:
+
+```
+source ./capnp-build-and-source.bash
+```
+
+note, you will need support packages like: `pkg-config autoconf automake libtoolmake` plus compiler/build-essential/etc.
