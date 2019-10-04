@@ -20,7 +20,6 @@ fn manual_example() {
             my_context_weak,
             TestActor::new(),
             TestOwnerHandler {
-                phantom: std::marker::PhantomData,
                 handle_event_to_owner_print: Box::new(|_me, message| {
                     println!("owner printing message from actor: {}", message);
                     Ok(())

@@ -80,7 +80,6 @@ impl GhostProtocol for TestProtocol {
 
 #[allow(dead_code)]
 pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
-    pub phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_actor_print:
         Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
     pub handle_request_to_actor_add_1: Box<
@@ -114,7 +113,6 @@ impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestActor
 
 #[allow(dead_code)]
 pub struct TestOwnerHandler<'lt, X: 'lt + Send + Sync> {
-    pub phantom: std::marker::PhantomData<&'lt X>,
     pub handle_event_to_owner_print:
         Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
     pub handle_request_to_owner_sub_1: Box<
