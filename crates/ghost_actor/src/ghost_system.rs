@@ -93,7 +93,15 @@ impl<'lt> GhostSystemRef<'lt> {
             None => false,
         }))?;
 
-        GhostEndpointRef::new(s1, r2, self, actor, user_data, handler)
+        GhostEndpointRef::new(
+            GhostProtocolDestination::Actor,
+            s1,
+            r2,
+            self,
+            actor,
+            user_data,
+            handler,
+        )
     }
 }
 

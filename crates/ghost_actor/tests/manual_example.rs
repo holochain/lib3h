@@ -22,7 +22,7 @@ fn manual_example() {
             TestOwnerHandler {
                 phantom: std::marker::PhantomData,
                 handle_event_to_owner_print: Box::new(|_me, message| {
-                    println!("owner got: {}", message);
+                    println!("owner printing message from actor: {}", message);
                     Ok(())
                 }),
                 handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
@@ -37,11 +37,12 @@ fn manual_example() {
         .request_to_actor_add_1(
             42,
             Box::new(|_, rsp| {
-                println!("actor got 42 + 1 = {:?}", rsp);
+                println!("owner got response from actor: 42 + 1 = {:?}", rsp);
                 Ok(())
             }),
         )
         .unwrap();
 
+    system.process().unwrap();
     system.process().unwrap();
 }

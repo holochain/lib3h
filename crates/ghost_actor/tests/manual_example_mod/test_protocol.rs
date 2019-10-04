@@ -26,7 +26,55 @@ pub enum TestProtocol {
     RequestToOwnerSub1Response(Result<i32, ()>),
 }
 
-impl GhostProtocol for TestProtocol {}
+static D_LIST: &'static [GhostProtocolDiscriminant] = &[
+    GhostProtocolDiscriminant {
+        id: "event_to_actor_print",
+        destination: GhostProtocolDestination::Actor,
+        variant_type: GhostProtocolVariantType::Event,
+    },
+    GhostProtocolDiscriminant {
+        id: "event_to_owner_print",
+        destination: GhostProtocolDestination::Owner,
+        variant_type: GhostProtocolVariantType::Event,
+    },
+    GhostProtocolDiscriminant {
+        id: "request_to_actor_add_1",
+        destination: GhostProtocolDestination::Actor,
+        variant_type: GhostProtocolVariantType::Request,
+    },
+    GhostProtocolDiscriminant {
+        id: "request_to_actor_add_1_response",
+        destination: GhostProtocolDestination::Owner,
+        variant_type: GhostProtocolVariantType::Response,
+    },
+    GhostProtocolDiscriminant {
+        id: "request_to_owner_sub_1",
+        destination: GhostProtocolDestination::Owner,
+        variant_type: GhostProtocolVariantType::Request,
+    },
+    GhostProtocolDiscriminant {
+        id: "request_to_owner_sub_1_response",
+        destination: GhostProtocolDestination::Actor,
+        variant_type: GhostProtocolVariantType::Response,
+    },
+];
+
+impl GhostProtocol for TestProtocol {
+    fn discriminant_list() -> &'static [GhostProtocolDiscriminant] {
+        D_LIST
+    }
+
+    fn discriminant(&self) -> &GhostProtocolDiscriminant {
+        match self {
+            TestProtocol::EventToActorPrint(_) => &D_LIST[0],
+            TestProtocol::EventToOwnerPrint(_) => &D_LIST[1],
+            TestProtocol::RequestToActorAdd1(_) => &D_LIST[2],
+            TestProtocol::RequestToActorAdd1Response(_) => &D_LIST[3],
+            TestProtocol::RequestToOwnerSub1(_) => &D_LIST[4],
+            TestProtocol::RequestToOwnerSub1Response(_) => &D_LIST[5],
+        }
+    }
+}
 
 // -- TestActorHandler -- //
 

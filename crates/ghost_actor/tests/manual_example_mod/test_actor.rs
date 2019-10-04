@@ -27,7 +27,7 @@ impl<'lt> GhostActor<'lt, TestProtocol, TestActor<'lt>> for TestActor<'lt> {
         let (system_ref, mut owner_ref) = inflator.inflate(TestActorHandler {
             phantom: std::marker::PhantomData,
             handle_event_to_actor_print: Box::new(|_me: &mut TestActor<'lt>, message| {
-                println!("actor print: {}", message);
+                println!("actor printing message from owner: {}", message);
                 Ok(())
             }),
             handle_request_to_actor_add_1: Box::new(|_me: &mut TestActor<'lt>, message, cb| {
@@ -38,7 +38,7 @@ impl<'lt> GhostActor<'lt, TestProtocol, TestActor<'lt>> for TestActor<'lt> {
         owner_ref.request_to_owner_sub_1(
             42,
             Box::new(|_me, result| {
-                println!("got sub from owner: 42 - 1 = {:?}", result);
+                println!("actor got response from owner: 42 - 1 = {:?}", result);
                 Ok(())
             }),
         )?;
