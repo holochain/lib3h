@@ -163,7 +163,7 @@ impl<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> GhostInflator<'a, 'lt, X, 
     }
 }
 
-pub trait GhostActor<'lt, P: GhostProtocol, X: 'lt + Send + Sync>: Send + Sync {
-    fn actor_init<'a>(&'a mut self, inflator: GhostInflator<'a, 'lt, X, P>) -> GhostResult<()>;
+pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sync {
+    fn actor_init<'a>(&'a mut self, inflator: GhostInflator<'a, 'lt, A, P>) -> GhostResult<()>;
     fn process(&mut self) -> GhostResult<()>;
 }
