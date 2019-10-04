@@ -14,12 +14,17 @@ use lib3h_sodium::SodiumCryptoSystem;
 use lib3h_zombie_actor::*;
 use url::Url;
 
-static NET_ID: &'static str = "send-demo-network";
-static SPACE_ID: &'static str = "send-demo-space";
+static NET_ID: &'static str = "query-demo-network";
+static SPACE_ID: &'static str = "query-demo-space";
+static ENTRY_ADDR: &'static str = "query-demo-entry";
+static ASPECT_ADDR: &'static str = "query-demo-aspect";
 static A_1_ID: &'static str = "agent-1-id";
 static A_2_ID: &'static str = "agent-2-id";
 
-#[allow(dead_code)]
+fn print_result<D: std::fmt::Debug>(r: D) {
+    println!("-- begin result --\n{:#?}\n--  end result  --", r);
+}
+
 struct EngineContainer<
     E: GhostActor<
         Lib3hToClient,
@@ -30,6 +35,7 @@ struct EngineContainer<
     >,
 > {
     engine1: Detach<GhostEngineParentWrapper<EngineContainer<E>, E, Lib3hError>>,
+    #[allow(dead_code)]
     engine1_addr: Lib3hUri,
     engine2: Detach<GhostEngineParentWrapper<EngineContainer<E>, E, Lib3hError>>,
     engine2_addr: Lib3hUri,
@@ -101,6 +107,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         };
 
         out.process();
+        out.process();
+
         out.engine1
             .request(
                 Span::fixme(),
@@ -114,12 +122,10 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+
         out.process();
         out.process();
-        out.process();
-        out.process();
-        out.process();
-        out.process();
+
         out.engine1
             .request(
                 Span::fixme(),
@@ -134,6 +140,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+
         out.engine2
             .request(
                 Span::fixme(),
@@ -148,25 +155,45 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 }),
             )
             .unwrap();
+
         out.process();
         out.process();
-        out.process();
-        out.process();
-        out.process();
-        out.process();
-        out.process();
+
         out
     }
 
-    pub fn process(&mut self) {
+    fn priv_process(&mut self) {
         detach_run!(self.engine1, |e| { e.process(self) }).unwrap();
         detach_run!(self.engine2, |e| { e.process(self) }).unwrap();
         for mut msg in self.engine1.drain_messages() {
             let payload = msg.take_message();
             println!("1 got: {:?}", payload);
+            match payload {
+                Some(Lib3hToClient::HandleQueryEntry(q_data)) => {
+                    msg.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(
+                        QueryEntryResultData {
+                            space_address: SPACE_ID.to_string().into(),
+                            entry_address: ENTRY_ADDR.to_string().into(),
+                            request_id: "TEST_REQ_ID".to_string(),
+                            requester_agent_id: A_1_ID.to_string().into(),
+                            responder_agent_id: A_1_ID.to_string().into(),
+                            query_result: format!(
+                                "echo: {}",
+                                String::from_utf8_lossy(&q_data.query)
+                            )
+                            .into_bytes()
+                            .into(),
+                        },
+                    )))
+                    .unwrap();
+                }
+                Some(Lib3hToClient::HandleStoreEntryAspect(a_data)) => print_result(a_data),
+                _ => (),
+            }
         }
         for mut msg in self.engine2.drain_messages() {
             let payload = msg.take_message();
+            println!("2 got: {:?}", payload);
             match payload {
                 Some(Lib3hToClient::HandleSendDirectMessage(dm_data)) => {
                     msg.respond(Ok(Lib3hToClientResponse::HandleSendDirectMessageResult(
@@ -182,8 +209,17 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     )))
                     .unwrap();
                 }
-                _ => println!("2 got: {:?}", payload),
+                Some(Lib3hToClient::HandleStoreEntryAspect(a_data)) => print_result(a_data),
+                _ => (),
             }
+        }
+    }
+
+    pub fn process(&mut self) {
+        self.priv_process();
+        for _ in 0..20 {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+            self.priv_process();
         }
     }
 
@@ -199,83 +235,129 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     content: b"bob".to_vec().into(),
                 }),
                 Box::new(|_, r| {
-                    println!("WE GOT A RESULT!!!: {:?}", r);
+                    print_result(r);
                     Ok(())
                 }),
             )
             .unwrap();
         self.process();
+        // send needs extra process calls
         self.process();
         self.process();
         self.process();
         self.process();
         self.process();
+    }
+
+    pub fn query_1(&mut self) {
+        self.engine1
+            .request(
+                Span::fixme(),
+                ClientToLib3h::QueryEntry(QueryEntryData {
+                    space_address: SPACE_ID.to_string().into(),
+                    entry_address: ENTRY_ADDR.to_string().into(),
+                    request_id: "TEST_REQ_ID".to_string(),
+                    requester_agent_id: A_1_ID.to_string().into(),
+                    query: b"bob".to_vec().into(),
+                }),
+                Box::new(|_, r| {
+                    print_result(r);
+                    Ok(())
+                }),
+            )
+            .unwrap();
         self.process();
+    }
+
+    pub fn publish_1(&mut self) {
+        self.engine1
+            .publish(
+                Span::fixme(),
+                ClientToLib3h::PublishEntry(ProvidedEntryData {
+                    space_address: SPACE_ID.to_string().into(),
+                    provider_agent_id: A_1_ID.to_string().into(),
+                    entry: EntryData {
+                        entry_address: ENTRY_ADDR.to_string().into(),
+                        aspect_list: vec![EntryAspectData {
+                            aspect_address: ASPECT_ADDR.to_string().into(),
+                            type_hint: "test".to_string(),
+                            aspect: b"bob".to_vec().into(),
+                            publish_ts: 0,
+                        }],
+                    },
+                }),
+            )
+            .unwrap();
         self.process();
-        ::std::thread::sleep(::std::time::Duration::from_millis(10));
-        self.process();
-        self.process();
-        self.process();
-        self.process();
-        self.process();
-        self.process();
+        // publish needs an extra 10 process calls
         self.process();
     }
 }
 
-pub fn main() {
+fn init_setup() {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warn");
     }
-    let _ = env_logger::builder()
+    env_logger::builder()
         .default_format_timestamp(false)
         .is_test(false)
-        .try_init();
+        .try_init()
+        .unwrap()
+}
+
+fn usage() {
+    println!(
+        r#"USAGE:
+  cargo run --bin demo -- --send          # demo direct send
+  cargo run --bin demo -- --send --ws     # demo direct send (websocket)
+  cargo run --bin demo -- --query         # demo query
+  cargo run --bin demo -- --query --ws    # demo query (websocket)
+  cargo run --bin demo -- --publish       # demo publish
+  cargo run --bin demo -- --publish --ws  # demo publish (websocket)
+"#
+    );
+    std::process::exit(1);
+}
+
+fn main() {
+    init_setup();
+
+    #[derive(Debug)]
+    enum Demo {
+        DemoNone,
+        DemoSend,
+        DemoQuery,
+        DemoPublish,
+    }
+    use Demo::*;
 
     let mut ws = false;
-    if let Ok(transport) = std::env::var("LIB3H_TRANSPORT") {
-        if transport == "ws" {
-            ws = true
+    let mut demo = DemoNone;
+
+    for a in std::env::args().skip(1) {
+        match a.as_str() {
+            "--ws" => ws = true,
+            "--send" => demo = DemoSend,
+            "--query" => demo = DemoQuery,
+            "--publish" => demo = DemoPublish,
+            _ => {
+                println!("unexpected {:?}", a);
+                usage();
+            }
         }
     }
+
+    if let DemoNone = demo {
+        println!("please specify a demo type (--send, --query, etc)");
+        usage();
+    }
+
     let mut engines = EngineContainer::new(ws);
-    engines.send_1_to_2();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    // node 2 should have message now-ish... run a couple more to get it back
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    // now back to node 1?
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
-    engines.process();
+
+    match demo {
+        DemoNone => usage(),
+        DemoSend => engines.send_1_to_2(),
+        DemoQuery => engines.query_1(),
+        DemoPublish => engines.publish_1(),
+    }
 }

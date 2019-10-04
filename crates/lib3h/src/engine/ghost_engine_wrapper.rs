@@ -115,7 +115,21 @@ where
                             ClientToLib3hResponse::LeaveSpaceResult => {
                                 server_success(request_id.clone(), space_addr, agent)
                             }
-                            _ => rsp.into(),
+                            ClientToLib3hResponse::SendDirectMessageResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::SendDirectMessageResult(data)
+                            }
+                            ClientToLib3hResponse::FetchEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::FetchEntryResult(data)
+                            }
+                            ClientToLib3hResponse::QueryEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::QueryEntryResult(data)
+                            }
                         };
                         me.client_request_responses.push(response)
                     }
@@ -204,9 +218,6 @@ where
                 data.space_address.clone(),
                 data.provider_agent_id.clone(),
             ),
-            Lib3hClientProtocol::FailureResult(data) => {
-                panic!("Received FailureResult: {:?}", data);
-            }
             msg => unimplemented!("Handle this case: {:?}", msg),
         };
 
@@ -305,6 +316,7 @@ where
         match &mut msg {
             Lib3hServerProtocol::Connected(data) => data.request_id = request_id,
             Lib3hServerProtocol::FetchEntryResult(data) => data.request_id = request_id,
+            Lib3hServerProtocol::HandleFetchEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleStoreEntryAspect(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleDropEntry(data) => data.request_id = request_id,
             Lib3hServerProtocol::HandleQueryEntry(data) => data.request_id = request_id,
@@ -470,7 +482,7 @@ mod tests {
         let data = ConnectData {
             request_id: "foo_request_id".into(),
             peer_location: Url::parse("mocknet://t1").expect("can parse url").into(),
-            network_id: "fake_id".to_string(),
+            network_id: "fake_id".into(),
         };
 
         assert!(legacy.post(Lib3hClientProtocol::Connect(data)).is_ok());

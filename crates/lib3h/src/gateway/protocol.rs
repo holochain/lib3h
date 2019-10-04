@@ -3,7 +3,7 @@ use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::data_types::*;
 
 /// Gateway protocol enums for use with GhostActor implementation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GatewayRequestToChild {
     Transport(transport::protocol::RequestToChild),
     Dht(DhtRequestToChild),

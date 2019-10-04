@@ -32,7 +32,23 @@ use test_suites::{
     three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
-use utils::{constants::*, test_network_id};
+use utils::{constants::*, processor_harness::ProcessingOptions, test_network_id};
+
+const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
+    max_iters: 10000,
+    delay_interval_ms: 1,
+    timeout_ms: 1000,
+    max_retries: 3,
+    should_abort: true,
+};
+
+const TWO_WSS_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
+    max_iters: 10000,
+    delay_interval_ms: 5,
+    timeout_ms: 5000,
+    max_retries: 3,
+    should_abort: true,
+};
 
 //--------------------------------------------------------------------------------------------------
 // Logging
@@ -50,6 +66,7 @@ fn enable_logging_for_test(enable: bool) {
     }
     let _ = env_logger::builder()
         .default_format_timestamp(false)
+        //.default_format_timestamp_nanos(true)
         .default_format_module_path(false)
         .is_test(enable)
         .try_init();
@@ -111,7 +128,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
         log_level: 'd',
         bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
         dht_gossip_interval: 500,
-        dht_timeout_threshold: 3000,
+        dht_timeout_threshold: 3005,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -182,7 +199,6 @@ fn test_two_memory_nodes_basic_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_two_memory_nodes_get_lists_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in TWO_NODES_GET_LISTS_TEST_FNS.iter() {
@@ -199,7 +215,6 @@ fn test_two_memory_nodes_spaces_suite() {
 }
 
 #[test]
-#[ignore]
 fn test_three_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
     for (test_fn, can_setup) in THREE_NODES_BASIC_TEST_FNS.iter() {
@@ -231,7 +246,7 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy);
+    test_fn(&mut alex, &mut billy, &TWO_MEMORY_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
     println!("========================");
@@ -392,7 +407,7 @@ fn launch_two_wss_nodes_test(
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy);
+    test_fn(&mut alex, &mut billy, &TWO_WSS_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
     println!("========================");
