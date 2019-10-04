@@ -10,9 +10,8 @@ use crate::{
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
+use lib3h_p2p_protocol::p2p::P2pMessage;
 use lib3h_protocol::{data_types::*, uri::Lib3hUri};
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
 
 /// Private internals
 impl P2pGateway {
@@ -47,21 +46,18 @@ impl P2pGateway {
                         this_peer.peer_name,
                         this_peer.timestamp,
                     );
-                    let mut buf = Vec::new();
-                    our_peer_name
-                        .serialize(&mut Serializer::new(&mut buf))
-                        .unwrap();
                     trace!(
                         "({}) sending P2pProtocol::PeerName: {:?} to {:?}",
                         me.identifier.nickname,
                         our_peer_name,
                         uri,
                     );
+                    let buf = our_peer_name.into_bytes().into();
                     me.send_with_full_low_uri(
                         SendWithFullLowUri {
                             span: span.follower("TODO send"),
                             full_low_uri: uri.clone(),
-                            payload: buf.into(),
+                            payload: buf,
                         },
                         Box::new(|response| {
                             match response {
@@ -105,7 +101,7 @@ impl P2pGateway {
                         },
                     )) => {
                         if payload.len() == 0 {
-                            debug!("Implement Ping!");
+                            panic!("We should no longer ever be sending zero length messages");
                         } else {
                             me.priv_on_receive(e_span, uri, payload)?;
                         }
@@ -118,10 +114,7 @@ impl P2pGateway {
     }
 
     fn priv_on_receive(&mut self, span: Span, uri: Lib3hUri, payload: Opaque) -> GhostResult<()> {
-        let mut de = Deserializer::new(&payload[..]);
-        let maybe_p2p_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
-            Deserialize::deserialize(&mut de);
-
+        let maybe_p2p_msg = P2pProtocol::from_bytes(payload.into());
         match maybe_p2p_msg {
             Ok(P2pProtocol::PeerName(gateway_id, peer_name, timestamp)) => {
                 if self.identifier.id != gateway_id.clone().into() {
@@ -142,30 +135,59 @@ impl P2pGateway {
                     DhtRequestToChild::HoldPeer(peer),
                 )?;
             }
-            Ok(_) => {
+            Ok(P2pProtocol::CapnProtoMessage(bytes)) => {
+                match P2pMessage::from_bytes(bytes) {
+                    Ok(P2pMessage::MsgPing(ping)) => {
+                        debug!("got ping from {} {:?}", uri, ping);
+                        let pong = P2pProtocol::CapnProtoMessage(
+                            P2pMessage::create_pong(ping.send_epoch_ms, None).into_bytes(),
+                        )
+                        .into_bytes()
+                        .into();
+                        self.send_with_full_low_uri(
+                            SendWithFullLowUri {
+                                span: Span::fixme(),
+                                full_low_uri: uri,
+                                payload: pong,
+                            },
+                            Box::new(move |response| {
+                                // we don't need to follow up on a pong
+                                // it can just be a fire-and-forget
+                                trace!("sent pong {:?}", response);
+                                Ok(())
+                            }),
+                        )?;
+                    }
+                    Ok(P2pMessage::MsgPong(pong)) => {
+                        let now = crate::time::since_epoch_ms();
+                        info!(
+                            "got pong from {} indicating latency = {} ms",
+                            uri,
+                            now - pong.ping_send_epoch_ms,
+                        );
+                    }
+                    _ => panic!("failed to decode P2pMessage"),
+                }
+            }
+            Ok(msg) => {
                 // TODO XXX - nope!
                 // We should handle these cases, and pick the ones we want to
                 // send up the chain, and which ones should be handled here.
 
-                trace!(
-                    "{:?} received {} {}",
-                    self.identifier,
-                    uri,
-                    String::from_utf8_lossy(&payload)
-                );
+                trace!("{:?} received {} {:?}", self.identifier, uri, msg,);
 
                 self.endpoint_self.as_mut().publish(
                     span.follower("bubble up to parent"),
                     GatewayRequestToParent::Transport(
-                        transport::protocol::RequestToParent::ReceivedData { uri, payload },
+                        transport::protocol::RequestToParent::ReceivedData {
+                            uri,
+                            payload: msg.into_bytes().into(),
+                        },
                     ),
                 )?;
             }
             _ => {
-                panic!(
-                    "unexpected received data type {} {:?}",
-                    payload, maybe_p2p_msg
-                );
+                panic!("unexpected received data type {:?}", maybe_p2p_msg);
             }
         };
         Ok(())
@@ -284,7 +306,7 @@ impl P2pGateway {
                 );
                 // trace!("Deserialize msg: {:?}", payload);
                 if payload.len() == 0 {
-                    debug!("Implement Ping!");
+                    panic!("We should no longer ever be sending zero length messages");
                 } else {
                     self.priv_decode_on_receive(span, uri.clone(), payload.clone())?;
                 }

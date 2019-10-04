@@ -1,11 +1,12 @@
 use crate::{
     dht::dht_protocol::*,
+    engine::p2p_protocol::P2pProtocol,
     error::*,
     gateway::{protocol::*, send_data_types::*, P2pGateway},
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::*;
+use lib3h_p2p_protocol::p2p::P2pMessage;
 
 impl
     GhostActor<
@@ -93,11 +94,15 @@ impl P2pGateway {
                 self.handle_dht_RequestToChild(span, dht_request, msg)
             }
             GatewayRequestToChild::Bootstrap(data) => {
+                let payload =
+                    P2pProtocol::CapnProtoMessage(P2pMessage::create_ping(None).into_bytes())
+                        .into_bytes()
+                        .into();
                 self.send_with_full_low_uri(
                     SendWithFullLowUri {
                         span,
                         full_low_uri: data.bootstrap_uri.clone(),
-                        payload: Opaque::new(), // TODO - implement ping
+                        payload,
                     },
                     Box::new(move |response| {
                         if response.is_ok() {
