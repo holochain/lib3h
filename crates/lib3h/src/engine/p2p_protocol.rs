@@ -4,6 +4,8 @@ use lib3h_protocol::{
     uri::Lib3hUri,
     Address,
 };
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 
 pub type SpaceAddress = String;
 pub type GatewayId = String;
@@ -22,6 +24,11 @@ pub enum P2pProtocol {
     BroadcastJoinSpace(SpaceAddress, PeerData),
     /// For sending a peer's 'JoinSpace' info to a newly connected peer
     AllJoinedSpaceList(Vec<(SpaceAddress, PeerData)>),
+    /// We would like to transition to using our capnproto p2p protocol
+    /// during the transition phase, capnproto messages will be
+    /// doubly encoded in this P2pProtocol enum variant,
+    /// once all messages have transitioned, we can drop this layer
+    CapnProtoMessage(Vec<u8>),
 }
 
 /// DHT gossip data
@@ -31,4 +38,24 @@ pub struct GossipData {
     pub to_peer_name: Lib3hUri,
     pub from_peer_name: Lib3hUri,
     pub bundle: Opaque,
+}
+
+impl P2pProtocol {
+    /// rust messagepack decode these bytes into a P2pProtocol instance
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, rmp_serde::decode::Error> {
+        let mut de = Deserializer::new(&bytes[..]);
+        Deserialize::deserialize(&mut de)
+    }
+
+    /// encode this P2pProtocol instance as rust messagepack bytes
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        self.serialize(&mut Serializer::new(&mut out)).unwrap();
+        out
+    }
+
+    /// convert this P2pProtocol instance into rust messagepack bytes
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.to_bytes()
+    }
 }

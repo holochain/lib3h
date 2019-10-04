@@ -9,12 +9,6 @@ use crate::utils::seeded_prng::SeededBooleanPrng;
 
 use std::sync::Mutex;
 
-#[allow(dead_code)]
-pub const MAX_PROCESSING_LOOPS: usize = 100;
-
-#[allow(dead_code)]
-pub const MAX_DID_WEIGHT_LOOPS: usize = 20;
-
 lazy_static! {
 pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
 
@@ -34,6 +28,63 @@ pub static ref BOOLEAN_PRNG: Mutex<SeededBooleanPrng> = {
 
     };
 
+}
+
+#[allow(dead_code)]
+pub const DEFAULT_MAX_ITERS: u64 = 1000;
+#[allow(dead_code)]
+pub const DEFAULT_MAX_RETRIES: u64 = 5;
+#[allow(dead_code)]
+pub const DEFAULT_DELAY_INTERVAL_MS: u64 = 1;
+#[allow(dead_code)]
+pub const DEFAULT_TIMEOUT_MS: u64 = 1000;
+#[allow(dead_code)]
+pub const DEFAULT_SHOULD_ABORT: bool = true;
+#[allow(dead_code)]
+pub const DEFAULT_WAIT_DID_WORK_MAX_ITERS: u64 = 10;
+#[allow(dead_code)]
+pub const DEFAULT_WAIT_DID_WORK_TIMEOUT_MS: u64 = 10;
+
+/// All configurable parameters when processing an actor.
+#[derive(Clone, Debug)]
+pub struct ProcessingOptions {
+    pub max_iters: u64,
+    pub max_retries: u64,
+    pub delay_interval_ms: u64,
+    pub timeout_ms: u64,
+    pub should_abort: bool,
+}
+
+impl ProcessingOptions {
+    #[allow(dead_code)]
+    pub fn wait_did_work_defaults() -> Self {
+        Self {
+            max_iters: DEFAULT_WAIT_DID_WORK_MAX_ITERS,
+            timeout_ms: DEFAULT_WAIT_DID_WORK_TIMEOUT_MS,
+            ..Default::default()
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_should_abort(should_abort: bool) -> Self {
+        let options = Self {
+            should_abort,
+            ..Default::default()
+        };
+        options
+    }
+}
+
+impl Default for ProcessingOptions {
+    fn default() -> Self {
+        Self {
+            max_iters: DEFAULT_MAX_ITERS,
+            max_retries: DEFAULT_MAX_RETRIES,
+            delay_interval_ms: DEFAULT_DELAY_INTERVAL_MS,
+            timeout_ms: DEFAULT_TIMEOUT_MS,
+            should_abort: DEFAULT_SHOULD_ABORT,
+        }
+    }
 }
 
 /// Represents all useful state after a single call to an engine's process function
@@ -348,16 +399,24 @@ impl predicates::reflection::PredicateReflection for DidWorkAssert {}
 /// Convenience function that asserts only one particular equality predicate
 /// (over a lib3h server protocol message)
 /// passes for two engine wrappers. See `assert2_processed` for more information.
-/// `equal_to` is compared to the actual and aborts if not actual.
+/// `equal_to` is compared to the actual and aborts if not actual by default.
 macro_rules! assert2_msg_eq {
     ($engine1:ident,
      $engine2:ident,
      $equal_to:expr
     ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        assert2_msg_eq!($engine1, $engine2, $equal_to, options)
+    }};
+    ($engine1:ident,
+     $engine2:ident,
+     $equal_to:expr,
+     $options:expr
+    ) => {{
         let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolEquals(
             $equal_to,
         ));
-        assert2_processed!($engine1, $engine2, p)
+        assert2_processed!($engine1, $engine2, p, $options)
     }};
 }
 
@@ -366,17 +425,26 @@ macro_rules! assert2_msg_eq {
 /// Convenience function that asserts only one particular equality predicate
 /// (over a lib3h server protocol message)
 /// passes for two engine wrappers. See `assert_processed` for
-/// more information. `regex` is matched against the actual value and aborts if not present
+/// more information. `regex` is matched against the actual value and aborts if not present by
+/// default
 macro_rules! assert2_msg_matches {
-    ($engine1:ident,
-     $engine2:ident,
-     $regex:expr
+    ($engine1: ident,
+     $engine2: ident,
+     $regex: expr
+    ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::assert2_msg_matches!($engine1, $engine2, $regex, options)
+    }};
+    ($engine1: ident,
+     $engine2: ident,
+     $regex: expr,
+     $options: expr
     ) => {{
         let p = Box::new($crate::utils::processor_harness::Lib3hServerProtocolRegex(
             regex::Regex::new($regex)
                 .expect(format!("[assert2_msg_matches] Invalid regex: {:?}", $regex).as_str()),
         ));
-        $crate::assert2_processed!($engine1, $engine2, p)
+        $crate::assert2_processed!($engine1, $engine2, p, $options)
     }};
 }
 
@@ -386,8 +454,15 @@ macro_rules! assert2_msg_matches {
 /// a regular expression over a lib3h server protocol message.
 /// This is a simplified version of `assert2_msg_matches` for one engine only.
 macro_rules! assert_msg_matches {
-    ($engine:ident,
-     $regex:expr
+    ($engine: ident,
+     $regex: expr,
+     $options: expr
+    ) => {
+        // TODO Hack make a single engine version
+        $crate::assert2_msg_matches!($engine, $engine, $regex, $options)
+    };
+    ($engine: ident,
+     $regex: expr
     ) => {
         // TODO Hack make a single engine version
         $crate::assert2_msg_matches!($engine, $engine, $regex)
@@ -421,10 +496,17 @@ macro_rules! assert2_msg_matches_all {
 /// Convenience function that asserts all regular expressions match
 /// over a set of lib3h server protocol messages for one engine wrapper.
 macro_rules! assert_msg_matches_all {
-    ($engine:ident,
-     $regexes:expr
+    ($engine: ident,
+     $regexes: expr
     ) => {
         $crate: utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes)
+    };
+    ($engine: ident,
+     $regexes: expr,
+     $options: expr
+    ) => {
+        $crate:
+            utils::processor_harness::assert2_msg_matches_all!($engine, $engine, $regexes, $options)
     };
 }
 
@@ -490,7 +572,8 @@ macro_rules! process_one_engine {
 macro_rules! assert2_processed_all {
     ($engine1:ident,
      $engine2:ident,
-     $processors:expr
+     $processors:expr,
+     $options: expr
     ) => {{
         let mut previous = Vec::new();
         let mut errors: Vec<(
@@ -502,15 +585,18 @@ macro_rules! assert2_processed_all {
             errors.push((p, None))
         }
 
+        let clock = std::time::SystemTime::now();
+        let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
         // each epoc represents one "random" engine processing once
-        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+        for epoc in 0..$options.max_iters {
             let b = $crate::utils::processor_harness::BOOLEAN_PRNG
                 .lock()
                 .expect("could not acquire lock on boolean prng")
                 .next()
                 .expect("could not generate a new seeded prng value");
             trace!(
-                "seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
+                "[processor_harness] seed: {:?}, epoc: {:?}, prng: {:?}, previous: {:?}",
                 $crate::utils::processor_harness::BOOLEAN_PRNG
                     .lock()
                     .expect("could not acquire lock on boolean prng")
@@ -529,8 +615,16 @@ macro_rules! assert2_processed_all {
             if errors.is_empty() {
                 break;
             }
-            // Simulate slow machine
-            // ::std::thread::sleep(::std::time::Duration::from_millis(100));
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!(
+                    "[process_harness] epoc:{:?} timed out, elapsed {:?} ",
+                    epoc,
+                    elapsed.as_millis()
+                );
+                break;
+            }
+            std::thread::sleep(delay_interval)
         }
 
         for (p, args) in errors {
@@ -563,12 +657,20 @@ macro_rules! assert2_processed_all {
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! assert2_processed {
-    ($engine1:ident,
-     $engine2:ident,
-     $processor:expr
+    ($engine1: ident,
+     $engine2: ident,
+     $processor: expr,
+     $options: expr
     ) => {{
         let processors = vec![$processor];
-        $crate::assert2_processed_all!($engine1, $engine2, processors)
+        $crate::assert2_processed_all!($engine1, $engine2, processors, $options)
+    }};
+    ($engine1: ident,
+     $engine2: ident,
+     $processor: expr
+    ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::assert2_processed!($engine1, $engine2, $processor, options)
     }};
 }
 
@@ -578,19 +680,26 @@ macro_rules! assert2_processed {
 ///
 /// Multiple calls to process() will be made as needed for
 /// the passed in processors to pass. It will failure after
-/// MAX_PROCESSING_LOOPS iterations regardless.
+/// ``$options.max_iters` iterations regardless.
 ///
 /// Returns all observed processor results for use by
 /// subsequent tests.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! assert_processed_all {
-    ($engine:ident,
-     $processors:expr
-    ) => {
+    ($engine: ident,
+     $processors: expr,
+     $options: expr
+    ) => {{
         // HACK make a singular version
-        $crate::assert2_processed_all!($engine, $engine, $processors)
-    };
+        $crate::assert2_processed_all!($engine, $engine, $processors, $options)
+    }};
+    ($engine: ident,
+     $processors: expr
+    ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::assert_processed_all!($engine, $processors, options)
+    }};
 }
 
 /// Asserts that one engine produces events
@@ -599,19 +708,26 @@ macro_rules! assert_processed_all {
 ///
 /// Multiple calls to process() will be made as needed for
 /// the passed in processors to pass. It will failure after
-/// MAX_PROCESSING_LOOPS iterations regardless.
+/// `$options.max_iters` iterations regardless.
 ///
 /// Returns all observed processor results for use by
 /// subsequent tests.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! assert_processed {
-    ($engine:ident,
-     $processor:expr
+    ($engine: ident,
+     $processor: expr,
+     $options: expr
     ) => {
         // HACK make a singular version
-        $crate::assert2_processed!($engine, $engine, $processor)
+        $crate::assert2_processed!($engine, $engine, $processor, $options)
     };
+    ($engine: ident,
+     $processor: expr
+    ) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::assert_processed!($engine, $processor, options)
+    }};
 }
 
 /// `wait_connect!(a, connect_data, b)` waits until engine w4rapper `a` connects
@@ -625,7 +741,8 @@ macro_rules! wait_connect {
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
-      $crate::assert2_msg_matches!($me, $other, "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"transportid:Hc.*\"\\) \\}\\)");
+        $crate::assert2_msg_matches!($me, $other,
+            "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"transportid:Hc.*\"\\) \\}\\)")
     }};
 }
 
@@ -634,39 +751,41 @@ macro_rules! wait_connect {
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! wait_engine_wrapper_did_work {
-    ($engine: ident,
-     $should_abort: expr
-    ) => {{
-        let timeout = std::time::Duration::from_millis(2000);
-        $crate::wait_engine_wrapper_did_work!($engine, $should_abort, timeout)
+    ($engine: ident) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::wait_did_work_defaults();
+        $crate::wait_engine_wrapper_did_work!($engine, options)
     }};
-    ($engine:ident) => {
-        $crate::wait_engine_wrapper_did_work!($engine, true)
-    };
     ($engine: ident,
-     $should_abort: expr,
-     $timeout : expr
-      ) => {{
+     $options: expr
+    ) => {{
         let mut did_work = false;
         let clock = std::time::SystemTime::now();
+        let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
 
-        for epoc in 0..$crate::utils::processor_harness::MAX_PROCESSING_LOOPS {
+        for epoc in 0..$options.max_iters {
             let (did_work_now, results) = $engine
                 .process()
-                .map_err(|e| error!("ghost actor processing error: {:?}", e))
+                .map_err(|e| error!("engine wrapper processing error: {:?}", e))
                 .unwrap_or((false, vec![]));
             did_work = did_work_now;
             if did_work {
                 break;
             }
             let elapsed = clock.elapsed().unwrap();
-            if elapsed > $timeout {
+            if elapsed > timeout {
+                trace!(
+                    "[{}] wait_engine_wrapper_did_work: timeout elapsed={:?}, results={:?}",
+                    epoc,
+                    elapsed.as_millis(),
+                    results
+                );
                 break;
             }
             trace!("[{}] wait_engine_wrapper_did_work: {:?}", epoc, results);
-            std::thread::sleep(std::time::Duration::from_millis(1))
+            std::thread::sleep(delay_interval)
         }
-        if $should_abort {
+        if $options.should_abort {
             assert!(did_work);
         }
         did_work
@@ -678,20 +797,35 @@ macro_rules! wait_engine_wrapper_did_work {
 #[macro_export]
 macro_rules! wait_engine_wrapper_until_no_work {
     ($engine: ident) => {{
-        let mut did_work;
-        let start = std::time::SystemTime::now();
-        loop {
-            did_work = $crate::wait_engine_wrapper_did_work!($engine, false);
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::wait_engine_wrapper_until_no_work!($engine, options)
+    }};
+    ($engine: ident, $options: expr) => {{
+        let mut did_work = false;
+        let clock = std::time::SystemTime::now();
+        let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
+
+        let did_work_options = $crate::utils::processor_harness::ProcessingOptions {
+            should_abort: false,
+            ..$crate::utils::processor_harness::ProcessingOptions::wait_did_work_defaults()
+        };
+
+        for i in 0..$options.max_iters {
+            did_work = $crate::wait_engine_wrapper_did_work!($engine, did_work_options);
             if !did_work {
                 break;
             }
-            let elapsed = start.elapsed().expect("SystemTime failed");
-            if elapsed.as_secs() > 1 {
-                println!("elapsed = {:?}", elapsed.as_secs());
-                if elapsed.as_secs() > 60 {
-                    break;
-                }
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!(
+                    "[{:?}] wait_engine_wrapper_until_no_work timeout elapsed = {:?}",
+                    i,
+                    elapsed.as_millis()
+                );
+                break;
             }
+            std::thread::sleep(delay_interval)
         }
         did_work
     }};
@@ -703,24 +837,25 @@ macro_rules! wait_engine_wrapper_until_no_work {
 macro_rules! wait2_engine_wrapper_did_work {
     ($engine1: ident,
      $engine2: ident,
-     $should_abort: expr
+     $options: expr
     ) => {{
         let processors = vec![
             Box::new($crate::utils::processor_harness::DidWorkAssert {
                 engine_name: $engine1.name(),
-                should_assert: $should_abort,
+                should_assert: $options.should_abort,
             }),
             Box::new($crate::utils::processor_harness::DidWorkAssert {
                 engine_name: $engine2.name(),
-                should_assert: $should_abort,
+                should_assert: $options.should_abort,
             }),
         ];
-        $crate::assert2_processed_all!($engine1, $engine2, processors)
+        $crate::assert2_processed_all!($engine1, $engine2, processors, $options)
     }};
     ($engine1: ident,
      $engine2: ident
     ) => {{
-        $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, true)
+        let options = $crate::utils::processor_harness::ProcessingOptions::wait_did_work_defaults();
+        $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, options)
     }};
 }
 
@@ -729,15 +864,35 @@ macro_rules! wait2_engine_wrapper_did_work {
 #[macro_export]
 macro_rules! wait2_engine_wrapper_until_no_work {
     ($engine1: ident, $engine2: ident) => {{
+        let options = $crate::utils::processor_harness::ProcessingOptions::default();
+        $crate::wait2_engine_wrapper_until_no_work!($engine1, $engine2, options)
+    }};
+    ($engine1: ident, $engine2: ident, $options: expr) => {{
         let mut did_work;
-        loop {
-            did_work = $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, false)
+        let clock = SystemTime::now();
+        let timeout = std::time::Duration::from_millis($options.timeout_ms);
+        let delay_interval = std::time::Duration::from_millis($options.delay_interval_ms);
+        for i in 0..$options.max_iters {
+            let did_work_options = ProcessingOptions {
+                should_abort: false,
+                ..$crate::utils::processor_harness::ProcessingOptions::wait_did_work_defaults()
+            };
+            did_work = $crate::wait2_engine_wrapper_did_work!($engine1, $engine2, did_work_options)
                 .iter()
                 .find(|result| result.did_work)
                 .is_some();
             if !did_work {
                 break;
             }
+            let elapsed = clock.elapsed().unwrap();
+            if elapsed > timeout {
+                trace!(
+                    "wait2_engine_Wrapper_until_no_work: timed out (over {:?} ms)",
+                    $options.timeout_ms
+                );
+                break;
+            }
+            std::thread::sleep(delay_interval)
         }
         did_work
     }};
