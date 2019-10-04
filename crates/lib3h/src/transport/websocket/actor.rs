@@ -794,7 +794,8 @@ mod tests {
             Some(expected_transport1_address.clone())
         );
 
-        // Advertise happens during bind so discover should now work.
+        // Advertise happens during bind so before processing transport2
+        // transport1 will only know about itself on the call to discover
         let urls = transport1
             .discover()
             .expect("Fail to discover nodes using WSS transport1.");
@@ -802,17 +803,18 @@ mod tests {
 
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut ());
-
         assert_eq!(
             transport2.bound_url(),
             Some(expected_transport2_address.clone())
         );
 
+        // After transport2 bind processes, then discover on transport1 should show
+        // transport2s bound address
         let urls = transport1
             .discover()
             .expect("Fail to discover nodes using WSS transport1.");
 
-        // println!("DISCOVERED: {:?}", urls);
         assert_eq!(urls.len(), 2);
+        assert!(urls.contains(&expected_transport2_address));
     }
 }
