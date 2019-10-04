@@ -139,7 +139,7 @@ pub fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pr
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: HashString\\(\"\\w+\"\\), request_id: \"[\\w\\d_~]+\", to_agent_id: HashString\\(\"alex\"\\), from_agent_id: HashString\\(\"billy\"\\), content: \"echo: wah\" \\}\\)";
-    assert2_msg_matches!(alex, billy, expected);
+    assert2_msg_matches!(alex, billy, expected, options);
 }
 
 /// Test SendDirectMessage and response failure
