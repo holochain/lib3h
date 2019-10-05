@@ -247,7 +247,7 @@ impl P2pGateway {
         let payload =
             if let GatewayOutputWrapType::WrapOutputWithP2pDirectMessage = self.wrap_output_type {
                 let dm_wrapper = DirectMessageData {
-                    space_address: self.identifier.id.clone(),
+                    space_address: self.identifier.id.clone().into(),
                     request_id: "".to_string(),
                     to_agent_id,
                     from_agent_id: self.this_peer.peer_name.clone().into(),

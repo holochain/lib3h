@@ -16,14 +16,14 @@ use crate::{
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{protocol::*, uri::Lib3hUri, Address};
+use lib3h_protocol::{protocol::*, types::SpaceHash, uri::Lib3hUri, Address};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
 
 /// Identifier of a source chain: SpaceAddress+AgentId
-pub type ChainId = (Address, Address);
+pub type ChainId = (SpaceHash, Address);
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct GatewayId {

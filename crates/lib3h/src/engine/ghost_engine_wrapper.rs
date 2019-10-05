@@ -15,6 +15,7 @@ use lib3h_protocol::{
     protocol::*,
     protocol_client::*,
     protocol_server::*,
+    types::*,
     uri::Lib3hUri,
     Address, DidWork,
 };
@@ -44,7 +45,7 @@ where
 fn server_failure(
     err: String,
     request_id: String,
-    space_address: Address,
+    space_address: SpaceHash,
     to_agent_id: Address,
 ) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
@@ -58,7 +59,7 @@ fn server_failure(
 
 fn server_success(
     request_id: String,
-    space_address: Address,
+    space_address: SpaceHash,
     to_agent_id: Address,
 ) -> Lib3hServerProtocol {
     let success_data = GenericResultData {
@@ -94,7 +95,7 @@ where
 
     fn make_callback(
         request_id: String,
-        space_addr: Address,
+        space_addr: SpaceHash,
         agent: Address,
     ) -> GhostCallback<LegacyLib3h<Engine, EngineError>, ClientToLib3hResponse, EngineError> {
         Box::new(
@@ -160,7 +161,7 @@ where
         let (request_id, space_addr, agent_id) = match &client_msg {
             Lib3hClientProtocol::Connect(data) => (
                 data.request_id.to_string(),
-                "bogus_address".into(),
+                SpaceHash::from("bogus_address"),
                 "bogus_agent".into(),
             ),
             Lib3hClientProtocol::JoinSpace(data) => (
@@ -491,7 +492,7 @@ mod tests {
 
         // The mock engine allways returns failure on connect requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"bogus_address\"), to_agent_id: HashString(\"bogus_agent\"), result_info: \"connection failed!\" })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: SpaceHash(HashString(\"bogus_address\")), to_agent_id: HashString(\"bogus_agent\"), result_info: \"connection failed!\" })]))",
             format!("{:?}", result)
         );
 
@@ -506,7 +507,7 @@ mod tests {
 
         // The mock engine allways returns success on Join requests
         assert_eq!(
-            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"fake_space_address\"), to_agent_id: HashString(\"fake_id\"), result_info: \"\" })]))",
+            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: SpaceHash(HashString(\"fake_space_address\")), to_agent_id: HashString(\"fake_id\"), result_info: \"\" })]))",
             format!("{:?}", result)
         );
 

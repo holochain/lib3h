@@ -1,6 +1,6 @@
 use holochain_persistence_api::hash::HashString;
 use lib3h::engine::GatewayId;
-use lib3h_protocol::Address;
+use lib3h_protocol::{types::SpaceHash, Address};
 use multihash::Hash;
 use std::sync::{Arc, Mutex};
 
@@ -13,9 +13,9 @@ lazy_static! {
     pub static ref BILLY_AGENT_ID: Address = "billy".into();
     pub static ref CAMILLE_AGENT_ID: Address = "camille".into();
     /// Spaces
-    pub static ref SPACE_ADDRESS_A: Address = "appA".into();
-    pub static ref SPACE_ADDRESS_B: Address = "appB".into();
-    pub static ref SPACE_ADDRESS_C: Address = "appC".into();
+    pub static ref SPACE_ADDRESS_A: SpaceHash = "appA".into();
+    pub static ref SPACE_ADDRESS_B: SpaceHash = "appB".into();
+    pub static ref SPACE_ADDRESS_C: SpaceHash = "appC".into();
     /// Entries
     pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".into();
     pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".into();

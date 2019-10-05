@@ -7,7 +7,9 @@ use lib3h::{
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
     error::Lib3hResult,
 };
-use lib3h_protocol::{protocol_server::Lib3hServerProtocol, uri::Lib3hUri, Address};
+use lib3h_protocol::{
+    protocol_server::Lib3hServerProtocol, types::SpaceHash, uri::Lib3hUri, Address,
+};
 use std::collections::{HashMap, HashSet};
 
 static TIMEOUT_MS: usize = 5000;
@@ -43,11 +45,11 @@ pub struct NodeMock {
     recv_msg_log: Vec<Lib3hServerProtocol>,
 
     /// Datastores per Space
-    chain_store_list: HashMap<Address, ChainStore>,
+    chain_store_list: HashMap<SpaceHash, ChainStore>,
     /// List of joined spaces
-    joined_space_list: HashSet<Address>,
+    joined_space_list: HashSet<SpaceHash>,
     /// Space currently in use
-    pub current_space: Option<Address>,
+    pub current_space: Option<SpaceHash>,
 }
 
 /// Constructors
@@ -86,7 +88,7 @@ impl NodeMock {
 }
 
 // utility function for tests that rely on nodes joining a space
-pub fn test_join_space(node: &mut NodeMock, space_address: &Address) {
+pub fn test_join_space(node: &mut NodeMock, space_address: &SpaceHash) {
     println!("\n {} joins {}", node.name(), space_address);
     let req_id = node.join_space(&space_address, true).unwrap();
     let (did_work, srv_msg_list) = node.process().unwrap();

@@ -259,7 +259,7 @@ impl<'engine> GhostEngine<'engine> {
                     bundle: msg.bundle.clone(),
                 };
                 // Check if its for the multiplexer
-                if msg.space_address == self.config.network_id.id {
+                if msg.space_address == self.config.network_id.id.clone().into() {
                     let _ = self.multiplexer.publish(
                         span.follower("TODO"),
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
