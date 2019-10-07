@@ -1,6 +1,7 @@
 use super::entry_store::EntryStore;
 use lib3h_protocol::{
     data_types::{EntryAspectData, EntryData},
+    types::*,
     Address,
 };
 use std::collections::HashMap;
@@ -8,13 +9,13 @@ use std::collections::HashMap;
 /// Holds Space-specific data
 #[derive(Clone)]
 pub struct ChainStore {
-    space_address: Address,
+    space_address: SpaceHash,
     stored_entry_store: EntryStore,
     authored_entry_store: EntryStore,
 }
 
 impl ChainStore {
-    pub fn new(space_address: &Address) -> Self {
+    pub fn new(space_address: &SpaceHash) -> Self {
         ChainStore {
             space_address: space_address.clone(),
             stored_entry_store: EntryStore::new(),
@@ -136,7 +137,7 @@ impl ChainStore {
     }
 
     #[allow(dead_code)]
-    pub fn space_address(&self) -> Address {
+    pub fn space_address(&self) -> SpaceHash {
         self.space_address.clone()
     }
 }

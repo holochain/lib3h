@@ -14,6 +14,14 @@ use serde::Serialize;
 const SEND_RETRY_INTERVAL_MS: u64 = 20;
 const SEND_RETRY_TIMEOUT_MS: u64 = 20000;
 
+/// we want to invoke this on the very next process call
+/// set our last_attempt back far enough to ensure this
+fn last_attempt_run_on_next_process() -> std::time::Instant {
+    std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_millis(SEND_RETRY_INTERVAL_MS * 2))
+        .expect("can subtract duration")
+}
+
 /// Private internals
 impl P2pGateway {
     /// check / dispatch all pending sends
@@ -176,6 +184,17 @@ impl P2pGateway {
         expires_at: std::time::Instant,
         cb: SendCallback,
     ) -> GhostResult<()> {
+        if !self.message_encoding.is_attached() {
+            // we must be in a call chain resulting from an incoming message
+            // we need to wait for the next process() call to continue
+            return self.priv_send_queue_pending(SendMetaData {
+                send_data: SendData::WithFullLowUri(send_data),
+                last_attempt: last_attempt_run_on_next_process(),
+                expires_at,
+                cb,
+            });
+        }
+
         // capture this first so our interval doesn't drift too much
         let last_attempt = std::time::Instant::now();
 
@@ -228,7 +247,7 @@ impl P2pGateway {
         let payload =
             if let GatewayOutputWrapType::WrapOutputWithP2pDirectMessage = self.wrap_output_type {
                 let dm_wrapper = DirectMessageData {
-                    space_address: self.identifier.id.clone(),
+                    space_address: self.identifier.id.clone().into(),
                     request_id: "".to_string(),
                     to_agent_id,
                     from_agent_id: self.this_peer.peer_name.clone().into(),

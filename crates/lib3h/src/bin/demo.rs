@@ -15,7 +15,7 @@ use lib3h_zombie_actor::*;
 use url::Url;
 
 static NET_ID: &'static str = "query-demo-network";
-static SPACE_ID: &'static str = "query-demo-space";
+static SPACE_ADDR: &'static str = "query-demo-space";
 static ENTRY_ADDR: &'static str = "query-demo-entry";
 static ASPECT_ADDR: &'static str = "query-demo-aspect";
 static A_1_ID: &'static str = "agent-1-id";
@@ -131,7 +131,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Span::fixme(),
                 ClientToLib3h::JoinSpace(SpaceData {
                     request_id: "".to_string(),
-                    space_address: SPACE_ID.to_string().into(),
+                    space_address: SPACE_ADDR.into(),
                     agent_id: A_1_ID.to_string().into(),
                 }),
                 Box::new(|_, r| {
@@ -146,7 +146,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Span::fixme(),
                 ClientToLib3h::JoinSpace(SpaceData {
                     request_id: "".to_string(),
-                    space_address: SPACE_ID.to_string().into(),
+                    space_address: SPACE_ADDR.into(),
                     agent_id: A_2_ID.to_string().into(),
                 }),
                 Box::new(|_, r| {
@@ -172,7 +172,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Some(Lib3hToClient::HandleQueryEntry(q_data)) => {
                     msg.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(
                         QueryEntryResultData {
-                            space_address: SPACE_ID.to_string().into(),
+                            space_address: SPACE_ADDR.into(),
                             entry_address: ENTRY_ADDR.to_string().into(),
                             request_id: "TEST_REQ_ID".to_string(),
                             requester_agent_id: A_1_ID.to_string().into(),
@@ -228,7 +228,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .request(
                 Span::fixme(),
                 ClientToLib3h::SendDirectMessage(DirectMessageData {
-                    space_address: SPACE_ID.to_string().into(),
+                    space_address: SPACE_ADDR.into(),
                     request_id: "TEST_REQ_ID".to_string(),
                     to_agent_id: A_2_ID.to_string().into(),
                     from_agent_id: A_1_ID.to_string().into(),
@@ -254,7 +254,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .request(
                 Span::fixme(),
                 ClientToLib3h::QueryEntry(QueryEntryData {
-                    space_address: SPACE_ID.to_string().into(),
+                    space_address: SPACE_ADDR.into(),
                     entry_address: ENTRY_ADDR.to_string().into(),
                     request_id: "TEST_REQ_ID".to_string(),
                     requester_agent_id: A_1_ID.to_string().into(),
@@ -274,7 +274,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .publish(
                 Span::fixme(),
                 ClientToLib3h::PublishEntry(ProvidedEntryData {
-                    space_address: SPACE_ID.to_string().into(),
+                    space_address: SPACE_ADDR.into(),
                     provider_agent_id: A_1_ID.to_string().into(),
                     entry: EntryData {
                         entry_address: ENTRY_ADDR.to_string().into(),

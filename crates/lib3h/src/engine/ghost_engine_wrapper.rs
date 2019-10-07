@@ -15,6 +15,7 @@ use lib3h_protocol::{
     protocol::*,
     protocol_client::*,
     protocol_server::*,
+    types::*,
     uri::Lib3hUri,
     Address, DidWork,
 };
@@ -44,7 +45,7 @@ where
 fn server_failure(
     err: String,
     request_id: String,
-    space_address: Address,
+    space_address: SpaceHash,
     to_agent_id: Address,
 ) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
@@ -58,7 +59,7 @@ fn server_failure(
 
 fn server_success(
     request_id: String,
-    space_address: Address,
+    space_address: SpaceHash,
     to_agent_id: Address,
 ) -> Lib3hServerProtocol {
     let success_data = GenericResultData {
@@ -94,7 +95,7 @@ where
 
     fn make_callback(
         request_id: String,
-        space_addr: Address,
+        space_addr: SpaceHash,
         agent: Address,
     ) -> GhostCallback<LegacyLib3h<Engine, EngineError>, ClientToLib3hResponse, EngineError> {
         Box::new(
@@ -115,7 +116,21 @@ where
                             ClientToLib3hResponse::LeaveSpaceResult => {
                                 server_success(request_id.clone(), space_addr, agent)
                             }
-                            _ => rsp.into(),
+                            ClientToLib3hResponse::SendDirectMessageResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::SendDirectMessageResult(data)
+                            }
+                            ClientToLib3hResponse::FetchEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::FetchEntryResult(data)
+                            }
+                            ClientToLib3hResponse::QueryEntryResult(sent_data) => {
+                                let mut data = sent_data;
+                                data.request_id = request_id.clone();
+                                Lib3hServerProtocol::QueryEntryResult(data)
+                            }
                         };
                         me.client_request_responses.push(response)
                     }
@@ -146,7 +161,7 @@ where
         let (request_id, space_addr, agent_id) = match &client_msg {
             Lib3hClientProtocol::Connect(data) => (
                 data.request_id.to_string(),
-                "bogus_address".into(),
+                SpaceHash::from("bogus_address"),
                 "bogus_agent".into(),
             ),
             Lib3hClientProtocol::JoinSpace(data) => (
@@ -468,7 +483,7 @@ mod tests {
         let data = ConnectData {
             request_id: "foo_request_id".into(),
             peer_location: Url::parse("mocknet://t1").expect("can parse url").into(),
-            network_id: "fake_id".to_string(),
+            network_id: "fake_id".into(),
         };
 
         assert!(legacy.post(Lib3hClientProtocol::Connect(data)).is_ok());
@@ -477,7 +492,7 @@ mod tests {
 
         // The mock engine allways returns failure on connect requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: HashString(\"bogus_address\"), to_agent_id: HashString(\"bogus_agent\"), result_info: \"connection failed!\" })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: SpaceHash(HashString(\"bogus_address\")), to_agent_id: HashString(\"bogus_agent\"), result_info: \"connection failed!\" })]))",
             format!("{:?}", result)
         );
 
@@ -492,7 +507,7 @@ mod tests {
 
         // The mock engine allways returns success on Join requests
         assert_eq!(
-            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: HashString(\"fake_space_address\"), to_agent_id: HashString(\"fake_id\"), result_info: \"\" })]))",
+            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: SpaceHash(HashString(\"fake_space_address\")), to_agent_id: HashString(\"fake_id\"), result_info: \"\" })]))",
             format!("{:?}", result)
         );
 

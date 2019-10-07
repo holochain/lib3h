@@ -11,6 +11,7 @@ use lib3h_protocol::{
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
+    types::*,
     uri::Lib3hUri,
     Address, DidWork,
 };
@@ -111,7 +112,8 @@ impl NodeMock {
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
-        debug!("\n\n({}).process() START", self.name);
+        debug!("\n");
+        debug!("({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
         debug!(
             "({}).process() END - {}",
@@ -128,7 +130,7 @@ impl NodeMock {
     }
 
     ///
-    pub fn set_current_space(&mut self, space_address: &Address) {
+    pub fn set_current_space(&mut self, space_address: &SpaceHash) {
         if self.chain_store_list.contains_key(space_address) {
             self.current_space = Some(space_address.clone());
         };
@@ -154,7 +156,7 @@ impl NodeMock {
     /// Return request_id
     pub fn join_space(
         &mut self,
-        space_address: &Address,
+        space_address: &SpaceHash,
         can_set_current: bool,
     ) -> Lib3hResult<String> {
         let join_space = lib3h_protocol::data_types::SpaceData {
@@ -185,7 +187,7 @@ impl NodeMock {
 
     /// Post a Lib3hClientProtocol::LeaveSpace and update internal tracking
     /// Return request_id
-    pub fn leave_space(&mut self, space_address: &Address) -> Lib3hResult<String> {
+    pub fn leave_space(&mut self, space_address: &SpaceHash) -> Lib3hResult<String> {
         let agent_id = self.agent_id.clone();
         let leave_space_msg = lib3h_protocol::data_types::SpaceData {
             request_id: self.generate_request_id(),
@@ -204,7 +206,7 @@ impl NodeMock {
     }
 
     ///
-    pub fn has_joined(&self, space_address: &Address) -> bool {
+    pub fn has_joined(&self, space_address: &SpaceHash) -> bool {
         self.joined_space_list.contains(space_address)
     }
 }
@@ -692,9 +694,9 @@ impl NodeMock {
     }
 
     /// Waits for work to be done
-    pub fn wait_did_work(&mut self, should_abort: bool) -> bool {
+    pub fn wait_did_work(&mut self) -> bool {
         let me = self;
-        wait_engine_wrapper_did_work!(me, should_abort)
+        wait_engine_wrapper_did_work!(me)
     }
 
     /// Continues processing the engine until no work is being done.

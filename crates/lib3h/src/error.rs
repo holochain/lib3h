@@ -3,6 +3,7 @@
 use crate::transport::error::TransportError;
 use lib3h_crypto_api::CryptoError;
 use lib3h_ghost_actor::{Backtwrap, GhostError};
+use lib3h_p2p_protocol::error::P2pError;
 use lib3h_protocol::error::{ErrorKind as Lib3hProtocolErrorKind, Lib3hProtocolError};
 use rmp_serde::decode::Error as RMPSerdeDecodeError;
 use std::{error::Error as StdError, fmt, io, result};
@@ -159,6 +160,12 @@ impl From<hcid::HcidError> for Lib3hError {
 impl From<Lib3hProtocolError> for Lib3hError {
     fn from(err: Lib3hProtocolError) -> Self {
         Lib3hError::new(ErrorKind::Lib3hProtocolError(err))
+    }
+}
+
+impl From<P2pError> for Lib3hError {
+    fn from(err: P2pError) -> Self {
+        format!("{:?}", err).into()
     }
 }
 
