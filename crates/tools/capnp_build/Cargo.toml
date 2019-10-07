@@ -5,4 +5,4 @@ authors = ["neonphog <neonphog@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-capnpc = "=0.10.0"
+capnpc = "=0.10.1"

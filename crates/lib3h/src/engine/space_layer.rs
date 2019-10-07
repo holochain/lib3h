@@ -11,7 +11,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::*, protocol::*, uri::Lib3hUri, DidWork};
+use lib3h_protocol::{data_types::*, protocol::*, types::SpaceHash, uri::Lib3hUri, DidWork};
 use rmp_serde::Deserializer;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ use url::Url;
 /// Engine does not process a space gateway's Transport because it is shared with the network layer
 impl<'engine> GhostEngine<'engine> {
     /// Return list of space+this_peer for all currently joined Spaces
-    pub fn get_all_spaces(&mut self) -> Vec<(SpaceAddress, PeerData)> {
+    pub fn get_all_spaces(&mut self) -> Vec<(SpaceHash, PeerData)> {
         let mut result = Vec::new();
         let chain_id_list: Vec<ChainId> = self
             .space_gateway_map
@@ -29,7 +29,7 @@ impl<'engine> GhostEngine<'engine> {
             .map(|(id, _)| id.clone())
             .collect();
         for chainId in chain_id_list {
-            let space_address: String = chainId.0.clone().into();
+            let space_address: SpaceHash = chainId.0.clone();
             result.push((
                 space_address,
                 self.this_space_peer(chainId.clone())
@@ -43,11 +43,11 @@ impl<'engine> GhostEngine<'engine> {
     /// Return first space gateway for a specified space_address
     pub fn get_first_space_mut(
         &mut self,
-        space_address: &str,
+        space_address: &SpaceHash,
     ) -> Option<&mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>> {
         for (chainId, space_gateway) in self.space_gateway_map.iter_mut() {
-            let current_space_address: String = chainId.0.clone().into();
-            if current_space_address == space_address {
+            let current_space_address: SpaceHash = chainId.0.clone();
+            if &current_space_address == space_address {
                 return Some(space_gateway);
             }
         }
@@ -66,7 +66,6 @@ impl<'engine> GhostEngine<'engine> {
         for (chain_id, mut space_gateway) in space_gateway_map.drain() {
             space_gateway.process(self)?;
             let request_list = space_gateway.drain_messages();
-            debug!("drained: {:?}", request_list);
             did_work = did_work || request_list.len() > 0;
             space_outbox_map.insert(chain_id.clone(), request_list);
             self.space_gateway_map.insert(chain_id, space_gateway);
@@ -74,7 +73,6 @@ impl<'engine> GhostEngine<'engine> {
         // Process all space gateway requests
         for (chain_id, request_list) in space_outbox_map {
             for request in request_list {
-                debug!("process {:?} {:?}", chain_id, request);
                 self.handle_space_request(
                     request.span().child("handle_space_request"),
                     &chain_id,
@@ -111,7 +109,7 @@ impl<'engine> GhostEngine<'engine> {
                     DhtRequestToParent::GossipTo(gossip_data) => {
                         let from_peer_name = &space_gateway.as_mut().as_mut().this_peer().peer_name;
                         handle_GossipTo(
-                            chain_id.0.clone(),
+                            chain_id.0.clone().into(),
                             space_gateway,
                             from_peer_name,
                             gossip_data,
@@ -243,7 +241,7 @@ impl<'engine> GhostEngine<'engine> {
                     }
                     RequestToParent::ReceivedData { uri, payload } => {
                         if payload.len() == 0 {
-                            debug!("Implement Ping!");
+                            panic!("We should no longer ever be sending zero length messages");
                         } else {
                             let mut de = Deserializer::new(&payload[..]);
                             let maybe_msg: Result<P2pProtocol, rmp_serde::decode::Error> =
