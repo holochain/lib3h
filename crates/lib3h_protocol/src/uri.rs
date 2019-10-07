@@ -328,7 +328,6 @@ mod tests {
         let scheme = "wss";
         let host = "ws1://127.0.0.1/";
         let port = 9000;
-        let url = Builder::with_raw_url(host)
             .unwrap_or_else(|e| panic!("with_raw_url: {:?}", e))
             //            .with_host(host)
             .with_scheme(scheme)
