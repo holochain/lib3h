@@ -86,56 +86,61 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
         };
 
         let weak = Arc::downgrade(&endpoint_ref.inner);
-        system_ref.enqueue_processor(Box::new(move || match weak.upgrade() {
-            Some(mut strong_inner) => match user_data.upgrade() {
-                Some(mut strong_user_data) => {
-                    let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
-                    while let Ok((request_id, cb)) = strong_inner.req_receiver.try_recv() {
-                        strong_inner.callbacks.insert(request_id, cb);
-                    }
-
-                    while let Ok((maybe_id, message)) = strong_inner.handle_receiver.try_recv() {
-                        // println!("HNDL {:?} {:?} {:?}", strong_inner.destination, maybe_id, message);
-                        if let GhostProtocolVariantType::Response =
-                            message.discriminant().variant_type()
-                        {
-                            let request_id = match maybe_id {
-                                None => panic!("response with no request_id: {:?}", message),
-                                Some(request_id) => request_id,
-                            };
-                            match strong_inner.callbacks.remove(&request_id) {
-                                None => {
-                                    println!("request_id {} not found {:?}", request_id, message)
-                                }
-                                Some(cb) => {
-                                    cb(&mut strong_user_data, Ok(message)).expect("aaa");
-                                }
-                            }
-                        } else {
-                            let cb: Option<GhostHandlerCb<'lt, P>> = match maybe_id {
-                                None => None,
-                                Some(request_id) => {
-                                    let resp_sender = strong_inner.resp_sender.clone();
-                                    Some(Box::new(move |message| {
-                                        resp_sender.send((Some(request_id), message))?;
-                                        Ok(())
-                                    }))
-                                }
-                            };
-                            strong_inner
-                                .handler
-                                .trigger(&mut strong_user_data, message, cb)
-                                .expect("endpoint process error");
+        system_ref.enqueue_processor(
+            0,
+            Box::new(move || match weak.upgrade() {
+                Some(mut strong_inner) => match user_data.upgrade() {
+                    Some(mut strong_user_data) => {
+                        let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                        let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                        while let Ok((request_id, cb)) = strong_inner.req_receiver.try_recv() {
+                            strong_inner.callbacks.insert(request_id, cb);
                         }
-                    }
 
-                    true
-                }
-                None => false,
-            },
-            None => false,
-        }))?;
+                        while let Ok((maybe_id, message)) = strong_inner.handle_receiver.try_recv()
+                        {
+                            // println!("HNDL {:?} {:?} {:?}", strong_inner.destination, maybe_id, message);
+                            if let GhostProtocolVariantType::Response =
+                                message.discriminant().variant_type()
+                            {
+                                let request_id = match maybe_id {
+                                    None => panic!("response with no request_id: {:?}", message),
+                                    Some(request_id) => request_id,
+                                };
+                                match strong_inner.callbacks.remove(&request_id) {
+                                    None => println!(
+                                        "request_id {} not found {:?}",
+                                        request_id, message
+                                    ),
+                                    Some(cb) => {
+                                        cb(&mut strong_user_data, Ok(message)).expect("aaa");
+                                    }
+                                }
+                            } else {
+                                let cb: Option<GhostHandlerCb<'lt, P>> = match maybe_id {
+                                    None => None,
+                                    Some(request_id) => {
+                                        let resp_sender = strong_inner.resp_sender.clone();
+                                        Some(Box::new(move |message| {
+                                            resp_sender.send((Some(request_id), message))?;
+                                            Ok(())
+                                        }))
+                                    }
+                                };
+                                strong_inner
+                                    .handler
+                                    .trigger(&mut strong_user_data, message, cb)
+                                    .expect("endpoint process error");
+                            }
+                        }
+
+                        GhostProcessInstructions::default().set_should_continue(true)
+                    }
+                    None => GhostProcessInstructions::default(),
+                },
+                None => GhostProcessInstructions::default(),
+            }),
+        )?;
 
         Ok(endpoint_ref)
     }
