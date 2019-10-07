@@ -3,6 +3,7 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
+use crate::utils::processor_harness::ProcessingOptions;
 use lib3h::{
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
     error::Lib3hResult,
@@ -11,7 +12,6 @@ use lib3h_protocol::{
     protocol_server::Lib3hServerProtocol, types::SpaceHash, uri::Lib3hUri, Address,
 };
 use std::collections::{HashMap, HashSet};
-use crate::utils::processor_harness::ProcessingOptions;
 
 static TIMEOUT_MS: usize = 5000;
 
@@ -89,10 +89,13 @@ impl NodeMock {
 }
 
 // utility function for tests that rely on nodes joining a space
-pub fn test_join_space(node: &mut NodeMock, space_address: &SpaceHash, options: &ProcessingOptions) {
+pub fn test_join_space(
+    node: &mut NodeMock,
+    space_address: &SpaceHash,
+    options: &ProcessingOptions,
+) {
     println!("\n {} joins {}", node.name(), space_address);
     let req_id = node.join_space(&space_address, true).unwrap();
     let expected = format!("SuccessResult\\(GenericResultData \\{{ request_id: \"{}\", space_address: SpaceHash\\(HashString\\(\"{}\"\\)\\), to_agent_id: HashString\\(\"{}\"\\), result_info: \"\" \\}}\\)", req_id, space_address.to_string(), node.name());
     assert_msg_matches!(node, expected.as_str(), options);
-
 }

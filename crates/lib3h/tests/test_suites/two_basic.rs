@@ -27,7 +27,11 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 #[allow(dead_code)]
-pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock, options: &ProcessingOptions) {
+pub fn setup_two_nodes(
+    mut alex: &mut NodeMock,
+    mut billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Connect Alex to Billy
     let connect_data = alex.connect_to(&billy.advertise()).unwrap();
     wait_connect!(alex, connect_data, billy);
@@ -37,9 +41,7 @@ pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock, option
     billy.wait_until_no_work();
     two_join_space(&mut alex, &mut billy, &SPACE_ADDRESS_A, options);
 
-    debug!(
-        "DONE setup_two_nodes() DONE \n\n ------------------------------------------------ \n"
-    );
+    debug!("DONE setup_two_nodes() DONE \n\n ------------------------------------------------ \n");
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -86,7 +88,12 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData, options: &Proces
 }
 
 // setup for two nodes joining the same space
-pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &SpaceHash, options: &ProcessingOptions) {
+pub fn two_join_space(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    space_address: &SpaceHash,
+    options: &ProcessingOptions,
+) {
     debug!(
         "\ntwo_join_space ({},{}) -> {}\n",
         alex.name(),

@@ -1,12 +1,16 @@
 use crate::{
     node_mock::{test_join_space, NodeMock},
     test_suites::two_basic::request_entry_ok,
-    utils::{processor_harness::ProcessingOptions, constants::*},
+    utils::{constants::*, processor_harness::ProcessingOptions},
 };
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
-pub type ThreeNodesTestFn = fn(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock,
-                               options: &ProcessingOptions);
+pub type ThreeNodesTestFn = fn(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    camille: &mut NodeMock,
+    options: &ProcessingOptions,
+);
 
 lazy_static! {
     pub static ref THREE_NODES_BASIC_TEST_FNS: Vec<(ThreeNodesTestFn, bool)> = vec![
@@ -25,7 +29,7 @@ pub fn setup_three_nodes(
     /*mut*/ alex: &mut NodeMock,
     billy: &mut NodeMock,
     /*mut*/ camille: &mut NodeMock,
-    options: &ProcessingOptions
+    options: &ProcessingOptions,
 ) {
     // Connection
     // ==========
@@ -68,12 +72,22 @@ pub fn setup_three_nodes(
 //--------------------------------------------------------------------------------------------------
 
 /// Empty function that triggers the test suite
-fn test_setup_only(_alex: &mut NodeMock, _billy: &mut NodeMock, _camille: &mut NodeMock, _options: &ProcessingOptions) {
+fn test_setup_only(
+    _alex: &mut NodeMock,
+    _billy: &mut NodeMock,
+    _camille: &mut NodeMock,
+    _options: &ProcessingOptions,
+) {
     // n/a
 }
 
 /// Test SendDirectMessage and response
-fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock, options: &ProcessingOptions) {
+fn test_send_message(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    camille: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // A sends DM to B
     // ===============
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
@@ -136,8 +150,12 @@ fn test_send_message(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut No
 
 /// Test publish, Store, Query
 #[allow(dead_code)]
-fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut NodeMock,
-                        options: &ProcessingOptions) {
+fn test_author_and_hold(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    camille: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Hold an entry without publishing it
     println!("\n Alex broadcasts entry via GossipingList...\n");
     let entry_1 = alex

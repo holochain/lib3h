@@ -42,7 +42,8 @@ const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions
     should_abort: true,
 };
 
-const THREE_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = TWO_MEMORY_NODES_PROCESSING_OPTIONS;
+const THREE_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions =
+    TWO_MEMORY_NODES_PROCESSING_OPTIONS;
 const MIRROR_TEST_PROCESSING_OPTIONS: ProcessingOptions = TWO_MEMORY_NODES_PROCESSING_OPTIONS;
 
 const TWO_WSS_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
@@ -501,13 +502,21 @@ fn launch_three_wss_nodes_test(
     );
 
     if can_setup {
-        setup_three_nodes(&mut alex, &mut billy, &mut camille,
-                &THREE_MEMORY_NODES_PROCESSING_OPTIONS);
+        setup_three_nodes(
+            &mut alex,
+            &mut billy,
+            &mut camille,
+            &THREE_MEMORY_NODES_PROCESSING_OPTIONS,
+        );
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy, &mut camille,
-            &THREE_MEMORY_NODES_PROCESSING_OPTIONS);
+    test_fn(
+        &mut alex,
+        &mut billy,
+        &mut camille,
+        &THREE_MEMORY_NODES_PROCESSING_OPTIONS,
+    );
 
     // Wrap-up test
     debug!("==========================");

@@ -1,7 +1,6 @@
 use crate::{
     node_mock::{test_join_space, NodeMock},
-    utils::{processor_harness::ProcessingOptions, constants::*},
-
+    utils::{constants::*, processor_harness::ProcessingOptions},
 };
 
 pub type MultiNodeTestFn = fn(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions);
@@ -113,7 +112,6 @@ fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions)
     }
 }
 
-
 fn process_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions) {
     let timeout = std::time::Duration::from_millis(options.timeout_ms);
     let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
@@ -122,7 +120,10 @@ fn process_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions) {
         process_nodes_inner(nodes);
         let elapsed = clock.elapsed().unwrap();
         if elapsed > timeout {
-            trace!("[process_nodes] timed out (elapsed={:?} ms)", elapsed.as_millis());
+            trace!(
+                "[process_nodes] timed out (elapsed={:?} ms)",
+                elapsed.as_millis()
+            );
             break;
         }
         std::thread::sleep(delay_interval);
@@ -133,5 +134,5 @@ fn process_nodes_inner(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
         //wait_engine_wrapper_until_no_work!(node);
         let _result = node.process();
-   }
+    }
 }
