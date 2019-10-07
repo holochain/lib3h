@@ -44,7 +44,7 @@ impl
             Box::new(|mut me, response| {
                 let response = {
                     match response {
-                        GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
+                        GhostCallbackData::Timeout(bt) => return Err(Lib3hError::new_timeout(&bt).into()),
                         GhostCallbackData::Response(response) => match response {
                             Err(e) => panic!("{:?}", e),
                             Ok(response) => response,
