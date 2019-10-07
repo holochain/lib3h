@@ -71,7 +71,7 @@ impl std::ops::DerefMut for Opaque {
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 pub struct EntryAspectData {
-    pub aspect_address: Address,
+    pub aspect_address: AspectHash,
     pub type_hint: String,
     pub aspect: Opaque,
     pub publish_ts: u64,
@@ -89,12 +89,12 @@ impl PartialOrd for EntryAspectData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryData {
-    pub entry_address: Address,
+    pub entry_address: EntryHash,
     pub aspect_list: Vec<EntryAspectData>,
 }
 
 impl EntryData {
-    pub fn new(address: &Address) -> Self {
+    pub fn new(address: &EntryHash) -> Self {
         EntryData {
             entry_address: address.clone(),
             aspect_list: Vec::new(),
@@ -102,7 +102,7 @@ impl EntryData {
     }
 
     /// get an EntryAspectData from an EntryData
-    pub fn get(&self, aspect_address: &Address) -> Option<EntryAspectData> {
+    pub fn get(&self, aspect_address: &AspectHash) -> Option<EntryAspectData> {
         for aspect in self.aspect_list.iter() {
             if aspect.aspect_address == *aspect_address {
                 return Some(aspect.clone());
@@ -174,7 +174,7 @@ impl std::fmt::Display for Opaque {
 pub struct BootstrapData {
     /// either the network layer network_id, or the dna hash
     // this needs a more accurate name which represents that this is the gateway id
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     /// connection uri, such as
     ///   `wss://1.2.3.4:55888?a=HcMyada`
     ///   `transportid:HcMyada?a=HcSagent`
@@ -252,7 +252,7 @@ pub struct DirectMessageData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryData {
     pub space_address: SpaceHash,
-    pub entry_address: Address,
+    pub entry_address: EntryHash,
     pub request_id: String,
     pub requester_agent_id: Address,
     pub query: Opaque,
@@ -261,7 +261,7 @@ pub struct QueryEntryData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryResultData {
     pub space_address: SpaceHash,
-    pub entry_address: Address,
+    pub entry_address: EntryHash,
     pub request_id: String,
     pub requester_agent_id: Address,
     pub responder_agent_id: Address,
@@ -285,7 +285,7 @@ pub struct StoreEntryAspectData {
     pub request_id: String,
     pub space_address: SpaceHash,
     pub provider_agent_id: Address,
-    pub entry_address: Address,
+    pub entry_address: EntryHash,
     pub entry_aspect: EntryAspectData,
 }
 
@@ -294,7 +294,7 @@ pub struct StoreEntryAspectData {
 pub struct DropEntryData {
     pub space_address: SpaceHash,
     pub request_id: String,
-    pub entry_address: Address,
+    pub entry_address: EntryHash,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -305,10 +305,10 @@ pub struct DropEntryData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FetchEntryData {
     pub space_address: SpaceHash,
-    pub entry_address: Address,
+    pub entry_address: EntryHash,
     pub request_id: String,
     pub provider_agent_id: Address,
-    pub aspect_address_list: Option<Vec<Address>>, // None -> Get all, otherwise get specified aspects
+    pub aspect_address_list: Option<Vec<AspectHash>>, // None -> Get all, otherwise get specified aspects
 }
 
 /// DHT data response from a request
@@ -337,7 +337,8 @@ pub struct EntryListData {
     pub space_address: SpaceHash,
     pub provider_agent_id: Address,
     pub request_id: String,
-    pub address_map: std::collections::HashMap<Address, Vec<Address>>, // Aspect addresses per entry
+    // Aspect addresses per entry
+    pub address_map: std::collections::HashMap<EntryHash, Vec<AspectHash>>,
 }
 
 // ---------- serialization helper for binary data as base 64 ---------- //
