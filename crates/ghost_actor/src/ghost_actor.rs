@@ -71,7 +71,8 @@ pub struct GhostEndpointRef<
     P: GhostProtocol,
     H: GhostHandler<'lt, X, P>,
 > {
-    inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
+    // just for ref counting
+    _inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
     req_sender: crossbeam_channel::Sender<(P, Option<GhostResponseCb<'lt, X, P>>)>,
     // just for ref counting
     _a_ref: Arc<Mutex<A>>,
@@ -89,40 +90,36 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
         handler: H,
     ) -> GhostResult<Self> {
         let (req_sender, req_receiver) = crossbeam_channel::unbounded();
-        let endpoint_ref = Self {
-            inner: Arc::new(Mutex::new(GhostEndpointRefInner {
-                sender,
-                handle_receiver: receiver,
-                req_receiver,
-                pending_callbacks: GhostTracker::new(sys_ref.clone(), user_data.clone()),
-                handler,
-            })),
+
+        let inner = Arc::new(Mutex::new(GhostEndpointRefInner {
+            sender,
+            handle_receiver: receiver,
+            req_receiver,
+            pending_callbacks: GhostTracker::new(sys_ref.clone(), user_data),
+            handler,
+        }));
+        let weak_inner = Arc::downgrade(&inner);
+        inner
+            .lock()
+            .expect("can lock inner during construction")
+            .pending_callbacks
+            .periodic_task(
+                0,
+                Box::new(move |user_data| match weak_inner.upgrade() {
+                    Some(mut strong_inner) => {
+                        let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                        strong_inner.priv_process(user_data)?;
+                        Ok(GhostProcessInstructions::default().set_should_continue(true))
+                    }
+                    None => Ok(GhostProcessInstructions::default()),
+                }),
+            )?;
+
+        Ok(Self {
+            _inner: inner,
             req_sender,
             _a_ref: a_ref,
-        };
-
-        let weak = Arc::downgrade(&endpoint_ref.inner);
-        sys_ref.enqueue_processor(
-            0,
-            Box::new(move || match weak.upgrade() {
-                Some(mut strong_inner) => match user_data.upgrade() {
-                    Some(mut strong_user_data) => {
-                        let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                        let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
-
-                        strong_inner
-                            .priv_process(&mut *strong_user_data)
-                            .expect("failed endpoint ref process");
-
-                        GhostProcessInstructions::default().set_should_continue(true)
-                    }
-                    None => GhostProcessInstructions::default(),
-                },
-                None => GhostProcessInstructions::default(),
-            }),
-        )?;
-
-        Ok(endpoint_ref)
+        })
     }
 }
 

@@ -16,7 +16,7 @@ pub type GhostResponseCb<'lt, X, T> =
     Box<dyn FnOnce(&mut X, GhostResult<T>) -> GhostResult<()> + 'lt + Send + Sync>;
 
 pub type GhostPeriodicCb<'lt, X> =
-    Box<dyn FnMut(&mut X) -> GhostProcessInstructions + 'lt + Send + Sync>;
+    Box<dyn FnMut(&mut X) -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
@@ -153,11 +153,11 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
                                 .process(&mut *strong_user_data)
                                 .expect("tracker process error");
 
-                            GhostProcessInstructions::default().set_should_continue(true)
+                            Ok(GhostProcessInstructions::default().set_should_continue(true))
                         }
-                        None => GhostProcessInstructions::default(),
+                        None => Ok(GhostProcessInstructions::default()),
                     },
-                    None => GhostProcessInstructions::default(),
+                    None => Ok(GhostProcessInstructions::default()),
                 }),
             )
             .expect("can enqueue processor");
@@ -185,7 +185,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
                     let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
                     cb(&mut *strong_user_data)
                 }
-                None => GhostProcessInstructions::default(),
+                None => Ok(GhostProcessInstructions::default()),
             }),
         )
     }
@@ -258,9 +258,9 @@ mod tests {
                 2,
                 Box::new(|me| {
                     me.ticks += 1;
-                    GhostProcessInstructions::default()
+                    Ok(GhostProcessInstructions::default()
                         .set_should_continue(true)
-                        .set_next_run_delay_ms(2)
+                        .set_next_run_delay_ms(2))
                 }),
             )
             .unwrap();

@@ -37,7 +37,8 @@ impl GhostProcessInstructions {
 }
 
 /// typedef for a periodic process callback
-pub type GhostProcessCb<'lt> = Box<dyn FnMut() -> GhostProcessInstructions + 'lt + Send + Sync>;
+pub type GhostProcessCb<'lt> =
+    Box<dyn FnMut() -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
 
 /// internal struct for tracking processor fns
 struct GhostProcessorData<'lt> {
@@ -67,13 +68,20 @@ impl<'lt> GhostSystemInner<'lt> {
         while let Ok(item) = self.process_recv.try_recv() {
             self.process_queue.push(item);
         }
+        let mut errors = Vec::new();
         for mut item in self.process_queue.drain(..).collect::<Vec<_>>() {
             match &item.delay_until {
                 Some(delay_until) if &std::time::Instant::now() < delay_until => {
                     self.process_queue.push(item)
                 }
                 _ => {
-                    let instructions = (item.cb)();
+                    let instructions = match (item.cb)() {
+                        Err(e) => {
+                            errors.push(e);
+                            continue;
+                        }
+                        Ok(i) => i,
+                    };
                     if instructions.should_continue {
                         let delay_ms = instructions.next_run_delay_ms();
                         item.delay_until = match delay_ms {
@@ -89,7 +97,11 @@ impl<'lt> GhostSystemInner<'lt> {
                 }
             }
         }
-        Ok(())
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.into())
+        }
     }
 }
 
@@ -160,11 +172,11 @@ impl<'lt> GhostSystemRef<'lt> {
                 Some(mut strong_actor) => {
                     let mut strong_actor = ghost_try_lock(&mut strong_actor);
                     match strong_actor.process() {
-                        Ok(()) => GhostProcessInstructions::default().set_should_continue(true),
+                        Ok(()) => Ok(GhostProcessInstructions::default().set_should_continue(true)),
                         Err(e) => panic!("actor.process() error: {:?}", e),
                     }
                 }
-                None => GhostProcessInstructions::default(),
+                None => Ok(GhostProcessInstructions::default()),
             }),
         )?;
 
@@ -229,7 +241,7 @@ mod tests {
                 2,
                 Box::new(move || {
                     test_clone.lock().unwrap().start_delay = true;
-                    GhostProcessInstructions::default()
+                    Ok(GhostProcessInstructions::default())
                 }),
             )
             .unwrap();
@@ -240,7 +252,7 @@ mod tests {
                 0,
                 Box::new(move || {
                     test_clone.lock().unwrap().non_start_delay = true;
-                    GhostProcessInstructions::default()
+                    Ok(GhostProcessInstructions::default())
                 }),
             )
             .unwrap();
@@ -286,9 +298,9 @@ mod tests {
                 0,
                 Box::new(move || {
                     test_clone.lock().unwrap().delayed_count += 1;
-                    GhostProcessInstructions::default()
+                    Ok(GhostProcessInstructions::default()
                         .set_should_continue(true)
-                        .set_next_run_delay_ms(3)
+                        .set_next_run_delay_ms(3))
                 }),
             )
             .unwrap();
@@ -299,7 +311,7 @@ mod tests {
                 0,
                 Box::new(move || {
                     test_clone.lock().unwrap().non_delayed_count += 1;
-                    GhostProcessInstructions::default().set_should_continue(true)
+                    Ok(GhostProcessInstructions::default().set_should_continue(true))
                 }),
             )
             .unwrap();
