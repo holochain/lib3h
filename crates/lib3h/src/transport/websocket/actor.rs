@@ -272,7 +272,7 @@ impl GhostTransportWebsocket {
             match event {
                 StreamEvent::ErrorOccured(uri, error) => {
                     warn!(
-                        "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
+                        "Error in GhostTransportWebsocket stream connection to {:?}: {:?}",
                         uri, error
                     );
                     self.endpoint_self.publish(
@@ -332,7 +332,7 @@ impl GhostTransportWebsocket {
                     temp.push(msg);
                 }
             } else {
-                panic!("Found a non-SendMessage message in GhostWebsocketTransport::pending!");
+                panic!("Found a non-SendMessage message in GhostTransportWebsocket::pending!");
             }
         }
         self.pending = temp;
