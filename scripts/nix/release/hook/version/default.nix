@@ -6,7 +6,8 @@ let
 for dep in \
  lib3h_protocol \
  lib3h_crypto_api \
- lib3h_sodium
+ lib3h_sodium \
+ lib3h_zombie_actor
 do
  echo "bumping $dep dependency versions to ${config.release.version.current} in all Cargo.toml"
  find . \
