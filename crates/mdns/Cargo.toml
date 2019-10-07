@@ -23,6 +23,6 @@ nanoid = "0.2.0"
 lib3h_protocol = { version = "=0.0.12", path = "../lib3h_protocol" }
 
 [dev-dependencies]
-lib3h = { version = "=0.0.11", path = "../lib3h" }
+lib3h = { version = "=0.0.12", path = "../lib3h" }
 lib3h_sodium = { version = "=0.0.12", path = "../sodium" }
 get_if_addrs = "0.5.3"
