@@ -4,8 +4,13 @@ let
 
  script = pkgs.writeShellScriptBin name ''
 for dep in \
- lib3h_protocol \
  lib3h_crypto_api \
+ detach \
+ ghost_actor \
+ lib3h \
+ lib3h_protocol \
+ lib3h_mdns \
+ lib3h_p2p_protocol \
  lib3h_sodium \
  lib3h_zombie_actor
 do
