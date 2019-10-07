@@ -8,11 +8,14 @@ echo "packaging for crates.io"
 # order is important here due to dependencies
 for crate in \
  crypto_api \
- sodium \
+ detach \
+ ghost_actor \
+ lib3h \
  lib3h_protocol \
  mdns \
  p2p_protocol \
- lib3h
+ sodium \
+ zombie_actor
 do
  cargo publish --manifest-path "crates/$crate/Cargo.toml"
 
