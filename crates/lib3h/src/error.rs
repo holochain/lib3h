@@ -20,6 +20,11 @@ impl Lib3hError {
         Lib3hError(Box::new(kind))
     }
 
+    /// Helper function to build a new [Timeout](ErrorKind::Timeout) error.
+    pub fn new_timeout(bt: &Backtwrap) -> Self {
+        Lib3hError::new(ErrorKind::Timeout(bt.clone()))
+    }
+
     /// Helper function to build a new error with an [Other](ErrorKind::Other) ErrorKind.
     pub fn new_other(s: &str) -> Self {
         Lib3hError::new(ErrorKind::Other(s.to_owned()))
