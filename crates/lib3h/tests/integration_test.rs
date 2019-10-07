@@ -42,6 +42,9 @@ const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions
     should_abort: true,
 };
 
+const THREE_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = TWO_MEMORY_NODES_PROCESSING_OPTIONS;
+const MIRROR_TEST_PROCESSING_OPTIONS: ProcessingOptions = TWO_MEMORY_NODES_PROCESSING_OPTIONS;
+
 const TWO_WSS_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
     max_iters: 10000,
     delay_interval_ms: 5,
@@ -233,23 +236,24 @@ fn test_two_memory_nodes_connection_suite() {
 // Do general test with config
 fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
-    println!("");
+    debug!("");
     print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
-    println!("========================");
+    debug!("========================");
 
+    let options = &TWO_MEMORY_NODES_PROCESSING_OPTIONS;
     let fn_name = fn_name(test_fn_ptr);
     // Setup
     let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name);
     let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name);
     if can_setup {
-        setup_two_nodes(&mut alex, &mut billy);
+        setup_two_nodes(&mut alex, &mut billy, options);
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy, &TWO_MEMORY_NODES_PROCESSING_OPTIONS);
+    test_fn(&mut alex, &mut billy, options);
 
     // Wrap-up test
-    println!("========================");
+    debug!("========================");
     print_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn_ptr);
 
     // Done
@@ -259,23 +263,25 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
 // Do general test with config
 fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
-    println!("");
+    debug!("");
     print_test_name("IN-MEMORY THREE NODES TEST: ", test_fn_ptr);
-    println!("==========================");
+    debug!("==========================");
 
     // Setup
     let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     let mut camille = setup_memory_node("camille", CAMILLE_AGENT_ID.clone(), &fn_name(test_fn_ptr));
+    let options = &THREE_MEMORY_NODES_PROCESSING_OPTIONS;
+
     if can_setup {
-        setup_three_nodes(&mut alex, &mut billy, &mut camille);
+        setup_three_nodes(&mut alex, &mut billy, &mut camille, options);
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy, &mut camille);
+    test_fn(&mut alex, &mut billy, &mut camille, options);
 
     // Wrap-up test
-    println!("==========================");
+    debug!("==========================");
     print_test_name("IN-MEMORY THREE NODES TEST END: ", test_fn_ptr);
 
     // Done
@@ -293,9 +299,11 @@ fn test_mirror_suite() {
 // Do general test with config
 fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
-    println!("");
+    debug!("");
     print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
-    println!("==========================");
+    debug!("==========================");
+
+    let options = &MIRROR_TEST_PROCESSING_OPTIONS;
 
     // Setup
     let mut nodes = Vec::new();
@@ -306,14 +314,13 @@ fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), (
         nodes.push(node);
     }
     if can_setup {
-        setup_mirror_nodes(&mut nodes);
+        setup_mirror_nodes(&mut nodes, options)
     }
 
-    // Execute test
-    test_fn(&mut nodes);
+    test_fn(&mut nodes, &MIRROR_TEST_PROCESSING_OPTIONS);
 
     // Wrap-up test
-    println!("==========================");
+    debug!("==========================");
     print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
 
     // Done
@@ -441,7 +448,7 @@ fn launch_two_wss_nodes_test(
         &fn_name(test_fn_ptr),
     );
     if can_setup {
-        setup_two_nodes(&mut alex, &mut billy);
+        setup_two_nodes(&mut alex, &mut billy, &TWO_WSS_NODES_PROCESSING_OPTIONS);
     }
 
     // Execute test
@@ -492,15 +499,18 @@ fn launch_three_wss_nodes_test(
         tls_config.clone(),
         &fn_name(test_fn_ptr),
     );
+
     if can_setup {
-        setup_three_nodes(&mut alex, &mut billy, &mut camille);
+        setup_three_nodes(&mut alex, &mut billy, &mut camille,
+                &THREE_MEMORY_NODES_PROCESSING_OPTIONS);
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy, &mut camille);
+    test_fn(&mut alex, &mut billy, &mut camille,
+            &THREE_MEMORY_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
-    println!("==========================");
+    debug!("==========================");
     print_test_name(
         format!("WSS THREE NODES TEST END ({:?}):", tls_config.clone()).as_str(),
         test_fn_ptr,
