@@ -135,7 +135,6 @@ impl P2pGateway {
                         Some(peer_data),
                     ))) => {
                         // hey, we got a low-level uri, let's process it
-                        trace!("send to peer: {:?}", peer_data);
                         let uri = peer_data.get_uri();
                         trace!("send to {}", uri);
                         me.priv_send_with_full_low_uri(

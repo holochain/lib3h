@@ -200,7 +200,7 @@ impl<'engine> GhostEngine<'engine> {
                                 our_joined_space_list,
                                 net_location_copy,
                             );
-                            // we need a transportId, so search for it in the DHT
+                            // we need a nodeId, so search for it in the DHT
                             let maybe_peer_data = peer_list
                                 .iter()
                                 .find(|pd| pd.peer_location == net_location_copy);

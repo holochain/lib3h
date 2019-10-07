@@ -286,7 +286,7 @@ fn convert_to_mdns_hostname(hostname: &str) -> String {
 #[test]
 fn map_record_update_test() {
     let networkid = "hcnmynetworkid.hc-mdns-discovery.holo.host";
-    let url = "wss://1.2.3.4:12345?a=HcMmymachineid";
+    let url = "wss://1.2.3.4:12345?a=HcMmynodeid";
     let record_to_prune1 = Record::new(networkid, url, 255);
     let record_to_prune2 = Record::new(networkid, url, 200);
     // Because this record has the smallest ttl, it's the one that supposed to be kept during the dedup

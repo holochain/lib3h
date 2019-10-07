@@ -433,9 +433,9 @@ mod tests {
     fn test_websocket_transport_send_direct_msg() {
         let networkid_address: Address = "wss-bootstapping-network-id1.holo.host".into();
 
-        let machine_id1 = "fake_machine_id1".into();
+        let node_id_1 = "fake_node_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(
-            machine_id1,
+            node_id_1,
             TlsConfig::Unencrypted,
             networkid_address.clone(),
         );
@@ -448,9 +448,9 @@ mod tests {
                 .request_id_prefix("twss_to_child1")
                 .build::<Option<String>>();
 
-        let machine_id2 = "fake_machine_id2".into();
+        let node_id_2 = "fake_node_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
-            machine_id2,
+            node_id_2,
             TlsConfig::Unencrypted,
             networkid_address.clone(),
         );
@@ -521,9 +521,9 @@ mod tests {
 
         let networkid_address: Address = "wss-bootstapping-network-id.holo.host".into();
 
-        let machine_id1 = "fake_machine_id1".into();
+        let node_id_1 = "fake_node_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(
-            machine_id1,
+            node_id_1,
             TlsConfig::Unencrypted,
             networkid_address.clone(),
         );
@@ -556,9 +556,9 @@ mod tests {
         for index in 1..10 {
             wait_until_no_work!(transport1);
             {
-                let machine_id2 = "fake_machine_id2".into();
+                let node_id_2 = "fake_node_id2".into();
                 let mut transport2 = GhostTransportWebsocket::new(
-                    machine_id2,
+                    node_id_2,
                     TlsConfig::Unencrypted,
                     networkid_address.clone(),
                 );
@@ -624,9 +624,9 @@ mod tests {
         let networkid_address: Address =
             format!("wss-bootstapping-network-id-{}.holo.host", nanoid::simple()).into();
 
-        let machine_id1 = "fake_machine_id1".into();
+        let node_id_1 = "fake_node_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(
-            machine_id1,
+            node_id_1,
             TlsConfig::Unencrypted,
             networkid_address.clone(),
         );
@@ -644,9 +644,9 @@ mod tests {
             format!("{:?}", transport1.discover())
         );
 
-        let machine_id2 = "fake_machine_id2".into();
+        let node_id_2 = "fake_node_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
-            machine_id2,
+            node_id_2,
             TlsConfig::Unencrypted,
             networkid_address.clone(),
         );

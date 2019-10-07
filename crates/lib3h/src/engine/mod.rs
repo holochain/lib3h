@@ -71,11 +71,11 @@ pub struct EngineConfig {
 }
 
 pub struct TransportKeys {
-    /// Our TransportId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
+    /// Our nodeId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
     pub node_id: NodePubKey,
-    /// The TransportId public key
+    /// The nodeId public key
     pub transport_public_key: Box<dyn Buffer>,
-    /// The TransportId secret key
+    /// The nodeId secret key
     pub transport_secret_key: Box<dyn Buffer>,
 }
 impl TransportKeys {

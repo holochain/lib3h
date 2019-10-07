@@ -75,8 +75,8 @@ impl Discovery for GhostTransportMemory {
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
-        let machines = self.network.lock().unwrap().discover();
-        Ok(machines.into_iter().map(|(uri, _)| uri).collect())
+        let nodes = self.network.lock().unwrap().discover();
+        Ok(nodes.into_iter().map(|(uri, _)| uri).collect())
     }
     fn release(&mut self) -> DiscoveryResult<()> {
         Ok(())
@@ -118,10 +118,10 @@ impl GhostTransportMemory {
             if self.maybe_my_address.is_some()
                 && t.elapsed().as_millis() > self.discover_interval_ms
             {
-                if let Ok(machines) = self.discover() {
-                    if machines.len() > 0 {
+                if let Ok(nodes) = self.discover() {
+                    if nodes.len() > 0 {
                         let my_addr = self.maybe_my_address.as_ref().expect("should have bound");
-                        for found_uri in machines {
+                        for found_uri in nodes {
                             if found_uri == *my_addr {
                                 continue;
                             }

@@ -68,8 +68,8 @@ impl<
     }
 
     /// create a route for a specific agent_id + space_address combination
-    /// we are wrapping a network/machine-level gateway with a machine
-    /// space_address and machineId... the space_address + agent_id parameters
+    /// we are wrapping a network/node-level gateway with a machine
+    /// space_address and nodeId... the space_address + agent_id parameters
     /// for this function are the higher-level notions for the AgentSpaceGateway
     pub fn create_agent_space_route(
         &mut self,
