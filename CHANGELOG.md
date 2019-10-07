@@ -6,6 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.0.11] - 2019-10-07
+
+### Added
+
 * Re-write to use GhostActor pattern for inter-component async handling
 * Adds mDNS discovery for websocket transport
 * Adds a legacy wrapper so old Li3hClient/ServerProtocol can still be used while integration with core
