@@ -214,12 +214,15 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    pub fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
+    pub fn form_EntryData(
+        entry_address: &EntryHash,
+        aspect_content_list: Vec<Vec<u8>>,
+    ) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
             aspect_list.push(EntryAspectData {
-                aspect_address: hash,
+                aspect_address: hash.into(),
                 type_hint: "NodeMock".to_string(),
                 aspect: aspect_content.into(),
                 publish_ts: 42,
@@ -232,7 +235,7 @@ impl NodeMock {
         }
     }
 
-    pub fn get_entry(&self, entry_address: &Address) -> Option<EntryData> {
+    pub fn get_entry(&self, entry_address: &EntryHash) -> Option<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let data_store = self.chain_store_list.get(&current_space)?;
         data_store.get_entry(entry_address)
@@ -241,7 +244,7 @@ impl NodeMock {
     ///
     pub fn author_entry(
         &mut self,
-        entry_address: &Address,
+        entry_address: &EntryHash,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<EntryData> {
@@ -284,7 +287,7 @@ impl NodeMock {
 
     pub fn hold_entry(
         &mut self,
-        entry_address: &Address,
+        entry_address: &EntryHash,
         aspect_content_list: Vec<Vec<u8>>,
     ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
@@ -335,7 +338,7 @@ impl NodeMock {
     }
 
     /// Node asks for some entry on the network.
-    pub fn request_entry(&mut self, entry_address: Address) -> QueryEntryData {
+    pub fn request_entry(&mut self, entry_address: EntryHash) -> QueryEntryData {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         let query_data = QueryEntryData {
