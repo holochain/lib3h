@@ -63,6 +63,8 @@ pub enum ErrorKind {
     KeyNotFound(String),
     /// Error occuring from a bad response to RequestEntry.
     RequestEntryBadResponse(String),
+    /// Error occuring after a timeout.
+    Timeout(Backtwrap),
     /// Yet undefined error.
     Other(String),
     /// Hints that destructuring should not be exhaustive.
@@ -85,6 +87,7 @@ impl StdError for Lib3hError {
             ErrorKind::HcId(ref err) => Some(err),
             ErrorKind::RmpSerdeDecodeError(ref err) => Some(err),
             ErrorKind::CryptoApiError(ref err) => Some(err),
+            ErrorKind::Timeout(ref _bt) => None,
             ErrorKind::Other(ref _s) | ErrorKind::KeyNotFound(ref _s) => None,
             _ => unreachable!(),
         }
@@ -101,6 +104,7 @@ impl fmt::Display for Lib3hError {
             ErrorKind::HcId(ref err) => err.fmt(f),
             ErrorKind::RmpSerdeDecodeError(ref err) => err.fmt(f),
             ErrorKind::CryptoApiError(ref err) => err.fmt(f),
+            ErrorKind::Timeout(ref bt) => write!(f, "Timeout: {:?}", bt),
             ErrorKind::KeyNotFound(ref s) => write!(f, "Key: '{}' not found", s),
             ErrorKind::Other(ref s) => write!(f, "Unknown error encountered: '{}'.", s),
             _ => unreachable!(),

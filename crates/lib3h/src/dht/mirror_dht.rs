@@ -1,10 +1,11 @@
 use crate::{
     dht::{dht_config::DhtConfig, dht_protocol::*},
-    error::{ErrorKind, Lib3hError, Lib3hResult},
+    error::{ErrorKind as ek, Lib3hError, Lib3hResult},
     time,
 };
 use detach::prelude::*;
 use holochain_tracing::Span;
+// use lib3h_ghost_actor::{ErrorKind as gek, GhostError};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::EntryData, uri::Lib3hUri, Address, DidWork};
 use rmp_serde::{Deserializer, Serializer};
@@ -365,7 +366,7 @@ impl MirrorDht {
                     Deserialize::deserialize(&mut de);
                 if let Err(e) = maybe_gossip {
                     error!("Failed to deserialize gossip.");
-                    return Err(Lib3hError::new(ErrorKind::RmpSerdeDecodeError(e)));
+                    return Err(Lib3hError::new(ek::RmpSerdeDecodeError(e)));
                 }
                 // Handle gossiped data
                 match maybe_gossip.unwrap() {
@@ -553,7 +554,7 @@ impl MirrorDht {
                     Box::new(|_me, response| {
                         let response = {
                             match response {
-                                GhostCallbackData::Timeout(bt) => panic!("timeout: {:?}", bt),
+                                GhostCallbackData::Timeout(bt) => return Err(Lib3hError::new(ek::Timeout(bt)).into()),
                                 GhostCallbackData::Response(response) => match response {
                                     Err(e) => panic!("{:?}", e),
                                     Ok(response) => response,

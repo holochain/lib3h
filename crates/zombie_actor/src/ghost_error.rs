@@ -1,3 +1,5 @@
+//! Lib3h custom error definition. This is a zombie and it's bond to disapear.
+
 /// Result type for GhostErrors
 pub type GhostResult<T> = Result<T, GhostError>;
 
@@ -29,6 +31,8 @@ pub enum ErrorKind {
     Multiple(Vec<GhostError>),
     /// returned on an attempt to handle an callback for a non-existent request
     RequestIdNotFound(String),
+    // /// Error occuring after a timeout.
+    // Timeout(Backtwrap),
     /// Generic stringified errors
     Other(String),
     EndpointDisconnected,
