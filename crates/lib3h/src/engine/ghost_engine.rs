@@ -16,7 +16,13 @@ use detach::Detach;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{data_types::*, protocol::*, types::SpaceHash, uri::Lib3hUri, Address};
+use lib3h_protocol::{
+    data_types::*,
+    protocol::*,
+    types::{SpaceHash, *},
+    uri::Lib3hUri,
+    Address,
+};
 use rmp_serde::Serializer;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -144,7 +150,7 @@ impl<'engine> GhostEngine<'engine> {
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                space_address: self.config.network_id.id.clone(),
+                space_address: self.config.network_id.id.clone().into(),
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
@@ -703,7 +709,7 @@ impl<'engine> GhostEngine<'engine> {
 
 /// Return true if all elements of list_b are found in list_a
 #[allow(dead_code)]
-fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
+fn includes(list_a: &[AspectHash], list_b: &[AspectHash]) -> bool {
     let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
     set_b.is_subset(&set_a)

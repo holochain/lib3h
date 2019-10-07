@@ -173,7 +173,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     msg.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(
                         QueryEntryResultData {
                             space_address: SPACE_ADDR.into(),
-                            entry_address: ENTRY_ADDR.to_string().into(),
+                            entry_address: ENTRY_ADDR.into(),
                             request_id: "TEST_REQ_ID".to_string(),
                             requester_agent_id: A_1_ID.to_string().into(),
                             responder_agent_id: A_1_ID.to_string().into(),
@@ -255,7 +255,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Span::fixme(),
                 ClientToLib3h::QueryEntry(QueryEntryData {
                     space_address: SPACE_ADDR.into(),
-                    entry_address: ENTRY_ADDR.to_string().into(),
+                    entry_address: ENTRY_ADDR.into(),
                     request_id: "TEST_REQ_ID".to_string(),
                     requester_agent_id: A_1_ID.to_string().into(),
                     query: b"bob".to_vec().into(),
@@ -277,9 +277,9 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     space_address: SPACE_ADDR.into(),
                     provider_agent_id: A_1_ID.to_string().into(),
                     entry: EntryData {
-                        entry_address: ENTRY_ADDR.to_string().into(),
+                        entry_address: ENTRY_ADDR.into(),
                         aspect_list: vec![EntryAspectData {
-                            aspect_address: ASPECT_ADDR.to_string().into(),
+                            aspect_address: ASPECT_ADDR.into(),
                             type_hint: "test".to_string(),
                             aspect: b"bob".to_vec().into(),
                             publish_ts: 0,
