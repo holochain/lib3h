@@ -1,9 +1,5 @@
-use crate::{uri::Lib3hUri, Address};
+use crate::{types::*, uri::Lib3hUri, Address};
 use std::cmp::Ordering;
-
-/// Tuple holding all the info required for identifying an Aspect.
-/// (entry_address, aspect_address)
-pub type AspectKey = (Address, Address);
 
 /// Represents an opaque vector of bytes. Lib3h will
 /// store or transfer this data but will never inspect
@@ -149,7 +145,7 @@ impl EntryData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GenericResultData {
     pub request_id: String,
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub to_agent_id: Address,
     pub result_info: Opaque,
 }
@@ -232,7 +228,7 @@ pub struct UnboundData {
 pub struct SpaceData {
     /// Identifier of this request
     pub request_id: String,
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub agent_id: Address,
 }
 
@@ -242,7 +238,7 @@ pub struct SpaceData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DirectMessageData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub request_id: String,
     pub to_agent_id: Address,
     pub from_agent_id: Address,
@@ -255,7 +251,7 @@ pub struct DirectMessageData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub entry_address: Address,
     pub request_id: String,
     pub requester_agent_id: Address,
@@ -264,7 +260,7 @@ pub struct QueryEntryData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct QueryEntryResultData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub entry_address: Address,
     pub request_id: String,
     pub requester_agent_id: Address,
@@ -279,7 +275,7 @@ pub struct QueryEntryResultData {
 /// Wrapped Entry message
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ProvidedEntryData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub provider_agent_id: Address,
     pub entry: EntryData,
 }
@@ -287,7 +283,7 @@ pub struct ProvidedEntryData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StoreEntryAspectData {
     pub request_id: String,
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub provider_agent_id: Address,
     pub entry_address: Address,
     pub entry_aspect: EntryAspectData,
@@ -296,7 +292,7 @@ pub struct StoreEntryAspectData {
 /// Identifier of what entry (and its meta?) to drop
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DropEntryData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub request_id: String,
     pub entry_address: Address,
 }
@@ -308,7 +304,7 @@ pub struct DropEntryData {
 /// Request for Entry
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FetchEntryData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub entry_address: Address,
     pub request_id: String,
     pub provider_agent_id: Address,
@@ -318,7 +314,7 @@ pub struct FetchEntryData {
 /// DHT data response from a request
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FetchEntryResultData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub provider_agent_id: Address,
     pub request_id: String,
     pub entry: EntryData,
@@ -330,7 +326,7 @@ pub struct FetchEntryResultData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct GetListData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     /// Request List from a specific Agent
     pub provider_agent_id: Address,
     pub request_id: String,
@@ -338,7 +334,7 @@ pub struct GetListData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryListData {
-    pub space_address: Address,
+    pub space_address: SpaceHash,
     pub provider_agent_id: Address,
     pub request_id: String,
     pub address_map: std::collections::HashMap<Address, Vec<Address>>, // Aspect addresses per entry

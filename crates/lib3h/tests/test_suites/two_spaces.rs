@@ -135,7 +135,7 @@ pub fn test_multispace_send(
     alex.set_current_space(&SPACE_ADDRESS_A);
     billy.set_current_space(&SPACE_ADDRESS_A);
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "marco".as_bytes().to_vec());
-    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_8\", space_address: HashString\\(\"appA\"\\), to_agent_id: HashString\\(\"billy\"\\), result_info: ";
+    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_8\", space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), to_agent_id: HashString\\(\"billy\"\\), result_info: ";
 
     let _results = assert2_msg_matches!(alex, billy, expected, options);
 }
