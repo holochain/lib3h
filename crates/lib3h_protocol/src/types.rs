@@ -5,7 +5,9 @@ use std::fmt;
 // SpaceHash: newtype for HashString
 //--------------------------------------------------------------------------------------------------
 
-#[derive(PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash)]
+#[derive(
+    Shrinkwrap, PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
+)]
 pub struct SpaceHash(HashString);
 
 impl fmt::Display for SpaceHash {
@@ -48,7 +50,9 @@ impl SpaceHash {
 // EntryHash: newtype for HashString
 //--------------------------------------------------------------------------------------------------
 
-#[derive(PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash)]
+#[derive(
+    Shrinkwrap, PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
+)]
 pub struct EntryHash(HashString);
 
 impl fmt::Display for EntryHash {
@@ -91,7 +95,9 @@ impl EntryHash {
 // AspectHash: newtype for HashString
 //--------------------------------------------------------------------------------------------------
 
-#[derive(PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash)]
+#[derive(
+    Shrinkwrap, PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
+)]
 pub struct AspectHash(HashString);
 
 impl fmt::Display for AspectHash {
