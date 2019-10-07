@@ -7,9 +7,7 @@ use lib3h::{
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
     error::Lib3hResult,
 };
-use lib3h_protocol::{
-    protocol_server::Lib3hServerProtocol, types::SpaceHash, uri::Lib3hUri, Address,
-};
+use lib3h_protocol::{protocol_server::Lib3hServerProtocol, types::*, uri::Lib3hUri};
 use std::collections::{HashMap, HashSet};
 
 static TIMEOUT_MS: usize = 5000;
@@ -29,7 +27,7 @@ pub struct NodeMock {
     /// Factory used to create the engine
     engine_factory: EngineFactory,
     /// The node's simulated agentId
-    pub agent_id: Address,
+    pub agent_id: AgentPubKey,
     /// The node's uri
     my_advertise: Lib3hUri,
     /// This node's handle
@@ -56,7 +54,7 @@ pub struct NodeMock {
 impl NodeMock {
     pub fn new_with_config(
         name: &str,
-        agent_id_arg: Address,
+        agent_id_arg: AgentPubKey,
         config: EngineConfig,
         engine_factory: EngineFactory,
         //_maybe_temp_dir: Option<tempfile::TempDir>,

@@ -7,7 +7,7 @@ use crate::{
 };
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::*;
+use lib3h_protocol::{data_types::*, types::*};
 use rmp_serde::Serializer;
 use serde::Serialize;
 
@@ -135,8 +135,8 @@ impl P2pGateway {
                         Some(peer_data),
                     ))) => {
                         // hey, we got a low-level uri, let's process it
-                        let mut uri = peer_data.peer_location.clone();
-                        uri.set_agent_id(&peer_data.peer_name.lower_address());
+                        trace!("send to peer: {:?}", peer_data);
+                        let uri = peer_data.get_uri();
                         trace!("send to {}", uri);
                         me.priv_send_with_full_low_uri(
                             SendWithFullLowUri {
@@ -239,18 +239,18 @@ impl P2pGateway {
         expires_at: std::time::Instant,
         cb: SendCallback,
     ) -> GhostResult<()> {
-        let to_agent_id = match send_data.full_low_uri.agent_id() {
+        let to_agent_id = match send_data.full_low_uri.get_agent_id() {
             Some(agent_id) => agent_id,
-            None => "".to_string().into(), // TODO - is this correct?
+            None => AgentPubKey::new(), // TODO - is this correct?
         };
 
         let payload =
             if let GatewayOutputWrapType::WrapOutputWithP2pDirectMessage = self.wrap_output_type {
                 let dm_wrapper = DirectMessageData {
                     space_address: self.identifier.id.clone().into(),
-                    request_id: "".to_string(),
+                    request_id: String::new(),
                     to_agent_id,
-                    from_agent_id: self.this_peer.peer_name.clone().into(),
+                    from_agent_id: self.this_peer.peer_name.agent_id(),
                     content: encoded_payload,
                 };
                 let mut payload = Vec::new();

@@ -266,10 +266,9 @@ impl<'engine> GhostEngine<'engine> {
                     );
                 } else {
                     // otherwise should be for one of our space
-                    let maybe_space_gateway = self.space_gateway_map.get_mut(&(
-                        msg.space_address.to_owned(),
-                        msg.to_peer_name.clone().into(),
-                    ));
+                    let maybe_space_gateway = self
+                        .space_gateway_map
+                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_name.agent_id()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
                             span.follower("TODO"),

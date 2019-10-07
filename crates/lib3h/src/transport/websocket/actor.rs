@@ -19,6 +19,7 @@ use lib3h_protocol::{
         error::{DiscoveryError, DiscoveryResult, ErrorKind as DiscoveryErrorKind},
         Discovery,
     },
+    types::*,
     uri::Lib3hUri,
     Address,
 };
@@ -31,7 +32,7 @@ pub type Message =
 
 pub struct GhostTransportWebsocket {
     #[allow(dead_code)]
-    transport_id: Address,
+    node_id: NodePubKey,
     network_id_address: Address,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
@@ -118,13 +119,13 @@ impl Drop for GhostTransportWebsocket {
 
 impl GhostTransportWebsocket {
     pub fn new(
-        transport_id: Address,
+        node_id: NodePubKey,
         tls_config: TlsConfig,
         networkid_address: Address,
     ) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
-            transport_id,
+            node_id,
             network_id_address: networkid_address,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(

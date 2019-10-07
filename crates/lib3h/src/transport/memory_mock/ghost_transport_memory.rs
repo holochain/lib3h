@@ -11,8 +11,8 @@ use lib3h_protocol::{
         error::{DiscoveryError, DiscoveryResult},
         Discovery,
     },
+    types::*,
     uri::Lib3hUri,
-    Address,
 };
 use std::{
     collections::HashSet,
@@ -50,7 +50,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
-    transport_id: Address,
+    node_id: NodePubKey,
     network: Arc<Mutex<MemoryNet>>,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
@@ -71,7 +71,7 @@ impl Discovery for GhostTransportMemory {
         self.network
             .lock()
             .unwrap()
-            .advertise(uri, self.transport_id.clone());
+            .advertise(uri, self.node_id.clone());
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
@@ -88,7 +88,7 @@ impl Discovery for GhostTransportMemory {
 const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
-    pub fn new(transport_id: Address, network_name: &str) -> Self {
+    pub fn new(node_id: NodePubKey, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
         let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
@@ -97,7 +97,7 @@ impl GhostTransportMemory {
             verse.get_network(network_name)
         };
         Self {
-            transport_id,
+            node_id,
             network,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
@@ -364,9 +364,9 @@ mod tests {
         GhostTransportMemory,
         GhostTransportMemoryEndpointContextParent,
     ) {
-        let transport_id = format!("fake_transport_id{}", id).into();
+        let node_id = format!("fake_node_id{}", id).as_str().into();
         let req_id_prefix = format!("tmem_to_child{}", id);
-        let mut transport = GhostTransportMemory::new(transport_id, &net_name);
+        let mut transport = GhostTransportMemory::new(node_id, &net_name);
         let endpoint: GhostTransportMemoryEndpointContextParent = transport
             .take_parent_endpoint()
             .expect("exists")

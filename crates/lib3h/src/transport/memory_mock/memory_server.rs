@@ -1,5 +1,5 @@
 use crate::transport::error::{TransportError, TransportResult};
-use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri, Address, DidWork};
+use lib3h_protocol::{data_types::Opaque, types::*, uri::Lib3hUri, DidWork};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::{Arc, Mutex, MutexGuard},
@@ -31,7 +31,7 @@ pub struct MemoryNet {
     name: String,
     pub server_map: HashMap<Lib3hUri, MemoryServer>,
     url_count: u32,
-    advertised_machines: HashSet<(Lib3hUri, Address)>,
+    advertised_nodes_list: HashSet<(Lib3hUri, NodePubKey)>,
 }
 
 impl MemoryNet {
@@ -40,14 +40,14 @@ impl MemoryNet {
             name: name.into(),
             server_map: HashMap::new(),
             url_count: 0,
-            advertised_machines: HashSet::new(),
+            advertised_nodes_list: HashSet::new(),
         }
     }
-    pub fn advertise(&mut self, uri: Lib3hUri, transport_id: Address) {
-        self.advertised_machines.insert((uri, transport_id));
+    pub fn advertise(&mut self, uri: Lib3hUri, node_id: NodePubKey) {
+        self.advertised_nodes_list.insert((uri, node_id));
     }
-    pub fn discover(&mut self) -> Vec<(Lib3hUri, Address)> {
-        self.advertised_machines.iter().cloned().collect()
+    pub fn discover(&mut self) -> Vec<(Lib3hUri, NodePubKey)> {
+        self.advertised_nodes_list.iter().cloned().collect()
     }
     pub fn new_url(&mut self) -> Lib3hUri {
         self.url_count += 1;
@@ -114,7 +114,7 @@ pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
 #[derive(Debug)]
 pub struct MemoryServer {
     /// Address of this server
-    this_uri: Lib3hUri,
+    this_trasnport_uri: Lib3hUri,
     /// Inboxes for payloads from each of its connections.
     inbox_map: HashMap<Lib3hUri, VecDeque<Vec<u8>>>,
     /// Inbox of connection state change requests
@@ -125,7 +125,7 @@ pub struct MemoryServer {
 
 impl Drop for MemoryServer {
     fn drop(&mut self) {
-        trace!("(MemoryServer) dropped: {:?}", self.this_uri);
+        trace!("(MemoryServer) dropped: {:?}", self.this_trasnport_uri);
     }
 }
 
@@ -140,7 +140,7 @@ impl MemoryServer {
     /// Constructor
     pub fn new(uri: &Lib3hUri) -> Self {
         MemoryServer {
-            this_uri: uri.clone(),
+            this_trasnport_uri: uri.clone(),
             inbox_map: HashMap::new(),
             connection_inbox: Vec::new(),
             state: State::Running,
@@ -162,18 +162,18 @@ impl MemoryServer {
     pub fn request_connect(&mut self, other_uri: &Lib3hUri) -> TransportResult<()> {
         debug!(
             "(MemoryServer) {} creates inbox for {}",
-            self.this_uri, other_uri
+            self.this_trasnport_uri, other_uri
         );
-        if other_uri == &self.this_uri {
+        if other_uri == &self.this_trasnport_uri {
             return Err(TransportError::new(format!(
                 "Server {} cannot connect to self",
-                self.this_uri,
+                self.this_trasnport_uri,
             )));
         }
         if self.inbox_map.contains_key(other_uri) {
             return Err(TransportError::new(format!(
                 "Server {}, is already connected to {}",
-                self.this_uri, other_uri,
+                self.this_trasnport_uri, other_uri,
             )));
         }
         // Establish connection
@@ -187,16 +187,19 @@ impl MemoryServer {
 
     /// Another node closes its connection with us
     pub fn request_close(&mut self, other_uri: &Lib3hUri) -> TransportResult<()> {
-        debug!("(MemoryServer {}).close({})", self.this_uri, other_uri);
+        debug!(
+            "(MemoryServer {}).close({})",
+            self.this_trasnport_uri, other_uri
+        );
         // delete this uri's inbox
         let res = self.inbox_map.remove(other_uri);
         if res.is_none() {
             return Err(TransportError::new(format!(
                 "uri '{}' unknown for server {}",
-                other_uri, self.this_uri
+                other_uri, self.this_trasnport_uri
             )));
         }
-        trace!("(MemoryServer {}). close event", self.this_uri);
+        trace!("(MemoryServer {}). close event", self.this_trasnport_uri);
         // Notify our TransportMemory
         self.connection_inbox.push((other_uri.clone(), false));
         // Done
@@ -209,7 +212,7 @@ impl MemoryServer {
         if let None = maybe_inbox {
             return Err(TransportError::new(format!(
                 "(MemoryServer {}) Unknown from_uri {}",
-                self.this_uri, from_uri
+                self.this_trasnport_uri, from_uri
             )));
         }
         maybe_inbox.unwrap().push_back(payload.to_vec());
@@ -220,7 +223,7 @@ impl MemoryServer {
     /// Return a TransportEvent::ReceivedData for each payload processed and
     /// a TransportEvent::IncomingConnectionEstablished for each incoming connection.
     pub fn process(&mut self) -> TransportResult<(DidWork, Vec<MemoryEvent>)> {
-        trace!("(MemoryServer {}).process()", self.this_uri);
+        trace!("(MemoryServer {}).process()", self.this_trasnport_uri);
         if self.state == State::Closed {
             return Ok((false, Vec::new()));
         }
@@ -230,7 +233,7 @@ impl MemoryServer {
         for (in_uri, is_new) in self.connection_inbox.iter() {
             trace!(
                 "(MemoryServer {}). connection_inbox: {} | {}",
-                self.this_uri,
+                self.this_trasnport_uri,
                 in_uri,
                 is_new,
             );
@@ -239,7 +242,11 @@ impl MemoryServer {
             } else {
                 MemoryEvent::ConnectionClosed(in_uri.clone())
             };
-            trace!("(MemoryServer {}). connection: {:?}", self.this_uri, event);
+            trace!(
+                "(MemoryServer {}). connection: {:?}",
+                self.this_trasnport_uri,
+                event
+            );
             outbox.push(event);
             did_work = true;
         }
@@ -254,7 +261,7 @@ impl MemoryServer {
                 did_work = true;
                 trace!(
                     "(MemoryServer {}) received: {} Bytes (from {})",
-                    self.this_uri,
+                    self.this_trasnport_uri,
                     payload.len(),
                     uri
                 );
@@ -263,8 +270,8 @@ impl MemoryServer {
             }
         }
         if self.state == State::Closing {
-            trace!("(MemoryServer {}).closing", self.this_uri);
-            outbox.push(MemoryEvent::Unbind(self.this_uri.clone()));
+            trace!("(MemoryServer {}).closing", self.this_trasnport_uri);
+            outbox.push(MemoryEvent::Unbind(self.this_trasnport_uri.clone()));
             self.state = State::Closed;
             did_work = true;
         }

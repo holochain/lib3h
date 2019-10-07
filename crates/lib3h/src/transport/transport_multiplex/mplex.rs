@@ -6,13 +6,13 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::Opaque, types::SpaceHash, uri::Lib3hUri, Address};
+use lib3h_protocol::{data_types::Opaque, types::*, uri::Lib3hUri};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct LocalRouteSpec {
     pub space_address: SpaceHash,
-    pub local_agent_id: Address,
+    pub local_agent_id: AgentPubKey,
 }
 
 pub struct TransportMultiplex<
@@ -74,7 +74,7 @@ impl<
     pub fn create_agent_space_route(
         &mut self,
         space_address: &SpaceHash,
-        local_agent_id: &Address,
+        local_agent_id: &AgentPubKey,
     ) -> TransportActorParentEndpoint {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_self = endpoint_self
@@ -102,7 +102,7 @@ impl<
     pub fn remove_agent_space_route(
         &mut self,
         space_address: &SpaceHash,
-        local_agent_id: &Address,
+        local_agent_id: &AgentPubKey,
     ) -> Option<TransportActorSelfEndpoint<TransportMultiplex<G>>> {
         let route_spec = LocalRouteSpec {
             space_address: space_address.clone(),
@@ -118,8 +118,8 @@ impl<
     pub fn received_data_for_agent_space_route(
         &mut self,
         space_address: &SpaceHash,
-        local_agent_id: &Address,
-        remote_agent_id: &Address,
+        local_agent_id: &AgentPubKey,
+        remote_agent_id: &AgentPubKey,
         unpacked_payload: Opaque,
     ) -> Lib3hResult<()> {
         let route_spec = LocalRouteSpec {

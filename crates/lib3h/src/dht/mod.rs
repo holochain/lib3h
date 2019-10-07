@@ -11,7 +11,6 @@ pub mod tests {
         tests::enable_logging_for_test,
     };
     use detach::prelude::*;
-    use holochain_persistence_api::hash::HashString;
     use holochain_tracing::test_span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{
@@ -34,9 +33,9 @@ pub mod tests {
         pub static ref ASPECT_ADDRESS_2: AspectHash = "aspect_addr_2".into();
         pub static ref ASPECT_ADDRESS_3: AspectHash = "aspect_addr_3".into();
         /// Peers
-        pub static ref PEER_A: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_A_STR));
-        pub static ref PEER_B: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_B_STR));
-        pub static ref PEER_C: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_C_STR));
+        pub static ref PEER_A: Lib3hUri = Lib3hUri::with_agent_id(&PEER_A_STR.into());
+        pub static ref PEER_B: Lib3hUri = Lib3hUri::with_agent_id(&PEER_B_STR.into());
+        pub static ref PEER_C: Lib3hUri = Lib3hUri::with_agent_id(&PEER_C_STR.into());
     }
 
     const PEER_A_STR: &str = "alex";
@@ -72,7 +71,7 @@ pub mod tests {
     }
 
     fn create_test_uri() -> Lib3hUri {
-        Lib3hUri::with_transport_id(&HashString::from("test"))
+        Lib3hUri::with_node_id(&"test".into())
     }
 
     #[allow(non_snake_case)]
@@ -297,7 +296,7 @@ pub mod tests {
         // Should get self
         let maybe_peer = get_peer(&mut dht, &*PEER_A);
         assert_eq!(
-            "Lib3hUri(\"agentid:alex\")",
+            "Lib3hUri(\"agentpubkey:alex\")",
             format!("{:?}", maybe_peer.unwrap().peer_name)
         );
         // Should be empty
