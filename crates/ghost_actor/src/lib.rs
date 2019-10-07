@@ -1,10 +1,13 @@
 #![recursion_limit = "128"]
 extern crate crossbeam_channel;
+extern crate holochain_tracing;
 extern crate inflector;
 //#[macro_use]
 extern crate lazy_static;
 extern crate lib3h_zombie_actor;
 extern crate proc_macro2;
+#[macro_use]
+extern crate shrinkwraprs;
 //#[macro_use]
 extern crate syn;
 #[allow(unused_imports)]
@@ -29,8 +32,37 @@ fn ghost_try_lock<'a, M>(m: &'a mut Arc<Mutex<M>>) -> MutexGuard<'a, M> {
     panic!("failed to obtain mutex lock");
 }
 
+#[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[shrinkwrap(mutable)]
+pub struct RequestId(pub String);
+
+impl RequestId {
+    pub fn new() -> Self {
+        Self::with_prefix("")
+    }
+
+    pub fn with_prefix(prefix: &str) -> Self {
+        Self(format!("{}{}", prefix, nanoid::simple()))
+    }
+}
+
+impl From<String> for RequestId {
+    fn from(s: String) -> Self {
+        RequestId(s)
+    }
+}
+
+impl From<RequestId> for String {
+    fn from(r: RequestId) -> Self {
+        r.0
+    }
+}
+
 mod ghost_protocol;
 pub use ghost_protocol::*;
+
+mod ghost_tracker;
+pub use ghost_tracker::*;
 
 mod ghost_actor;
 pub use crate::ghost_actor::*;

@@ -6,9 +6,6 @@ use std::{
 
 pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(T) -> GhostResult<()> + 'lt + Send + Sync>;
 
-pub type GhostResponseCb<'lt, X, T> =
-    Box<dyn FnOnce(&mut X, GhostResult<T>) -> GhostResult<()> + 'lt + Send + Sync>;
-
 pub trait GhostHandler<'lt, X: 'lt + Send + Sync, P: GhostProtocol>: Send + Sync {
     fn trigger(
         &mut self,
