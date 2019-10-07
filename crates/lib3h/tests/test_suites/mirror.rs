@@ -73,12 +73,48 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
         entry
     };
 
-    process_nodes(nodes, options);
+    let mut checked = std::collections::HashSet::new();
 
+    let clock = std::time::SystemTime::now();
+    let timeout = std::time::Duration::from_millis(30000);
+    let max_iters = 100000;
+    let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
+    for _i in 0..max_iters {
+        process_nodes(nodes, options);
+
+        check_entries(nodes, &mut checked, &entry);
+        if checked.len() == nodes.len() {
+            trace!("Mirror entry check found all nodes.");
+            break;
+        }
+        let elapsed = clock.elapsed().unwrap();
+        if elapsed > timeout {
+            trace!("Mirror entry check timeout");
+            break;
+        }
+        std::thread::sleep(delay_interval);
+    }
+    assert!(checked.len() == nodes.len());
+}
+
+fn check_entries(
+    nodes: &mut Vec<NodeMock>,
+    checked: &mut std::collections::HashSet<String>,
+    entry: &lib3h_protocol::data_types::EntryData,
+) {
     for node in nodes {
+        if checked.contains(&node.name()) {
+            continue;
+        }
+
         trace!("checking if {} has entry...", node.name());
-        assert_eq!(entry, node.get_entry(&ENTRY_ADDRESS_1).unwrap());
-        trace!("found entry for node {}", node.name());
+        let last = node.get_entry(&ENTRY_ADDRESS_1);
+        if let Some(entry2) = last.clone() {
+            if &entry2 == entry {
+                trace!("Found entry for node {}", node.name());
+                checked.insert(node.name());
+            }
+        }
     }
 }
 
@@ -113,8 +149,9 @@ fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions)
 }
 
 fn process_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions) {
-    let timeout = std::time::Duration::from_millis(options.timeout_ms);
-    let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
+    let timeout = std::time::Duration::from_millis(1000);
+
+    let delay_interval = std::time::Duration::from_millis(1);
     let clock = std::time::SystemTime::now();
     for _i in 0..options.max_iters {
         process_nodes_inner(nodes);
