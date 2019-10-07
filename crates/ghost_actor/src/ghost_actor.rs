@@ -1,8 +1,6 @@
 use crate::*;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex, Weak},
-};
+use holochain_tracing::Span;
+use std::sync::{Arc, Mutex, Weak};
 
 struct GhostEndpointRefInner<
     'lt,
@@ -10,16 +8,60 @@ struct GhostEndpointRefInner<
     P: GhostProtocol,
     H: GhostHandler<'lt, X, P>,
 > {
-    #[allow(dead_code)]
-    destination: GhostProtocolDestination,
-    pub(crate) phantom_x: std::marker::PhantomData<&'lt X>,
-    pub(crate) phantom_p: std::marker::PhantomData<&'lt P>,
+    sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     handle_receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-    resp_sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-    req_receiver: crossbeam_channel::Receiver<(RequestId, GhostResponseCb<'lt, X, P>)>,
-    callbacks: HashMap<RequestId, GhostResponseCb<'lt, X, P>>,
-    #[allow(dead_code)]
+    req_receiver: crossbeam_channel::Receiver<(P, Option<GhostResponseCb<'lt, X, P>>)>,
+    pending_callbacks: GhostTracker<'lt, X, P>,
     handler: H,
+}
+
+impl<'lt, X: 'lt + Send + Sync, P: GhostProtocol, H: GhostHandler<'lt, X, P>>
+    GhostEndpointRefInner<'lt, X, P, H>
+{
+    fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
+        self.priv_process_incoming_requests()?;
+        self.priv_process_handle_requests(user_data)?;
+        Ok(())
+    }
+
+    fn priv_process_incoming_requests(&mut self) -> GhostResult<()> {
+        while let Ok((message, maybe_cb)) = self.req_receiver.try_recv() {
+            match maybe_cb {
+                Some(cb) => {
+                    let request_id = self.pending_callbacks.bookmark(Span::fixme(), cb)?;
+
+                    self.sender.send((Some(request_id), message))?;
+                }
+                None => self.sender.send((None, message))?,
+            }
+        }
+        Ok(())
+    }
+
+    fn priv_process_handle_requests(&mut self, user_data: &mut X) -> GhostResult<()> {
+        while let Ok((maybe_id, message)) = self.handle_receiver.try_recv() {
+            if let GhostProtocolVariantType::Response = message.discriminant().variant_type() {
+                let request_id = match maybe_id {
+                    None => panic!("response with no request_id: {:?}", message),
+                    Some(request_id) => request_id,
+                };
+                self.pending_callbacks.handle(request_id, message)?;
+            } else {
+                let cb: Option<GhostHandlerCb<'lt, P>> = match maybe_id {
+                    None => None,
+                    Some(request_id) => {
+                        let resp_sender = self.sender.clone();
+                        Some(Box::new(move |message| {
+                            resp_sender.send((Some(request_id), message))?;
+                            Ok(())
+                        }))
+                    }
+                };
+                self.handler.trigger(user_data, message, cb)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 pub struct GhostEndpointRef<
@@ -30,10 +72,7 @@ pub struct GhostEndpointRef<
     H: GhostHandler<'lt, X, P>,
 > {
     inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
-    phantom_a: std::marker::PhantomData<&'lt A>,
-    sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-    req_sender: crossbeam_channel::Sender<(RequestId, GhostResponseCb<'lt, X, P>)>,
-    count: u64,
+    req_sender: crossbeam_channel::Sender<(P, Option<GhostResponseCb<'lt, X, P>>)>,
     // just for ref counting
     _a_ref: Arc<Mutex<A>>,
 }
@@ -42,10 +81,9 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
     GhostEndpointRef<'lt, X, A, P, H>
 {
     pub(crate) fn new(
-        destination: GhostProtocolDestination,
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-        system_ref: &mut GhostSystemRef<'lt>,
+        sys_ref: &mut GhostSystemRef<'lt>,
         a_ref: Arc<Mutex<A>>,
         user_data: Weak<Mutex<X>>,
         handler: H,
@@ -53,70 +91,28 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
         let (req_sender, req_receiver) = crossbeam_channel::unbounded();
         let endpoint_ref = Self {
             inner: Arc::new(Mutex::new(GhostEndpointRefInner {
-                destination,
-                phantom_x: std::marker::PhantomData,
-                phantom_p: std::marker::PhantomData,
+                sender,
                 handle_receiver: receiver,
-                resp_sender: sender.clone(),
                 req_receiver,
-                callbacks: HashMap::new(),
+                pending_callbacks: GhostTracker::new(sys_ref.clone(), user_data.clone()),
                 handler,
             })),
-            phantom_a: std::marker::PhantomData,
-            sender,
             req_sender,
-            count: 0,
             _a_ref: a_ref,
         };
 
         let weak = Arc::downgrade(&endpoint_ref.inner);
-        system_ref.enqueue_processor(
+        sys_ref.enqueue_processor(
             0,
             Box::new(move || match weak.upgrade() {
                 Some(mut strong_inner) => match user_data.upgrade() {
                     Some(mut strong_user_data) => {
                         let mut strong_inner = ghost_try_lock(&mut strong_inner);
                         let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
-                        while let Ok((request_id, cb)) = strong_inner.req_receiver.try_recv() {
-                            strong_inner.callbacks.insert(request_id, cb);
-                        }
 
-                        while let Ok((maybe_id, message)) = strong_inner.handle_receiver.try_recv()
-                        {
-                            // println!("HNDL {:?} {:?} {:?}", strong_inner.destination, maybe_id, message);
-                            if let GhostProtocolVariantType::Response =
-                                message.discriminant().variant_type()
-                            {
-                                let request_id = match maybe_id {
-                                    None => panic!("response with no request_id: {:?}", message),
-                                    Some(request_id) => request_id,
-                                };
-                                match strong_inner.callbacks.remove(&request_id) {
-                                    None => println!(
-                                        "request_id {:?} not found {:?}",
-                                        request_id, message
-                                    ),
-                                    Some(cb) => {
-                                        cb(&mut strong_user_data, Ok(message)).expect("aaa");
-                                    }
-                                }
-                            } else {
-                                let cb: Option<GhostHandlerCb<'lt, P>> = match maybe_id {
-                                    None => None,
-                                    Some(request_id) => {
-                                        let resp_sender = strong_inner.resp_sender.clone();
-                                        Some(Box::new(move |message| {
-                                            resp_sender.send((Some(request_id), message))?;
-                                            Ok(())
-                                        }))
-                                    }
-                                };
-                                strong_inner
-                                    .handler
-                                    .trigger(&mut strong_user_data, message, cb)
-                                    .expect("endpoint process error");
-                            }
-                        }
+                        strong_inner
+                            .priv_process(&mut *strong_user_data)
+                            .expect("failed endpoint ref process");
 
                         GhostProcessInstructions::default().set_should_continue(true)
                     }
@@ -138,17 +134,7 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
-        self.count += 1;
-        match cb {
-            Some(cb) => {
-                let request_id = RequestId::new();
-                self.req_sender.send((request_id.clone(), cb))?;
-                self.sender.send((Some(request_id), message))?;
-            }
-            None => {
-                self.sender.send((None, message))?;
-            }
-        }
+        self.req_sender.send((message, cb))?;
         Ok(())
     }
 }
@@ -163,7 +149,6 @@ pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
 
 pub struct GhostInflator<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     pub(crate) phantom_a: std::marker::PhantomData<&'a P>,
-    pub(crate) phantom_b: std::marker::PhantomData<&'lt P>,
     pub(crate) system_ref: GhostSystemRef<'lt>,
     pub(crate) sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     pub(crate) receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -176,7 +161,6 @@ impl<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> GhostInflator<'a, 'lt, X, 
         handler: H,
     ) -> GhostResult<(GhostSystemRef<'lt>, GhostEndpointRef<'lt, X, (), P, H>)> {
         let owner_ref = GhostEndpointRef::new(
-            GhostProtocolDestination::Owner,
             self.sender,
             self.receiver,
             &mut self.system_ref,

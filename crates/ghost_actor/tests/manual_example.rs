@@ -44,4 +44,6 @@ fn manual_example() {
 
     system.process().unwrap();
     system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
 }

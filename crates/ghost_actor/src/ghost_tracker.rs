@@ -25,46 +25,6 @@ struct GhostTrackerEntry<'lt, X, T> {
     cb: GhostResponseCb<'lt, X, T>,
 }
 
-#[derive(Debug, Clone)]
-pub struct GhostTrackerBuilder {
-    request_id_prefix: String,
-    default_timeout_ms: u64,
-}
-
-impl Default for GhostTrackerBuilder {
-    fn default() -> Self {
-        Self {
-            request_id_prefix: "".to_string(),
-            default_timeout_ms: DEFAULT_TIMEOUT_MS,
-        }
-    }
-}
-
-impl GhostTrackerBuilder {
-    pub fn build<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync>(
-        self,
-        sys_ref: GhostSystemRef<'lt>,
-        weak_user_data: Weak<Mutex<X>>,
-    ) -> GhostTracker<'lt, X, T> {
-        GhostTracker::new(
-            sys_ref,
-            weak_user_data,
-            self.request_id_prefix,
-            self.default_timeout_ms,
-        )
-    }
-
-    pub fn request_id_prefix(mut self, request_id_prefix: &str) -> Self {
-        self.request_id_prefix = request_id_prefix.to_string();
-        self
-    }
-
-    pub fn default_timeout_ms(mut self, default_timeout_ms: u64) -> Self {
-        self.default_timeout_ms = default_timeout_ms;
-        self
-    }
-}
-
 struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     pending: HashMap<RequestId, GhostTrackerEntry<'lt, X, T>>,
     recv_bookmark: crossbeam_channel::Receiver<(RequestId, GhostTrackerEntry<'lt, X, T>)>,
@@ -139,19 +99,6 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
     }
 }
 
-/// GhostTracker registers callbacks associated with request_ids
-/// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
-    sys_ref: GhostSystemRef<'lt>,
-    weak_user_data: Weak<Mutex<X>>,
-    request_id_prefix: String,
-    default_timeout_ms: u64,
-    // just for ref count
-    _inner: Arc<Mutex<GhostTrackerInner<'lt, X, T>>>,
-    send_bookmark: crossbeam_channel::Sender<(RequestId, GhostTrackerEntry<'lt, X, T>)>,
-    send_handle: crossbeam_channel::Sender<(RequestId, T)>,
-}
-
 #[derive(Debug, Clone)]
 pub struct GhostTrackerBookmarkOptions {
     pub timeout_ms: Option<u64>,
@@ -164,19 +111,25 @@ impl Default for GhostTrackerBookmarkOptions {
 }
 
 impl GhostTrackerBookmarkOptions {
-    pub fn timeout_ms(mut self, timeout_ms: u64) -> Self {
+    pub fn set_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.timeout_ms = Some(timeout_ms);
         self
     }
 }
 
+/// GhostTracker registers callbacks associated with request_ids
+/// that can be triggered later when a response comes back indicating that id
+pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
+    sys_ref: GhostSystemRef<'lt>,
+    weak_user_data: Weak<Mutex<X>>,
+    // just for ref count
+    _inner: Arc<Mutex<GhostTrackerInner<'lt, X, T>>>,
+    send_bookmark: crossbeam_channel::Sender<(RequestId, GhostTrackerEntry<'lt, X, T>)>,
+    send_handle: crossbeam_channel::Sender<(RequestId, T)>,
+}
+
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
-    fn new(
-        mut sys_ref: GhostSystemRef<'lt>,
-        weak_user_data: Weak<Mutex<X>>,
-        request_id_prefix: String,
-        default_timeout_ms: u64,
-    ) -> Self {
+    pub fn new(mut sys_ref: GhostSystemRef<'lt>, weak_user_data: Weak<Mutex<X>>) -> Self {
         let (send_bookmark, recv_bookmark) = crossbeam_channel::unbounded();
         let (send_handle, recv_handle) = crossbeam_channel::unbounded();
 
@@ -212,8 +165,6 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         Self {
             sys_ref,
             weak_user_data,
-            request_id_prefix,
-            default_timeout_ms,
             _inner: inner,
             send_bookmark,
             send_handle,
@@ -255,10 +206,10 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         cb: GhostResponseCb<'lt, X, T>,
         options: GhostTrackerBookmarkOptions,
     ) -> GhostResult<RequestId> {
-        let request_id = RequestId::with_prefix(&self.request_id_prefix);
+        let request_id = RequestId::new();
 
         let timeout_ms = match options.timeout_ms {
-            None => self.default_timeout_ms,
+            None => DEFAULT_TIMEOUT_MS,
             Some(timeout_ms) => timeout_ms,
         };
 
@@ -299,8 +250,8 @@ mod tests {
 
         let mut sys = GhostSystem::new();
 
-        let mut track = GhostTrackerBuilder::default()
-            .build::<Test, ()>(sys.create_ref(), Arc::downgrade(&test));
+        let mut track: GhostTracker<Test, ()> =
+            GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
 
         track
             .periodic_task(
@@ -336,12 +287,11 @@ mod tests {
 
         let mut sys = GhostSystem::new();
 
-        let mut track = GhostTrackerBuilder::default()
-            .default_timeout_ms(0)
-            .build::<Test, ()>(sys.create_ref(), Arc::downgrade(&test));
+        let mut track: GhostTracker<Test, ()> =
+            GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
 
         track
-            .bookmark(
+            .bookmark_options(
                 Span::fixme(),
                 Box::new(|me, response| {
                     assert_eq!(
@@ -351,6 +301,7 @@ mod tests {
                     me.got_timeout = true;
                     Ok(())
                 }),
+                GhostTrackerBookmarkOptions::default().set_timeout_ms(0),
             )
             .unwrap();
 
@@ -374,8 +325,8 @@ mod tests {
 
         let mut sys = GhostSystem::new();
 
-        let mut track = GhostTrackerBuilder::default()
-            .build::<Test, String>(sys.create_ref(), Arc::downgrade(&test));
+        let mut track: GhostTracker<Test, String> =
+            GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
 
         let rid = track
             .bookmark(

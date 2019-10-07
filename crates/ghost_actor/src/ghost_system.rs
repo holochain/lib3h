@@ -144,7 +144,6 @@ impl<'lt> GhostSystemRef<'lt> {
 
         let inflator = GhostInflator {
             phantom_a: std::marker::PhantomData,
-            phantom_b: std::marker::PhantomData,
             system_ref: self.clone(),
             sender: s2,
             receiver: r1,
@@ -169,15 +168,7 @@ impl<'lt> GhostSystemRef<'lt> {
             }),
         )?;
 
-        GhostEndpointRef::new(
-            GhostProtocolDestination::Actor,
-            s1,
-            r2,
-            self,
-            actor,
-            user_data,
-            handler,
-        )
+        GhostEndpointRef::new(s1, r2, self, actor, user_data, handler)
     }
 }
 
