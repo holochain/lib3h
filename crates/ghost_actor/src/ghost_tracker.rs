@@ -1,8 +1,13 @@
 use holochain_tracing::Span;
-use std::sync::{Arc, Weak, Mutex};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, Weak},
+};
 
-use crate::{ghost_try_lock, GhostErrorKind, GhostResult, RequestId, GhostSystemRef, GhostProcessInstructions};
+use crate::{
+    ghost_try_lock, GhostErrorKind, GhostProcessInstructions, GhostResult, GhostSystemRef,
+    RequestId,
+};
 
 // TODO - should be 2000 or less but tests currently fail if below that
 const DEFAULT_TIMEOUT_MS: u64 = 20000;
@@ -36,8 +41,17 @@ impl Default for GhostTrackerBuilder {
 }
 
 impl GhostTrackerBuilder {
-    pub fn build<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync>(self, sys_ref: GhostSystemRef<'lt>, weak_user_data: Weak<Mutex<X>>) -> GhostTracker<'lt, X, T> {
-        GhostTracker::new(sys_ref, weak_user_data, self.request_id_prefix, self.default_timeout_ms)
+    pub fn build<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync>(
+        self,
+        sys_ref: GhostSystemRef<'lt>,
+        weak_user_data: Weak<Mutex<X>>,
+    ) -> GhostTracker<'lt, X, T> {
+        GhostTracker::new(
+            sys_ref,
+            weak_user_data,
+            self.request_id_prefix,
+            self.default_timeout_ms,
+        )
     }
 
     pub fn request_id_prefix(mut self, request_id_prefix: &str) -> Self {
@@ -128,8 +142,8 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
 pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
-    // just a ref count
-    _sys_ref: GhostSystemRef<'lt>,
+    sys_ref: GhostSystemRef<'lt>,
+    weak_user_data: Weak<Mutex<X>>,
     request_id_prefix: String,
     default_timeout_ms: u64,
     // just for ref count
@@ -172,25 +186,32 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         )));
         let weak_inner = Arc::downgrade(&inner);
 
-        sys_ref.enqueue_processor(0, Box::new(move || match weak_inner.upgrade() {
-            Some(mut strong_inner) => match weak_user_data.upgrade() {
-                Some(mut strong_user_data) => {
-                    let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+        let weak_user_data_clone = weak_user_data.clone();
+        sys_ref
+            .enqueue_processor(
+                0,
+                Box::new(move || match weak_inner.upgrade() {
+                    Some(mut strong_inner) => match weak_user_data_clone.upgrade() {
+                        Some(mut strong_user_data) => {
+                            let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                            let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
 
-                    strong_inner.process(&mut *strong_user_data)
-                        .expect("tracker process error");
+                            strong_inner
+                                .process(&mut *strong_user_data)
+                                .expect("tracker process error");
 
-                    GhostProcessInstructions::default()
-                        .set_should_continue(true)
-                }
-                None => GhostProcessInstructions::default(),
-            }
-            None => GhostProcessInstructions::default(),
-        })).expect("can enqueue processor");
+                            GhostProcessInstructions::default().set_should_continue(true)
+                        }
+                        None => GhostProcessInstructions::default(),
+                    },
+                    None => GhostProcessInstructions::default(),
+                }),
+            )
+            .expect("can enqueue processor");
 
         Self {
-            _sys_ref: sys_ref,
+            sys_ref,
+            weak_user_data,
             request_id_prefix,
             default_timeout_ms,
             _inner: inner,
@@ -199,8 +220,31 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         }
     }
 
+    /// register a periodic task
+    pub fn periodic_task(
+        &mut self,
+        start_delay_ms: u64,
+        mut cb: GhostPeriodicCb<'lt, X>,
+    ) -> GhostResult<()> {
+        let weak_user_data_clone = self.weak_user_data.clone();
+        self.sys_ref.enqueue_processor(
+            start_delay_ms,
+            Box::new(move || match weak_user_data_clone.upgrade() {
+                Some(mut strong_user_data) => {
+                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                    cb(&mut *strong_user_data)
+                }
+                None => GhostProcessInstructions::default(),
+            }),
+        )
+    }
+
     /// register a callback
-    pub fn bookmark(&mut self, span: Span, cb: GhostResponseCb<'lt, X, T>) -> GhostResult<RequestId> {
+    pub fn bookmark(
+        &mut self,
+        span: Span,
+        cb: GhostResponseCb<'lt, X, T>,
+    ) -> GhostResult<RequestId> {
         self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
@@ -232,123 +276,121 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     }
 
     /// handle a response
-    pub fn handle(
-        &mut self,
-        request_id: RequestId,
-        data: T,
-    ) -> GhostResult<()> {
-        self.send_handle.send((
-            request_id,
-            data,
-        ))?;
+    pub fn handle(&mut self, request_id: RequestId, data: T) -> GhostResult<()> {
+        self.send_handle.send((request_id, data))?;
 
         Ok(())
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use detach::prelude::*;
-    use holochain_tracing::test_span;
+    use crate::*;
+    use holochain_tracing::Span;
 
-    type TestError = String;
-
-    #[derive(Debug)]
-    pub struct TestCallbackData(pub String);
-
-    struct TestTrackingActor {
-        state: String,
-        tracker: Detach<GhostTracker<TestTrackingActor, TestCallbackData, TestError>>,
-    }
-
-    impl TestTrackingActor {
-        fn new(request_id_prefix: &str) -> Self {
-            let tracker_builder =
-                GhostTrackerBuilder::default().request_id_prefix(request_id_prefix);
-            Self {
-                state: "".into(),
-                tracker: Detach::new(tracker_builder.build()),
-            }
+    #[test]
+    fn it_can_schedule_periodic() {
+        #[derive(Debug)]
+        struct Test {
+            ticks: i32,
         }
-    }
 
-    #[test]
-    fn test_ghost_tracker_should_bookmark_and_handle() {
-        let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let span = test_span("some_context_data");
+        let test = Arc::new(Mutex::new(Test { ticks: 0 }));
 
-        let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
-            Box::new(|me, callback_data| {
-                if let GhostCallbackData::Response(Ok(TestCallbackData(payload))) = callback_data {
-                    me.state = payload;
-                }
-                Ok(())
-            });
+        let mut sys = GhostSystem::new();
 
-        // lets bookmark a callback that should set our actors state to the value
-        // of the callback response
-        let req_id = actor.tracker.bookmark(span, cb);
+        let mut track = GhostTrackerBuilder::default()
+            .build::<Test, ()>(sys.create_ref(), Arc::downgrade(&test));
 
-        let _entry = actor.tracker.pending.get(&req_id).unwrap();
-
-        // the state should be empty from the new
-        assert_eq!(actor.state, "");
-        // after handling
-        detach_run!(&mut actor.tracker, |tracker| {
-            let result = tracker.handle(
-                req_id.clone(),
-                &mut actor,
-                Ok(TestCallbackData("here's the data!".into())),
-            );
-            assert_eq!("Ok(())", format!("{:?}", result))
-        });
-        assert_eq!(actor.state, "here's the data!");
-
-        // try again and this time we should get that the request ID wasn't found
-        detach_run!(&mut actor.tracker, |tracker| {
-            let result = tracker.handle(
-                req_id,
-                &mut actor,
-                Ok(TestCallbackData("here's the data again!".into())),
-            );
-            assert_eq!(
-                b"Err(GhostError(RequestIdNotFound",
-                &format!("{:?}", result).as_bytes()[..32],
+        track
+            .periodic_task(
+                2,
+                Box::new(|me| {
+                    me.ticks += 1;
+                    GhostProcessInstructions::default()
+                        .set_should_continue(true)
+                        .set_next_run_delay_ms(2)
+                }),
             )
-        });
+            .unwrap();
+
+        for _ in 0..10 {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            sys.process().unwrap();
+        }
+
+        let test = test.lock().unwrap();
+        println!("got {:?}", *test);
+        assert!(test.ticks > 0);
+        assert!(test.ticks < 9);
     }
 
     #[test]
-    fn test_ghost_tracker_should_timeout() {
-        let mut actor = TestTrackingActor::new("test_request_id_prefix");
-        let span = test_span("foo");
-        let cb: GhostCallback<TestTrackingActor, TestCallbackData, TestError> =
-            Box::new(|me, callback_data| {
-                // when the timeout happens the callback should get
-                // the timeout enum in the callback_data
-                match callback_data {
-                    GhostCallbackData::Timeout(_) => me.state = "timed_out".into(),
-                    _ => assert!(false),
-                }
-                Ok(())
-            });
-        let _req_id = actor.tracker.bookmark_options(
-            span,
-            cb,
-            GhostTrackerBookmarkOptions::default().timeout(std::time::Duration::from_millis(1)),
-        );
-        assert_eq!(actor.tracker.pending.len(), 1);
+    fn it_should_timeout() {
+        #[derive(Debug)]
+        struct Test {
+            got_timeout: bool,
+        }
 
-        // wait 1 ms for the callback to have expired
+        let test = Arc::new(Mutex::new(Test { got_timeout: false }));
+
+        let mut sys = GhostSystem::new();
+
+        let mut track = GhostTrackerBuilder::default()
+            .default_timeout_ms(0)
+            .build::<Test, ()>(sys.create_ref(), Arc::downgrade(&test));
+
+        track
+            .bookmark(
+                Span::fixme(),
+                Box::new(|me, response| {
+                    assert_eq!(
+                        "Err(GhostError(Other(\"timeout\")))",
+                        &format!("{:?}", response)
+                    );
+                    me.got_timeout = true;
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
         std::thread::sleep(std::time::Duration::from_millis(1));
-        detach_run!(&mut actor.tracker, |tracker| {
-            let result = tracker.process(&mut actor);
-            assert_eq!("Ok(WorkWasDone(true))", format!("{:?}", result));
-        });
-        assert_eq!(actor.state, "timed_out");
-        assert_eq!(actor.tracker.pending.len(), 0);
+
+        sys.process().unwrap();
+
+        assert!(test.lock().unwrap().got_timeout);
+    }
+
+    #[test]
+    fn it_should_respond() {
+        #[derive(Debug)]
+        struct Test {
+            got_response: String,
+        }
+
+        let test = Arc::new(Mutex::new(Test {
+            got_response: "".to_string(),
+        }));
+
+        let mut sys = GhostSystem::new();
+
+        let mut track = GhostTrackerBuilder::default()
+            .build::<Test, String>(sys.create_ref(), Arc::downgrade(&test));
+
+        let rid = track
+            .bookmark(
+                Span::fixme(),
+                Box::new(|me, response| {
+                    me.got_response = format!("{:?}", response);
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        track.handle(rid, "test-response".to_string()).unwrap();
+
+        sys.process().unwrap();
+
+        assert_eq!("Ok(\"test-response\")", &test.lock().unwrap().got_response);
     }
 }
-*/
