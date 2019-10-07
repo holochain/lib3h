@@ -4,19 +4,6 @@ use std::{
     sync::{Arc, Mutex, Weak},
 };
 
-pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(T) -> GhostResult<()> + 'lt + Send + Sync>;
-
-pub trait GhostHandler<'lt, X: 'lt + Send + Sync, P: GhostProtocol>: Send + Sync {
-    fn trigger(
-        &mut self,
-        user_data: &mut X,
-        message: P,
-        cb: Option<GhostHandlerCb<'lt, P>>,
-    ) -> GhostResult<()>;
-}
-
-pub type RequestId = String;
-
 struct GhostEndpointRefInner<
     'lt,
     X: 'lt + Send + Sync,
@@ -106,7 +93,7 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
                                 };
                                 match strong_inner.callbacks.remove(&request_id) {
                                     None => println!(
-                                        "request_id {} not found {:?}",
+                                        "request_id {:?} not found {:?}",
                                         request_id, message
                                     ),
                                     Some(cb) => {
@@ -154,7 +141,7 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X
         self.count += 1;
         match cb {
             Some(cb) => {
-                let request_id = format!("req_{}", self.count);
+                let request_id = RequestId::new();
                 self.req_sender.send((request_id.clone(), cb))?;
                 self.sender.send((Some(request_id), message))?;
             }
