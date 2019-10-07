@@ -16,23 +16,23 @@ pub mod tests {
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{
         data_types::{EntryAspectData, EntryData},
+        types::*,
         uri::Lib3hUri,
-        Address,
     };
 
     lazy_static! {
         /// CONSTS
         /// Entries
-        pub static ref ENTRY_ADDRESS_1: Address = "entry_addr_1".into();
-        pub static ref ENTRY_ADDRESS_2: Address = "entry_addr_2".into();
-        pub static ref ENTRY_ADDRESS_3: Address = "entry_addr_3".into();
+        pub static ref ENTRY_ADDRESS_1: EntryHash = "entry_addr_1".into();
+        pub static ref ENTRY_ADDRESS_2: EntryHash = "entry_addr_2".into();
+        pub static ref ENTRY_ADDRESS_3: EntryHash = "entry_addr_3".into();
         /// Aspects
         pub static ref ASPECT_CONTENT_1: Vec<u8> = "hello-1".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_2: Vec<u8> = "l-2".as_bytes().to_vec();
         pub static ref ASPECT_CONTENT_3: Vec<u8> = "ChainHeader-3".as_bytes().to_vec();
-        pub static ref ASPECT_ADDRESS_1: Address = "aspect_addr_1".into();
-        pub static ref ASPECT_ADDRESS_2: Address = "aspect_addr_2".into();
-        pub static ref ASPECT_ADDRESS_3: Address = "aspect_addr_3".into();
+        pub static ref ASPECT_ADDRESS_1: AspectHash = "aspect_addr_1".into();
+        pub static ref ASPECT_ADDRESS_2: AspectHash = "aspect_addr_2".into();
+        pub static ref ASPECT_ADDRESS_3: AspectHash = "aspect_addr_3".into();
         /// Peers
         pub static ref PEER_A: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_A_STR));
         pub static ref PEER_B: Lib3hUri = Lib3hUri::with_agent_id(&HashString::from(PEER_B_STR));
@@ -51,8 +51,8 @@ pub mod tests {
         this_peer: PeerData,
         maybe_peer: Option<PeerData>,
         peer_list: Vec<PeerData>,
-        entry_list: Vec<Address>,
-        maybe_aspect_list: Option<Vec<Address>>,
+        entry_list: Vec<EntryHash>,
+        maybe_aspect_list: Option<Vec<AspectHash>>,
     }
 
     impl DhtData {
@@ -86,8 +86,8 @@ pub mod tests {
 
     #[allow(non_snake_case)]
     fn create_EntryData(
-        entry_address: &Address,
-        aspect_address: &Address,
+        entry_address: &EntryHash,
+        aspect_address: &AspectHash,
         aspect_content: &[u8],
     ) -> EntryData {
         let aspect = EntryAspectData {
@@ -104,7 +104,7 @@ pub mod tests {
 
     #[allow(non_snake_case)]
     #[allow(dead_code)]
-    fn create_FetchEntry(entry_address: &Address) -> FetchDhtEntryData {
+    fn create_FetchEntry(entry_address: &EntryHash) -> FetchDhtEntryData {
         unsafe {
             FETCH_COUNT += 1;
             FetchDhtEntryData {
@@ -219,7 +219,7 @@ pub mod tests {
         ud.peer_list
     }
 
-    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<Address> {
+    fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<EntryHash> {
         let mut ud = DhtData::new();
         dht.request(
             test_span(""),
@@ -251,8 +251,8 @@ pub mod tests {
 
     fn get_aspects_of(
         dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>,
-        entry_address: &Address,
-    ) -> Option<Vec<Address>> {
+        entry_address: &EntryHash,
+    ) -> Option<Vec<AspectHash>> {
         let mut ud = DhtData::new();
         dht.request(
             test_span(""),
@@ -341,7 +341,7 @@ pub mod tests {
         let entry_address_list = get_entry_address_list(&mut dht);
         assert_eq!(entry_address_list.len(), 0);
         // Add a data item
-        let entry = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
+        let entry = create_EntryData(&*ENTRY_ADDRESS_1, &*ASPECT_ADDRESS_1, &*ASPECT_CONTENT_1);
         println!("dht.process(HoldEntryAspectAddress)...");
         dht.publish(
             test_span(""),
@@ -477,7 +477,8 @@ pub mod tests {
         }
 
         // Add a data item in DHT A
-        let entry_data = create_EntryData(&ENTRY_ADDRESS_1, &ASPECT_ADDRESS_1, &ASPECT_CONTENT_1);
+        let entry_data =
+            create_EntryData(&*ENTRY_ADDRESS_1, &*ASPECT_ADDRESS_1, &*ASPECT_CONTENT_1);
         dht_a
             .publish(
                 test_span(""),
@@ -530,7 +531,7 @@ pub mod tests {
                 entry,
             } = payload
             {
-                assert_eq!(Lib3hUri::from(from_peer_name), *PEER_B);
+                assert_eq!(from_peer_name, *PEER_B);
                 assert_eq!(entry, entry_data.clone());
                 did_get_hold_entry = true;
             }

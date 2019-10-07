@@ -144,7 +144,7 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
     alex.reply_to_first_HandleGetGossipingEntryList();
 
     // Should receive a HandleFetchEntry request from network module after receiving list
-    let expected = "HandleFetchEntry\\(FetchEntryData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), entry_address: HashString\\(\"entry_addr_1\"\\), request_id: \"[\\w\\d_~]+\", provider_agent_id: HashString\\(\"alex\"\\), aspect_address_list: None \\}\\)";
+    let expected = "HandleFetchEntry\\(FetchEntryData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_1\"\\)\\), request_id: \"[\\w\\d_~]+\", provider_agent_id: HashString\\(\"alex\"\\), aspect_address_list: None \\}\\)";
     let results = assert_msg_matches!(alex, expected);
     let fetch_event = &results[0].events[0];
     // extract msg data
@@ -158,9 +158,9 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
         .expect("Reply to HandleFetchEntry should work");
 
     // Expect HandleStoreEntryAspect from receiving entry via gossip
-    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"billy\"\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_1\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, billy, expected);
-    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"camille\"\\), entry_address: HashString\\(\"entry_addr_1\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"camille\"\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_1\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, camille, expected);
 
     // Billy publish data on the network
@@ -170,10 +170,10 @@ fn test_author_and_hold(alex: &mut NodeMock, billy: &mut NodeMock, camille: &mut
         .unwrap();
     // let (did_work, _srv_msg_list) = billy.process().unwrap();
 
-    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"alex\"\\), entry_address: HashString\\(\"entry_addr_2\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"l-2\", publish_ts: \\d+ \\} \\}\\)";
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"alex\"\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_2\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"l-2\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(alex, billy, expected);
 
-    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"camille\"\\), entry_address: HashString\\(\"entry_addr_2\"\\), entry_aspect: EntryAspectData \\{ aspect_address: HashString\\(\"[\\w\\d]+\"\\), type_hint: \"NodeMock\", aspect: \"l-2\", publish_ts: \\d+ \\} \\}\\)";
+    let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: HashString\\(\"camille\"\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_2\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"l-2\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(camille, billy, expected);
 
     request_entry_ok(camille, &entry_1);
