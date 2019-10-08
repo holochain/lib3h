@@ -6,8 +6,7 @@ use std::sync::{Arc, Mutex};
 
 lazy_static! {
     /// Networks
-    pub static ref NETWORK_A_ID_STR: String = "net_A".to_string();
-    pub static ref NETWORK_A_ID: GatewayId = GatewayId::fake_new(&*NETWORK_A_ID_STR);
+    pub static ref NETWORK_A_ID: NetworkHash = "net_A".into();
     /// Agents
     pub static ref ALEX_AGENT_ID: AgentPubKey = "alex".into();
     pub static ref BILLY_AGENT_ID: AgentPubKey = "billy".into();

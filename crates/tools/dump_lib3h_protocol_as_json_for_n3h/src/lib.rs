@@ -172,7 +172,7 @@ pub fn dump_lib3h_protocol_as_json_for_n3h() {
     }));
 
     test_server(Lib3hServerProtocol::Disconnected(DisconnectedData {
-        network_id: "nid".to_string(),
+        network_id: "nid".into(),
     }));
 
     test_server(Lib3hServerProtocol::SendDirectMessageResult(
