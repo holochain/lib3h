@@ -130,6 +130,12 @@ fn check_entries(
             if &entry2 == entry {
                 trace!("Found entry for node {}", node.name());
                 checked.insert(node.name());
+            } else {
+                warn!(
+                    "Found entry for node {} but not same value we expected: {:?}",
+                    node.name(),
+                    entry2
+                );
             }
         }
     }
