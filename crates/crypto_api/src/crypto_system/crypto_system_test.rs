@@ -52,6 +52,9 @@ impl FullSuite {
         );
 
         // test compare
+        let mut z1 = self.crypto.buf_new_secure(0);
+        let mut z2 = self.crypto.buf_new_secure(0);
+
         let mut a = self.crypto.buf_new_secure(1);
         {
             let mut a = a.write_lock();
@@ -67,31 +70,88 @@ impl FullSuite {
             let mut c = c.write_lock();
             c[0] = 45;
         }
-        let mut d = self.crypto.buf_new_secure(2);
+        let mut d0 = self.crypto.buf_new_secure(2);
         {
-            let mut d = d.write_lock();
-            d[0] = 45;
-            d[1] = 0;
+            let mut d0 = d0.write_lock();
+            d0[0] = 45;
+            d0[1] = 0;
         }
-        let mut e = self.crypto.buf_new_secure(2);
+        let mut d1 = self.crypto.buf_new_secure(2);
         {
-            let mut e = e.write_lock();
-            e[1] = 1;
+            let mut d1 = d1.write_lock();
+            d1[0] = 45;
+            d1[1] = 1;
         }
+        let mut d045 = self.crypto.buf_new_secure(2);
+        {
+            let mut d045 = d045.write_lock();
+            d045[0] = 0;
+            d045[1] = 45;
+        }
+        let mut e0 = self.crypto.buf_new_secure(2);
+        {
+            let mut e0 = e0.write_lock();
+            e0[0] = 0;
+            e0[1] = 2;
+        }
+        let mut e2 = self.crypto.buf_new_secure(2);
+        {
+            let mut e2 = e2.write_lock();
+            e2[0] = 2;
+            e2[1] = 0;
+        }
+        let mut f = self.crypto.buf_new_secure(3);
+        {
+            let mut f = f.write_lock();
+            f[0] = 1;
+            f[1] = 1;
+            f[2] = 1;
+        }
+
+        // compare length 0 sized buffers
+        assert_eq!(z1.compare(&mut z2), 0);
+        assert_eq!(z2.compare(&mut z1), 0);
 
         // compare length 1 sized buffers
-        assert_eq!(1, a.compare(&mut b));
-        assert_eq!(-1, b.compare(&mut a));
-        assert_eq!(0, b.compare(&mut c));
+        assert_eq!(b.compare(&mut c), 0); // [45] == [45]
+        assert_eq!(a.compare(&mut b), 1); // [50] > [45]
+        assert_eq!(b.compare(&mut a), -1); // [45] < [50]
 
         // compare length 2 sized buffers
-        assert_eq!(-1, d.compare(&mut e));
-        assert_eq!(1, e.compare(&mut d));
+        assert_eq!(d1.compare(&mut e0), -1); // [45, 1] < [0, 2]
+        assert_eq!(e0.compare(&mut d1), 1); // [0, 2] > [45, 1]
+        assert_eq!(d0.compare(&mut e0), -1); // [45, 0] < [0, 2]
+        assert_eq!(e0.compare(&mut d0), 1); // [0, 2] > [45, 0]
+
+        assert_eq!(d1.compare(&mut e2), 1); // [45, 1] > [2, 0]
+        assert_eq!(e2.compare(&mut d1), -1); // [2, 0] < [45, 1]
+        assert_eq!(d0.compare(&mut e2), 1); // [45, 0] > [2, 0]
+        assert_eq!(e2.compare(&mut d0), -1); // [2, 0] < [45, 0]
+
+        assert_eq!(d1.compare(&mut d0), 1); // [45, 1] > [45, 0]
+        assert_eq!(d0.compare(&mut d1), -1); // [45, 0] < [45, 1]
+
+        assert_eq!(d045.compare(&mut d0), 1); // [0, 45] > [45, 0]
+        assert_eq!(d0.compare(&mut d045), -1); // [45, 0] < [0, 45]
 
         // compare different sized buffers
-        assert_eq!(0, c.compare(&mut d));
-        assert_eq!(1, a.compare(&mut d));
-        assert_eq!(-1, a.compare(&mut e));  // WAT?  why is [50] > than [0,1]
+        assert_eq!(c.compare(&mut d1), 0); // [45] == [45, 1]
+        assert_eq!(c.compare(&mut d0), 0); // [45] == [45, 0]
+        assert_eq!(c.compare(&mut d045), 1); // [45] > [0, 45]
+        assert_eq!(d0.compare(&mut c), 0); // [45, 0] == [45]
+        assert_eq!(d1.compare(&mut c), 1); // [45, 1] > [45]
+        assert_eq!(d045.compare(&mut c), 1); // [0, 45] > [45]
+
+        //
+        assert_eq!(a.compare(&mut d1), 1); // [50] > [45, 1]
+        assert_eq!(d1.compare(&mut a), 1); // [45, 1] > [50]
+
+        assert_eq!(e0.compare(&mut a), 1); // [0, 2] > [50]
+        assert_eq!(a.compare(&mut e0), 1); // [50] > [0, 2]
+
+        // compare different sized buffers
+        assert_eq!(f.compare(&mut e0), 1); // [1, 1, 1] > [1, 2]
+        assert_eq!(e0.compare(&mut f), 1); // [0, 2] > [1, 1, 1]
     }
 
     fn test_random(&self) {
