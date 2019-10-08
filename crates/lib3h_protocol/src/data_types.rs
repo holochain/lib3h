@@ -1,4 +1,4 @@
-use crate::{types::*, uri::Lib3hUri, Address};
+use crate::{types::*, uri::Lib3hUri};
 use std::cmp::Ordering;
 
 /// Represents an opaque vector of bytes. Lib3h will
@@ -146,7 +146,7 @@ impl EntryData {
 pub struct GenericResultData {
     pub request_id: String,
     pub space_address: SpaceHash,
-    pub to_agent_id: Address,
+    pub to_agent_id: AgentPubKey,
     pub result_info: Opaque,
 }
 
@@ -177,7 +177,7 @@ pub struct BootstrapData {
     pub space_address: SpaceHash,
     /// connection uri, such as
     ///   `wss://1.2.3.4:55888?a=HcMyada`
-    ///   `transportid:HcMyada?a=HcSagent`
+    ///   `nodepubkey:HcMyada?a=HcSagent`
     pub bootstrap_uri: Lib3hUri,
 }
 
@@ -229,7 +229,7 @@ pub struct SpaceData {
     /// Identifier of this request
     pub request_id: String,
     pub space_address: SpaceHash,
-    pub agent_id: Address,
+    pub agent_id: AgentPubKey,
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -240,8 +240,8 @@ pub struct SpaceData {
 pub struct DirectMessageData {
     pub space_address: SpaceHash,
     pub request_id: String,
-    pub to_agent_id: Address,
-    pub from_agent_id: Address,
+    pub to_agent_id: AgentPubKey,
+    pub from_agent_id: AgentPubKey,
     pub content: Opaque,
 }
 
@@ -254,7 +254,7 @@ pub struct QueryEntryData {
     pub space_address: SpaceHash,
     pub entry_address: EntryHash,
     pub request_id: String,
-    pub requester_agent_id: Address,
+    pub requester_agent_id: AgentPubKey,
     pub query: Opaque,
 }
 
@@ -263,8 +263,8 @@ pub struct QueryEntryResultData {
     pub space_address: SpaceHash,
     pub entry_address: EntryHash,
     pub request_id: String,
-    pub requester_agent_id: Address,
-    pub responder_agent_id: Address,
+    pub requester_agent_id: AgentPubKey,
+    pub responder_agent_id: AgentPubKey,
     pub query_result: Opaque, // opaque query-result struct
 }
 
@@ -276,7 +276,7 @@ pub struct QueryEntryResultData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ProvidedEntryData {
     pub space_address: SpaceHash,
-    pub provider_agent_id: Address,
+    pub provider_agent_id: AgentPubKey,
     pub entry: EntryData,
 }
 
@@ -284,7 +284,7 @@ pub struct ProvidedEntryData {
 pub struct StoreEntryAspectData {
     pub request_id: String,
     pub space_address: SpaceHash,
-    pub provider_agent_id: Address,
+    pub provider_agent_id: AgentPubKey,
     pub entry_address: EntryHash,
     pub entry_aspect: EntryAspectData,
 }
@@ -307,7 +307,7 @@ pub struct FetchEntryData {
     pub space_address: SpaceHash,
     pub entry_address: EntryHash,
     pub request_id: String,
-    pub provider_agent_id: Address,
+    pub provider_agent_id: AgentPubKey,
     pub aspect_address_list: Option<Vec<AspectHash>>, // None -> Get all, otherwise get specified aspects
 }
 
@@ -315,7 +315,7 @@ pub struct FetchEntryData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct FetchEntryResultData {
     pub space_address: SpaceHash,
-    pub provider_agent_id: Address,
+    pub provider_agent_id: AgentPubKey,
     pub request_id: String,
     pub entry: EntryData,
 }
@@ -328,14 +328,14 @@ pub struct FetchEntryResultData {
 pub struct GetListData {
     pub space_address: SpaceHash,
     /// Request List from a specific Agent
-    pub provider_agent_id: Address,
+    pub provider_agent_id: AgentPubKey,
     pub request_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct EntryListData {
     pub space_address: SpaceHash,
-    pub provider_agent_id: Address,
+    pub provider_agent_id: AgentPubKey,
     pub request_id: String,
     // Aspect addresses per entry
     pub address_map: std::collections::HashMap<EntryHash, Vec<AspectHash>>,

@@ -13,7 +13,7 @@ use lib3h_protocol::{
     protocol_server::Lib3hServerProtocol,
     types::*,
     uri::Lib3hUri,
-    Address, DidWork,
+    DidWork,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -454,7 +454,7 @@ impl NodeMock {
 impl NodeMock {
     /// Send a DirectMessage on the network.
     /// Returns the generated request_id for this send
-    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
+    pub fn send_direct_message(&mut self, to_agent_id: &AgentPubKey, content: Vec<u8>) -> String {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let request_id = self.generate_request_id();
         debug!("current_space: {:?}", self.current_space);
@@ -476,7 +476,7 @@ impl NodeMock {
     pub fn send_response(
         &mut self,
         request_id: &str,
-        to_agent_id: &Address,
+        to_agent_id: &AgentPubKey,
         response_content: Vec<u8>,
     ) {
         self.send_response_inner(request_id, to_agent_id, response_content)
@@ -487,7 +487,7 @@ impl NodeMock {
     pub fn send_response_inner(
         &mut self,
         request_id: &str,
-        to_agent_id: &Address,
+        to_agent_id: &AgentPubKey,
         response_content: Vec<u8>,
     ) -> Result<(), lib3h_protocol::error::Lib3hProtocolError> {
         let current_space = self.current_space.clone().expect("Current Space not set");
@@ -708,7 +708,7 @@ impl NodeMock {
         wait_engine_wrapper_until_no_work!(me)
     }
 
-    pub fn agent_id(&self) -> Address {
+    pub fn agent_id(&self) -> AgentPubKey {
         self.agent_id.clone()
     }
 }

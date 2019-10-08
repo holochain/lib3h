@@ -6,6 +6,7 @@ use lib3h_protocol::{
 
 use crate::{dht::dht_config::DhtConfig, error::*};
 use lib3h_ghost_actor::prelude::*;
+use lib3h_protocol::uri::UriScheme;
 
 pub type FromPeerName = Lib3hUri;
 
@@ -146,6 +147,18 @@ pub struct PeerData {
     pub peer_name: Lib3hUri,
     pub peer_location: Lib3hUri,
     pub timestamp: u64,
+}
+
+impl PeerData {
+    pub fn get_uri(&self) -> Lib3hUri {
+        assert!(
+            self.peer_name.is_scheme(UriScheme::Node) || self.peer_name.is_scheme(UriScheme::Agent)
+        );
+        if self.peer_name.is_scheme(UriScheme::Node) {
+            return self.peer_location.clone();
+        }
+        Lib3hUri::with_node_and_agent_id(&self.peer_location.node_id(), &self.peer_name.agent_id())
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
