@@ -25,53 +25,105 @@ struct GhostTrackerEntry<'lt, X, T> {
     cb: GhostResponseCb<'lt, X, T>,
 }
 
+enum GhostTrackerToInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
+    Bookmark(RequestId, GhostTrackerEntry<'lt, X, T>),
+    Handle(RequestId, T),
+    Periodic(u64, GhostPeriodicCb<'lt, X>),
+}
+
 struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
+    sys_ref: GhostSystemRef<'lt>,
+    weak_user_data: Weak<Mutex<X>>,
     pending: HashMap<RequestId, GhostTrackerEntry<'lt, X, T>>,
-    recv_bookmark: crossbeam_channel::Receiver<(RequestId, GhostTrackerEntry<'lt, X, T>)>,
-    recv_handle: crossbeam_channel::Receiver<(RequestId, T)>,
+    recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
 }
 
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, T> {
     fn new(
-        recv_bookmark: crossbeam_channel::Receiver<(RequestId, GhostTrackerEntry<'lt, X, T>)>,
-        recv_handle: crossbeam_channel::Receiver<(RequestId, T)>,
+        sys_ref: GhostSystemRef<'lt>,
+        weak_user_data: Weak<Mutex<X>>,
+        recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
     ) -> Self {
         Self {
+            sys_ref,
+            weak_user_data,
             pending: HashMap::new(),
-            recv_bookmark,
-            recv_handle,
+            recv_inner,
         }
     }
 
     /// trigger any periodic or delayed callbacks
     /// also check / cleanup any timeouts
     pub fn process(&mut self, user_data: &mut X) -> GhostResult<()> {
-        // order is important so we can test with fewest process() calls
-        self.priv_process_bookmarks()?;
-        self.priv_process_handle(user_data)?;
+        if self.priv_process_inner(user_data)? {
+            // we got new user_data...
+            // we can't continue until the next process() call
+            return Ok(());
+        }
         self.priv_process_timeouts(user_data)?;
         Ok(())
     }
 
-    /// start tracking any pending bookmark requests
-    fn priv_process_bookmarks(&mut self) -> GhostResult<()> {
-        while let Ok((request_id, entry)) = self.recv_bookmark.try_recv() {
-            self.pending.insert(request_id, entry);
+    fn priv_process_inner(&mut self, user_data: &mut X) -> GhostResult<bool> {
+        while let Ok(msg) = self.recv_inner.try_recv() {
+            match msg {
+                GhostTrackerToInner::Bookmark(request_id, entry) => {
+                    self.priv_process_bookmark(request_id, entry)?;
+                }
+                GhostTrackerToInner::Handle(request_id, data) => {
+                    self.priv_process_handle(user_data, request_id, data)?;
+                }
+                GhostTrackerToInner::Periodic(start_delay_ms, cb) => {
+                    self.priv_process_periodic(start_delay_ms, cb)?;
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// start tracking a pending bookmark request
+    fn priv_process_bookmark(
+        &mut self,
+        request_id: RequestId,
+        entry: GhostTrackerEntry<'lt, X, T>,
+    ) -> GhostResult<()> {
+        self.pending.insert(request_id, entry);
+        Ok(())
+    }
+
+    /// match up a pending handle request with any pending bookmarks
+    fn priv_process_handle(
+        &mut self,
+        user_data: &mut X,
+        request_id: RequestId,
+        data: T,
+    ) -> GhostResult<()> {
+        match self.pending.remove(&request_id) {
+            None => return Err(GhostErrorKind::RequestIdNotFound("".to_string()).into()),
+            Some(entry) => {
+                (entry.cb)(user_data, Ok(data))?;
+            }
         }
         Ok(())
     }
 
-    /// match up any pending handle requests with pending bookmarks
-    fn priv_process_handle(&mut self, user_data: &mut X) -> GhostResult<()> {
-        while let Ok((request_id, data)) = self.recv_handle.try_recv() {
-            match self.pending.remove(&request_id) {
-                None => return Err(GhostErrorKind::RequestIdNotFound("".to_string()).into()),
-                Some(entry) => {
-                    (entry.cb)(user_data, Ok(data))?;
+    /// queue up a periodic processing task
+    fn priv_process_periodic(
+        &mut self,
+        start_delay_ms: u64,
+        mut cb: GhostPeriodicCb<'lt, X>,
+    ) -> GhostResult<()> {
+        let weak_user_data_clone = self.weak_user_data.clone();
+        self.sys_ref.enqueue_processor(
+            start_delay_ms,
+            Box::new(move || match weak_user_data_clone.upgrade() {
+                Some(mut strong_user_data) => {
+                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                    cb(&mut *strong_user_data)
                 }
-            }
-        }
-        Ok(())
+                None => Ok(GhostProcessInstructions::default()),
+            }),
+        )
     }
 
     /// if there are any expired bookmarks, clean them up
@@ -120,54 +172,52 @@ impl GhostTrackerBookmarkOptions {
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
 pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
-    sys_ref: GhostSystemRef<'lt>,
-    weak_user_data: Weak<Mutex<X>>,
     // just for ref count
     _inner: Arc<Mutex<GhostTrackerInner<'lt, X, T>>>,
-    send_bookmark: crossbeam_channel::Sender<(RequestId, GhostTrackerEntry<'lt, X, T>)>,
-    send_handle: crossbeam_channel::Sender<(RequestId, T)>,
+    send_inner: crossbeam_channel::Sender<GhostTrackerToInner<'lt, X, T>>,
 }
 
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     pub fn new(mut sys_ref: GhostSystemRef<'lt>, weak_user_data: Weak<Mutex<X>>) -> Self {
-        let (send_bookmark, recv_bookmark) = crossbeam_channel::unbounded();
-        let (send_handle, recv_handle) = crossbeam_channel::unbounded();
+        let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
         let inner = Arc::new(Mutex::new(GhostTrackerInner::new(
-            recv_bookmark,
-            recv_handle,
+            sys_ref.clone(),
+            weak_user_data,
+            recv_inner,
         )));
         let weak_inner = Arc::downgrade(&inner);
 
-        let weak_user_data_clone = weak_user_data.clone();
         sys_ref
             .enqueue_processor(
                 0,
                 Box::new(move || match weak_inner.upgrade() {
-                    Some(mut strong_inner) => match weak_user_data_clone.upgrade() {
-                        Some(mut strong_user_data) => {
-                            let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                            let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                    Some(mut strong_inner) => {
+                        let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                        match strong_inner.weak_user_data.upgrade() {
+                            Some(mut strong_user_data) => {
+                                let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
 
-                            strong_inner
-                                .process(&mut *strong_user_data)
-                                .expect("tracker process error");
+                                strong_inner
+                                    .process(&mut *strong_user_data)
+                                    .expect("tracker process error");
 
-                            Ok(GhostProcessInstructions::default().set_should_continue(true))
+                                Ok(GhostProcessInstructions::default().set_should_continue(true))
+                            }
+                            None => {
+                                // we don't have any user_data, next time?
+                                Ok(GhostProcessInstructions::default().set_should_continue(true))
+                            }
                         }
-                        None => Ok(GhostProcessInstructions::default()),
-                    },
+                    }
                     None => Ok(GhostProcessInstructions::default()),
                 }),
             )
             .expect("can enqueue processor");
 
         Self {
-            sys_ref,
-            weak_user_data,
             _inner: inner,
-            send_bookmark,
-            send_handle,
+            send_inner,
         }
     }
 
@@ -175,19 +225,11 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     pub fn periodic_task(
         &mut self,
         start_delay_ms: u64,
-        mut cb: GhostPeriodicCb<'lt, X>,
+        cb: GhostPeriodicCb<'lt, X>,
     ) -> GhostResult<()> {
-        let weak_user_data_clone = self.weak_user_data.clone();
-        self.sys_ref.enqueue_processor(
-            start_delay_ms,
-            Box::new(move || match weak_user_data_clone.upgrade() {
-                Some(mut strong_user_data) => {
-                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
-                    cb(&mut *strong_user_data)
-                }
-                None => Ok(GhostProcessInstructions::default()),
-            }),
-        )
+        self.send_inner
+            .send(GhostTrackerToInner::Periodic(start_delay_ms, cb))?;
+        Ok(())
     }
 
     /// register a callback
@@ -213,7 +255,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
             Some(timeout_ms) => timeout_ms,
         };
 
-        self.send_bookmark.send((
+        self.send_inner.send(GhostTrackerToInner::Bookmark(
             request_id.clone(),
             GhostTrackerEntry {
                 expires: std::time::Instant::now()
@@ -228,8 +270,14 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
 
     /// handle a response
     pub fn handle(&mut self, request_id: RequestId, data: T) -> GhostResult<()> {
-        self.send_handle.send((request_id, data))?;
+        self.send_inner
+            .send(GhostTrackerToInner::Handle(request_id, data))?;
+        Ok(())
+    }
 
+    /// replace user data
+    pub fn set_user_data(&mut self, user_data: Weak<Mutex<X>>) -> GhostResult<()> {
+        ghost_try_lock(&mut self._inner).weak_user_data = user_data;
         Ok(())
     }
 }

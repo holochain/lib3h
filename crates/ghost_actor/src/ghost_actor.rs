@@ -2,15 +2,20 @@ use crate::*;
 use holochain_tracing::Span;
 use std::sync::{Arc, Mutex, Weak};
 
+enum GhostEndpointToInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
+    IncomingRequest(P, Option<GhostResponseCb<'lt, X, P>>),
+}
+
 struct GhostEndpointRefInner<
     'lt,
     X: 'lt + Send + Sync,
     P: GhostProtocol,
     H: GhostHandler<'lt, X, P>,
 > {
+    weak_user_data: Weak<Mutex<X>>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     handle_receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-    req_receiver: crossbeam_channel::Receiver<(P, Option<GhostResponseCb<'lt, X, P>>)>,
+    recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
     pending_callbacks: GhostTracker<'lt, X, P>,
     handler: H,
 }
@@ -19,21 +24,38 @@ impl<'lt, X: 'lt + Send + Sync, P: GhostProtocol, H: GhostHandler<'lt, X, P>>
     GhostEndpointRefInner<'lt, X, P, H>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
-        self.priv_process_incoming_requests()?;
+        if self.priv_process_inner()? {
+            // we got new user data, we need to abort the current loop
+            // so that we use the new user_data next process() call
+            return Ok(());
+        }
         self.priv_process_handle_requests(user_data)?;
         Ok(())
     }
 
-    fn priv_process_incoming_requests(&mut self) -> GhostResult<()> {
-        while let Ok((message, maybe_cb)) = self.req_receiver.try_recv() {
-            match maybe_cb {
-                Some(cb) => {
-                    let request_id = self.pending_callbacks.bookmark(Span::fixme(), cb)?;
-
-                    self.sender.send((Some(request_id), message))?;
+    fn priv_process_inner(&mut self) -> GhostResult<bool> {
+        while let Ok(inner_msg) = self.recv_inner.try_recv() {
+            match inner_msg {
+                GhostEndpointToInner::IncomingRequest(message, maybe_cb) => {
+                    self.priv_process_incoming_request(message, maybe_cb)?;
                 }
-                None => self.sender.send((None, message))?,
             }
+        }
+        Ok(false)
+    }
+
+    fn priv_process_incoming_request(
+        &mut self,
+        message: P,
+        maybe_cb: Option<GhostResponseCb<'lt, X, P>>,
+    ) -> GhostResult<()> {
+        match maybe_cb {
+            Some(cb) => {
+                let request_id = self.pending_callbacks.bookmark(Span::fixme(), cb)?;
+
+                self.sender.send((Some(request_id), message))?;
+            }
+            None => self.sender.send((None, message))?,
         }
         Ok(())
     }
@@ -71,55 +93,67 @@ pub struct GhostEndpointRef<
     P: GhostProtocol,
     H: GhostHandler<'lt, X, P>,
 > {
-    // just for ref counting
     _inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
-    req_sender: crossbeam_channel::Sender<(P, Option<GhostResponseCb<'lt, X, P>>)>,
+    send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
     // just for ref counting
     _a_ref: Arc<Mutex<A>>,
 }
 
+pub(crate) type GhostEndpointRefFinalizeCb<'lt, X> =
+    Box<dyn FnOnce(Weak<Mutex<X>>) -> GhostResult<()> + 'lt>;
+
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<'lt, X, P>>
     GhostEndpointRef<'lt, X, A, P, H>
 {
-    pub(crate) fn new(
+    pub(crate) fn new_partial(
+        sys_ref: &mut GhostSystemRef<'lt>,
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-        sys_ref: &mut GhostSystemRef<'lt>,
         a_ref: Arc<Mutex<A>>,
-        user_data: Weak<Mutex<X>>,
         handler: H,
-    ) -> GhostResult<Self> {
-        let (req_sender, req_receiver) = crossbeam_channel::unbounded();
-
+    ) -> GhostResult<(Self, GhostEndpointRefFinalizeCb<'lt, X>)> {
+        let (send_inner, recv_inner) = crossbeam_channel::unbounded();
         let inner = Arc::new(Mutex::new(GhostEndpointRefInner {
+            weak_user_data: Weak::new(),
             sender,
             handle_receiver: receiver,
-            req_receiver,
-            pending_callbacks: GhostTracker::new(sys_ref.clone(), user_data),
+            recv_inner,
+            pending_callbacks: GhostTracker::new(sys_ref.clone(), Weak::new()),
             handler,
         }));
-        let weak_inner = Arc::downgrade(&inner);
-        inner
-            .lock()
-            .expect("can lock inner during construction")
-            .pending_callbacks
-            .periodic_task(
-                0,
-                Box::new(move |user_data| match weak_inner.upgrade() {
-                    Some(mut strong_inner) => {
-                        let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                        strong_inner.priv_process(user_data)?;
-                        Ok(GhostProcessInstructions::default().set_should_continue(true))
-                    }
-                    None => Ok(GhostProcessInstructions::default()),
-                }),
-            )?;
 
-        Ok(Self {
-            _inner: inner,
-            req_sender,
-            _a_ref: a_ref,
-        })
+        let weak_inner = Arc::downgrade(&inner);
+        let finalize_cb = Box::new(
+            move |user_data: Weak<Mutex<X>>| match weak_inner.upgrade() {
+                Some(mut strong_inner) => {
+                    let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                    strong_inner.weak_user_data = user_data.clone();
+                    strong_inner.pending_callbacks.set_user_data(user_data)?;
+                    strong_inner.pending_callbacks.periodic_task(
+                        0,
+                        Box::new(move |user_data| match weak_inner.upgrade() {
+                            Some(mut strong_inner) => {
+                                let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                                strong_inner.priv_process(user_data)?;
+                                Ok(GhostProcessInstructions::default().set_should_continue(true))
+                            }
+                            None => Ok(GhostProcessInstructions::default()),
+                        }),
+                    )?;
+                    Ok(())
+                }
+                None => Ok(()),
+            },
+        );
+
+        Ok((
+            Self {
+                _inner: inner,
+                send_inner,
+                _a_ref: a_ref,
+            },
+            finalize_cb,
+        ))
     }
 }
 
@@ -131,7 +165,8 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: GhostHandler<'lt, X
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
-        self.req_sender.send((message, cb))?;
+        self.send_inner
+            .send(GhostEndpointToInner::IncomingRequest(message, cb))?;
         Ok(())
     }
 }
@@ -144,32 +179,89 @@ pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     ) -> GhostResult<()>;
 }
 
-pub struct GhostInflator<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
-    pub(crate) phantom_a: std::marker::PhantomData<&'a P>,
-    pub(crate) system_ref: GhostSystemRef<'lt>,
-    pub(crate) sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-    pub(crate) receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-    pub(crate) weak_ref: Weak<Mutex<X>>,
+pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sync {
+    fn process(&mut self) -> GhostResult<()>;
 }
 
-impl<'a, 'lt, X: 'lt + Send + Sync, P: GhostProtocol> GhostInflator<'a, 'lt, X, P> {
-    pub fn inflate<H: 'lt + GhostHandler<'lt, X, P>>(
+pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> {
+    finalize: Arc<Mutex<Option<GhostEndpointRefFinalizeCb<'lt, A>>>>,
+    sys_ref: GhostSystemRef<'lt>,
+    sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
+    receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
+}
+
+impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> GhostInflator<'lt, P, A> {
+    pub fn inflate<H: 'lt + GhostHandler<'lt, A, P>>(
         mut self,
         handler: H,
-    ) -> GhostResult<(GhostSystemRef<'lt>, GhostEndpointRef<'lt, X, (), P, H>)> {
-        let owner_ref = GhostEndpointRef::new(
+    ) -> GhostResult<GhostEndpointRef<'lt, A, (), P, H>> {
+        let (owner_ref, finalize) = GhostEndpointRef::new_partial(
+            &mut self.sys_ref,
             self.sender,
             self.receiver,
-            &mut self.system_ref,
+            // this is the deref/refcount object... but on the actor side
+            // we don't give actors direct access to their owners,
+            // and we certainly don't refcount them ;p
             Arc::new(Mutex::new(())),
-            self.weak_ref,
             handler,
         )?;
-        Ok((self.system_ref, owner_ref))
+        std::mem::replace(&mut *ghost_try_lock(&mut self.finalize), Some(finalize));
+
+        Ok(owner_ref)
     }
 }
 
-pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sync {
-    fn actor_init<'a>(&'a mut self, inflator: GhostInflator<'a, 'lt, A, P>) -> GhostResult<()>;
-    fn process(&mut self) -> GhostResult<()>;
+pub type GhostActorSpawnCb<'lt, A, P> =
+    Box<dyn FnOnce(GhostInflator<'lt, P, A>) -> GhostResult<A> + 'lt>;
+
+pub fn ghost_actor_spawn<
+    'lt,
+    X: 'lt + Send + Sync,
+    P: GhostProtocol,
+    A: 'lt + GhostActor<'lt, P, A>,
+    H: 'lt + GhostHandler<'lt, X, P>,
+>(
+    mut sys_ref: GhostSystemRef<'lt>,
+    user_data: Weak<Mutex<X>>,
+    spawn_cb: GhostActorSpawnCb<'lt, A, P>,
+    handler: H,
+) -> GhostResult<GhostEndpointRef<'lt, X, A, P, H>> {
+    let (s1, r1) = crossbeam_channel::unbounded();
+    let (s2, r2) = crossbeam_channel::unbounded();
+
+    let mut finalize: Arc<Mutex<Option<GhostEndpointRefFinalizeCb<'lt, A>>>> =
+        Arc::new(Mutex::new(None));
+
+    let inflator: GhostInflator<'lt, P, A> = GhostInflator {
+        finalize: finalize.clone(),
+        sys_ref: sys_ref.clone(),
+        sender: s2,
+        receiver: r1,
+    };
+
+    let strong_actor = Arc::new(Mutex::new(spawn_cb(inflator)?));
+    let weak_actor = Arc::downgrade(&strong_actor);
+
+    let finalize = std::mem::replace(&mut *ghost_try_lock(&mut finalize), None);
+
+    (finalize.expect("spawn cannot initialize owner endpoint ref"))(weak_actor.clone())?;
+
+    sys_ref.enqueue_processor(
+        0,
+        Box::new(move || match weak_actor.upgrade() {
+            Some(mut strong_actor) => {
+                let mut strong_actor = ghost_try_lock(&mut strong_actor);
+                match strong_actor.process() {
+                    Ok(()) => Ok(GhostProcessInstructions::default().set_should_continue(true)),
+                    Err(e) => panic!("actor.process() error: {:?}", e),
+                }
+            }
+            None => Ok(GhostProcessInstructions::default()),
+        }),
+    )?;
+
+    let (ep, finalize) =
+        GhostEndpointRef::new_partial(&mut sys_ref, s1, r2, strong_actor, handler)?;
+    finalize(user_data)?;
+    Ok(ep)
 }

@@ -1,5 +1,5 @@
 use crate::*;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 /// struct used for hinting on whether / when to next run this process fn
 pub struct GhostProcessInstructions {
@@ -134,53 +134,6 @@ impl<'lt> GhostSystemRef<'lt> {
         };
         self.process_send.send(data)?;
         Ok(())
-    }
-
-    /// spawn / manage a new actor
-    pub fn spawn<
-        'a,
-        X: 'lt + Send + Sync,
-        P: GhostProtocol,
-        A: 'lt + GhostActor<'lt, P, A>,
-        H: 'lt + GhostHandler<'lt, X, P>,
-    >(
-        &'a mut self,
-        user_data: Weak<Mutex<X>>,
-        actor: A,
-        handler: H,
-    ) -> GhostResult<GhostEndpointRef<'lt, X, A, P, H>> {
-        let (s1, r1) = crossbeam_channel::unbounded();
-        let (s2, r2) = crossbeam_channel::unbounded();
-
-        let mut actor = Arc::new(Mutex::new(actor));
-
-        let inflator = GhostInflator {
-            phantom_a: std::marker::PhantomData,
-            system_ref: self.clone(),
-            sender: s2,
-            receiver: r1,
-            weak_ref: Arc::downgrade(&actor),
-        };
-
-        ghost_try_lock(&mut actor).actor_init(inflator)?;
-
-        let weak_ref = Arc::downgrade(&actor);
-
-        self.enqueue_processor(
-            0,
-            Box::new(move || match weak_ref.upgrade() {
-                Some(mut strong_actor) => {
-                    let mut strong_actor = ghost_try_lock(&mut strong_actor);
-                    match strong_actor.process() {
-                        Ok(()) => Ok(GhostProcessInstructions::default().set_should_continue(true)),
-                        Err(e) => panic!("actor.process() error: {:?}", e),
-                    }
-                }
-                None => Ok(GhostProcessInstructions::default()),
-            }),
-        )?;
-
-        GhostEndpointRef::new(s1, r2, self, actor, user_data, handler)
     }
 }
 
