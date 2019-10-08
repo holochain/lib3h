@@ -119,7 +119,6 @@ fn test_send_message(
     debug!("\nCamille sends DM to Alex...\n");
 
     let _req_id = camille.send_direct_message(&ALEX_AGENT_ID, "marco".as_bytes().to_vec());
-    let _results = assert2_msg_matches!(alex, camille, expected, options);
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"camille\"\\)\\), content: \"marco\" \\}\\)";
     let results = assert2_msg_matches!(alex, camille, expected);
     let handle_send_direct_msg = results.first().unwrap();
@@ -130,7 +129,8 @@ fn test_send_message(
 
     // C should not receive
     let expected = "None";
-    let _results = assert_msg_matches!(billy, expected, options);
+    let small_iters_options = ProcessingOptions { max_iters:100, ..*options };
+    let _results = assert_msg_matches!(billy, expected, small_iters_options);
 
     // Send response
     println!("\n Alex responds to Camille...\n");
