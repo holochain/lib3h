@@ -28,6 +28,7 @@ impl FullSuite {
         self.test_aead();
     }
 
+    #[allow(clippy::cognitive_complexity)]
     fn test_sec_buf(&self) {
         let mut b1 = self.crypto.buf_new_secure(8);
         assert_eq!(8, b1.len());
