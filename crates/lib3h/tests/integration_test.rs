@@ -42,8 +42,13 @@ const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions
     should_abort: true,
 };
 
-const THREE_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions =
-    TWO_MEMORY_NODES_PROCESSING_OPTIONS;
+const THREE_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
+    max_iters: 10000,
+    delay_interval_ms: 1,
+    timeout_ms: 10000,
+    max_retries: 3,
+    should_abort: true,
+};
 
 const MIRROR_TEST_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
     max_iters: 20000,
