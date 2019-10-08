@@ -16,7 +16,13 @@ use detach::Detach;
 use holochain_tracing::Span;
 use lib3h_crypto_api::CryptoSystem;
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{data_types::*, protocol::*, types::SpaceHash, uri::Lib3hUri, Address};
+use lib3h_protocol::{
+    data_types::*,
+    protocol::*,
+    types::{SpaceHash, *},
+    uri::Lib3hUri,
+    Address,
+};
 use rmp_serde::Serializer;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -40,29 +46,29 @@ impl<'engine> GhostEngine<'engine> {
         // This will change when multi-transport is impelmented
         assert_eq!(config.transport_configs.len(), 1);
         let transport_config = config.transport_configs[0].clone();
-        let transport_id = transport_keys.transport_id.clone();
-        let transport_id_uri = Lib3hUri::with_transport_id(&transport_keys.transport_id);
+        let node_id = transport_keys.node_id.clone();
+        let node_uri = Lib3hUri::with_node_id(&transport_keys.node_id);
 
         let transport: DynTransportActor = match &transport_config {
             TransportConfig::Websocket(tls_config) => {
                 let tls = tls_config.clone();
                 Box::new(GhostTransportWebsocket::new(
-                    transport_id,
+                    node_id,
                     tls,
                     config.network_id.id.clone(),
                 ))
             }
-            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(transport_id, &net)),
+            TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(node_id, &net)),
         };
 
         let prebound_binding = Lib3hUri::with_undefined();
         let this_net_peer = PeerData {
-            peer_name: transport_id_uri.clone(),
+            peer_name: node_uri.clone(),
             peer_location: prebound_binding.clone(),
             timestamp: crate::time::since_epoch_ms(),
         };
         // Create DhtConfig
-        let dht_config = DhtConfig::with_engine_config(&transport_id_uri, &config);
+        let dht_config = DhtConfig::with_engine_config(&node_uri, &config);
         debug!("New MOCK Engine {} -> {:?}", name, this_net_peer);
         let mut multiplexer = Detach::new(GatewayParentWrapper::new(
             TransportMultiplex::new(P2pGateway::new(
@@ -144,7 +150,7 @@ impl<'engine> GhostEngine<'engine> {
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                space_address: self.config.network_id.id.clone(),
+                space_address: self.config.network_id.id.clone().into(),
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
@@ -253,8 +259,8 @@ impl<'engine> GhostEngine<'engine> {
     fn add_gateway(
         &mut self,
         space_address: SpaceHash,
-        agent_id: Address,
-    ) -> Lib3hResult<(SpaceHash, Address)> {
+        agent_id: AgentPubKey,
+    ) -> Lib3hResult<(SpaceHash, AgentPubKey)> {
         let chain_id = (space_address.clone(), agent_id.clone());
         if self.space_gateway_map.contains_key(&chain_id) {
             return Err(Lib3hError::new_other("Already joined space"));
@@ -282,7 +288,7 @@ impl<'engine> GhostEngine<'engine> {
             P2pGateway::new(
                 GatewayOutputWrapType::WrapOutputWithP2pDirectMessage,
                 gateway_id,
-                Lib3hUri::with_transport_id(&self.transport_keys.transport_id),
+                Lib3hUri::with_node_id(&self.transport_keys.node_id),
                 Box::new(uniplex),
                 self.dht_factory,
                 &dht_config,
@@ -528,8 +534,8 @@ impl<'engine> GhostEngine<'engine> {
     pub(crate) fn prepare_direct_peer_msg(
         &mut self,
         space_address: SpaceHash,
-        from_agent_id: Address,
-        _to_agent_id: Address,
+        from_agent_id: AgentPubKey,
+        _to_agent_id: AgentPubKey,
         net_msg: P2pProtocol,
     ) -> Lib3hResult<(
         &mut GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>,
@@ -691,7 +697,7 @@ impl<'engine> GhostEngine<'engine> {
     pub fn get_space(
         &mut self,
         space_address: &SpaceHash,
-        agent_id: &Address,
+        agent_id: &AgentPubKey,
     ) -> Lib3hResult<&mut Detach<GatewayParentWrapper<GhostEngine<'engine>, P2pGateway>>> {
         self.space_gateway_map
             .get_mut(&(space_address.to_owned(), agent_id.to_owned()))
@@ -703,7 +709,7 @@ impl<'engine> GhostEngine<'engine> {
 
 /// Return true if all elements of list_b are found in list_a
 #[allow(dead_code)]
-fn includes(list_a: &[Address], list_b: &[Address]) -> bool {
+fn includes(list_a: &[AspectHash], list_b: &[AspectHash]) -> bool {
     let set_a: HashSet<_> = list_a.iter().map(|addr| addr).collect();
     let set_b: HashSet<_> = list_b.iter().map(|addr| addr).collect();
     set_b.is_subset(&set_a)

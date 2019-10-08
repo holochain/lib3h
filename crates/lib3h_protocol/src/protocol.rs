@@ -6,8 +6,6 @@ use crate::{
     uri::Lib3hUri,
 };
 
-use std::convert::TryFrom;
-
 /// Enum holding the message types describe the lib3h protocol.
 /// There are 4 categories of messages:
 ///  - ClientToLib3h: A request or event sent from the user/client of lib3h
@@ -111,7 +109,7 @@ impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
         match c {
             Lib3hClientProtocol::Connect(connect_data) => {
                 Ok(ClientToLib3h::Bootstrap(BootstrapData {
-                    space_address: connect_data.network_id,
+                    space_address: connect_data.network_id.as_str().into(),
                     bootstrap_uri: connect_data.peer_location,
                 }))
             }
@@ -366,7 +364,7 @@ mod tests {
             to_c,
             ClientToLib3h::Bootstrap(BootstrapData {
                 bootstrap_uri: Url::parse("wss://192.168.0.102:58081/").unwrap().into(),
-                space_address: "network_id".to_string().into(),
+                space_address: "network_id".into(),
             })
         );
 

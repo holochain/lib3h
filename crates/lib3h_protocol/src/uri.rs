@@ -1,4 +1,4 @@
-use crate::{error::Lib3hProtocolError, Address};
+use crate::{error::Lib3hProtocolError, types::*};
 use std::convert::{TryFrom, TryInto};
 use url::Url;
 
@@ -6,26 +6,26 @@ use url::Url;
 // UriScheme
 //--------------------------------------------------------------------------------------------------
 
-static AGENT_SCHEME: &'static str = "agentid";
-static TRANSPORT_SCHEME: &'static str = "transportid";
+static AGENT_SCHEME: &'static str = "agentpubkey";
+static NODE_SCHEME: &'static str = "nodepubkey";
 static MEMORY_SCHEME: &'static str = "mem";
 static UNDEFINED_SCHEME: &'static str = "none";
 
 pub enum UriScheme {
-    Agent,
-    Transport,
-    Memory,
     Undefined,
+    Agent,
+    Node,
+    Memory,
     Other(String),
 }
 
 impl From<UriScheme> for &str {
     fn from(scheme: UriScheme) -> &'static str {
         match scheme {
-            UriScheme::Agent => AGENT_SCHEME,
-            UriScheme::Transport => TRANSPORT_SCHEME,
-            UriScheme::Memory => MEMORY_SCHEME,
             UriScheme::Undefined => UNDEFINED_SCHEME,
+            UriScheme::Agent => AGENT_SCHEME,
+            UriScheme::Node => NODE_SCHEME,
+            UriScheme::Memory => MEMORY_SCHEME,
             UriScheme::Other(_) => "",
         }
     }
@@ -34,10 +34,10 @@ impl From<UriScheme> for &str {
 impl From<UriScheme> for String {
     fn from(scheme: UriScheme) -> String {
         match scheme {
-            UriScheme::Agent => AGENT_SCHEME.into(),
-            UriScheme::Transport => TRANSPORT_SCHEME.into(),
-            UriScheme::Memory => MEMORY_SCHEME.into(),
             UriScheme::Undefined => UNDEFINED_SCHEME.into(),
+            UriScheme::Agent => AGENT_SCHEME.into(),
+            UriScheme::Node => NODE_SCHEME.into(),
+            UriScheme::Memory => MEMORY_SCHEME.into(),
             UriScheme::Other(s) => s.clone(),
         }
     }
@@ -54,19 +54,15 @@ pub struct Lib3hUri(pub Url);
 impl Lib3hUri {
     // -- Constructors -- //
 
-    #[allow(dead_code)]
-    pub fn with_transport_and_agent_id(transport_id: &Address, agent_id: &Address) -> Self {
-        let url = Self::parse(&format!(
-            "{}:{}?a={}",
-            TRANSPORT_SCHEME, transport_id, agent_id
-        ));
+    pub fn with_node_and_agent_id(node_id: &NodePubKey, agent_id: &AgentPubKey) -> Self {
+        let url = Self::parse(&format!("{}:{}?a={}", NODE_SCHEME, node_id, agent_id));
         Lib3hUri(url)
     }
-    pub fn with_transport_id(transport_id: &Address) -> Self {
-        let url = Self::parse(&format!("{}:{}", TRANSPORT_SCHEME, transport_id));
+    pub fn with_node_id(node_id: &NodePubKey) -> Self {
+        let url = Self::parse(&format!("{}:{}", NODE_SCHEME, node_id));
         Lib3hUri(url)
     }
-    pub fn with_agent_id(agent_id: &Address) -> Self {
+    pub fn with_agent_id(agent_id: &AgentPubKey) -> Self {
         let url = Self::parse(&format!("{}:{}", AGENT_SCHEME, agent_id));
         Lib3hUri(url)
     }
@@ -85,6 +81,12 @@ impl Lib3hUri {
     pub fn is_scheme(&self, scheme: UriScheme) -> bool {
         let s: String = scheme.into();
         self.scheme() == s
+    }
+
+    /// True if its a TransportUri
+    pub fn is_transport(&self) -> bool {
+        let this_scheme = self.scheme();
+        this_scheme != UNDEFINED_SCHEME && this_scheme != NODE_SCHEME && this_scheme != AGENT_SCHEME
     }
 
     /// new uri from &str
@@ -119,7 +121,8 @@ impl Lib3hUri {
     }
 
     /// set a higher-level agent_id i.e. ?a=agent_id
-    pub fn set_agent_id(&mut self, agent_id: &Address) {
+    pub fn set_agent_id(&mut self, agent_id: &AgentPubKey) {
+        assert!(self.is_scheme(UriScheme::Node));
         self.0
             .query_pairs_mut()
             .clear()
@@ -128,22 +131,30 @@ impl Lib3hUri {
 
     /// clear any higher-level agent_id
     pub fn clear_agent_id(&mut self) {
+        //assert!(self.is_scheme(UriScheme::Node), "{:?}", self);
         self.0.set_query(None);
     }
 
     /// do we have a higher-level agent_id? i.e. ?a=agent_id
-    pub fn agent_id(&self) -> Option<Address> {
+    pub fn get_agent_id(&self) -> Option<AgentPubKey> {
+        if !self.is_scheme(UriScheme::Node) {
+            return None;
+        }
         for (n, v) in self.0.query_pairs() {
             if &n == "a" {
-                return Some(v.to_string().into());
+                return Some(v.to_string().as_str().into());
             }
         }
         None
     }
 
-    /// get our lower component as an address
-    /// i.e. transportid:HcMyada would return HcMyada
-    pub fn lower_address(&self) -> Address {
+    pub fn node_id(&self) -> NodePubKey {
+        assert!(self.is_scheme(UriScheme::Node), "{:?}", self);
+        self.0.path().into()
+    }
+
+    pub fn agent_id(&self) -> AgentPubKey {
+        assert!(self.is_scheme(UriScheme::Agent), "{:?}", self);
         self.0.path().into()
     }
 }
@@ -203,15 +214,6 @@ impl Builder {
 
 // -- Converters -- //
 
-impl From<Lib3hUri> for Address {
-    fn from(u: Lib3hUri) -> Address {
-        if !(u.is_scheme(UriScheme::Agent) || u.is_scheme(UriScheme::Transport)) {
-            panic!("Can't convert a non *Id Lib3hUri into an address")
-        }
-        u.path().into()
-    }
-}
-
 impl TryFrom<&str> for Lib3hUri {
     type Error = Lib3hProtocolError;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
@@ -245,8 +247,8 @@ mod tests {
     fn test_uri_scheme_convert_str() {
         let s: &str = UriScheme::Agent.into();
         assert_eq!(s, AGENT_SCHEME);
-        let s: &str = UriScheme::Transport.into();
-        assert_eq!(s, TRANSPORT_SCHEME);
+        let s: &str = UriScheme::Node.into();
+        assert_eq!(s, NODE_SCHEME);
         let s: &str = UriScheme::Memory.into();
         assert_eq!(s, MEMORY_SCHEME);
         let s: &str = UriScheme::Undefined.into();
@@ -256,8 +258,8 @@ mod tests {
     fn test_uri_scheme_convert_string() {
         let s: String = UriScheme::Agent.into();
         assert_eq!(s, AGENT_SCHEME.to_string());
-        let s: String = UriScheme::Transport.into();
-        assert_eq!(s, TRANSPORT_SCHEME.to_string());
+        let s: String = UriScheme::Node.into();
+        assert_eq!(s, NODE_SCHEME.to_string());
         let s: String = UriScheme::Memory.into();
         assert_eq!(s, MEMORY_SCHEME.to_string());
         let s: String = UriScheme::Undefined.into();
@@ -283,20 +285,21 @@ mod tests {
 
     #[test]
     fn test_address_from_uri() {
-        let id: Address = "HcAsdkfjsdflkjsdf".into();
+        let id: AgentPubKey = "HcAsdkfjsdflkjsdf".into();
         let uri = Lib3hUri::with_agent_id(&id);
-        let roundtrip: Address = uri.into();
+        let roundtrip: AgentPubKey = uri.agent_id();
         assert_eq!(roundtrip, id);
-        let uri = Lib3hUri::with_transport_id(&id);
-        let roundtrip: Address = uri.into();
+        let id: NodePubKey = "HcAsdkfjsdflkjsdf".into();
+        let uri = Lib3hUri::with_node_id(&id);
+        let roundtrip: NodePubKey = uri.node_id();
         assert_eq!(roundtrip, id);
     }
 
     #[test]
     fn test_uri_is_scheme() {
-        let uri = Lib3hUri::try_from("agentid:HcAsdkfjsdflkjsdf").unwrap();
+        let uri = Lib3hUri::try_from("agentpubkey:HcAsdkfjsdflkjsdf").unwrap();
         assert!(uri.is_scheme(UriScheme::Agent));
-        assert!(!uri.is_scheme(UriScheme::Transport));
+        assert!(!uri.is_scheme(UriScheme::Node));
         let uri = Lib3hUri::try_from("ws:x").unwrap();
         assert!(!uri.is_scheme(UriScheme::Agent));
         assert!(uri.is_scheme(UriScheme::Other("ws".to_string())));
@@ -305,22 +308,19 @@ mod tests {
 
     #[test]
     fn test_uri_create_transport() {
-        let transport_id: Address = "fake_transport_id".into();
-        let agent_id: Address = "HcAfake_agent_id".into();
-        let mut uri = Lib3hUri::with_transport_and_agent_id(&transport_id, &agent_id);
+        let node_id: NodePubKey = "fake_node_id".into();
+        let agent_id: AgentPubKey = "HcAfake_agent_id".into();
+        let mut uri = Lib3hUri::with_node_and_agent_id(&node_id, &agent_id);
         assert_eq!(
-            "Lib3hUri(\"transportid:fake_transport_id?a=HcAfake_agent_id\")",
+            "Lib3hUri(\"nodepubkey:fake_node_id?a=HcAfake_agent_id\")",
             format!("{:?}", uri)
         );
-        assert_eq!(
-            Some(Address::from("HcAfake_agent_id".to_string())),
-            uri.agent_id(),
-        );
-        uri.set_agent_id(&"bla".to_string().into());
-        assert_eq!(Some(Address::from("bla".to_string())), uri.agent_id());
-        assert_eq!(Address::from("fake_transport_id"), uri.lower_address());
+        assert_eq!(Some("HcAfake_agent_id".into()), uri.get_agent_id());
+        uri.set_agent_id(&"bla".into());
+        assert_eq!(Some("bla".into()), uri.get_agent_id());
+        assert_eq!(NodePubKey::from("fake_node_id"), uri.node_id());
         uri.clear_agent_id();
-        assert_eq!(None, uri.agent_id());
+        assert_eq!(None, uri.get_agent_id());
     }
 
     #[test]

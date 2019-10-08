@@ -16,14 +16,14 @@ use crate::{
 use detach::Detach;
 use lib3h_crypto_api::{Buffer, CryptoSystem};
 use lib3h_ghost_actor::{prelude::*, RequestId};
-use lib3h_protocol::{protocol::*, types::SpaceHash, uri::Lib3hUri, Address};
+use lib3h_protocol::{protocol::*, types::*, uri::Lib3hUri, Address};
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
 
 /// Identifier of a source chain: SpaceAddress+AgentId
-pub type ChainId = (SpaceHash, Address);
+pub type ChainId = (SpaceHash, AgentPubKey);
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct GatewayId {
@@ -80,11 +80,11 @@ pub struct EngineConfig {
 }
 
 pub struct TransportKeys {
-    /// Our TransportId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
-    pub transport_id: Address,
-    /// The TransportId public key
+    /// Our nodeId, i.e. Base32 encoded public key (e.g. "HcMyadayada")
+    pub node_id: NodePubKey,
+    /// The nodeId public key
     pub transport_public_key: Box<dyn Buffer>,
-    /// The TransportId secret key
+    /// The nodeId secret key
     pub transport_secret_key: Box<dyn Buffer>,
 }
 impl TransportKeys {
@@ -94,7 +94,7 @@ impl TransportKeys {
         let mut secret_key = crypto.buf_new_secure(crypto.sign_secret_key_bytes());
         crypto.sign_keypair(&mut public_key, &mut secret_key)?;
         Ok(Self {
-            transport_id: hcm0.encode(&public_key)?.into(),
+            node_id: hcm0.encode(&public_key)?.as_str().into(),
             transport_public_key: public_key,
             transport_secret_key: secret_key,
         })
@@ -128,7 +128,7 @@ pub struct GhostEngine<'engine> {
     /// crypto system to use
     crypto: Box<dyn CryptoSystem>,
     #[allow(dead_code)]
-    /// transport_id data, public/private keys, etc
+    /// transport data: node_id, public/private keys, etc
     transport_keys: TransportKeys,
     /// items we need to send on our multiplexer in another process loop
     multiplexer_defered_sends: Vec<(Lib3hUri, lib3h_protocol::data_types::Opaque)>,
