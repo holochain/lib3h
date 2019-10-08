@@ -150,7 +150,7 @@ impl<'engine> GhostEngine<'engine> {
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                network_or_space_address: self.config.network_id.id.clone().into(),
+                network_or_space_address: self.config.network_id.id.clone(),
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
