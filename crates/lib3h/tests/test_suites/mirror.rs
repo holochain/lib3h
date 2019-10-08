@@ -79,7 +79,7 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
     let mut checked = std::collections::HashSet::new();
 
     let clock = std::time::SystemTime::now();
-    let timeout = std::time::Duration::from_millis(60000);
+    let timeout = std::time::Duration::from_millis(120000);
     let max_iters = 100000;
     let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
     for _i in 0..max_iters {
@@ -97,7 +97,21 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
         }
         std::thread::sleep(delay_interval);
     }
-    assert!(checked.len() == nodes.len());
+    let mut node_names = std::collections::HashSet::new();
+    for n in nodes {
+        node_names.insert(n.name());
+    }
+    let difference = node_names.difference(&checked);
+
+    let mut unchecked = std::collections::HashSet::new();
+    for d in difference {
+        unchecked.insert(d);
+    }
+    assert!(
+        unchecked.is_empty(),
+        "Some nodes did not have the expected entry: {:?}",
+        unchecked
+    );
 }
 
 fn check_entries(
