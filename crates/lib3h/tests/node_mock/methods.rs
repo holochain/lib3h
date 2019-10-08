@@ -11,7 +11,9 @@ use lib3h_protocol::{
     error::{ErrorKind, Lib3hProtocolError, Lib3hProtocolResult},
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
-    Address, DidWork,
+    types::*,
+    uri::Lib3hUri,
+    DidWork,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -43,7 +45,7 @@ impl NodeMock {
         None
     }
 
-    pub fn advertise(&self) -> Url {
+    pub fn advertise(&self) -> Lib3hUri {
         self.my_advertise.clone()
     }
 }
@@ -53,12 +55,13 @@ impl NodeMock {
     /// Disconnect the NetworkEngine by destroying it.
     pub fn disconnect(&mut self) {
         let mut dummy_config = self.config.clone();
-        dummy_config.bind_url =
-            Url::parse(&format!("{}/dummy", self.config.bind_url.as_str())).unwrap();
-        self.engine = (self.engine_factory)(&dummy_config, "__dummy")
-            .expect("Failed to create dummy RealEngine");
-        self.engine = (self.engine_factory)(&self.config, &self.name)
-            .expect("Failed to re-create RealEngine");
+        dummy_config.bind_url = Url::parse(&format!("{}/dummy", self.config.bind_url.as_str()))
+            .unwrap()
+            .into();
+        self.engine =
+            (self.engine_factory)(&dummy_config, "__dummy").expect("Failed to create dummy Engine");
+        self.engine =
+            (self.engine_factory)(&self.config, &self.name).expect("Failed to re-create Engine");
         self.my_advertise = self.engine.advertise();
     }
 
@@ -95,10 +98,10 @@ impl NodeMock {
     }
 
     /// Connect to another peer via its uri
-    pub fn connect_to(&mut self, uri: &Url) -> Lib3hProtocolResult<ConnectData> {
+    pub fn connect_to(&mut self, uri: &Lib3hUri) -> Lib3hProtocolResult<ConnectData> {
         let req_connect = ConnectData {
             request_id: self.generate_request_id(),
-            peer_uri: uri.clone(),
+            peer_location: uri.clone(),
             network_id: NETWORK_A_ID.clone(),
         };
         self.connected_list.insert(uri.clone());
@@ -109,16 +112,25 @@ impl NodeMock {
     }
 
     pub fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
+        debug!("\n");
+        debug!("({}).process() START", self.name);
         let (did_work, msgs) = self.engine.process()?;
+        debug!(
+            "({}).process() END - {}",
+            self.name,
+            self.recv_msg_log.len()
+        );
         self.recv_msg_log.extend_from_slice(msgs.as_slice());
         for msg in msgs.iter() {
+            trace!("({}).process() handle_lib3h({:?})", self.name, msg);
             self.handle_lib3h(msg.clone());
         }
+        debug!("({}).process() - DRAIN END\n", self.name);
         Ok((did_work, msgs))
     }
 
     ///
-    pub fn set_current_space(&mut self, space_address: &Address) {
+    pub fn set_current_space(&mut self, space_address: &SpaceHash) {
         if self.chain_store_list.contains_key(space_address) {
             self.current_space = Some(space_address.clone());
         };
@@ -144,7 +156,7 @@ impl NodeMock {
     /// Return request_id
     pub fn join_space(
         &mut self,
-        space_address: &Address,
+        space_address: &SpaceHash,
         can_set_current: bool,
     ) -> Lib3hResult<String> {
         let join_space = lib3h_protocol::data_types::SpaceData {
@@ -175,7 +187,7 @@ impl NodeMock {
 
     /// Post a Lib3hClientProtocol::LeaveSpace and update internal tracking
     /// Return request_id
-    pub fn leave_space(&mut self, space_address: &Address) -> Lib3hResult<String> {
+    pub fn leave_space(&mut self, space_address: &SpaceHash) -> Lib3hResult<String> {
         let agent_id = self.agent_id.clone();
         let leave_space_msg = lib3h_protocol::data_types::SpaceData {
             request_id: self.generate_request_id(),
@@ -194,7 +206,7 @@ impl NodeMock {
     }
 
     ///
-    pub fn has_joined(&self, space_address: &Address) -> bool {
+    pub fn has_joined(&self, space_address: &SpaceHash) -> bool {
         self.joined_space_list.contains(space_address)
     }
 }
@@ -202,14 +214,17 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    pub fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
+    pub fn form_EntryData(
+        entry_address: &EntryHash,
+        aspect_content_list: Vec<Vec<u8>>,
+    ) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
             aspect_list.push(EntryAspectData {
-                aspect_address: hash,
+                aspect_address: hash.into(),
                 type_hint: "NodeMock".to_string(),
-                aspect: aspect_content,
+                aspect: aspect_content.into(),
                 publish_ts: 42,
             });
         }
@@ -220,10 +235,16 @@ impl NodeMock {
         }
     }
 
+    pub fn get_entry(&self, entry_address: &EntryHash) -> Option<EntryData> {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let data_store = self.chain_store_list.get(&current_space)?;
+        data_store.get_entry(entry_address)
+    }
+
     ///
     pub fn author_entry(
         &mut self,
-        entry_address: &Address,
+        entry_address: &EntryHash,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<EntryData> {
@@ -266,11 +287,16 @@ impl NodeMock {
 
     pub fn hold_entry(
         &mut self,
-        entry_address: &Address,
+        entry_address: &EntryHash,
         aspect_content_list: Vec<Vec<u8>>,
-        can_tell_engine: bool,
     ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
+        trace!(
+            "[NodeMock {:?}] hold_entry start: address={:?}, current_space={:?}",
+            self.name(),
+            entry_address,
+            current_space
+        );
         let entry = NodeMock::form_EntryData(entry_address, aspect_content_list);
         let chain_store = self
             .chain_store_list
@@ -290,15 +316,11 @@ impl NodeMock {
                 return Err(Lib3hError::new_other("Storing of aspects failed."));
             }
         }
-        if can_tell_engine {
-            let msg_data = ProvidedEntryData {
-                space_address: current_space,
-                provider_agent_id: self.agent_id.clone(),
-                entry: entry.clone(),
-            };
-            self.engine
-                .post(Lib3hClientProtocol::HoldEntry(msg_data).into())?;
-        }
+        trace!(
+            "[NodeMock {:?}] hold_entry end: entry={:?}",
+            self.name(),
+            entry
+        );
         // Done
         Ok(entry)
     }
@@ -316,7 +338,7 @@ impl NodeMock {
     }
 
     /// Node asks for some entry on the network.
-    pub fn request_entry(&mut self, entry_address: Address) -> QueryEntryData {
+    pub fn request_entry(&mut self, entry_address: EntryHash) -> QueryEntryData {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         let query_data = QueryEntryData {
@@ -324,7 +346,7 @@ impl NodeMock {
             entry_address,
             request_id: self.generate_request_id(),
             requester_agent_id: self.agent_id.clone(),
-            query: vec![], // empty means give me the EntryData,
+            query: b"test_query".to_vec().into(),
         };
         self.engine
             .post(Lib3hClientProtocol::QueryEntry(query_data.clone()).into())
@@ -337,18 +359,13 @@ impl NodeMock {
         &mut self,
         query: &QueryEntryData,
     ) -> Result<QueryEntryResultData, GenericResultData> {
-        // Must be empty query
-        if !query.query.is_empty() {
-            let msg_data = GenericResultData {
-                space_address: query.space_address.clone(),
-                request_id: query.request_id.clone(),
-                to_agent_id: query.requester_agent_id.clone(),
-                result_info: "Unknown query request".as_bytes().to_vec(),
-            };
-            self.engine
-                .post(Lib3hClientProtocol::FailureResult(msg_data.clone()).into())
-                .expect("Posting FailureResult failed");
-            return Err(msg_data);
+        trace!(
+            "[NodeMock {}] reply_to_HandleQueryEntry: query={:?}",
+            self.name(),
+            query
+        );
+        if query.query != b"test_query".to_vec().into() {
+            panic!("invalid test query opaque data: {:?}", query.query);
         }
         // Convert query to fetch
         let fetch = FetchEntryData {
@@ -359,17 +376,12 @@ impl NodeMock {
             aspect_address_list: None,
         };
         // HandleFetchEntry
-        let fetch_res = self.reply_to_HandleFetchEntry_inner(&fetch);
-        if let Err(res) = fetch_res {
-            self.engine
-                .post(Lib3hClientProtocol::FailureResult(res.clone()).into())
-                .expect("Sending FailureResult failed");
-            return Err(res);
-        }
+        let fetch_res = self
+            .reply_to_HandleFetchEntry_inner(&fetch)
+            .expect("Should work");
         // Convert query to fetch
         let mut query_result = Vec::new();
         fetch_res
-            .unwrap()
             .entry
             .serialize(&mut Serializer::new(&mut query_result))
             .unwrap();
@@ -379,11 +391,11 @@ impl NodeMock {
             request_id: query.request_id.clone(),
             requester_agent_id: query.requester_agent_id.clone(),
             responder_agent_id: self.agent_id.clone(),
-            query_result,
+            query_result: query_result.into(),
         };
         self.engine
             .post(Lib3hClientProtocol::HandleQueryEntryResult(query_res.clone()).into())
-            .expect("Sending FailureResult failed");
+            .expect("Sending HandleQueryEntryResult failed");
         return Ok(query_res);
     }
 
@@ -391,48 +403,41 @@ impl NodeMock {
     pub fn reply_to_HandleFetchEntry(
         &mut self,
         fetch: &FetchEntryData,
-    ) -> Result<FetchEntryResultData, GenericResultData> {
-        let fetch_res = self.reply_to_HandleFetchEntry_inner(fetch);
-        let msg = match fetch_res.clone() {
-            Err(res) => Lib3hClientProtocol::FailureResult(res),
-            Ok(fetch) => Lib3hClientProtocol::HandleFetchEntryResult(fetch),
-        };
+    ) -> Result<FetchEntryResultData, String> {
+        let fetch_res = self.reply_to_HandleFetchEntry_inner(fetch)?;
+        let msg = Lib3hClientProtocol::HandleFetchEntryResult(fetch_res.clone());
         self.engine.post(msg.into()).expect("Sending failed");
-        fetch_res
+        Ok(fetch_res)
     }
 
     /// Node asks for some entry on the network.
     fn reply_to_HandleFetchEntry_inner(
         &mut self,
         fetch: &FetchEntryData,
-    ) -> Result<FetchEntryResultData, GenericResultData> {
+    ) -> Result<FetchEntryResultData, String> {
         // Must be tracking Space
         if !self.has_joined(&fetch.space_address) {
-            let msg_data = GenericResultData {
-                space_address: fetch.space_address.clone(),
-                request_id: fetch.request_id.clone(),
-                to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: "Space is not tracked".as_bytes().to_vec(),
-            };
-            return Err(msg_data);
+            return Err("Space is not tracked".to_owned());
         }
         // Get Entry
         let maybe_store = self.chain_store_list.get(&fetch.space_address);
         let maybe_entry = match maybe_store {
-            None => None,
+            None => {
+                trace!(
+                    "[NodeMock {}] no chain store for space address: {:?}",
+                    self.name(),
+                    fetch.space_address
+                );
+                None
+            }
             Some(chain_store) => chain_store.get_entry(&fetch.entry_address),
         };
-        // No entry, send failure
-        if maybe_entry.is_none() {
-            let msg_data = GenericResultData {
-                space_address: fetch.space_address.clone(),
-                request_id: fetch.request_id.clone(),
-                to_agent_id: fetch.provider_agent_id.clone(),
-                result_info: "No entry found".as_bytes().to_vec(),
-            };
-            return Err(msg_data);
-        }
-        let entry = maybe_entry.unwrap();
+        // No entry, send empty entry_data
+        let entry = if maybe_entry.is_none() {
+            EntryData::new(&fetch.entry_address)
+        } else {
+            maybe_entry.unwrap()
+        };
         // println!("\n reply_to_HandleFetchEntry_inner({}) = {:?}\n", entry.aspect_list.len(), entry.clone());
         // Send EntryData as binary
         let fetch_result_data = FetchEntryResultData {
@@ -446,7 +451,57 @@ impl NodeMock {
 }
 
 /// Direct Messaging
-impl NodeMock {}
+impl NodeMock {
+    /// Send a DirectMessage on the network.
+    /// Returns the generated request_id for this send
+    pub fn send_direct_message(&mut self, to_agent_id: &AgentPubKey, content: Vec<u8>) -> String {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let request_id = self.generate_request_id();
+        debug!("current_space: {:?}", self.current_space);
+        let msg_data = DirectMessageData {
+            space_address: current_space.clone(),
+            request_id: request_id.clone(),
+            to_agent_id: to_agent_id.clone(),
+            from_agent_id: self.agent_id.clone(),
+            content: content.into(),
+        };
+        let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
+        self.engine
+            .post(p)
+            .expect("Posting SendDirectMessage failed");
+        request_id
+    }
+
+    /// Send a DirectMessage response on the network.
+    pub fn send_response(
+        &mut self,
+        request_id: &str,
+        to_agent_id: &AgentPubKey,
+        response_content: Vec<u8>,
+    ) {
+        self.send_response_inner(request_id, to_agent_id, response_content)
+            .expect("Posting HandleSendMessageResult failed");
+    }
+
+    // inner fn with error
+    pub fn send_response_inner(
+        &mut self,
+        request_id: &str,
+        to_agent_id: &AgentPubKey,
+        response_content: Vec<u8>,
+    ) -> Result<(), lib3h_protocol::error::Lib3hProtocolError> {
+        let current_space = self.current_space.clone().expect("Current Space not set");
+        let response = DirectMessageData {
+            space_address: current_space.clone(),
+            request_id: request_id.to_owned(),
+            to_agent_id: to_agent_id.clone(),
+            from_agent_id: self.agent_id.clone(),
+            content: response_content.into(),
+        };
+        self.engine
+            .post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
+    }
+}
 
 /// Reply to get*List
 impl NodeMock {
@@ -632,68 +687,28 @@ impl NodeMock {
         predicate: Box<dyn Predicate<Lib3hServerProtocol>>,
     ) -> Vec<ProcessorResult> {
         let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolAssert(predicate));
-        assert_one_processed!(self, self, predicate)
+        assert_processed!(self, predicate)
     }
 
     /// Asserts some event produced by produce equals actual
     pub fn wait_eq(&mut self, actual: &Lib3hServerProtocol) -> Vec<ProcessorResult> {
         let predicate: Box<dyn Processor> = Box::new(Lib3hServerProtocolEquals(actual.clone()));
-        assert_one_processed!(self, self, predicate)
+        assert_processed!(self, predicate)
     }
 
     /// Waits for work to be done
-    pub fn wait_did_work(&mut self, should_abort: bool) -> Vec<ProcessorResult> {
+    pub fn wait_did_work(&mut self) -> bool {
         let me = self;
-        wait_did_work!(me, me, should_abort)
+        wait_engine_wrapper_did_work!(me)
     }
 
     /// Continues processing the engine until no work is being done.
-    pub fn wait_until_no_work(&mut self) -> Vec<ProcessorResult> {
+    pub fn wait_until_no_work(&mut self) -> bool {
         let me = self;
-        wait_until_no_work!(me, me)
+        wait_engine_wrapper_until_no_work!(me)
     }
 
-    /// Send a DirectMessage on the network.
-    /// Returns the generated request_id for this send
-    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
-        let current_space = self.current_space.clone().expect("Current Space not set");
-        let request_id = self.generate_request_id();
-        debug!("current_space: {:?}", self.current_space);
-        let msg_data = DirectMessageData {
-            space_address: current_space.clone(),
-            request_id: request_id.clone(),
-            to_agent_id: to_agent_id.clone(),
-            from_agent_id: self.agent_id.clone(),
-            content,
-        };
-        let p = Lib3hClientProtocol::SendDirectMessage(msg_data.clone()).into();
-        self.engine
-            .post(p)
-            .expect("Posting SendDirectMessage failed");
-        request_id
-    }
-
-    /// Send a DirectMessage response on the network.
-    pub fn send_response(
-        &mut self,
-        request_id: &str,
-        to_agent_id: &Address,
-        response_content: Vec<u8>,
-    ) {
-        let current_space = self.current_space.clone().expect("Current Space not set");
-        let response = DirectMessageData {
-            space_address: current_space.clone(),
-            request_id: request_id.to_owned(),
-            to_agent_id: to_agent_id.clone(),
-            from_agent_id: self.agent_id.clone(),
-            content: response_content,
-        };
-        self.engine
-            .post(Lib3hClientProtocol::HandleSendDirectMessageResult(response.clone()).into())
-            .expect("Posting HandleSendMessageResult failed");
-    }
-
-    pub fn agent_id(&self) -> Address {
+    pub fn agent_id(&self) -> AgentPubKey {
         self.agent_id.clone()
     }
 }
@@ -769,17 +784,6 @@ impl NodeMock {
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
                     );
-                    let provided_entry = ProvidedEntryData {
-                        space_address: msg.space_address.clone(),
-                        provider_agent_id: msg.provider_agent_id.clone(),
-                        entry: EntryData {
-                            entry_address: msg.entry_address.clone(),
-                            aspect_list: vec![msg.entry_aspect.clone()],
-                        },
-                    };
-                    self.engine
-                        .post(Lib3hClientProtocol::HoldEntry(provided_entry))
-                        .expect("Engine.post() can't fail");
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
@@ -819,7 +823,7 @@ impl lib3h_protocol::network_engine::NetworkEngine for NodeMock {
     fn process(&mut self) -> Lib3hProtocolResult<(DidWork, Vec<Lib3hServerProtocol>)> {
         self.process()
     }
-    fn advertise(&self) -> Url {
+    fn advertise(&self) -> Lib3hUri {
         self.advertise()
     }
 

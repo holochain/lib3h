@@ -163,6 +163,9 @@ pub trait CryptoSystem: Sync {
         salt: &Box<dyn Buffer>,
     ) -> CryptoResult<()>;
 
+    /// bytelength of parent key from which to derive
+    fn kdf_key_bytes(&self) -> usize;
+
     /// bytelength of key derivation context
     fn kdf_context_bytes(&self) -> usize;
 

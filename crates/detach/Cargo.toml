@@ -1,0 +1,14 @@
+[package]
+name = "detach"
+version = "0.0.13"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2018"
+description = "helper type for being able to detach/reatach a member item"
+keywords = ["detach", "mutable", "self", "reference"]
+categories = ["rust-patterns", "data-structures"]
+license = "Apache-2.0"
+readme = "README.md"
+documentation = "https://docs.rs/detach"
+repository = "https://github.com/holochain/lib3h"
+
+[dependencies]

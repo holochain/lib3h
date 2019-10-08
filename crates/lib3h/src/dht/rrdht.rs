@@ -1,10 +1,9 @@
 use crate::{
-    dht::{dht_protocol::*, dht_trait::Dht, PeerAddressRef},
+    dht::{dht_config::DhtConfig, dht_protocol::*, Lib3hUri},
     error::Lib3hResult,
 };
 use lib3h_protocol::{Address, DidWork};
 use std::collections::VecDeque;
-use url::Url;
 
 /// RedRibbon DHT implementation
 /// TODO #167
@@ -20,8 +19,8 @@ impl RrDht {
         RrDht {
             inbox: VecDeque::new(),
             this_peer: PeerData {
-                peer_address: "FIXME".to_string(),
-                peer_uri: Url::parse("fixme://host:123").expect("a valid transport url"),
+                peer_name: Lib3hUri::with_undefined(),
+                peer_location: Lib3hUri::with_undefined(),
                 timestamp: 0, // TODO #166
             },
         }
@@ -40,7 +39,7 @@ impl Dht for RrDht {
         vec![]
     }
 
-    fn get_peer(&self, _peer_address: &PeerAddressRef) -> Option<PeerData> {
+    fn get_peer(&self, _peer_name: &Lib3hUri) -> Option<PeerData> {
         // FIXME
         None
     }
@@ -51,11 +50,11 @@ impl Dht for RrDht {
 
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<&Address> {
+    fn get_entry_address_list(&self) -> Vec<&EntryHash> {
         // FIXME
         vec![]
     }
-    fn get_aspects_of(&self, _entry_address: &Address) -> Option<Vec<Address>> {
+    fn get_aspects_of(&self, _entry_address: &EntryHash) -> Option<Vec<AspectHash>> {
         // FIXME
         None
     }

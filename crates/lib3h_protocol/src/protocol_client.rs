@@ -14,9 +14,6 @@ pub enum Lib3hClientProtocol {
     // -- Generic responses -- //
     /// Success response to a request (any Command with an `request_id` field.)
     SuccessResult(GenericResultData),
-    /// Failure response to a request (any Command with an `request_id` field.)
-    /// Can also be a response to a mal-formed request.
-    FailureResult(GenericResultData),
 
     // -- Connection -- //
     /// Connect to the specified multiaddr
@@ -41,8 +38,6 @@ pub enum Lib3hClientProtocol {
     HandleFetchEntryResult(FetchEntryResultData),
     /// Publish data to the dht.
     PublishEntry(ProvidedEntryData),
-    /// Tell network module Core is holding this entry
-    HoldEntry(ProvidedEntryData),
     /// Request some info / data from a Entry
     QueryEntry(QueryEntryData),
     /// Response to a `HandleQueryEntry` request

@@ -1,6 +1,6 @@
 //! mDNS module error definition.
 
-use lib3h_discovery::error::DiscoveryError;
+use lib3h_protocol::discovery::error::DiscoveryError;
 use regex;
 use std::{error::Error as StdError, fmt, io, net};
 
