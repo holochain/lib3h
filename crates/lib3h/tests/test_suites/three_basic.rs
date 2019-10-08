@@ -92,7 +92,7 @@ fn test_send_message(
     // ===============
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "wah".as_bytes().to_vec());
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"billy\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), content: \"wah\" \\}\\)";
-    let results = assert2_msg_matches!(alex, billy, expected);
+    let results = assert2_msg_matches!(alex, billy, expected, options);
     let handle_send_direct_msg = results.first().unwrap();
     let event = handle_send_direct_msg.events.first().unwrap();
     let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
@@ -112,7 +112,7 @@ fn test_send_message(
     );
     billy.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"billy\"\\)\\), content: \"echo: wah\" \\}\\)";
-    assert2_msg_matches!(alex, billy, expected);
+    assert2_msg_matches!(alex, billy, expected, options);
 
     // C sends DM to A
     // ===============
@@ -120,7 +120,7 @@ fn test_send_message(
 
     let _req_id = camille.send_direct_message(&ALEX_AGENT_ID, "marco".as_bytes().to_vec());
     let expected = "HandleSendDirectMessage\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"camille\"\\)\\), content: \"marco\" \\}\\)";
-    let results = assert2_msg_matches!(alex, camille, expected);
+    let results = assert2_msg_matches!(alex, camille, expected, options);
     let handle_send_direct_msg = results.first().unwrap();
     let event = handle_send_direct_msg.events.first().unwrap();
     let msg = unwrap_to!(event => Lib3hServerProtocol::HandleSendDirectMessage);
@@ -149,7 +149,7 @@ fn test_send_message(
         response_content.clone(),
     );
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"camille\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), content: \"echo: marco\" \\}\\)";
-    assert2_msg_matches!(alex, camille, expected);
+    assert2_msg_matches!(alex, camille, expected, options);
 }
 
 /// Test publish, Store, Query
@@ -184,9 +184,10 @@ fn test_author_and_hold(
 
     // Expect HandleStoreEntryAspect from receiving entry via gossip
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"billy\"\\)\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_1\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
-    let _results = assert2_msg_matches!(alex, billy, expected);
+    let _results = assert2_msg_matches!(alex, billy, expected, options);
+
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"camille\"\\)\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_1\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"hello-1\", publish_ts: \\d+ \\} \\}\\)";
-    let _results = assert2_msg_matches!(alex, camille, expected);
+    let _results = assert2_msg_matches!(alex, camille, expected, options);
 
     // Billy publish data on the network
     println!("\n Billy authors a second entry...\n");
@@ -196,7 +197,7 @@ fn test_author_and_hold(
     // let (did_work, _srv_msg_list) = billy.process().unwrap();
 
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_2\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"l-2\", publish_ts: \\d+ \\} \\}\\)";
-    let _results = assert2_msg_matches!(alex, billy, expected);
+    let _results = assert2_msg_matches!(alex, billy, expected, options);
 
     let expected = "HandleStoreEntryAspect\\(StoreEntryAspectData \\{ request_id: \"[\\w\\d_~]+\", space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"camille\"\\)\\), entry_address: EntryHash\\(HashString\\(\"entry_addr_2\"\\)\\), entry_aspect: EntryAspectData \\{ aspect_address: AspectHash\\(HashString\\(\"[\\w\\d]+\"\\)\\), type_hint: \"NodeMock\", aspect: \"l-2\", publish_ts: \\d+ \\} \\}\\)";
     let _results = assert2_msg_matches!(camille, billy, expected);
