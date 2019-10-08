@@ -1,20 +1,20 @@
 use super::entry_store::EntryStore;
 use lib3h_protocol::{
     data_types::{EntryAspectData, EntryData},
-    Address,
+    types::*,
 };
 use std::collections::HashMap;
 
 /// Holds Space-specific data
 #[derive(Clone)]
 pub struct ChainStore {
-    space_address: Address,
+    space_address: SpaceHash,
     stored_entry_store: EntryStore,
     authored_entry_store: EntryStore,
 }
 
 impl ChainStore {
-    pub fn new(space_address: &Address) -> Self {
+    pub fn new(space_address: &SpaceHash) -> Self {
         ChainStore {
             space_address: space_address.clone(),
             stored_entry_store: EntryStore::new(),
@@ -22,7 +22,7 @@ impl ChainStore {
         }
     }
 
-    pub fn get_entry(&self, entry_address: &Address) -> Option<EntryData> {
+    pub fn get_entry(&self, entry_address: &EntryHash) -> Option<EntryData> {
         let mut has_aspects = false;
         let mut entry = EntryData {
             entry_address: entry_address.clone(),
@@ -69,7 +69,7 @@ impl ChainStore {
     /// Return Err if Aspect is already known
     pub fn author_aspect(
         &mut self,
-        entry_address: &Address,
+        entry_address: &EntryHash,
         aspect: &EntryAspectData,
     ) -> Result<(), ()> {
         if self
@@ -86,7 +86,7 @@ impl ChainStore {
     /// Return Err if Aspect is already known
     pub fn hold_aspect(
         &mut self,
-        entry_address: &Address,
+        entry_address: &EntryHash,
         aspect: &EntryAspectData,
     ) -> Result<(), ()> {
         if self
@@ -101,22 +101,22 @@ impl ChainStore {
 
     // -- has -- //
 
-    pub fn has_authored(&self, entry_address: &Address) -> bool {
+    pub fn has_authored(&self, entry_address: &EntryHash) -> bool {
         self.authored_entry_store.get(&entry_address).is_some()
     }
 
-    pub fn has_stored(&self, entry_address: &Address) -> bool {
+    pub fn has_stored(&self, entry_address: &EntryHash) -> bool {
         self.stored_entry_store.get(&entry_address).is_some()
     }
 
-    pub fn has(&self, entry_address: &Address) -> bool {
+    pub fn has(&self, entry_address: &EntryHash) -> bool {
         self.has_authored(entry_address) || self.has_stored(entry_address)
     }
 
     pub fn get_aspect(
         &self,
-        entry_address: &Address,
-        aspect_address: &Address,
+        entry_address: &EntryHash,
+        aspect_address: &AspectHash,
     ) -> Option<EntryAspectData> {
         let maybe_entry = self.get_entry(entry_address);
         if let Some(entry) = maybe_entry {
@@ -127,16 +127,16 @@ impl ChainStore {
 
     // -- Getters -- //
 
-    pub fn get_authored_store(&self) -> HashMap<Address, HashMap<Address, EntryAspectData>> {
+    pub fn get_authored_store(&self) -> HashMap<EntryHash, HashMap<AspectHash, EntryAspectData>> {
         self.authored_entry_store.store.clone()
     }
 
-    pub fn get_stored_store(&self) -> HashMap<Address, HashMap<Address, EntryAspectData>> {
+    pub fn get_stored_store(&self) -> HashMap<EntryHash, HashMap<AspectHash, EntryAspectData>> {
         self.stored_entry_store.store.clone()
     }
 
     #[allow(dead_code)]
-    pub fn space_address(&self) -> Address {
+    pub fn space_address(&self) -> SpaceHash {
         self.space_address.clone()
     }
 }

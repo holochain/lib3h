@@ -6,11 +6,17 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate rmp_serde;
+#[macro_use]
+extern crate shrinkwraprs;
 
 pub mod data_types;
+pub mod discovery;
 pub mod network_engine;
+pub mod protocol;
 pub mod protocol_client;
 pub mod protocol_server;
+pub mod types;
+pub mod uri;
 
 /// string encoded address type
 pub type Address = holochain_persistence_api::hash::HashString;
