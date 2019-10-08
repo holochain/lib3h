@@ -184,7 +184,6 @@ pub fn test_send_message_self(
     );
     alex.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
-    // TODO Set this to correct value once test passes
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), content: \"echo: wah\" \\}\\)";
 
     assert_msg_matches!(alex, expected, options);
