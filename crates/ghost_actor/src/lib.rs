@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 pub use lib3h_zombie_actor::{ErrorKind as GhostErrorKind, GhostError, GhostResult};
 
-fn ghost_try_lock<'a, M>(m: &'a mut Arc<Mutex<M>>) -> MutexGuard<'a, M> {
+fn ghost_try_lock<'a, M>(m: &'a Arc<Mutex<M>>) -> MutexGuard<'a, M> {
     let mut wait_ms = 0;
     for _ in 0..100 {
         match m.try_lock() {

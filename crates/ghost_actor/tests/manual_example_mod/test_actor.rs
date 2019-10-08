@@ -37,6 +37,10 @@ impl<'lt> TestActor<'lt> {
         )?;
         Ok(out)
     }
+
+    pub fn test_mut_method(&mut self) -> String {
+        "test_mut_method_data".to_string()
+    }
 }
 
 impl<'lt> GhostActor<'lt, TestProtocol, TestActor<'lt>> for TestActor<'lt> {

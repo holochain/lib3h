@@ -61,4 +61,10 @@ fn manual_example() {
 
     assert_eq!("MyContext { to_owner_prints: [\"message from actor\", \"echo: \\\"zombies\\\"\", \"echo: Ok(Ok(41))\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock().unwrap()));
     println!("{:#?}", my_context);
+
+    // can we access it directly?
+    assert_eq!(
+        "test_mut_method_data",
+        &actor_ref.as_mut().test_mut_method()
+    );
 }

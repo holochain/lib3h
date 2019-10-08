@@ -95,17 +95,15 @@ pub struct GhostEndpointRef<
 > {
     _inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
     send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
-    // just for ref counting
-    _a_ref: Arc<Mutex<A>>,
+    a_ref: Arc<Mutex<A>>,
 }
 
-pub(crate) type GhostEndpointRefFinalizeCb<'lt, X> =
-    Box<dyn FnOnce(Weak<Mutex<X>>) -> GhostResult<()> + 'lt>;
+type GhostEndpointRefFinalizeCb<'lt, X> = Box<dyn FnOnce(Weak<Mutex<X>>) -> GhostResult<()> + 'lt>;
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<'lt, X, P>>
     GhostEndpointRef<'lt, X, A, P, H>
 {
-    pub(crate) fn new_partial(
+    fn new_partial(
         sys_ref: &mut GhostSystemRef<'lt>,
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -150,10 +148,14 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
             Self {
                 _inner: inner,
                 send_inner,
-                _a_ref: a_ref,
+                a_ref,
             },
             finalize_cb,
         ))
+    }
+
+    pub fn as_mut(&mut self) -> std::sync::MutexGuard<'_, A> {
+        ghost_try_lock(&self.a_ref)
     }
 }
 
