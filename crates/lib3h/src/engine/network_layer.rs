@@ -200,7 +200,7 @@ impl<'engine> GhostEngine<'engine> {
                                 our_joined_space_list,
                                 net_location_copy,
                             );
-                            // we need a transportId, so search for it in the DHT
+                            // we need a nodeId, so search for it in the DHT
                             let maybe_peer_data = peer_list
                                 .iter()
                                 .find(|pd| pd.peer_location == net_location_copy);
@@ -266,10 +266,9 @@ impl<'engine> GhostEngine<'engine> {
                     );
                 } else {
                     // otherwise should be for one of our space
-                    let maybe_space_gateway = self.space_gateway_map.get_mut(&(
-                        msg.space_address.to_owned(),
-                        msg.to_peer_name.clone().into(),
-                    ));
+                    let maybe_space_gateway = self
+                        .space_gateway_map
+                        .get_mut(&(msg.space_address.to_owned(), msg.to_peer_name.agent_id()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
                             span.follower("TODO"),
