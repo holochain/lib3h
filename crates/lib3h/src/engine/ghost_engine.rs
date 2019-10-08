@@ -55,7 +55,7 @@ impl<'engine> GhostEngine<'engine> {
                 Box::new(GhostTransportWebsocket::new(
                     node_id,
                     tls,
-                    config.network_id.id.clone(),
+                    config.network_id.id.clone().into(),
                 ))
             }
             TransportConfig::Memory(net) => Box::new(GhostTransportMemory::new(node_id, &net)),
@@ -150,7 +150,7 @@ impl<'engine> GhostEngine<'engine> {
         for bs in nodes {
             // can't use handle_bootstrap() because it assumes a message to respond to
             let cmd = GatewayRequestToChild::Bootstrap(BootstrapData {
-                space_address: self.config.network_id.id.clone().into(),
+                network_or_space_address: self.config.network_id.id.clone().into(),
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(

@@ -113,7 +113,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .request(
                 Span::fixme(),
                 ClientToLib3h::Bootstrap(BootstrapData {
-                    space_address: NET_ID.into(),
+                    network_or_space_address: NET_ID.into(),
                     bootstrap_uri: out.engine2_addr.clone(),
                 }),
                 Box::new(|_, r| {
