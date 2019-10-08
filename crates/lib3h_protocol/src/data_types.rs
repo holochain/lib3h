@@ -193,7 +193,7 @@ pub struct ConnectData {
     pub peer_location: Lib3hUri,
     /// Specify to which network to connect to.
     /// Empty string for 'any'
-    pub network_id: Address,
+    pub network_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
