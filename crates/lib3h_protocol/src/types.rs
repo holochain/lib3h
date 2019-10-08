@@ -137,6 +137,51 @@ impl AspectHash {
 }
 
 //--------------------------------------------------------------------------------------------------
+// NetworkHash: newtype for HashString
+//--------------------------------------------------------------------------------------------------
+
+#[derive(
+    Shrinkwrap, PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
+)]
+pub struct NetworkHash(HashString);
+
+impl fmt::Display for NetworkHash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<HashString> for NetworkHash {
+    fn from(s: HashString) -> NetworkHash {
+        NetworkHash(s)
+    }
+}
+
+impl From<NetworkHash> for HashString {
+    fn from(h: NetworkHash) -> HashString {
+        h.0
+    }
+}
+
+impl<'a> From<&'a HashString> for NetworkHash {
+    fn from(s: &HashString) -> NetworkHash {
+        NetworkHash::from(s.to_owned())
+    }
+}
+
+impl<'a> From<&'a str> for NetworkHash {
+    fn from(s: &str) -> NetworkHash {
+        HashString::from(s.to_owned()).into()
+    }
+}
+
+impl NetworkHash {
+    pub fn new() -> NetworkHash {
+        NetworkHash(HashString::new())
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
 // AgentPubKey: newtype for HashString
 //--------------------------------------------------------------------------------------------------
 
