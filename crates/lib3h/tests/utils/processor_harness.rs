@@ -549,7 +549,7 @@ macro_rules! process_one_engine {
                     // end up passing
                     let orig_processor_result = orig_processor_result.unwrap_or_else(|| processor_result.clone());
                     let prefered_failed_result = processor.prefer(&orig_processor_result, &processor_result);
-                    failed.push((processor, Some(prefered_failed_result)));
+                    failed.push((processor, Some(prefered_failed_result.to_owned())));
                 }
             }
             $errors.append(&mut failed);
