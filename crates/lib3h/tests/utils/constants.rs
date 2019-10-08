@@ -1,5 +1,5 @@
 use holochain_persistence_api::hash::HashString;
-use lib3h_protocol::{types::*, Address};
+use lib3h_protocol::types::*;
 use multihash::Hash;
 use std::sync::{Arc, Mutex};
 
@@ -7,9 +7,9 @@ lazy_static! {
     /// Networks
     pub static ref NETWORK_A_ID: String = "net_A".to_string();
     /// Agents
-    pub static ref ALEX_AGENT_ID: Address = "alex".into();
-    pub static ref BILLY_AGENT_ID: Address = "billy".into();
-    pub static ref CAMILLE_AGENT_ID: Address = "camille".into();
+    pub static ref ALEX_AGENT_ID: AgentPubKey = "alex".into();
+    pub static ref BILLY_AGENT_ID: AgentPubKey = "billy".into();
+    pub static ref CAMILLE_AGENT_ID: AgentPubKey = "camille".into();
     /// Spaces
     pub static ref SPACE_ADDRESS_A: SpaceHash = "appA".into();
     pub static ref SPACE_ADDRESS_B: SpaceHash = "appB".into();

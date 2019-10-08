@@ -1,6 +1,6 @@
 //! Let's say we have two agentIds: a1 and a2
-//! a1 is running on transportId: m1
-//! a2 is running on transportId: m2
+//! a1 is running on nodeId: m1
+//! a2 is running on nodeId: m2
 //!
 //! The AgentSpaceGateway will wrap messages in a p2p_proto direct message:
 //!   DirectMessage {
@@ -13,7 +13,7 @@
 //! Then send it to the transport id:
 //!   dest: "m2", payload: <above, but binary>
 //!
-//! When the multiplexer receives data (at the network/machine gateway),
+//! When the multiplexer receives data (at the network/node gateway),
 //! if it is any other p2p_proto message, it will be forwarded to
 //! the engine or network gateway. If it is a direct message, it will be
 //! sent to the appropriate Route / AgentSpaceGateway
@@ -212,7 +212,10 @@ mod tests {
 
         let msg = msgs.remove(0).take_message().unwrap();
         if let RequestToParent::ReceivedData { uri, payload } = msg {
-            assert_eq!(&Lib3hUri::with_agent_id(&HashString::from("agent_x")), &uri);
+            assert_eq!(
+                &Lib3hUri::with_agent_id(&HashString::from("agent_x").into()),
+                &uri
+            );
             let expected: Opaque = "hello".into();
             assert_eq!(&expected, &payload);
         } else {

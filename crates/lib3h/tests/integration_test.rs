@@ -25,7 +25,7 @@ use lib3h::{
     error::Lib3hResult,
     transport::websocket::tls::TlsConfig,
 };
-use lib3h_protocol::{uri::Lib3hUri, Address};
+use lib3h_protocol::{types::*, uri::Lib3hUri};
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
@@ -116,9 +116,9 @@ fn construct_wss_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrappe
 // Node Setup
 //--------------------------------------------------------------------------------------------------
 
-pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
+pub type NodeFactory = fn(name: &str, agent_id_arg: AgentPubKey) -> NodeMock;
 
-fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
+fn setup_memory_node(name: &str, agent_id_arg: AgentPubKey, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
         network_id: test_network_id(),
@@ -136,7 +136,7 @@ fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMo
 
 fn setup_wss_node(
     name: &str,
-    agent_id_arg: Address,
+    agent_id_arg: AgentPubKey,
     tls_config: TlsConfig,
     fn_name: &str,
 ) -> NodeMock {
