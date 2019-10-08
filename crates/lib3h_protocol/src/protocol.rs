@@ -6,7 +6,6 @@ use crate::{
     types::NetworkHash,
     uri::Lib3hUri,
 };
-use holochain_persistence_api::hash::HashString;
 use std::convert::TryFrom;
 
 /// Enum holding the message types describe the lib3h protocol.
@@ -238,7 +237,7 @@ impl From<ClientToLib3h> for Lib3hClientProtocol {
             ClientToLib3h::Bootstrap(bootstrap_data) => Lib3hClientProtocol::Connect(ConnectData {
                 request_id: "".to_string(),
                 peer_location: bootstrap_data.bootstrap_uri,
-                network_id: HashString::from(bootstrap_data.network_or_space_address).into(),
+                network_id: bootstrap_data.network_or_space_address.into(),
             }),
             ClientToLib3h::JoinSpace(space_data) => Lib3hClientProtocol::JoinSpace(space_data),
             ClientToLib3h::LeaveSpace(space_data) => Lib3hClientProtocol::LeaveSpace(space_data),
