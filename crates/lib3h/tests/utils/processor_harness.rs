@@ -6,6 +6,7 @@ use predicates::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 use crate::utils::seeded_prng::SeededBooleanPrng;
+use edit_distance::edit_distance;
 
 use std::sync::Mutex;
 
@@ -110,7 +111,11 @@ pub trait Processor: Predicate<ProcessorResult> {
     /// flow with a useful error if self.eval(args) is false.
     fn test(&self, args: &ProcessorResult);
 
-    fn prefer<'a>(&self, result1:&'a ProcessorResult, _result2:&'a ProcessorResult) -> &'a ProcessorResult {
+    fn prefer<'a>(
+        &self,
+        result1: &'a ProcessorResult,
+        _result2: &'a ProcessorResult,
+    ) -> &'a ProcessorResult {
         result1
     }
 }
@@ -197,6 +202,33 @@ where
                 .map(|a| format!("{:?}", a))
                 .unwrap_or("None".to_string());
             assert_eq!(self.expected().as_str(), actual.as_str())
+        }
+    }
+
+    fn prefer<'a>(
+        &self,
+        result1: &'a ProcessorResult,
+        result2: &'a ProcessorResult,
+    ) -> &'a ProcessorResult {
+        let expected = self.expected().to_string();
+        let distance1 = self
+            .extracted(result1)
+            .iter()
+            .map(|actual| format!("{:?}", *actual))
+            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
+            .fold(std::usize::MAX, usize::min);
+        let distance2 = self
+            .extracted(result2)
+            .iter()
+            .map(|actual| format!("{:?}", *actual))
+            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
+            .fold(std::usize::MAX, usize::min);
+        trace!("result1: {:?} with score {:?}", result1, distance1);
+        trace!("result2: {:?} with score {:?}", result2, distance2);
+        if distance1 <= distance2 {
+            result1
+        } else {
+            result2
         }
     }
 }
@@ -314,6 +346,33 @@ impl Processor for Lib3hServerProtocolRegex {
                 .map(|a| format!("{:?}", a))
                 .unwrap_or("None".to_string());
             assert_eq!(self.expected().as_str(), actual.as_str())
+        }
+    }
+
+    fn prefer<'a>(
+        &self,
+        result1: &'a ProcessorResult,
+        result2: &'a ProcessorResult,
+    ) -> &'a ProcessorResult {
+        let expected = self.expected().to_string();
+        let distance1 = self
+            .extracted(result1)
+            .iter()
+            .map(|actual| format!("{:?}", *actual))
+            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
+            .fold(std::usize::MAX, usize::min);
+        let distance2 = self
+            .extracted(result2)
+            .iter()
+            .map(|actual| format!("{:?}", *actual))
+            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
+            .fold(std::usize::MAX, usize::min);
+        trace!("result1: {:?} with score {:?}", result1, distance1);
+        trace!("result2: {:?} with score {:?}", result2, distance2);
+        if distance1 <= distance2 {
+            result1
+        } else {
+            result2
         }
     }
 }
@@ -547,8 +606,10 @@ macro_rules! process_one_engine {
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing
-                    let orig_processor_result = orig_processor_result.unwrap_or_else(|| processor_result.clone());
-                    let prefered_failed_result = processor.prefer(&orig_processor_result, &processor_result);
+                    let orig_processor_result =
+                        orig_processor_result.unwrap_or_else(|| processor_result.clone());
+                    let prefered_failed_result =
+                        processor.prefer(&orig_processor_result, &processor_result);
                     failed.push((processor, Some(prefered_failed_result.to_owned())));
                 }
             }

@@ -1,3 +1,4 @@
+extern crate edit_distance;
 extern crate rand;
 extern crate xoroshiro128;
 
