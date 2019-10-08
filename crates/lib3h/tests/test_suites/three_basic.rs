@@ -129,7 +129,10 @@ fn test_send_message(
 
     // C should not receive
     let expected = "None";
-    let small_iters_options = ProcessingOptions { max_iters:100, ..*options };
+    let small_iters_options = ProcessingOptions {
+        max_iters: 100,
+        ..*options
+    };
     let _results = assert_msg_matches!(billy, expected, small_iters_options);
 
     // Send response
