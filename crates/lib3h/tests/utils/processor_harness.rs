@@ -109,6 +109,10 @@ pub trait Processor: Predicate<ProcessorResult> {
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
     fn test(&self, args: &ProcessorResult);
+
+    fn prefer<'a>(&self, result1:&'a ProcessorResult, _result2:&'a ProcessorResult) -> &'a ProcessorResult {
+        result1
+    }
 }
 
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
@@ -534,7 +538,7 @@ macro_rules! process_one_engine {
             };
             let mut failed = Vec::new();
 
-            for (processor, _orig_processor_result) in $errors.drain(..) {
+            for (processor, orig_processor_result) in $errors.drain(..) {
                 let result = processor.eval(&processor_result.clone());
                 if result {
                     // Simulate the succesful assertion behavior
@@ -543,7 +547,9 @@ macro_rules! process_one_engine {
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing
-                    failed.push((processor, Some(processor_result.clone())));
+                    let orig_processor_result = orig_processor_result.unwrap_or_else(|| processor_result.clone());
+                    let prefered_failed_result = processor.prefer(&orig_processor_result, &processor_result);
+                    failed.push((processor, Some(prefered_failed_result)));
                 }
             }
             $errors.append(&mut failed);

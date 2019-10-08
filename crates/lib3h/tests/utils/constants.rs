@@ -1,6 +1,5 @@
 use holochain_persistence_api::hash::HashString;
-use lib3h::engine::GatewayId;
-use lib3h_protocol::types::{AgentPubKey, AspectHash, EntryHash, SpaceHash};
+use lib3h_protocol::types::{AgentPubKey, AspectHash, EntryHash, SpaceHash, NetworkHash};
 use multihash::Hash;
 use std::sync::{Arc, Mutex};
 
