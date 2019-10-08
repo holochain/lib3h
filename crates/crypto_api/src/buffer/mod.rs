@@ -79,6 +79,7 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
     /// | if a > b; return 1
     /// | if a < b; return -1
     /// | if a == b; return 0
+    #[allow(clippy::borrowed_box)]
     fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32 {
         let a = self.read_lock();
         let b = b.read_lock();
