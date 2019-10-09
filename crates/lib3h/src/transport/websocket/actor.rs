@@ -353,10 +353,19 @@ impl GhostTransportWebsocket {
                 if self.bound_url.is_some()
                     && last_discover.elapsed().as_millis() > self.discover_interval_ms
                 {
-                    // Increase the time between two peer discovery to avoid unnecessary burden on
-                    // the network
                     if self.discover_interval_ms < 30_000 {
-                        self.discover_interval_ms += 1_000;
+                        // TODO:  <2019-10-09, dymayday> //
+                        // This is a futur proof solution, right now we only need to discover one other
+                        // peer, and the rest of the discovery, finding other nodes, is made by through
+                        // gossip mechanism.
+
+                        // // Increase the time between two peer discovery to avoid unnecessary burden on
+                        // // the network
+                        // self.discover_interval_ms += 1_000;
+
+                        // This is the temporary solution then: we set the interval to the max
+                        // possible value, so this code block is called only once
+                        self.discover_interval_ms = ::std::u128::MAX;
                     }
 
                     // Do the peer discovery
