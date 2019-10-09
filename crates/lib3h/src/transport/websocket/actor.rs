@@ -275,6 +275,18 @@ impl GhostTransportWebsocket {
                         "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
                         uri, error
                     );
+                    let error = match error.kind() {
+                        crate::transport::error::ErrorKind::Other(err) => {
+                            if err == "Protocol(\"Connection reset without closing handshake\")" {
+                                TransportError::new_kind(
+                                    crate::transport::error::ErrorKind::Disconnect,
+                                )
+                            } else {
+                                error
+                            }
+                        }
+                        _ => error,
+                    };
                     self.endpoint_self.publish(
                         Span::fixme(),
                         RequestToParent::ErrorOccured {
@@ -308,6 +320,9 @@ impl GhostTransportWebsocket {
                 }
                 StreamEvent::ConnectionClosed(uri) => {
                     trace!("StreamEvent::ConnectionClosed: {}", uri);
+                    return Err(crate::transport::error::TransportError::new_kind(
+                        crate::transport::error::ErrorKind::Disconnect,
+                    ));
                 }
             }
         }
