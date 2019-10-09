@@ -1,4 +1,4 @@
-use crate::{types::*, uri::Lib3hUri};
+use crate::{types::*, uri::Lib3hUri, Address};
 use std::cmp::Ordering;
 
 /// Represents an opaque vector of bytes. Lib3h will
@@ -174,7 +174,7 @@ impl std::fmt::Display for Opaque {
 pub struct BootstrapData {
     /// either the network layer network_id, or the dna hash
     // this needs a more accurate name which represents that this is the gateway id
-    pub space_address: SpaceHash,
+    pub network_or_space_address: Address,
     /// connection uri, such as
     ///   `wss://1.2.3.4:55888?a=HcMyada`
     ///   `nodepubkey:HcMyada?a=HcSagent`
@@ -193,7 +193,7 @@ pub struct ConnectData {
     pub peer_location: Lib3hUri,
     /// Specify to which network to connect to.
     /// Empty string for 'any'
-    pub network_id: String,
+    pub network_id: NetworkHash,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -211,7 +211,7 @@ pub struct ConnectedData {
 pub struct DisconnectedData {
     /// Specify which network
     /// Empty string for 'all'
-    pub network_id: String,
+    pub network_id: NetworkHash,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

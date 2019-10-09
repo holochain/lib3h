@@ -3,7 +3,7 @@
 use crate::error::{Lib3hError, Lib3hResult};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::data_types::Opaque;
+use lib3h_protocol::{data_types::Opaque, types::NetworkHash, Address};
 
 const CURRENT_ENCODING_HEURISTIC_MAGIC: u16 = 0x1f6c;
 
@@ -12,7 +12,7 @@ const CURRENT_ENCODING_HEURISTIC_MAGIC: u16 = 0x1f6c;
 enum InterimEncodingProtocol {
     Handshake {
         magic: u16,
-        network_id: String,
+        network_id: NetworkHash,
         id: String,
     },
     Payload {
@@ -42,15 +42,27 @@ pub mod encoding_protocol {
 
     #[derive(Debug)]
     pub enum RequestToChild {
-        Decode { payload: Opaque },
-        EncodeHandshake { space_address: String, id: String },
-        EncodePayload { payload: Opaque },
+        Decode {
+            payload: Opaque,
+        },
+        EncodeHandshake {
+            network_or_space_address: Address,
+            id: String,
+        },
+        EncodePayload {
+            payload: Opaque,
+        },
     }
 
     #[derive(Debug)]
     pub enum DecodeData {
-        Handshake { space_address: String, id: String },
-        Payload { payload: Opaque },
+        Handshake {
+            network_or_space_address: Address,
+            id: String,
+        },
+        Payload {
+            payload: Opaque,
+        },
     }
 
     #[derive(Debug)]
@@ -134,9 +146,10 @@ impl MessageEncoding {
     ) -> Lib3hResult<()> {
         match msg.take_message().expect("exists") {
             RequestToChild::Decode { payload } => self.handle_decode(msg, payload),
-            RequestToChild::EncodeHandshake { space_address, id } => {
-                self.handle_encode_handshake(msg, space_address, id)
-            }
+            RequestToChild::EncodeHandshake {
+                network_or_space_address,
+                id,
+            } => self.handle_encode_handshake(msg, network_or_space_address.into(), id),
             RequestToChild::EncodePayload { payload } => self.handle_encode_payload(msg, payload),
         }
     }
@@ -161,7 +174,7 @@ impl MessageEncoding {
                     return Ok(());
                 }
                 DecodeData::Handshake {
-                    space_address: network_id,
+                    network_or_space_address: network_id.into(),
                     id,
                 }
             }
@@ -174,12 +187,12 @@ impl MessageEncoding {
     fn handle_encode_handshake(
         &mut self,
         msg: MessageEncodingMessageFromParent,
-        space_address: String,
+        network_id: NetworkHash,
         id: String,
     ) -> Lib3hResult<()> {
         let payload = InterimEncodingProtocol::Handshake {
             magic: CURRENT_ENCODING_HEURISTIC_MAGIC,
-            network_id: space_address,
+            network_id,
             id: id,
         }
         .to_opaque();
@@ -234,12 +247,12 @@ mod tests {
         let mut e: MessageEncodingActorParentWrapper<String> =
             GhostParentWrapper::new(MessageEncoding::new(), "test");
 
-        let mut in_out = "".to_string();
+        let mut in_out = String::new();
 
         e.request(
             holochain_tracing::test_span(""),
             RequestToChild::EncodeHandshake {
-                space_address: "space-1".to_string(),
+                network_or_space_address: "space-1".into(),
                 id: "id-1".to_string(),
             },
             Box::new(|out: &mut String, resp| {
@@ -270,9 +283,13 @@ mod tests {
                 out.clear();
                 match resp {
                     GhostCallbackData::Response(Ok(RequestToChildResponse::DecodeResult {
-                        result: DecodeData::Handshake { space_address, id },
+                        result:
+                            DecodeData::Handshake {
+                                network_or_space_address,
+                                id,
+                            },
                     })) => {
-                        out.push_str(&format!("{} {}", space_address, id));
+                        out.push_str(&format!("{} {}", network_or_space_address, id));
                     }
                     _ => panic!("bad type: {:?}", resp),
                 }
