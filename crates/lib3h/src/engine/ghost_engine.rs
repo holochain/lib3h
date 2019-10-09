@@ -767,7 +767,7 @@ mod tests {
     use super::*;
     use crate::{
         dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
-        transport::memory_mock::memory_server,
+        transport::{memory_mock::memory_server, websocket::tls::TlsConfig}
     };
     use holochain_tracing::test_span;
     use lib3h_ghost_actor::{ghost_test_harness::ProcessingOptions, wait_can_track_did_work};
@@ -795,6 +795,26 @@ mod tests {
             work_dir: PathBuf::new(),
             log_level: 'd',
             bind_url: Lib3hUri::with_memory("test_engine"),
+            dht_gossip_interval: 100,
+            dht_timeout_threshold: 1000,
+            dht_custom_config: vec![],
+        };
+        let dht_factory = MirrorDht::new_with_config;
+
+        let engine =
+            GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap();
+        engine
+    }
+
+    fn make_test_engine_with_wss_transport(test_net: &str) -> GhostEngine<'static> {
+        let crypto = Box::new(SodiumCryptoSystem::new());
+        let config = EngineConfig {
+            network_id: test_network_id(),
+            transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
+            bootstrap_nodes: vec![],
+            work_dir: PathBuf::new(),
+            log_level: 'd',
+            bind_url: url::Url::parse("wss://127.0.0.1:66175").unwrap().into(),
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],
