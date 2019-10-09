@@ -143,8 +143,8 @@ fn setup_memory_node(name: &str, agent_id_arg: AgentPubKey, fn_name: &str) -> No
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
-        dht_gossip_interval: 500,
-        dht_timeout_threshold: 3005,
+        dht_gossip_interval: 250,
+        dht_timeout_threshold: 10005,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)

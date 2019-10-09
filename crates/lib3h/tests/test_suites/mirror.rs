@@ -176,12 +176,13 @@ fn process_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions) {
 
     let delay_interval = std::time::Duration::from_millis(1);
     let clock = std::time::SystemTime::now();
-    for _i in 0..options.max_iters {
+    for epoch in 0..options.max_iters {
         process_nodes_inner(nodes);
         let elapsed = clock.elapsed().unwrap();
         if elapsed > timeout {
             trace!(
-                "[process_nodes] timed out (elapsed={:?} ms)",
+                "[process_nodes] timed out at epoch {} (elapsed={:?} ms)",
+                epoch,
                 elapsed.as_millis()
             );
             break;
