@@ -793,7 +793,7 @@ mod tests {
             log_level: 'd',
             bind_url: Lib3hUri::with_memory("test_engine"),
             dht_gossip_interval: 100,
-            dht_timeout_threshold: 1000,
+            dht_timeout_threshold: 10000,
             dht_custom_config: vec![],
         };
         let dht_factory = MirrorDht::new_with_config;
