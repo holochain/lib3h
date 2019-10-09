@@ -134,10 +134,12 @@ impl Buffer for SecureBuffer {
         *self.p.borrow_mut() = ProtectState::ReadWrite;
     }
 
-    fn compare(&mut self, b: &mut Box<dyn Buffer>) -> i32 {
-        let mut a = self.write_lock();
-        let mut b = b.write_lock();
-        unsafe { rust_sodium_sys::sodium_compare(raw_ptr_char!(a), raw_ptr_char!(b), a.len()) }
+    fn compare(&self, b: &Box<dyn Buffer>) -> i32 {
+        let a = self.read_lock();
+        let b = b.read_lock();
+        unsafe {
+            rust_sodium_sys::sodium_compare(raw_ptr_char_immut!(a), raw_ptr_char_immut!(b), a.len())
+        }
     }
 }
 
