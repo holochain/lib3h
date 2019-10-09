@@ -34,7 +34,7 @@ fn test_two_disconnect(alex: &mut NodeMock, billy: &mut NodeMock, _options: &Pro
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
     one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
-        assert_eq!(response.network_id, "FIXME");
+        assert_eq!(response.network_id, "FIXME".into());
     });
 }
 
@@ -140,7 +140,7 @@ fn test_two_reconnect(alex: &mut NodeMock, billy: &mut NodeMock, options: &Proce
     assert_eq!(srv_msg_list.len(), 1);
     let msg_1 = &srv_msg_list[0];
     one_let!(Lib3hServerProtocol::Disconnected(response) = msg_1 {
-        assert_eq!(response.network_id, "FIXME");
+        assert_eq!(response.network_id, "FIXME".into());
     });
 
     println!("\n Reconnecting Alex...\n");

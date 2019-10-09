@@ -557,7 +557,7 @@ mod tests {
         let result = legacy.process();
 
         assert_eq!(
-            "Ok((true, [Disconnected(DisconnectedData { network_id: \"\" })]))",
+            "Ok((true, [Disconnected(DisconnectedData { network_id: NetworkHash(HashString(\"\")) })]))",
             format!("{:?}", result)
         );
     }
