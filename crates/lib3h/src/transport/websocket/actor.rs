@@ -371,22 +371,23 @@ impl GhostTransportWebsocket {
                                     // Ignoring our own address
                                     continue;
                                 } else {
+
                                     // if not already connected, request a connections
                                     if self.connections.get(&found_uri).is_none() {
-                                        self.connections.insert(found_uri.clone());
-                                        trace!(
-                                            "mDNS WSS Discovered {}, we are: {}",
-                                            &found_uri,
-                                            &my_addr
-                                        );
-                                        self.endpoint_self
-                                            .publish(
-                                                Span::fixme(),
-                                                RequestToParent::IncomingConnection {
-                                                    uri: found_uri.clone(),
-                                                },
-                                            )
-                                            .expect("should be able to publish");
+                                        // The proper way to connect is by using 'streams'
+                                        match self.streams.connect(&found_uri) {
+                                            Ok(()) => {
+                                                trace!("New connection to {} initialized using mDNS", &found_uri)
+                                            }
+                                            Err(error) => {
+                                                trace!(
+                                                    "Could not connect to {}! Transport error: {:?}",
+                                                    found_uri.to_string(),
+                                                    error
+                                                );
+                                            }
+                                        }
+
                                     }
                                 }
                             }
