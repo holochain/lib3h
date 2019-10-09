@@ -386,7 +386,8 @@ impl GhostTransportWebsocket {
                                         // The proper way to connect is by using 'streams'
                                         match self.streams.connect(&found_uri) {
                                             Ok(()) => {
-                                                trace!("New connection to {} initialized using mDNS", &found_uri)
+                                                self.connections.insert(found_uri.clone());
+                                                trace!("New connection to {} initialized using mDNS", &found_uri);
                                             }
                                             Err(error) => {
                                                 trace!(
