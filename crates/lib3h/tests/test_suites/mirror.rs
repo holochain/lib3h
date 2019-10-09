@@ -82,17 +82,21 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
     let timeout = std::time::Duration::from_millis(120000);
     let max_iters = 100000;
     let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
-    for _i in 0..max_iters {
+    for epoch in 0..max_iters {
         process_nodes(nodes, options);
 
         check_entries(nodes, &mut checked, &entry);
         if checked.len() == nodes.len() {
-            trace!("Mirror entry check found all nodes.");
+            trace!("[epoch {}] Mirror entry check found all nodes.", epoch);
             break;
         }
         let elapsed = clock.elapsed().unwrap();
         if elapsed > timeout {
-            trace!("Mirror entry check timeout");
+            trace!(
+                "[epoch {}] Mirror entry check timeout : {:?} ms",
+                epoch,
+                elapsed.as_millis()
+            );
             break;
         }
         std::thread::sleep(delay_interval);
@@ -109,8 +113,10 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
     }
     assert!(
         unchecked.is_empty(),
-        "Some nodes did not have the expected entry: {:?}",
-        unchecked
+        "Some nodes did not have the expected entry: {:?}. Found nodes: {:?}. Missing {:?} total.",
+        unchecked,
+        checked,
+        unchecked.len() - checked.len()
     );
 }
 
@@ -172,7 +178,7 @@ fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions)
 }
 
 fn process_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions) {
-    let timeout = std::time::Duration::from_millis(1000);
+    let timeout = std::time::Duration::from_millis(10000);
 
     let delay_interval = std::time::Duration::from_millis(1);
     let clock = std::time::SystemTime::now();
