@@ -113,7 +113,7 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
     }
     assert!(
         unchecked.is_empty(),
-        "Some {} nodes did not have the expected entry: {:?}. Found {} nodes: {:?}. Missing {}/{}.",
+        "{} node(s) did not have the expected entry: {:?}. Found {} node(s): {:?}. Missing {}/{}.",
         unchecked.len(),
         unchecked,
         checked.len(),
