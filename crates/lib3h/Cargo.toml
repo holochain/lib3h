@@ -39,6 +39,8 @@ log = "=0.4.8"
 predicates = "=1.0.1"
 # Should be dev only
 lazy_static = "=1.2.0"
+openssl = "0.10.25"
+rand = "0.7.2"
 
 [dev-dependencies]
 crossbeam-channel = "=0.3.8"
