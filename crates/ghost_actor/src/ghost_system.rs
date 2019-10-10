@@ -253,7 +253,7 @@ mod tests {
                     test_clone.lock().delayed_count += 1;
                     Ok(GhostProcessInstructions::default()
                         .set_should_continue(true)
-                        .set_next_run_delay_ms(30))
+                        .set_next_run_delay_ms(40))
                 }),
             )
             .unwrap();

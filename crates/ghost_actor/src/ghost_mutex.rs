@@ -166,7 +166,7 @@ mod tests {
             }));
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(100));
         *cont.lock() = false;
 
         for t in threads.drain(..) {
@@ -191,7 +191,7 @@ mod tests {
             "got: min {} max {} min % {} out of {:?}",
             min, max, min_pct, tally
         );
-        // make sure our min is at least 20% of our max
-        assert!(min_pct > 20);
+        // make sure our min is at least 10% of our max
+        assert!(min_pct > 10);
     }
 }
