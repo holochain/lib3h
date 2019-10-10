@@ -806,7 +806,7 @@ mod tests {
         engine
     }
 
-    fn make_test_engine_with_wss_transport(test_net: &str) -> GhostEngine<'static> {
+    fn make_test_engine_with_wss_transport(bind_url: Lib3hUri) -> GhostEngine<'static> {
         let crypto = Box::new(SodiumCryptoSystem::new());
         let config = EngineConfig {
             network_id: test_network_id(),
@@ -814,16 +814,14 @@ mod tests {
             bootstrap_nodes: vec![],
             work_dir: PathBuf::new(),
             log_level: 'd',
-            bind_url: url::Url::parse("wss://127.0.0.1:66175").unwrap().into(),
+            bind_url,
             dht_gossip_interval: 100,
             dht_timeout_threshold: 1000,
             dht_custom_config: vec![],
         };
         let dht_factory = MirrorDht::new_with_config;
 
-        let engine =
-            GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap();
-        engine
+        GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap()
     }
 
     fn make_test_engine_wrapper(
@@ -841,6 +839,29 @@ mod tests {
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
 
         // check that bootstrap nodes were connected to
+    }
+
+    #[test]
+    fn wss_bootstrap_mdns_discovery_test() {
+        let url_1 = url::Url::parse("wss://0.0.0.0:60861").expect("Fail to parse wss url.").into();
+        let url_2 = url::Url::parse("wss://0.0.0.0:60862").expect("Fail to parse wss url.").into();
+
+        let mut _engine_1 = make_test_engine_with_wss_transport(url_1);
+        let mut _engine_2 = make_test_engine_with_wss_transport(url_2);
+
+        // I don't think it's calling the right advertisement, is it ?
+        _engine_1.advertise();
+        _engine_2.advertise();
+
+        // Let's discover engine2 using the websocket transport function 'process_concrete' which
+        // should handle the discovery part by calling 'try_discover'
+        _engine_1.process().expect("Fail to process from engine1");
+
+
+        // Let's check we did discover our peer by retrieving the list of peer from the dht
+        // let peer_list = _engine_1.multiplexer.as_mut().process_concrete();//.get_peer_list();
+        //
+        // assert_eq!(peer_list, 1);
     }
 
     fn make_test_join_request() -> SpaceData {
