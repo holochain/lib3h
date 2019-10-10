@@ -92,7 +92,7 @@ pub fn test_join_space(
     space_address: &SpaceHash,
     options: &ProcessingOptions,
 ) {
-    println!("\n {} joins {}", node.name(), space_address);
+    debug!("\n {} joins {}", node.name(), space_address);
     let req_id = node.join_space(&space_address, true).unwrap();
     let expected = format!("SuccessResult\\(GenericResultData \\{{ request_id: \"{}\", space_address: SpaceHash\\(HashString\\(\"{}\"\\)\\), to_agent_id: AgentPubKey\\(HashString\\(\"{}\"\\)\\), result_info: \"\" \\}}\\)", req_id, space_address.to_string(), node.name());
     assert_msg_matches!(node, expected.as_str(), options);

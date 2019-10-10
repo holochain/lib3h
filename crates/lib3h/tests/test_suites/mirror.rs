@@ -30,7 +30,10 @@ pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions
     nodes.insert(0, node0);
 
     nodes_join_space(nodes, options);
-    process_nodes(nodes, options);
+
+    for _i in 0..10000 {
+        process_nodes(nodes, options);
+    }
     debug!(
         "DONE setup_mirror_nodes() DONE \n\n =================================================\n"
     );
@@ -76,11 +79,16 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
         entry
     };
 
+    assert_entries_exist(nodes, &entry, options);
+}
+
+fn assert_entries_exist(nodes: &mut Vec<NodeMock>, entry: &lib3h_protocol::data_types::EntryData,
+    options: &ProcessingOptions) {
     let mut checked = std::collections::HashSet::new();
 
     let clock = std::time::SystemTime::now();
-    let timeout = std::time::Duration::from_millis(100);
-    let max_iters = 100;
+    let timeout = std::time::Duration::from_millis(10000);
+    let max_iters = 10000;
     let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
     for epoch in 0..max_iters {
         process_nodes(nodes, options);
@@ -148,6 +156,7 @@ fn check_entries(
             }
         }
     }
+
 }
 
 // test using nodeN, NOT the one all the other nodes connected to
@@ -171,38 +180,32 @@ fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions)
         entry
     };
 
-    process_nodes(nodes, options);
-
-    for node in nodes {
-        println!("checking if {} has entry...", node.name());
-        assert_eq!(entry, node.get_entry(&ENTRY_ADDRESS_1).unwrap());
-        println!("yes!");
-    }
+    assert_entries_exist(nodes, &entry, options);
 }
 
-fn process_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions) {
-    let timeout = std::time::Duration::from_millis(10000);
+fn process_nodes(nodes: &mut Vec<NodeMock>, _options: &ProcessingOptions) {
+    //let timeout = std::time::Duration::from_millis(10);
 
-    let delay_interval = std::time::Duration::from_millis(1);
-    let clock = std::time::SystemTime::now();
-    for epoch in 0..options.max_iters {
+   // let delay_interval = std::time::Duration::from_millis(1);
+    //let clock = std::time::SystemTime::now();
+//    for _epoch in 0..options.max_iters {
         process_nodes_inner(nodes);
-        let elapsed = clock.elapsed().unwrap();
-        if elapsed > timeout {
+   //     let elapsed = clock.elapsed().unwrap();
+     /*   if elapsed > timeout {
             trace!(
                 "[process_nodes] timed out at epoch {} (elapsed={:?} ms)",
                 epoch,
                 elapsed.as_millis()
             );
             break;
-        }
-        std::thread::sleep(delay_interval);
-    }
+        }*/
+  //      std::thread::sleep(delay_interval);
+    //}
 }
 
 fn process_nodes_inner(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
-        //wait_engine_wrapper_until_no_work!(node);
+//        wait_engine_wrapper_until_no_work!(node);
         let _result = node.process();
     }
 }
