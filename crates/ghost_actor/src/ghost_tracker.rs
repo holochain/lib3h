@@ -303,18 +303,18 @@ mod tests {
 
         track
             .periodic_task(
-                2,
+                20,
                 Box::new(|me| {
                     me.ticks += 1;
                     Ok(GhostProcessInstructions::default()
                         .set_should_continue(true)
-                        .set_next_run_delay_ms(2))
+                        .set_next_run_delay_ms(20))
                 }),
             )
             .unwrap();
 
         for _ in 0..10 {
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            std::thread::sleep(std::time::Duration::from_millis(10));
             sys.process().unwrap();
         }
 
