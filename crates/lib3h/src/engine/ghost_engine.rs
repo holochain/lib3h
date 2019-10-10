@@ -859,7 +859,7 @@ mod tests {
 
 
         // Let's check we did discover our peer by retrieving the list of peer from the dht
-        // let peer_list = _engine_1.multiplexer.as_mut().process_concrete();//.get_peer_list();
+        // let peer_list = _engine_1.multiplexer.as_mut().get_peer_list();
         //
         // assert_eq!(peer_list, 1);
     }
