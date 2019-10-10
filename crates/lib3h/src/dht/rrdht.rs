@@ -54,7 +54,7 @@ impl Dht for RrDht {
         // FIXME
         vec![]
     }
-    fn get_aspects_of(&self, _entry_address: &Address) -> Option<Vec<AspectHash>> {
+    fn get_aspects_of(&self, _entry_address: &EntryHash) -> Option<Vec<AspectHash>> {
         // FIXME
         None
     }
