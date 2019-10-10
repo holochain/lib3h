@@ -456,7 +456,11 @@ impl MirrorDht {
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
             DhtRequestToChild::HoldEntryAspectAddress(entry) => {
-                trace!("({:?}).DhtRequestToChild::HoldEntryAspectAddress: {:?}", self.config.this_peer_name(), entry);
+                trace!(
+                    "({:?}).DhtRequestToChild::HoldEntryAspectAddress: {:?}",
+                    self.config.this_peer_name(),
+                    entry
+                );
                 // if its shallow, ask for actual data
                 if entry.aspect_list.len() > 0 && entry.aspect_list[0].aspect.len() == 0 {
                     self.endpoint_self.publish(

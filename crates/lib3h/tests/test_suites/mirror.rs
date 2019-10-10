@@ -82,8 +82,11 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
     assert_entries_exist(nodes, &entry, options);
 }
 
-fn assert_entries_exist(nodes: &mut Vec<NodeMock>, entry: &lib3h_protocol::data_types::EntryData,
-    options: &ProcessingOptions) {
+fn assert_entries_exist(
+    nodes: &mut Vec<NodeMock>,
+    entry: &lib3h_protocol::data_types::EntryData,
+    options: &ProcessingOptions,
+) {
     let mut checked = std::collections::HashSet::new();
 
     let clock = std::time::SystemTime::now();
@@ -156,7 +159,6 @@ fn check_entries(
             }
         }
     }
-
 }
 
 // test using nodeN, NOT the one all the other nodes connected to
@@ -186,26 +188,26 @@ fn test_mirror_from_edge(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions)
 fn process_nodes(nodes: &mut Vec<NodeMock>, _options: &ProcessingOptions) {
     //let timeout = std::time::Duration::from_millis(10);
 
-   // let delay_interval = std::time::Duration::from_millis(1);
+    // let delay_interval = std::time::Duration::from_millis(1);
     //let clock = std::time::SystemTime::now();
-//    for _epoch in 0..options.max_iters {
-        process_nodes_inner(nodes);
-   //     let elapsed = clock.elapsed().unwrap();
-     /*   if elapsed > timeout {
-            trace!(
-                "[process_nodes] timed out at epoch {} (elapsed={:?} ms)",
-                epoch,
-                elapsed.as_millis()
-            );
-            break;
-        }*/
-  //      std::thread::sleep(delay_interval);
+    //    for _epoch in 0..options.max_iters {
+    process_nodes_inner(nodes);
+    //     let elapsed = clock.elapsed().unwrap();
+    /*   if elapsed > timeout {
+        trace!(
+            "[process_nodes] timed out at epoch {} (elapsed={:?} ms)",
+            epoch,
+            elapsed.as_millis()
+        );
+        break;
+    }*/
+    //      std::thread::sleep(delay_interval);
     //}
 }
 
 fn process_nodes_inner(nodes: &mut Vec<NodeMock>) {
     for node in nodes {
-//        wait_engine_wrapper_until_no_work!(node);
+        //        wait_engine_wrapper_until_no_work!(node);
         let _result = node.process();
     }
 }
