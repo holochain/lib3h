@@ -79,8 +79,8 @@ fn test_mirror_from_center(nodes: &mut Vec<NodeMock>, options: &ProcessingOption
     let mut checked = std::collections::HashSet::new();
 
     let clock = std::time::SystemTime::now();
-    let timeout = std::time::Duration::from_millis(120000);
-    let max_iters = 100000;
+    let timeout = std::time::Duration::from_millis(100);
+    let max_iters = 100;
     let delay_interval = std::time::Duration::from_millis(options.delay_interval_ms);
     for epoch in 0..max_iters {
         process_nodes(nodes, options);
