@@ -1,6 +1,6 @@
 use crate::*;
 use holochain_tracing::Span;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
 enum GhostEndpointToInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     IncomingRequest(P, Option<GhostResponseCb<'lt, X, P>>),
@@ -12,7 +12,7 @@ struct GhostEndpointRefInner<
     P: GhostProtocol,
     H: GhostHandler<'lt, X, P>,
 > {
-    weak_user_data: Weak<Mutex<X>>,
+    weak_user_data: Weak<GhostMutex<X>>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     handle_receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
@@ -93,12 +93,13 @@ pub struct GhostEndpointRef<
     P: GhostProtocol,
     H: GhostHandler<'lt, X, P>,
 > {
-    _inner: Arc<Mutex<GhostEndpointRefInner<'lt, X, P, H>>>,
+    _inner: Arc<GhostMutex<GhostEndpointRefInner<'lt, X, P, H>>>,
     send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
-    a_ref: Arc<Mutex<A>>,
+    a_ref: Arc<GhostMutex<A>>,
 }
 
-type GhostEndpointRefFinalizeCb<'lt, X> = Box<dyn FnOnce(Weak<Mutex<X>>) -> GhostResult<()> + 'lt>;
+type GhostEndpointRefFinalizeCb<'lt, X> =
+    Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<'lt, X, P>>
     GhostEndpointRef<'lt, X, A, P, H>
@@ -107,11 +108,11 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
         sys_ref: &mut GhostSystemRef<'lt>,
         sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-        a_ref: Arc<Mutex<A>>,
+        a_ref: Arc<GhostMutex<A>>,
         handler: H,
     ) -> GhostResult<(Self, GhostEndpointRefFinalizeCb<'lt, X>)> {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
-        let inner = Arc::new(Mutex::new(GhostEndpointRefInner {
+        let inner = Arc::new(GhostMutex::new(GhostEndpointRefInner {
             weak_user_data: Weak::new(),
             sender,
             handle_receiver: receiver,
@@ -121,28 +122,30 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
         }));
 
         let weak_inner = Arc::downgrade(&inner);
-        let finalize_cb = Box::new(
-            move |user_data: Weak<Mutex<X>>| match weak_inner.upgrade() {
-                Some(mut strong_inner) => {
-                    let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                    strong_inner.weak_user_data = user_data.clone();
-                    strong_inner.pending_callbacks.set_user_data(user_data)?;
-                    strong_inner.pending_callbacks.periodic_task(
-                        0,
-                        Box::new(move |user_data| match weak_inner.upgrade() {
-                            Some(mut strong_inner) => {
-                                let mut strong_inner = ghost_try_lock(&mut strong_inner);
-                                strong_inner.priv_process(user_data)?;
-                                Ok(GhostProcessInstructions::default().set_should_continue(true))
-                            }
-                            None => Ok(GhostProcessInstructions::default()),
-                        }),
-                    )?;
-                    Ok(())
-                }
-                None => Ok(()),
-            },
-        );
+        let finalize_cb =
+            Box::new(
+                move |user_data: Weak<GhostMutex<X>>| match weak_inner.upgrade() {
+                    Some(strong_inner) => {
+                        let mut strong_inner = strong_inner.lock();
+                        strong_inner.weak_user_data = user_data.clone();
+                        strong_inner.pending_callbacks.set_user_data(user_data)?;
+                        strong_inner.pending_callbacks.periodic_task(
+                            0,
+                            Box::new(move |user_data| match weak_inner.upgrade() {
+                                Some(strong_inner) => {
+                                    let mut strong_inner = strong_inner.lock();
+                                    strong_inner.priv_process(user_data)?;
+                                    Ok(GhostProcessInstructions::default()
+                                        .set_should_continue(true))
+                                }
+                                None => Ok(GhostProcessInstructions::default()),
+                            }),
+                        )?;
+                        Ok(())
+                    }
+                    None => Ok(()),
+                },
+            );
 
         Ok((
             Self {
@@ -154,8 +157,8 @@ impl<'lt, X: 'lt + Send + Sync, A: 'lt, P: GhostProtocol, H: 'lt + GhostHandler<
         ))
     }
 
-    pub fn as_mut(&mut self) -> std::sync::MutexGuard<'_, A> {
-        ghost_try_lock(&self.a_ref)
+    pub fn as_mut(&mut self) -> GhostMutexGuard<'_, A> {
+        self.a_ref.lock()
     }
 }
 
@@ -186,7 +189,7 @@ pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sy
 }
 
 pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> {
-    finalize: Arc<Mutex<Option<GhostEndpointRefFinalizeCb<'lt, A>>>>,
+    finalize: Arc<GhostMutex<Option<GhostEndpointRefFinalizeCb<'lt, A>>>>,
     sys_ref: GhostSystemRef<'lt>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -204,10 +207,10 @@ impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> GhostInflator<'lt, P
             // this is the deref/refcount object... but on the actor side
             // we don't give actors direct access to their owners,
             // and we certainly don't refcount them ;p
-            Arc::new(Mutex::new(())),
+            Arc::new(GhostMutex::new(())),
             handler,
         )?;
-        std::mem::replace(&mut *ghost_try_lock(&mut self.finalize), Some(finalize));
+        std::mem::replace(&mut *self.finalize.lock(), Some(finalize));
 
         Ok(owner_ref)
     }
@@ -224,15 +227,15 @@ pub fn ghost_actor_spawn<
     H: 'lt + GhostHandler<'lt, X, P>,
 >(
     mut sys_ref: GhostSystemRef<'lt>,
-    user_data: Weak<Mutex<X>>,
+    user_data: Weak<GhostMutex<X>>,
     spawn_cb: GhostActorSpawnCb<'lt, A, P>,
     handler: H,
 ) -> GhostResult<GhostEndpointRef<'lt, X, A, P, H>> {
     let (s1, r1) = crossbeam_channel::unbounded();
     let (s2, r2) = crossbeam_channel::unbounded();
 
-    let mut finalize: Arc<Mutex<Option<GhostEndpointRefFinalizeCb<'lt, A>>>> =
-        Arc::new(Mutex::new(None));
+    let finalize: Arc<GhostMutex<Option<GhostEndpointRefFinalizeCb<'lt, A>>>> =
+        Arc::new(GhostMutex::new(None));
 
     let inflator: GhostInflator<'lt, P, A> = GhostInflator {
         finalize: finalize.clone(),
@@ -241,18 +244,18 @@ pub fn ghost_actor_spawn<
         receiver: r1,
     };
 
-    let strong_actor = Arc::new(Mutex::new(spawn_cb(inflator)?));
+    let strong_actor = Arc::new(GhostMutex::new(spawn_cb(inflator)?));
     let weak_actor = Arc::downgrade(&strong_actor);
 
-    let finalize = std::mem::replace(&mut *ghost_try_lock(&mut finalize), None);
+    let finalize = std::mem::replace(&mut *finalize.lock(), None);
 
     (finalize.expect("spawn cannot initialize owner endpoint ref"))(weak_actor.clone())?;
 
     sys_ref.enqueue_processor(
         0,
         Box::new(move || match weak_actor.upgrade() {
-            Some(mut strong_actor) => {
-                let mut strong_actor = ghost_try_lock(&mut strong_actor);
+            Some(strong_actor) => {
+                let mut strong_actor = strong_actor.lock();
                 match strong_actor.process() {
                     Ok(()) => Ok(GhostProcessInstructions::default().set_should_continue(true)),
                     Err(e) => panic!("actor.process() error: {:?}", e),

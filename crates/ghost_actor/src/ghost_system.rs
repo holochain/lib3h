@@ -1,5 +1,5 @@
 use crate::*;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// struct used for hinting on whether / when to next run this process fn
 pub struct GhostProcessInstructions {
@@ -111,7 +111,7 @@ impl<'lt> GhostSystemInner<'lt> {
 pub struct GhostSystemRef<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessorData<'lt>>,
     // just a refcount
-    _system_inner: Arc<Mutex<GhostSystemInner<'lt>>>,
+    _system_inner: Arc<GhostMutex<GhostSystemInner<'lt>>>,
 }
 
 impl<'lt> GhostSystemRef<'lt> {
@@ -141,7 +141,7 @@ impl<'lt> GhostSystemRef<'lt> {
 /// and provides a process() function to actually execute them
 pub struct GhostSystem<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessorData<'lt>>,
-    system_inner: Arc<Mutex<GhostSystemInner<'lt>>>,
+    system_inner: Arc<GhostMutex<GhostSystemInner<'lt>>>,
 }
 
 impl<'lt> GhostSystem<'lt> {
@@ -150,7 +150,7 @@ impl<'lt> GhostSystem<'lt> {
         let (process_send, process_recv) = crossbeam_channel::unbounded();
         Self {
             process_send,
-            system_inner: Arc::new(Mutex::new(GhostSystemInner::new(process_recv))),
+            system_inner: Arc::new(GhostMutex::new(GhostSystemInner::new(process_recv))),
         }
     }
 
@@ -165,7 +165,7 @@ impl<'lt> GhostSystem<'lt> {
 
     /// execute all queued processor functions
     pub fn process(&mut self) -> GhostResult<()> {
-        ghost_try_lock(&mut self.system_inner).process()
+        self.system_inner.lock().process()
     }
 }
 
@@ -181,7 +181,7 @@ mod tests {
             non_start_delay: bool,
         }
 
-        let test = Arc::new(Mutex::new(Test {
+        let test = Arc::new(GhostMutex::new(Test {
             start_delay: false,
             non_start_delay: false,
         }));
@@ -193,7 +193,7 @@ mod tests {
             .enqueue_processor(
                 2,
                 Box::new(move || {
-                    test_clone.lock().unwrap().start_delay = true;
+                    test_clone.lock().start_delay = true;
                     Ok(GhostProcessInstructions::default())
                 }),
             )
@@ -204,7 +204,7 @@ mod tests {
             .enqueue_processor(
                 0,
                 Box::new(move || {
-                    test_clone.lock().unwrap().non_start_delay = true;
+                    test_clone.lock().non_start_delay = true;
                     Ok(GhostProcessInstructions::default())
                 }),
             )
@@ -213,7 +213,7 @@ mod tests {
         sys.process().unwrap();
 
         {
-            let test = test.lock().unwrap();
+            let test = test.lock();
             println!("start_delay_result {:?}", *test);
             assert_eq!(true, test.non_start_delay);
             assert_eq!(false, test.start_delay);
@@ -223,7 +223,7 @@ mod tests {
         sys.process().unwrap();
 
         {
-            let test = test.lock().unwrap();
+            let test = test.lock();
             println!("start_delay_result {:?}", *test);
             assert_eq!(true, test.non_start_delay);
             assert_eq!(true, test.start_delay);
@@ -238,7 +238,7 @@ mod tests {
             non_delayed_count: i32,
         }
 
-        let test = Arc::new(Mutex::new(Test {
+        let test = Arc::new(GhostMutex::new(Test {
             delayed_count: 0,
             non_delayed_count: 0,
         }));
@@ -250,7 +250,7 @@ mod tests {
             .enqueue_processor(
                 0,
                 Box::new(move || {
-                    test_clone.lock().unwrap().delayed_count += 1;
+                    test_clone.lock().delayed_count += 1;
                     Ok(GhostProcessInstructions::default()
                         .set_should_continue(true)
                         .set_next_run_delay_ms(30))
@@ -263,7 +263,7 @@ mod tests {
             .enqueue_processor(
                 0,
                 Box::new(move || {
-                    test_clone.lock().unwrap().non_delayed_count += 1;
+                    test_clone.lock().non_delayed_count += 1;
                     Ok(GhostProcessInstructions::default().set_should_continue(true))
                 }),
             )
@@ -274,7 +274,7 @@ mod tests {
             sys.process().unwrap();
         }
 
-        let test = test.lock().unwrap();
+        let test = test.lock();
         println!("delay_result {:?}", *test);
         assert!(
             test.non_delayed_count > test.delayed_count,

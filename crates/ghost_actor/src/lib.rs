@@ -5,6 +5,8 @@ extern crate inflector;
 //#[macro_use]
 extern crate lazy_static;
 extern crate lib3h_zombie_actor;
+extern crate lock_api;
+extern crate parking_lot;
 extern crate proc_macro2;
 #[macro_use]
 extern crate shrinkwraprs;
@@ -14,23 +16,10 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
-use std::sync::{Arc, Mutex, MutexGuard};
-
 pub use lib3h_zombie_actor::{ErrorKind as GhostErrorKind, GhostError, GhostResult};
 
-fn ghost_try_lock<'a, M>(m: &'a Arc<Mutex<M>>) -> MutexGuard<'a, M> {
-    let mut wait_ms = 0;
-    for _ in 0..100 {
-        match m.try_lock() {
-            Ok(g) => return g,
-            Err(_) => {
-                std::thread::sleep(std::time::Duration::from_millis(wait_ms));
-                wait_ms += 1;
-            }
-        }
-    }
-    panic!("failed to obtain mutex lock");
-}
+mod ghost_mutex;
+pub use ghost_mutex::*;
 
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
