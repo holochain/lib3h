@@ -91,7 +91,7 @@ impl<T: ?Sized> GhostMutex<T> {
     pub fn lock(&self) -> GhostMutexGuard<'_, T> {
         match self
             .mutex
-            .try_lock_for(std::time::Duration::from_millis(10))
+            .try_lock_for(std::time::Duration::from_millis(1000))
         {
             None => panic!("failed to obtain lock within timeout"),
             Some(g) => GhostMutexGuard { guard: Some(g) },
