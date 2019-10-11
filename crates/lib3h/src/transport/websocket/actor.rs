@@ -349,7 +349,13 @@ impl GhostTransportWebsocket {
             None => {
                 // Here we call a mDNS discovery at least once, which will take care of calling an
                 // advertise for us if it's the fist time the mDNS actor is invoked
-                self.discover().map_err(|_| error!("Fail to discover during 'try_discover'")).unwrap();
+                match self.discover() {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Fail to discover during 'try_discover': {:?}", e);
+                        eprintln!("Fail to discover during 'try_discover': {:?}", e);
+                    }
+                }
                 Some(Instant::now())
             },
             Some(last_discover) => {
