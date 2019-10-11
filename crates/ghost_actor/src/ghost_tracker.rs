@@ -1,13 +1,10 @@
 use holochain_tracing::Span;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, Weak},
+    sync::{Arc, Weak},
 };
 
-use crate::{
-    ghost_try_lock, GhostErrorKind, GhostProcessInstructions, GhostResult, GhostSystemRef,
-    RequestId,
-};
+use crate::*;
 
 // TODO - should be 2000 or less but tests currently fail if below that
 const DEFAULT_TIMEOUT_MS: u64 = 20000;
@@ -33,7 +30,7 @@ enum GhostTrackerToInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
 
 struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     sys_ref: GhostSystemRef<'lt>,
-    weak_user_data: Weak<Mutex<X>>,
+    weak_user_data: Weak<GhostMutex<X>>,
     pending: HashMap<RequestId, GhostTrackerEntry<'lt, X, T>>,
     recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
 }
@@ -41,7 +38,7 @@ struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, T> {
     fn new(
         sys_ref: GhostSystemRef<'lt>,
-        weak_user_data: Weak<Mutex<X>>,
+        weak_user_data: Weak<GhostMutex<X>>,
         recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
     ) -> Self {
         Self {
@@ -117,8 +114,8 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
         self.sys_ref.enqueue_processor(
             start_delay_ms,
             Box::new(move || match weak_user_data_clone.upgrade() {
-                Some(mut strong_user_data) => {
-                    let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                Some(strong_user_data) => {
+                    let mut strong_user_data = strong_user_data.lock();
                     cb(&mut *strong_user_data)
                 }
                 None => Ok(GhostProcessInstructions::default()),
@@ -173,15 +170,15 @@ impl GhostTrackerBookmarkOptions {
 /// that can be triggered later when a response comes back indicating that id
 pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     // just for ref count
-    _inner: Arc<Mutex<GhostTrackerInner<'lt, X, T>>>,
+    _inner: Arc<GhostMutex<GhostTrackerInner<'lt, X, T>>>,
     send_inner: crossbeam_channel::Sender<GhostTrackerToInner<'lt, X, T>>,
 }
 
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
-    pub fn new(mut sys_ref: GhostSystemRef<'lt>, weak_user_data: Weak<Mutex<X>>) -> Self {
+    pub fn new(mut sys_ref: GhostSystemRef<'lt>, weak_user_data: Weak<GhostMutex<X>>) -> Self {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
-        let inner = Arc::new(Mutex::new(GhostTrackerInner::new(
+        let inner = Arc::new(GhostMutex::new(GhostTrackerInner::new(
             sys_ref.clone(),
             weak_user_data,
             recv_inner,
@@ -192,11 +189,11 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
             .enqueue_processor(
                 0,
                 Box::new(move || match weak_inner.upgrade() {
-                    Some(mut strong_inner) => {
-                        let mut strong_inner = ghost_try_lock(&mut strong_inner);
+                    Some(strong_inner) => {
+                        let mut strong_inner = strong_inner.lock();
                         match strong_inner.weak_user_data.upgrade() {
-                            Some(mut strong_user_data) => {
-                                let mut strong_user_data = ghost_try_lock(&mut strong_user_data);
+                            Some(strong_user_data) => {
+                                let mut strong_user_data = strong_user_data.lock();
 
                                 strong_inner
                                     .process(&mut *strong_user_data)
@@ -276,8 +273,8 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     }
 
     /// replace user data
-    pub fn set_user_data(&mut self, user_data: Weak<Mutex<X>>) -> GhostResult<()> {
-        ghost_try_lock(&mut self._inner).weak_user_data = user_data;
+    pub fn set_user_data(&mut self, user_data: Weak<GhostMutex<X>>) -> GhostResult<()> {
+        self._inner.lock().weak_user_data = user_data;
         Ok(())
     }
 }
@@ -286,6 +283,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
 mod tests {
     use crate::*;
     use holochain_tracing::Span;
+    use std::sync::Arc;
 
     #[test]
     fn it_can_schedule_periodic() {
@@ -294,7 +292,7 @@ mod tests {
             ticks: i32,
         }
 
-        let test = Arc::new(Mutex::new(Test { ticks: 0 }));
+        let test = Arc::new(GhostMutex::new(Test { ticks: 0 }));
 
         let mut sys = GhostSystem::new();
 
@@ -308,7 +306,7 @@ mod tests {
                     me.ticks += 1;
                     Ok(GhostProcessInstructions::default()
                         .set_should_continue(true)
-                        .set_next_run_delay_ms(20))
+                        .set_next_run_delay_ms(40))
                 }),
             )
             .unwrap();
@@ -318,7 +316,7 @@ mod tests {
             sys.process().unwrap();
         }
 
-        let test = test.lock().unwrap();
+        let test = test.lock();
         println!("got {:?}", *test);
         assert!(test.ticks > 0);
         assert!(test.ticks < 9);
@@ -331,7 +329,7 @@ mod tests {
             got_timeout: bool,
         }
 
-        let test = Arc::new(Mutex::new(Test { got_timeout: false }));
+        let test = Arc::new(GhostMutex::new(Test { got_timeout: false }));
 
         let mut sys = GhostSystem::new();
 
@@ -357,7 +355,7 @@ mod tests {
 
         sys.process().unwrap();
 
-        assert!(test.lock().unwrap().got_timeout);
+        assert!(test.lock().got_timeout);
     }
 
     #[test]
@@ -367,7 +365,7 @@ mod tests {
             got_response: String,
         }
 
-        let test = Arc::new(Mutex::new(Test {
+        let test = Arc::new(GhostMutex::new(Test {
             got_response: "".to_string(),
         }));
 
@@ -390,6 +388,6 @@ mod tests {
 
         sys.process().unwrap();
 
-        assert_eq!("Ok(\"test-response\")", &test.lock().unwrap().got_response);
+        assert_eq!("Ok(\"test-response\")", &test.lock().got_response);
     }
 }

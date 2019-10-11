@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use ghost_actor::prelude::*;
 
@@ -17,7 +17,7 @@ fn manual_example() {
         to_actor_add_resp: Vec<String>,
     }
 
-    let my_context = Arc::new(Mutex::new(MyContext {
+    let my_context = Arc::new(GhostMutex::new(MyContext {
         to_owner_prints: Vec::new(),
         to_actor_add_resp: Vec::new(),
     }));
@@ -59,7 +59,7 @@ fn manual_example() {
     system.process().unwrap();
     system.process().unwrap();
 
-    assert_eq!("MyContext { to_owner_prints: [\"message from actor\", \"echo: \\\"zombies\\\"\", \"echo: Ok(Ok(41))\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock().unwrap()));
+    assert_eq!("MyContext { to_owner_prints: [\"message from actor\", \"echo: \\\"zombies\\\"\", \"echo: Ok(Ok(41))\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
     println!("{:#?}", my_context);
 
     // can we access it directly?
