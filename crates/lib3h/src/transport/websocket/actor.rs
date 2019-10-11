@@ -275,25 +275,24 @@ impl GhostTransportWebsocket {
                         "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
                         uri, error
                     );
-                    let error = match error.kind() {
+                    let response = match error.kind() {
                         crate::transport::error::ErrorKind::Other(err) => {
                             if err == "Protocol(\"Connection reset without closing handshake\")" {
-                                TransportError::new_kind(
-                                    crate::transport::error::ErrorKind::Disconnect,
-                                )
+                                trace!("rude disconnect from {}", uri);
+                                RequestToParent::Disconnect(uri.into())
                             } else {
-                                error
+                                RequestToParent::ErrorOccured {
+                                    uri: uri.into(),
+                                    error,
+                                }
                             }
                         }
-                        _ => error,
-                    };
-                    self.endpoint_self.publish(
-                        Span::fixme(),
-                        RequestToParent::ErrorOccured {
+                        _ => RequestToParent::ErrorOccured {
                             uri: uri.into(),
                             error,
                         },
-                    )?;
+                    };
+                    self.endpoint_self.publish(Span::fixme(), response)?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
@@ -320,9 +319,8 @@ impl GhostTransportWebsocket {
                 }
                 StreamEvent::ConnectionClosed(uri) => {
                     trace!("StreamEvent::ConnectionClosed: {}", uri);
-                    return Err(crate::transport::error::TransportError::new_kind(
-                        crate::transport::error::ErrorKind::Disconnect,
-                    ));
+                    self.endpoint_self
+                        .publish(Span::fixme(), RequestToParent::Disconnect(uri.into()))?;
                 }
             }
         }

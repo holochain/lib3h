@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::{ErrorKind, TransportError},
+    error::TransportError,
     memory_mock::memory_server::{self, *},
     protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
@@ -256,23 +256,13 @@ impl
                         }
                         MemoryEvent::Unbind(url) => {
                             trace!("MemoryEvent::Unbind: {:?}", url);
-                            self.endpoint_self.publish(
-                                Span::fixme(),
-                                RequestToParent::ErrorOccured {
-                                    uri: url,
-                                    error: TransportError::new_kind(ErrorKind::Unbind),
-                                },
-                            )?;
+                            self.endpoint_self
+                                .publish(Span::fixme(), RequestToParent::Unbind(url))?;
                         }
                         MemoryEvent::ConnectionClosed(url) => {
                             trace!("MemoryEvent::ConnectionClosed: {:?}", url);
-                            self.endpoint_self.publish(
-                                Span::fixme(),
-                                RequestToParent::ErrorOccured {
-                                    uri: url,
-                                    error: TransportError::new_kind(ErrorKind::Disconnect),
-                                },
-                            )?;
+                            self.endpoint_self
+                                .publish(Span::fixme(), RequestToParent::Disconnect(url))?;
                         }
                         _ => panic!(format!("WHAT: {:?}", event)),
                     };
@@ -635,7 +625,7 @@ mod tests {
         let mut requests = t2_endpoint.drain_messages();
         assert_eq!(4, requests.len());
         assert_eq!(
-            "Some(ErrorOccured { uri: Lib3hUri(\"mem://addr_1/\"), error: TransportError(Disconnect) })",
+            "Some(Disconnect(Lib3hUri(\"mem://addr_1/\")))",
             format!("{:?}", requests[3].take_message())
         );
     }

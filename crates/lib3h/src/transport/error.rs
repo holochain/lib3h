@@ -46,8 +46,6 @@ impl TransportError {
 /// The specific type of an error.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ErrorKind {
-    Unbind,
-    Disconnect,
     Ignore(String),
     Other(String),
     /// Hints that destructuring should not be exhaustive.
@@ -62,8 +60,6 @@ pub enum ErrorKind {
 impl std::fmt::Display for TransportError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self.0 {
-            ErrorKind::Unbind => write!(f, "Unbind"),
-            ErrorKind::Disconnect => write!(f, "Disconnect"),
             ErrorKind::Other(ref s) => write!(f, "{}", s),
             _ => unreachable!(),
         }
@@ -74,8 +70,6 @@ impl std::error::Error for TransportError {
     /// The lower-level source of this error, if any.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self.0 {
-            ErrorKind::Unbind => None,
-            ErrorKind::Disconnect => None,
             ErrorKind::Other(ref _s) => None,
             _ => unreachable!(),
         }

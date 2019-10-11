@@ -259,13 +259,13 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                 if let WebsocketStreamState::ReadyWss(socket) = &mut info.stateful_socket {
                     if let Err(e) = socket.write_message(tungstenite::Message::Ping(vec![])) {
                         error!("Transport error trying to send ping over stream: {:?}. Dropping stream...", e);
-                        continue
+                        continue;
                     }
                 }
                 if let WebsocketStreamState::ReadyWs(socket) = &mut info.stateful_socket {
                     if let Err(e) = socket.write_message(tungstenite::Message::Ping(vec![])) {
                         error!("Transport error trying to send ping over stream: {:?}. Dropping stream...", e);
-                        continue
+                        continue;
                     }
                 }
             } else if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_WAIT_MS {
