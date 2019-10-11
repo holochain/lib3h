@@ -346,7 +346,12 @@ impl GhostTransportWebsocket {
     /// Try to discover peers on the network using mDNS.
     fn try_discover(&mut self) {
         self.last_discover = match self.last_discover {
-            None => Some(Instant::now()),
+            None => {
+                // Here we call a mDNS discovery at least once, which will take care of calling an
+                // advertise for us if it's the fist time the mDNS actor is invoked
+                self.discover().map_err(|_| error!("Fail to discover during 'try_discover'")).unwrap();
+                Some(Instant::now())
+            },
             Some(last_discover) => {
                 // Let's check if it's time to discover some peers, but only if we already
                 // did some url binding
