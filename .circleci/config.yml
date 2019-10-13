@@ -6,7 +6,7 @@ jobs:
    - image: holochain/holonix:latest
   steps:
    - checkout
-   - run: BACKTRACE_STRATEGY=CAPTURE_RESOLVED nix-shell --run l3h-test
+   - run: BACKTRACE_STRATEGY=CAPTURE_RESOLVED NIX_CONF_DIR="$HOME/project/.circleci" nix-shell --run l3h-test
  linux_bench:
    docker:
      - image: debian:10.1-slim
