@@ -27,6 +27,7 @@ jobs:
    - run:
       name: tests via nix
       command: |
+       export NIX_CONF_DIR="$HOME/project/.circleci"
        curl https://nixos.org/nix/install | sh
        . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
        # same as linux from here
