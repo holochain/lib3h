@@ -37,7 +37,7 @@ use utils::{constants::*, processor_harness::ProcessingOptions, test_network_id}
 const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
     max_iters: 10000,
     delay_interval_ms: 1,
-    timeout_ms: 5000,
+    timeout_ms: 10000,
     max_retries: 3,
     should_abort: true,
 };
