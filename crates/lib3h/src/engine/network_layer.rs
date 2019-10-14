@@ -86,7 +86,8 @@ impl<'engine> GhostEngine<'engine> {
                 self.multiplexer
                     .publish(span.child("DhtRequestToParent::HoldPeerRequested"), cmd)?;
             }
-            DhtRequestToParent::PeerTimedOut(_peer_name) => {
+            DhtRequestToParent::PeerTimedOut(peer_name) => {
+                trace!("peer timed out: {:?}", peer_name)
                 // Disconnect from that peer by calling a Close on it.
                 // FIXME
             }
