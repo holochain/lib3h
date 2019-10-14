@@ -117,6 +117,7 @@ impl<'engine> GhostEngine<'engine> {
             config,
             name: name.to_string(),
             dht_factory,
+            // This timeout is not actually used
             request_track: Tracker::new("real_engine_", 2000),
             multiplexer,
             this_net_peer,

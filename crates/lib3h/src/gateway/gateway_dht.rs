@@ -18,6 +18,7 @@ impl P2pGateway {
         request: DhtRequestToChild,
         parent_msg: GatewayToChildMessage,
     ) -> Lib3hResult<()> {
+        trace!("handle_dht_RequestToChild: parent_msg={:?}", parent_msg);
         // TODO: which span do we actually want?
         let span_parent = parent_msg.span().child("handle_dht_RequestToChild");
         // forward to child dht
@@ -108,7 +109,7 @@ impl P2pGateway {
                     span,
                     GatewayRequestToParent::Dht(payload),
                     Box::new(|me, response| {
-                        trace!("Received requestEntry response in Gateway");
+                        trace!("Received requestEntry response in Gateway: {:?}", response);
                         let dht_response = match response {
                             GhostCallbackData::Response(Ok(
                                 GatewayRequestToParentResponse::Dht(d),
@@ -118,7 +119,8 @@ impl P2pGateway {
                         // #fullsync - received entry response after request from gossip list handling,
                         // treat it as an entry from author list handling.
                         if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
-                            me.inner_dht
+                            trace!("Broadast entry {:?} to inner dht", entry);
+                             me.inner_dht
                                 .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
                         }
                         Ok(())

@@ -213,6 +213,7 @@ impl<'engine> GhostEngine<'engine> {
                                             trace!("Received HandleFetchEntryResult response | is_data_for_author_list:{}",
                                                 is_data_for_author_list);
                                             if is_data_for_author_list {
+                                                trace!("Broadcasting entry {:?}", entry);
                                                 space_gateway.publish(
                                                     Span::fixme(),
                                                     GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
