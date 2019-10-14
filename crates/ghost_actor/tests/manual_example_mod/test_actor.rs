@@ -7,22 +7,46 @@ use ghost_actor::prelude::*;
 
 pub struct TestActor<'lt> {
     owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>>,
+    sub_actor: Option<GhostEndpointFull<'lt, TestProtocol, Self, Self, TestActorHandler<'lt, Self>>>,
 }
 
 impl<'lt> TestActor<'lt> {
-    pub fn new(inflator: GhostInflator<'lt, TestProtocol, Self>) -> GhostResult<Self> {
+    pub fn new(inflator: GhostInflator<'lt, TestProtocol, Self>, sub_actor: Option<GhostEndpointSeed<'lt, TestProtocol, Self>>) -> GhostResult<Self> {
+        let sub_actor = match sub_actor {
+            None => None,
+            _ => unimplemented!(),
+        };
+
         let mut out = Self {
             owner_ref: inflator.inflate(TestActorHandler {
                 handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt>, message| {
-                    me.owner_ref
-                        .event_to_owner_print(format!("echo: {:?}", message))?;
-                    println!("actor printing message from owner: {}", message);
+                    match &mut me.sub_actor {
+                        None => {
+                            me.owner_ref
+                                .event_to_owner_print(format!("echo: {:?}", message))?;
+                            println!("actor printing message from owner: {}", message);
+                        }
+                        Some(sub_actor) => {
+                            sub_actor.event_to_actor_print(message)?;
+                        }
+                    }
                     Ok(())
                 }),
-                handle_request_to_actor_add_1: Box::new(|_me: &mut TestActor<'lt>, message, cb| {
-                    cb(Ok(message + 1))
+                handle_request_to_actor_add_1: Box::new(|me: &mut TestActor<'lt>, message, cb| {
+                    match &mut me.sub_actor {
+                        None => cb(Ok(message + 1)),
+                        Some(sub_actor) => {
+                            sub_actor.request_to_actor_add_1(
+                                message,
+                                Box::new(move |_me, result| {
+                                    cb(result?)
+                                }),
+                            )
+                        }
+                    }
                 }),
             })?,
+            sub_actor,
         };
         out.owner_ref
             .event_to_owner_print("message from actor".to_string())?;

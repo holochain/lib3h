@@ -28,7 +28,7 @@ fn manual_example() {
         ghost_actor_spawn::<MyContext, TestProtocol, TestActor, TestOwnerHandler<MyContext>>(
             system_ref.clone(),
             my_context_weak,
-            Box::new(|inflator| TestActor::new(inflator)),
+            Box::new(|inflator| TestActor::new(inflator, None)),
             TestOwnerHandler {
                 handle_event_to_owner_print: Box::new(|me, message| {
                     me.to_owner_prints.push(message.clone());
