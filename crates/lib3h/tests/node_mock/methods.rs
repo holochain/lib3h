@@ -260,6 +260,7 @@ impl NodeMock {
             let res = chain_store.author_entry(&entry);
             // Entry is known, try authoring each aspect instead
             if res.is_err() {
+                trace!("Entry {:?} is already known: {:?}", entry, res.err());
                 let mut success = false;
                 for aspect in &entry.aspect_list {
                     let aspect_res = chain_store.author_aspect(&entry.entry_address, aspect);
@@ -270,12 +271,14 @@ impl NodeMock {
                 if !success {
                     return Err(Lib3hError::new_other("Authoring of all aspects failed."));
                 }
+            } else {
+                trace!("Entry {:?} authored: {:?}", entry, res.ok());
             }
         }
         if can_broadcast {
             let msg_data = ProvidedEntryData {
                 space_address: current_space,
-                provider_agent_id: self.agent_id.clone(),
+                provider_agent_id: self.agent_id(),
                 entry: entry.clone(),
             };
             self.engine
@@ -783,6 +786,11 @@ impl NodeMock {
                         msg.entry_address,
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
+                    );
+                } else {
+                    warn!(
+                        "({:?}) Got store entry for space we haven't joined: {:?}",
+                        self.agent_id, msg
                     );
                 }
             }

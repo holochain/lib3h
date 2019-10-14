@@ -1,3 +1,4 @@
+extern crate edit_distance;
 extern crate rand;
 extern crate xoroshiro128;
 
@@ -34,8 +35,5 @@ macro_rules! assert_process_success {
 
 // Real test network-id should be a hc version of sha256 of a string
 pub fn test_network_id() -> GatewayId {
-    GatewayId {
-        nickname: "test-net".into(),
-        id: "Hc_fake_addr_for_test-net".into(),
-    }
+    GatewayId::fake_new("test-net")
 }
