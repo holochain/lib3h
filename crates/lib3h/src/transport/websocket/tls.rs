@@ -196,6 +196,24 @@ mod tests {
         cli_recv: Vec<u8>,
     }
 
+    fn write_all<W: std::io::Write>(stream: &mut W, mut data: &[u8]) {
+        for _ in 0..10 {
+            match stream.write(data) {
+                Ok(0) => panic!("failed to write"),
+                Ok(n) => data = &data[n..],
+                Err(ref e)
+                    if e.kind() == std::io::ErrorKind::Interrupted
+                        || e.kind() == std::io::ErrorKind::WouldBlock => {}
+                Err(e) => panic!("{:?}", e),
+            }
+            if data.is_empty() {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        panic!("failed to write");
+    }
+
     impl MockConnection {
         pub fn new(tls_config: TlsConfig) -> Self {
             let connector = native_tls::TlsConnector::builder()
@@ -243,7 +261,7 @@ mod tests {
         pub fn srv_write(&mut self, data: &[u8]) {
             match &mut self.srv {
                 Some(MockTlsStream::Ready(srv)) => {
-                    srv.write_all(data).unwrap();
+                    write_all(srv, data);
                 }
                 _ => panic!("unexpected"),
             }
@@ -252,7 +270,7 @@ mod tests {
         pub fn cli_write(&mut self, data: &[u8]) {
             match &mut self.cli {
                 Some(MockTlsStream::Ready(cli)) => {
-                    cli.write_all(data).unwrap();
+                    write_all(cli, data);
                 }
                 _ => panic!("unexpected"),
             }
