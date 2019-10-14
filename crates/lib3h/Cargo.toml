@@ -17,7 +17,7 @@ backtrace = "=0.3.27"
 detach = { version = "=0.0.15", path = "../detach" }
 env_logger = "=0.6.1"
 hcid = "=0.0.6"
-holochain_persistence_api = "=0.0.8"
+holochain_persistence_api = "=0.0.9"
 holochain_tracing = "=0.0.1"
 # version on the left for release regex
 lib3h_protocol = { version = "=0.0.15", path = "../lib3h_protocol" }

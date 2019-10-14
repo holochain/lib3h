@@ -15,7 +15,7 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 backtrace = "=0.3.27"
 base64 = "=0.10.1"
-holochain_persistence_api = "=0.0.8"
+holochain_persistence_api = "=0.0.9"
 rmp-serde = "=0.13.7"
 serde = "=1.0.89"
 serde_derive = "=1.0.89"
