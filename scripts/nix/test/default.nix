@@ -7,7 +7,7 @@ let
   echo BACKTRACE_STRATEGY=$BACKTRACE_STRATEGY
   hn-rust-fmt-check \
   && hn-rust-clippy \
-  && RUST_BACKTRACE=1 RUST_LOG=info cargo test
+  && RUST_BACKTRACE=1 RUST_LOG=trace cargo test test_mirror_suite
   '';
 in
 {
