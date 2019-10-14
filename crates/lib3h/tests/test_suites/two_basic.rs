@@ -27,7 +27,11 @@ lazy_static! {
 //--------------------------------------------------------------------------------------------------
 
 #[allow(dead_code)]
-pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
+pub fn setup_two_nodes(
+    mut alex: &mut NodeMock,
+    mut billy: &mut NodeMock,
+    options: &ProcessingOptions,
+) {
     // Connect Alex to Billy
     let connect_data = alex.connect_to(&billy.advertise()).unwrap();
     wait_connect!(alex, connect_data, billy);
@@ -35,11 +39,9 @@ pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
     billy.wait_until_no_work();
     alex.wait_until_no_work();
     billy.wait_until_no_work();
-    two_join_space(&mut alex, &mut billy, &SPACE_ADDRESS_A);
+    two_join_space(&mut alex, &mut billy, &SPACE_ADDRESS_A, options);
 
-    println!(
-        "DONE setup_two_nodes() DONE \n\n ------------------------------------------------ \n"
-    );
+    debug!("DONE setup_two_nodes() DONE \n\n ------------------------------------------------ \n");
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -48,32 +50,32 @@ pub fn setup_two_nodes(mut alex: &mut NodeMock, mut billy: &mut NodeMock) {
 
 /// Request ENTRY_ADDRESS_1 from the network and should get it back
 #[allow(dead_code)]
-pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
+pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData, options: &ProcessingOptions) {
     let enty_address_str = &entry.entry_address;
-    println!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
+    debug!("\n{} requesting entry: {}\n", node.name(), enty_address_str);
     let mut query_data = node.request_entry(entry.entry_address.clone());
 
     let expected = "HandleQueryEntry\\(QueryEntryData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), entry_address: EntryHash\\(HashString\\(\"[\\w\\d_~]+\"\\)\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: AgentPubKey\\(HashString\\(\"[\\w\\d]+\"\\)\\), query: \"test_query\" \\}\\)";
     let results = assert_msg_matches!(node, expected);
     println!("\n results: {:?}\n", results);
     let handle_query = &results[0].events[0];
-    println!("\n query_data: {:?}\n", query_data);
-    println!("\n handle_query_data: {:?}\n", handle_query);
+    debug!("\n query_data: {:?}\n", query_data);
+    debug!("\n handle_query_data: {:?}\n", handle_query);
     if let Lib3hServerProtocol::HandleQueryEntry(h_query_data) = handle_query {
         query_data = h_query_data.to_owned();
     }
 
     // #fullsync
     // Billy sends that data back to the network
-    println!("\n{} reply to own request: {:?}\n", node.name(), query_data);
+    debug!("\n{} reply to own request: {:?}\n", node.name(), query_data);
     let _ = node.reply_to_HandleQueryEntry(&query_data).unwrap();
 
     let expected = "QueryEntryResult\\(QueryEntryResultData \\{ space_address: SpaceHash\\(HashString\\(\"\\w+\"\\)\\), entry_address: EntryHash\\(HashString\\(\"[\\w\\d_~]+\"\\)\\), request_id: \"[\\w\\d_~]+\", requester_agent_id: AgentPubKey\\(HashString\\(\"[\\w\\d]+\"\\)\\), responder_agent_id: AgentPubKey\\(HashString\\(\"[\\w\\d]+\"\\)\\), query_result: ";
 
-    let results = assert_msg_matches!(node, expected);
-    println!("\n results: {:?}\n", results);
+    let results = assert_msg_matches!(node, expected, options);
+    debug!("\n results: {:?}\n", results);
     let query_result = &results[0].events[0];
-    println!("\n query_result: {:?}\n", query_result);
+    debug!("\n query_result: {:?}\n", query_result);
     let msg = unwrap_to!(query_result => Lib3hServerProtocol::QueryEntryResult);
     assert_eq!(&msg.entry_address, &entry.entry_address);
 
@@ -86,20 +88,22 @@ pub fn request_entry_ok(node: &mut NodeMock, entry: &EntryData) {
 }
 
 // setup for two nodes joining the same space
-pub fn two_join_space(alex: &mut NodeMock, billy: &mut NodeMock, space_address: &SpaceHash) {
-    println!(
+pub fn two_join_space(
+    alex: &mut NodeMock,
+    billy: &mut NodeMock,
+    space_address: &SpaceHash,
+    options: &ProcessingOptions,
+) {
+    debug!(
         "\ntwo_join_space ({},{}) -> {}\n",
         alex.name(),
         billy.name(),
         space_address
     );
     // Alex joins space
-    test_join_space(alex, space_address);
-    // Extra processing required for auto-handshaking
-    let (_did_work, _srv_msg_list) = billy.process().unwrap();
-
+    test_join_space(alex, space_address, options);
     // Billy joins space
-    test_join_space(billy, space_address);
+    test_join_space(billy, space_address, options);
 
     // Extra processing required for auto-handshaking
     // TODO figure out something to explicitly wait on (eg. a drained message)
@@ -180,7 +184,6 @@ pub fn test_send_message_self(
     );
     alex.send_response(&msg.request_id, &alex.agent_id(), response_content.clone());
 
-    // TODO Set this to correct value once test passes
     let expected = "SendDirectMessageResult\\(DirectMessageData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), request_id: \"[\\w\\d_~]+\", to_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), from_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), content: \"echo: wah\" \\}\\)";
 
     assert_msg_matches!(alex, expected, options);
@@ -203,7 +206,7 @@ pub fn test_author_one_aspect(
 
     // Billy asks for that entry
     // =========================
-    request_entry_ok(billy, &entry);
+    request_entry_ok(billy, &entry, options);
 
     // Billy asks for unknown entry
     // ============================
@@ -273,7 +276,7 @@ fn test_author_two_aspects(alex: &mut NodeMock, billy: &mut NodeMock, options: &
     assert_eq!(entry.aspect_list.len(), 2);
 
     // Billy asks for that entry
-    request_entry_ok(billy, &entry);
+    request_entry_ok(billy, &entry, options);
 }
 
 /// Entry with two aspects case
@@ -306,5 +309,5 @@ fn test_two_authors(alex: &mut NodeMock, billy: &mut NodeMock, options: &Process
         &ENTRY_ADDRESS_1,
         vec![ASPECT_CONTENT_1.clone(), ASPECT_CONTENT_2.clone()],
     );
-    request_entry_ok(alex, &entry);
+    request_entry_ok(alex, &entry, options);
 }
