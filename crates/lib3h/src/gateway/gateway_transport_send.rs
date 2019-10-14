@@ -12,7 +12,7 @@ use rmp_serde::Serializer;
 use serde::Serialize;
 
 const SEND_RETRY_INTERVAL_MS: u64 = 20;
-const SEND_RETRY_TIMEOUT_MS: u64 = 20000;
+const SEND_RETRY_TIMEOUT_MS: u64 = 60000;
 
 /// we want to invoke this on the very next process call
 /// set our last_attempt back far enough to ensure this

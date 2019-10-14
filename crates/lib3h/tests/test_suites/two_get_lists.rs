@@ -44,7 +44,7 @@ pub fn author_list_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pro
     let _results = assert2_msg_matches!(alex, billy, expected, options);
 
     // Billy asks for that entry
-    request_entry_ok(billy, &entry);
+    request_entry_ok(billy, &entry, options);
 }
 
 /// Return some entry in gossiping_list request
@@ -75,7 +75,7 @@ pub fn hold_list_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &Proce
     let _results = assert2_msg_matches!(alex, billy, expected, options);
 
     // Billy asks for that entry
-    request_entry_ok(billy, &entry);
+    request_entry_ok(billy, &entry, options);
 }
 
 ///
@@ -140,7 +140,7 @@ pub fn author_list_known_entry_test(
     let _results = assert2_msg_matches!(alex, billy, expected, fast_timeout_options);
 
     // Billy asks for that entry
-    request_entry_ok(billy, &entry);
+    request_entry_ok(billy, &entry, options);
 }
 
 /// Return lots of entries
@@ -175,7 +175,7 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pr
     let fetch_event = &results[0].events[0];
     // extract msg data
     let fetch_data = unwrap_to!(fetch_event => Lib3hServerProtocol::HandleFetchEntry);
-    println!("fetch_data: {:?}", fetch_data);
+    trace!("fetch_data: {:?}", fetch_data);
     // Respond
     alex.reply_to_HandleFetchEntry(&fetch_data)
         .expect("Reply to HandleFetchEntry should work");
@@ -188,7 +188,7 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pr
 
     // Send GossipingList
     // ==================
-    println!("\nAlex sends GossipingEntryList\n");
+    trace!("\nAlex sends GossipingEntryList\n");
     alex.reply_to_first_HandleGetGossipingEntryList();
 
     // Should receive a HandleFetchEntry request from network module after receiving list
@@ -220,5 +220,5 @@ pub fn many_aspects_test(alex: &mut NodeMock, billy: &mut NodeMock, options: &Pr
     let _results = assert2_msg_matches!(alex, billy, expected, options);
 
     // Billy asks for that entry
-    request_entry_ok(billy, &entry_2);
+    request_entry_ok(billy, &entry_2, options);
 }
