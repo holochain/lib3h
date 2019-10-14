@@ -220,6 +220,12 @@ impl<'a> From<&'a str> for AgentPubKey {
     }
 }
 
+impl From<String> for AgentPubKey {
+    fn from(s: String) -> AgentPubKey {
+        HashString::from(s.to_owned()).into()
+    }
+}
+
 impl AgentPubKey {
     pub fn new() -> AgentPubKey {
         AgentPubKey(HashString::new())
