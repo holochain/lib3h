@@ -120,7 +120,7 @@ impl P2pGateway {
                         // treat it as an entry from author list handling.
                         if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
                             trace!("Broadast entry {:?} to inner dht", entry);
-                             me.inner_dht
+                            me.inner_dht
                                 .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
                         }
                         Ok(())
