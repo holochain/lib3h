@@ -6,8 +6,8 @@ use crate::{
     types::NetworkHash,
     uri::Lib3hUri,
 };
-use std::convert::TryFrom;
 
+use std::convert::TryFrom;
 /// Enum holding the message types describe the lib3h protocol.
 /// There are 4 categories of messages:
 ///  - ClientToLib3h: A request or event sent from the user/client of lib3h
