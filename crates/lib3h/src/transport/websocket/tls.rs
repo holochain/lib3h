@@ -196,24 +196,6 @@ mod tests {
         cli_recv: Vec<u8>,
     }
 
-    fn write_all<W: std::io::Write>(stream: &mut W, mut data: &[u8]) {
-        for _ in 0..10 {
-            match stream.write(data) {
-                Ok(0) => panic!("failed to write"),
-                Ok(n) => data = &data[n..],
-                Err(ref e)
-                    if e.kind() == std::io::ErrorKind::Interrupted
-                        || e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => panic!("{:?}", e),
-            }
-            if data.is_empty() {
-                return;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
-        panic!("failed to write");
-    }
-
     impl MockConnection {
         pub fn new(tls_config: TlsConfig) -> Self {
             let connector = native_tls::TlsConnector::builder()
@@ -255,25 +237,45 @@ mod tests {
         pub fn process(&mut self) {
             for _ in 0..10 {
                 self.priv_process();
+                std::thread::sleep(std::time::Duration::from_millis(1));
             }
+        }
+
+        pub fn write_all(&mut self, is_srv: bool, mut data: &[u8]) {
+            for _ in 0..10 {
+                match match is_srv {
+                    true => &mut self.srv,
+                    false => &mut self.cli,
+                } {
+                    Some(MockTlsStream::Ready(stream)) => {
+                        println!("(is_srv: {}) TRY WRITE {} bytes", is_srv, data.len());
+                        match stream.write(data) {
+                            Ok(0) => panic!("failed to write"),
+                            Ok(n) => data = &data[n..],
+                            Err(ref e)
+                                if e.kind() == std::io::ErrorKind::Interrupted
+                                    || e.kind() == std::io::ErrorKind::WouldBlock =>
+                            {
+                                println!("-- {:?}", e)
+                            }
+                            Err(e) => panic!("{:?}", e),
+                        }
+                        if data.is_empty() {
+                            return;
+                        }
+                    }
+                    _ => panic!("unexpected"),
+                }
+            }
+            panic!("failed to write");
         }
 
         pub fn srv_write(&mut self, data: &[u8]) {
-            match &mut self.srv {
-                Some(MockTlsStream::Ready(srv)) => {
-                    write_all(srv, data);
-                }
-                _ => panic!("unexpected"),
-            }
+            self.write_all(true, data);
         }
 
         pub fn cli_write(&mut self, data: &[u8]) {
-            match &mut self.cli {
-                Some(MockTlsStream::Ready(cli)) => {
-                    write_all(cli, data);
-                }
-                _ => panic!("unexpected"),
-            }
+            self.write_all(false, data);
         }
 
         fn priv_process_stream(&mut self, stream: MockTlsStream) -> (MockTlsStream, Vec<u8>) {
@@ -287,8 +289,15 @@ mod tests {
                     _ => panic!("unexpected"),
                 },
                 MockTlsStream::Ready(mut stream) => {
-                    stream.get_mut().set_should_end();
-                    stream.read_to_end(&mut data).unwrap();
+                    let mut buf: [u8; 1024] = [0; 1024];
+                    match stream.read(&mut buf) {
+                        Ok(read) => {
+                            if read > 0 {
+                                data.extend_from_slice(&buf[0..read]);
+                            }
+                        }
+                        _ => (),
+                    }
                     MockTlsStream::Ready(stream)
                 }
             };
