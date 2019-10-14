@@ -849,50 +849,36 @@ mod tests {
         let mut _engine_1 = make_test_engine_with_wss_transport(url_1.clone());
         let mut _engine_2 = make_test_engine_with_wss_transport(url_2.clone());
 
-        // // I don't think it's calling the right advertisement, is it ?
-        // _engine_1.advertise();
-        // _engine_2.advertise();
-
         // Apparently we need to bind the URL before anything can happen...
-        let t1_endpoint = _engine_1.take_parent_endpoint()
+        let e1_endpoint = _engine_1.take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("twss_to_child1")
             .build::<()>();
 
-        // // Request the bind !
-        // t1_endpoint
-        //     .request(
-        //         Span::fixme(),
-        //         RequestToChild::Bind {
-        //             spec: url_1.clone(),
-        //         },
-        //         Box::new(move |_: &mut (), r| {
-        //             // parent should see the bind event
-        //             assert_eq!(
-        //                 format!(
-        //                     "Response(Ok(Bind(BindResultData {{ bound_url: Lib3hUri(\"wss://0.0.0.0:60861/\") }})))",
-        //                 ),
-        //                 format!("{:?}", r)
-        //             );
-        //             Ok(())
-        //         }),
-        //     )
-        //     .unwrap();
+        // Let's give some time to the engine to make the url binding...
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
+        _engine_1.process().expect("Fail to process from engine1 while testing url binding.");
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
+        _engine_2.process().expect("Fail to process from engine2 while testing url binding.");
 
+        // e1_endpoint.as_mut().as_mut().as_mut().bound_url;
+        // e1_endpoint.bound_url;
+
+        for _i in 0..10 {
+            ::std::thread::sleep(::std::time::Duration::from_millis(100));
+            _engine_1.process().expect("Fail to process from engine1");
+        }
 
         // Let's discover engine2 using the websocket transport function 'process_concrete' which
         // should handle the discovery part by calling 'try_discover'
-        _engine_1.process().expect("Fail to process from engine1");
-
 
         // let x = _engine_1.multiplexer.as_mut().as_mut();
         // dbg!(&x);
 
         // Let's check we did discover our peer by retrieving the list of peer from the dht
-        // let peer_list = _engine_1.multiplexer.as_ref().as_mut().as_mut().get_peer_list();
-        // let peer_list = _engine_1.multiplexer.as_mut().get_peer_list();
-        //
+        // let peer_list = _engine_1.multiplexer.as_mut().as_mut().get_peer_list();
+
         // assert_eq!(peer_list, 1);
     }
 
