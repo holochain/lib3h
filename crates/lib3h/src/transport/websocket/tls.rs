@@ -182,109 +182,170 @@ mod tests {
         assert_eq!("hello", &String::from_utf8_lossy(&v[..]));
     }
 
+    enum MockTlsStream {
+        Mid(native_tls::MidHandshakeTlsStream<MockStream>),
+        Ready(native_tls::TlsStream<MockStream>),
+    }
+
+    struct MockConnection {
+        srv: Option<MockTlsStream>,
+        cli: Option<MockTlsStream>,
+        srv_send: Vec<u8>,
+        cli_send: Vec<u8>,
+        srv_recv: Vec<u8>,
+        cli_recv: Vec<u8>,
+    }
+
+    impl MockConnection {
+        pub fn new(tls_config: TlsConfig) -> Self {
+            let connector = native_tls::TlsConnector::builder()
+                .danger_accept_invalid_certs(true)
+                .danger_accept_invalid_hostnames(true)
+                .build()
+                .unwrap();
+            let client_side = match connector.connect("test.test", MockStream::new("client")) {
+                Err(native_tls::HandshakeError::WouldBlock(socket)) => socket,
+                _ => panic!("unexpected"),
+            };
+
+            let identity = tls_config.get_identity().unwrap();
+            let acceptor = native_tls::TlsAcceptor::new(identity).unwrap();
+            let server_side = match acceptor.accept(MockStream::new("server")) {
+                Err(native_tls::HandshakeError::WouldBlock(socket)) => socket,
+                _ => panic!("unexpected"),
+            };
+
+            let mut out = Self {
+                srv: Some(MockTlsStream::Mid(server_side)),
+                cli: Some(MockTlsStream::Mid(client_side)),
+                srv_send: Vec::new(),
+                cli_send: Vec::new(),
+                srv_recv: Vec::new(),
+                cli_recv: Vec::new(),
+            };
+            out.process();
+            out
+        }
+
+        pub fn flush(&mut self) {
+            self.srv_send.clear();
+            self.cli_send.clear();
+            self.srv_recv.clear();
+            self.cli_recv.clear();
+        }
+
+        pub fn process(&mut self) {
+            for _ in 0..10 {
+                self.priv_process();
+            }
+        }
+
+        pub fn srv_write(&mut self, data: &[u8]) {
+            match &mut self.srv {
+                Some(MockTlsStream::Ready(srv)) => {
+                    srv.write_all(data).unwrap();
+                }
+                _ => panic!("unexpected"),
+            }
+        }
+
+        pub fn cli_write(&mut self, data: &[u8]) {
+            match &mut self.cli {
+                Some(MockTlsStream::Ready(cli)) => {
+                    cli.write_all(data).unwrap();
+                }
+                _ => panic!("unexpected"),
+            }
+        }
+
+        fn priv_process_stream(&mut self, stream: MockTlsStream) -> (MockTlsStream, Vec<u8>) {
+            let mut data = Vec::new();
+            let stream = match stream {
+                MockTlsStream::Mid(stream) => match stream.handshake() {
+                    Err(native_tls::HandshakeError::WouldBlock(stream)) => {
+                        MockTlsStream::Mid(stream)
+                    }
+                    Ok(stream) => MockTlsStream::Ready(stream),
+                    _ => panic!("unexpected"),
+                },
+                MockTlsStream::Ready(mut stream) => {
+                    stream.get_mut().set_should_end();
+                    stream.read_to_end(&mut data).unwrap();
+                    MockTlsStream::Ready(stream)
+                }
+            };
+            (stream, data)
+        }
+
+        fn priv_process(&mut self) {
+            {
+                let srv = match self.srv.as_mut().unwrap() {
+                    MockTlsStream::Mid(srv) => srv.get_mut(),
+                    MockTlsStream::Ready(srv) => srv.get_mut(),
+                };
+                let cli = match self.cli.as_mut().unwrap() {
+                    MockTlsStream::Mid(cli) => cli.get_mut(),
+                    MockTlsStream::Ready(cli) => cli.get_mut(),
+                };
+                let data = srv.drain_send();
+                if data.len() > 0 {
+                    self.srv_send.extend_from_slice(&data);
+                    cli.inject_recv(data);
+                }
+                let data = cli.drain_send();
+                if data.len() > 0 {
+                    self.cli_send.extend_from_slice(&data);
+                    srv.inject_recv(data);
+                }
+            }
+            {
+                let srv = std::mem::replace(&mut self.srv, None).unwrap();
+                let (srv, data) = self.priv_process_stream(srv);
+                self.srv_recv.extend_from_slice(&data);
+                std::mem::replace(&mut self.srv, Some(srv));
+            }
+            {
+                let cli = std::mem::replace(&mut self.cli, None).unwrap();
+                let (cli, data) = self.priv_process_stream(cli);
+                self.cli_recv.extend_from_slice(&data);
+                std::mem::replace(&mut self.cli, Some(cli));
+            }
+        }
+    }
+
     fn test_enc_dec(tls_config: TlsConfig) {
-        let connector = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
-            .danger_accept_invalid_hostnames(true)
-            .build()
-            .unwrap();
-        let client_side = connector.connect("test.test", MockStream::new("client"));
-
-        // handshake client send 1
-
-        let mut client_side = match client_side {
-            Err(native_tls::HandshakeError::WouldBlock(socket)) => socket,
-            _ => panic!("unexpected"),
-        };
-
-        println!("cs1 {:?}", client_side);
-
-        let mut server_side = MockStream::new("server");
-        server_side.inject_recv(client_side.get_mut().drain_send());
-
-        let identity = tls_config.get_identity().unwrap();
-        let acceptor = native_tls::TlsAcceptor::new(identity).unwrap();
-        let server_side = acceptor.accept(server_side);
-
-        // handshake server send 1
-
-        let mut server_side = match server_side {
-            Err(native_tls::HandshakeError::WouldBlock(socket)) => socket,
-            _ => panic!("unexpected"),
-        };
-
-        println!("ss1 {:?}", server_side);
-
-        client_side
-            .get_mut()
-            .inject_recv(server_side.get_mut().drain_send());
-
-        // handshake client send 2
-
-        let mut client_side = match client_side.handshake() {
-            Err(native_tls::HandshakeError::WouldBlock(socket)) => socket,
-            _ => panic!("unexpected"),
-        };
-
-        println!("cs2 {:?}", client_side);
-
-        server_side
-            .get_mut()
-            .inject_recv(client_side.get_mut().drain_send());
-
-        // handshake server send 2 - FINAL
-
-        let mut server_side = match server_side.handshake() {
-            Ok(socket) => socket,
-            _ => panic!("unexpected"),
-        };
-
-        println!("ss2 {:?}", server_side);
-
-        client_side
-            .get_mut()
-            .inject_recv(server_side.get_mut().drain_send());
-
-        // handshake client send 3 - FINAL
-
-        let mut client_side = match client_side.handshake() {
-            Ok(socket) => socket,
-            _ => panic!("unexpected"),
-        };
-
-        println!("cs3 {:?}", client_side);
-
-        // -- we have now completed handshaking -- //
-
-        // -- try sending a message from client to server -- //
+        let mut con = MockConnection::new(tls_config);
+        con.flush();
 
         const TO_SERVER: &'static [u8] = b"test-message-to-server";
+        con.cli_write(TO_SERVER);
 
-        client_side.write_all(TO_SERVER).unwrap();
-        let to_server = client_side.get_mut().drain_send();
-        assert_ne!(TO_SERVER, &to_server[..]);
+        con.process();
 
-        server_side.get_mut().inject_recv(to_server);
-        server_side.get_mut().set_should_end();
+        println!(
+            "{:?} -- {:?}",
+            String::from_utf8_lossy(&con.srv_recv),
+            String::from_utf8_lossy(&con.cli_send),
+        );
 
-        let mut from_client = Vec::new();
-        server_side.read_to_end(&mut from_client).unwrap();
-        assert_eq!(TO_SERVER, &from_client[..]);
+        assert_ne!(TO_SERVER, &con.cli_send[..]);
+        assert_eq!(TO_SERVER, &con.srv_recv[..]);
 
-        // -- try sending a message from server to client -- //
+        con.flush();
 
         const TO_CLIENT: &'static [u8] = b"test-message-to-client";
+        con.srv_write(TO_CLIENT);
 
-        server_side.write_all(TO_CLIENT).unwrap();
-        let to_client = server_side.get_mut().drain_send();
-        assert_ne!(TO_CLIENT, &to_client[..]);
+        con.process();
 
-        client_side.get_mut().inject_recv(to_client);
-        client_side.get_mut().set_should_end();
+        println!(
+            "{:?} -- {:?}",
+            String::from_utf8_lossy(&con.cli_recv),
+            String::from_utf8_lossy(&con.srv_send),
+        );
 
-        let mut from_server = Vec::new();
-        client_side.read_to_end(&mut from_server).unwrap();
-        assert_eq!(TO_CLIENT, &from_server[..]);
+        assert_ne!(TO_CLIENT, &con.srv_send[..]);
+        assert_eq!(TO_CLIENT, &con.cli_recv[..]);
     }
 
     #[test]
