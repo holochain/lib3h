@@ -473,8 +473,11 @@ impl
     // BOILERPLATE END----------------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
-        // Periodic peer discovery
-        self.try_discover();
+        // Check if the needed url binding happened before calling 'try_discover'
+        if self.bound_url.is_some() {
+            // Periodic peer discovery
+            self.try_discover();
+        }
 
         // process the self endpoint
         detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
