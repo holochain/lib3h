@@ -491,6 +491,10 @@ impl MirrorDht {
                 let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
                 if !received_new_content {
+                    trace!(
+                        "@MirrorDht@ did not receive new content from entry {:?}",
+                        entry
+                    );
                     return Ok(());
                 }
                 let gossip_evt = self.gossip_entry(&entry);

@@ -787,6 +787,11 @@ impl NodeMock {
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
                     );
+                } else {
+                    warn!(
+                        "({:?}) Got store entry for space we haven't joined: {:?}",
+                        self.agent_id, msg
+                    );
                 }
             }
             Lib3hServerProtocol::HandleDropEntry(_msg) => {
