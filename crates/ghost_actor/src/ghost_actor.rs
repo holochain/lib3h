@@ -2,9 +2,12 @@ use crate::*;
 use holochain_tracing::Span;
 use std::sync::{Arc, Weak};
 
+/// If you plant an endpoind seed "later", it will return this callback
+/// allowing you to finalize it with the weak user data reference.
 pub type GhostEndpointFullFinalizeCb<'lt, X> =
     Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
 
+/// An incomplete GhostEndpoint. It needs to be `plant`ed to fully function
 pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt> {
     sys_ref: GhostSystemRef<'lt>,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -13,7 +16,7 @@ pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt> {
 }
 
 impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
-    pub fn new(
+    fn new(
         sys_ref: GhostSystemRef<'lt>,
         send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
@@ -27,6 +30,9 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
         }
     }
 
+    /// plant this seed to expand it into a usage context.
+    /// This builds the "handler" for managing incoming events / requests
+    /// as well as associating the user_data so callbacks have context.
     pub fn plant<X: 'lt + Send + Sync, H: 'lt + GhostHandler<'lt, X, P>>(
         self,
         weak_user_data: Weak<GhostMutex<X>>,
@@ -37,6 +43,10 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
         Ok(out)
     }
 
+    /// You may not yet have access to a weak reference to your user_data
+    /// especially in the most normal use-case where you want the "user_data"
+    /// to be a reference to the very struct you are probably constructing.
+    /// `plant_later` allows you to pass in that weak user_data ref later.
     #[allow(clippy::complexity)]
     pub fn plant_later<X: 'lt + Send + Sync, H: 'lt + GhostHandler<'lt, X, P>>(
         self,
@@ -98,7 +108,7 @@ enum GhostEndpointToInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     IncomingRequest(P, Option<GhostResponseCb<'lt, X, P>>),
 }
 
-pub struct GhostEndpointFullInner<
+struct GhostEndpointFullInner<
     'lt,
     P: GhostProtocol,
     X: 'lt + Send + Sync,
@@ -179,6 +189,7 @@ impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
     }
 }
 
+/// a full `plant`ed GhostEndpoint. Used to interact with the remote end.
 pub struct GhostEndpointFull<
     'lt,
     P: GhostProtocol,
@@ -194,6 +205,12 @@ pub struct GhostEndpointFull<
 impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
     GhostEndpointFull<'lt, P, D, X, H>
 {
+    /// Sometimes you might need to invoke some functions on and endpoint
+    /// before passing that endpoint off to another class. If you were invoking
+    /// functions, it needed to be `plant`ed in your context. But you don't
+    /// want to persist that context where you are sending it.
+    /// `regress` lets you return this endpoint to seed form, so it can later
+    /// be `plant`ed in a different context / with a different handler.
     pub fn regress(mut self) -> Result<GhostEndpointSeed<'lt, P, D>, Self> {
         // unwrapping Arc-s is weird...
         // if there is an error, put ourself back together and return
@@ -233,6 +250,9 @@ impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X
     }
 }
 
+/// A GhostEndpointFull needs a raw send_protocol message.
+/// But, you will most often not use this, you should use the code-generated
+/// helper functions.
 pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     fn send_protocol(
         &mut self,
@@ -241,10 +261,16 @@ pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     ) -> GhostResult<()>;
 }
 
+/// Describes an actor that can be used within the "Ghost" actor system
 pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sync {
-    fn process(&mut self) -> GhostResult<()>;
+    /// If you need to do any periodic work, you should override this
+    /// default "no-op" implementation of GhostActor::process()
+    fn process(&mut self) -> GhostResult<()> {
+        Ok(())
+    }
 }
 
+/// Slightly awkward helper class for obtaining an Endpoint for an actor's owner
 pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> {
     finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>>,
     sys_ref: GhostSystemRef<'lt>,
@@ -253,6 +279,7 @@ pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> 
 }
 
 impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> GhostInflator<'lt, P, A> {
+    /// call this to get the `plant`ed full owner endpoint
     pub fn inflate<H: 'lt + GhostHandler<'lt, A, P>>(
         self,
         handler: H,
@@ -273,9 +300,13 @@ impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> GhostInflator<'lt, P
     }
 }
 
+/// when spawning a new actor, this callback gives access to an inflator instance
+/// and should return the constructed actor instance.
 pub type GhostActorSpawnCb<'lt, A, P> =
     Box<dyn FnOnce(GhostInflator<'lt, P, A>) -> GhostResult<A> + 'lt>;
 
+/// actor instances in the "Ghost" actor system should generally be spawned
+/// using this function.
 pub fn ghost_actor_spawn<
     'lt,
     X: 'lt + Send + Sync,
