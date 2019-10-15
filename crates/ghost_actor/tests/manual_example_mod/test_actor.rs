@@ -6,19 +6,27 @@ use super::test_protocol::*;
 use ghost_actor::prelude::*;
 
 pub struct TestActor<'lt> {
+    #[allow(dead_code)]
+    sys_ref: GhostActorSystem<'lt, Self>,
     owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>>,
-    sub_actor: Option<GhostEndpointFull<'lt, TestProtocol, Self, Self, TestActorHandler<'lt, Self>>>,
+    sub_actor:
+        Option<GhostEndpointFull<'lt, TestProtocol, Self, Self, TestActorHandler<'lt, Self>>>,
 }
 
 impl<'lt> TestActor<'lt> {
-    pub fn new(inflator: GhostInflator<'lt, TestProtocol, Self>, sub_actor: Option<GhostEndpointSeed<'lt, TestProtocol, Self>>) -> GhostResult<Self> {
+    pub fn new(
+        mut sys_ref: GhostActorSystem<'lt, Self>,
+        owner_seed: GhostEndpointSeed<'lt, TestProtocol, ()>,
+        sub_actor: Option<GhostEndpointSeed<'lt, TestProtocol, Self>>,
+    ) -> GhostResult<Self> {
         let sub_actor = match sub_actor {
             None => None,
             _ => unimplemented!(),
         };
 
-        let mut out = Self {
-            owner_ref: inflator.inflate(TestActorHandler {
+        let owner_ref = sys_ref.plant_endpoint(
+            owner_seed,
+            TestActorHandler {
                 handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt>, message| {
                     match &mut me.sub_actor {
                         None => {
@@ -35,17 +43,18 @@ impl<'lt> TestActor<'lt> {
                 handle_request_to_actor_add_1: Box::new(|me: &mut TestActor<'lt>, message, cb| {
                     match &mut me.sub_actor {
                         None => cb(Ok(message + 1)),
-                        Some(sub_actor) => {
-                            sub_actor.request_to_actor_add_1(
-                                message,
-                                Box::new(move |_me, result| {
-                                    cb(result?)
-                                }),
-                            )
-                        }
+                        Some(sub_actor) => sub_actor.request_to_actor_add_1(
+                            message,
+                            Box::new(move |_me, result| cb(result?)),
+                        ),
                     }
                 }),
-            })?,
+            },
+        )?;
+
+        let mut out = Self {
+            sys_ref,
+            owner_ref,
             sub_actor,
         };
         out.owner_ref

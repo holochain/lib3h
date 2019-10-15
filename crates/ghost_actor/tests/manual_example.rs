@@ -9,7 +9,6 @@ use manual_example_mod::*;
 #[test]
 fn manual_example() {
     let mut system = GhostSystem::new();
-    let system_ref = system.create_ref();
 
     #[derive(Debug)]
     struct MyContext {
@@ -24,18 +23,21 @@ fn manual_example() {
 
     let my_context_weak = Arc::downgrade(&my_context);
 
-    let mut actor_ref =
-        ghost_actor_spawn::<MyContext, TestProtocol, TestActor, TestOwnerHandler<MyContext>>(
-            system_ref.clone(),
-            my_context_weak,
-            Box::new(|inflator| TestActor::new(inflator, None)),
+    let (mut system_ref, finalize) = system.create_external_system_ref();
+    finalize(my_context_weak).unwrap();
+
+    let mut actor_ref = system_ref
+        .spawn(
+            Box::new(|sys_ref, owner_seed| TestActor::new(sys_ref, owner_seed, None)),
             TestOwnerHandler {
-                handle_event_to_owner_print: Box::new(|me, message| {
+                handle_event_to_owner_print: Box::new(|me: &mut MyContext, message| {
                     me.to_owner_prints.push(message.clone());
                     println!("owner printing message from actor: {}", message);
                     Ok(())
                 }),
-                handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
+                handle_request_to_owner_sub_1: Box::new(|_me: &mut MyContext, message, cb| {
+                    cb(Ok(message - 1))
+                }),
             },
         )
         .unwrap();
