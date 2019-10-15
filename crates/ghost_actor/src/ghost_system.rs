@@ -16,6 +16,13 @@ impl Default for GhostProcessInstructions {
     }
 }
 
+pub trait GhostSystem {
+
+    /// execute all queued processor functions
+    fn process(&mut self) -> GhostResult<()>;
+
+}
+
 impl GhostProcessInstructions {
     pub fn should_continue(&self) -> bool {
         self.should_continue
@@ -139,12 +146,12 @@ impl<'lt> GhostSystemRef<'lt> {
 
 /// the main ghost system struct. Allows queueing new processor functions
 /// and provides a process() function to actually execute them
-pub struct GhostSystem<'lt> {
+pub struct SingleThreadedGhostSystem<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessorData<'lt>>,
     system_inner: Arc<GhostMutex<GhostSystemInner<'lt>>>,
 }
 
-impl<'lt> GhostSystem<'lt> {
+impl<'lt> SingleThreadedGhostSystem<'lt> {
     /// create a new ghost system
     pub fn new() -> Self {
         let (process_send, process_recv) = crossbeam_channel::unbounded();
@@ -186,7 +193,7 @@ mod tests {
             non_start_delay: false,
         }));
 
-        let mut sys = GhostSystem::new();
+        let mut sys : GhostSystem = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
