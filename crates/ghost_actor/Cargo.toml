@@ -28,3 +28,4 @@ syn = { version = "=1.0.5", features = [ "full", "extra-traits" ] }
 
 [dev-dependencies]
 env_logger = "=0.6.1"
+diff = "=0.1.11"
