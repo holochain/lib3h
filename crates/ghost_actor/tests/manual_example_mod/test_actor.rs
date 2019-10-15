@@ -6,7 +6,7 @@ use super::test_protocol::*;
 use ghost_actor::prelude::*;
 
 pub struct TestActor<'lt> {
-    owner_ref: GhostEndpointRef<'lt, Self, (), TestProtocol, TestActorHandler<'lt, Self>>,
+    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>>,
 }
 
 impl<'lt> TestActor<'lt> {

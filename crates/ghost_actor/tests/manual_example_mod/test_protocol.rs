@@ -170,7 +170,7 @@ pub trait TestActorRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestPro
 }
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, TestProtocol>> TestActorRef<'lt, X>
-    for GhostEndpointRef<'lt, X, A, TestProtocol, H>
+    for GhostEndpointFull<'lt, TestProtocol, A, X, H>
 {
 }
 
@@ -202,6 +202,6 @@ pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestPro
 }
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, TestProtocol>> TestOwnerRef<'lt, X>
-    for GhostEndpointRef<'lt, X, A, TestProtocol, H>
+    for GhostEndpointFull<'lt, TestProtocol, A, X, H>
 {
 }
