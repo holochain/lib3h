@@ -210,7 +210,8 @@ impl<'engine> GhostEngine<'engine> {
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
-                                            trace!("Received HandleFetchEntryResult response | {}", is_data_for_author_list);
+                                            trace!("Received HandleFetchEntryResult response | is_data_for_author_list:{}",
+                                                is_data_for_author_list);
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
                                                     Span::fixme(),
