@@ -9,15 +9,15 @@ pub type GhostEndpointFullFinalizeCb<'lt, X> =
 
 /// An incomplete GhostEndpoint. It needs to be `plant`ed to fully function
 pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt> {
-    sys_ref: GhostSystemRef<'lt>,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     d_ref: Arc<GhostMutex<D>>,
-}
+    sys_ref: Box<dyn GhostSystemRef<'lt>>
+ }
 
 impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
     fn new(
-        sys_ref: GhostSystemRef<'lt>,
+        sys_ref: Box<dyn GhostSystemRef<'lt>>,
         send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
         d_ref: Arc<GhostMutex<D>>,
@@ -114,14 +114,14 @@ struct GhostEndpointFullInner<
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
 > {
-    sys_ref: GhostSystemRef<'lt>,
     weak_user_data: Weak<GhostMutex<X>>,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
     pending_callbacks: GhostTracker<'lt, X, P>,
     handler: H,
-}
+    sys_ref: Box<dyn GhostSystemRef<'lt>>
+ }
 
 impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
     GhostEndpointFullInner<'lt, P, X, H>
@@ -273,10 +273,10 @@ pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sy
 /// Slightly awkward helper class for obtaining an Endpoint for an actor's owner
 pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> {
     finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>>,
-    sys_ref: GhostSystemRef<'lt>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-}
+    sys_ref: dyn GhostSystemRef<'lt>,
+ }
 
 impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> GhostInflator<'lt, P, A> {
     /// call this to get the `plant`ed full owner endpoint
@@ -314,7 +314,7 @@ pub fn ghost_actor_spawn<
     A: 'lt + GhostActor<'lt, P, A>,
     H: 'lt + GhostHandler<'lt, X, P>,
 >(
-    mut sys_ref: GhostSystemRef<'lt>,
+    mut sys_ref: Box<dyn GhostSystemRef<'lt>>,
     user_data: Weak<GhostMutex<X>>,
     spawn_cb: GhostActorSpawnCb<'lt, A, P>,
     handler: H,
@@ -327,7 +327,7 @@ pub fn ghost_actor_spawn<
 
     let inflator: GhostInflator<'lt, P, A> = GhostInflator {
         finalize: finalize.clone(),
-        sys_ref: sys_ref.clone(),
+        sys_ref: sys_ref,
         sender: s2,
         receiver: r1,
     };

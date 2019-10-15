@@ -16,11 +16,22 @@ impl Default for GhostProcessInstructions {
     }
 }
 
-pub trait GhostSystem {
+pub trait GhostSystemRef<'lt> {
+    fn enqueue_processor(
+        &mut self,
+        start_delay_ms: u64,
+        cb: GhostProcessCb<'lt>,
+    ) -> GhostResult<()>;
+}
+
+pub type GhostSystemRefDyn<'lt> = Box<dyn GhostSystemRef<'lt>>;
+
+pub trait GhostSystem<'lt> {
 
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()>;
 
+    fn create_ref(&self) -> GhostSystemRefDyn<'lt>;
 }
 
 impl GhostProcessInstructions {
@@ -115,15 +126,15 @@ impl<'lt> GhostSystemInner<'lt> {
 /// Ref that allows queueing of new process functions
 /// but does not have the ability to actually run process
 #[derive(Clone)]
-pub struct GhostSystemRef<'lt> {
+pub struct SingleThreadedGhostSystemRef<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessorData<'lt>>,
     // just a refcount
     _system_inner: Arc<GhostMutex<GhostSystemInner<'lt>>>,
 }
 
-impl<'lt> GhostSystemRef<'lt> {
+impl<'lt> GhostSystemRef<'lt> for SingleThreadedGhostSystemRef<'lt> {
     /// enqueue a new processor function for periodic execution
-    pub fn enqueue_processor(
+    fn enqueue_processor(
         &mut self,
         start_delay_ms: u64,
         cb: GhostProcessCb<'lt>,
@@ -152,6 +163,7 @@ pub struct SingleThreadedGhostSystem<'lt> {
 }
 
 impl<'lt> SingleThreadedGhostSystem<'lt> {
+
     /// create a new ghost system
     pub fn new() -> Self {
         let (process_send, process_recv) = crossbeam_channel::unbounded();
@@ -160,18 +172,21 @@ impl<'lt> SingleThreadedGhostSystem<'lt> {
             system_inner: Arc::new(GhostMutex::new(GhostSystemInner::new(process_recv))),
         }
     }
+}
 
+impl<'lt> GhostSystem<'lt> for SingleThreadedGhostSystem<'lt> {
     /// get a GhostSystemRef capable of enqueueing new processor functions
     /// without creating any deadlocks
-    pub fn create_ref(&self) -> GhostSystemRef<'lt> {
-        GhostSystemRef {
+    fn create_ref(&self) -> GhostSystemRefDyn<'lt> {
+        let x : GhostSystemRefDyn<'lt> = Box::new(SingleThreadedGhostSystemRef {
             process_send: self.process_send.clone(),
             _system_inner: self.system_inner.clone(),
-        }
+        });
+        x
     }
 
     /// execute all queued processor functions
-    pub fn process(&mut self) -> GhostResult<()> {
+    fn process(&mut self) -> GhostResult<()> {
         self.system_inner.lock().process()
     }
 }
@@ -193,7 +208,7 @@ mod tests {
             non_start_delay: false,
         }));
 
-        let mut sys : GhostSystem = SingleThreadedGhostSystem::new();
+        let mut sys = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
@@ -250,7 +265,7 @@ mod tests {
             non_delayed_count: 0,
         }));
 
-        let mut sys = GhostSystem::new();
+        let mut sys = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
