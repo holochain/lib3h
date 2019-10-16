@@ -24,21 +24,26 @@ fn manual_example() {
 
     let my_context_weak = Arc::downgrade(&my_context);
 
-    let mut actor_ref =
-        ghost_actor_spawn::<MyContext, TestProtocol, TestActor, TestOwnerHandler<MyContext>>(
-            system_ref.clone(),
-            my_context_weak,
-            Box::new(|inflator| TestActor::new(inflator)),
-            TestOwnerHandler {
-                handle_event_to_owner_print: Box::new(|me, message| {
-                    me.to_owner_prints.push(message.clone());
-                    println!("owner printing message from actor: {}", message);
-                    Ok(())
-                }),
-                handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
-            },
-        )
-        .unwrap();
+    let mut actor_ref = ghost_actor_spawn::<
+        MyContext,
+        TestProtocol,
+        TestActor,
+        TestOwnerHandler<MyContext>,
+        GhostTestSystemRef,
+    >(
+        system_ref.clone(),
+        my_context_weak,
+        Box::new(|inflator| TestActor::new(inflator)),
+        TestOwnerHandler {
+            handle_event_to_owner_print: Box::new(|me, message| {
+                me.to_owner_prints.push(message.clone());
+                println!("owner printing message from actor: {}", message);
+                Ok(())
+            }),
+            handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
+        },
+    )
+    .unwrap();
 
     actor_ref
         .event_to_actor_print("zombies".to_string())

@@ -9,13 +9,16 @@ pub type GhostEndpointFullFinalizeCb<'lt, X> =
 
 /// An incomplete GhostEndpoint. It needs to be `plant`ed to fully function
 pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> {
+    sys_ref: S,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     d_ref: Arc<GhostMutex<D>>,
-    sys_ref: S
- }
+    _phantom: std::marker::PhantomData<&'lt S>,
+}
 
-impl<'lt, P: GhostProtocol, D: 'lt, S:GhostSystemRef<'lt>> GhostEndpointSeed<'lt, P, D, S> {
+impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt> + Sync + Send + Clone>
+    GhostEndpointSeed<'lt, P, D, S>
+{
     fn new(
         sys_ref: S,
         send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -27,6 +30,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, S:GhostSystemRef<'lt>> GhostEndpointSeed<'lt
             send,
             recv,
             d_ref,
+            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -52,18 +56,18 @@ impl<'lt, P: GhostProtocol, D: 'lt, S:GhostSystemRef<'lt>> GhostEndpointSeed<'lt
         self,
         handler: H,
     ) -> GhostResult<(
-        GhostEndpointFull<'lt, P, D, X, H>,
+        GhostEndpointFull<'lt, P, D, X, H, S>,
         GhostEndpointFullFinalizeCb<'lt, X>,
     )> {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
         let inner = Arc::new(GhostMutex::new(GhostEndpointFullInner {
-            sys_ref: self.sys_ref,
+            sys_ref: self.sys_ref.clone(),
             weak_user_data: Weak::new(),
             send: self.send,
             recv: self.recv,
             recv_inner,
-            pending_callbacks: GhostTracker::new(self.sys_ref, Weak::new()),
+            pending_callbacks: GhostTracker::new(self.sys_ref.clone(), Weak::new()),
             handler,
         }));
 
@@ -113,7 +117,7 @@ struct GhostEndpointFullInner<
     P: GhostProtocol,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
-    S: GhostSystemRef<'lt>
+    S: GhostSystemRef<'lt>,
 > {
     weak_user_data: Weak<GhostMutex<X>>,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -121,11 +125,16 @@ struct GhostEndpointFullInner<
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
     pending_callbacks: GhostTracker<'lt, X, P, S>,
     handler: H,
-    sys_ref: S
- }
+    sys_ref: S,
+}
 
-impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S: GhostSystemRef<'lt> + Sync + Send>
-    GhostEndpointFullInner<'lt, P, X, H, S>
+impl<
+        'lt,
+        P: GhostProtocol,
+        X: 'lt + Send + Sync,
+        H: GhostHandler<'lt, X, P>,
+        S: 'lt + GhostSystemRef<'lt> + Sync + Send + Clone,
+    > GhostEndpointFullInner<'lt, P, X, H, S>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
         if self.priv_process_inner()? {
@@ -197,15 +206,21 @@ pub struct GhostEndpointFull<
     D: 'lt,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
-    S: GhostSystemRef<'lt>
+    S: GhostSystemRef<'lt> + Send + Sync,
 > {
     inner: Arc<GhostMutex<GhostEndpointFullInner<'lt, P, X, H, S>>>,
     send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
     d_ref: Arc<GhostMutex<D>>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S : GhostSystemRef<'lt>>
-    GhostEndpointFull<'lt, P, D, X, H, S>
+impl<
+        'lt,
+        P: GhostProtocol,
+        D: 'lt,
+        X: 'lt + Send + Sync,
+        H: GhostHandler<'lt, X, P>,
+        S: GhostSystemRef<'lt> + Sync + Send + Clone,
+    > GhostEndpointFull<'lt, P, D, X, H, S>
 {
     /// Sometimes you might need to invoke some functions on and endpoint
     /// before passing that endpoint off to another class. If you were invoking
@@ -238,8 +253,14 @@ impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X
     }
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S: GhostSystemRef<'lt>>
-    GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H, S>
+impl<
+        'lt,
+        P: GhostProtocol,
+        D: 'lt,
+        X: 'lt + Send + Sync,
+        H: GhostHandler<'lt, X, P>,
+        S: GhostSystemRef<'lt> + Sync + Send,
+    > GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H, S>
 {
     fn send_protocol(
         &mut self,
@@ -273,14 +294,25 @@ pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sy
 }
 
 /// Slightly awkward helper class for obtaining an Endpoint for an actor's owner
-pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S: GhostSystemRef<'lt>> {
+pub struct GhostInflator<
+    'lt,
+    P: GhostProtocol,
+    A: 'lt + GhostActor<'lt, P, A>,
+    S: GhostSystemRef<'lt>,
+> {
     finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-    sys_ref: S 
- }
+    sys_ref: S,
+}
 
-impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S:GhostSystemRef<'lt>> GhostInflator<'lt, P, A, S> {
+impl<
+        'lt,
+        P: GhostProtocol,
+        A: 'lt + GhostActor<'lt, P, A>,
+        S: 'lt + GhostSystemRef<'lt> + Sync + Send + Clone,
+    > GhostInflator<'lt, P, A, S>
+{
     /// call this to get the `plant`ed full owner endpoint
     pub fn inflate<H: 'lt + GhostHandler<'lt, A, P>>(
         self,
@@ -315,8 +347,7 @@ pub fn ghost_actor_spawn<
     P: GhostProtocol,
     A: 'lt + GhostActor<'lt, P, A>,
     H: 'lt + GhostHandler<'lt, X, P>,
-    S: 'lt + GhostSystemRef<'lt>,
- 
+    S: 'lt + GhostSystemRef<'lt> + Send + Sync + Clone,
 >(
     mut sys_ref: S,
     user_data: Weak<GhostMutex<X>>,
@@ -331,7 +362,7 @@ pub fn ghost_actor_spawn<
 
     let inflator: GhostInflator<'lt, P, A, S> = GhostInflator {
         finalize: finalize.clone(),
-        sys_ref: sys_ref,
+        sys_ref: sys_ref.clone(),
         sender: s2,
         receiver: r1,
     };
@@ -357,7 +388,7 @@ pub fn ghost_actor_spawn<
         }),
     )?;
 
-    let seed = GhostEndpointSeed::new(sys_ref, s1, r2, strong_actor);
+    let seed = GhostEndpointSeed::new(sys_ref.clone(), s1, r2, strong_actor);
     let ep = seed.plant(user_data, handler)?;
     Ok(ep)
 }

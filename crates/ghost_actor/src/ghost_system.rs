@@ -24,8 +24,7 @@ pub trait GhostSystemRef<'lt> {
     ) -> GhostResult<()>;
 }
 
-pub trait GhostSystem<'lt, S : GhostSystemRef<'lt>> {
-
+pub trait GhostSystem<'lt, S: GhostSystemRef<'lt>> {
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()>;
 
@@ -85,7 +84,7 @@ impl<'lt> GhostSystemInner<'lt> {
             self.process_queue.push(item);
         }
         let mut errors = Vec::new();
-        for mut item in self.process_queue.drain(..) {
+        for mut item in self.process_queue.drain(..).collect::<Vec<_>>() {
             match &item.delay_until {
                 Some(delay_until) if &std::time::Instant::now() < delay_until => {
                     self.process_queue.push(item)
@@ -161,7 +160,6 @@ pub struct SingleThreadedGhostSystem<'lt> {
 }
 
 impl<'lt> SingleThreadedGhostSystem<'lt> {
-
     /// create a new ghost system
     pub fn new() -> Self {
         let (process_send, process_recv) = crossbeam_channel::unbounded();
@@ -179,7 +177,7 @@ impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreaded
         SingleThreadedGhostSystemRef {
             process_send: self.process_send.clone(),
             _system_inner: self.system_inner.clone(),
-        };
+        }
     }
 
     /// execute all queued processor functions

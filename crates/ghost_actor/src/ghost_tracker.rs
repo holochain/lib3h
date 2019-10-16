@@ -33,9 +33,11 @@ struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: Gho
     pending: HashMap<RequestId, GhostTrackerEntry<'lt, X, T>>,
     recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
     sys_ref: S,
- }
+}
 
-impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostTrackerInner<'lt, X, T, S> {
+impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>>
+    GhostTrackerInner<'lt, X, T, S>
+{
     fn new(
         sys_ref: S,
         weak_user_data: Weak<GhostMutex<X>>,
@@ -174,12 +176,18 @@ pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: Ghos
     send_inner: crossbeam_channel::Sender<GhostTrackerToInner<'lt, X, T>>,
 }
 
-impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt> + Send + Sync> GhostTracker<'lt, X, T, S> {
+impl<
+        'lt,
+        X: 'lt + Send + Sync,
+        T: 'lt + Send + Sync,
+        S: 'lt + GhostSystemRef<'lt> + Send + Sync + Clone,
+    > GhostTracker<'lt, X, T, S>
+{
     pub fn new(mut sys_ref: S, weak_user_data: Weak<GhostMutex<X>>) -> Self {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
         let inner = Arc::new(GhostMutex::new(GhostTrackerInner::new(
-            sys_ref,
+            sys_ref.clone(),
             weak_user_data,
             recv_inner,
         )));
@@ -296,7 +304,7 @@ mod tests {
 
         let mut sys = SingleThreadedGhostSystem::new();
 
-        let mut track: GhostTracker<Test, ()> =
+        let mut track: GhostTracker<Test, (), SingleThreadedGhostSystemRef> =
             GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
 
         track
@@ -333,7 +341,7 @@ mod tests {
 
         let mut sys = SingleThreadedGhostSystem::new();
 
-        let mut track: GhostTracker<Test, ()> =
+        let mut track: GhostTracker<Test, (), SingleThreadedGhostSystemRef> =
             GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
 
         track
@@ -371,7 +379,7 @@ mod tests {
 
         let mut sys = SingleThreadedGhostSystem::new();
 
-        let mut track: GhostTracker<Test, String> =
+        let mut track: GhostTracker<Test, String, SingleThreadedGhostSystemRef> =
             GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
 
         let rid = track

@@ -5,12 +5,23 @@
 use super::test_protocol::*;
 use ghost_actor::prelude::*;
 
+pub type GhostSystemRef<'lt> = SingleThreadedGhostSystemRef<'lt>;
+
 pub struct TestActor<'lt> {
-    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>>,
+    owner_ref: GhostEndpointFull<
+        'lt,
+        TestProtocol,
+        (),
+        Self,
+        TestActorHandler<'lt, Self>,
+        GhostSystemRef<'lt>,
+    >,
 }
 
 impl<'lt> TestActor<'lt> {
-    pub fn new(inflator: GhostInflator<'lt, TestProtocol, Self>) -> GhostResult<Self> {
+    pub fn new(
+        inflator: GhostInflator<'lt, TestProtocol, Self, GhostSystemRef<'lt>>,
+    ) -> GhostResult<Self> {
         let mut out = Self {
             owner_ref: inflator.inflate(TestActorHandler {
                 handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt>, message| {

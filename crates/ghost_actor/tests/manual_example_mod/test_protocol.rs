@@ -26,6 +26,8 @@ pub enum TestProtocol {
     RequestToOwnerSub1Response(Result<i32, ()>),
 }
 
+pub type GhostTestSystemRef<'lt> = SingleThreadedGhostSystemRef<'lt>;
+
 static D_LIST: &'static [GhostProtocolDiscriminant] = &[
     GhostProtocolDiscriminant {
         id: "event_to_actor_print",
@@ -170,7 +172,7 @@ pub trait TestActorRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestPro
 }
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, TestProtocol>> TestActorRef<'lt, X>
-    for GhostEndpointFull<'lt, TestProtocol, A, X, H>
+    for GhostEndpointFull<'lt, TestProtocol, A, X, H, GhostTestSystemRef<'lt>>
 {
 }
 
@@ -202,6 +204,6 @@ pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestPro
 }
 
 impl<'lt, X: 'lt + Send + Sync, A: 'lt, H: GhostHandler<'lt, X, TestProtocol>> TestOwnerRef<'lt, X>
-    for GhostEndpointFull<'lt, TestProtocol, A, X, H>
+    for GhostEndpointFull<'lt, TestProtocol, A, X, H, GhostTestSystemRef<'lt>>
 {
 }
