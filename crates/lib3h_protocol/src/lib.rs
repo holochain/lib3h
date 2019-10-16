@@ -26,5 +26,4 @@ pub type DidWork = bool;
 
 pub mod error;
 
-#[cfg(test)]
 pub mod fixture;
