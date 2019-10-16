@@ -315,9 +315,8 @@ impl NodePubKey {
 pub mod tests {
 
     use super::SpaceHash;
-    use holochain_persistence_api::hash::HashString;
     use crate::fixture::space_hash_fresh;
-    use holochain_persistence_api::fixture::test_hash_a;
+    use holochain_persistence_api::{fixture::test_hash_a, hash::HashString};
     use uuid::Uuid;
 
     #[test]
@@ -325,10 +324,7 @@ pub mod tests {
         let s = Uuid::new_v4().to_string();
         let space_hash = SpaceHash::from(HashString::from(s.clone()));
 
-        assert_eq!(
-            s,
-            format!("{}", &space_hash),
-        );
+        assert_eq!(s, format!("{}", &space_hash),);
     }
 
     #[test]
@@ -338,18 +334,12 @@ pub mod tests {
         // cloned
         let space_hash = SpaceHash::from(hash.clone());
 
-        assert_eq!(
-            &hash,
-            space_hash.hash_string()
-        );
+        assert_eq!(&hash, space_hash.hash_string());
 
         // referenced
         let space_hash = SpaceHash::from(&hash);
 
-        assert_eq!(
-            &hash,
-            space_hash.hash_string()
-        );
+        assert_eq!(&hash, space_hash.hash_string());
     }
 
     #[test]
@@ -359,18 +349,12 @@ pub mod tests {
         // cloned
         let hash_string = HashString::from(space_hash.clone());
 
-        assert_eq!(
-            space_hash.hash_string(),
-            &hash_string,
-        );
+        assert_eq!(space_hash.hash_string(), &hash_string,);
 
         // reference
         let hash_string = HashString::from(&space_hash);
 
-        assert_eq!(
-            space_hash.hash_string(),
-            &hash_string
-        );
+        assert_eq!(space_hash.hash_string(), &hash_string);
     }
 
     #[test]
@@ -379,28 +363,19 @@ pub mod tests {
 
         let space_hash = SpaceHash::from(str);
 
-        assert_eq!(
-            space_hash.hash_string(),
-            &HashString::from(str),
-        );
+        assert_eq!(space_hash.hash_string(), &HashString::from(str),);
 
         let string = String::from(str);
 
         // cloned string
         let space_hash = SpaceHash::from(string.clone());
 
-        assert_eq!(
-            String::from(space_hash.hash_string().clone()),
-            string,
-        );
+        assert_eq!(String::from(space_hash.hash_string().clone()), string,);
 
         // reference
         let space_hash = SpaceHash::from(&string);
 
-        assert_eq!(
-            String::from(space_hash.hash_string().clone()),
-            string,
-        );
+        assert_eq!(String::from(space_hash.hash_string().clone()), string,);
     }
 
     #[test]
@@ -409,17 +384,10 @@ pub mod tests {
         let space_hash = SpaceHash::from(s);
 
         // cloned
-        assert_eq!(
-            &String::from(s),
-            &String::from(space_hash.clone()),
-        );
+        assert_eq!(&String::from(s), &String::from(space_hash.clone()),);
 
         // referenced
-        assert_eq!(
-            &String::from(s),
-            &String::from(&space_hash),
-        );
-
+        assert_eq!(&String::from(s), &String::from(&space_hash),);
     }
 
 }
