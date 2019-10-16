@@ -121,15 +121,16 @@ impl<'engine> GhostEngine<'engine> {
         );
         // Note: use same order as the enum
         match request {
+            transport::protocol::RequestToParent::Unbind(uri) => {
+                let data = UnboundData { uri: uri.clone() };
+                self.lib3h_endpoint
+                    .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
+            }
+            transport::protocol::RequestToParent::Disconnect(uri) => {
+                debug!("disconnect from {}", uri);
+            }
             transport::protocol::RequestToParent::ErrorOccured { uri, error } => {
-                if error.kind() == &transport::error::ErrorKind::Unbind {
-                    let data = UnboundData { uri: uri.clone() };
-                    self.lib3h_endpoint
-                        .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
-                } else {
-                    // FIXME #391
-                    error!("unhandled error {}", error);
-                }
+                error!("unhandled error {} on {}", error, uri);
             }
             transport::protocol::RequestToParent::IncomingConnection { uri } => {
                 self.handle_incoming_connection(
