@@ -259,7 +259,7 @@ impl<
         D: 'lt,
         X: 'lt + Send + Sync,
         H: GhostHandler<'lt, X, P>,
-        S: GhostSystemRef<'lt> + Sync + Send,
+        S: GhostSystemRef<'lt>,
     > GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H, S>
 {
     fn send_protocol(
