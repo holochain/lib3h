@@ -24,6 +24,7 @@ pub use ghost_mutex::*;
 mod ghost_deep_ref;
 pub(crate) use ghost_deep_ref::*;
 
+/// Keep track of pending requests using unique request identifiers
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct RequestId(pub String);
