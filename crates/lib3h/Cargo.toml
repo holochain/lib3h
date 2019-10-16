@@ -20,6 +20,8 @@ hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.10"
 holochain_tracing = "=0.0.1"
 # version on the left for release regex
+ghost_actor = { version = "=0.0.16", path = "../ghost_actor" }
+ghost_actor_derive = { version = "=0.0.16", path = "../ghost_actor/ghost_actor_derive" }
 lib3h_protocol = { version = "=0.0.16", path = "../lib3h_protocol" }
 lib3h_p2p_protocol = { version = "=0.0.16", path = "../p2p_protocol" }
 lib3h_crypto_api = { version = "=0.0.16", path = "../crypto_api" }
@@ -53,3 +55,8 @@ hexf = "0.1.0"
 rand = "0.7.0"
 tempfile = "=3.1.0"
 edit-distance = "=2.1.0"
+
+[build-dependencies]
+ghost_actor = { version = "=0.0.16", path = "../ghost_actor" }
+proc-macro2 = "=1.0.3"
+quote = "=1.0.2"

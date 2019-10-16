@@ -3,6 +3,8 @@
 extern crate backtrace;
 #[macro_use]
 extern crate detach;
+extern crate ghost_actor;
+extern crate ghost_actor_derive;
 extern crate hcid;
 extern crate lib3h_crypto_api;
 extern crate lib3h_p2p_protocol;
@@ -28,6 +30,7 @@ pub mod engine;
 pub mod error;
 pub mod gateway;
 pub mod keystore;
+pub mod keystore2;
 pub mod message_encoding;
 pub mod time;
 pub mod track;
