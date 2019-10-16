@@ -22,21 +22,51 @@ impl From<HashString> for SpaceHash {
     }
 }
 
+impl From<&HashString> for SpaceHash {
+    fn from(s: &HashString) -> SpaceHash {
+        (*s).to_owned().into()
+    }
+}
+
 impl From<SpaceHash> for HashString {
     fn from(h: SpaceHash) -> HashString {
         h.0
     }
 }
 
-impl<'a> From<&'a HashString> for SpaceHash {
-    fn from(s: &HashString) -> SpaceHash {
-        SpaceHash::from(s.to_owned())
+impl From<&SpaceHash> for HashString {
+    fn from(h: &SpaceHash) -> HashString {
+        (*h).to_owned().into()
     }
 }
 
-impl<'a> From<&'a str> for SpaceHash {
+impl From<&str> for SpaceHash {
     fn from(s: &str) -> SpaceHash {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
+    }
+}
+
+impl From<String> for SpaceHash {
+    fn from(s: String) -> SpaceHash {
+        SpaceHash::from(s.as_str())
+    }
+}
+
+impl From<&String> for SpaceHash {
+    fn from(s: &String) -> SpaceHash {
+        (*s).to_owned().into()
+    }
+}
+
+impl From<SpaceHash> for String {
+    fn from(s: SpaceHash) -> String {
+        s.hash_string().to_owned().into()
+    }
+}
+
+impl From<&SpaceHash> for String {
+    fn from(s: &SpaceHash) -> String {
+        (*s).to_owned().into()
     }
 }
 
@@ -286,6 +316,7 @@ pub mod tests {
 
     use super::SpaceHash;
     use holochain_persistence_api::hash::HashString;
+    use crate::fixture::space_hash_fresh;
     use holochain_persistence_api::fixture::test_hash_a;
     use uuid::Uuid;
 
@@ -319,6 +350,76 @@ pub mod tests {
             &hash,
             space_hash.hash_string()
         );
+    }
+
+    #[test]
+    fn hash_string_from_space_hash() {
+        let space_hash = space_hash_fresh();
+
+        // cloned
+        let hash_string = HashString::from(space_hash.clone());
+
+        assert_eq!(
+            space_hash.hash_string(),
+            &hash_string,
+        );
+
+        // reference
+        let hash_string = HashString::from(&space_hash);
+
+        assert_eq!(
+            space_hash.hash_string(),
+            &hash_string
+        );
+    }
+
+    #[test]
+    fn space_hash_from_str() {
+        let str = "foo";
+
+        let space_hash = SpaceHash::from(str);
+
+        assert_eq!(
+            space_hash.hash_string(),
+            &HashString::from(str),
+        );
+
+        let string = String::from(str);
+
+        // cloned string
+        let space_hash = SpaceHash::from(string.clone());
+
+        assert_eq!(
+            String::from(space_hash.hash_string().clone()),
+            string,
+        );
+
+        // reference
+        let space_hash = SpaceHash::from(&string);
+
+        assert_eq!(
+            String::from(space_hash.hash_string().clone()),
+            string,
+        );
+    }
+
+    #[test]
+    fn str_from_space_hash() {
+        let s = "foo";
+        let space_hash = SpaceHash::from(s);
+
+        // cloned
+        assert_eq!(
+            &String::from(s),
+            &String::from(space_hash.clone()),
+        );
+
+        // referenced
+        assert_eq!(
+            &String::from(s),
+            &String::from(&space_hash),
+        );
+
     }
 
 }
