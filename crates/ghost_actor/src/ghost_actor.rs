@@ -347,7 +347,7 @@ pub fn ghost_actor_spawn<
     P: GhostProtocol,
     A: 'lt + GhostActor<'lt, P, A>,
     H: 'lt + GhostHandler<'lt, X, P>,
-    S: 'lt + GhostSystemRef<'lt> + Send + Sync + Clone,
+    S: 'lt + GhostSystemRef<'lt>,
 >(
     mut sys_ref: S,
     user_data: Weak<GhostMutex<X>>,
