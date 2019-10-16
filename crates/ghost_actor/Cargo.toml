@@ -16,7 +16,7 @@ crossbeam-channel = "=0.3.8"
 holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/holochain-tracing" }
 Inflector = "=0.11.4"
 lazy_static = "=1.2.0"
-lib3h_zombie_actor = { version = "=0.0.15", path = "../zombie_actor" }
+lib3h_zombie_actor = { version = "=0.0.16", path = "../zombie_actor" }
 lock_api = "=0.1.5"
 log = "=0.4.8"
 nanoid = "=0.2.0"
