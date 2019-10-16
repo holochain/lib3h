@@ -28,16 +28,16 @@ enum GhostTrackerToInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     Periodic(u64, GhostPeriodicCb<'lt, X>),
 }
 
-struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
+struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
     weak_user_data: Weak<GhostMutex<X>>,
     pending: HashMap<RequestId, GhostTrackerEntry<'lt, X, T>>,
     recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
-    sys_ref: GhostSystemRefDyn<'lt>,
+    sys_ref: S,
  }
 
-impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, T> {
+impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostTrackerInner<'lt, X, T, S> {
     fn new(
-        sys_ref: Box<dyn GhostSystemRef<'lt>>,
+        sys_ref: S,
         weak_user_data: Weak<GhostMutex<X>>,
         recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
     ) -> Self {
@@ -168,14 +168,14 @@ impl GhostTrackerBookmarkOptions {
 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
+pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
     // just for ref count
-    _inner: Arc<GhostMutex<GhostTrackerInner<'lt, X, T>>>,
+    _inner: Arc<GhostMutex<GhostTrackerInner<'lt, X, T, S>>>,
     send_inner: crossbeam_channel::Sender<GhostTrackerToInner<'lt, X, T>>,
 }
 
-impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
-    pub fn new(mut sys_ref: Box<dyn GhostSystemRef<'lt>>, weak_user_data: Weak<GhostMutex<X>>) -> Self {
+impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt> + Send + Sync> GhostTracker<'lt, X, T, S> {
+    pub fn new(mut sys_ref: S, weak_user_data: Weak<GhostMutex<X>>) -> Self {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
         let inner = Arc::new(GhostMutex::new(GhostTrackerInner::new(

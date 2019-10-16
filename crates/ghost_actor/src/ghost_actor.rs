@@ -8,16 +8,16 @@ pub type GhostEndpointFullFinalizeCb<'lt, X> =
     Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
 
 /// An incomplete GhostEndpoint. It needs to be `plant`ed to fully function
-pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt> {
+pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> {
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     d_ref: Arc<GhostMutex<D>>,
-    sys_ref: Box<dyn GhostSystemRef<'lt>>
+    sys_ref: S
  }
 
-impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
+impl<'lt, P: GhostProtocol, D: 'lt, S:GhostSystemRef<'lt>> GhostEndpointSeed<'lt, P, D, S> {
     fn new(
-        sys_ref: Box<dyn GhostSystemRef<'lt>>,
+        sys_ref: S,
         send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
         d_ref: Arc<GhostMutex<D>>,
@@ -58,7 +58,7 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
         let inner = Arc::new(GhostMutex::new(GhostEndpointFullInner {
-            sys_ref: self.sys_ref.clone(),
+            sys_ref: self.sys_ref,
             weak_user_data: Weak::new(),
             send: self.send,
             recv: self.recv,
@@ -113,6 +113,7 @@ struct GhostEndpointFullInner<
     P: GhostProtocol,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
+    S: GhostSystemRef<'lt>
 > {
     weak_user_data: Weak<GhostMutex<X>>,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -120,11 +121,11 @@ struct GhostEndpointFullInner<
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
     pending_callbacks: GhostTracker<'lt, X, P>,
     handler: H,
-    sys_ref: Box<dyn GhostSystemRef<'lt>>
+    sys_ref: S
  }
 
-impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
-    GhostEndpointFullInner<'lt, P, X, H>
+impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S: GhostSystemRef<'lt>>
+    GhostEndpointFullInner<'lt, P, X, H, S>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
         if self.priv_process_inner()? {
@@ -196,14 +197,15 @@ pub struct GhostEndpointFull<
     D: 'lt,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
+    S: GhostSystemRef<'lt>
 > {
-    inner: Arc<GhostMutex<GhostEndpointFullInner<'lt, P, X, H>>>,
+    inner: Arc<GhostMutex<GhostEndpointFullInner<'lt, P, X, H, S>>>,
     send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
     d_ref: Arc<GhostMutex<D>>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
-    GhostEndpointFull<'lt, P, D, X, H>
+impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S : GhostSystemRef<'lt>>
+    GhostEndpointFull<'lt, P, D, X, H, S>
 {
     /// Sometimes you might need to invoke some functions on and endpoint
     /// before passing that endpoint off to another class. If you were invoking
@@ -211,7 +213,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X
     /// want to persist that context where you are sending it.
     /// `regress` lets you return this endpoint to seed form, so it can later
     /// be `plant`ed in a different context / with a different handler.
-    pub fn regress(mut self) -> Result<GhostEndpointSeed<'lt, P, D>, Self> {
+    pub fn regress(mut self) -> Result<GhostEndpointSeed<'lt, P, D, S>, Self> {
         // unwrapping Arc-s is weird...
         // if there is an error, put ourself back together and return
         let inner = match Arc::try_unwrap(self.inner) {
@@ -236,8 +238,8 @@ impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X
     }
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
-    GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H>
+impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S: GhostSystemRef<'lt>>
+    GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H, S>
 {
     fn send_protocol(
         &mut self,
@@ -271,19 +273,19 @@ pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sy
 }
 
 /// Slightly awkward helper class for obtaining an Endpoint for an actor's owner
-pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> {
+pub struct GhostInflator<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S: GhostSystemRef<'lt>> {
     finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>>,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-    sys_ref: dyn GhostSystemRef<'lt>,
+    sys_ref: S 
  }
 
-impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>> GhostInflator<'lt, P, A> {
+impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S:GhostSystemRef<'lt>> GhostInflator<'lt, P, A, S> {
     /// call this to get the `plant`ed full owner endpoint
     pub fn inflate<H: 'lt + GhostHandler<'lt, A, P>>(
         self,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, (), A, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, (), A, H, S>> {
         let seed = GhostEndpointSeed::new(
             self.sys_ref,
             self.sender,

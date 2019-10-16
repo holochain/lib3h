@@ -24,14 +24,12 @@ pub trait GhostSystemRef<'lt> {
     ) -> GhostResult<()>;
 }
 
-pub type GhostSystemRefDyn<'lt> = Box<dyn GhostSystemRef<'lt>>;
-
-pub trait GhostSystem<'lt> {
+pub trait GhostSystem<'lt, S : GhostSystemRef<'lt>> {
 
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()>;
 
-    fn create_ref(&self) -> GhostSystemRefDyn<'lt>;
+    fn create_ref(&self) -> S;
 }
 
 impl GhostProcessInstructions {
@@ -87,7 +85,7 @@ impl<'lt> GhostSystemInner<'lt> {
             self.process_queue.push(item);
         }
         let mut errors = Vec::new();
-        for mut item in self.process_queue.drain(..).collect::<Vec<_>>() {
+        for mut item in self.process_queue.drain(..) {
             match &item.delay_until {
                 Some(delay_until) if &std::time::Instant::now() < delay_until => {
                     self.process_queue.push(item)
@@ -174,15 +172,14 @@ impl<'lt> SingleThreadedGhostSystem<'lt> {
     }
 }
 
-impl<'lt> GhostSystem<'lt> for SingleThreadedGhostSystem<'lt> {
+impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreadedGhostSystem<'lt> {
     /// get a GhostSystemRef capable of enqueueing new processor functions
     /// without creating any deadlocks
-    fn create_ref(&self) -> GhostSystemRefDyn<'lt> {
-        let x : GhostSystemRefDyn<'lt> = Box::new(SingleThreadedGhostSystemRef {
+    fn create_ref(&self) -> SingleThreadedGhostSystemRef<'lt> {
+        SingleThreadedGhostSystemRef {
             process_send: self.process_send.clone(),
             _system_inner: self.system_inner.clone(),
-        });
-        x
+        };
     }
 
     /// execute all queued processor functions

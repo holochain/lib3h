@@ -8,7 +8,7 @@ use manual_example_mod::*;
 
 #[test]
 fn manual_example() {
-    let mut system = GhostSystem::new();
+    let mut system = SingleThreadedGhostSystem::new();
     let system_ref = system.create_ref();
 
     #[derive(Debug)]
