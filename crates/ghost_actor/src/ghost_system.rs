@@ -1,5 +1,5 @@
 use crate::*;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 /// struct used for hinting on whether / when to next run this process fn
 pub struct GhostProcessInstructions {
@@ -152,6 +152,9 @@ impl<'lt> GhostSystemRef<'lt> for SingleThreadedGhostSystemRef<'lt> {
     }
 }
 
+pub type FinalizeExternalSystemRefCb<'lt, X> =
+    Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
+
 /// the main ghost system struct. Allows queueing new processor functions
 /// and provides a process() function to actually execute them
 pub struct SingleThreadedGhostSystem<'lt> {
@@ -170,11 +173,36 @@ impl<'lt> SingleThreadedGhostSystem<'lt> {
     }
 }
 
+<<<<<<< HEAD
 impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreadedGhostSystem<'lt> {
     /// get a GhostSystemRef capable of enqueueing new processor functions
     /// without creating any deadlocks
     fn create_ref(&self) -> SingleThreadedGhostSystemRef<'lt> {
         SingleThreadedGhostSystemRef {
+=======
+    pub fn create_external_system_ref<X: 'lt + Send + Sync>(
+        &self,
+    ) -> (
+        GhostActorSystem<'lt, X>,
+        FinalizeExternalSystemRefCb<'lt, X>,
+    ) {
+        let mut deep_ref = DeepRef::new();
+        let system = GhostActorSystem::new(
+            GhostSystemRef {
+                process_send: self.process_send.clone(),
+                _system_inner: self.system_inner.clone(),
+            },
+            deep_ref.clone(),
+        );
+        (system, Box::new(move |user_data| deep_ref.set(user_data)))
+    }
+
+    #[allow(dead_code)]
+    /// get a GhostSystemRef capable of enqueueing new processor functions
+    /// without creating any deadlocks
+    pub(crate) fn create_ref(&self) -> GhostSystemRef<'lt> {
+        GhostSystemRef {
+>>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
             process_send: self.process_send.clone(),
             _system_inner: self.system_inner.clone(),
         }

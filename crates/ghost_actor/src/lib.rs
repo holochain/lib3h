@@ -21,6 +21,9 @@ pub use lib3h_zombie_actor::{ErrorKind as GhostErrorKind, GhostError, GhostResul
 mod ghost_mutex;
 pub use ghost_mutex::*;
 
+mod ghost_deep_ref;
+pub(crate) use ghost_deep_ref::*;
+
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[shrinkwrap(mutable)]
 pub struct RequestId(pub String);
