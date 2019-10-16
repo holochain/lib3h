@@ -2,7 +2,7 @@ use crate::*;
 use holochain_tracing::Span;
 use std::sync::{Arc, Weak};
 
-/// If you plant an endpoind seed "later", it will return this callback
+/// If you plant an endpoint seed "later", it will return this callback
 /// allowing you to finalize it with the weak user data reference.
 pub type GhostEndpointFullFinalizeCb<'lt, X> =
     Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
