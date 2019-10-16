@@ -16,9 +16,7 @@ pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'l
     _phantom: std::marker::PhantomData<&'lt S>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>>
-    GhostEndpointSeed<'lt, P, D, S>
-{
+impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> GhostEndpointSeed<'lt, P, D, S> {
     fn new(
         sys_ref: S,
         send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
@@ -206,7 +204,7 @@ pub struct GhostEndpointFull<
     D: 'lt,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
-    S: GhostSystemRef<'lt> + Send + Sync,
+    S: GhostSystemRef<'lt>,
 > {
     inner: Arc<GhostMutex<GhostEndpointFullInner<'lt, P, X, H, S>>>,
     send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
@@ -306,12 +304,8 @@ pub struct GhostInflator<
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
 }
 
-impl<
-        'lt,
-        P: GhostProtocol,
-        A: 'lt + GhostActor<'lt, P, A>,
-        S: 'lt + GhostSystemRef<'lt>,
-    > GhostInflator<'lt, P, A, S>
+impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S: 'lt + GhostSystemRef<'lt>>
+    GhostInflator<'lt, P, A, S>
 {
     /// call this to get the `plant`ed full owner endpoint
     pub fn inflate<H: 'lt + GhostHandler<'lt, A, P>>(

@@ -6,20 +6,11 @@ use super::test_protocol::*;
 use ghost_actor::prelude::*;
 
 pub struct TestActor<'lt, S: GhostSystemRef<'lt> + Sync + Send> {
-    owner_ref: GhostEndpointFull<
-        'lt,
-        TestProtocol,
-        (),
-        Self,
-        TestActorHandler<'lt, Self>,
-        S
-    >,
+    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>, S>,
 }
 
 impl<'lt, S: GhostSystemRef<'lt> + Send + Sync + Clone> TestActor<'lt, S> {
-    pub fn new(
-        inflator: GhostInflator<'lt, TestProtocol, Self, S>
-    ) -> GhostResult<Self> {
+    pub fn new(inflator: GhostInflator<'lt, TestProtocol, Self, S>) -> GhostResult<Self> {
         let mut out = Self {
             owner_ref: inflator.inflate(TestActorHandler {
                 handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt, S>, message| {
@@ -28,9 +19,9 @@ impl<'lt, S: GhostSystemRef<'lt> + Send + Sync + Clone> TestActor<'lt, S> {
                     println!("actor printing message from owner: {}", message);
                     Ok(())
                 }),
-                handle_request_to_actor_add_1: Box::new(|_me: &mut TestActor<'lt, S>, message, cb| {
-                    cb(Ok(message + 1))
-                }),
+                handle_request_to_actor_add_1: Box::new(
+                    |_me: &mut TestActor<'lt, S>, message, cb| cb(Ok(message + 1)),
+                ),
             })?,
         };
         out.owner_ref
@@ -52,7 +43,9 @@ impl<'lt, S: GhostSystemRef<'lt> + Send + Sync + Clone> TestActor<'lt, S> {
     }
 }
 
-impl<'lt, S: GhostSystemRef<'lt> + Send + Sync > GhostActor<'lt, TestProtocol, TestActor<'lt, S>> for TestActor<'lt, S> {
+impl<'lt, S: GhostSystemRef<'lt> + Send + Sync> GhostActor<'lt, TestProtocol, TestActor<'lt, S>>
+    for TestActor<'lt, S>
+{
     fn process(&mut self) -> GhostResult<()> {
         println!("process called");
         Ok(())

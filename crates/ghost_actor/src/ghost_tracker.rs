@@ -176,12 +176,8 @@ pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: Ghos
     send_inner: crossbeam_channel::Sender<GhostTrackerToInner<'lt, X, T>>,
 }
 
-impl<
-        'lt,
-        X: 'lt + Send + Sync,
-        T: 'lt + Send + Sync,
-        S: 'lt + GhostSystemRef<'lt>,
-    > GhostTracker<'lt, X, T, S>
+impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: 'lt + GhostSystemRef<'lt>>
+    GhostTracker<'lt, X, T, S>
 {
     pub fn new(mut sys_ref: S, weak_user_data: Weak<GhostMutex<X>>) -> Self {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();

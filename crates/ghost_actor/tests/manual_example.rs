@@ -29,7 +29,7 @@ fn manual_example() {
         TestProtocol,
         TestActor<SingleThreadedGhostSystemRef>,
         TestOwnerHandler<MyContext>,
-        GhostTestSystemRef,
+        SingleThreadedGhostSystemRef,
     >(
         system_ref.clone(),
         my_context_weak,
