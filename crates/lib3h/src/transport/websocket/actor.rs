@@ -353,6 +353,7 @@ impl GhostTransportWebsocket {
                     Ok(_) => (),
                     Err(e) => {
                         error!("Fail to discover during 'try_discover': {:?}", e);
+                        // TODO remove this print
                         eprintln!("Fail to discover during 'try_discover': {:?}", e);
                     }
                 }
