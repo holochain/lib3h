@@ -25,11 +25,11 @@ use lib3h::{
     error::Lib3hResult,
     transport::websocket::tls::TlsConfig,
 };
-use lib3h_protocol::{types::*, uri::Lib3hUri};
+use lib3h_protocol::{uri::Lib3hUri, Address};
 use node_mock::NodeMock;
 use std::path::PathBuf;
 use test_suites::{
-    mirror::*, three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
+    three_basic::*, two_basic::*, two_connection::*, two_get_lists::*, two_spaces::*,
 };
 use url::Url;
 use utils::{constants::*, processor_harness::ProcessingOptions, test_network_id};
@@ -37,23 +37,7 @@ use utils::{constants::*, processor_harness::ProcessingOptions, test_network_id}
 const TWO_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
     max_iters: 10000,
     delay_interval_ms: 1,
-    timeout_ms: 10000,
-    max_retries: 3,
-    should_abort: true,
-};
-
-const THREE_MEMORY_NODES_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
-    max_iters: 10000,
-    delay_interval_ms: 1,
-    timeout_ms: 10000,
-    max_retries: 3,
-    should_abort: true,
-};
-
-const MIRROR_TEST_PROCESSING_OPTIONS: ProcessingOptions = ProcessingOptions {
-    max_iters: 60000,
-    delay_interval_ms: 1,
-    timeout_ms: 60000,
+    timeout_ms: 1000,
     max_retries: 3,
     should_abort: true,
 };
@@ -81,9 +65,9 @@ fn enable_logging_for_test(enable: bool) {
         std::env::set_var("RUST_LOG", "trace");
     }
     let _ = env_logger::builder()
-        .default_format_timestamp(true)
+        .default_format_timestamp(false)
         //.default_format_timestamp_nanos(true)
-        .default_format_module_path(true)
+        .default_format_module_path(false)
         .is_test(enable)
         .try_init();
 }
@@ -132,9 +116,9 @@ fn construct_wss_engine(config: &EngineConfig, name: &str) -> Lib3hResult<Wrappe
 // Node Setup
 //--------------------------------------------------------------------------------------------------
 
-pub type NodeFactory = fn(name: &str, agent_id_arg: AgentPubKey) -> NodeMock;
+pub type NodeFactory = fn(name: &str, agent_id_arg: Address) -> NodeMock;
 
-fn setup_memory_node(name: &str, agent_id_arg: AgentPubKey, fn_name: &str) -> NodeMock {
+fn setup_memory_node(name: &str, agent_id_arg: Address, fn_name: &str) -> NodeMock {
     let fn_name = fn_name.replace("::", "__");
     let config = EngineConfig {
         network_id: test_network_id(),
@@ -143,8 +127,8 @@ fn setup_memory_node(name: &str, agent_id_arg: AgentPubKey, fn_name: &str) -> No
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url: Lib3hUri::with_memory(format!("{}/{}", fn_name, name).as_str()),
-        dht_gossip_interval: 300,
-        dht_timeout_threshold: 180005,
+        dht_gossip_interval: 500,
+        dht_timeout_threshold: 3005,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_mock_engine)
@@ -152,7 +136,7 @@ fn setup_memory_node(name: &str, agent_id_arg: AgentPubKey, fn_name: &str) -> No
 
 fn setup_wss_node(
     name: &str,
-    agent_id_arg: AgentPubKey,
+    agent_id_arg: Address,
     tls_config: TlsConfig,
     fn_name: &str,
 ) -> NodeMock {
@@ -173,8 +157,8 @@ fn setup_wss_node(
         work_dir: PathBuf::new(),
         log_level: 'd',
         bind_url,
-        dht_gossip_interval: 300,
-        dht_timeout_threshold: 60005,
+        dht_gossip_interval: 500,
+        dht_timeout_threshold: 3005,
         dht_custom_config: vec![],
     };
     NodeMock::new_with_config(name, agent_id_arg, config, construct_wss_engine)
@@ -249,24 +233,23 @@ fn test_two_memory_nodes_connection_suite() {
 // Do general test with config
 fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
-    debug!("");
+    println!("");
     print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
-    debug!("========================");
+    println!("========================");
 
-    let options = &TWO_MEMORY_NODES_PROCESSING_OPTIONS;
     let fn_name = fn_name(test_fn_ptr);
     // Setup
     let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name);
     let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name);
     if can_setup {
-        setup_two_nodes(&mut alex, &mut billy, options);
+        setup_two_nodes(&mut alex, &mut billy);
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy, options);
+    test_fn(&mut alex, &mut billy, &TWO_MEMORY_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
-    debug!("========================");
+    println!("========================");
     print_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn_ptr);
 
     // Done
@@ -276,65 +259,24 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
 // Do general test with config
 fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
-    debug!("");
+    println!("");
     print_test_name("IN-MEMORY THREE NODES TEST: ", test_fn_ptr);
-    debug!("==========================");
+    println!("==========================");
 
     // Setup
     let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     let mut billy = setup_memory_node("billy", BILLY_AGENT_ID.clone(), &fn_name(test_fn_ptr));
     let mut camille = setup_memory_node("camille", CAMILLE_AGENT_ID.clone(), &fn_name(test_fn_ptr));
-    let options = &THREE_MEMORY_NODES_PROCESSING_OPTIONS;
-
     if can_setup {
-        setup_three_nodes(&mut alex, &mut billy, &mut camille, options);
+        setup_three_nodes(&mut alex, &mut billy, &mut camille);
     }
 
     // Execute test
-    test_fn(&mut alex, &mut billy, &mut camille, options);
+    test_fn(&mut alex, &mut billy, &mut camille);
 
     // Wrap-up test
-    debug!("==========================");
+    println!("==========================");
     print_test_name("IN-MEMORY THREE NODES TEST END: ", test_fn_ptr);
-
-    // Done
-    Ok(())
-}
-
-#[test]
-fn test_mirror_suite() {
-    enable_logging_for_test(true);
-    for (test_fn, can_setup) in MIRROR_TEST_FNS.iter() {
-        launch_mirror_test(*test_fn, *can_setup).unwrap();
-    }
-}
-
-// Do general test with config
-fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), ()> {
-    let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
-    debug!("");
-    print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
-    debug!("==========================");
-
-    let options = &MIRROR_TEST_PROCESSING_OPTIONS;
-
-    // Setup
-    let mut nodes = Vec::new();
-    for i in 0..*MIRROR_NODES_COUNT {
-        let node_name = format!("mirror_node{}", i);
-        println!("making engine: {}", node_name);
-        let node = setup_memory_node(&node_name.clone(), node_name.into(), &fn_name(test_fn_ptr));
-        nodes.push(node);
-    }
-    if can_setup {
-        setup_mirror_nodes(&mut nodes, options)
-    }
-
-    test_fn(&mut nodes, &MIRROR_TEST_PROCESSING_OPTIONS);
-
-    // Wrap-up test
-    debug!("==========================");
-    print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
 
     // Done
     Ok(())
@@ -461,7 +403,7 @@ fn launch_two_wss_nodes_test(
         &fn_name(test_fn_ptr),
     );
     if can_setup {
-        setup_two_nodes(&mut alex, &mut billy, &TWO_WSS_NODES_PROCESSING_OPTIONS);
+        setup_two_nodes(&mut alex, &mut billy);
     }
 
     // Execute test
@@ -512,26 +454,15 @@ fn launch_three_wss_nodes_test(
         tls_config.clone(),
         &fn_name(test_fn_ptr),
     );
-
     if can_setup {
-        setup_three_nodes(
-            &mut alex,
-            &mut billy,
-            &mut camille,
-            &THREE_MEMORY_NODES_PROCESSING_OPTIONS,
-        );
+        setup_three_nodes(&mut alex, &mut billy, &mut camille);
     }
 
     // Execute test
-    test_fn(
-        &mut alex,
-        &mut billy,
-        &mut camille,
-        &THREE_MEMORY_NODES_PROCESSING_OPTIONS,
-    );
+    test_fn(&mut alex, &mut billy, &mut camille);
 
     // Wrap-up test
-    debug!("==========================");
+    println!("==========================");
     print_test_name(
         format!("WSS THREE NODES TEST END ({:?}):", tls_config.clone()).as_str(),
         test_fn_ptr,

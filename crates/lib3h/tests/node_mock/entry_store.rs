@@ -1,12 +1,12 @@
 use lib3h_protocol::{
     data_types::{EntryAspectData, EntryData},
-    types::*,
+    Address,
 };
 use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct EntryStore {
-    pub store: HashMap<EntryHash, HashMap<AspectHash, EntryAspectData>>,
+    pub store: HashMap<Address, HashMap<Address, EntryAspectData>>,
 }
 
 impl EntryStore {
@@ -18,7 +18,7 @@ impl EntryStore {
 
     /// Check if this value is already stored
     #[allow(dead_code)]
-    pub fn has(&self, entry_address: &EntryHash, aspect_address: &AspectHash) -> bool {
+    pub fn has(&self, entry_address: &Address, aspect_address: &Address) -> bool {
         let maybe_map = self.store.get(entry_address);
         if maybe_map.is_none() {
             return false;
@@ -46,7 +46,7 @@ impl EntryStore {
     }
 
     ///
-    pub fn insert_aspect(&mut self, entry_address: &EntryHash, aspect: &EntryAspectData) {
+    pub fn insert_aspect(&mut self, entry_address: &Address, aspect: &EntryAspectData) {
         trace!(
             "EntryStore: adding content for '{:?}': {:?}",
             entry_address,
@@ -65,7 +65,7 @@ impl EntryStore {
     }
 
     /// Get all values for a meta_key as a vec
-    pub fn get(&self, entry_address: &EntryHash) -> Option<EntryData> {
+    pub fn get(&self, entry_address: &Address) -> Option<EntryData> {
         let aspect_map = self.store.get(entry_address)?;
         let aspect_list: Vec<EntryAspectData> = aspect_map.iter().map(|(_, v)| v.clone()).collect();
         return if aspect_list.is_empty() {
@@ -82,8 +82,8 @@ impl EntryStore {
     #[allow(dead_code)]
     pub fn get_aspect(
         &self,
-        entry_address: &EntryHash,
-        aspect_address: &AspectHash,
+        entry_address: &Address,
+        aspect_address: &Address,
     ) -> Option<EntryAspectData> {
         let maybe_entry = self.get(entry_address);
         if maybe_entry.is_none() {

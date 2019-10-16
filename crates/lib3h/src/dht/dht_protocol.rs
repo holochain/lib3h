@@ -1,12 +1,11 @@
 use lib3h_protocol::{
     data_types::{EntryData, Opaque},
-    types::*,
     uri::Lib3hUri,
+    Address,
 };
 
 use crate::{dht::dht_config::DhtConfig, error::*};
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::uri::UriScheme;
 
 pub type FromPeerName = Lib3hUri;
 
@@ -63,7 +62,7 @@ pub enum DhtRequestToChild {
     /// Parent wants us to bookkeep an entry and broadcast it to neighbors
     BroadcastEntry(EntryData),
     /// Parent notifies us that is is not holding an entry anymore.
-    DropEntryAddress(EntryHash),
+    DropEntryAddress(Address),
 
     /// Parent notifies us that the binding changed
     UpdateAdvertise(Lib3hUri),
@@ -78,9 +77,9 @@ pub enum DhtRequestToChild {
     /// Parent wants the list of entries we are holding
     RequestEntryAddressList,
     /// Parent wants address' we have for an entry
-    RequestAspectsOf(EntryHash),
+    RequestAspectsOf(Address),
     /// Parent wants a specific entry.
-    RequestEntry(EntryHash),
+    RequestEntry(Address),
 }
 
 #[derive(Debug, Clone)]
@@ -88,8 +87,8 @@ pub enum DhtRequestToChildResponse {
     RequestPeer(Option<PeerData>),
     RequestPeerList(Vec<PeerData>),
     RequestThisPeer(PeerData),
-    RequestEntryAddressList(Vec<EntryHash>),
-    RequestAspectsOf(Option<Vec<AspectHash>>),
+    RequestEntryAddressList(Vec<Address>),
+    RequestAspectsOf(Option<Vec<Address>>),
     RequestEntry(EntryData),
 }
 
@@ -114,11 +113,11 @@ pub enum DhtRequestToParent {
     },
     /// Notify owner that we are no longer tracking this entry internally.
     /// Owner should purge this address from storage, but they can, of course, choose not to.
-    EntryPruned(EntryHash),
+    EntryPruned(Address),
 
     /// Requests
     /// DHT wants an entry in order to send it to someone on the network
-    RequestEntry(EntryHash),
+    RequestEntry(Address),
 }
 
 #[derive(Debug, Clone)]
@@ -149,22 +148,10 @@ pub struct PeerData {
     pub timestamp: u64,
 }
 
-impl PeerData {
-    pub fn get_uri(&self) -> Lib3hUri {
-        assert!(
-            self.peer_name.is_scheme(UriScheme::Node) || self.peer_name.is_scheme(UriScheme::Agent)
-        );
-        if self.peer_name.is_scheme(UriScheme::Node) {
-            return self.peer_location.clone();
-        }
-        Lib3hUri::with_node_and_agent_id(&self.peer_location.node_id(), &self.peer_name.agent_id())
-    }
-}
-
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct FetchDhtEntryData {
     pub msg_id: String,
-    pub entry_address: EntryHash,
+    pub entry_address: Address,
 }
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]

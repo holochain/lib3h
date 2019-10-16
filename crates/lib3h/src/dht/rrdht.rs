@@ -1,5 +1,5 @@
 use crate::{
-    dht::{dht_config::DhtConfig, dht_protocol::*, Lib3hUri},
+    dht::{dht_protocol::*, dht_config::DhtConfig, Lib3hUri},
     error::Lib3hResult,
 };
 use lib3h_protocol::{Address, DidWork};
@@ -50,11 +50,11 @@ impl Dht for RrDht {
 
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<&EntryHash> {
+    fn get_entry_address_list(&self) -> Vec<&Address> {
         // FIXME
         vec![]
     }
-    fn get_aspects_of(&self, _entry_address: &EntryHash) -> Option<Vec<AspectHash>> {
+    fn get_aspects_of(&self, _entry_address: &Address) -> Option<Vec<Address>> {
         // FIXME
         None
     }

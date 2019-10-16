@@ -6,7 +6,6 @@ use predicates::prelude::*;
 use lib3h_protocol::protocol_server::Lib3hServerProtocol;
 
 use crate::utils::seeded_prng::SeededBooleanPrng;
-use edit_distance::edit_distance;
 
 use std::sync::Mutex;
 
@@ -110,14 +109,6 @@ pub trait Processor: Predicate<ProcessorResult> {
     /// Test the predicate function. Should interrupt control
     /// flow with a useful error if self.eval(args) is false.
     fn test(&self, args: &ProcessorResult);
-
-    fn prefer<'a>(
-        &self,
-        result1: &'a ProcessorResult,
-        _result2: &'a ProcessorResult,
-    ) -> &'a ProcessorResult {
-        result1
-    }
 }
 
 /// Asserts some extracted data from ProcessorResult is equal to an expected instance.
@@ -202,33 +193,6 @@ where
                 .map(|a| format!("{:?}", a))
                 .unwrap_or("None".to_string());
             assert_eq!(self.expected().as_str(), actual.as_str())
-        }
-    }
-
-    fn prefer<'a>(
-        &self,
-        result1: &'a ProcessorResult,
-        result2: &'a ProcessorResult,
-    ) -> &'a ProcessorResult {
-        let expected = self.expected().to_string();
-        let distance1 = self
-            .extracted(result1)
-            .iter()
-            .map(|actual| format!("{:?}", *actual))
-            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
-            .fold(std::usize::MAX, usize::min);
-        let distance2 = self
-            .extracted(result2)
-            .iter()
-            .map(|actual| format!("{:?}", *actual))
-            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
-            .fold(std::usize::MAX, usize::min);
-        trace!("result1: {:?} with score {:?}", result1, distance1);
-        trace!("result2: {:?} with score {:?}", result2, distance2);
-        if distance1 <= distance2 {
-            result1
-        } else {
-            result2
         }
     }
 }
@@ -346,33 +310,6 @@ impl Processor for Lib3hServerProtocolRegex {
                 .map(|a| format!("{:?}", a))
                 .unwrap_or("None".to_string());
             assert_eq!(self.expected().as_str(), actual.as_str())
-        }
-    }
-
-    fn prefer<'a>(
-        &self,
-        result1: &'a ProcessorResult,
-        result2: &'a ProcessorResult,
-    ) -> &'a ProcessorResult {
-        let expected = self.expected().to_string();
-        let distance1 = self
-            .extracted(result1)
-            .iter()
-            .map(|actual| format!("{:?}", *actual))
-            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
-            .fold(std::usize::MAX, usize::min);
-        let distance2 = self
-            .extracted(result2)
-            .iter()
-            .map(|actual| format!("{:?}", *actual))
-            .map(|actual| edit_distance(expected.as_str(), actual.as_str()))
-            .fold(std::usize::MAX, usize::min);
-        trace!("result1: {:?} with score {:?}", result1, distance1);
-        trace!("result2: {:?} with score {:?}", result2, distance2);
-        if distance1 <= distance2 {
-            result1
-        } else {
-            result2
         }
     }
 }
@@ -597,7 +534,7 @@ macro_rules! process_one_engine {
             };
             let mut failed = Vec::new();
 
-            for (processor, orig_processor_result) in $errors.drain(..) {
+            for (processor, _orig_processor_result) in $errors.drain(..) {
                 let result = processor.eval(&processor_result.clone());
                 if result {
                     // Simulate the succesful assertion behavior
@@ -606,11 +543,7 @@ macro_rules! process_one_engine {
                 } else {
                     // Cache the assertion error and trigger it later if we never
                     // end up passing
-                    let orig_processor_result =
-                        orig_processor_result.unwrap_or_else(|| processor_result.clone());
-                    let prefered_failed_result =
-                        processor.prefer(&orig_processor_result, &processor_result);
-                    failed.push((processor, Some(prefered_failed_result.to_owned())));
+                    failed.push((processor, Some(processor_result.clone())));
                 }
             }
             $errors.append(&mut failed);
@@ -808,12 +741,9 @@ macro_rules! wait_connect {
         $other: ident
     ) => {{
         let _connect_data = $connect_data;
-
         $crate::assert2_msg_matches!($me, $other,
-            "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\".*\"\\) \\}\\)")
-// TODO which one is correct?
-//            "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"nodepubkey:HcM.*\"\\) \\}\\)")
-     }};
+            "Connected\\(ConnectedData \\{ request_id: \"client_to_lib3_response_.*\", uri: Lib3hUri\\(\"transportid:Hc.*\"\\) \\}\\)")
+    }};
 }
 
 /// Waits for work to be done. Will interrupt the program if no work was done and should_abort

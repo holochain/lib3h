@@ -3,12 +3,13 @@ pub mod entry_store;
 pub mod methods;
 
 use self::chain_store::ChainStore;
-use crate::utils::processor_harness::ProcessingOptions;
 use lib3h::{
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig},
     error::Lib3hResult,
 };
-use lib3h_protocol::{protocol_server::Lib3hServerProtocol, types::*, uri::Lib3hUri};
+use lib3h_protocol::{
+    protocol_server::Lib3hServerProtocol, types::SpaceHash, uri::Lib3hUri, Address,
+};
 use std::collections::{HashMap, HashSet};
 
 static TIMEOUT_MS: usize = 5000;
@@ -28,7 +29,7 @@ pub struct NodeMock {
     /// Factory used to create the engine
     engine_factory: EngineFactory,
     /// The node's simulated agentId
-    pub agent_id: AgentPubKey,
+    pub agent_id: Address,
     /// The node's uri
     my_advertise: Lib3hUri,
     /// This node's handle
@@ -55,7 +56,7 @@ pub struct NodeMock {
 impl NodeMock {
     pub fn new_with_config(
         name: &str,
-        agent_id_arg: AgentPubKey,
+        agent_id_arg: Address,
         config: EngineConfig,
         engine_factory: EngineFactory,
         //_maybe_temp_dir: Option<tempfile::TempDir>,
@@ -87,13 +88,14 @@ impl NodeMock {
 }
 
 // utility function for tests that rely on nodes joining a space
-pub fn test_join_space(
-    node: &mut NodeMock,
-    space_address: &SpaceHash,
-    options: &ProcessingOptions,
-) {
-    debug!("\n {} joins {}", node.name(), space_address);
+pub fn test_join_space(node: &mut NodeMock, space_address: &SpaceHash) {
+    println!("\n {} joins {}", node.name(), space_address);
     let req_id = node.join_space(&space_address, true).unwrap();
-    let expected = format!("SuccessResult\\(GenericResultData \\{{ request_id: \"{}\", space_address: SpaceHash\\(HashString\\(\"{}\"\\)\\), to_agent_id: AgentPubKey\\(HashString\\(\"{}\"\\)\\), result_info: \"\" \\}}\\)", req_id, space_address.to_string(), node.name());
-    assert_msg_matches!(node, expected.as_str(), options);
+    let (did_work, srv_msg_list) = node.process().unwrap();
+    assert!(did_work);
+    assert_eq!(srv_msg_list.len(), 3);
+    let msg_1 = &srv_msg_list[0];
+    one_let!(Lib3hServerProtocol::SuccessResult(response) = msg_1 {
+        assert_eq!(response.request_id, req_id);
+    });
 }

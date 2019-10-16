@@ -3,11 +3,11 @@ use crate::{
     error::{ErrorKind, Lib3hProtocolError},
     protocol_client::Lib3hClientProtocol,
     protocol_server::Lib3hServerProtocol,
-    types::NetworkHash,
     uri::Lib3hUri,
 };
 
 use std::convert::TryFrom;
+
 /// Enum holding the message types describe the lib3h protocol.
 /// There are 4 categories of messages:
 ///  - ClientToLib3h: A request or event sent from the user/client of lib3h
@@ -111,7 +111,7 @@ impl TryFrom<Lib3hClientProtocol> for ClientToLib3h {
         match c {
             Lib3hClientProtocol::Connect(connect_data) => {
                 Ok(ClientToLib3h::Bootstrap(BootstrapData {
-                    network_or_space_address: connect_data.network_id.clone().into(),
+                    space_address: connect_data.network_id.into(),
                     bootstrap_uri: connect_data.peer_location,
                 }))
             }
@@ -237,7 +237,7 @@ impl From<ClientToLib3h> for Lib3hClientProtocol {
             ClientToLib3h::Bootstrap(bootstrap_data) => Lib3hClientProtocol::Connect(ConnectData {
                 request_id: "".to_string(),
                 peer_location: bootstrap_data.bootstrap_uri,
-                network_id: bootstrap_data.network_or_space_address.into(),
+                network_id: bootstrap_data.space_address.into(),
             }),
             ClientToLib3h::JoinSpace(space_data) => Lib3hClientProtocol::JoinSpace(space_data),
             ClientToLib3h::LeaveSpace(space_data) => Lib3hClientProtocol::LeaveSpace(space_data),
@@ -288,7 +288,7 @@ impl From<Lib3hToClient> for Lib3hServerProtocol {
             }
             Lib3hToClient::Unbound(_unbound_data) => {
                 Lib3hServerProtocol::Disconnected(DisconnectedData {
-                    network_id: NetworkHash::new(),
+                    network_id: "".into(),
                 })
             }
             Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
@@ -366,7 +366,7 @@ mod tests {
             to_c,
             ClientToLib3h::Bootstrap(BootstrapData {
                 bootstrap_uri: Url::parse("wss://192.168.0.102:58081/").unwrap().into(),
-                network_or_space_address: "network_id".into(),
+                space_address: "network_id".to_string().into(),
             })
         );
 

@@ -133,7 +133,8 @@ impl P2pGateway {
                                 DhtRequestToChildResponse::RequestPeerList(peer_list),
                             )) => {
                                 for peer in peer_list {
-                                    let uri = peer.get_uri();
+                                    let mut uri = peer.peer_location.clone();
+                                    uri.set_agent_id(&peer.peer_name.lower_address());
                                     me.send_with_full_low_uri(
                                         SendWithFullLowUri {
                                             span: Span::fixme(),

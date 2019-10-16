@@ -73,30 +73,6 @@ pub trait Buffer: Send + std::fmt::Debug + Deref<Target = [u8]> + DerefMut<Targe
         }
         Ok(())
     }
-
-    /// compare this buffer to another buffer
-    /// Return :
-    /// | if a > b; return 1
-    /// | if a < b; return -1
-    /// | if a == b; return 0
-    #[allow(clippy::borrowed_box)]
-    fn compare(&self, b: &Box<dyn Buffer>) -> i32 {
-        let a = self.read_lock();
-        let b = b.read_lock();
-        let al = self.len();
-        let bl = b.len();
-        // Compare al length like libsodium
-        for i in (0..al).rev() {
-            let av = a[i];
-            let bv = if i >= bl { 0 } else { b[i] };
-            if av > bv {
-                return 1;
-            } else if av < bv {
-                return -1;
-            };
-        }
-        return 0;
-    }
 }
 
 /// Track if a buffer has read/write access or is memory protected.

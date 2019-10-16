@@ -17,15 +17,6 @@ use lib3h_protocol::{data_types::*, uri::Lib3hUri};
 impl P2pGateway {
     /// Handle IncomingConnection event from child transport
     fn handle_incoming_connection(&mut self, span: Span, uri: Lib3hUri) -> TransportResult<()> {
-        // TODO #199: This is prbably wrong in that a different level of URI should be being bubbled up.
-        // depends on how & what we decide to send up to the client.
-        self.endpoint_self.publish(
-            Span::fixme(),
-            GatewayRequestToParent::Transport(
-                transport::protocol::RequestToParent::IncomingConnection { uri: uri.clone() },
-            ),
-        )?;
-
         self.inner_dht.request(
             span.child("handle_incoming_connection"),
             DhtRequestToChild::RequestThisPeer,
@@ -40,6 +31,17 @@ impl P2pGateway {
                     }
                 };
                 if let DhtRequestToChildResponse::RequestThisPeer(this_peer) = response {
+                    // once we have the peer info from the other side, bubble the incoming connection
+                    // to the network layer
+                    me.endpoint_self.publish(
+                        Span::fixme(),
+                        GatewayRequestToParent::Transport(
+                            transport::protocol::RequestToParent::IncomingConnection {
+                                uri: this_peer.peer_name.clone(),
+                            },
+                        ),
+                    )?;
+
                     // Send to other node our PeerName
                     let our_peer_name = P2pProtocol::PeerName(
                         me.identifier.id.to_owned().into(),

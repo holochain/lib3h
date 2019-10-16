@@ -11,8 +11,8 @@ use lib3h_protocol::{
         error::{DiscoveryError, DiscoveryResult},
         Discovery,
     },
-    types::*,
     uri::Lib3hUri,
+    Address,
 };
 use std::{
     collections::HashSet,
@@ -50,7 +50,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
-    node_id: NodePubKey,
+    transport_id: Address,
     network: Arc<Mutex<MemoryNet>>,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
@@ -71,12 +71,12 @@ impl Discovery for GhostTransportMemory {
         self.network
             .lock()
             .unwrap()
-            .advertise(uri, self.node_id.clone());
+            .advertise(uri, self.transport_id.clone());
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
-        let nodes = self.network.lock().unwrap().discover();
-        Ok(nodes.into_iter().map(|(uri, _)| uri).collect())
+        let machines = self.network.lock().unwrap().discover();
+        Ok(machines.into_iter().map(|(uri, _)| uri).collect())
     }
     fn release(&mut self) -> DiscoveryResult<()> {
         Ok(())
@@ -88,7 +88,7 @@ impl Discovery for GhostTransportMemory {
 const DEFAULT_DISCOVERY_INTERVAL_MS: u64 = 30000;
 
 impl GhostTransportMemory {
-    pub fn new(node_id: NodePubKey, network_name: &str) -> Self {
+    pub fn new(transport_id: Address, network_name: &str) -> Self {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let interval = DEFAULT_DISCOVERY_INTERVAL_MS;
         let start = Instant::now().checked_sub(std::time::Duration::from_millis(interval + 1));
@@ -97,7 +97,7 @@ impl GhostTransportMemory {
             verse.get_network(network_name)
         };
         Self {
-            node_id,
+            transport_id,
             network,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
@@ -118,10 +118,10 @@ impl GhostTransportMemory {
             if self.maybe_my_address.is_some()
                 && t.elapsed().as_millis() > self.discover_interval_ms
             {
-                if let Ok(nodes) = self.discover() {
-                    if nodes.len() > 0 {
+                if let Ok(machines) = self.discover() {
+                    if machines.len() > 0 {
                         let my_addr = self.maybe_my_address.as_ref().expect("should have bound");
-                        for found_uri in nodes {
+                        for found_uri in machines {
                             if found_uri == *my_addr {
                                 continue;
                             }
@@ -364,9 +364,9 @@ mod tests {
         GhostTransportMemory,
         GhostTransportMemoryEndpointContextParent,
     ) {
-        let node_id = format!("fake_node_id{}", id).as_str().into();
+        let transport_id = format!("fake_transport_id{}", id).into();
         let req_id_prefix = format!("tmem_to_child{}", id);
-        let mut transport = GhostTransportMemory::new(node_id, &net_name);
+        let mut transport = GhostTransportMemory::new(transport_id, &net_name);
         let endpoint: GhostTransportMemoryEndpointContextParent = transport
             .take_parent_endpoint()
             .expect("exists")

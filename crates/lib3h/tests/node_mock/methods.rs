@@ -13,7 +13,7 @@ use lib3h_protocol::{
     protocol_server::Lib3hServerProtocol,
     types::*,
     uri::Lib3hUri,
-    DidWork,
+    Address, DidWork,
 };
 use multihash::Hash;
 use rmp_serde::Serializer;
@@ -214,15 +214,12 @@ impl NodeMock {
 ///
 impl NodeMock {
     /// Convert an aspect_content_list into an EntryData
-    pub fn form_EntryData(
-        entry_address: &EntryHash,
-        aspect_content_list: Vec<Vec<u8>>,
-    ) -> EntryData {
+    pub fn form_EntryData(entry_address: &Address, aspect_content_list: Vec<Vec<u8>>) -> EntryData {
         let mut aspect_list = Vec::new();
         for aspect_content in aspect_content_list {
             let hash = HashString::encode_from_bytes(aspect_content.as_slice(), Hash::SHA2256);
             aspect_list.push(EntryAspectData {
-                aspect_address: hash.into(),
+                aspect_address: hash,
                 type_hint: "NodeMock".to_string(),
                 aspect: aspect_content.into(),
                 publish_ts: 42,
@@ -235,7 +232,7 @@ impl NodeMock {
         }
     }
 
-    pub fn get_entry(&self, entry_address: &EntryHash) -> Option<EntryData> {
+    pub fn get_entry(&self, entry_address: &Address) -> Option<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let data_store = self.chain_store_list.get(&current_space)?;
         data_store.get_entry(entry_address)
@@ -244,7 +241,7 @@ impl NodeMock {
     ///
     pub fn author_entry(
         &mut self,
-        entry_address: &EntryHash,
+        entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
         can_broadcast: bool,
     ) -> Lib3hResult<EntryData> {
@@ -260,7 +257,6 @@ impl NodeMock {
             let res = chain_store.author_entry(&entry);
             // Entry is known, try authoring each aspect instead
             if res.is_err() {
-                trace!("Entry {:?} is already known: {:?}", entry, res.err());
                 let mut success = false;
                 for aspect in &entry.aspect_list {
                     let aspect_res = chain_store.author_aspect(&entry.entry_address, aspect);
@@ -271,14 +267,12 @@ impl NodeMock {
                 if !success {
                     return Err(Lib3hError::new_other("Authoring of all aspects failed."));
                 }
-            } else {
-                trace!("Entry {:?} authored: {:?}", entry, res.ok());
             }
         }
         if can_broadcast {
             let msg_data = ProvidedEntryData {
                 space_address: current_space,
-                provider_agent_id: self.agent_id(),
+                provider_agent_id: self.agent_id.clone(),
                 entry: entry.clone(),
             };
             self.engine
@@ -290,7 +284,7 @@ impl NodeMock {
 
     pub fn hold_entry(
         &mut self,
-        entry_address: &EntryHash,
+        entry_address: &Address,
         aspect_content_list: Vec<Vec<u8>>,
     ) -> Lib3hResult<EntryData> {
         let current_space = self.current_space.clone().expect("Current Space not set");
@@ -341,7 +335,7 @@ impl NodeMock {
     }
 
     /// Node asks for some entry on the network.
-    pub fn request_entry(&mut self, entry_address: EntryHash) -> QueryEntryData {
+    pub fn request_entry(&mut self, entry_address: Address) -> QueryEntryData {
         assert!(self.current_space.is_some());
         let current_space = self.current_space.clone().unwrap();
         let query_data = QueryEntryData {
@@ -457,7 +451,7 @@ impl NodeMock {
 impl NodeMock {
     /// Send a DirectMessage on the network.
     /// Returns the generated request_id for this send
-    pub fn send_direct_message(&mut self, to_agent_id: &AgentPubKey, content: Vec<u8>) -> String {
+    pub fn send_direct_message(&mut self, to_agent_id: &Address, content: Vec<u8>) -> String {
         let current_space = self.current_space.clone().expect("Current Space not set");
         let request_id = self.generate_request_id();
         debug!("current_space: {:?}", self.current_space);
@@ -479,7 +473,7 @@ impl NodeMock {
     pub fn send_response(
         &mut self,
         request_id: &str,
-        to_agent_id: &AgentPubKey,
+        to_agent_id: &Address,
         response_content: Vec<u8>,
     ) {
         self.send_response_inner(request_id, to_agent_id, response_content)
@@ -490,7 +484,7 @@ impl NodeMock {
     pub fn send_response_inner(
         &mut self,
         request_id: &str,
-        to_agent_id: &AgentPubKey,
+        to_agent_id: &Address,
         response_content: Vec<u8>,
     ) -> Result<(), lib3h_protocol::error::Lib3hProtocolError> {
         let current_space = self.current_space.clone().expect("Current Space not set");
@@ -711,7 +705,7 @@ impl NodeMock {
         wait_engine_wrapper_until_no_work!(me)
     }
 
-    pub fn agent_id(&self) -> AgentPubKey {
+    pub fn agent_id(&self) -> Address {
         self.agent_id.clone()
     }
 }
@@ -786,11 +780,6 @@ impl NodeMock {
                         msg.entry_address,
                         msg.entry_aspect.aspect_address,
                         res.is_ok()
-                    );
-                } else {
-                    warn!(
-                        "({:?}) Got store entry for space we haven't joined: {:?}",
-                        self.agent_id, msg
                     );
                 }
             }
