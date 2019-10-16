@@ -219,7 +219,7 @@ impl<
         D: 'lt,
         X: 'lt + Send + Sync,
         H: GhostHandler<'lt, X, P>,
-        S: GhostSystemRef<'lt> + Sync + Send + Clone,
+        S: GhostSystemRef<'lt>,
     > GhostEndpointFull<'lt, P, D, X, H, S>
 {
     /// Sometimes you might need to invoke some functions on and endpoint
