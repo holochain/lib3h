@@ -301,9 +301,9 @@ pub struct GhostInflator<
     S: GhostSystemRef<'lt>,
 > {
     finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>>,
+    sys_ref: S,
     sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-    sys_ref: S,
 }
 
 impl<

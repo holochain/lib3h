@@ -27,7 +27,7 @@ fn manual_example() {
     let mut actor_ref = ghost_actor_spawn::<
         MyContext,
         TestProtocol,
-        TestActor,
+        TestActor<SingleThreadedGhostSystemRef>,
         TestOwnerHandler<MyContext>,
         GhostTestSystemRef,
     >(
