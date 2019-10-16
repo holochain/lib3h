@@ -304,7 +304,16 @@ pub mod tests {
     fn space_hash_from_hash_string() {
         let hash = test_hash_a();
 
-        let space_hash = SpaceHash::from(hash);
+        // cloned
+        let space_hash = SpaceHash::from(hash.clone());
+
+        assert_eq!(
+            &hash,
+            space_hash.hash_string()
+        );
+
+        // referenced
+        let space_hash = SpaceHash::from(&hash);
 
         assert_eq!(
             &hash,
