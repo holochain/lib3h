@@ -9,7 +9,6 @@ use manual_example_mod::*;
 #[test]
 fn manual_example() {
     let mut system = GhostSystem::new();
-    let system_ref = system.create_ref();
 
     #[derive(Debug)]
     struct MyContext {
@@ -24,31 +23,32 @@ fn manual_example() {
 
     let my_context_weak = Arc::downgrade(&my_context);
 
-    let mut actor_ref =
-        ghost_actor_spawn::<MyContext, TestProtocol, TestActor, TestOwnerHandler<MyContext>>(
-            system_ref.clone(),
-            my_context_weak,
-            Box::new(|inflator| TestActor::new(inflator)),
+    let (mut system_ref, finalize) = system.create_external_system_ref();
+    finalize(my_context_weak).unwrap();
+
+    let mut actor_ref = system_ref
+        .spawn(
+            Box::new(|sys_ref, owner_seed| TestActor::new("root", sys_ref, owner_seed, None)),
             TestOwnerHandler {
-                handle_event_to_owner_print: Box::new(|me, message| {
-                    me.to_owner_prints.push(message.clone());
-                    println!("owner printing message from actor: {}", message);
+                handle_event_to_owner_print: Box::new(|me: &mut MyContext, message| {
+                    me.to_owner_prints.push(message);
                     Ok(())
                 }),
-                handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
+                handle_request_to_owner_sub_1: Box::new(|_me: &mut MyContext, message, cb| {
+                    cb(Ok(message - 1))
+                }),
             },
         )
         .unwrap();
 
     actor_ref
-        .event_to_actor_print("zombies".to_string())
+        .event_to_actor_print("test-from-framework".to_string())
         .unwrap();
     actor_ref
         .request_to_actor_add_1(
             42,
             Box::new(|me, rsp| {
                 me.to_actor_add_resp.push(format!("{:?}", rsp));
-                println!("owner got response from actor: 42 + 1 = {:?}", rsp);
                 Ok(())
             }),
         )
@@ -58,8 +58,20 @@ fn manual_example() {
     system.process().unwrap();
     system.process().unwrap();
     system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
+    system.process().unwrap();
 
-    assert_eq!("MyContext { to_owner_prints: [\"message from actor\", \"echo: \\\"zombies\\\"\", \"echo: Ok(Ok(41))\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
+    assert_eq!("MyContext { to_owner_prints: [\"(root chain (sub_1 chain (sub_2 to_owner_print)))\", \"(root fwd sub_1 Ok(Ok(41))\", \"(root chain (sub_1 fwd sub_1 Ok(Ok(41)))\", \"(root chain (sub_1 fwd add_1 request))\", \"(root chain (sub_1 chain (sub_2 recv print (sub_1 fwd print (root fwd print test-from-framework)))))\", \"(root chain (sub_1 chain (sub_2 add 1 to 42)))\", \"(root chain (sub_1 chain (sub_2 rsp 42 - 1 = Ok(Ok(41)))))\", \"(root fwd add_1 request)\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
     println!("{:#?}", my_context);
 
     // can we access it directly?
