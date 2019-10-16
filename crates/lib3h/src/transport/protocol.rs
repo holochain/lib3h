@@ -29,6 +29,10 @@ pub enum RequestToChildResponse {
 
 #[derive(Debug, Clone)]
 pub enum RequestToParent {
+    // we have become unbound from our interface
+    Unbind(Lib3hUri),
+    // a connection has been dropped
+    Disconnect(Lib3hUri),
     // TODO remove `uri` field once we have refactored how we handle Connection/Disconnection
     ErrorOccured {
         uri: Lib3hUri,

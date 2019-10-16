@@ -4,7 +4,7 @@ use crate::transport::{
         tls::TlsConfig, wss_info::WssInfo, BaseStream, SocketMap, TlsConnectResult,
         TlsMidHandshake, TlsSrvMidHandshake, TlsStream, WsConnectResult, WsMidHandshake,
         WsSrvAcceptResult, WsSrvMidHandshake, WsStream, WssConnectResult, WssMidHandshake,
-        WssSrvAcceptResult, WssSrvMidHandshake, WssStream, FAKE_PASS, FAKE_PKCS12,
+        WssSrvAcceptResult, WssSrvMidHandshake, WssStream,
     },
 };
 use lib3h_protocol::{uri::Lib3hUri, DidWork};
@@ -257,10 +257,16 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
             }
             if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_MS {
                 if let WebsocketStreamState::ReadyWss(socket) = &mut info.stateful_socket {
-                    socket.write_message(tungstenite::Message::Ping(vec![]))?;
+                    if let Err(e) = socket.write_message(tungstenite::Message::Ping(vec![])) {
+                        error!("Transport error trying to send ping over stream: {:?}. Dropping stream...", e);
+                        continue;
+                    }
                 }
                 if let WebsocketStreamState::ReadyWs(socket) = &mut info.stateful_socket {
-                    socket.write_message(tungstenite::Message::Ping(vec![]))?;
+                    if let Err(e) = socket.write_message(tungstenite::Message::Ping(vec![])) {
+                        error!("Transport error trying to send ping over stream: {:?}. Dropping stream...", e);
+                        continue;
+                    }
                 }
             } else if info.last_msg.elapsed().as_millis() as usize > DEFAULT_HEARTBEAT_WAIT_MS {
                 self.event_queue
@@ -326,15 +332,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
                         self.priv_ws_srv_handshake(&info.url, tungstenite::accept(socket))?;
                     return Ok(());
                 }
-                let ident = match &self.tls_config {
-                    TlsConfig::Unencrypted => unimplemented!(),
-                    TlsConfig::FakeServer => {
-                        native_tls::Identity::from_pkcs12(FAKE_PKCS12, FAKE_PASS)?
-                    }
-                    TlsConfig::SuppliedCertificate(cert) => {
-                        native_tls::Identity::from_pkcs12(&cert.pkcs12_data, &cert.passphrase)?
-                    }
-                };
+                let ident = self.tls_config.get_identity()?;
                 let acceptor = native_tls::TlsAcceptor::builder(ident)
                     .build()
                     .expect("failed to build TlsAcceptor");

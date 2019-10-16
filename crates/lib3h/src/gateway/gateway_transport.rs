@@ -278,6 +278,18 @@ impl P2pGateway {
         let span = msg.span().child("handle_transport_RequestToParent");
         let msg = msg.take_message().expect("exists");
         match &msg {
+            transport::protocol::RequestToParent::Unbind(_uri) => {
+                self.endpoint_self.publish(
+                    Span::fixme(),
+                    GatewayRequestToParent::Transport(msg.clone()),
+                )?;
+            }
+            transport::protocol::RequestToParent::Disconnect(_uri) => {
+                self.endpoint_self.publish(
+                    Span::fixme(),
+                    GatewayRequestToParent::Transport(msg.clone()),
+                )?;
+            }
             transport::protocol::RequestToParent::ErrorOccured { uri: _, error: _ } => {
                 // pass any errors back up the chain so network layer can handle them (i.e.)
                 self.endpoint_self.publish(
