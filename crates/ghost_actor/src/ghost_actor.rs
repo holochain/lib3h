@@ -16,7 +16,7 @@ pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'l
     _phantom: std::marker::PhantomData<&'lt S>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt> + Sync + Send + Clone>
+impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>>
     GhostEndpointSeed<'lt, P, D, S>
 {
     fn new(
@@ -133,7 +133,7 @@ impl<
         P: GhostProtocol,
         X: 'lt + Send + Sync,
         H: GhostHandler<'lt, X, P>,
-        S: 'lt + GhostSystemRef<'lt> + Sync + Send + Clone,
+        S: 'lt + GhostSystemRef<'lt>,
     > GhostEndpointFullInner<'lt, P, X, H, S>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
@@ -219,7 +219,7 @@ impl<
         D: 'lt,
         X: 'lt + Send + Sync,
         H: GhostHandler<'lt, X, P>,
-        S: GhostSystemRef<'lt> + Sync + Send + Clone,
+        S: GhostSystemRef<'lt>,
     > GhostEndpointFull<'lt, P, D, X, H, S>
 {
     /// Sometimes you might need to invoke some functions on and endpoint
@@ -259,7 +259,7 @@ impl<
         D: 'lt,
         X: 'lt + Send + Sync,
         H: GhostHandler<'lt, X, P>,
-        S: GhostSystemRef<'lt> + Sync + Send,
+        S: GhostSystemRef<'lt>,
     > GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H, S>
 {
     fn send_protocol(
@@ -310,7 +310,7 @@ impl<
         'lt,
         P: GhostProtocol,
         A: 'lt + GhostActor<'lt, P, A>,
-        S: 'lt + GhostSystemRef<'lt> + Sync + Send + Clone,
+        S: 'lt + GhostSystemRef<'lt>,
     > GhostInflator<'lt, P, A, S>
 {
     /// call this to get the `plant`ed full owner endpoint
@@ -347,7 +347,7 @@ pub fn ghost_actor_spawn<
     P: GhostProtocol,
     A: 'lt + GhostActor<'lt, P, A>,
     H: 'lt + GhostHandler<'lt, X, P>,
-    S: 'lt + GhostSystemRef<'lt> + Send + Sync + Clone,
+    S: 'lt + GhostSystemRef<'lt>,
 >(
     mut sys_ref: S,
     user_data: Weak<GhostMutex<X>>,

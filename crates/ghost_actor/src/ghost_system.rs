@@ -16,7 +16,7 @@ impl Default for GhostProcessInstructions {
     }
 }
 
-pub trait GhostSystemRef<'lt> {
+pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
     fn enqueue_processor(
         &mut self,
         start_delay_ms: u64,
