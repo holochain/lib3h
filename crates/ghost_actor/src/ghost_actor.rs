@@ -318,8 +318,12 @@ pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
 
 /// Describes an actor that can be used within the "Ghost" actor system
 pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sync {
-    /// This is an indication that it is ok to begin processing
-    /// before actor_init is called, our self context may not be initialized
+    /// GhostActors may not be fully usable in their constructors.
+    /// While they can create EndpointFull instances, those instances don't
+    /// yet have the reference context for invoking callbacks.
+    /// when `actor_init` is invoked on a ghost actor, it is fully usable.
+    /// You may want to trigger requests / set up processing within the
+    /// this `actor_init` function invocation.
     fn actor_init(&mut self) -> GhostResult<()> {
         Ok(())
     }
