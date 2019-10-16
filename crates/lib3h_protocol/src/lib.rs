@@ -25,3 +25,5 @@ pub type Address = holochain_persistence_api::hash::HashString;
 pub type DidWork = bool;
 
 pub mod error;
+
+pub mod fixture;
