@@ -37,7 +37,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, S:GhostSystemRef<'lt>> GhostEndpointSeed<'lt
         self,
         weak_user_data: Weak<GhostMutex<X>>,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H, S>> {
         let (out, finalize_cb) = self.plant_later(handler)?;
         finalize_cb(weak_user_data)?;
         Ok(out)
@@ -119,12 +119,12 @@ struct GhostEndpointFullInner<
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
-    pending_callbacks: GhostTracker<'lt, X, P>,
+    pending_callbacks: GhostTracker<'lt, X, P, S>,
     handler: H,
     sys_ref: S
  }
 
-impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S: GhostSystemRef<'lt>>
+impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>, S: GhostSystemRef<'lt> + Sync + Send>
     GhostEndpointFullInner<'lt, P, X, H, S>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
@@ -304,8 +304,8 @@ impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S:GhostSystemRef<'lt
 
 /// when spawning a new actor, this callback gives access to an inflator instance
 /// and should return the constructed actor instance.
-pub type GhostActorSpawnCb<'lt, A, P> =
-    Box<dyn FnOnce(GhostInflator<'lt, P, A>) -> GhostResult<A> + 'lt>;
+pub type GhostActorSpawnCb<'lt, A, P, S> =
+    Box<dyn FnOnce(GhostInflator<'lt, P, A, S>) -> GhostResult<A> + 'lt>;
 
 /// actor instances in the "Ghost" actor system should generally be spawned
 /// using this function.
@@ -315,19 +315,21 @@ pub fn ghost_actor_spawn<
     P: GhostProtocol,
     A: 'lt + GhostActor<'lt, P, A>,
     H: 'lt + GhostHandler<'lt, X, P>,
+    S: 'lt + GhostSystemRef<'lt>,
+ 
 >(
-    mut sys_ref: Box<dyn GhostSystemRef<'lt>>,
+    mut sys_ref: S,
     user_data: Weak<GhostMutex<X>>,
-    spawn_cb: GhostActorSpawnCb<'lt, A, P>,
+    spawn_cb: GhostActorSpawnCb<'lt, A, P, S>,
     handler: H,
-) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H>> {
+) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H, S>> {
     let (s1, r1) = crossbeam_channel::unbounded();
     let (s2, r2) = crossbeam_channel::unbounded();
 
     let finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>> =
         Arc::new(GhostMutex::new(None));
 
-    let inflator: GhostInflator<'lt, P, A> = GhostInflator {
+    let inflator: GhostInflator<'lt, P, A, S> = GhostInflator {
         finalize: finalize.clone(),
         sys_ref: sys_ref,
         sender: s2,
