@@ -180,7 +180,7 @@ impl<
         'lt,
         X: 'lt + Send + Sync,
         T: 'lt + Send + Sync,
-        S: 'lt + GhostSystemRef<'lt> + Send + Sync + Clone,
+        S: 'lt + GhostSystemRef<'lt>,
     > GhostTracker<'lt, X, T, S>
 {
     pub fn new(mut sys_ref: S, weak_user_data: Weak<GhostMutex<X>>) -> Self {
