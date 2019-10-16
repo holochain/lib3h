@@ -133,7 +133,7 @@ impl<
         P: GhostProtocol,
         X: 'lt + Send + Sync,
         H: GhostHandler<'lt, X, P>,
-        S: 'lt + GhostSystemRef<'lt> + Sync + Send + Clone,
+        S: 'lt + GhostSystemRef<'lt>,
     > GhostEndpointFullInner<'lt, P, X, H, S>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
