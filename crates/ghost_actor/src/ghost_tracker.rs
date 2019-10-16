@@ -185,11 +185,11 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         span: Span,
         cb: GhostResponseCb<'lt, X, T>,
     ) -> GhostResult<RequestId> {
-        self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
+        self.bookmark_with_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
-    pub fn bookmark_options(
+    pub fn bookmark_with_options(
         &mut self,
         _span: Span,
         cb: GhostResponseCb<'lt, X, T>,
@@ -247,7 +247,7 @@ mod tests {
         let mut track: GhostTracker<Test, ()> = GhostTracker::new(sys.create_ref(), deep).unwrap();
 
         track
-            .bookmark_options(
+            .bookmark_with_options(
                 Span::fixme(),
                 Box::new(|me, response| {
                     assert_eq!(

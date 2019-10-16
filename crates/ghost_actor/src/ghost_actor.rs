@@ -160,7 +160,10 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
     }
 }
 
+/// protocol for internal communication between Endpoint and EndpointInner
+/// right now only has one variant, but we may have other messages in the future
 enum GhostEndpointToInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
+    /// incoming request, we may need to start tracking a response cb
     IncomingRequest(P, Option<GhostResponseCb<'lt, X, P>>),
 }
 
