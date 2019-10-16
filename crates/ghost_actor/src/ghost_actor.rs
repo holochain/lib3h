@@ -16,7 +16,7 @@ pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'l
     _phantom: std::marker::PhantomData<&'lt S>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt> + Sync + Send + Clone>
+impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>>
     GhostEndpointSeed<'lt, P, D, S>
 {
     fn new(
