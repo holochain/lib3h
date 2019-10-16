@@ -44,6 +44,10 @@ impl SpaceHash {
     pub fn new() -> SpaceHash {
         SpaceHash(HashString::new())
     }
+
+    pub fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -269,4 +273,37 @@ impl NodePubKey {
     pub fn new() -> NodePubKey {
         NodePubKey(HashString::new())
     }
+}
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::SpaceHash;
+    use holochain_persistence_api::hash::HashString;
+    use holochain_persistence_api::fixture::test_hash_a;
+    use uuid::Uuid;
+
+    #[test]
+    fn display_for_space_hash() {
+        let s = Uuid::new_v4().to_string();
+        let space_hash = SpaceHash::from(HashString::from(s.clone()));
+
+        assert_eq!(
+            s,
+            format!("{}", &space_hash),
+        );
+    }
+
+    #[test]
+    fn space_hash_from_hash_string() {
+        let hash = test_hash_a();
+
+        let space_hash = SpaceHash::from(hash);
+
+        assert_eq!(
+            &hash,
+            space_hash.hash_string()
+        );
+    }
+
 }
