@@ -310,7 +310,7 @@ impl<
         'lt,
         P: GhostProtocol,
         A: 'lt + GhostActor<'lt, P, A>,
-        S: 'lt + GhostSystemRef<'lt> + Sync + Send + Clone,
+        S: 'lt + GhostSystemRef<'lt>,
     > GhostInflator<'lt, P, A, S>
 {
     /// call this to get the `plant`ed full owner endpoint
