@@ -2,21 +2,30 @@ use crate::*;
 use holochain_tracing::Span;
 use std::sync::Arc;
 
+
+pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
+    fn enqueue_processor(
+        &mut self,
+        start_delay_ms: u64,
+        cb: GhostProcessCb<'lt>,
+    ) -> GhostResult<()>;
+}
+
 /// an actor system ref with local context
 /// in general, this is passed into actor constructors
 /// but cannot be used until actor_init is called
-pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync> {
-    sys_ref: GhostSystemRef<'lt>,
+pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
+    sys_ref: S,
     deep_user_data: DeepRef<'lt, X>,
 }
 
 /// callback for spawning a new actor
-pub type GhostActorSpawnCb<'lt, A, P> = Box<
-    dyn FnOnce(GhostActorSystem<'lt, A>, GhostEndpointSeed<'lt, P, ()>) -> GhostResult<A> + 'lt,
+pub type GhostActorSpawnCb<'lt, A, P, S: GhostSystemRef<'lt>> = Box<
+    dyn FnOnce(GhostActorSystem<'lt, A, S>, GhostEndpointSeed<'lt, P, (), S>) -> GhostResult<A> + 'lt,
 >;
 
-impl<'lt, X: 'lt + Send + Sync> GhostActorSystem<'lt, X> {
-    pub(crate) fn new(sys_ref: GhostSystemRef<'lt>, deep_user_data: DeepRef<'lt, X>) -> Self {
+impl<'lt, X: 'lt + Send + Sync, S:GhostSystemRef<'lt>> GhostActorSystem<'lt, X, S> {
+    pub(crate) fn new(sys_ref: S, deep_user_data: DeepRef<'lt, X>) -> Self {
         Self {
             sys_ref,
             deep_user_data,
@@ -114,28 +123,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> GhostEndpointSeed<'l
         self,
         mut deep_user_data: DeepRef<'lt, X>,
         handler: H,
-<<<<<<< HEAD
     ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H, S>> {
-        let (out, finalize_cb) = self.plant_later(handler)?;
-        finalize_cb(weak_user_data)?;
-        Ok(out)
-    }
-
-    /// You may not yet have access to a weak reference to your user_data
-    /// especially in the most normal use-case where you want the "user_data"
-    /// to be a reference to the very struct you are probably constructing.
-    /// `plant_later` allows you to pass in that weak user_data ref later.
-    #[allow(clippy::complexity)]
-    pub fn plant_later<X: 'lt + Send + Sync, H: 'lt + GhostHandler<'lt, X, P>>(
-        self,
-        handler: H,
-    ) -> GhostResult<(
-        GhostEndpointFull<'lt, P, D, X, H, S>,
-        GhostEndpointFullFinalizeCb<'lt, X>,
-    )> {
-=======
-    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H>> {
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
         let mut sys_ref_clone = self.sys_ref.clone();
 
@@ -144,11 +132,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> GhostEndpointSeed<'l
             send: self.send,
             recv: self.recv,
             recv_inner,
-<<<<<<< HEAD
-            pending_callbacks: GhostTracker::new(self.sys_ref.clone(), Weak::new()),
-=======
-            pending_callbacks: GhostTracker::new(self.sys_ref, deep_user_data.clone())?,
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
+            pending_callbacks: GhostTracker::new(self.sys_ref.clone(), deep_user_data.clone())?,
             handler,
         }));
 
@@ -198,11 +182,7 @@ struct GhostEndpointFullInner<
     H: GhostHandler<'lt, X, P>,
     S: GhostSystemRef<'lt>,
 > {
-<<<<<<< HEAD
     weak_user_data: Weak<GhostMutex<X>>,
-=======
-    sys_ref: GhostSystemRef<'lt>,
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
@@ -385,102 +365,3 @@ pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sy
         Ok(())
     }
 }
-<<<<<<< HEAD
-
-/// Slightly awkward helper class for obtaining an Endpoint for an actor's owner
-pub struct GhostInflator<
-    'lt,
-    P: GhostProtocol,
-    A: 'lt + GhostActor<'lt, P, A>,
-    S: GhostSystemRef<'lt>,
-> {
-    finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>>,
-    sys_ref: S,
-    sender: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-    receiver: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
-}
-
-impl<'lt, P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>, S: 'lt + GhostSystemRef<'lt>>
-    GhostInflator<'lt, P, A, S>
-{
-    /// call this to get the `plant`ed full owner endpoint
-    pub fn inflate<H: 'lt + GhostHandler<'lt, A, P>>(
-        self,
-        handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, (), A, H, S>> {
-        let seed = GhostEndpointSeed::new(
-            self.sys_ref,
-            self.sender,
-            self.receiver,
-            // this is the deref/refcount object... but on the actor side
-            // we don't give actors direct access to their owners,
-            // and we certainly don't refcount them ;p
-            Arc::new(GhostMutex::new(())),
-        );
-        let (owner_ref, finalize) = seed.plant_later(handler)?;
-        std::mem::replace(&mut *self.finalize.lock(), Some(finalize));
-
-        Ok(owner_ref)
-    }
-}
-
-/// when spawning a new actor, this callback gives access to an inflator instance
-/// and should return the constructed actor instance.
-pub type GhostActorSpawnCb<'lt, A, P, S> =
-    Box<dyn FnOnce(GhostInflator<'lt, P, A, S>) -> GhostResult<A> + 'lt>;
-
-/// actor instances in the "Ghost" actor system should generally be spawned
-/// using this function.
-pub fn ghost_actor_spawn<
-    'lt,
-    X: 'lt + Send + Sync,
-    P: GhostProtocol,
-    A: 'lt + GhostActor<'lt, P, A>,
-    H: 'lt + GhostHandler<'lt, X, P>,
-    S: 'lt + GhostSystemRef<'lt>,
->(
-    mut sys_ref: S,
-    user_data: Weak<GhostMutex<X>>,
-    spawn_cb: GhostActorSpawnCb<'lt, A, P, S>,
-    handler: H,
-) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H, S>> {
-    let (s1, r1) = crossbeam_channel::unbounded();
-    let (s2, r2) = crossbeam_channel::unbounded();
-
-    let finalize: Arc<GhostMutex<Option<GhostEndpointFullFinalizeCb<'lt, A>>>> =
-        Arc::new(GhostMutex::new(None));
-
-    let inflator: GhostInflator<'lt, P, A, S> = GhostInflator {
-        finalize: finalize.clone(),
-        sys_ref: sys_ref.clone(),
-        sender: s2,
-        receiver: r1,
-    };
-
-    let strong_actor = Arc::new(GhostMutex::new(spawn_cb(inflator)?));
-    let weak_actor = Arc::downgrade(&strong_actor);
-
-    let finalize = std::mem::replace(&mut *finalize.lock(), None);
-
-    (finalize.expect("spawn cannot initialize owner endpoint ref"))(weak_actor.clone())?;
-
-    sys_ref.enqueue_processor(
-        0,
-        Box::new(move || match weak_actor.upgrade() {
-            Some(strong_actor) => {
-                let mut strong_actor = strong_actor.lock();
-                match strong_actor.process() {
-                    Ok(()) => Ok(GhostProcessInstructions::default().set_should_continue(true)),
-                    Err(e) => panic!("actor.process() error: {:?}", e),
-                }
-            }
-            None => Ok(GhostProcessInstructions::default()),
-        }),
-    )?;
-
-    let seed = GhostEndpointSeed::new(sys_ref.clone(), s1, r2, strong_actor);
-    let ep = seed.plant(user_data, handler)?;
-    Ok(ep)
-}
-=======
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e

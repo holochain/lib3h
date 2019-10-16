@@ -8,12 +8,7 @@ use manual_example_mod::*;
 
 #[test]
 fn manual_example() {
-<<<<<<< HEAD
     let mut system = SingleThreadedGhostSystem::new();
-    let system_ref = system.create_ref();
-=======
-    let mut system = GhostSystem::new();
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
 
     #[derive(Debug)]
     struct MyContext {
@@ -28,28 +23,6 @@ fn manual_example() {
 
     let my_context_weak = Arc::downgrade(&my_context);
 
-<<<<<<< HEAD
-    let mut actor_ref = ghost_actor_spawn::<
-        MyContext,
-        TestProtocol,
-        TestActor<SingleThreadedGhostSystemRef>,
-        TestOwnerHandler<MyContext>,
-        SingleThreadedGhostSystemRef,
-    >(
-        system_ref.clone(),
-        my_context_weak,
-        Box::new(|inflator| TestActor::new(inflator)),
-        TestOwnerHandler {
-            handle_event_to_owner_print: Box::new(|me, message| {
-                me.to_owner_prints.push(message.clone());
-                println!("owner printing message from actor: {}", message);
-                Ok(())
-            }),
-            handle_request_to_owner_sub_1: Box::new(|_me, message, cb| cb(Ok(message - 1))),
-        },
-    )
-    .unwrap();
-=======
     let (mut system_ref, finalize) = system.create_external_system_ref();
     finalize(my_context_weak).unwrap();
 
@@ -67,7 +40,6 @@ fn manual_example() {
             },
         )
         .unwrap();
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
 
     actor_ref
         .event_to_actor_print("test-from-framework".to_string())

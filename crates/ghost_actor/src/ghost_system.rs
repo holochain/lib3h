@@ -16,19 +16,16 @@ impl Default for GhostProcessInstructions {
     }
 }
 
-pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
-    fn enqueue_processor(
-        &mut self,
-        start_delay_ms: u64,
-        cb: GhostProcessCb<'lt>,
-    ) -> GhostResult<()>;
-}
-
 pub trait GhostSystem<'lt, S: GhostSystemRef<'lt>> {
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()>;
 
-    fn create_ref(&self) -> S;
+    fn create_external_system_ref<X: 'lt + Send + Sync>(
+        &self,
+    ) -> (
+        GhostActorSystem<'lt, X, S>,
+        FinalizeExternalSystemRefCb<'lt, X>,
+    );
 }
 
 impl GhostProcessInstructions {
@@ -173,13 +170,9 @@ impl<'lt> SingleThreadedGhostSystem<'lt> {
     }
 }
 
-<<<<<<< HEAD
 impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreadedGhostSystem<'lt> {
     /// get a GhostSystemRef capable of enqueueing new processor functions
     /// without creating any deadlocks
-    fn create_ref(&self) -> SingleThreadedGhostSystemRef<'lt> {
-        SingleThreadedGhostSystemRef {
-=======
     pub fn create_external_system_ref<X: 'lt + Send + Sync>(
         &self,
     ) -> (
@@ -188,24 +181,13 @@ impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreaded
     ) {
         let mut deep_ref = DeepRef::new();
         let system = GhostActorSystem::new(
-            GhostSystemRef {
+            SingleThreadedGhostSystemRef {
                 process_send: self.process_send.clone(),
                 _system_inner: self.system_inner.clone(),
             },
             deep_ref.clone(),
         );
         (system, Box::new(move |user_data| deep_ref.set(user_data)))
-    }
-
-    #[allow(dead_code)]
-    /// get a GhostSystemRef capable of enqueueing new processor functions
-    /// without creating any deadlocks
-    pub(crate) fn create_ref(&self) -> GhostSystemRef<'lt> {
-        GhostSystemRef {
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
-            process_send: self.process_send.clone(),
-            _system_inner: self.system_inner.clone(),
-        }
     }
 
     /// execute all queued processor functions
