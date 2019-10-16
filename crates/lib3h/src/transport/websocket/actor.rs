@@ -19,11 +19,12 @@ use lib3h_protocol::{
         error::{DiscoveryError, DiscoveryResult, ErrorKind as DiscoveryErrorKind},
         Discovery,
     },
+    types::*,
     uri::Lib3hUri,
-    Address,
 };
 
 // Use mDNS for bootstrapping
+use holochain_persistence_api::hash::HashString;
 use lib3h_mdns::{MulticastDns, MulticastDnsBuilder};
 
 pub type Message =
@@ -31,8 +32,8 @@ pub type Message =
 
 pub struct GhostTransportWebsocket {
     #[allow(dead_code)]
-    transport_id: Address,
-    network_id_address: Address,
+    node_id: NodePubKey,
+    network_id_address: NetworkHash,
     endpoint_parent: Option<GhostTransportWebsocketEndpoint>,
     endpoint_self: Detach<GhostTransportWebsocketEndpointContext>,
     streams: StreamManager<std::net::TcpStream>,
@@ -54,12 +55,12 @@ impl Discovery for GhostTransportWebsocket {
 
             // let uri: url::Url = uri.into();
 
-            let netid: String = self.network_id_address.clone().into();
+            let network_id_str: String = HashString::from(self.network_id_address.clone()).into();
 
             let mut mdns = MulticastDnsBuilder::new()
-                .own_record(&netid, &[&uri.clone().into_string()])
+                .own_record(&network_id_str, &[&uri.clone().into_string()])
                 .build()?;
-            mdns.insert_record(&netid, &[&uri.into_string()]);
+            mdns.insert_record(&network_id_str, &[&uri.into_string()]);
 
             self.mdns = Some(mdns);
         }
@@ -118,14 +119,14 @@ impl Drop for GhostTransportWebsocket {
 
 impl GhostTransportWebsocket {
     pub fn new(
-        transport_id: Address,
+        node_id: NodePubKey,
         tls_config: TlsConfig,
-        networkid_address: Address,
+        network_id_address: NetworkHash,
     ) -> GhostTransportWebsocket {
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         GhostTransportWebsocket {
-            transport_id,
-            network_id_address: networkid_address,
+            node_id,
+            network_id_address,
             endpoint_parent: Some(endpoint_parent),
             endpoint_self: Detach::new(
                 endpoint_self
@@ -272,7 +273,7 @@ impl GhostTransportWebsocket {
             match event {
                 StreamEvent::ErrorOccured(uri, error) => {
                     warn!(
-                        "Error in GhostWebsocketTransport stream connection to {:?}: {:?}",
+                        "Error in GhostTransportWebsocket stream connection to {:?}: {:?}",
                         uri, error
                     );
                     let response = match error.kind() {
@@ -345,7 +346,7 @@ impl GhostTransportWebsocket {
                     temp.push(msg);
                 }
             } else {
-                panic!("Found a non-SendMessage message in GhostWebsocketTransport::pending!");
+                panic!("Found a non-SendMessage message in GhostTransportWebsocket::pending!");
             }
         }
         self.pending = temp;
@@ -443,13 +444,13 @@ mod tests {
 
     #[test]
     fn test_websocket_transport_send_direct_msg() {
-        let networkid_address: Address = "wss-bootstapping-network-id1.holo.host".into();
+        let network_id_address: NetworkHash = "wss-bootstapping-network-id1.holo.host".into();
 
-        let machine_id1 = "fake_machine_id1".into();
+        let node_id_1 = "fake_node_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(
-            machine_id1,
+            node_id_1,
             TlsConfig::Unencrypted,
-            networkid_address.clone(),
+            network_id_address.clone(),
         );
 
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent<Option<String>> =
@@ -460,11 +461,11 @@ mod tests {
                 .request_id_prefix("twss_to_child1")
                 .build::<Option<String>>();
 
-        let machine_id2 = "fake_machine_id2".into();
+        let node_id_2 = "fake_node_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
-            machine_id2,
+            node_id_2,
             TlsConfig::Unencrypted,
-            networkid_address.clone(),
+            network_id_address.clone(),
         );
 
         let mut t2_endpoint = transport2
@@ -531,13 +532,13 @@ mod tests {
     fn test_websocket_transport_reconnect() {
         enable_logging_for_test(true);
 
-        let networkid_address: Address = "wss-bootstapping-network-id.holo.host".into();
+        let network_id_address: NetworkHash = "wss-bootstapping-network-id.holo.host".into();
 
-        let machine_id1 = "fake_machine_id1".into();
+        let node_id_1 = "fake_node_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(
-            machine_id1,
+            node_id_1,
             TlsConfig::Unencrypted,
-            networkid_address.clone(),
+            network_id_address.clone(),
         );
 
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent<_> = transport1
@@ -568,11 +569,11 @@ mod tests {
         for index in 1..10 {
             wait_until_no_work!(transport1);
             {
-                let machine_id2 = "fake_machine_id2".into();
+                let node_id_2 = "fake_node_id2".into();
                 let mut transport2 = GhostTransportWebsocket::new(
-                    machine_id2,
+                    node_id_2,
                     TlsConfig::Unencrypted,
-                    networkid_address.clone(),
+                    network_id_address.clone(),
                 );
 
                 let mut t2_endpoint = transport2
@@ -633,14 +634,16 @@ mod tests {
     /// Check if we manage to discover nodes using WebSocket for bootstapping using mDNS.
     #[test]
     fn mdns_wss_bootstrapping_test() {
-        let networkid_address: Address =
-            format!("wss-bootstapping-network-id-{}.holo.host", nanoid::simple()).into();
+        let network_id_address: NetworkHash =
+            format!("wss-bootstapping-network-id-{}.holo.host", nanoid::simple())
+                .as_str()
+                .into();
 
-        let machine_id1 = "fake_machine_id1".into();
+        let node_id_1 = "fake_node_id1".into();
         let mut transport1 = GhostTransportWebsocket::new(
-            machine_id1,
+            node_id_1,
             TlsConfig::Unencrypted,
-            networkid_address.clone(),
+            network_id_address.clone(),
         );
         let mut t1_endpoint: GhostTransportWebsocketEndpointContextParent<_> = transport1
             .take_parent_endpoint()
@@ -656,11 +659,11 @@ mod tests {
             format!("{:?}", transport1.discover())
         );
 
-        let machine_id2 = "fake_machine_id2".into();
+        let node_id_2 = "fake_node_id2".into();
         let mut transport2 = GhostTransportWebsocket::new(
-            machine_id2,
+            node_id_2,
             TlsConfig::Unencrypted,
-            networkid_address.clone(),
+            network_id_address.clone(),
         );
         let mut t2_endpoint = transport2
             .take_parent_endpoint()

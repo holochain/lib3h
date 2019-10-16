@@ -6,7 +6,7 @@ use crate::{
 use detach::prelude::*;
 use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
-use lib3h_protocol::{data_types::EntryData, uri::Lib3hUri, Address, DidWork};
+use lib3h_protocol::{data_types::EntryData, types::*, uri::Lib3hUri, DidWork};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -26,7 +26,7 @@ enum MirrorGossip {
 ///  - Monotonic data
 pub struct MirrorDht {
     /// Storage of EntryData with empty aspect content?
-    entry_list: HashMap<Address, HashSet<Address>>,
+    entry_list: HashMap<EntryHash, HashSet<AspectHash>>,
     /// Monotonic Storage of PeerData
     peer_map: HashMap<Lib3hUri, PeerData>,
     /// Track if peer timed out
@@ -115,11 +115,11 @@ impl MirrorDht {
 
     // -- Entry -- //
 
-    fn get_entry_address_list(&self) -> Vec<Address> {
+    fn get_entry_address_list(&self) -> Vec<EntryHash> {
         self.entry_list.iter().map(|kv| kv.0.clone()).collect()
     }
 
-    fn get_aspects_of(&self, entry_address: &Address) -> Option<Vec<Address>> {
+    fn get_aspects_of(&self, entry_address: &EntryHash) -> Option<Vec<AspectHash>> {
         match self.entry_list.get(entry_address) {
             None => None,
             Some(set) => {
@@ -236,7 +236,7 @@ impl MirrorDht {
                 true
             }
             Some(mut peer) => {
-                if peer_info.timestamp <= peer.timestamp {
+                if peer_info.timestamp < peer.timestamp {
                     debug!(
                         "@MirrorDht@ Adding peer - BAD {:?} has earlier timestamp than {:?}",
                         peer_info.timestamp, peer.timestamp
@@ -260,7 +260,7 @@ impl MirrorDht {
 
     /// Return aspect addresses diff between
     /// known aspects and aspects in the entry argument
-    fn diff_aspects(&self, entry: &EntryData) -> HashSet<Address> {
+    fn diff_aspects(&self, entry: &EntryData) -> HashSet<AspectHash> {
         let aspect_address_set: HashSet<_> = entry
             .aspect_list
             .iter()
@@ -456,7 +456,11 @@ impl MirrorDht {
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
             DhtRequestToChild::HoldEntryAspectAddress(entry) => {
-                trace!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
+                trace!(
+                    "({:?}).DhtRequestToChild::HoldEntryAspectAddress: {:?}",
+                    self.config.this_peer_name(),
+                    entry
+                );
                 // if its shallow, ask for actual data
                 if entry.aspect_list.len() > 0 && entry.aspect_list[0].aspect.len() == 0 {
                     self.endpoint_self.publish(
@@ -487,6 +491,10 @@ impl MirrorDht {
                 let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
                 if !received_new_content {
+                    trace!(
+                        "@MirrorDht@ did not receive new content from entry {:?}",
+                        entry
+                    );
                     return Ok(());
                 }
                 let gossip_evt = self.gossip_entry(&entry);

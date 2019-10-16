@@ -80,8 +80,7 @@ impl P2pGateway {
                     P2pProtocol::CapnProtoMessage(P2pMessage::create_ping(None).into_bytes())
                         .into_bytes()
                         .into();
-                let mut uri = peer_data.peer_location.clone();
-                uri.set_agent_id(&peer_data.peer_name.lower_address());
+                let uri = peer_data.get_uri();
                 self.send_with_full_low_uri(
                     SendWithFullLowUri {
                         span: span.follower("DhtRequestToParent::HoldPeerRequested"),

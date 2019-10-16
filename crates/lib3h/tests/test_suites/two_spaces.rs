@@ -76,7 +76,7 @@ pub fn test_rejoining(alex: &mut NodeMock, billy: &mut NodeMock, options: &Proce
     assert_process_success!(billy, req_id);
     // Alex and Billy re-joins
     println!("\nAlex and Billy re-joins...\n");
-    two_join_space(alex, billy, &SPACE_ADDRESS_A);
+    two_join_space(alex, billy, &SPACE_ADDRESS_A, options);
     // Do some test
     println!("\nTest send DirectMessage...\n");
     test_send_message(alex, billy, options);
@@ -106,8 +106,8 @@ pub fn test_multispace_send(
     assert_process_success!(alex, req_id);
     // Alex and Billy joins other spaces
     println!("\n Alex and Billy joins other spaces...\n");
-    two_join_space(alex, billy, &SPACE_ADDRESS_B);
-    two_join_space(alex, billy, &SPACE_ADDRESS_C);
+    two_join_space(alex, billy, &SPACE_ADDRESS_B, options);
+    two_join_space(alex, billy, &SPACE_ADDRESS_C, options);
     wait_engine_wrapper_until_no_work!(alex);
     wait_engine_wrapper_until_no_work!(billy);
 
@@ -135,7 +135,7 @@ pub fn test_multispace_send(
     alex.set_current_space(&SPACE_ADDRESS_A);
     billy.set_current_space(&SPACE_ADDRESS_A);
     let _req_id = alex.send_direct_message(&BILLY_AGENT_ID, "marco".as_bytes().to_vec());
-    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_8\", space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), to_agent_id: HashString\\(\"billy\"\\), result_info: ";
+    let expected = "FailureResult\\(GenericResultData \\{ request_id: \"req_alex_8\", space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), to_agent_id: AgentPubKey\\(HashString\\(\"billy\"\\)\\), result_info: ";
 
     let _results = assert2_msg_matches!(alex, billy, expected, options);
 }
@@ -149,8 +149,8 @@ pub fn test_multispace_dht(alex: &mut NodeMock, billy: &mut NodeMock, options: &
     assert_process_success!(alex, req_id);
     // Alex and Billy joins other spaces
     println!("\nAlex and Billy re-joins...\n");
-    two_join_space(alex, billy, &SPACE_ADDRESS_B);
-    two_join_space(alex, billy, &SPACE_ADDRESS_C);
+    two_join_space(alex, billy, &SPACE_ADDRESS_B, options);
+    two_join_space(alex, billy, &SPACE_ADDRESS_C, options);
 
     // Author entry on SPACE B
     // =======================

@@ -144,7 +144,7 @@ impl<'engine> GhostEngine<'engine> {
                             let lib3h_msg = StoreEntryAspectData {
                                 request_id: self.request_track.reserve(),
                                 space_address: chain_id.0.clone(),
-                                provider_agent_id: from_peer_name.clone().into(),
+                                provider_agent_id: from_peer_name.agent_id(),
                                 entry_address: entry.entry_address.clone(),
                                 entry_aspect: aspect,
                             };
@@ -210,7 +210,8 @@ impl<'engine> GhostEngine<'engine> {
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
-                                            trace!("Received HandleFetchEntryResult response | {}", is_data_for_author_list);
+                                            trace!("Received HandleFetchEntryResult response | is_data_for_author_list:{}",
+                                                is_data_for_author_list);
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
                                                     Span::fixme(),
@@ -344,8 +345,10 @@ impl<'engine> GhostEngine<'engine> {
                     from_peer_name: gossip_data.from_peer_name.clone(),
                     bundle: gossip_data.bundle.clone(),
                 };
-                let space_gateway =
-                    self.get_space(&gossip_data.space_address, &gossip_data.to_peer_name.into())?;
+                let space_gateway = self.get_space(
+                    &gossip_data.space_address,
+                    &gossip_data.to_peer_name.agent_id(),
+                )?;
                 space_gateway.publish(
                     span.follower("TODO"),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(remote_gossip)),

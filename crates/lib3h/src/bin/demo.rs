@@ -113,7 +113,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             .request(
                 Span::fixme(),
                 ClientToLib3h::Bootstrap(BootstrapData {
-                    space_address: NET_ID.into(),
+                    network_or_space_address: NET_ID.into(),
                     bootstrap_uri: out.engine2_addr.clone(),
                 }),
                 Box::new(|_, r| {
@@ -132,7 +132,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 ClientToLib3h::JoinSpace(SpaceData {
                     request_id: "".to_string(),
                     space_address: SPACE_ADDR.into(),
-                    agent_id: A_1_ID.to_string().into(),
+                    agent_id: A_1_ID.into(),
                 }),
                 Box::new(|_, r| {
                     println!("1 got: {:?}", r);
@@ -147,7 +147,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 ClientToLib3h::JoinSpace(SpaceData {
                     request_id: "".to_string(),
                     space_address: SPACE_ADDR.into(),
-                    agent_id: A_2_ID.to_string().into(),
+                    agent_id: A_2_ID.into(),
                 }),
                 Box::new(|_, r| {
                     println!("2 got: {:?}", r);
@@ -173,10 +173,10 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                     msg.respond(Ok(Lib3hToClientResponse::HandleQueryEntryResult(
                         QueryEntryResultData {
                             space_address: SPACE_ADDR.into(),
-                            entry_address: ENTRY_ADDR.to_string().into(),
+                            entry_address: ENTRY_ADDR.into(),
                             request_id: "TEST_REQ_ID".to_string(),
-                            requester_agent_id: A_1_ID.to_string().into(),
-                            responder_agent_id: A_1_ID.to_string().into(),
+                            requester_agent_id: A_1_ID.into(),
+                            responder_agent_id: A_1_ID.into(),
                             query_result: format!(
                                 "echo: {}",
                                 String::from_utf8_lossy(&q_data.query)
@@ -230,8 +230,8 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 ClientToLib3h::SendDirectMessage(DirectMessageData {
                     space_address: SPACE_ADDR.into(),
                     request_id: "TEST_REQ_ID".to_string(),
-                    to_agent_id: A_2_ID.to_string().into(),
-                    from_agent_id: A_1_ID.to_string().into(),
+                    to_agent_id: A_2_ID.into(),
+                    from_agent_id: A_1_ID.into(),
                     content: b"bob".to_vec().into(),
                 }),
                 Box::new(|_, r| {
@@ -255,9 +255,9 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Span::fixme(),
                 ClientToLib3h::QueryEntry(QueryEntryData {
                     space_address: SPACE_ADDR.into(),
-                    entry_address: ENTRY_ADDR.to_string().into(),
+                    entry_address: ENTRY_ADDR.into(),
                     request_id: "TEST_REQ_ID".to_string(),
-                    requester_agent_id: A_1_ID.to_string().into(),
+                    requester_agent_id: A_1_ID.into(),
                     query: b"bob".to_vec().into(),
                 }),
                 Box::new(|_, r| {
@@ -275,11 +275,11 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
                 Span::fixme(),
                 ClientToLib3h::PublishEntry(ProvidedEntryData {
                     space_address: SPACE_ADDR.into(),
-                    provider_agent_id: A_1_ID.to_string().into(),
+                    provider_agent_id: A_1_ID.into(),
                     entry: EntryData {
-                        entry_address: ENTRY_ADDR.to_string().into(),
+                        entry_address: ENTRY_ADDR.into(),
                         aspect_list: vec![EntryAspectData {
-                            aspect_address: ASPECT_ADDR.to_string().into(),
+                            aspect_address: ASPECT_ADDR.into(),
                             type_hint: "test".to_string(),
                             aspect: b"bob".to_vec().into(),
                             publish_ts: 0,

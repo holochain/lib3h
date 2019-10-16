@@ -17,7 +17,7 @@ use lib3h_protocol::{
     protocol_server::*,
     types::*,
     uri::Lib3hUri,
-    Address, DidWork,
+    DidWork,
 };
 pub type WrappedGhostLib3h = LegacyLib3h<GhostEngine<'static>, Lib3hError>;
 
@@ -46,7 +46,7 @@ fn server_failure(
     err: String,
     request_id: String,
     space_address: SpaceHash,
-    to_agent_id: Address,
+    to_agent_id: AgentPubKey,
 ) -> Lib3hServerProtocol {
     let failure_data = GenericResultData {
         request_id,
@@ -60,7 +60,7 @@ fn server_failure(
 fn server_success(
     request_id: String,
     space_address: SpaceHash,
-    to_agent_id: Address,
+    to_agent_id: AgentPubKey,
 ) -> Lib3hServerProtocol {
     let success_data = GenericResultData {
         request_id,
@@ -96,7 +96,7 @@ where
     fn make_callback(
         request_id: String,
         space_addr: SpaceHash,
-        agent: Address,
+        agent: AgentPubKey,
     ) -> GhostCallback<LegacyLib3h<Engine, EngineError>, ClientToLib3hResponse, EngineError> {
         Box::new(
             |me: &mut LegacyLib3h<Engine, EngineError>,
@@ -241,7 +241,7 @@ where
             debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
-            let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
+            let ghost_message = maybe_ghost_message.ok_or_else(|| {
                 Lib3hProtocolError::new(ErrorKind::Other(format!(
                     "No ghost message for request: {:?}",
                     request_id.as_str()
@@ -266,7 +266,7 @@ where
                 _ => lib3h_to_client_response.clone(),
             };
 
-            ghost_mesage
+            ghost_message
                 .respond(Ok(response))
                 .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         }
@@ -492,7 +492,7 @@ mod tests {
 
         // The mock engine allways returns failure on connect requests
         assert_eq!(
-            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: SpaceHash(HashString(\"bogus_address\")), to_agent_id: HashString(\"bogus_agent\"), result_info: \"connection failed!\" })]))",
+            "Ok((true, [FailureResult(GenericResultData { request_id: \"foo_request_id\", space_address: SpaceHash(HashString(\"bogus_address\")), to_agent_id: AgentPubKey(HashString(\"bogus_agent\")), result_info: \"connection failed!\" })]))",
             format!("{:?}", result)
         );
 
@@ -507,7 +507,7 @@ mod tests {
 
         // The mock engine allways returns success on Join requests
         assert_eq!(
-            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: SpaceHash(HashString(\"fake_space_address\")), to_agent_id: HashString(\"fake_id\"), result_info: \"\" })]))",
+            "Ok((true, [SuccessResult(GenericResultData { request_id: \"bar_request_id\", space_address: SpaceHash(HashString(\"fake_space_address\")), to_agent_id: AgentPubKey(HashString(\"fake_id\")), result_info: \"\" })]))",
             format!("{:?}", result)
         );
 
@@ -557,7 +557,7 @@ mod tests {
         let result = legacy.process();
 
         assert_eq!(
-            "Ok((true, [Disconnected(DisconnectedData { network_id: \"\" })]))",
+            "Ok((true, [Disconnected(DisconnectedData { network_id: NetworkHash(HashString(\"\")) })]))",
             format!("{:?}", result)
         );
     }

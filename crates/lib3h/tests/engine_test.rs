@@ -43,8 +43,8 @@ fn enable_logging_for_test(enable: bool) {
         std::env::set_var("RUST_LOG", "trace");
     }
     let _ = env_logger::builder()
-        .default_format_timestamp(false)
-        .default_format_module_path(false)
+        .default_format_timestamp(true)
+        .default_format_module_path(true)
         .is_test(enable)
         .try_init();
 }
@@ -166,10 +166,10 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
         )
         .unwrap();
     let handle_get_gossip_entry_list_regex =
-        "HandleGetGossipingEntryList\\(GetListData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
+        "HandleGetGossipingEntryList\\(GetListData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
     let handle_get_authoring_entry_list_regex =
-        "HandleGetAuthoringEntryList\\(GetListData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), provider_agent_id: HashString\\(\"alex\"\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
+        "HandleGetAuthoringEntryList\\(GetListData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), request_id: \"[\\w\\d_~]*\" \\}\\)";
 
     let regexes = vec![
         handle_get_authoring_entry_list_regex,
