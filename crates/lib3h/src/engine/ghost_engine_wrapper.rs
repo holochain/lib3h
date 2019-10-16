@@ -241,7 +241,7 @@ where
             debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
-            let ghost_mesage = maybe_ghost_message.ok_or_else(|| {
+            let ghost_message = maybe_ghost_message.ok_or_else(|| {
                 Lib3hProtocolError::new(ErrorKind::Other(format!(
                     "No ghost message for request: {:?}",
                     request_id.as_str()
@@ -266,7 +266,7 @@ where
                 _ => lib3h_to_client_response.clone(),
             };
 
-            ghost_mesage
+            ghost_message
                 .respond(Ok(response))
                 .map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         }
