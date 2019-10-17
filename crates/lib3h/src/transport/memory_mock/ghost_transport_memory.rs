@@ -1,5 +1,5 @@
 use crate::transport::{
-    error::{ErrorKind, TransportError},
+    error::TransportError,
     memory_mock::memory_server::{self, *},
     protocol::{RequestToChildResponse::SendMessageSuccess, *},
 };
@@ -256,13 +256,13 @@ impl
                         }
                         MemoryEvent::Unbind(url) => {
                             trace!("MemoryEvent::Unbind: {:?}", url);
-                            self.endpoint_self.publish(
-                                Span::fixme(),
-                                RequestToParent::ErrorOccured {
-                                    uri: url,
-                                    error: TransportError::new_kind(ErrorKind::Unbind),
-                                },
-                            )?;
+                            self.endpoint_self
+                                .publish(Span::fixme(), RequestToParent::Unbind(url))?;
+                        }
+                        MemoryEvent::ConnectionClosed(url) => {
+                            trace!("MemoryEvent::ConnectionClosed: {:?}", url);
+                            self.endpoint_self
+                                .publish(Span::fixme(), RequestToParent::Disconnect(url))?;
                         }
                         _ => panic!(format!("WHAT: {:?}", event)),
                     };
@@ -568,4 +568,65 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_gmem_disconnect() {
+        let netname = "test_gmem_disconnect";
+        let (mut transport1, mut t1_endpoint) = make_test_transport("1", netname);
+        let (mut transport2, mut t2_endpoint) = make_test_transport("2", netname);
+        let mut bound_transport1_address = Lib3hUri::with_undefined();
+        do_bind(&mut t1_endpoint);
+        let mut bound_transport2_address = Lib3hUri::with_undefined();
+        do_bind(&mut t2_endpoint);
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut bound_transport2_address);
+
+        // send a message from transport1 to transport2 over the bound addresses to establish the connection
+        t1_endpoint
+            .request(
+                test_span(""),
+                RequestToChild::create_send_message(
+                    Lib3hUri::with_memory("addr_2"),
+                    b"test message".to_vec().into(),
+                ),
+                Box::new(|_: &mut Lib3hUri, r| {
+                    // parent should see that the send request was OK
+                    assert_eq!("Response(Ok(SendMessageSuccess))", &format!("{:?}", r));
+                    Ok(())
+                }),
+            )
+            .unwrap();
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut bound_transport2_address);
+
+        // now have transport1's connection drop
+        let t1_uri = transport1.maybe_my_address.clone().unwrap();
+        let t2_uri = transport2.maybe_my_address.clone().unwrap();
+        {
+            let network = {
+                let mut verse = get_memory_verse();
+                verse.get_network(netname)
+            };
+            let mut net = network.lock().unwrap();
+            let server = net
+                .get_server(&t2_uri)
+                .expect("there should be a server for to_uri");
+            server.request_close(&t1_uri).expect("can disconnect");
+        }
+
+        transport1.process().unwrap();
+        let _ = t1_endpoint.process(&mut bound_transport1_address);
+        transport2.process().unwrap();
+        let _ = t2_endpoint.process(&mut bound_transport2_address);
+
+        let mut requests = t2_endpoint.drain_messages();
+        assert_eq!(4, requests.len());
+        assert_eq!(
+            "Some(Disconnect(Lib3hUri(\"mem://addr_1/\")))",
+            format!("{:?}", requests[3].take_message())
+        );
+    }
 }

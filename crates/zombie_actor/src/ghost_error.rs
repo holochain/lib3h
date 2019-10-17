@@ -61,6 +61,12 @@ impl std::fmt::Display for GhostError {
     }
 }
 
+impl From<ErrorKind> for GhostError {
+    fn from(k: ErrorKind) -> Self {
+        GhostError::new(k)
+    }
+}
+
 impl From<Vec<GhostError>> for GhostError {
     fn from(m: Vec<GhostError>) -> Self {
         GhostError::new(ErrorKind::Multiple(m))

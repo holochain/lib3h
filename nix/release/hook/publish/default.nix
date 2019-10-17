@@ -9,13 +9,13 @@ echo "packaging for crates.io"
 for crate in \
  crypto_api \
  detach \
+ sodium \
+ zombie_actor \
  ghost_actor \
- lib3h \
  lib3h_protocol \
  mdns \
  p2p_protocol \
- sodium \
- zombie_actor
+ lib3h
 do
  cargo publish --manifest-path "crates/$crate/Cargo.toml"
 

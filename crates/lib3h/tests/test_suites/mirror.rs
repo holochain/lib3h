@@ -31,7 +31,7 @@ pub fn setup_mirror_nodes(nodes: &mut Vec<NodeMock>, options: &ProcessingOptions
 
     nodes_join_space(nodes, options);
 
-    for _i in 0..100 * *MIRROR_NODES_COUNT {
+    for _i in 0..100 * *MIRROR_NODES_COUNT as usize {
         process_nodes(nodes, options);
     }
     debug!(
