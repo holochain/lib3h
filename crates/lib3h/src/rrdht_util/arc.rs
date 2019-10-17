@@ -49,6 +49,32 @@ impl Arc {
         unimplemented!();
     }
 
+    /// the start position for this arc
+    pub fn start(&self) -> Location {
+        self.start
+    }
+
+    /// the length of this arc
+    pub fn length(&self) -> u64 {
+        self.length
+    }
+
+    /// the center point of this arc, the "location" if specified by radius
+    pub fn center(&self) -> Location {
+        if self.length == 0 {
+            return self.start;
+        }
+        self.start + (self.radius() - 1).into()
+    }
+
+    /// the radius of this arc
+    pub fn radius(&self) -> u32 {
+        if self.length == 0 {
+            return 0;
+        }
+        (self.length / 2 + 1) as u32
+    }
+
     /// returns `true` if given location is within this arc
     pub fn contains_location(&self, location: Location) -> bool {
         self.start.forward_distance_to(location) < self.length
@@ -128,6 +154,120 @@ mod tests {
             "32r80000000:100000000",
             Arc::new_radius(0.into(), ARC_RADIUS_MAX).to_string(),
         );
+    }
+
+    #[test]
+    fn it_center_and_radius_give_sane_results() {
+        // make sure zero length works
+        let t = Arc::new(42.into(), 0);
+        assert_eq!(42, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(0, t.length());
+        assert_eq!(0, t.radius());
+        let t = Arc::new(43.into(), 0);
+        assert_eq!(43, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(0, t.length());
+        assert_eq!(0, t.radius());
+        let t = Arc::new_radius(42.into(), 0);
+        assert_eq!(42, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(0, t.length());
+        assert_eq!(0, t.radius());
+        let t = Arc::new_radius(43.into(), 0);
+        assert_eq!(43, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(0, t.length());
+        assert_eq!(0, t.radius());
+        // make sure 1 length works
+        let t = Arc::new(42.into(), 1);
+        assert_eq!(42, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(1, t.length());
+        assert_eq!(1, t.radius());
+        let t = Arc::new(43.into(), 1);
+        assert_eq!(43, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(1, t.length());
+        assert_eq!(1, t.radius());
+        // make sure 1 radius works
+        let t = Arc::new_radius(42.into(), 1);
+        assert_eq!(42, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(1, t.length());
+        assert_eq!(1, t.radius());
+        let t = Arc::new_radius(43.into(), 1);
+        assert_eq!(43, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(1, t.length());
+        assert_eq!(1, t.radius());
+        // 2 length is a little weird... it's not an even radius
+        let t = Arc::new(42.into(), 2);
+        assert_eq!(43, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(2, t.length());
+        assert_eq!(2, t.radius());
+        let t = Arc::new(43.into(), 2);
+        assert_eq!(44, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(2, t.length());
+        assert_eq!(2, t.radius());
+        // make sure 3 length works
+        let t = Arc::new(42.into(), 3);
+        assert_eq!(43, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(3, t.length());
+        assert_eq!(2, t.radius());
+        let t = Arc::new(43.into(), 3);
+        assert_eq!(44, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(3, t.length());
+        assert_eq!(2, t.radius());
+        // make sure 2 radius works
+        let t = Arc::new_radius(42.into(), 2);
+        assert_eq!(42, t.center());
+        assert_eq!(41, t.start());
+        assert_eq!(3, t.length());
+        assert_eq!(2, t.radius());
+        let t = Arc::new_radius(43.into(), 2);
+        assert_eq!(43, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(3, t.length());
+        assert_eq!(2, t.radius());
+        // make sure full length works
+        let t = Arc::new(42.into(), ARC_LENGTH_MAX);
+        assert_eq!(0x8000002a, t.center());
+        assert_eq!(42, t.start());
+        assert_eq!(ARC_LENGTH_MAX, t.length());
+        assert_eq!(ARC_RADIUS_MAX, t.radius());
+        let t = Arc::new(43.into(), ARC_LENGTH_MAX);
+        assert_eq!(0x8000002b, t.center());
+        assert_eq!(43, t.start());
+        assert_eq!(ARC_LENGTH_MAX, t.length());
+        assert_eq!(ARC_RADIUS_MAX, t.radius());
+        // make sure full radius works
+        let t = Arc::new_radius(42.into(), ARC_RADIUS_MAX);
+        assert_eq!(42, t.center());
+        assert_eq!(0x8000002a, t.start());
+        assert_eq!(ARC_LENGTH_MAX, t.length());
+        assert_eq!(ARC_RADIUS_MAX, t.radius());
+        let t = Arc::new_radius(43.into(), ARC_RADIUS_MAX);
+        assert_eq!(43, t.center());
+        assert_eq!(0x8000002b, t.start());
+        assert_eq!(ARC_LENGTH_MAX, t.length());
+        assert_eq!(ARC_RADIUS_MAX, t.radius());
+        // make sure wrap length works
+        let t = Arc::new(0xffffffff.into(), 3);
+        assert_eq!(0, t.center());
+        assert_eq!(0xffffffff, t.start());
+        assert_eq!(3, t.length());
+        assert_eq!(2, t.radius());
+        // make sure wrap radius works
+        let t = Arc::new_radius(0.into(), 2);
+        assert_eq!(0, t.center());
+        assert_eq!(0xffffffff, t.start());
+        assert_eq!(3, t.length());
+        assert_eq!(2, t.radius());
     }
 
     #[test]
