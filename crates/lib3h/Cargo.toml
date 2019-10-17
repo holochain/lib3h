@@ -1,6 +1,6 @@
 [package]
 name = "lib3h"
-version = "0.0.17"
+version = "0.0.18"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
@@ -14,18 +14,18 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 backtrace = "=0.3.27"
-detach = { version = "=0.0.17", path = "../detach" }
+detach = { version = "=0.0.18", path = "../detach" }
 env_logger = "=0.6.1"
 hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.10"
 holochain_tracing = "=0.0.1"
 # version on the left for release regex
-lib3h_protocol = { version = "=0.0.17", path = "../lib3h_protocol" }
-lib3h_p2p_protocol = { version = "=0.0.17", path = "../p2p_protocol" }
-lib3h_crypto_api = { version = "=0.0.17", path = "../crypto_api" }
-lib3h_zombie_actor = { version = "=0.0.17", path = "../zombie_actor" }
-lib3h_sodium = { version = "=0.0.17", path = "../sodium" }
-lib3h_mdns = { version = "=0.0.17", path = "../mdns" }
+lib3h_protocol = { version = "=0.0.18", path = "../lib3h_protocol" }
+lib3h_p2p_protocol = { version = "=0.0.18", path = "../p2p_protocol" }
+lib3h_crypto_api = { version = "=0.0.18", path = "../crypto_api" }
+lib3h_zombie_actor = { version = "=0.0.18", path = "../zombie_actor" }
+lib3h_sodium = { version = "=0.0.18", path = "../sodium" }
+lib3h_mdns = { version = "=0.0.18", path = "../mdns" }
 nanoid = "=0.2.0"
 tungstenite = "=0.9.1"
 url = { version = "=2.1.0", features = ["serde"] }
