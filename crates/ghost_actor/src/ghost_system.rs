@@ -20,12 +20,20 @@ pub trait GhostSystem<'lt, S: GhostSystemRef<'lt>> {
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()>;
 
+    fn create_ref(&self) -> S;
+
+    /// get a GhostSystemRef capable of enqueueing new processor functions
+    /// without creating any deadlocks
     fn create_external_system_ref<X: 'lt + Send + Sync>(
         &self,
     ) -> (
         GhostActorSystem<'lt, X, S>,
         FinalizeExternalSystemRefCb<'lt, X>,
-    );
+    ) {
+        let mut deep_ref = DeepRef::new();
+        let system = GhostActorSystem::new(self.create_ref(), deep_ref.clone());
+        (system, Box::new(move |user_data| deep_ref.set(user_data)))
+    }
 }
 
 impl GhostProcessInstructions {
@@ -171,28 +179,16 @@ impl<'lt> SingleThreadedGhostSystem<'lt> {
 }
 
 impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreadedGhostSystem<'lt> {
-    /// get a GhostSystemRef capable of enqueueing new processor functions
-    /// without creating any deadlocks
-    pub fn create_external_system_ref<X: 'lt + Send + Sync>(
-        &self,
-    ) -> (
-        GhostActorSystem<'lt, X>,
-        FinalizeExternalSystemRefCb<'lt, X>,
-    ) {
-        let mut deep_ref = DeepRef::new();
-        let system = GhostActorSystem::new(
-            SingleThreadedGhostSystemRef {
-                process_send: self.process_send.clone(),
-                _system_inner: self.system_inner.clone(),
-            },
-            deep_ref.clone(),
-        );
-        (system, Box::new(move |user_data| deep_ref.set(user_data)))
-    }
-
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()> {
         self.system_inner.lock().process()
+    }
+
+    fn create_ref(&self) -> SingleThreadedGhostSystemRef<'lt> {
+        SingleThreadedGhostSystemRef {
+            process_send: self.process_send.clone(),
+            _system_inner: self.system_inner.clone(),
+        }
     }
 }
 

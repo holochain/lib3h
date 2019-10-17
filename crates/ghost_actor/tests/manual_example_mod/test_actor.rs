@@ -5,52 +5,21 @@
 use super::test_protocol::*;
 use ghost_actor::prelude::*;
 
-<<<<<<< HEAD
-pub struct TestActor<'lt, S: GhostSystemRef<'lt> + Sync + Send> {
-    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>, S>,
-}
-
-impl<'lt, S: GhostSystemRef<'lt> + Send + Sync + Clone> TestActor<'lt, S> {
-    pub fn new(inflator: GhostInflator<'lt, TestProtocol, Self, S>) -> GhostResult<Self> {
-        let mut out = Self {
-            owner_ref: inflator.inflate(TestActorHandler {
-                handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt, S>, message| {
-                    me.owner_ref
-                        .event_to_owner_print(format!("echo: {:?}", message))?;
-                    println!("actor printing message from owner: {}", message);
-                    Ok(())
-                }),
-                handle_request_to_actor_add_1: Box::new(
-                    |_me: &mut TestActor<'lt, S>, message, cb| cb(Ok(message + 1)),
-                ),
-            })?,
-        };
-        out.owner_ref
-            .event_to_owner_print("message from actor".to_string())?;
-        out.owner_ref.request_to_owner_sub_1(
-            42,
-            Box::new(|me, result| {
-                me.owner_ref
-                    .event_to_owner_print(format!("echo: {:?}", result))?;
-                println!("actor got response from owner: 42 - 1 = {:?}", result);
-                Ok(())
-            }),
-=======
-pub struct TestActor<'lt> {
+pub struct TestActor<'lt, S: GhostSystemRef<'lt>> {
     name: String,
     #[allow(dead_code)]
-    sys_ref: GhostActorSystem<'lt, Self>,
-    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>>,
+    sys_ref: GhostActorSystem<'lt, Self, S>,
+    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>, S>,
     sub_actor:
-        Option<GhostEndpointFull<'lt, TestProtocol, Self, Self, TestOwnerHandler<'lt, Self>>>,
+        Option<GhostEndpointFull<'lt, TestProtocol, Self, Self, TestOwnerHandler<'lt, Self>, S>>,
 }
 
-impl<'lt> TestActor<'lt> {
+impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
     pub fn new(
         name: &str,
-        mut sys_ref: GhostActorSystem<'lt, Self>,
-        owner_seed: GhostEndpointSeed<'lt, TestProtocol, ()>,
-        sub_actor: Option<GhostEndpointSeed<'lt, TestProtocol, Self>>,
+        mut sys_ref: GhostActorSystem<'lt, Self, S>,
+        owner_seed: GhostEndpointSeed<'lt, TestProtocol, (), S>,
+        sub_actor: Option<GhostEndpointSeed<'lt, TestProtocol, Self, S>>,
     ) -> GhostResult<Self> {
         let sub_actor = if name == "root" {
             if let Some(_) = sub_actor {
@@ -96,7 +65,7 @@ impl<'lt> TestActor<'lt> {
         let mut owner_ref = sys_ref.plant_endpoint(
             owner_seed,
             TestActorHandler {
-                handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt>, message| {
+                handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt, S>, message| {
                     match &mut me.sub_actor {
                         None => {
                             me.owner_ref.event_to_owner_print(format!(
@@ -113,8 +82,8 @@ impl<'lt> TestActor<'lt> {
                     }
                     Ok(())
                 }),
-                handle_request_to_actor_add_1: Box::new(|me: &mut TestActor<'lt>, message, cb| {
-                    match &mut me.sub_actor {
+                handle_request_to_actor_add_1: Box::new(
+                    |me: &mut TestActor<'lt, S>, message, cb| match &mut me.sub_actor {
                         None => {
                             me.owner_ref.event_to_owner_print(format!(
                                 "({} add 1 to {})",
@@ -132,10 +101,9 @@ impl<'lt> TestActor<'lt> {
                                 cb(result?)
                             }),
                         ),
-                    }
-                }),
+                    },
+                ),
             },
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
         )?;
 
         if sub_actor.is_none() {

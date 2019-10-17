@@ -21,30 +21,13 @@ enum GhostTrackerToInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     Handle(RequestId, T),
 }
 
-<<<<<<< HEAD
-struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
-    weak_user_data: Weak<GhostMutex<X>>,
-=======
 struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
     pending: HashMap<RequestId, GhostTrackerEntry<'lt, X, T>>,
     recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
-    sys_ref: S,
 }
 
-<<<<<<< HEAD
-impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>>
-    GhostTrackerInner<'lt, X, T, S>
-{
-    fn new(
-        sys_ref: S,
-        weak_user_data: Weak<GhostMutex<X>>,
-        recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>,
-    ) -> Self {
-=======
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, T> {
     fn new(recv_inner: crossbeam_channel::Receiver<GhostTrackerToInner<'lt, X, T>>) -> Self {
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
         Self {
             pending: HashMap::new(),
             recv_inner,
@@ -144,24 +127,17 @@ impl GhostTrackerBookmarkOptions {
 
 /// GhostTracker registers callbacks associated with request_ids
 /// that can be triggered later when a response comes back indicating that id
-pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
+pub struct GhostTracker<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     // just for ref count
-    _inner: Arc<GhostMutex<GhostTrackerInner<'lt, X, T, S>>>,
+    _inner: Arc<GhostMutex<GhostTrackerInner<'lt, X, T>>>,
     send_inner: crossbeam_channel::Sender<GhostTrackerToInner<'lt, X, T>>,
 }
 
-<<<<<<< HEAD
-impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync, S: 'lt + GhostSystemRef<'lt>>
-    GhostTracker<'lt, X, T, S>
-{
-    pub fn new(mut sys_ref: S, weak_user_data: Weak<GhostMutex<X>>) -> Self {
-=======
 impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
-    pub(crate) fn new(
-        mut sys_ref: GhostSystemRef<'lt>,
+    pub(crate) fn new<S: 'lt + GhostSystemRef<'lt>>(
+        mut sys_ref: S,
         mut deep_user_data: DeepRef<'lt, X>,
     ) -> GhostResult<Self> {
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
 
         let inner = Arc::new(GhostMutex::new(GhostTrackerInner::new(recv_inner)));
@@ -209,11 +185,11 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         span: Span,
         cb: GhostResponseCb<'lt, X, T>,
     ) -> GhostResult<RequestId> {
-        self.bookmark_options(span, cb, GhostTrackerBookmarkOptions::default())
+        self.bookmark_with_options(span, cb, GhostTrackerBookmarkOptions::default())
     }
 
     /// register a callback, using a specific timeout instead of the default
-    pub fn bookmark_options(
+    pub fn bookmark_with_options(
         &mut self,
         _span: Span,
         cb: GhostResponseCb<'lt, X, T>,
@@ -254,46 +230,6 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-<<<<<<< HEAD
-    fn it_can_schedule_periodic() {
-        #[derive(Debug)]
-        struct Test {
-            ticks: i32,
-        }
-
-        let test = Arc::new(GhostMutex::new(Test { ticks: 0 }));
-
-        let mut sys = SingleThreadedGhostSystem::new();
-
-        let mut track: GhostTracker<Test, (), SingleThreadedGhostSystemRef> =
-            GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
-
-        track
-            .periodic_task(
-                20,
-                Box::new(|me| {
-                    me.ticks += 1;
-                    Ok(GhostProcessInstructions::default()
-                        .set_should_continue(true)
-                        .set_next_run_delay_ms(40))
-                }),
-            )
-            .unwrap();
-
-        for _ in 0..10 {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            sys.process().unwrap();
-        }
-
-        let test = test.lock();
-        println!("got {:?}", *test);
-        assert!(test.ticks > 0);
-        assert!(test.ticks < 9);
-    }
-
-    #[test]
-=======
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
     fn it_should_timeout() {
         #[derive(Debug)]
         struct Test {
@@ -304,21 +240,14 @@ mod tests {
         let mut deep = DeepRef::new();
         deep.set(Arc::downgrade(&test)).unwrap();
 
-<<<<<<< HEAD
         let mut sys = SingleThreadedGhostSystem::new();
-
-        let mut track: GhostTracker<Test, (), SingleThreadedGhostSystemRef> =
-            GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
-=======
-        let mut sys = GhostSystem::new();
         let (_sys_ref, finalize) = sys.create_external_system_ref();
         finalize(Arc::downgrade(&test)).unwrap();
 
         let mut track: GhostTracker<Test, ()> = GhostTracker::new(sys.create_ref(), deep).unwrap();
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
 
         track
-            .bookmark_options(
+            .bookmark_with_options(
                 Span::fixme(),
                 Box::new(|me, response| {
                     assert_eq!(
@@ -352,19 +281,12 @@ mod tests {
         let mut deep = DeepRef::new();
         deep.set(Arc::downgrade(&test)).unwrap();
 
-<<<<<<< HEAD
         let mut sys = SingleThreadedGhostSystem::new();
-
-        let mut track: GhostTracker<Test, String, SingleThreadedGhostSystemRef> =
-            GhostTracker::new(sys.create_ref(), Arc::downgrade(&test));
-=======
-        let mut sys = GhostSystem::new();
         let (_sys_ref, finalize) = sys.create_external_system_ref();
         finalize(Arc::downgrade(&test)).unwrap();
 
         let mut track: GhostTracker<Test, String> =
             GhostTracker::new(sys.create_ref(), deep).unwrap();
->>>>>>> 3b5b13a57822e366f5ab2eaad105afd72d09bf5e
 
         let rid = track
             .bookmark(

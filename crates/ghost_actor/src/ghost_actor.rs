@@ -2,7 +2,6 @@ use crate::*;
 use holochain_tracing::Span;
 use std::sync::Arc;
 
-
 pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
     fn enqueue_processor(
         &mut self,
@@ -20,11 +19,12 @@ pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
 }
 
 /// callback for spawning a new actor
-pub type GhostActorSpawnCb<'lt, A, P, S: GhostSystemRef<'lt>> = Box<
-    dyn FnOnce(GhostActorSystem<'lt, A, S>, GhostEndpointSeed<'lt, P, (), S>) -> GhostResult<A> + 'lt,
+pub type GhostActorSpawnCb<'lt, A, P, S> = Box<
+    dyn FnOnce(GhostActorSystem<'lt, A, S>, GhostEndpointSeed<'lt, P, (), S>) -> GhostResult<A>
+        + 'lt,
 >;
 
-impl<'lt, X: 'lt + Send + Sync, S:GhostSystemRef<'lt>> GhostActorSystem<'lt, X, S> {
+impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X, S> {
     pub(crate) fn new(sys_ref: S, deep_user_data: DeepRef<'lt, X>) -> Self {
         Self {
             sys_ref,
@@ -35,17 +35,17 @@ impl<'lt, X: 'lt + Send + Sync, S:GhostSystemRef<'lt>> GhostActorSystem<'lt, X, 
     /// expand an endpoint seed with local context / handling
     pub fn plant_endpoint<P: GhostProtocol, D: 'lt, H: 'lt + GhostHandler<'lt, X, P>>(
         &mut self,
-        seed: GhostEndpointSeed<'lt, P, D>,
+        seed: GhostEndpointSeed<'lt, P, D, S>,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H, S>> {
         seed.priv_plant(self.deep_user_data.clone(), handler)
     }
 
     /// create a new sub-actor in seed form for later planting
     pub fn spawn_seed<P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>>(
         &mut self,
-        spawn_cb: GhostActorSpawnCb<'lt, A, P>,
-    ) -> GhostResult<GhostEndpointSeed<'lt, P, A>> {
+        spawn_cb: GhostActorSpawnCb<'lt, A, P, S>,
+    ) -> GhostResult<GhostEndpointSeed<'lt, P, A, S>> {
         let (s1, r1) = crossbeam_channel::unbounded();
         let (s2, r2) = crossbeam_channel::unbounded();
 
@@ -86,9 +86,9 @@ impl<'lt, X: 'lt + Send + Sync, S:GhostSystemRef<'lt>> GhostActorSystem<'lt, X, 
         H: 'lt + GhostHandler<'lt, X, P>,
     >(
         &mut self,
-        spawn_cb: GhostActorSpawnCb<'lt, A, P>,
+        spawn_cb: GhostActorSpawnCb<'lt, A, P, S>,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H, S>> {
         let seed = self.spawn_seed(spawn_cb)?;
         self.plant_endpoint(seed, handler)
     }
@@ -182,13 +182,12 @@ struct GhostEndpointFullInner<
     H: GhostHandler<'lt, X, P>,
     S: GhostSystemRef<'lt>,
 > {
-    weak_user_data: Weak<GhostMutex<X>>,
+    sys_ref: S,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
-    pending_callbacks: GhostTracker<'lt, X, P, S>,
+    pending_callbacks: GhostTracker<'lt, X, P>,
     handler: H,
-    sys_ref: S,
 }
 
 impl<
