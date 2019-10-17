@@ -19,6 +19,8 @@ extern crate serde_derive;
 extern crate rmp_serde;
 extern crate serde_json;
 #[macro_use]
+extern crate shrinkwraprs;
+#[macro_use]
 extern crate log;
 
 // -- mod -- //
@@ -29,6 +31,7 @@ pub mod error;
 pub mod gateway;
 pub mod keystore;
 pub mod message_encoding;
+pub mod rrdht_util;
 pub mod time;
 pub mod track;
 #[macro_use]
