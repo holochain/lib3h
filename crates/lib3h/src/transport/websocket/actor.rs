@@ -369,7 +369,7 @@ impl GhostTransportWebsocket {
                     }
                 }
                 Some(Instant::now())
-            },
+            }
             Some(last_discover) => {
                 // Let's check if it's time to discover some peers, but only if we already
                 // did some url binding
@@ -403,14 +403,16 @@ impl GhostTransportWebsocket {
                                     // Ignoring our own address
                                     continue;
                                 } else {
-
                                     // if not already connected, request a connections
                                     if self.connections.get(&found_uri).is_none() {
                                         // The proper way to connect is by using 'streams'
                                         match self.streams.connect(&found_uri) {
                                             Ok(()) => {
                                                 self.connections.insert(found_uri.clone());
-                                                trace!("New connection to {} initialized using mDNS", &found_uri);
+                                                trace!(
+                                                    "New connection to {} initialized using mDNS",
+                                                    &found_uri
+                                                );
                                             }
                                             Err(error) => {
                                                 trace!(
@@ -420,7 +422,6 @@ impl GhostTransportWebsocket {
                                                 );
                                             }
                                         }
-
                                     }
                                 }
                             }

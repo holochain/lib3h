@@ -766,8 +766,10 @@ pub fn handle_GossipTo<
 mod tests {
     use super::*;
     use crate::{
-        dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
-        transport::{memory_mock::memory_server, websocket::tls::TlsConfig}
+        dht::mirror_dht::MirrorDht,
+        engine::GatewayId,
+        tests::enable_logging_for_test,
+        transport::{memory_mock::memory_server, websocket::tls::TlsConfig},
     };
     use holochain_tracing::test_span;
     use lib3h_ghost_actor::{ghost_test_harness::ProcessingOptions, wait_can_track_did_work};
@@ -844,14 +846,19 @@ mod tests {
     /// bootstrapping.
     /// TODO: We need to make it work with ghost_actor v2 :)
     fn wss_bootstrap_mdns_discovery_test() {
-        let url_1: Lib3hUri = url::Url::parse("wss://0.0.0.0:60861").expect("Fail to parse wss url.").into();
-        let _url_2: Lib3hUri = url::Url::parse("wss://0.0.0.0:60862").expect("Fail to parse wss url.").into();
+        let url_1: Lib3hUri = url::Url::parse("wss://0.0.0.0:60861")
+            .expect("Fail to parse wss url.")
+            .into();
+        let _url_2: Lib3hUri = url::Url::parse("wss://0.0.0.0:60862")
+            .expect("Fail to parse wss url.")
+            .into();
 
         let mut _engine_1 = make_test_engine_with_wss_transport(url_1.clone());
         let mut _engine_2 = make_test_engine_with_wss_transport(_url_2.clone());
 
         // Apparently we need to bind the URL before anything can happen...
-        let _e1_endpoint = _engine_1.take_parent_endpoint()
+        let _e1_endpoint = _engine_1
+            .take_parent_endpoint()
             .expect("exists")
             .as_context_endpoint_builder()
             .request_id_prefix("twss_to_child1")
@@ -868,13 +875,17 @@ mod tests {
         //         }),
         //     ).unwrap();
 
-        _engine_2.process().expect("Fail to process from engine2 while testing url binding.");
+        _engine_2
+            .process()
+            .expect("Fail to process from engine2 while testing url binding.");
         // // Let's give some time to the engine to make the url bindings...
         // ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
         // Let's discover engine2 using the websocket transport function 'process' which
         // should handle the discovery part by calling 'try_discover'
-        _engine_1.process().expect("Fail to process from engine1 while testing url binding.");
+        _engine_1
+            .process()
+            .expect("Fail to process from engine1 while testing url binding.");
         // // Let's give some time to the engine to advertise etc...
         // ::std::thread::sleep(::std::time::Duration::from_millis(100));
 

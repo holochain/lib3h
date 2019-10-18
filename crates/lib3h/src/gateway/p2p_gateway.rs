@@ -69,16 +69,18 @@ impl P2pGateway {
     /// Retrieve the list of peer from a dht.
     /// TODO: Find a way to actually retrive this list from an async call :)
     pub fn get_peer_list(&mut self) -> Vec<String> {
-    // pub fn get_peer_list(&mut self) -> Vec<PeerData> {
+        // pub fn get_peer_list(&mut self) -> Vec<PeerData> {
         let inner_dht = &mut self.inner_dht;
-        inner_dht.request(
-            holochain_tracing::Span::fixme(),
-            crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
-            Box::new(|_, r| {
-                eprintln!("1 got: {:?}", r);
-                Ok(())
-            }),
-        ).unwrap();
+        inner_dht
+            .request(
+                holochain_tracing::Span::fixme(),
+                crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
+                Box::new(|_, r| {
+                    eprintln!("1 got: {:?}", r);
+                    Ok(())
+                }),
+            )
+            .unwrap();
 
         vec!["TODO: get_peer_list's result".to_string()]
     }
