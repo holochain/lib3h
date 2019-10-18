@@ -288,7 +288,7 @@ impl From<Lib3hToClient> for Lib3hServerProtocol {
             }
             Lib3hToClient::Unbound(_unbound_data) => {
                 Lib3hServerProtocol::Disconnected(DisconnectedData {
-                    network_id: NetworkHash::new(),
+                    network_id: NetworkHash::default(),
                 })
             }
             Lib3hToClient::SendDirectMessageResult(direct_message_data) => {
