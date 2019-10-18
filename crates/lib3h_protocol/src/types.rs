@@ -1,6 +1,10 @@
 use holochain_persistence_api::hash::HashString;
 use std::fmt;
 
+pub trait HashStringNewType {
+    fn hash_string(&self) -> &HashString;
+}
+
 //--------------------------------------------------------------------------------------------------
 // SpaceHash: newtype for HashString
 //--------------------------------------------------------------------------------------------------
@@ -9,6 +13,12 @@ use std::fmt;
     Shrinkwrap, PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
 )]
 pub struct SpaceHash(HashString);
+
+impl HashStringNewType for SpaceHash {
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
+}
 
 impl fmt::Display for SpaceHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -70,16 +80,6 @@ impl From<&SpaceHash> for String {
     }
 }
 
-impl SpaceHash {
-    pub fn new() -> SpaceHash {
-        SpaceHash(HashString::new())
-    }
-
-    pub fn hash_string(&self) -> &HashString {
-        &self.0
-    }
-}
-
 //--------------------------------------------------------------------------------------------------
 // EntryHash: newtype for HashString
 //--------------------------------------------------------------------------------------------------
@@ -88,6 +88,12 @@ impl SpaceHash {
     Shrinkwrap, PartialOrd, PartialEq, Eq, Ord, Clone, Debug, Serialize, Deserialize, Default, Hash,
 )]
 pub struct EntryHash(HashString);
+
+impl HashStringNewType for EntryHash {
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
+}
 
 impl fmt::Display for EntryHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -101,27 +107,51 @@ impl From<HashString> for EntryHash {
     }
 }
 
+impl From<&HashString> for EntryHash {
+    fn from(s: &HashString) -> EntryHash {
+        (*s).to_owned().into()
+    }
+}
+
 impl From<EntryHash> for HashString {
     fn from(h: EntryHash) -> HashString {
         h.0
     }
 }
 
-impl<'a> From<&'a HashString> for EntryHash {
-    fn from(s: &HashString) -> EntryHash {
-        EntryHash::from(s.to_owned())
+impl From<&EntryHash> for HashString {
+    fn from(h: &EntryHash) -> HashString {
+        (*h).to_owned().into()
     }
 }
 
-impl<'a> From<&'a str> for EntryHash {
+impl From<&str> for EntryHash {
     fn from(s: &str) -> EntryHash {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
     }
 }
 
-impl EntryHash {
-    pub fn new() -> EntryHash {
-        EntryHash(HashString::new())
+impl From<String> for EntryHash {
+    fn from(s: String) -> EntryHash {
+        EntryHash::from(s.as_str())
+    }
+}
+
+impl From<&String> for EntryHash {
+    fn from(s: &String) -> EntryHash {
+        (*s).to_owned().into()
+    }
+}
+
+impl From<EntryHash> for String {
+    fn from(h: EntryHash) -> String {
+        h.hash_string().to_owned().into()
+    }
+}
+
+impl From<&EntryHash> for String {
+    fn from(h: &EntryHash) -> String {
+        (*h).to_owned().into()
     }
 }
 
@@ -146,27 +176,57 @@ impl From<HashString> for AspectHash {
     }
 }
 
+impl From<&HashString> for AspectHash {
+    fn from(s: &HashString) -> AspectHash {
+        (*s).to_owned().into()
+    }
+}
+
 impl From<AspectHash> for HashString {
     fn from(h: AspectHash) -> HashString {
         h.0
     }
 }
 
-impl<'a> From<&'a HashString> for AspectHash {
-    fn from(s: &HashString) -> AspectHash {
-        AspectHash::from(s.to_owned())
+impl From<&AspectHash> for HashString {
+    fn from(h: &AspectHash) -> HashString {
+        (*h).to_owned().into()
     }
 }
 
-impl<'a> From<&'a str> for AspectHash {
+impl From<&str> for AspectHash {
     fn from(s: &str) -> AspectHash {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
     }
 }
 
-impl AspectHash {
-    pub fn new() -> AspectHash {
-        AspectHash(HashString::new())
+impl From<String> for AspectHash {
+    fn from(s: String) -> AspectHash {
+        AspectHash::from(s.as_str())
+    }
+}
+
+impl From<&String> for AspectHash {
+    fn from(s: &String) -> AspectHash {
+        (*s).to_owned().into()
+    }
+}
+
+impl From<AspectHash> for String {
+    fn from(s: AspectHash) -> String {
+        s.hash_string().to_owned().into()
+    }
+}
+
+impl From<&AspectHash> for String {
+    fn from(s: &AspectHash) -> String {
+        (*s).to_owned().into()
+    }
+}
+
+impl HashStringNewType for AspectHash {
+    fn hash_string(&self) -> &HashString {
+        &self.0
     }
 }
 
@@ -191,27 +251,57 @@ impl From<HashString> for NetworkHash {
     }
 }
 
+impl From<&HashString> for NetworkHash {
+    fn from(s: &HashString) -> NetworkHash {
+        (*s).to_owned().into()
+    }
+}
+
 impl From<NetworkHash> for HashString {
     fn from(h: NetworkHash) -> HashString {
         h.0
     }
 }
 
-impl<'a> From<&'a HashString> for NetworkHash {
-    fn from(s: &HashString) -> NetworkHash {
-        NetworkHash::from(s.to_owned())
+impl From<&NetworkHash> for HashString {
+    fn from(h: &NetworkHash) -> HashString {
+        (*h).to_owned().into()
     }
 }
 
 impl<'a> From<&'a str> for NetworkHash {
     fn from(s: &str) -> NetworkHash {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
     }
 }
 
-impl NetworkHash {
-    pub fn new() -> NetworkHash {
-        NetworkHash(HashString::new())
+impl From<String> for NetworkHash {
+    fn from(s: String) -> NetworkHash {
+        NetworkHash::from(s.as_str())
+    }
+}
+
+impl From<&String> for NetworkHash {
+    fn from(s: &String) -> NetworkHash {
+        (*s).to_owned().into()
+    }
+}
+
+impl From<NetworkHash> for String {
+    fn from(s: NetworkHash) -> String {
+        s.hash_string().to_owned().into()
+    }
+}
+
+impl From<&NetworkHash> for String {
+    fn from(s: &NetworkHash) -> String {
+        (*s).to_owned().into()
+    }
+}
+
+impl HashStringNewType for NetworkHash {
+    fn hash_string(&self) -> &HashString {
+        &self.0
     }
 }
 
@@ -236,33 +326,57 @@ impl From<HashString> for AgentPubKey {
     }
 }
 
+impl From<&HashString> for AgentPubKey {
+    fn from(s: &HashString) -> AgentPubKey {
+        (*s).to_owned().into()
+    }
+}
+
 impl From<AgentPubKey> for HashString {
     fn from(h: AgentPubKey) -> HashString {
         h.0
     }
 }
 
-impl<'a> From<&'a HashString> for AgentPubKey {
-    fn from(s: &HashString) -> AgentPubKey {
-        AgentPubKey::from(s.to_owned())
+impl From<&AgentPubKey> for HashString {
+    fn from(h: &AgentPubKey) -> HashString {
+        (*h).to_owned().into()
     }
 }
 
-impl<'a> From<&'a str> for AgentPubKey {
+impl From<&str> for AgentPubKey {
     fn from(s: &str) -> AgentPubKey {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
     }
 }
 
 impl From<String> for AgentPubKey {
     fn from(s: String) -> AgentPubKey {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
     }
 }
 
-impl AgentPubKey {
-    pub fn new() -> AgentPubKey {
-        AgentPubKey(HashString::new())
+impl From<&String> for AgentPubKey {
+    fn from(s: &String) -> AgentPubKey {
+        (*s).to_owned().into()
+    }
+}
+
+impl From<AgentPubKey> for String {
+    fn from(s: AgentPubKey) -> String {
+        s.hash_string().to_owned().into()
+    }
+}
+
+impl From<&AgentPubKey> for String {
+    fn from(s: &AgentPubKey) -> String {
+        (*s).to_owned().into()
+    }
+}
+
+impl HashStringNewType for AgentPubKey {
+    fn hash_string(&self) -> &HashString {
+        &self.0
     }
 }
 
@@ -287,107 +401,200 @@ impl From<HashString> for NodePubKey {
     }
 }
 
+impl From<&HashString> for NodePubKey {
+    fn from(s: &HashString) -> NodePubKey {
+        (*s).to_owned().into()
+    }
+}
+
 impl From<NodePubKey> for HashString {
     fn from(h: NodePubKey) -> HashString {
         h.0
     }
 }
 
-impl<'a> From<&'a HashString> for NodePubKey {
-    fn from(s: &HashString) -> NodePubKey {
-        NodePubKey::from(s.to_owned())
+impl From<&NodePubKey> for HashString {
+    fn from(h: &NodePubKey) -> HashString {
+        (*h).to_owned().into()
     }
 }
 
-impl<'a> From<&'a str> for NodePubKey {
+impl From<&str> for NodePubKey {
     fn from(s: &str) -> NodePubKey {
-        HashString::from(s.to_owned()).into()
+        HashString::from(s).into()
     }
 }
 
-impl NodePubKey {
-    pub fn new() -> NodePubKey {
-        NodePubKey(HashString::new())
+impl From<String> for NodePubKey {
+    fn from(s: String) -> NodePubKey {
+        NodePubKey::from(s.as_str())
+    }
+}
+
+impl From<&String> for NodePubKey {
+    fn from(s: &String) -> NodePubKey {
+        (*s).to_owned().into()
+    }
+}
+
+impl From<NodePubKey> for String {
+    fn from(s: NodePubKey) -> String {
+        s.hash_string().to_owned().into()
+    }
+}
+
+impl From<&NodePubKey> for String {
+    fn from(s: &NodePubKey) -> String {
+        (*s).to_owned().into()
+    }
+}
+
+impl HashStringNewType for NodePubKey {
+    fn hash_string(&self) -> &HashString {
+        &self.0
     }
 }
 
 #[cfg(test)]
 pub mod tests {
 
-    use super::SpaceHash;
-    use crate::fixture::space_hash_fresh;
+    use super::{AspectHash, SpaceHash};
+    use crate::{
+        fixture::space_hash_fresh,
+        types::{AgentPubKey, EntryHash, HashStringNewType, NetworkHash, NodePubKey},
+    };
     use holochain_persistence_api::{fixture::test_hash_a, hash::HashString};
     use uuid::Uuid;
 
-    #[test]
-    fn display_for_space_hash() {
+    fn display_for_t<T: std::fmt::Display + From<HashString>>() {
         let s = Uuid::new_v4().to_string();
-        let space_hash = SpaceHash::from(HashString::from(s.clone()));
+        let t = T::from(HashString::from(s.clone()));
 
-        assert_eq!(s, format!("{}", &space_hash),);
+        assert_eq!(s, format!("{}", &t),);
     }
 
-    #[test]
-    fn space_hash_from_hash_string() {
+    fn t_from_hash_string<T: HashStringNewType + Clone + From<HashString>>() {
         let hash = test_hash_a();
 
         // cloned
-        let space_hash = SpaceHash::from(hash.clone());
-
-        assert_eq!(&hash, space_hash.hash_string());
-
-        // referenced
-        let space_hash = SpaceHash::from(&hash);
-
-        assert_eq!(&hash, space_hash.hash_string());
+        let t = T::from(hash.clone());
+        assert_eq!(&hash, t.hash_string());
     }
 
-    #[test]
-    fn hash_string_from_space_hash() {
-        let space_hash = space_hash_fresh();
+    fn t_from_hash_string_ref<'a, T: From<&'a HashString>>() {
+        // i don't know how to test this
+        // some lifetime weirdness...
+    }
 
+    fn hash_string_from_t<T: Into<HashString> + Clone + HashStringNewType>(t: T) {
         // cloned
-        let hash_string = HashString::from(space_hash.clone());
+        let hash_string: HashString = t.clone().into();
 
-        assert_eq!(space_hash.hash_string(), &hash_string,);
-
-        // reference
-        let hash_string = HashString::from(&space_hash);
-
-        assert_eq!(space_hash.hash_string(), &hash_string);
+        assert_eq!(t.hash_string(), &hash_string,);
     }
 
-    #[test]
-    fn space_hash_from_str() {
+    fn t_from_str<'a, T: HashStringNewType + From<&'a str> + From<String> + From<&'a String>>() {
         let str = "foo";
 
-        let space_hash = SpaceHash::from(str);
+        let t = T::from(str);
 
-        assert_eq!(space_hash.hash_string(), &HashString::from(str),);
+        assert_eq!(t.hash_string(), &HashString::from(str),);
 
         let string = String::from(str);
 
         // cloned string
-        let space_hash = SpaceHash::from(string.clone());
+        let t = T::from(string.clone());
 
-        assert_eq!(String::from(space_hash.hash_string().clone()), string,);
+        assert_eq!(String::from(t.hash_string().clone()), string,);
 
         // reference
-        let space_hash = SpaceHash::from(&string);
-
-        assert_eq!(String::from(space_hash.hash_string().clone()), string,);
+        // TODO fix lifetimes
+        // let t = T::from(&string);
+        // assert_eq!(String::from(t.hash_string().clone()), string,);
     }
 
     #[test]
-    fn str_from_space_hash() {
-        let s = "foo";
-        let space_hash = SpaceHash::from(s);
+    fn test_space_hash() {
+        display_for_t::<SpaceHash>();
+        t_from_hash_string::<SpaceHash>();
+        t_from_hash_string_ref::<SpaceHash>();
 
-        // cloned
-        assert_eq!(&String::from(s), &String::from(space_hash.clone()),);
+        hash_string_from_t(space_hash_fresh());
+        let _ = HashString::from(&SpaceHash::default());
 
-        // referenced
-        assert_eq!(&String::from(s), &String::from(&space_hash),);
+        t_from_str::<SpaceHash>();
+        let _ = String::from(&SpaceHash::default());
+        let _ = String::from(SpaceHash::from("foo"));
+    }
+
+    #[test]
+    fn test_entry_hash() {
+        display_for_t::<EntryHash>();
+        t_from_hash_string::<EntryHash>();
+        t_from_hash_string_ref::<EntryHash>();
+
+        hash_string_from_t(space_hash_fresh());
+        let _ = HashString::from(&EntryHash::default());
+
+        t_from_str::<EntryHash>();
+        let _ = String::from(&EntryHash::default());
+        let _ = String::from(EntryHash::from("foo"));
+    }
+
+    #[test]
+    fn test_aspect_hash() {
+        display_for_t::<AspectHash>();
+        t_from_hash_string::<AspectHash>();
+        t_from_hash_string_ref::<AspectHash>();
+
+        hash_string_from_t(space_hash_fresh());
+        let _ = HashString::from(&AspectHash::default());
+
+        t_from_str::<AspectHash>();
+        let _ = String::from(&AspectHash::default());
+        let _ = String::from(AspectHash::from("foo"));
+    }
+
+    #[test]
+    fn test_network_hash() {
+        display_for_t::<NetworkHash>();
+        t_from_hash_string::<NetworkHash>();
+        t_from_hash_string_ref::<NetworkHash>();
+
+        hash_string_from_t(space_hash_fresh());
+        let _ = HashString::from(&NetworkHash::default());
+
+        t_from_str::<NetworkHash>();
+        let _ = String::from(&NetworkHash::default());
+        let _ = String::from(NetworkHash::from("foo"));
+    }
+
+    #[test]
+    fn test_agent_pub_key() {
+        display_for_t::<AgentPubKey>();
+        t_from_hash_string::<AgentPubKey>();
+        t_from_hash_string_ref::<AgentPubKey>();
+
+        hash_string_from_t(space_hash_fresh());
+        let _ = HashString::from(&AgentPubKey::default());
+
+        t_from_str::<AgentPubKey>();
+        let _ = String::from(&AgentPubKey::default());
+        let _ = String::from(AgentPubKey::from("foo"));
+    }
+
+    #[test]
+    fn test_node_pub_key() {
+        display_for_t::<NodePubKey>();
+        t_from_hash_string::<NodePubKey>();
+        t_from_hash_string_ref::<NodePubKey>();
+
+        hash_string_from_t(space_hash_fresh());
+        let _ = HashString::from(&NodePubKey::default());
+
+        t_from_str::<NodePubKey>();
+        let _ = String::from(&NodePubKey::default());
+        let _ = String::from(NodePubKey::from("foo"));
     }
 
 }

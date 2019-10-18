@@ -240,7 +240,7 @@ impl P2pGateway {
     ) -> GhostResult<()> {
         let to_agent_id = match send_data.full_low_uri.get_agent_id() {
             Some(agent_id) => agent_id,
-            None => AgentPubKey::new(), // TODO - is this correct?
+            None => AgentPubKey::default(), // TODO - is this correct?
         };
 
         let payload =
