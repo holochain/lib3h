@@ -49,7 +49,10 @@ impl Arc {
         assert_eq!("32r", pre);
         let loc = u32::from_str_radix(&repr[3..11], 16).expect("can parse hex");
         let len = u64::from_str_radix(&repr[12..], 16).expect("can parse hex");
-        Self { start: loc.into(), length: len }
+        Self {
+            start: loc.into(),
+            length: len,
+        }
     }
 
     /// the start position for this arc
