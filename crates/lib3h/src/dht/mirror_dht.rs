@@ -237,7 +237,7 @@ impl MirrorDht {
                 true
             }
             Some(mut peer) => {
-                if peer_info.timestamp <= peer.timestamp {
+                if peer_info.timestamp < peer.timestamp {
                     debug!(
                         "@MirrorDht@ Adding peer - BAD {:?} has earlier timestamp than {:?}",
                         peer_info.timestamp, peer.timestamp
@@ -457,7 +457,11 @@ impl MirrorDht {
             // Owner is holding some entry. Store its address for bookkeeping.
             // Ask for its data and broadcast it because we want fullsync.
             DhtRequestToChild::HoldEntryAspectAddress(entry) => {
-                trace!("DhtRequestToChild::HoldEntryAspectAddress: {:?}", entry);
+                trace!(
+                    "({:?}).DhtRequestToChild::HoldEntryAspectAddress: {:?}",
+                    self.config.this_peer_name(),
+                    entry
+                );
                 // if its shallow, ask for actual data
                 if entry.aspect_list.len() > 0 && entry.aspect_list[0].aspect.len() == 0 {
                     self.endpoint_self.publish(
@@ -488,6 +492,10 @@ impl MirrorDht {
                 let received_new_content = self.add_entry_aspects(&entry);
                 //// Bail if did not receive new content
                 if !received_new_content {
+                    trace!(
+                        "@MirrorDht@ did not receive new content from entry {:?}",
+                        entry
+                    );
                     return Ok(());
                 }
                 let gossip_evt = self.gossip_entry(&entry);

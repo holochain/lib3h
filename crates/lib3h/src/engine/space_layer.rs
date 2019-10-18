@@ -210,7 +210,8 @@ impl<'engine> GhostEngine<'engine> {
                                                 }
                                                 _ => panic!("bad response type"),
                                             };
-                                            trace!("Received HandleFetchEntryResult response | {}", is_data_for_author_list);
+                                            trace!("Received HandleFetchEntryResult response | is_data_for_author_list:{}",
+                                                is_data_for_author_list);
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
                                                     Span::fixme(),
@@ -233,6 +234,12 @@ impl<'engine> GhostEngine<'engine> {
             GatewayRequestToParent::Transport(transport_request) => {
                 trace!("space_layer got {:#?}", transport_request);
                 match transport_request {
+                    RequestToParent::Unbind(uri) => {
+                        panic!("can't handle unbind {}", uri);
+                    }
+                    RequestToParent::Disconnect(uri) => {
+                        panic!("can't handle disconnect {}", uri);
+                    }
                     RequestToParent::ErrorOccured { uri: _, error } => {
                         panic!("can't handle {:?}", error);
                     }
