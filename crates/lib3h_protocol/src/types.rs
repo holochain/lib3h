@@ -15,9 +15,9 @@ pub trait HashStringNewType {
 pub struct SpaceHash(HashString);
 
 impl HashStringNewType for SpaceHash {
-  fn hash_string(&self) -> &HashString {
-    &self.0
-  }
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 impl fmt::Display for SpaceHash {
@@ -90,9 +90,9 @@ impl From<&SpaceHash> for String {
 pub struct EntryHash(HashString);
 
 impl HashStringNewType for EntryHash {
-  fn hash_string(&self) -> &HashString {
-    &self.0
-  }
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 impl fmt::Display for EntryHash {
@@ -225,9 +225,9 @@ impl From<&AspectHash> for String {
 }
 
 impl HashStringNewType for AspectHash {
-  fn hash_string(&self) -> &HashString {
-    &self.0
-  }
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -300,9 +300,9 @@ impl From<&NetworkHash> for String {
 }
 
 impl HashStringNewType for NetworkHash {
-  fn hash_string(&self) -> &HashString {
-    &self.0
-  }
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -375,9 +375,9 @@ impl From<&AgentPubKey> for String {
 }
 
 impl HashStringNewType for AgentPubKey {
-  fn hash_string(&self) -> &HashString {
-    &self.0
-  }
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -450,22 +450,19 @@ impl From<&NodePubKey> for String {
 }
 
 impl HashStringNewType for NodePubKey {
-  fn hash_string(&self) -> &HashString {
-    &self.0
-  }
+    fn hash_string(&self) -> &HashString {
+        &self.0
+    }
 }
 
 #[cfg(test)]
 pub mod tests {
 
-    use super::SpaceHash;
-    use super::AspectHash;
-    use crate::types::NodePubKey;
-    use crate::types::AgentPubKey;
-    use crate::types::NetworkHash;
-    use crate::types::EntryHash;
-    use crate::types::HashStringNewType;
-    use crate::fixture::space_hash_fresh;
+    use super::{AspectHash, SpaceHash};
+    use crate::{
+        fixture::space_hash_fresh,
+        types::{AgentPubKey, EntryHash, HashStringNewType, NetworkHash, NodePubKey},
+    };
     use holochain_persistence_api::{fixture::test_hash_a, hash::HashString};
     use uuid::Uuid;
 
