@@ -27,26 +27,56 @@ impl std::fmt::Debug for Arc {
 
 impl Arc {
     /// construct a new Arc instance given a start Location and a length
+    /// if length > ARC_LENGTH_MAX it will be clipped to that value
     pub fn new(start: Location, length: u64) -> Self {
         let length = std::cmp::min(length, ARC_LENGTH_MAX);
         Self { start, length }
     }
 
     /// construct a new Arc instance given a center Location and a radius
+    /// radius as in half the arc length
     pub fn new_radius(center: Location, radius: u32) -> Self {
         if radius == 0 {
             return Arc::new(center, 0);
         }
+
         let radius = std::cmp::min(radius, ARC_RADIUS_MAX);
+
+        // we need to subtract 1 from the radius in the following
+        // calculations to ensure that:
+        // - 0 means no coverage
+        // - 1 means coverage only including the center point
+        // - any thing obove expand out to the sides
         let start = center - Location::from(radius - 1);
         let length = u64::from(radius) * 2 - 1;
+
         Arc::new(start, length)
     }
 
     /// construct a new Arc from canonical BITSrHEX:HEX format
-    /// UNIMPLEMENTED
-    pub fn new_repr(_repr: &str) -> Self {
-        unimplemented!();
+    pub fn new_repr(repr: &str) -> Self {
+        match Arc::try_new_repr(repr) {
+            Err(e) => panic!(e),
+            Ok(a) => a,
+        }
+    }
+
+    /// construct a new Arc from canonical BITSrHEX:HEX format
+    pub fn try_new_repr(repr: &str) -> crate::error::Lib3hResult<Self> {
+        macro_rules! err {
+            () => {
+                crate::error::Lib3hError::from(format!("could not parse arc repr: {:?}", repr))
+            };
+        }
+        if "32r" != &repr[0..3] {
+            return Err(err!());
+        }
+        let loc = u32::from_str_radix(&repr[3..11], 16).map_err(|_| err!())?;
+        let len = u64::from_str_radix(&repr[12..], 16).map_err(|_| err!())?;
+        Ok(Self {
+            start: loc.into(),
+            length: len,
+        })
     }
 
     /// the start position for this arc
@@ -64,6 +94,7 @@ impl Arc {
         if self.length == 0 {
             return self.start;
         }
+        // see "new_radius" for description of why the -1
         self.start + (self.radius() - 1).into()
     }
 
@@ -72,6 +103,9 @@ impl Arc {
         if self.length == 0 {
             return 0;
         }
+        // in "new_radius" we had to subtract 1 to manage defining an arc
+        // around a center point.
+        // To get the given radius we need to add the 1 back in
         (self.length / 2 + 1) as u32
     }
 
@@ -109,6 +143,20 @@ mod tests {
             "Arc(\"32r0000002a:00000002a\")",
             &format!("{:?}", Arc::new(42.into(), 42))
         );
+    }
+
+    #[test]
+    fn it_can_parse() {
+        let a = Arc::new(0xffffffff.into(), ARC_LENGTH_MAX);
+        let b = a.to_string();
+        assert_eq!("32rffffffff:100000000", b);
+        let c = Arc::new_repr(&b);
+        assert_eq!(a, c);
+        let d = Arc::new(0xffffffff.into(), 0);
+        let e = d.to_string();
+        assert_eq!("32rffffffff:000000000", e);
+        let f = Arc::new_repr(&e);
+        assert_eq!(d, f);
     }
 
     #[test]
