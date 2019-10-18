@@ -1,4 +1,4 @@
-use crate::rrdht_util::{Arc, ARC_LENGTH_MAX};
+use crate::rrdht_util::{Arc, ARC_LENGTH_MAX, ARC_RADIUS_MAX};
 
 /// builder for our knowledge of a single agent's storage / reachability
 pub struct RValuePeerRecord {
@@ -98,7 +98,7 @@ pub fn interpolate_r_value_for_given_arc(peer_record_set: &RValuePeerRecordSet) 
     running_pct_total * (1.0 / pct_of_space_covered)
 }
 
-/// As an agent, we need to set our storage arc length to something
+/// As an agent, we need to set our storage arc radius to something
 /// on the one hand, if we have enough storage and network bandwidth,
 /// we might want to set it as high as possible. On the other hand, we
 /// might want to conserve resources / power. If our network is healthy,
@@ -107,106 +107,107 @@ pub fn interpolate_r_value_for_given_arc(peer_record_set: &RValuePeerRecordSet) 
 /// want to maintain stability so we're not thrashing our resources.
 ///
 /// Given current network conditions (within the sample slice given)
-/// this function will return a recommended storage arc length.
-/// LENGTH, not radius. Please divide by 2 if using Arc::new_radius.
+/// this function will return a recommended storage arc radius.
+/// RADIUS not length. Please use `Arc::new_radius(0.into(), radius).length()`
+/// if you need to determine the length for a given radius..
 ///
-/// If you provide a current_arc_length, and the network is anywhere near
-/// stable, this function will probably return your current length back.
+/// If you provide a current_arc_radius, and the network is anywhere near
+/// stable, this function will probably return your current radius back.
 /// Otherwise it will pick a maintenance target right in the middle.
 ///
-/// If the network is over replicated, this function may pick a small length.
+/// If the network is over replicated, this function may pick a small radius.
 /// If the network is unhealthy, or immature this function may pick a large
-/// arc length, up to 100% in the case of a new / immature network.
+/// arc radius, up to 100% in the case of a new / immature network.
 ///
 /// Also, this is a bit of a naive first implementation, expect the specific
 /// algorithm / heuristics to be updated on an on-going basis.
-pub fn get_recommended_storage_arc_length(
+pub fn get_recommended_storage_arc_radius(
     peer_record_set: &RValuePeerRecordSet,
     target_minimum_r_value: f64,
     target_maximum_r_value: f64,
     self_uptime_0_to_1: f64,
-    current_arc_length: Option<u64>,
-) -> u64 {
+    current_arc_radius: Option<u32>,
+) -> u32 {
     let pct_of_space_covered: f64 =
         peer_record_set.arc_of_included_peer_records.length() as f64 / ARC_LENGTH_MAX as f64;
     let interp_total_node_count =
         peer_record_set.peer_records.len() as f64 * (1.0 / pct_of_space_covered);
     if interp_total_node_count < target_minimum_r_value * 2.0 {
         // consider this network immature, recommend full coverage
-        return ARC_LENGTH_MAX;
+        return ARC_RADIUS_MAX;
     }
 
     let cur_r_value = interpolate_r_value_for_given_arc(peer_record_set);
 
     let mut count: u64 = 0;
-    let mut len_min: u64 = ARC_LENGTH_MAX;
-    let mut len_max: u64 = 0;
-    let mut len_avg: f64 = 0.0;
+    let mut rad_min: u32 = ARC_RADIUS_MAX;
+    let mut rad_max: u32 = 0;
+    let mut rad_avg: f64 = 0.0;
 
     #[allow(clippy::explicit_counter_loop)]
     for record in peer_record_set.peer_records.iter() {
         count += 1;
 
-        let len = record.storage_arc.length();
+        let rad = record.storage_arc.radius();
 
-        len_min = std::cmp::min(len, len_min);
-        len_max = std::cmp::max(len, len_max);
-        len_avg = ((len_avg * (count as f64 - 1.0)) + len as f64) / count as f64;
+        rad_min = std::cmp::min(rad, rad_min);
+        rad_max = std::cmp::max(rad, rad_max);
+        rad_avg = (rad_avg * (count as f64 - 1.0) + f64::from(rad)) / count as f64;
     }
 
     /*
     println!(r#"
         count: {}
-        len_min: {}
-        len_max: {}
-        len_avg: {}
-    "#, count, len_min, len_max, len_avg);
+        rad_min: {}
+        rad_max: {}
+        rad_avg: {}
+    "#, count, rad_min, rad_max, rad_avg);
     */
 
-    let out_length: f64 = if cur_r_value < target_minimum_r_value {
+    let out_radius: f64 = if cur_r_value < target_minimum_r_value {
         // our network is unhealthy! let's try to capture more!
-        let new_mid_len = len_avg * 1.375;
-        match current_arc_length {
-            None => new_mid_len,
+        let new_mid_rad = rad_avg * 1.375;
+        match current_arc_radius {
+            None => new_mid_rad,
             Some(ucur) => {
                 // again - try to maintain some stability
-                let cur = ucur as f64;
-                let new_min_len = len_avg * 1.25;
-                let new_max_len = len_avg * 1.5;
-                if cur > new_min_len && cur < new_max_len {
+                let cur = f64::from(ucur);
+                let new_min_rad = rad_avg * 1.25;
+                let new_max_rad = rad_avg * 1.5;
+                if cur > new_min_rad && cur < new_max_rad {
                     return ucur;
                 } else {
-                    new_mid_len
+                    new_mid_rad
                 }
             }
         }
     } else if cur_r_value > target_maximum_r_value {
         // our network is heavy! let's pull back
-        let new_mid_len = len_avg * 0.625;
-        match current_arc_length {
-            None => new_mid_len,
+        let new_mid_rad = rad_avg * 0.625;
+        match current_arc_radius {
+            None => new_mid_rad,
             Some(ucur) => {
                 // again - try to maintain some stability
-                let cur = ucur as f64;
-                let new_min_len = len_avg * 0.5;
-                let new_max_len = len_avg * 0.75;
-                if cur > new_min_len && cur < new_max_len {
+                let cur = f64::from(ucur);
+                let new_min_rad = rad_avg * 0.5;
+                let new_max_rad = rad_avg * 0.75;
+                if cur > new_min_rad && cur < new_max_rad {
                     return ucur;
                 } else {
-                    new_mid_len
+                    new_mid_rad
                 }
             }
         }
     } else {
         // our network is perfect, let's try to keep it this way!
-        match current_arc_length {
-            None => len_avg,
+        match current_arc_radius {
+            None => rad_avg,
             Some(cur) => return cur,
         }
     };
 
     // correct for our own uptime
-    (out_length * (1.0 / self_uptime_0_to_1)) as u64
+    (out_radius * (1.0 / self_uptime_0_to_1)) as u32
 }
 
 #[cfg(test)]
@@ -249,7 +250,7 @@ mod tests {
     #[test]
     fn it_can_get_recommended_arc_length_immature() {
         let set = RValuePeerRecordSet::default()
-            .arc_of_included_peer_records(Arc::new(0.into(), ARC_LENGTH_MAX))
+            .arc_of_included_peer_records(Arc::new_radius(0.into(), ARC_RADIUS_MAX))
             .push_peer_record(
                 RValuePeerRecord::default()
                     .storage_arc(Arc::new(0.into(), 42))
@@ -263,71 +264,71 @@ mod tests {
 
         // network is immature - algorithm recommends full coverage
         assert_eq!(
-            ARC_LENGTH_MAX,
-            get_recommended_storage_arc_length(&set, 25.0, 50.0, 0.8, Some(ARC_LENGTH_MAX / 4),),
+            ARC_RADIUS_MAX,
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),),
         );
     }
 
     #[test]
     fn it_can_get_recommended_arc_length_low() {
         let mut set = RValuePeerRecordSet::default()
-            .arc_of_included_peer_records(Arc::new(0.into(), ARC_LENGTH_MAX));
+            .arc_of_included_peer_records(Arc::new_radius(0.into(), ARC_RADIUS_MAX));
 
         // if average length is 1/4, with 0.75 uptime = 0.1875 avg pct
         // we need ~90 nodes to make an unhealthy (low coverage) network
         for _ in 0..90 {
             set = set.push_peer_record(
                 RValuePeerRecord::default()
-                    .storage_arc(Arc::new(0.into(), ARC_LENGTH_MAX / 4))
+                    .storage_arc(Arc::new_radius(0.into(), ARC_RADIUS_MAX / 4))
                     .uptime_0_to_1(0.75),
             )
         }
 
         assert!(
-            get_recommended_storage_arc_length(&set, 25.0, 50.0, 0.8, Some(ARC_LENGTH_MAX / 4),)
-                > ARC_LENGTH_MAX / 4
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),)
+                > ARC_RADIUS_MAX / 4
         );
     }
 
     #[test]
     fn it_can_get_recommended_arc_length_medium() {
         let mut set = RValuePeerRecordSet::default()
-            .arc_of_included_peer_records(Arc::new(0.into(), ARC_LENGTH_MAX));
+            .arc_of_included_peer_records(Arc::new_radius(0.into(), ARC_RADIUS_MAX));
 
         // if average length is 1/4, with 0.75 uptime = 0.1875 avg pct
         // we need ~203 nodes to make a medium healthy network
         for _ in 0..203 {
             set = set.push_peer_record(
                 RValuePeerRecord::default()
-                    .storage_arc(Arc::new(0.into(), ARC_LENGTH_MAX / 4))
+                    .storage_arc(Arc::new_radius(0.into(), ARC_RADIUS_MAX / 4))
                     .uptime_0_to_1(0.75),
             )
         }
 
         assert_eq!(
-            ARC_LENGTH_MAX / 4,
-            get_recommended_storage_arc_length(&set, 25.0, 50.0, 0.8, Some(ARC_LENGTH_MAX / 4),),
+            ARC_RADIUS_MAX / 4,
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),),
         );
     }
 
     #[test]
     fn it_can_get_recommended_arc_length_heavy() {
         let mut set = RValuePeerRecordSet::default()
-            .arc_of_included_peer_records(Arc::new(0.into(), ARC_LENGTH_MAX));
+            .arc_of_included_peer_records(Arc::new_radius(0.into(), ARC_RADIUS_MAX));
 
         // if average length is 1/4, with 0.75 uptime = 0.1875 avg pct
         // ~1066 nodes will give us an r-value around 200
         for _ in 0..1066 {
             set = set.push_peer_record(
                 RValuePeerRecord::default()
-                    .storage_arc(Arc::new(0.into(), ARC_LENGTH_MAX / 4))
+                    .storage_arc(Arc::new_radius(0.into(), ARC_RADIUS_MAX / 4))
                     .uptime_0_to_1(0.75),
             )
         }
 
         assert!(
-            get_recommended_storage_arc_length(&set, 25.0, 50.0, 0.8, Some(ARC_LENGTH_MAX / 4),)
-                < ARC_LENGTH_MAX / 4
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),)
+                < ARC_RADIUS_MAX / 4
         );
     }
 }
