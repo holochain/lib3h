@@ -44,9 +44,12 @@ impl Arc {
     }
 
     /// construct a new Arc from canonical BITSrHEX:HEX format
-    /// UNIMPLEMENTED
-    pub fn new_repr(_repr: &str) -> Self {
-        unimplemented!();
+    pub fn new_repr(repr: &str) -> Self {
+        let pre = &repr[0..3];
+        assert_eq!("32r", pre);
+        let loc = u32::from_str_radix(&repr[3..11], 16).expect("can parse hex");
+        let len = u64::from_str_radix(&repr[12..], 16).expect("can parse hex");
+        Self { start: loc.into(), length: len }
     }
 
     /// the start position for this arc
@@ -109,6 +112,20 @@ mod tests {
             "Arc(\"32r0000002a:00000002a\")",
             &format!("{:?}", Arc::new(42.into(), 42))
         );
+    }
+
+    #[test]
+    fn it_can_parse() {
+        let a = Arc::new(0xffffffff.into(), ARC_LENGTH_MAX);
+        let b = a.to_string();
+        assert_eq!("32rffffffff:100000000", b);
+        let c = Arc::new_repr(&b);
+        assert_eq!(a, c);
+        let d = Arc::new(0xffffffff.into(), 0);
+        let e = d.to_string();
+        assert_eq!("32rffffffff:000000000", e);
+        let f = Arc::new_repr(&e);
+        assert_eq!(d, f);
     }
 
     #[test]
