@@ -8,7 +8,7 @@ use manual_example_mod::*;
 
 #[test]
 fn manual_example() {
-    let mut system = GhostSystem::new();
+    let mut system = SingleThreadedGhostSystem::new();
 
     #[derive(Debug)]
     struct MyContext {

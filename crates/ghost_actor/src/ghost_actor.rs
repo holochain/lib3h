@@ -2,21 +2,30 @@ use crate::*;
 use holochain_tracing::Span;
 use std::sync::Arc;
 
+pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
+    fn enqueue_processor(
+        &mut self,
+        start_delay_ms: u64,
+        cb: GhostProcessCb<'lt>,
+    ) -> GhostResult<()>;
+}
+
 /// an actor system ref with local context
 /// in general, this is passed into actor constructors
 /// but cannot be used until actor_init is called
-pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync> {
-    sys_ref: GhostSystemRef<'lt>,
+pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
+    sys_ref: S,
     deep_user_data: DeepRef<'lt, X>,
 }
 
 /// callback for spawning a new actor
-pub type GhostActorSpawnCb<'lt, A, P> = Box<
-    dyn FnOnce(GhostActorSystem<'lt, A>, GhostEndpointSeed<'lt, P, ()>) -> GhostResult<A> + 'lt,
+pub type GhostActorSpawnCb<'lt, A, P, S> = Box<
+    dyn FnOnce(GhostActorSystem<'lt, A, S>, GhostEndpointSeed<'lt, P, (), S>) -> GhostResult<A>
+        + 'lt,
 >;
 
-impl<'lt, X: 'lt + Send + Sync> GhostActorSystem<'lt, X> {
-    pub(crate) fn new(sys_ref: GhostSystemRef<'lt>, deep_user_data: DeepRef<'lt, X>) -> Self {
+impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X, S> {
+    pub(crate) fn new(sys_ref: S, deep_user_data: DeepRef<'lt, X>) -> Self {
         Self {
             sys_ref,
             deep_user_data,
@@ -26,17 +35,17 @@ impl<'lt, X: 'lt + Send + Sync> GhostActorSystem<'lt, X> {
     /// expand an endpoint seed with local context / handling
     pub fn plant_endpoint<P: GhostProtocol, D: 'lt, H: 'lt + GhostHandler<'lt, X, P>>(
         &mut self,
-        seed: GhostEndpointSeed<'lt, P, D>,
+        seed: GhostEndpointSeed<'lt, P, D, S>,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H, S>> {
         seed.priv_plant(self.deep_user_data.clone(), handler)
     }
 
     /// create a new sub-actor in seed form for later planting
     pub fn spawn_seed<P: GhostProtocol, A: 'lt + GhostActor<'lt, P, A>>(
         &mut self,
-        spawn_cb: GhostActorSpawnCb<'lt, A, P>,
-    ) -> GhostResult<GhostEndpointSeed<'lt, P, A>> {
+        spawn_cb: GhostActorSpawnCb<'lt, A, P, S>,
+    ) -> GhostResult<GhostEndpointSeed<'lt, P, A, S>> {
         let (s1, r1) = crossbeam_channel::unbounded();
         let (s2, r2) = crossbeam_channel::unbounded();
 
@@ -77,25 +86,26 @@ impl<'lt, X: 'lt + Send + Sync> GhostActorSystem<'lt, X> {
         H: 'lt + GhostHandler<'lt, X, P>,
     >(
         &mut self,
-        spawn_cb: GhostActorSpawnCb<'lt, A, P>,
+        spawn_cb: GhostActorSpawnCb<'lt, A, P, S>,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H, S>> {
         let seed = self.spawn_seed(spawn_cb)?;
         self.plant_endpoint(seed, handler)
     }
 }
 
 /// An incomplete GhostEndpoint. It needs to be `plant`ed to fully function
-pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt> {
-    sys_ref: GhostSystemRef<'lt>,
+pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> {
+    sys_ref: S,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     d_ref: Arc<GhostMutex<D>>,
+    _phantom: std::marker::PhantomData<&'lt S>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
+impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> GhostEndpointSeed<'lt, P, D, S> {
     fn new(
-        sys_ref: GhostSystemRef<'lt>,
+        sys_ref: S,
         send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
         recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
         d_ref: Arc<GhostMutex<D>>,
@@ -105,6 +115,7 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
             send,
             recv,
             d_ref,
+            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -112,7 +123,7 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
         self,
         mut deep_user_data: DeepRef<'lt, X>,
         handler: H,
-    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H>> {
+    ) -> GhostResult<GhostEndpointFull<'lt, P, D, X, H, S>> {
         let (send_inner, recv_inner) = crossbeam_channel::unbounded();
         let mut sys_ref_clone = self.sys_ref.clone();
 
@@ -121,7 +132,7 @@ impl<'lt, P: GhostProtocol, D: 'lt> GhostEndpointSeed<'lt, P, D> {
             send: self.send,
             recv: self.recv,
             recv_inner,
-            pending_callbacks: GhostTracker::new(self.sys_ref, deep_user_data.clone())?,
+            pending_callbacks: GhostTracker::new(self.sys_ref.clone(), deep_user_data.clone())?,
             handler,
         }));
 
@@ -172,8 +183,9 @@ struct GhostEndpointFullInner<
     P: GhostProtocol,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
+    S: GhostSystemRef<'lt>,
 > {
-    sys_ref: GhostSystemRef<'lt>,
+    sys_ref: S,
     send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
     recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
@@ -181,8 +193,13 @@ struct GhostEndpointFullInner<
     handler: H,
 }
 
-impl<'lt, P: GhostProtocol, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
-    GhostEndpointFullInner<'lt, P, X, H>
+impl<
+        'lt,
+        P: GhostProtocol,
+        X: 'lt + Send + Sync,
+        H: GhostHandler<'lt, X, P>,
+        S: 'lt + GhostSystemRef<'lt>,
+    > GhostEndpointFullInner<'lt, P, X, H, S>
 {
     fn priv_process(&mut self, user_data: &mut X) -> GhostResult<()> {
         if self.priv_process_inner()? {
@@ -254,14 +271,21 @@ pub struct GhostEndpointFull<
     D: 'lt,
     X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
+    S: GhostSystemRef<'lt>,
 > {
-    inner: Arc<GhostMutex<GhostEndpointFullInner<'lt, P, X, H>>>,
+    inner: Arc<GhostMutex<GhostEndpointFullInner<'lt, P, X, H, S>>>,
     send_inner: crossbeam_channel::Sender<GhostEndpointToInner<'lt, X, P>>,
     d_ref: Arc<GhostMutex<D>>,
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
-    GhostEndpointFull<'lt, P, D, X, H>
+impl<
+        'lt,
+        P: GhostProtocol,
+        D: 'lt,
+        X: 'lt + Send + Sync,
+        H: GhostHandler<'lt, X, P>,
+        S: GhostSystemRef<'lt>,
+    > GhostEndpointFull<'lt, P, D, X, H, S>
 {
     /// Sometimes you might need to invoke some functions on and endpoint
     /// before passing that endpoint off to another class. If you were invoking
@@ -269,7 +293,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X
     /// want to persist that context where you are sending it.
     /// `regress` lets you return this endpoint to seed form, so it can later
     /// be `plant`ed in a different context / with a different handler.
-    pub fn regress(mut self) -> Result<GhostEndpointSeed<'lt, P, D>, Self> {
+    pub fn regress(mut self) -> Result<GhostEndpointSeed<'lt, P, D, S>, Self> {
         // unwrapping Arc-s is weird...
         // if there is an error, put ourself back together and return
         let inner = match Arc::try_unwrap(self.inner) {
@@ -294,8 +318,14 @@ impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X
     }
 }
 
-impl<'lt, P: GhostProtocol, D: 'lt, X: 'lt + Send + Sync, H: GhostHandler<'lt, X, P>>
-    GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H>
+impl<
+        'lt,
+        P: GhostProtocol,
+        D: 'lt,
+        X: 'lt + Send + Sync,
+        H: GhostHandler<'lt, X, P>,
+        S: GhostSystemRef<'lt>,
+    > GhostEndpoint<'lt, X, P> for GhostEndpointFull<'lt, P, D, X, H, S>
 {
     fn send_protocol(
         &mut self,

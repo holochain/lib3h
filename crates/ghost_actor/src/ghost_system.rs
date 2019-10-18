@@ -16,6 +16,26 @@ impl Default for GhostProcessInstructions {
     }
 }
 
+pub trait GhostSystem<'lt, S: GhostSystemRef<'lt>> {
+    /// execute all queued processor functions
+    fn process(&mut self) -> GhostResult<()>;
+
+    fn create_ref(&self) -> S;
+
+    /// get a GhostSystemRef capable of enqueueing new processor functions
+    /// without creating any deadlocks
+    fn create_external_system_ref<X: 'lt + Send + Sync>(
+        &self,
+    ) -> (
+        GhostActorSystem<'lt, X, S>,
+        FinalizeExternalSystemRefCb<'lt, X>,
+    ) {
+        let mut deep_ref = DeepRef::new();
+        let system = GhostActorSystem::new(self.create_ref(), deep_ref.clone());
+        (system, Box::new(move |user_data| deep_ref.set(user_data)))
+    }
+}
+
 impl GhostProcessInstructions {
     pub fn should_continue(&self) -> bool {
         self.should_continue
@@ -108,15 +128,15 @@ impl<'lt> GhostSystemInner<'lt> {
 /// Ref that allows queueing of new process functions
 /// but does not have the ability to actually run process
 #[derive(Clone)]
-pub struct GhostSystemRef<'lt> {
+pub struct SingleThreadedGhostSystemRef<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessorData<'lt>>,
     // just a refcount
     _system_inner: Arc<GhostMutex<GhostSystemInner<'lt>>>,
 }
 
-impl<'lt> GhostSystemRef<'lt> {
+impl<'lt> GhostSystemRef<'lt> for SingleThreadedGhostSystemRef<'lt> {
     /// enqueue a new processor function for periodic execution
-    pub fn enqueue_processor(
+    fn enqueue_processor(
         &mut self,
         start_delay_ms: u64,
         cb: GhostProcessCb<'lt>,
@@ -142,12 +162,12 @@ pub type FinalizeExternalSystemRefCb<'lt, X> =
 
 /// the main ghost system struct. Allows queueing new processor functions
 /// and provides a process() function to actually execute them
-pub struct GhostSystem<'lt> {
+pub struct SingleThreadedGhostSystem<'lt> {
     process_send: crossbeam_channel::Sender<GhostProcessorData<'lt>>,
     system_inner: Arc<GhostMutex<GhostSystemInner<'lt>>>,
 }
 
-impl<'lt> GhostSystem<'lt> {
+impl<'lt> SingleThreadedGhostSystem<'lt> {
     /// create a new ghost system
     pub fn new() -> Self {
         let (process_send, process_recv) = crossbeam_channel::unbounded();
@@ -156,37 +176,19 @@ impl<'lt> GhostSystem<'lt> {
             system_inner: Arc::new(GhostMutex::new(GhostSystemInner::new(process_recv))),
         }
     }
+}
 
-    pub fn create_external_system_ref<X: 'lt + Send + Sync>(
-        &self,
-    ) -> (
-        GhostActorSystem<'lt, X>,
-        FinalizeExternalSystemRefCb<'lt, X>,
-    ) {
-        let mut deep_ref = DeepRef::new();
-        let system = GhostActorSystem::new(
-            GhostSystemRef {
-                process_send: self.process_send.clone(),
-                _system_inner: self.system_inner.clone(),
-            },
-            deep_ref.clone(),
-        );
-        (system, Box::new(move |user_data| deep_ref.set(user_data)))
+impl<'lt> GhostSystem<'lt, SingleThreadedGhostSystemRef<'lt>> for SingleThreadedGhostSystem<'lt> {
+    /// execute all queued processor functions
+    fn process(&mut self) -> GhostResult<()> {
+        self.system_inner.lock().process()
     }
 
-    #[allow(dead_code)]
-    /// get a GhostSystemRef capable of enqueueing new processor functions
-    /// without creating any deadlocks
-    pub(crate) fn create_ref(&self) -> GhostSystemRef<'lt> {
-        GhostSystemRef {
+    fn create_ref(&self) -> SingleThreadedGhostSystemRef<'lt> {
+        SingleThreadedGhostSystemRef {
             process_send: self.process_send.clone(),
             _system_inner: self.system_inner.clone(),
         }
-    }
-
-    /// execute all queued processor functions
-    pub fn process(&mut self) -> GhostResult<()> {
-        self.system_inner.lock().process()
     }
 }
 
@@ -207,7 +209,7 @@ mod tests {
             non_start_delay: false,
         }));
 
-        let mut sys = GhostSystem::new();
+        let mut sys = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
@@ -264,7 +266,7 @@ mod tests {
             non_delayed_count: 0,
         }));
 
-        let mut sys = GhostSystem::new();
+        let mut sys = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
