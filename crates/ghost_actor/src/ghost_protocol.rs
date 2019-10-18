@@ -1,4 +1,5 @@
 use crate::*;
+use holochain_tracing::*;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -95,7 +96,7 @@ pub trait GhostProtocol: 'static + Debug + Clone + Send + Sync {
 
 /// when a protocol handler received a callback for fulfilling a request
 /// it will follow this signature
-pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(T) -> GhostResult<()> + 'lt + Send + Sync>;
+pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(Span, T) -> GhostResult<()> + 'lt + Send + Sync>;
 
 /// any protocol handler should implement this trait
 pub trait GhostHandler<'lt, X: 'lt + Send + Sync, P: GhostProtocol>: Send + Sync {

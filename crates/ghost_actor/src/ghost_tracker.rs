@@ -2,23 +2,25 @@ use holochain_tracing::Span;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::*;
+use holochain_tracing::*;
 
 // TODO - should be 2000 or less but tests currently fail if below that
 const DEFAULT_TIMEOUT_MS: u64 = 20000;
 
 pub type GhostResponseCb<'lt, X, T> =
-    Box<dyn FnOnce(&mut X, GhostResult<T>) -> GhostResult<()> + 'lt + Send + Sync>;
+    Box<dyn FnOnce(Span, &mut X, GhostResult<T>) -> GhostResult<()> + 'lt + Send + Sync>;
 
 /// this internal struct helps us keep track of the context and timeout
 /// for a callback that was bookmarked in the tracker
 struct GhostTrackerEntry<'lt, X, T> {
+    span: Span,
     expires: std::time::Instant,
     cb: GhostResponseCb<'lt, X, T>,
 }
 
 enum GhostTrackerToInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
     Bookmark(RequestId, GhostTrackerEntry<'lt, X, T>),
-    Handle(RequestId, T),
+    Handle(Span, RequestId, T),
 }
 
 struct GhostTrackerInner<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> {
@@ -48,8 +50,8 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
                 GhostTrackerToInner::Bookmark(request_id, entry) => {
                     self.priv_process_bookmark(request_id, entry)?;
                 }
-                GhostTrackerToInner::Handle(request_id, data) => {
-                    self.priv_process_handle(user_data, request_id, data)?;
+                GhostTrackerToInner::Handle(span, request_id, data) => {
+                    self.priv_process_handle(span, user_data, request_id, data)?;
                 }
             }
         }
@@ -69,14 +71,15 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
     /// match up a pending handle request with any pending bookmarks
     fn priv_process_handle(
         &mut self,
+        span: Span,
         user_data: &mut X,
         request_id: RequestId,
         data: T,
     ) -> GhostResult<()> {
         match self.pending.remove(&request_id) {
-            None => return Err(GhostErrorKind::RequestIdNotFound("".to_string()).into()),
+            None => return Err(GhostErrorKind::RequestIdNotFound(String::new()).into()),
             Some(entry) => {
-                (entry.cb)(user_data, Ok(data))?;
+                (entry.cb)(span.follower("process_handle"), user_data, Ok(data))?;
             }
         }
         Ok(())
@@ -98,7 +101,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
             match self.pending.remove(&request_id) {
                 None => (),
                 Some(entry) => {
-                    (entry.cb)(user_data, Err("timeout".into()))?;
+                    (entry.cb)(entry.span, user_data, Err("timeout".into()))?;
                 }
             }
         }
@@ -191,7 +194,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     /// register a callback, using a specific timeout instead of the default
     pub fn bookmark_with_options(
         &mut self,
-        _span: Span,
+        span: Span,
         cb: GhostResponseCb<'lt, X, T>,
         options: GhostTrackerBookmarkOptions,
     ) -> GhostResult<RequestId> {
@@ -205,6 +208,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
         self.send_inner.send(GhostTrackerToInner::Bookmark(
             request_id.clone(),
             GhostTrackerEntry {
+                span,
                 expires: std::time::Instant::now()
                     .checked_add(std::time::Duration::from_millis(timeout_ms))
                     .expect("can add timeout to SystemTime::now()"),
@@ -216,9 +220,12 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     }
 
     /// handle a response
-    pub fn handle(&mut self, request_id: RequestId, data: T) -> GhostResult<()> {
-        self.send_inner
-            .send(GhostTrackerToInner::Handle(request_id, data))?;
+    pub fn handle(&mut self, span: Span, request_id: RequestId, data: T) -> GhostResult<()> {
+        self.send_inner.send(GhostTrackerToInner::Handle(
+            span.follower("tracker_handle"),
+            request_id,
+            data,
+        ))?;
         Ok(())
     }
 }
@@ -298,7 +305,9 @@ mod tests {
             )
             .unwrap();
 
-        track.handle(rid, "test-response".to_string()).unwrap();
+        track
+            .handle(span::fixme(), rid, "test-response".to_string())
+            .unwrap();
 
         sys.process().unwrap();
 
