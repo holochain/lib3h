@@ -125,7 +125,6 @@ pub fn get_recommended_storage_arc_radius(
     peer_record_set: &RValuePeerRecordSet,
     target_minimum_r_value: f64,
     target_maximum_r_value: f64,
-    self_uptime_0_to_1: f64,
     current_arc_radius: Option<u32>,
 ) -> u32 {
     let pct_of_space_covered: f64 =
@@ -140,8 +139,6 @@ pub fn get_recommended_storage_arc_radius(
     let cur_r_value = interpolate_r_value_for_given_arc(peer_record_set);
 
     let mut count: u64 = 0;
-    let mut rad_min: u32 = ARC_RADIUS_MAX;
-    let mut rad_max: u32 = 0;
     let mut rad_avg: f64 = 0.0;
 
     #[allow(clippy::explicit_counter_loop)]
@@ -150,32 +147,27 @@ pub fn get_recommended_storage_arc_radius(
 
         let rad = record.storage_arc.radius();
 
-        rad_min = std::cmp::min(rad, rad_min);
-        rad_max = std::cmp::max(rad, rad_max);
         rad_avg = (rad_avg * (count as f64 - 1.0) + f64::from(rad)) / count as f64;
     }
 
-    /*
-    println!(r#"
-        count: {}
-        rad_min: {}
-        rad_max: {}
-        rad_avg: {}
-    "#, count, rad_min, rad_max, rad_avg);
-    */
-
     let out_radius: f64 = if cur_r_value < target_minimum_r_value {
         // our network is unhealthy! let's try to capture more!
-        let new_mid_rad = rad_avg * 1.375;
+
+        // let's double the current average for our target mid-point
+        let new_mid_rad = rad_avg * 2.0;
+
         match current_arc_radius {
             None => new_mid_rad,
-            Some(ucur) => {
-                // again - try to maintain some stability
-                let cur = f64::from(ucur);
-                let new_min_rad = rad_avg * 1.25;
-                let new_max_rad = rad_avg * 1.5;
+            Some(cur) => {
+                let cur = f64::from(cur);
+
+                // try to maintain some stability
+                // we'll accept any current from 1.5 to 3 times the average
+                let new_min_rad = rad_avg * 1.5;
+                let new_max_rad = rad_avg * 3.0;
+
                 if cur > new_min_rad && cur < new_max_rad {
-                    return ucur;
+                    cur
                 } else {
                     new_mid_rad
                 }
@@ -183,16 +175,20 @@ pub fn get_recommended_storage_arc_radius(
         }
     } else if cur_r_value > target_maximum_r_value {
         // our network is heavy! let's pull back
+
+        // let's shoot for somewhere between half and 3/4 the current average
         let new_mid_rad = rad_avg * 0.625;
         match current_arc_radius {
             None => new_mid_rad,
-            Some(ucur) => {
-                // again - try to maintain some stability
-                let cur = f64::from(ucur);
+            Some(cur) => {
+                let cur = f64::from(cur);
+
+                // try to maintain some stability
                 let new_min_rad = rad_avg * 0.5;
                 let new_max_rad = rad_avg * 0.75;
+
                 if cur > new_min_rad && cur < new_max_rad {
-                    return ucur;
+                    cur
                 } else {
                     new_mid_rad
                 }
@@ -202,12 +198,19 @@ pub fn get_recommended_storage_arc_radius(
         // our network is perfect, let's try to keep it this way!
         match current_arc_radius {
             None => rad_avg,
-            Some(cur) => return cur,
+            Some(cur) => f64::from(cur),
         }
     };
 
-    // correct for our own uptime
-    (out_radius * (1.0 / self_uptime_0_to_1)) as u32
+    // we might be tempted to correct for any shortage in our own uptime here
+    // but we are using average radius indicators from average nodes with
+    // the entire range of uptime statistics. The tendency to higher radii
+    // to account for uptime should already be built in.
+
+    if out_radius >= f64::from(ARC_RADIUS_MAX) {
+        return ARC_RADIUS_MAX;
+    }
+    out_radius as u32
 }
 
 #[cfg(test)]
@@ -265,7 +268,7 @@ mod tests {
         // network is immature - algorithm recommends full coverage
         assert_eq!(
             ARC_RADIUS_MAX,
-            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),),
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, Some(ARC_RADIUS_MAX / 4),),
         );
     }
 
@@ -285,7 +288,7 @@ mod tests {
         }
 
         assert!(
-            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),)
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, Some(ARC_RADIUS_MAX / 4),)
                 > ARC_RADIUS_MAX / 4
         );
     }
@@ -307,7 +310,7 @@ mod tests {
 
         assert_eq!(
             ARC_RADIUS_MAX / 4,
-            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),),
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, Some(ARC_RADIUS_MAX / 4),),
         );
     }
 
@@ -327,7 +330,7 @@ mod tests {
         }
 
         assert!(
-            get_recommended_storage_arc_radius(&set, 25.0, 50.0, 0.8, Some(ARC_RADIUS_MAX / 4),)
+            get_recommended_storage_arc_radius(&set, 25.0, 50.0, Some(ARC_RADIUS_MAX / 4),)
                 < ARC_RADIUS_MAX / 4
         );
     }
