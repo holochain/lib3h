@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_zombie_actor"
-version = "0.0.16"
+version = "0.0.19"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h actor request tracking module"
@@ -14,7 +14,7 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 backtrace = "=0.3.27"
 crossbeam-channel = "=0.3.8"
-detach = { version = "=0.0.16", path = "../detach" }
+detach = { version = "=0.0.19", path = "../detach" }
 holochain_tracing = "=0.0.1"
 nanoid = "=0.2.0"
 shrinkwraprs = "=0.2.1"
