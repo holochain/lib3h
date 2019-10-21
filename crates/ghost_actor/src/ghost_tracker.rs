@@ -255,7 +255,7 @@ mod tests {
         track
             .bookmark_with_options(
                 Span::fixme(),
-                Box::new(|me, response| {
+                Box::new(|_span, me, response| {
                     assert_eq!(
                         "Err(GhostError(Other(\"timeout\")))",
                         &format!("{:?}", response)
@@ -297,7 +297,7 @@ mod tests {
         let rid = track
             .bookmark(
                 Span::fixme(),
-                Box::new(|me, response| {
+                Box::new(|_span, me, response| {
                     me.got_response = format!("{:?}", response);
                     Ok(())
                 }),
@@ -305,7 +305,7 @@ mod tests {
             .unwrap();
 
         track
-            .handle(span::fixme(), rid, "test-response".to_string())
+            .handle(Span::fixme(), rid, "test-response".to_string())
             .unwrap();
 
         sys.process().unwrap();
