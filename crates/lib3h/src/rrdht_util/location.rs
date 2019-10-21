@@ -12,9 +12,9 @@ impl Location {
     /// get the distance from this location to an `other` location
     /// this distance is processed forward taking wrapping into account
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn forward_distance_to(&self, other: Location) -> u64 {
-        let a: u64 = u64::from((self.0).0);
-        let b: u64 = u64::from((other.0).0);
+    pub fn forward_distance_to(&self, other: Location) -> u32 {
+        let a = (self.0).0;
+        let b = (other.0).0;
         if b >= a {
             return b - a;
         }
@@ -114,6 +114,11 @@ mod tests {
         assert_eq!(
             0xffffffff,
             Location::from(0).forward_distance_to(0xffffffff.into())
+        );
+        // max to max - 1 is max units
+        assert_eq!(
+            0xffffffff,
+            Location::from(0xffffffff).forward_distance_to(0xfffffffe.into())
         );
     }
 }
