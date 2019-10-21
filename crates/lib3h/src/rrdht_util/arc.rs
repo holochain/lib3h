@@ -4,6 +4,17 @@ pub const ARC_LENGTH_MAX: u64 = 0x100000000;
 pub const ARC_RADIUS_MAX: u32 = 0x80000001;
 
 /// An rrdht "arc" indicates a range on the u32 "location" circle
+/// In general, to implement the rrdht sharding algorithm, new `Arc`s
+/// will need to be created using `Arc::new_radius(center, radius)`.
+/// The `center` parameter for a storage arc, for example, will be the
+/// agent's u32 "Location", and the `radius` (read: half arc-length)
+/// will be how large an arc around that center location the agent
+/// is claiming to store.
+/// - 0 indicates they are storing nothing
+/// - 1 indicates they are storing only those entries that hash to the
+///     exact same u32 location value
+/// - 2 indicates they store that same u32 value + one on each side, etc.
+/// - ARC_RADIUS_MAX indicates they claim to store all values.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Arc {
     start: Location,
@@ -111,7 +122,7 @@ impl Arc {
 
     /// returns `true` if given location is within this arc
     pub fn contains_location(&self, location: Location) -> bool {
-        self.start.forward_distance_to(location) < self.length
+        u64::from(self.start.forward_distance_to(location)) < self.length
     }
 }
 
