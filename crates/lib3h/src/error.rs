@@ -12,7 +12,7 @@ use std::{error::Error as StdError, fmt, io, result};
 pub type Lib3hResult<T> = result::Result<T, Lib3hError>;
 
 /// An error that can occur when interacting with the algorithm.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lib3hError(Box<ErrorKind>);
 
 impl Lib3hError {
@@ -71,6 +71,23 @@ pub enum ErrorKind {
     /// could break existing code.)
     #[doc(hidden)]
     __Nonexhaustive,
+}
+
+impl Clone for ErrorKind {
+    fn clone(&self) -> Self {
+        match self {
+            ErrorKind::GhostError(e) => ErrorKind::GhostError(e.clone()),
+            ErrorKind::Io(e) => ErrorKind::Io(e.kind().into()),
+            ErrorKind::TransportError(e) => ErrorKind::TransportError(e.clone()),
+            ErrorKind::Lib3hProtocolError(e) => ErrorKind::Lib3hProtocolError(e.clone()),
+            ErrorKind::HcId(e) => ErrorKind::HcId(e.clone()),
+            ErrorKind::RmpSerdeDecodeError(e) => ErrorKind::Other(format!("{:?}", e)),
+            ErrorKind::CryptoApiError(e) => ErrorKind::CryptoApiError(e.clone()),
+            ErrorKind::KeyNotFound(e) => ErrorKind::KeyNotFound(e.clone()),
+            ErrorKind::Other(e) => ErrorKind::Other(e.clone()),
+            _ => ErrorKind::Other(format!("error cloning error: {:?}", self)),
+        }
+    }
 }
 
 impl StdError for Lib3hError {
