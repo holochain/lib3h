@@ -7,6 +7,38 @@ mod manual_example_mod;
 #[allow(unused_imports)]
 use manual_example_mod::*;
 
+use rustracing::tag::Tag;
+use std::{thread, time::Duration};
+
+#[test]
+fn trace_test() {
+    // Creates a tracer
+    let (span_tx, span_rx) = crossbeam_channel::bounded(10);
+    let tracer = Tracer::with_sender(AllSampler, span_tx);
+    {
+        // Starts "parent" span
+        let parent_span = tracer.span("parent").start();
+        thread::sleep(Duration::from_millis(10));
+        {
+            // Starts "child" span
+            let mut child_span = tracer
+                .span("child_span")
+                .child_of(&parent_span)
+                .tag(Tag::new("key", "value"))
+                .start();
+
+            child_span.log(|log| {
+                log.error().message("a log message");
+            });
+        } // The "child" span dropped and will be sent to `span_rx`
+    } // The "parent" span dropped and will be sent to `span_rx`
+
+    // Outputs finished spans to the standard output
+    while let Ok(span) = span_rx.try_recv() {
+        println!("# SPAN: {:?}", span);
+    }
+}
+
 #[test]
 fn manual_example() {
     let mut actor_system = SingleThreadedGhostSystem::new();
@@ -50,8 +82,9 @@ fn manual_example() {
     let tracer = Tracer::with_sender(AllSampler, span_tx);
     // Starts "root" span
     {
-        let root_span: HSpan = tracer.span("manual_example_span").start().into();
+        let mut root_span: HSpan = tracer.span("manual_example_span").start().into();
         //let root_span = test_span("manual_example_span");
+        root_span.event("start");
 
         actor_ref
             .event_to_actor_print(
@@ -89,7 +122,6 @@ fn manual_example() {
         actor_system.process().unwrap();
         actor_system.process().unwrap();
     }
-    //println!("root_span: {:?}", root_span);
     // Outputs finished spans to the standard output
     while let Ok(span) = span_rx.try_recv() {
         println!("# SPAN: {:?}", span);
