@@ -2,7 +2,6 @@ use holochain_tracing::Span;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::*;
-use holochain_tracing::*;
 
 // TODO - should be 2000 or less but tests currently fail if below that
 const DEFAULT_TIMEOUT_MS: u64 = 20000;
@@ -79,7 +78,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTrackerInner<'lt, X, 
         match self.pending.remove(&request_id) {
             None => return Err(GhostErrorKind::RequestIdNotFound(String::new()).into()),
             Some(entry) => {
-                (entry.cb)(span.follower("process_handle"), user_data, Ok(data))?;
+                (entry.cb)(span.child("process_handle"), user_data, Ok(data))?;
             }
         }
         Ok(())
@@ -222,7 +221,7 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
     /// handle a response
     pub fn handle(&mut self, span: Span, request_id: RequestId, data: T) -> GhostResult<()> {
         self.send_inner.send(GhostTrackerToInner::Handle(
-            span.follower("tracker_handle"),
+            span.child("tracker_handle"),
             request_id,
             data,
         ))?;

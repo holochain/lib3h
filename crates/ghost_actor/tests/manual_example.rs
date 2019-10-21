@@ -83,19 +83,17 @@ fn manual_example() {
     // Starts "root" span
     {
         let mut root_span: HSpan = tracer.span("manual_example_span").start().into();
-        //let root_span = test_span("manual_example_span");
         root_span.event("start");
-
         actor_ref
             .event_to_actor_print(
-                Some(root_span.follower("first event")),
+                Some(root_span.child("first event")),
                 "test-from-framework".to_string(),
             )
             .unwrap();
 
         actor_ref
             .request_to_actor_add_1(
-                Some(root_span.follower("first request")),
+                Some(root_span.child("first request")),
                 42,
                 Box::new(|mut span, me, rsp| {
                     span.event(format!("{:?}", rsp));

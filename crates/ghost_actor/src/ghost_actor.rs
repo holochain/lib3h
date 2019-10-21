@@ -12,7 +12,8 @@ pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
 
 /// an actor system ref with local context
 /// in general, this is passed into actor constructors
-/// but cannot be used until actor_init is called
+/// but cannot be used until actor_init is called.
+/// X = conteXt or user_data  (usually yourself)
 pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
     sys_ref: S,
     deep_user_data: DeepRef<'lt, X>,
@@ -33,6 +34,7 @@ impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X,
     }
 
     /// expand an endpoint seed with local context / handling
+    /// D = deref. An actual actor reference  or null in situations where its not possible.
     pub fn plant_seed<P: GhostProtocol, D: 'lt, H: 'lt + GhostHandler<'lt, X, P>>(
         &mut self,
         seed: GhostEndpointSeed<'lt, P, D, S>,
@@ -232,7 +234,7 @@ impl<
             Some(cb) => {
                 let request_id = self
                     .pending_callbacks
-                    .bookmark(span.follower("bookmark"), cb)?;
+                    .bookmark(span.child("bookmarking"), cb)?;
 
                 self.send.send((span, Some(request_id), message))?;
             }
@@ -271,8 +273,8 @@ impl<
 pub struct GhostEndpointFull<
     'lt,
     P: GhostProtocol,
-    D: 'lt,               /* deref. actual actor reference  or null if not possible */
-    X: 'lt + Send + Sync, /* context or user_data  (usually yourself) */
+    D: 'lt,
+    X: 'lt + Send + Sync,
     H: GhostHandler<'lt, X, P>,
     S: GhostSystemRef<'lt>,
 > {

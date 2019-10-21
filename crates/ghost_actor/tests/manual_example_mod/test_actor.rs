@@ -58,7 +58,7 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
                                 message,
                                 Box::new(move |span, me, resp| {
                                     me.owner_ref.event_to_owner_print(
-                                        Some(span.follower("sub_1 request_to_owner_sub_1")),
+                                        Some(span.child("sub_1 request_to_owner_sub_1")),
                                         format!("({} fwd sub_1 {:?}", me.name, resp),
                                     )?;
                                     cb(span, resp?)
@@ -107,7 +107,7 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
                             message,
                             Box::new(move |span, me, result| {
                                 me.owner_ref.event_to_owner_print(
-                                    Some(span.follower("add_1 request")),
+                                    Some(span.child("add_1 request")),
                                     format!("({} fwd add_1 request)", me.name),
                                 )?;
                                 cb(span, result?)
@@ -121,16 +121,11 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
         // if we are the lowest level, send some events/requests to owner
         if maybe_sub_actor.is_none() {
             owner_ref.event_to_owner_print(
-                // Some(Span::todo(&format!("{} actor created", name))),
                 Some(Span::todo("actor created")),
                 format!("({} to_owner_print)", name),
             )?;
             let name_clone = name.to_string();
             owner_ref.request_to_owner_sub_1(
-                //                Some(Span::todo(&format!(
-                //                    "{} asking owner to subtract one from 42",
-                //                    name
-                //                ))),
                 None, // FIXME
                 42,
                 Box::new(move |span, me, result| {
