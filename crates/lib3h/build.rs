@@ -56,18 +56,21 @@ fn get_keystore_protocol() -> TokenStream {
         // -- first, the data types -- //
 
         ///We need to support both agent pubkeys and node pubkeys
+        #[derive(Debug, Clone)]
         pub enum PubKey {
             AgentPubKey(::lib3h_protocol::types::AgentPubKey),
             NodePubKey(::lib3h_protocol::types::NodePubKey),
         }
 
         ///Data required for submitting a keystore signature request
+        #[derive(Debug, Clone)]
         pub struct SignRequestData {
             pub pub_key: PubKey,
             pub data: ::lib3h_protocol::data_types::Opaque,
         }
 
         ///A successful result of a keystore signature request
+        #[derive(Debug, Clone)]
         pub struct SignResultData {
             pub signature: ::lib3h_protocol::data_types::Opaque,
         }
@@ -81,9 +84,36 @@ fn get_keystore_protocol() -> TokenStream {
         // -- end definition --
 
         ///Hand-Rolled KeystoreProtocol Enum
+        #[derive(Debug, Clone)]
         pub enum KeystoreProtocol {
             RequestToActorSign(SignRequestData),
             RequestToActorSignResponse(Result<SignResultData, crate::error::Lib3hError>),
+        }
+
+        static D_LIST: &'static [::ghost_actor::GhostProtocolDiscriminant] = &[
+            ::ghost_actor::GhostProtocolDiscriminant {
+                id: "request_to_actor_sign",
+                destination: ::ghost_actor::GhostProtocolDestination::Actor,
+                variant_type: ::ghost_actor::GhostProtocolVariantType::Request,
+            },
+            ::ghost_actor::GhostProtocolDiscriminant {
+                id: "request_to_actor_sign_response",
+                destination: ::ghost_actor::GhostProtocolDestination::Owner,
+                variant_type: ::ghost_actor::GhostProtocolVariantType::Response,
+            },
+        ];
+
+        impl ::ghost_actor::GhostProtocol for KeystoreProtocol {
+            fn discriminant_list() -> &'static [::ghost_actor::GhostProtocolDiscriminant] {
+                D_LIST
+            }
+
+            fn discriminant(&self) -> &::ghost_actor::GhostProtocolDiscriminant {
+                match self {
+                    KeystoreProtocol::RequestToActorSign(_) => &D_LIST[0],
+                    KeystoreProtocol::RequestToActorSignResponse(_) => &D_LIST[1],
+                }
+            }
         }
     }
 }
