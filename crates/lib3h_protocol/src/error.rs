@@ -8,7 +8,7 @@ use url::ParseError;
 pub type Lib3hProtocolResult<T> = result::Result<T, Lib3hProtocolError>;
 
 /// An error that can occur when interacting with the algorithm.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lib3hProtocolError(Box<ErrorKind>);
 
 impl Lib3hProtocolError {
@@ -51,6 +51,20 @@ pub enum ErrorKind {
     /// could break existing code.)
     #[doc(hidden)]
     __Nonexhaustive,
+}
+
+impl Clone for ErrorKind {
+    fn clone(&self) -> Self {
+        match self {
+            ErrorKind::Io(e) => ErrorKind::Io(e.kind().into()),
+            ErrorKind::TransportError(e) => ErrorKind::TransportError(e.clone()),
+            ErrorKind::DeserializeError(e) => ErrorKind::DeserializeError(e.clone()),
+            ErrorKind::Lib3hError(e, bt) => ErrorKind::Lib3hError(e.clone(), bt.clone()),
+            ErrorKind::UrlError(e) => ErrorKind::UrlError(*e),
+            ErrorKind::Other(e) => ErrorKind::Other(e.clone()),
+            _ => ErrorKind::Other(format!("error cloning error: {:?}", self)),
+        }
+    }
 }
 
 impl StdError for Lib3hProtocolError {
