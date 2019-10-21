@@ -338,7 +338,7 @@ impl<
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
-        let span = maybe_span.unwrap_or(Span::todo("send_protocol"));
+        let span = maybe_span.unwrap_or_else(|| Span::todo("send_protocol"));
         self.send_inner
             .send(GhostEndpointToInner::IncomingRequest(span, message, cb))?;
         Ok(())
