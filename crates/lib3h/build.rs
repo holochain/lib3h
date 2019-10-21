@@ -8,8 +8,10 @@ use std::io::Write;
 
 /// to get debug output in a build.rs script every line needs a prefix
 fn debug(s: &str) {
-    let s = s.replace("\n", "\ncargo:warning=");
-    println!("cargo:warning={}", &s);
+    if std::env::var("GHOST_DEBUG_CODEGEN").is_ok() {
+        let s = s.replace("\n", "\ncargo:warning=");
+        println!("cargo:warning={}", &s);
+    }
 }
 
 /// this will eventually use the ghost_actor code generation to render a protocol
@@ -145,7 +147,7 @@ fn get_keystore_protocol() -> TokenStream {
 
         ///Implement this to handle messages sent to the owner of a keystore
         pub struct KeystoreOwnerHandler<'lt, X: 'lt + Send + Sync> {
-            phantom: ::std::marker::PhantomData<&'lt X>,
+            pub phantom: ::std::marker::PhantomData<&'lt X>,
         }
 
         impl<'lt, X: 'lt + Send + Sync> ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol> for KeystoreOwnerHandler<'lt, X> {

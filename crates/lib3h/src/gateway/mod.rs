@@ -38,8 +38,10 @@ pub struct P2pGateway {
     /// DHT
     inner_dht: Detach<ChildDhtWrapperDyn<P2pGateway>>,
 
+    // note - making MessageEncoding 'static for now, eventually
+    // will need to bubble lifetime params up the stack
     /// message encoding actor
-    message_encoding: Detach<MessageEncodingActorParentWrapper<P2pGateway>>,
+    message_encoding: Detach<MessageEncodingActorParentWrapper<'static, P2pGateway>>,
 
     /// self ghost actor
     endpoint_parent: Option<GatewayParentEndpoint>,

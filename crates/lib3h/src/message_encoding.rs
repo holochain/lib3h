@@ -1,6 +1,9 @@
 //! utility actor for encoding / decoding messages
 
-use crate::error::{Lib3hError, Lib3hResult};
+use crate::{
+    error::{Lib3hError, Lib3hResult},
+    keystore2::*,
+};
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, types::NetworkHash, Address};
@@ -89,14 +92,14 @@ pub type MessageEncodingActorParentEndpoint = GhostEndpoint<
     Lib3hError,
 >;
 
-pub type MessageEncodingActorParentWrapper<T> = GhostParentWrapper<
+pub type MessageEncodingActorParentWrapper<'lt, T> = GhostParentWrapper<
     T,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
     RequestToChildResponse,
     Lib3hError,
-    MessageEncoding,
+    MessageEncoding<'lt>,
 >;
 
 type MessageEncodingParentEndpoint = GhostEndpoint<
@@ -107,8 +110,8 @@ type MessageEncodingParentEndpoint = GhostEndpoint<
     Lib3hError,
 >;
 
-type MessageEncodingSelfEndpoint = GhostContextEndpoint<
-    MessageEncoding,
+type MessageEncodingSelfEndpoint<'lt> = GhostContextEndpoint<
+    MessageEncoding<'lt>,
     RequestToParent,
     RequestToParentResponse,
     RequestToChild,
@@ -119,13 +122,41 @@ type MessageEncodingSelfEndpoint = GhostContextEndpoint<
 type MessageEncodingMessageFromParent =
     GhostMessage<RequestToChild, RequestToParent, RequestToChildResponse, Lib3hError>;
 
-pub struct MessageEncoding {
+pub struct MessageEncoding<'lt> {
     endpoint_parent: Option<MessageEncodingParentEndpoint>,
-    endpoint_self: Detach<MessageEncodingSelfEndpoint>,
+    endpoint_self: Detach<MessageEncodingSelfEndpoint<'lt>>,
+    local_system: ghost_actor::SingleThreadedGhostSystem<'lt>,
+    #[allow(dead_code)]
+    ghost_context: std::sync::Arc<ghost_actor::GhostMutex<()>>,
+    keystore_ref: ghost_actor::GhostEndpointFull<
+        'lt,
+        keystore_protocol::KeystoreProtocol,
+        Keystore2ActorStub<'lt, ghost_actor::SingleThreadedGhostSystemRef<'lt>>,
+        (),
+        keystore_protocol::KeystoreOwnerHandler<'lt, ()>,
+        ghost_actor::SingleThreadedGhostSystemRef<'lt>,
+    >,
 }
 
-impl MessageEncoding {
+impl<'lt> MessageEncoding<'lt> {
     pub fn new() -> Self {
+        // stub keystore for now
+        // also micro/local ghost system for now
+        use ghost_actor::GhostSystem;
+        let local_system = ghost_actor::SingleThreadedGhostSystem::new();
+        let ghost_context = std::sync::Arc::new(ghost_actor::GhostMutex::new(()));
+        let (mut sys_ref, finalize) = local_system.create_external_system_ref();
+        finalize(std::sync::Arc::downgrade(&ghost_context)).expect("can finalize ghost system");
+
+        let keystore_ref = sys_ref
+            .spawn(
+                Box::new(|sys_ref, owner_seed| Keystore2ActorStub::new(sys_ref, owner_seed)),
+                keystore_protocol::KeystoreOwnerHandler {
+                    phantom: std::marker::PhantomData,
+                },
+            )
+            .expect("can spawn stub keystore actor");
+
         let (endpoint_parent, endpoint_self) = create_ghost_channel();
         let endpoint_parent = Some(endpoint_parent);
         let endpoint_self = Detach::new(
@@ -137,6 +168,9 @@ impl MessageEncoding {
         Self {
             endpoint_parent,
             endpoint_self,
+            local_system,
+            ghost_context,
+            keystore_ref,
         }
     }
 
@@ -208,25 +242,40 @@ impl MessageEncoding {
         payload: Opaque,
     ) -> Lib3hResult<()> {
         let payload = InterimEncodingProtocol::Payload { payload }.to_opaque();
-        msg.respond(Ok(RequestToChildResponse::EncodePayloadResult { payload }))?;
+        // fake doing a signature of the payload
+        use keystore_protocol::KeystoreActorRef;
+        self.keystore_ref.request_to_actor_sign(
+            keystore_protocol::SignRequestData {
+                pub_key: keystore_protocol::PubKey::AgentPubKey("fake".into()),
+                data: payload.clone(),
+            },
+            Box::new(move |_me, _signature| {
+                msg.respond(Ok(RequestToChildResponse::EncodePayloadResult { payload }))?;
+                Ok(())
+            }),
+        )?;
         Ok(())
     }
 }
 
-impl
+impl<'lt>
     GhostActor<
         RequestToParent,
         RequestToParentResponse,
         RequestToChild,
         RequestToChildResponse,
         Lib3hError,
-    > for MessageEncoding
+    > for MessageEncoding<'lt>
 {
     fn take_parent_endpoint(&mut self) -> Option<MessageEncodingParentEndpoint> {
         std::mem::replace(&mut self.endpoint_parent, None)
     }
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // process our local ghost_actor 2.0 system
+        use ghost_actor::GhostSystem;
+        self.local_system.process()?;
+
         let mut did_work = detach_run!(&mut self.endpoint_self, |es| es.process(self))?;
 
         for msg in self.endpoint_self.as_mut().drain_messages() {
@@ -330,6 +379,11 @@ mod tests {
         )
         .unwrap();
 
+        e.process(&mut in_out).unwrap();
+        e.process(&mut in_out).unwrap();
+        e.process(&mut in_out).unwrap();
+        e.process(&mut in_out).unwrap();
+        e.process(&mut in_out).unwrap();
         e.process(&mut in_out).unwrap();
 
         assert_eq!(
