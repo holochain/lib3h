@@ -83,6 +83,8 @@ fn get_keystore_protocol() -> TokenStream {
         // request_to_actor(sign, SignRequestData, Result<SignResultData, Lib3hError>),
         // -- end definition --
 
+        // all code below will go away once we implement code generation:
+
         ///Hand-Rolled KeystoreProtocol Enum
         #[derive(Debug, Clone)]
         pub enum KeystoreProtocol {
@@ -115,5 +117,90 @@ fn get_keystore_protocol() -> TokenStream {
                 }
             }
         }
+
+        ///Implement this to handle messages sent to a keystore actor
+        pub struct KeystoreActorHandler<'lt, X: 'lt + Send + Sync> {
+            pub handle_request_to_actor_sign: Box<
+                dyn FnMut(&mut X, SignRequestData, ::ghost_actor::GhostHandlerCb<'lt, Result<SignResultData, crate::error::Lib3hError>>) -> ::ghost_actor::GhostResult<()> + 'lt + Send + Sync
+            >,
+        }
+
+        impl<'lt, X: 'lt + Send + Sync> ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol> for KeystoreActorHandler<'lt, X> {
+            fn trigger(
+                &mut self,
+                user_data: &mut X,
+                message: KeystoreProtocol,
+                cb: Option<::ghost_actor::GhostHandlerCb<'lt, KeystoreProtocol>>,
+            ) -> ::ghost_actor::GhostResult<()> {
+                match message {
+                    KeystoreProtocol::RequestToActorSign(m) => {
+                        let cb = cb.unwrap();
+                        let cb = Box::new(move |resp| cb(KeystoreProtocol::RequestToActorSignResponse(resp)));
+                        (self.handle_request_to_actor_sign)(user_data, m, cb)
+                    }
+                    _ => panic!("bad"),
+                }
+            }
+        }
+
+        ///Implement this to handle messages sent to the owner of a keystore
+        pub struct KeystoreOwnerHandler<'lt, X: 'lt + Send + Sync> {
+            phantom: ::std::marker::PhantomData<&'lt X>,
+        }
+
+        impl<'lt, X: 'lt + Send + Sync> ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol> for KeystoreOwnerHandler<'lt, X> {
+            fn trigger(
+                &mut self,
+                _user_data: &mut X,
+                _message: KeystoreProtocol,
+                _cb: Option<::ghost_actor::GhostHandlerCb<'lt, KeystoreProtocol>>,
+            ) -> ::ghost_actor::GhostResult<()> {
+                panic!("bad")
+            }
+        }
+
+        ///This will be implemented on GhostEndpointFull so you can easily emit
+        ///events and issue requests / handle responses
+        pub trait KeystoreActorRef<'lt, X: 'lt + Send + Sync>: ::ghost_actor::GhostEndpoint<'lt, X, KeystoreProtocol> {
+            fn request_to_actor_sign(
+                &mut self,
+                message: SignRequestData,
+                cb: ::ghost_actor::GhostResponseCb<'lt, X, Result<SignResultData, crate::error::Lib3hError>>,
+            ) -> ::ghost_actor::GhostResult<()> {
+                let cb: ::ghost_actor::GhostResponseCb<'lt, X, KeystoreProtocol> = Box::new(move |me, resp| {
+                    cb(
+                        me,
+                        match resp {
+                            Ok(r) => match r {
+                                KeystoreProtocol::RequestToActorSignResponse(m) => Ok(m),
+                                _ => panic!("bad"),
+                            },
+                            Err(e) => Err(e),
+                        },
+                    )
+                });
+                self.send_protocol(KeystoreProtocol::RequestToActorSign(message), Some(cb))
+            }
+        }
+
+        impl<
+            'lt,
+            X: 'lt + Send + Sync,
+            A: 'lt,
+            H: ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol>,
+            S: ::ghost_actor::GhostSystemRef<'lt>,
+        > KeystoreActorRef<'lt, X> for ::ghost_actor::GhostEndpointFull<'lt, KeystoreProtocol, A, X, H, S> {}
+
+        ///This will be implemented on GhostEndpointFull so you can easily emit
+        ///events and issue requests / handle responses
+        pub trait KeystoreOwnerRef<'lt, X: 'lt + Send + Sync>: ::ghost_actor::GhostEndpoint<'lt, X, KeystoreProtocol> {}
+
+        impl<
+            'lt,
+            X: 'lt + Send + Sync,
+            A: 'lt,
+            H: ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol>,
+            S: ::ghost_actor::GhostSystemRef<'lt>,
+        > KeystoreOwnerRef<'lt, X> for ::ghost_actor::GhostEndpointFull<'lt, KeystoreProtocol, A, X, H, S> {}
     }
 }
