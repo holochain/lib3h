@@ -22,14 +22,17 @@ impl<'lt, S: GhostSystemRef<'lt>> Keystore2ActorStub<'lt, S> {
         mut sys_ref: GhostActorSystem<'lt, Self, S>,
         owner_seed: GhostEndpointSeed<'lt, KeystoreProtocol, (), S>,
     ) -> GhostResult<Self> {
-        let owner_ref = sys_ref.plant_endpoint(
+        let owner_ref = sys_ref.plant_seed(
             owner_seed,
             KeystoreActorHandler {
                 handle_request_to_actor_sign: Box::new(|_me, _message, cb| {
                     // THIS IS A STUB, just responding with empty signature
-                    cb(Ok(SignResultData {
-                        signature: b"".to_vec().into(),
-                    }))
+                    cb(
+                        holochain_tracing::Span::fixme(),
+                        Ok(SignResultData {
+                            signature: b"".to_vec().into(),
+                        }),
+                    )
                 }),
             },
         )?;

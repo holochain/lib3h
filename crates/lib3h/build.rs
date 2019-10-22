@@ -130,6 +130,7 @@ fn get_keystore_protocol() -> TokenStream {
         impl<'lt, X: 'lt + Send + Sync> ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol> for KeystoreActorHandler<'lt, X> {
             fn trigger(
                 &mut self,
+                _span: ::holochain_tracing::Span,
                 user_data: &mut X,
                 message: KeystoreProtocol,
                 cb: Option<::ghost_actor::GhostHandlerCb<'lt, KeystoreProtocol>>,
@@ -137,7 +138,7 @@ fn get_keystore_protocol() -> TokenStream {
                 match message {
                     KeystoreProtocol::RequestToActorSign(m) => {
                         let cb = cb.unwrap();
-                        let cb = Box::new(move |resp| cb(KeystoreProtocol::RequestToActorSignResponse(resp)));
+                        let cb = Box::new(move |span, resp| cb(span, KeystoreProtocol::RequestToActorSignResponse(resp)));
                         (self.handle_request_to_actor_sign)(user_data, m, cb)
                     }
                     _ => panic!("bad"),
@@ -153,6 +154,7 @@ fn get_keystore_protocol() -> TokenStream {
         impl<'lt, X: 'lt + Send + Sync> ::ghost_actor::GhostHandler<'lt, X, KeystoreProtocol> for KeystoreOwnerHandler<'lt, X> {
             fn trigger(
                 &mut self,
+                _span: ::holochain_tracing::Span,
                 _user_data: &mut X,
                 _message: KeystoreProtocol,
                 _cb: Option<::ghost_actor::GhostHandlerCb<'lt, KeystoreProtocol>>,
@@ -166,11 +168,13 @@ fn get_keystore_protocol() -> TokenStream {
         pub trait KeystoreActorRef<'lt, X: 'lt + Send + Sync>: ::ghost_actor::GhostEndpoint<'lt, X, KeystoreProtocol> {
             fn request_to_actor_sign(
                 &mut self,
+                maybe_span: Option<::holochain_tracing::Span>,
                 message: SignRequestData,
                 cb: ::ghost_actor::GhostResponseCb<'lt, X, Result<SignResultData, crate::error::Lib3hError>>,
             ) -> ::ghost_actor::GhostResult<()> {
-                let cb: ::ghost_actor::GhostResponseCb<'lt, X, KeystoreProtocol> = Box::new(move |me, resp| {
+                let cb: ::ghost_actor::GhostResponseCb<'lt, X, KeystoreProtocol> = Box::new(move |span, me, resp| {
                     cb(
+                        span,
                         me,
                         match resp {
                             Ok(r) => match r {
@@ -181,7 +185,7 @@ fn get_keystore_protocol() -> TokenStream {
                         },
                     )
                 });
-                self.send_protocol(KeystoreProtocol::RequestToActorSign(message), Some(cb))
+                self.send_protocol(maybe_span, KeystoreProtocol::RequestToActorSign(message), Some(cb))
             }
         }
 

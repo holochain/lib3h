@@ -245,11 +245,12 @@ impl<'lt> MessageEncoding<'lt> {
         // fake doing a signature of the payload
         use keystore_protocol::KeystoreActorRef;
         self.keystore_ref.request_to_actor_sign(
+            None,
             keystore_protocol::SignRequestData {
                 pub_key: keystore_protocol::PubKey::AgentPubKey("fake".into()),
                 data: payload.clone(),
             },
-            Box::new(move |_me, _signature| {
+            Box::new(move |_span, _me, _signature| {
                 msg.respond(Ok(RequestToChildResponse::EncodePayloadResult { payload }))?;
                 Ok(())
             }),
