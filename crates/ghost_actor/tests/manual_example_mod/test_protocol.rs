@@ -94,6 +94,7 @@ pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
 impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestActorHandler<'lt, X> {
     fn trigger(
         &mut self,
+        _span: Span,
         user_data: &mut X,
         message: TestProtocol,
         cb: Option<GhostHandlerCb<'lt, TestProtocol>>,
@@ -129,20 +130,21 @@ pub struct TestOwnerHandler<'lt, X: 'lt + Send + Sync> {
 impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestOwnerHandler<'lt, X> {
     fn trigger(
         &mut self,
+        span: Span,
         user_data: &mut X,
         message: TestProtocol,
         cb: Option<GhostHandlerCb<'lt, TestProtocol>>,
     ) -> GhostResult<()> {
         match message {
             TestProtocol::EventToOwnerPrint(m) => {
-                (self.handle_event_to_owner_print)(Span::fixme(), user_data, m)
+                (self.handle_event_to_owner_print)(span.child("trigger"), user_data, m)
             }
             TestProtocol::RequestToOwnerSub1(m) => {
                 let cb = cb.unwrap();
                 let cb = Box::new(move |span, resp| {
                     cb(span, TestProtocol::RequestToOwnerSub1Response(resp))
                 });
-                (self.handle_request_to_owner_sub_1)(Span::fixme(), user_data, m, cb)
+                (self.handle_request_to_owner_sub_1)(span.child("trigger"), user_data, m, cb)
             }
             _ => panic!("bad"),
         }

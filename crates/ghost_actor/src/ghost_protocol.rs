@@ -102,6 +102,7 @@ pub type GhostHandlerCb<'lt, T> = Box<dyn FnOnce(Span, T) -> GhostResult<()> + '
 pub trait GhostHandler<'lt, X: 'lt + Send + Sync, P: GhostProtocol>: Send + Sync {
     fn trigger(
         &mut self,
+        _span: Span,
         user_data: &mut X,
         message: P,
         cb: Option<GhostHandlerCb<'lt, P>>,

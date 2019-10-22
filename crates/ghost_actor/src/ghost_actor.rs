@@ -262,7 +262,7 @@ impl<
                         }))
                     }
                 };
-                self.handler.trigger(user_data, message, cb)?;
+                self.handler.trigger(span, user_data, message, cb)?;
             }
         }
         Ok(())
