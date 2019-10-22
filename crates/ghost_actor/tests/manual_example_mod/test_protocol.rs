@@ -12,6 +12,7 @@
 //! ```
 
 use ghost_actor::prelude::*;
+use holochain_tracing::*;
 
 // -- TestProtocol -- //
 
@@ -21,9 +22,9 @@ pub enum TestProtocol {
     EventToActorPrint(String),
     EventToOwnerPrint(String),
     RequestToActorAdd1(i32),
-    RequestToActorAdd1Response(Result<i32, ()>),
+    RequestToActorAdd1Response(Result<i32>),
     RequestToOwnerSub1(i32),
-    RequestToOwnerSub1Response(Result<i32, ()>),
+    RequestToOwnerSub1Response(Result<i32>),
 }
 
 static D_LIST: &'static [GhostProtocolDiscriminant] = &[
@@ -83,7 +84,7 @@ pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
     pub handle_event_to_actor_print:
         Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
     pub handle_request_to_actor_add_1: Box<
-        dyn FnMut(&mut X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()>
+        dyn FnMut(&mut X, i32, GhostHandlerCb<'lt, Result<i32>>) -> GhostResult<()>
             + 'lt
             + Send
             + Sync,
@@ -93,6 +94,7 @@ pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
 impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestActorHandler<'lt, X> {
     fn trigger(
         &mut self,
+        _span: Span,
         user_data: &mut X,
         message: TestProtocol,
         cb: Option<GhostHandlerCb<'lt, TestProtocol>>,
@@ -101,7 +103,9 @@ impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestActor
             TestProtocol::EventToActorPrint(m) => (self.handle_event_to_actor_print)(user_data, m),
             TestProtocol::RequestToActorAdd1(m) => {
                 let cb = cb.unwrap();
-                let cb = Box::new(move |resp| cb(TestProtocol::RequestToActorAdd1Response(resp)));
+                let cb = Box::new(move |span, resp| {
+                    cb(span, TestProtocol::RequestToActorAdd1Response(resp))
+                });
                 (self.handle_request_to_actor_add_1)(user_data, m, cb)
             }
             _ => panic!("bad"),
@@ -114,9 +118,9 @@ impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestActor
 #[allow(dead_code)]
 pub struct TestOwnerHandler<'lt, X: 'lt + Send + Sync> {
     pub handle_event_to_owner_print:
-        Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
+        Box<dyn FnMut(Span, &mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
     pub handle_request_to_owner_sub_1: Box<
-        dyn FnMut(&mut X, i32, GhostHandlerCb<'lt, Result<i32, ()>>) -> GhostResult<()>
+        dyn FnMut(Span, &mut X, i32, GhostHandlerCb<'lt, Result<i32>>) -> GhostResult<()>
             + 'lt
             + Send
             + Sync,
@@ -126,16 +130,21 @@ pub struct TestOwnerHandler<'lt, X: 'lt + Send + Sync> {
 impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestOwnerHandler<'lt, X> {
     fn trigger(
         &mut self,
+        span: Span,
         user_data: &mut X,
         message: TestProtocol,
         cb: Option<GhostHandlerCb<'lt, TestProtocol>>,
     ) -> GhostResult<()> {
         match message {
-            TestProtocol::EventToOwnerPrint(m) => (self.handle_event_to_owner_print)(user_data, m),
+            TestProtocol::EventToOwnerPrint(m) => {
+                (self.handle_event_to_owner_print)(span.child("trigger"), user_data, m)
+            }
             TestProtocol::RequestToOwnerSub1(m) => {
                 let cb = cb.unwrap();
-                let cb = Box::new(move |resp| cb(TestProtocol::RequestToOwnerSub1Response(resp)));
-                (self.handle_request_to_owner_sub_1)(user_data, m, cb)
+                let cb = Box::new(move |span, resp| {
+                    cb(span, TestProtocol::RequestToOwnerSub1Response(resp))
+                });
+                (self.handle_request_to_owner_sub_1)(span.child("trigger"), user_data, m, cb)
             }
             _ => panic!("bad"),
         }
@@ -145,16 +154,25 @@ impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestOwner
 // -- TestActorRef -- //
 
 pub trait TestActorRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestProtocol> {
-    fn event_to_actor_print(&mut self, message: String) -> GhostResult<()> {
-        self.send_protocol(TestProtocol::EventToActorPrint(message), None)
+    // Example helper for sending an event
+    fn event_to_actor_print(
+        &mut self,
+        maybe_span: Option<Span>,
+        message: String,
+    ) -> GhostResult<()> {
+        self.send_protocol(maybe_span, TestProtocol::EventToActorPrint(message), None)
     }
+
+    // Example helper for sending a request
     fn request_to_actor_add_1(
         &mut self,
+        maybe_span: Option<Span>,
         message: i32,
-        cb: GhostResponseCb<'lt, X, Result<i32, ()>>,
+        response_cb: GhostResponseCb<'lt, X, Result<i32>>,
     ) -> GhostResult<()> {
-        let cb: GhostResponseCb<'lt, X, TestProtocol> = Box::new(move |me, resp| {
-            cb(
+        let cb: GhostResponseCb<'lt, X, TestProtocol> = Box::new(move |span, me, resp| {
+            response_cb(
+                span,
                 me,
                 match resp {
                     Ok(r) => match r {
@@ -165,7 +183,11 @@ pub trait TestActorRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestPro
                 },
             )
         });
-        self.send_protocol(TestProtocol::RequestToActorAdd1(message), Some(cb))
+        self.send_protocol(
+            maybe_span,
+            TestProtocol::RequestToActorAdd1(message),
+            Some(cb),
+        )
     }
 }
 
@@ -182,16 +204,22 @@ impl<
 // -- TestOwnerRef -- //
 
 pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestProtocol> {
-    fn event_to_owner_print(&mut self, message: String) -> GhostResult<()> {
-        self.send_protocol(TestProtocol::EventToOwnerPrint(message), None)
+    fn event_to_owner_print(
+        &mut self,
+        maybe_span: Option<Span>,
+        message: String,
+    ) -> GhostResult<()> {
+        self.send_protocol(maybe_span, TestProtocol::EventToOwnerPrint(message), None)
     }
     fn request_to_owner_sub_1(
         &mut self,
+        maybe_span: Option<Span>,
         message: i32,
-        cb: GhostResponseCb<'lt, X, Result<i32, ()>>,
+        response_cb: GhostResponseCb<'lt, X, Result<i32>>,
     ) -> GhostResult<()> {
-        let cb: GhostResponseCb<'lt, X, TestProtocol> = Box::new(move |me, resp| {
-            cb(
+        let cb: GhostResponseCb<'lt, X, TestProtocol> = Box::new(move |span, me, resp| {
+            response_cb(
+                span,
                 me,
                 match resp {
                     Ok(r) => match r {
@@ -202,7 +230,11 @@ pub trait TestOwnerRef<'lt, X: 'lt + Send + Sync>: GhostEndpoint<'lt, X, TestPro
                 },
             )
         });
-        self.send_protocol(TestProtocol::RequestToOwnerSub1(message), Some(cb))
+        self.send_protocol(
+            maybe_span,
+            TestProtocol::RequestToOwnerSub1(message),
+            Some(cb),
+        )
     }
 }
 
