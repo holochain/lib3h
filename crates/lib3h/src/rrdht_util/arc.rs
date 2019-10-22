@@ -57,7 +57,7 @@ impl Arc {
         // calculations to ensure that:
         // - 0 means no coverage
         // - 1 means coverage only including the center point
-        // - any thing obove expand out to the sides
+        // - any thing above expand out to the sides
         let start = center - Location::from(radius - 1);
         let length = u64::from(radius) * 2 - 1;
 
