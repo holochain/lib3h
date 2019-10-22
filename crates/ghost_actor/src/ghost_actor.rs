@@ -12,7 +12,8 @@ pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
 
 /// an actor system ref with local context
 /// in general, this is passed into actor constructors
-/// but cannot be used until actor_init is called
+/// but cannot be used until actor_init is called.
+/// X = conteXt or user_data  (usually yourself)
 pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
     sys_ref: S,
     deep_user_data: DeepRef<'lt, X>,
@@ -33,7 +34,8 @@ impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X,
     }
 
     /// expand an endpoint seed with local context / handling
-    pub fn plant_endpoint<P: GhostProtocol, D: 'lt, H: 'lt + GhostHandler<'lt, X, P>>(
+    /// D = deref. An actual actor reference  or null in situations where its not possible.
+    pub fn plant_seed<P: GhostProtocol, D: 'lt, H: 'lt + GhostHandler<'lt, X, P>>(
         &mut self,
         seed: GhostEndpointSeed<'lt, P, D, S>,
         handler: H,
@@ -90,15 +92,15 @@ impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X,
         handler: H,
     ) -> GhostResult<GhostEndpointFull<'lt, P, A, X, H, S>> {
         let seed = self.spawn_seed(spawn_cb)?;
-        self.plant_endpoint(seed, handler)
+        self.plant_seed(seed, handler)
     }
 }
 
 /// An incomplete GhostEndpoint. It needs to be `plant`ed to fully function
 pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> {
     sys_ref: S,
-    send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-    recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
+    send: crossbeam_channel::Sender<(Span, Option<RequestId>, P)>,
+    recv: crossbeam_channel::Receiver<(Span, Option<RequestId>, P)>,
     d_ref: Arc<GhostMutex<D>>,
     _phantom: std::marker::PhantomData<&'lt S>,
 }
@@ -106,8 +108,8 @@ pub struct GhostEndpointSeed<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'l
 impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> GhostEndpointSeed<'lt, P, D, S> {
     fn new(
         sys_ref: S,
-        send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-        recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
+        send: crossbeam_channel::Sender<(Span, Option<RequestId>, P)>,
+        recv: crossbeam_channel::Receiver<(Span, Option<RequestId>, P)>,
         d_ref: Arc<GhostMutex<D>>,
     ) -> Self {
         Self {
@@ -175,7 +177,7 @@ impl<'lt, P: GhostProtocol, D: 'lt, S: GhostSystemRef<'lt>> GhostEndpointSeed<'l
 /// right now only has one variant, but we may have other messages in the future
 enum GhostEndpointToInner<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     /// incoming request, we may need to start tracking a response cb
-    IncomingRequest(P, Option<GhostResponseCb<'lt, X, P>>),
+    IncomingRequest(Span, P, Option<GhostResponseCb<'lt, X, P>>),
 }
 
 struct GhostEndpointFullInner<
@@ -186,8 +188,8 @@ struct GhostEndpointFullInner<
     S: GhostSystemRef<'lt>,
 > {
     sys_ref: S,
-    send: crossbeam_channel::Sender<(Option<RequestId>, P)>,
-    recv: crossbeam_channel::Receiver<(Option<RequestId>, P)>,
+    send: crossbeam_channel::Sender<(Span, Option<RequestId>, P)>,
+    recv: crossbeam_channel::Receiver<(Span, Option<RequestId>, P)>,
     recv_inner: crossbeam_channel::Receiver<GhostEndpointToInner<'lt, X, P>>,
     pending_callbacks: GhostTracker<'lt, X, P>,
     handler: H,
@@ -214,8 +216,8 @@ impl<
     fn priv_process_inner(&mut self) -> GhostResult<bool> {
         while let Ok(inner_msg) = self.recv_inner.try_recv() {
             match inner_msg {
-                GhostEndpointToInner::IncomingRequest(message, maybe_cb) => {
-                    self.priv_process_incoming_request(message, maybe_cb)?;
+                GhostEndpointToInner::IncomingRequest(span, message, maybe_cb) => {
+                    self.priv_process_incoming_request(span, message, maybe_cb)?;
                 }
             }
         }
@@ -224,40 +226,43 @@ impl<
 
     fn priv_process_incoming_request(
         &mut self,
+        span: Span,
         message: P,
         maybe_cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
         match maybe_cb {
             Some(cb) => {
-                let request_id = self.pending_callbacks.bookmark(Span::fixme(), cb)?;
+                let request_id = self
+                    .pending_callbacks
+                    .bookmark(span.child("bookmarking"), cb)?;
 
-                self.send.send((Some(request_id), message))?;
+                self.send.send((span, Some(request_id), message))?;
             }
-            None => self.send.send((None, message))?,
+            None => self.send.send((span, None, message))?,
         }
         Ok(())
     }
 
     fn priv_process_handle_requests(&mut self, user_data: &mut X) -> GhostResult<()> {
-        while let Ok((maybe_id, message)) = self.recv.try_recv() {
+        while let Ok((span, maybe_id, message)) = self.recv.try_recv() {
             if let GhostProtocolVariantType::Response = message.discriminant().variant_type() {
                 let request_id = match maybe_id {
                     None => panic!("response with no request_id: {:?}", message),
                     Some(request_id) => request_id,
                 };
-                self.pending_callbacks.handle(request_id, message)?;
+                self.pending_callbacks.handle(span, request_id, message)?;
             } else {
                 let cb: Option<GhostHandlerCb<'lt, P>> = match maybe_id {
                     None => None,
                     Some(request_id) => {
                         let resp_sender = self.send.clone();
-                        Some(Box::new(move |message| {
-                            resp_sender.send((Some(request_id), message))?;
+                        Some(Box::new(move |span, message| {
+                            resp_sender.send((span, Some(request_id), message))?;
                             Ok(())
                         }))
                     }
                 };
-                self.handler.trigger(user_data, message, cb)?;
+                self.handler.trigger(span, user_data, message, cb)?;
             }
         }
         Ok(())
@@ -329,11 +334,13 @@ impl<
 {
     fn send_protocol(
         &mut self,
+        maybe_span: Option<Span>,
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
+        let span = maybe_span.unwrap_or_else(|| Span::todo("send_protocol"));
         self.send_inner
-            .send(GhostEndpointToInner::IncomingRequest(message, cb))?;
+            .send(GhostEndpointToInner::IncomingRequest(span, message, cb))?;
         Ok(())
     }
 }
@@ -344,6 +351,7 @@ impl<
 pub trait GhostEndpoint<'lt, X: 'lt + Send + Sync, P: GhostProtocol> {
     fn send_protocol(
         &mut self,
+        maybe_span: Option<Span>,
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()>;
