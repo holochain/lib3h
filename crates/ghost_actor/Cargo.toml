@@ -28,3 +28,5 @@ syn = { version = "=1.0.5", features = [ "full", "extra-traits" ] }
 
 [dev-dependencies]
 env_logger = "=0.6.1"
+rustracing = "=0.2.0"
+rustracing_jaeger = "=0.2.1"
