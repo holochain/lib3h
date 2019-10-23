@@ -6,12 +6,17 @@ extern crate detach;
 extern crate holochain_tracing;
 #[macro_use]
 extern crate lazy_static;
+extern crate lock_api;
 extern crate nanoid;
+extern crate parking_lot;
 #[macro_use]
 extern crate shrinkwraprs;
 
 #[macro_use]
 extern crate log;
+
+mod ghost_mutex;
+pub use ghost_mutex::*;
 
 #[macro_use]
 pub mod ghost_test_harness;
@@ -88,9 +93,9 @@ pub use ghost_actor::{GhostActor, GhostParentWrapper, GhostParentWrapperDyn};
 pub mod prelude {
     pub use super::{
         create_ghost_channel, ghost_error::ErrorKind, GhostActor, GhostCallback, GhostCallbackData,
-        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage,
-        GhostParentWrapper, GhostParentWrapperDyn, GhostResult, GhostTrackRequestOptions,
-        GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
+        GhostCanTrack, GhostContextEndpoint, GhostEndpoint, GhostError, GhostMessage, GhostMutex,
+        GhostMutexGuard, GhostParentWrapper, GhostParentWrapperDyn, GhostResult,
+        GhostTrackRequestOptions, GhostTracker, GhostTrackerBookmarkOptions, WorkWasDone,
     };
 }
 
