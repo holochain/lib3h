@@ -766,8 +766,10 @@ pub fn handle_GossipTo<
 mod tests {
     use super::*;
     use crate::{
-        dht::mirror_dht::MirrorDht, engine::GatewayId, tests::enable_logging_for_test,
-        transport::memory_mock::memory_server,
+        dht::mirror_dht::MirrorDht,
+        engine::GatewayId,
+        tests::enable_logging_for_test,
+        transport::{memory_mock::memory_server, websocket::tls::TlsConfig},
     };
     use holochain_tracing::test_span;
     use lib3h_ghost_actor::{ghost_test_harness::ProcessingOptions, wait_can_track_did_work};
@@ -803,6 +805,24 @@ mod tests {
         engine
     }
 
+    fn make_test_engine_with_wss_transport(bind_url: Lib3hUri) -> GhostEngine<'static> {
+        let crypto = Box::new(SodiumCryptoSystem::new());
+        let config = EngineConfig {
+            network_id: test_network_id(),
+            transport_configs: vec![TransportConfig::Websocket(TlsConfig::Unencrypted)],
+            bootstrap_nodes: vec![],
+            work_dir: PathBuf::new(),
+            log_level: 'd',
+            bind_url,
+            dht_gossip_interval: 100,
+            dht_timeout_threshold: 1000,
+            dht_custom_config: vec![],
+        };
+        let dht_factory = MirrorDht::new_with_config;
+
+        GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap()
+    }
+
     fn make_test_engine_wrapper(
         net: &str,
     ) -> GhostEngineParentWrapper<MockCore, GhostEngine<'static>, Lib3hError> {
@@ -818,6 +838,63 @@ mod tests {
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 0);
 
         // check that bootstrap nodes were connected to
+    }
+
+    #[test]
+    #[ignore]
+    /// This is supposed to test the use of mDNS to discover at least one node on the network for
+    /// bootstrapping.
+    /// TODO: We need to make it work with ghost_actor v2 :)
+    fn wss_bootstrap_mdns_discovery_test() {
+        let url_1: Lib3hUri = url::Url::parse("wss://0.0.0.0:60861")
+            .expect("Fail to parse wss url.")
+            .into();
+        let _url_2: Lib3hUri = url::Url::parse("wss://0.0.0.0:60862")
+            .expect("Fail to parse wss url.")
+            .into();
+
+        let mut _engine_1 = make_test_engine_with_wss_transport(url_1.clone());
+        let mut _engine_2 = make_test_engine_with_wss_transport(_url_2.clone());
+
+        // Apparently we need to bind the URL before anything can happen...
+        let _e1_endpoint = _engine_1
+            .take_parent_endpoint()
+            .expect("exists")
+            .as_context_endpoint_builder()
+            .request_id_prefix("twss_to_child1")
+            .build::<()>();
+
+        // Attempt to use ghost actor v1
+        // _e1_endpoint
+        //     .request(
+        //         Span::fixme(),
+        //         crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
+        //         Box::new(|_, r| {
+        //             println!("1 got: {:?}", r);
+        //             Ok(())
+        //         }),
+        //     ).unwrap();
+
+        _engine_2
+            .process()
+            .expect("Fail to process from engine2 while testing url binding.");
+        // // Let's give some time to the engine to make the url bindings...
+        // ::std::thread::sleep(::std::time::Duration::from_millis(100));
+
+        // Let's discover engine2 using the websocket transport function 'process' which
+        // should handle the discovery part by calling 'try_discover'
+        _engine_1
+            .process()
+            .expect("Fail to process from engine1 while testing url binding.");
+        // // Let's give some time to the engine to advertise etc...
+        // ::std::thread::sleep(::std::time::Duration::from_millis(100));
+
+        // We would like to retreave a list of peer (at least 1) so to make sure bootstrappiong
+        // occured using mDNS :
+        // Let's check that we did discover our peer by retrieving the list of peer from the dht
+        // let peer_list = _engine_1.multiplexer.as_mut().as_mut().get_peer_list();
+
+        // assert_eq!(peer_list, 1);
     }
 
     fn make_test_join_request() -> SpaceData {
