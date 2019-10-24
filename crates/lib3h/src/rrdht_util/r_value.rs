@@ -75,27 +75,25 @@ impl RValuePeerRecordSet {
 /// we can interpolate what the whole network "R" value is
 /// also taking into account our experience of those agents' reachability.
 pub fn interpolate_r_value_for_given_arc(peer_record_set: &RValuePeerRecordSet) -> f64 {
-    let mut running_pct_total: f64 = 0.0;
+    let mut running_avg_coverage = 0.0_f64;
 
-    for record in peer_record_set.peer_records.iter() {
-        // first get the percentage of total space this peer is covering
-        let mut relative_pct_of_space_covered: f64 =
-            record.storage_arc.length() as f64 / ARC_LENGTH_MAX as f64;
+    for (i, record) in peer_record_set.peer_records.iter().enumerate() {
+        // what is the total coverage factor for this record?
+        let coverage =
+            (record.storage_arc.length() as f64 / ARC_LENGTH_MAX as f64) * record.uptime_0_to_1;
 
-        // if their uptime is less than 1,
-        // they only count directly proportional to their uptime
-        relative_pct_of_space_covered *= record.uptime_0_to_1;
-
-        // update our running percentage covered
-        running_pct_total += relative_pct_of_space_covered;
+        // mix it into our running average
+        running_avg_coverage = (running_avg_coverage * i as f64 + coverage) / (i as f64 + 1.0);
     }
 
-    let pct_of_space_covered: f64 =
-        peer_record_set.arc_of_included_peer_records.length() as f64 / ARC_LENGTH_MAX as f64;
+    // given our known arc, estimate the total node count
+    let est_node_count = peer_record_set.peer_records.len() as f64
+        * (1.0
+            / (peer_record_set.arc_of_included_peer_records.length() as f64
+                / ARC_LENGTH_MAX as f64));
 
-    // we are only sampling the pct_of_space_covered
-    // we need to grow our sample (interpolate) to the rest of the space
-    running_pct_total * (1.0 / pct_of_space_covered)
+    // get the estimated total coverage a.k.a r-value
+    running_avg_coverage * est_node_count
 }
 
 /// As an agent, we need to set our storage arc radius to something
