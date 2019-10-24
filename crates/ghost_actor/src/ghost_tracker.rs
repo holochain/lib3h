@@ -246,7 +246,7 @@ mod tests {
         let mut deep = DeepRef::new();
         deep.set(Arc::downgrade(&test)).unwrap();
 
-        let mut sys = SingleThreadedGhostSystem::new();
+        let mut sys = SingleThreadedGhostSystem::default();
         let (_sys_ref, finalize) = sys.create_external_system_ref();
         finalize(Arc::downgrade(&test)).unwrap();
 
@@ -287,7 +287,7 @@ mod tests {
         let mut deep = DeepRef::new();
         deep.set(Arc::downgrade(&test)).unwrap();
 
-        let mut sys = SingleThreadedGhostSystem::new();
+        let mut sys = SingleThreadedGhostSystem::default();
         let (_sys_ref, finalize) = sys.create_external_system_ref();
         finalize(Arc::downgrade(&test)).unwrap();
 

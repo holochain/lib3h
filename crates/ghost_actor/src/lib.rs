@@ -2,7 +2,7 @@
 extern crate crossbeam_channel;
 extern crate holochain_tracing;
 extern crate inflector;
-//#[macro_use]
+#[macro_use]
 extern crate lazy_static;
 extern crate lib3h_zombie_actor;
 extern crate lock_api;
@@ -23,6 +23,14 @@ pub use ghost_mutex::*;
 
 mod ghost_deep_ref;
 pub(crate) use ghost_deep_ref::*;
+
+use holochain_tracing::{tracer_console::ConsoleTracer, Tracer};
+use std::sync::Mutex;
+/// Tracer used by the Ghost actor system
+lazy_static! {
+    // pub static ref NULL_TRACER: Tracer = holochain_tracing::null_tracer();
+    pub static ref TRACER_SINGLETON: Mutex<ConsoleTracer> = Mutex::new(ConsoleTracer::new());
+}
 
 /// Keep track of pending requests using unique request identifiers
 #[derive(Shrinkwrap, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
