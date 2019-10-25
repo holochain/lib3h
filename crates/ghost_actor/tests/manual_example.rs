@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ghost_actor::prelude::*;
-use holochain_tracing::{tracer_console::ConsoleTracer, *};
+use holochain_tracing::*;
 
 mod manual_example_mod;
 #[allow(unused_imports)]
@@ -21,7 +21,7 @@ fn manual_example() {
             .into();
         root_span.event("start");
         // SystemTime is not monotonic so wait a bit to make sure following spans are shown after this span
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        thread::sleep(Duration::from_millis(1));
 
         let mut actor_system = SingleThreadedGhostSystem::new();
 
@@ -69,7 +69,7 @@ fn manual_example() {
                 .unwrap();
         }
         // SystemTime is not monotonic so wait a bit to make sure following spans are shown after this span
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        thread::sleep(Duration::from_millis(1));
         {
             let mut span = root_span.child("first request");
             span.set_tag(|| Tag::new("actor", actor_ref.as_mut().name()));
@@ -102,7 +102,7 @@ fn manual_example() {
         actor_system.process().unwrap();
         actor_system.process().unwrap();
 
-        //assert_eq!("MyContext { to_owner_prints: [\"(root chain (sub_1 chain (sub_2 to_owner_print)))\", \"(root fwd sub_1 Ok(Ok(41))\", \"(root chain (sub_1 fwd sub_1 Ok(Ok(41)))\", \"(root chain (sub_1 fwd add_1 request))\", \"(root chain (sub_1 chain (sub_2 recv print (sub_1 fwd print (root fwd print test-from-framework)))))\", \"(root chain (sub_1 chain (sub_2 add 1 to 42)))\", \"(root chain (sub_1 chain (sub_2 rsp 42 - 1 = Ok(Ok(41)))))\", \"(root fwd add_1 request)\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
+        assert_eq!("MyContext { to_owner_prints: [\"(root chain (sub_1 chain (sub_2 to_owner_print)))\", \"(root fwd sub_1 Ok(Ok(41))\", \"(root chain (sub_1 fwd sub_1 Ok(Ok(41)))\", \"(root chain (sub_1 fwd add_1 request))\", \"(root chain (sub_1 chain (sub_2 recv print (sub_1 fwd print (root fwd print test-from-framework)))))\", \"(root chain (sub_1 chain (sub_2 add 1 to 42)))\", \"(root chain (sub_1 chain (sub_2 rsp 42 - 1 = Ok(Ok(41)))))\", \"(root fwd add_1 request)\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
         println!("\n my_context = {:#?}", my_context);
 
         // can we access it directly?

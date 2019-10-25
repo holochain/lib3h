@@ -1,5 +1,4 @@
 use crate::*;
-use holochain_tracing::*;
 use std::sync::{Arc, Weak};
 
 /// struct used for hinting on whether / when to next run this process fn
@@ -213,7 +212,7 @@ mod tests {
             non_start_delay: false,
         }));
 
-        let mut sys = SingleThreadedGhostSystem::default();
+        let mut sys = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
@@ -270,7 +269,7 @@ mod tests {
             non_delayed_count: 0,
         }));
 
-        let mut sys = SingleThreadedGhostSystem::default();
+        let mut sys = SingleThreadedGhostSystem::new();
 
         let test_clone = test.clone();
         sys.create_ref()
