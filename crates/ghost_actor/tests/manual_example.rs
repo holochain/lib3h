@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate lazy_static;
-
 use std::sync::Arc;
 
 use ghost_actor::prelude::*;
@@ -12,17 +9,18 @@ use manual_example_mod::*;
 
 use std::{thread, time::Duration};
 
-//lazy_static! {
-//    pub static ref CONSOLE_TRACER: ConsoleTracer = ConsoleTracer::new();
-//}
 #[test]
 fn manual_example() {
-    //    let mut tracer = &mut *CONSOLE_TRACER;
-    //    let mut wtf = TRACER_SINGLETON.lock().unwrap();
-    //    *wtf = &tracer;
-    //*wtf = *ConsoleTracer::new();
     // Starts "root" span
     {
+        let mut root_span: HSpan = TRACER_SINGLETON
+            .lock()
+            .unwrap()
+            .span("manual_example_root_span")
+            .start()
+            .into();
+        root_span.event("start");
+
         let mut actor_system = SingleThreadedGhostSystem::new();
 
         #[derive(Debug)]
@@ -47,7 +45,7 @@ fn manual_example() {
                 TestOwnerHandler {
                     handle_event_to_owner_print: Box::new(
                         |mut span, me: &mut MyContext, message| {
-                            span.event("print");
+                            span.event(format!("print: \"{}\"", message));
                             me.to_owner_prints.push(message);
                             Ok(())
                         },
@@ -61,13 +59,6 @@ fn manual_example() {
             )
             .unwrap();
 
-        let mut root_span: HSpan = TRACER_SINGLETON
-            .lock()
-            .unwrap()
-            .span("manual_example_root_span")
-            .start()
-            .into();
-        root_span.event("start");
         actor_ref
             .event_to_actor_print(
                 Some(root_span.child("first event")),
@@ -105,7 +96,7 @@ fn manual_example() {
         actor_system.process().unwrap();
         actor_system.process().unwrap();
 
-        assert_eq!("MyContext { to_owner_prints: [\"(root chain (sub_1 chain (sub_2 to_owner_print)))\", \"(root fwd sub_1 Ok(Ok(41))\", \"(root chain (sub_1 fwd sub_1 Ok(Ok(41)))\", \"(root chain (sub_1 fwd add_1 request))\", \"(root chain (sub_1 chain (sub_2 recv print (sub_1 fwd print (root fwd print test-from-framework)))))\", \"(root chain (sub_1 chain (sub_2 add 1 to 42)))\", \"(root chain (sub_1 chain (sub_2 rsp 42 - 1 = Ok(Ok(41)))))\", \"(root fwd add_1 request)\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
+        //assert_eq!("MyContext { to_owner_prints: [\"(root chain (sub_1 chain (sub_2 to_owner_print)))\", \"(root fwd sub_1 Ok(Ok(41))\", \"(root chain (sub_1 fwd sub_1 Ok(Ok(41)))\", \"(root chain (sub_1 fwd add_1 request))\", \"(root chain (sub_1 chain (sub_2 recv print (sub_1 fwd print (root fwd print test-from-framework)))))\", \"(root chain (sub_1 chain (sub_2 add 1 to 42)))\", \"(root chain (sub_1 chain (sub_2 rsp 42 - 1 = Ok(Ok(41)))))\", \"(root fwd add_1 request)\"], to_actor_add_resp: [\"Ok(Ok(43))\"] }", &format!("{:?}", my_context.lock()));
         println!("\n my_context = {:#?}", my_context);
 
         // can we access it directly?
@@ -116,5 +107,5 @@ fn manual_example() {
     }
     let count = TRACER_SINGLETON.lock().unwrap().drain();
     println!("span count = {}", count);
-    TRACER_SINGLETON.lock().unwrap().print();
+    TRACER_SINGLETON.lock().unwrap().print(false);
 }

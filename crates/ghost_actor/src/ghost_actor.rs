@@ -1,5 +1,5 @@
 use crate::*;
-use holochain_tracing::Span;
+use holochain_tracing::{Span, Tag};
 use std::sync::Arc;
 
 pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
@@ -338,14 +338,15 @@ impl<
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
-        let span = maybe_span.unwrap_or_else(|| {
+        let mut span = maybe_span.unwrap_or_else(|| {
             if let Ok(tracer) = TRACER_SINGLETON.lock() {
                 tracer.span("send_protocol").start().into()
             } else {
                 Span::todo("send_protocol")
             }
         });
-        //let span = maybe_span.unwrap_or_else(|| Span::todo("send_protocol"));
+        let id = message.discriminant().clone().id().to_string();
+        span.set_tag(move || Tag::new("message_type", id));
         self.send_inner
             .send(GhostEndpointToInner::IncomingRequest(span, message, cb))?;
         Ok(())
