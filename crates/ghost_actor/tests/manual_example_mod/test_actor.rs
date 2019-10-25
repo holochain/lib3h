@@ -16,6 +16,11 @@ pub struct TestActor<'lt, S: GhostSystemRef<'lt>> {
 }
 
 impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
+    /// Getter
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
     /// Create a TestActor from seeds
     pub fn new(
         name: &str,
@@ -76,34 +81,38 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
         let mut owner_ref = sys_ref.plant_seed(
             owner_seed,
             TestActorHandler {
-                handle_event_to_actor_print: Box::new(|me: &mut TestActor<'lt, S>, message| {
-                    match &mut me.maybe_sub_actor {
-                        None => {
-                            me.owner_ref.event_to_owner_print(
-                                None, // FIXME
-                                format!("({} recv print {})", me.name, message),
-                            )?;
+                handle_event_to_actor_print: Box::new(
+                    |span: Span, me: &mut TestActor<'lt, S>, message| {
+                        match &mut me.maybe_sub_actor {
+                            None => {
+                                me.owner_ref.event_to_owner_print(
+                                    Some(span),
+                                    format!("({} recv print {})", me.name, message),
+                                )?;
+                            }
+                            Some(sub_actor) => {
+                                sub_actor.event_to_actor_print(
+                                    Some(span),
+                                    format!("({} fwd print {})", me.name, message),
+                                )?;
+                            }
                         }
-                        Some(sub_actor) => {
-                            sub_actor.event_to_actor_print(
-                                None, // FIXME
-                                format!("({} fwd print {})", me.name, message),
-                            )?;
-                        }
-                    }
-                    Ok(())
-                }),
+                        Ok(())
+                    },
+                ),
                 handle_request_to_actor_add_1: Box::new(
-                    |me: &mut TestActor<'lt, S>, message, cb| match &mut me.maybe_sub_actor {
+                    |span: Span, me: &mut TestActor<'lt, S>, message, cb| match &mut me
+                        .maybe_sub_actor
+                    {
                         None => {
                             me.owner_ref.event_to_owner_print(
-                                None, // FIXME
+                                Some(span),
                                 format!("({} add 1 to {})", me.name, message),
                             )?;
                             cb(Span::fixme(), Ok(message + 1))
                         }
                         Some(sub_actor) => sub_actor.request_to_actor_add_1(
-                            None, // FIXME
+                            Some(span),
                             message,
                             Box::new(move |span, me, result| {
                                 me.owner_ref.event_to_owner_print(
@@ -120,13 +129,16 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
 
         // if we are the lowest level, send some events/requests to owner
         if maybe_sub_actor.is_none() {
+            let name_clone = name.to_string();
+            let tracer = TRACER_SINGLETON.lock().unwrap();
+            let mut span: Span = tracer.span("TestActor leaf creation").start().into();
+            span.set_tag(|| Tag::new("actor", name_clone.clone()));
             owner_ref.event_to_owner_print(
-                Some(Span::todo("actor created")),
+                Some(span.child("event_to_owner_print")),
                 format!("({} to_owner_print)", name),
             )?;
-            let name_clone = name.to_string();
             owner_ref.request_to_owner_sub_1(
-                None, // FIXME
+                Some(span.child("request_to_owner_sub_1")),
                 42,
                 Box::new(move |span, me, result| {
                     me.owner_ref.event_to_owner_print(

@@ -20,6 +20,8 @@ fn manual_example() {
             .start()
             .into();
         root_span.event("start");
+        // SystemTime is not monotonic so wait a bit to make sure following spans are shown after this span
+        std::thread::sleep(std::time::Duration::from_millis(1));
 
         let mut actor_system = SingleThreadedGhostSystem::new();
 
@@ -59,26 +61,30 @@ fn manual_example() {
             )
             .unwrap();
 
-        actor_ref
-            .event_to_actor_print(
-                Some(root_span.child("first event")),
-                "test-from-framework".to_string(),
-            )
-            .unwrap();
-        // SystemTime is not monotonic so wait a bit to make sure previous span is prior to next span
+        {
+            let mut span = root_span.child("first event");
+            span.set_tag(|| Tag::new("actor", actor_ref.as_mut().name()));
+            actor_ref
+                .event_to_actor_print(Some(span), "test-from-framework".to_string())
+                .unwrap();
+        }
+        // SystemTime is not monotonic so wait a bit to make sure following spans are shown after this span
         std::thread::sleep(std::time::Duration::from_millis(1));
-        actor_ref
-            .request_to_actor_add_1(
-                Some(root_span.child("first request")),
-                42,
-                Box::new(|mut span, me, rsp| {
-                    span.event(format!("{:?}", rsp));
-                    me.to_actor_add_resp.push(format!("{:?}", rsp));
-                    Ok(())
-                }),
-            )
-            .unwrap();
-
+        {
+            let mut span = root_span.child("first request");
+            span.set_tag(|| Tag::new("actor", actor_ref.as_mut().name()));
+            actor_ref
+                .request_to_actor_add_1(
+                    Some(span),
+                    42,
+                    Box::new(|mut span, me, rsp| {
+                        span.event(format!("{:?}", rsp));
+                        me.to_actor_add_resp.push(format!("{:?}", rsp));
+                        Ok(())
+                    }),
+                )
+                .unwrap();
+        }
         actor_system.process().unwrap();
         actor_system.process().unwrap();
         actor_system.process().unwrap();

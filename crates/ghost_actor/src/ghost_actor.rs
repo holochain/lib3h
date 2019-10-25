@@ -338,13 +338,12 @@ impl<
         message: P,
         cb: Option<GhostResponseCb<'lt, X, P>>,
     ) -> GhostResult<()> {
-        let mut span = maybe_span.unwrap_or_else(|| {
-            if let Ok(tracer) = TRACER_SINGLETON.lock() {
-                tracer.span("send_protocol").start().into()
-            } else {
-                Span::todo("send_protocol")
-            }
-        });
+        let mut span = if let Some(parent_span) = maybe_span {
+            parent_span.child("send_protocol")
+        } else {
+            let tracer = TRACER_SINGLETON.lock().unwrap();
+            tracer.span("(root).send_protocol").start().into()
+        };
         let id = message.discriminant().clone().id().to_string();
         span.set_tag(move || Tag::new("message_type", id));
         self.send_inner
