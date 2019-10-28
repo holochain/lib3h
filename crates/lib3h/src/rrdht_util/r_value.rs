@@ -61,16 +61,23 @@ impl RValuePeerRecordSet {
             .arc_of_included_peer_records
             .contains_location(peer_record.storage_arc.center())
         {
-            panic!("peer record does not fit within arc_of_included_peer_records");
+            panic!("peer record location is not located within arc_of_included_peer_records");
         }
         self.peer_records.push(peer_record);
         self
+    }
+
+    /// guess the total node count, based on our known arc / peer count
+    pub fn guess_total_node_count(&self) -> f64 {
+        self.peer_records.len() as f64
+            * (ARC_LENGTH_MAX as f64 / self.arc_of_included_peer_records.length() as f64)
     }
 }
 
 /// Interpolate qualified redundancy in the network given our current
 /// knowledge of peers' claimed storage arcs.
-/// For a given storage arc (should match *this* agent's storage arc),
+/// For a given storage arc (should match *this* agent's storage arc
+/// and therefore we should know about all peers here (minus some eventuals)),
 /// if all the peers we know about are actually storing what they claim to be
 /// we can interpolate what the whole network "R" value is
 /// also taking into account our experience of those agents' reachability.
@@ -87,10 +94,7 @@ pub fn interpolate_r_value_for_given_arc(peer_record_set: &RValuePeerRecordSet) 
     }
 
     // given our known arc, estimate the total node count
-    let est_node_count = peer_record_set.peer_records.len() as f64
-        * (1.0
-            / (peer_record_set.arc_of_included_peer_records.length() as f64
-                / ARC_LENGTH_MAX as f64));
+    let est_node_count = peer_record_set.guess_total_node_count();
 
     // get the estimated total coverage a.k.a r-value
     running_avg_coverage * est_node_count
@@ -114,8 +118,8 @@ pub fn interpolate_r_value_for_given_arc(peer_record_set: &RValuePeerRecordSet) 
 /// Otherwise it will pick a maintenance target right in the middle.
 ///
 /// If the network is over replicated, this function may pick a small radius.
-/// If the network is unhealthy, or immature this function may pick a large
-/// arc radius, up to 100% in the case of a new / immature network.
+/// If the network is under replicated, or immature this function may pick a
+/// large arc radius, up to 100% in the case of a new / immature network.
 ///
 /// Also, this is a bit of a naive first implementation, expect the specific
 /// algorithm / heuristics to be updated on an on-going basis.
@@ -125,16 +129,18 @@ pub fn get_recommended_storage_arc_radius(
     target_maximum_r_value: f64,
     current_arc_radius: Option<u32>,
 ) -> u32 {
-    let pct_of_space_covered: f64 =
-        peer_record_set.arc_of_included_peer_records.length() as f64 / ARC_LENGTH_MAX as f64;
-    let interp_total_node_count =
-        peer_record_set.peer_records.len() as f64 * (1.0 / pct_of_space_covered);
-    if interp_total_node_count < target_minimum_r_value * 2.0 {
+    // given our known arc, estimate the total node count
+    let est_node_count = peer_record_set.guess_total_node_count();
+
+    // even if all nodes had at least 50% uptime (which they may not)
+    // and they can all cover 100% arcs (which they probably cannot)
+    // we only just barely reach our minimum r_value... not a good place to be
+    if est_node_count < target_minimum_r_value * 2.0 {
         // consider this network immature, recommend full coverage
         return ARC_RADIUS_MAX;
     }
 
-    let cur_r_value = interpolate_r_value_for_given_arc(peer_record_set);
+    let cur_r_value_est = interpolate_r_value_for_given_arc(peer_record_set);
 
     let mut count: u64 = 0;
     let mut rad_avg: f64 = 0.0;
@@ -148,8 +154,8 @@ pub fn get_recommended_storage_arc_radius(
         rad_avg = (rad_avg * (count as f64 - 1.0) + f64::from(rad)) / count as f64;
     }
 
-    let out_radius: f64 = if cur_r_value < target_minimum_r_value {
-        // our network is unhealthy! let's try to capture more!
+    let out_radius: f64 = if cur_r_value_est < target_minimum_r_value {
+        // our network is under replicated! let's try to capture more!
 
         // let's double the current average for our target mid-point
         let new_mid_rad = rad_avg * 2.0;
@@ -171,7 +177,7 @@ pub fn get_recommended_storage_arc_radius(
                 }
             }
         }
-    } else if cur_r_value > target_maximum_r_value {
+    } else if cur_r_value_est > target_maximum_r_value {
         // our network is heavy! let's pull back
 
         // let's shoot for somewhere between half and 3/4 the current average
