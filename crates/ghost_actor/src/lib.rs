@@ -29,7 +29,7 @@ use std::sync::Mutex;
 
 // Tracer used by the Ghost actor system
 lazy_static! {
-    // TODO change to a more genereic Tracer instead
+    // TODO change to a more generic Tracer instead
     pub static ref TRACER_SINGLETON: Mutex<ConsoleTracer> = Mutex::new(ConsoleTracer::new());
 }
 
