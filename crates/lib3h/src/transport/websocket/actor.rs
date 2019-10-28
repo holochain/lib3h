@@ -8,10 +8,6 @@ use crate::transport::{
 };
 use detach::Detach;
 use holochain_tracing::Span;
-// use lib3h_discovery::{
-//     error::{DiscoveryError, DiscoveryResult},
-//     Discovery,
-// };
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::Opaque,
@@ -22,6 +18,7 @@ use lib3h_protocol::{
     types::*,
     uri::Lib3hUri,
 };
+use std::{collections::HashSet, time::Instant};
 
 // Use mDNS for bootstrapping
 use holochain_persistence_api::hash::HashString;
@@ -39,7 +36,12 @@ pub struct GhostTransportWebsocket {
     streams: StreamManager<std::net::TcpStream>,
     bound_url: Option<Lib3hUri>,
     pending: Vec<Message>,
+
+    // mDNS specific variables
     mdns: Option<MulticastDns>,
+    connections: HashSet<Lib3hUri>,
+    last_discover: Option<Instant>,
+    discover_interval_ms: u128,
 }
 
 // Here we just need to use mDNS, but use it only once, with advertise probably, and that's all.
@@ -52,8 +54,6 @@ impl Discovery for GhostTransportWebsocket {
                 .clone()
                 .ok_or_else(|| DiscoveryError::new_other("Must bind URL before advertising."))?
                 .into();
-
-            // let uri: url::Url = uri.into();
 
             let network_id_str: String = HashString::from(self.network_id_address.clone()).into();
 
@@ -138,6 +138,9 @@ impl GhostTransportWebsocket {
             bound_url: None,
             pending: Vec::new(),
             mdns: None,
+            connections: HashSet::new(),
+            last_discover: None,
+            discover_interval_ms: 1_000,
         }
     }
 
@@ -352,6 +355,89 @@ impl GhostTransportWebsocket {
         self.pending = temp;
         Ok(())
     }
+
+    /// Try to discover peers on the network using mDNS.
+    fn try_discover(&mut self) {
+        self.last_discover = match self.last_discover {
+            None => {
+                // Here we call a mDNS discovery at least once, which will take care of calling an
+                // advertise for us if it's the fist time the mDNS actor is invoked
+                match self.discover() {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Fail to discover during 'try_discover': {:?}", e);
+                    }
+                }
+                Some(Instant::now())
+            }
+            Some(last_discover) => {
+                // Let's check if it's time to discover some peers, but only if we already
+                // did some url binding
+                if self.bound_url.is_some()
+                    && last_discover.elapsed().as_millis() > self.discover_interval_ms
+                {
+                    if self.discover_interval_ms < 30_000 {
+                        // TODO:  <2019-10-09, dymayday> //
+                        // This is a futur proof solution, right now we only need to discover one other
+                        // peer, and the rest of the discovery, finding other nodes, is made by through
+                        // gossip mechanism.
+
+                        // // Increase the time between two peer discovery to avoid unnecessary burden on
+                        // // the network
+                        // self.discover_interval_ms += 1_000;
+
+                        // This is the temporary solution then: we set the interval to the max
+                        // possible value, so this code block is called only once
+                        self.discover_interval_ms = ::std::u128::MAX;
+                    }
+
+                    // Do the peer discovery
+                    if let Ok(machines) = self.discover() {
+                        if !machines.is_empty() {
+                            let my_addr = self.bound_url.as_ref().expect(
+                                "'bound_url' already checked earlier, so it should not be None.",
+                            );
+
+                            for found_uri in machines {
+                                if found_uri == *my_addr {
+                                    // Ignoring our own address
+                                    continue;
+                                } else {
+                                    // if not already connected, request a connections
+                                    if self.connections.get(&found_uri).is_none() {
+                                        // The proper way to connect is by using 'streams'
+                                        match self.streams.connect(&found_uri) {
+                                            Ok(()) => {
+                                                self.connections.insert(found_uri.clone());
+                                                trace!(
+                                                    "New connection to {} initialized using mDNS",
+                                                    &found_uri
+                                                );
+                                            }
+                                            Err(error) => {
+                                                trace!(
+                                                    "Could not connect to {}! Transport error: {:?}",
+                                                    found_uri.to_string(),
+                                                    error
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Some(Instant::now())
+                } else {
+                    if self.bound_url.is_none() {
+                        trace!("URL not bound yet.");
+                    }
+                    self.last_discover
+                }
+            }
+        }
+    }
 }
 
 pub type UserData = GhostTransportWebsocket;
@@ -400,6 +486,12 @@ impl
     // BOILERPLATE END----------------------------------
 
     fn process_concrete(&mut self) -> GhostResult<WorkWasDone> {
+        // Check if the needed url binding happened before calling 'try_discover'
+        if self.bound_url.is_some() {
+            // Periodic peer discovery
+            self.try_discover();
+        }
+
         // process the self endpoint
         detach_run!(self.endpoint_self, |endpoint_self| endpoint_self
             .process(self))?;
@@ -631,6 +723,11 @@ mod tests {
         // TODO
     }
 
+    #[test]
+    fn try_discover_test() {
+        // TODO
+    }
+
     /// Check if we manage to discover nodes using WebSocket for bootstapping using mDNS.
     #[test]
     fn mdns_wss_bootstrapping_test() {
@@ -734,7 +831,8 @@ mod tests {
             Some(expected_transport1_address.clone())
         );
 
-        // Advertise happens during bind so discover should now work.
+        // Advertise happens during bind so before processing transport2
+        // transport1 will only know about itself on the call to discover
         let urls = transport1
             .discover()
             .expect("Fail to discover nodes using WSS transport1.");
@@ -742,17 +840,18 @@ mod tests {
 
         transport2.process().unwrap();
         let _ = t2_endpoint.process(&mut ());
-
         assert_eq!(
             transport2.bound_url(),
             Some(expected_transport2_address.clone())
         );
 
+        // After transport2 bind processes, then discover on transport1 should show
+        // transport2s bound address
         let urls = transport1
             .discover()
             .expect("Fail to discover nodes using WSS transport1.");
 
-        // println!("DISCOVERED: {:?}", urls);
         assert_eq!(urls.len(), 2);
+        assert!(urls.contains(&expected_transport2_address));
     }
 }
