@@ -1,8 +1,9 @@
 use crate::transport::error::{TransportError, TransportResult};
+use lib3h_ghost_actor::{GhostMutex, GhostMutexGuard};
 use lib3h_protocol::{data_types::Opaque, types::*, uri::Lib3hUri, DidWork};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    sync::{Arc, Mutex, MutexGuard},
+    sync::Arc,
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -76,7 +77,7 @@ impl MemoryNet {
 
 /// Holds a universe of memory networks so we can run tests in separate universes
 pub struct MemoryVerse {
-    server_maps: HashMap<String, Arc<Mutex<MemoryNet>>>,
+    server_maps: HashMap<String, Arc<GhostMutex<MemoryNet>>>,
 }
 impl MemoryVerse {
     pub fn new() -> Self {
@@ -84,27 +85,21 @@ impl MemoryVerse {
             server_maps: HashMap::new(),
         }
     }
-    pub fn get_network(&mut self, network_name: &str) -> Arc<Mutex<MemoryNet>> {
+    pub fn get_network(&mut self, network_name: &str) -> Arc<GhostMutex<MemoryNet>> {
         self.server_maps
             .entry(network_name.to_string())
-            .or_insert_with(|| Arc::new(Mutex::new(MemoryNet::new(network_name))))
+            .or_insert_with(|| Arc::new(GhostMutex::new(MemoryNet::new(network_name))))
             .clone()
     }
 }
 
 // this is the actual memory space for our in-memory servers
 lazy_static! {
-    pub static ref MEMORY_VERSE: Mutex<MemoryVerse> = Mutex::new(MemoryVerse::new());
+    pub static ref MEMORY_VERSE: GhostMutex<MemoryVerse> = GhostMutex::new(MemoryVerse::new());
 }
 
-pub fn get_memory_verse<'a>() -> MutexGuard<'a, MemoryVerse> {
-    for _ in 0..10 {
-        match MEMORY_VERSE.try_lock() {
-            Ok(l) => return l,
-            _ => std::thread::sleep(std::time::Duration::from_millis(1)),
-        }
-    }
-    panic!("unable to obtain mutex lock on MEMORY_VERSE");
+pub fn get_memory_verse<'a>() -> GhostMutexGuard<'a, MemoryVerse> {
+    MEMORY_VERSE.lock()
 }
 
 //--------------------------------------------------------------------------------------------------
