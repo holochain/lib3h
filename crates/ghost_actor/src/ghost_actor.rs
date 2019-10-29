@@ -10,7 +10,7 @@ pub type GhostActorSpawnCb<'lt, A, P, S> = Box<
 
 /// periodic callback signature including the mutable context (or self) ref
 pub type GhostActorPeriodicCb<'lt, X> =
-    Box<dyn FnMut(&mut X) -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
+    Box<dyn FnMut(Option<&mut X>) -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
 
 /// an actor system ref with local context
 /// in general, this is passed into actor constructors
@@ -40,8 +40,8 @@ impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X,
         self.sys_ref.enqueue_processor(
             start_delay_ms,
             Box::new(move || match deep_ref.lock().upgrade() {
-                Some(strong) => cb(&mut *strong.lock()),
-                None => panic!("bad periodic task"),
+                Some(strong) => cb(Some(&mut *strong.lock())),
+                None => cb(None),
             }),
         )
     }
@@ -418,6 +418,7 @@ mod tests {
             .schedule_periodic_task(
                 0,
                 Box::new(move |me| {
+                    let me = me.unwrap();
                     me.call_count += 1;
                     Ok(GhostProcessInstructions::default().set_should_continue(true))
                 }),
