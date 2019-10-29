@@ -1,6 +1,20 @@
 use crate::*;
 use std::sync::{Arc, Weak};
 
+/// typedef for a periodic process callback
+pub type GhostProcessCb<'lt> =
+    Box<dyn FnMut() -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
+
+/// generally, you will work with GhostSystemRef instances
+/// (as opposed to a full GhostSystem instance)
+pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
+    fn enqueue_processor(
+        &mut self,
+        start_delay_ms: u64,
+        cb: GhostProcessCb<'lt>,
+    ) -> GhostResult<()>;
+}
+
 /// struct used for hinting on whether / when to next run this process fn
 pub struct GhostProcessInstructions {
     should_continue: bool,
@@ -16,6 +30,8 @@ impl Default for GhostProcessInstructions {
     }
 }
 
+/// defines a trait for a full ghost system
+/// this should only be used outside the ghost actor system
 pub trait GhostSystem<'lt, S: GhostSystemRef<'lt>> {
     /// execute all queued processor functions
     fn process(&mut self) -> GhostResult<()>;
@@ -55,10 +71,6 @@ impl GhostProcessInstructions {
         self
     }
 }
-
-/// typedef for a periodic process callback
-pub type GhostProcessCb<'lt> =
-    Box<dyn FnMut() -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
 
 /// internal struct for tracking processor fns
 struct GhostProcessorData<'lt> {
