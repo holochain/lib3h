@@ -60,15 +60,15 @@ l3h-release-hook-publish
   # the commit hash that the release process should target
   # this will always be behind what ends up being deployed
   # the release process needs to add some commits for changelog etc.
-  commit = "c6b7bd75c4cadf52cbb5af2d78ecb311afa1b80a";
+  commit = "1c306c869dd58ba340eed566992558f29dd512a8";
 
   # the semver for prev and current releases
   # the previous version will be scanned/bumped by release scripts
   # the current version is what the release scripts bump *to*
   version = {
-   current = "0.0.20";
+   current = "0.0.21";
    # not used by version hooks in this repo
-   previous = "0.0.19";
+   previous = "0.0.20";
   };
 
   github = {

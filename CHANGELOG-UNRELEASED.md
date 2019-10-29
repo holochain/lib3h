@@ -6,6 +6,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- first cut r-value logic for rrdht
+
 ### Changed
 
 ### Deprecated
