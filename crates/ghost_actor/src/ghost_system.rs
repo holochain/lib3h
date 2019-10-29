@@ -124,6 +124,12 @@ impl<'lt> GhostSystemInner<'lt> {
         }
     }
 }
+pub type FinalizeExternalSystemRefCb<'lt, X> =
+    Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
+
+//--------------------------------------------------------------------------------------------------
+// SingleThreadedGhostSystem
+//--------------------------------------------------------------------------------------------------
 
 /// Ref that allows queueing of new process functions
 /// but does not have the ability to actually run process
@@ -156,9 +162,6 @@ impl<'lt> GhostSystemRef<'lt> for SingleThreadedGhostSystemRef<'lt> {
         Ok(())
     }
 }
-
-pub type FinalizeExternalSystemRefCb<'lt, X> =
-    Box<dyn FnOnce(Weak<GhostMutex<X>>) -> GhostResult<()> + 'lt>;
 
 /// the main ghost system struct. Allows queueing new processor functions
 /// and provides a process() function to actually execute them

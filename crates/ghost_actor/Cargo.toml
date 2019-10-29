@@ -13,7 +13,7 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 crossbeam-channel = "=0.3.8"
-holochain_tracing = { version = "=0.0.1", git = "https://github.com/holochain/holochain-tracing" }
+holochain_tracing = { version = "=0.0.2", git = "https://github.com/holochain/holochain-tracing" }
 Inflector = "=0.11.4"
 lazy_static = "=1.2.0"
 lib3h_zombie_actor = { version = "=0.0.20", path = "../zombie_actor" }

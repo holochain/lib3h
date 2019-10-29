@@ -82,9 +82,9 @@ impl GhostProtocol for TestProtocol {
 #[allow(dead_code)]
 pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
     pub handle_event_to_actor_print:
-        Box<dyn FnMut(&mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
+        Box<dyn FnMut(Span, &mut X, String) -> GhostResult<()> + 'lt + Send + Sync>,
     pub handle_request_to_actor_add_1: Box<
-        dyn FnMut(&mut X, i32, GhostHandlerCb<'lt, Result<i32>>) -> GhostResult<()>
+        dyn FnMut(Span, &mut X, i32, GhostHandlerCb<'lt, Result<i32>>) -> GhostResult<()>
             + 'lt
             + Send
             + Sync,
@@ -94,19 +94,21 @@ pub struct TestActorHandler<'lt, X: 'lt + Send + Sync> {
 impl<'lt, X: 'lt + Send + Sync> GhostHandler<'lt, X, TestProtocol> for TestActorHandler<'lt, X> {
     fn trigger(
         &mut self,
-        _span: Span,
+        span: Span,
         user_data: &mut X,
         message: TestProtocol,
         cb: Option<GhostHandlerCb<'lt, TestProtocol>>,
     ) -> GhostResult<()> {
         match message {
-            TestProtocol::EventToActorPrint(m) => (self.handle_event_to_actor_print)(user_data, m),
+            TestProtocol::EventToActorPrint(m) => {
+                (self.handle_event_to_actor_print)(span, user_data, m)
+            }
             TestProtocol::RequestToActorAdd1(m) => {
                 let cb = cb.unwrap();
                 let cb = Box::new(move |span, resp| {
                     cb(span, TestProtocol::RequestToActorAdd1Response(resp))
                 });
-                (self.handle_request_to_actor_add_1)(user_data, m, cb)
+                (self.handle_request_to_actor_add_1)(span, user_data, m, cb)
             }
             _ => panic!("bad"),
         }
