@@ -109,6 +109,7 @@ impl<'engine> GhostEngine<'engine> {
                     DhtRequestToParent::GossipTo(gossip_data) => {
                         let from_peer_name = &space_gateway.as_mut().as_mut().this_peer().peer_name;
                         handle_GossipTo(
+                            span.child("handle_GossipTo"),
                             chain_id.0.clone().into(),
                             space_gateway,
                             from_peer_name,

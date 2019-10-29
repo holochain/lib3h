@@ -39,6 +39,17 @@ pub mod transport;
 // FIXME
 // pub mod transport_wss;
 
+// Global Tracer
+lazy_static! {
+    pub static ref LIB3H_TRACER: std::sync::Mutex<holochain_tracing::Tracer> =
+        std::sync::Mutex::new(holochain_tracing::null_tracer());
+}
+
+pub fn new_root_span(op_name: &str) -> holochain_tracing::Span {
+    let tracer = LIB3H_TRACER.lock().unwrap();
+    tracer.span(format!("(root).{}", op_name)).start().into()
+}
+
 #[cfg(test)]
 mod tests {
     extern crate test;

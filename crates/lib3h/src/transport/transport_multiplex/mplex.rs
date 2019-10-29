@@ -313,8 +313,7 @@ impl<
         let data = msg.take_message().expect("exists");
         if msg.is_request() {
             self.inner_gateway.as_mut().request(
-                msg.span()
-                    .follower("TODO follower of message in handle_msg_from_parent"),
+                msg.span().child("handle_msg_from_parent"),
                 data,
                 Box::new(move |_, response| {
                     let response = {
@@ -333,8 +332,7 @@ impl<
         } else {
             let orig_req = data.clone();
             self.inner_gateway.as_mut().request(
-                msg.span()
-                    .follower("TODO follower of message in handle_msg_from_parent"),
+                msg.span().child("handle_msg_from_parent"),
                 data,
                 Box::new(move |_, response| {
                     match response {

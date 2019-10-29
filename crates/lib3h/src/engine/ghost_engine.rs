@@ -35,7 +35,7 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with for GhostEngine
     pub fn new(
-        span: Span,
+        mut span: Span,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -85,7 +85,7 @@ impl<'engine> GhostEngine<'engine> {
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
         multiplexer.as_mut().request(
-            Span::fixme(),
+            span.child("request Bind"),
             GatewayRequestToChild::Transport(RequestToChild::Bind {
                 spec: config.bind_url.clone(),
             }),
@@ -135,13 +135,13 @@ impl<'engine> GhostEngine<'engine> {
         };
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.multiplexer.as_mut().publish(
-            Span::fixme(),
+            span.child("publish UpdateAdvertise"),
             GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
                 engine.this_net_peer.peer_location.clone(),
             )),
         )?;
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
-        engine.priv_connect_bootstraps(span)?;
+        engine.priv_connect_bootstraps(span.child("priv_connect_bootstraps"))?;
         Ok(engine)
     }
 
@@ -154,7 +154,7 @@ impl<'engine> GhostEngine<'engine> {
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
-                span.child("priv_connect_bootstrap TODO extra info"),
+                span.child("request Bootstrap"),
                 cmd,
                 Box::new(|_, response| {
                     let response = match response {
@@ -190,7 +190,7 @@ impl<'engine> GhostEngine<'engine> {
         data: BootstrapData,
     ) -> GhostResult<()> {
         self.multiplexer.request(
-            Span::fixme(),
+            msg.span().child("handle_bootstrap"),
             GatewayRequestToChild::Bootstrap(data),
             Box::new(move |_me, response| {
                 match response {
@@ -326,6 +326,7 @@ impl<'engine> GhostEngine<'engine> {
     #[allow(non_snake_case)]
     fn handle_HandleGetAuthoringEntryListResult(
         &mut self,
+        span: Span,
         entry_list: EntryListData,
     ) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
@@ -333,19 +334,15 @@ impl<'engine> GhostEngine<'engine> {
             &entry_list.provider_agent_id.to_owned(),
         )?;
 
-        /*let x =                   DhtContext::RequestAspectsOf {
-            entry_address: entry_address.clone(),
-            aspect_address_list,
-            msg: msg.clone(),
-            request_id: self.request_track.reserve(),
-        };*/
-
         for (entry_address, aspect_address_list) in entry_list.address_map.clone() {
             let space_address = entry_list.space_address.clone();
             let provider_agent_id = entry_list.provider_agent_id.clone();
+            let span_fetch = span.child("request Lib3hToClient::HandleFetchEntry");
+            let span_fetch_result =
+                span.child("publish Lib3hToClientResponse::HandleFetchEntryResult");
             // Check aspects and only request entry with new aspects
             space_gateway.request(
-                Span::fixme(),
+                span.child("request DHT::RequestAspectsOf"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
                     entry_address.clone(),
                 )),
@@ -382,7 +379,7 @@ impl<'engine> GhostEngine<'engine> {
                             };
 
                             me.lib3h_endpoint.request(
-                                Span::fixme(),
+                                span_fetch,
                                 Lib3hToClient::HandleFetchEntry(msg_data),
                                 Box::new(move |me, response| {
                                     let space_gateway = me
@@ -395,7 +392,7 @@ impl<'engine> GhostEngine<'engine> {
                                         GhostCallbackData::Response(Ok(
                                             Lib3hToClientResponse::HandleFetchEntryResult(msg),
                                         )) => space_gateway.publish(
-                                            Span::fixme(),
+                                            span_fetch_result,
                                             GatewayRequestToChild::Dht(
                                                 DhtRequestToChild::BroadcastEntry(
                                                     msg.entry.clone(),
@@ -422,7 +419,11 @@ impl<'engine> GhostEngine<'engine> {
     }
 
     #[allow(non_snake_case)]
-    fn handle_HandleGetGossipingEntryListResult(&mut self, msg: EntryListData) -> Lib3hResult<()> {
+    fn handle_HandleGetGossipingEntryListResult(
+        &mut self,
+        span: Span,
+        msg: EntryListData,
+    ) -> Lib3hResult<()> {
         let space_gateway = self.get_space(
             &msg.space_address.to_owned(),
             &msg.provider_agent_id.to_owned(),
@@ -446,7 +447,7 @@ impl<'engine> GhostEngine<'engine> {
             };
             space_gateway
                 .publish(
-                    Span::fixme(),
+                    span.child("publish DHT::HoldEntryAspectAddress"),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
                         shallow_entry,
                     )),
@@ -477,14 +478,14 @@ impl<'engine> GhostEngine<'engine> {
             provider_agent_id: join_msg.agent_id.clone(),
             request_id: self.request_track.reserve(),
         };
-
+        let span_list_result = span.follower("handle_HandleGetGossipingEntryListResult");
         self.lib3h_endpoint.request(
             span.follower("TODO"),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
             Box::new(|me, response| match response {
                 GhostCallbackData::Response(Ok(
                     Lib3hToClientResponse::HandleGetGossipingEntryListResult(msg),
-                )) => Ok(me.handle_HandleGetGossipingEntryListResult(msg)?),
+                )) => Ok(me.handle_HandleGetGossipingEntryListResult(span_list_result, msg)?),
                 GhostCallbackData::Response(Err(e)) => Err(e.into()),
                 GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                 _ => Err("bad response type".into()),
@@ -492,14 +493,15 @@ impl<'engine> GhostEngine<'engine> {
         )?;
 
         list_data.request_id = self.request_track.reserve();
+        let span_list_result = span.follower("handle_HandleGetAuthoringEntryListResult");
         self.lib3h_endpoint
             .request(
-                span.follower("TODO"),
+                span.child("Lib3hToClient::HandleGetAuthoringEntryList"),
                 Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
                 Box::new(|me, response| match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
-                    )) => Ok(me.handle_HandleGetAuthoringEntryListResult(msg)?),
+                    )) => Ok(me.handle_HandleGetAuthoringEntryListResult(span_list_result, msg)?),
                     GhostCallbackData::Response(Err(e)) => Err(e.into()),
                     GhostCallbackData::Timeout(bt) => Err(format!("timeout: {:?}", bt).into()),
                     _ => Err("bad response type".into()),
@@ -725,6 +727,7 @@ pub fn handle_GossipTo<
         Lib3hError,
     >,
 >(
+    span: Span,
     gateway_identifier: Address,
     gateway: &mut GatewayParentWrapper<GhostEngine, G>,
     from_peer_name: &Lib3hUri,
@@ -758,7 +761,10 @@ pub fn handle_GossipTo<
         // Forward gossip to the inner_transport
         let msg =
             transport::protocol::RequestToChild::create_send_message(to_peer_name, payload.into());
-        gateway.publish(Span::fixme(), GatewayRequestToChild::Transport(msg))?;
+        gateway.publish(
+            span.child("Transport Transport::SendMessage"),
+            GatewayRequestToChild::Transport(msg),
+        )?;
     }
     Ok(())
 }

@@ -3,7 +3,7 @@ use crate::{
     engine::{ghost_engine::handle_GossipTo, p2p_protocol::P2pProtocol, GhostEngine},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
-    transport,
+    new_root_span, transport,
 };
 
 use holochain_tracing::Span;
@@ -37,7 +37,7 @@ impl<'engine> GhostEngine<'engine> {
         for (to, payload) in self.multiplexer_defered_sends.drain(..) {
             // println!("########## {} {}", to, payload);
             self.multiplexer.request(
-                Span::fixme(),
+                new_root_span("multiplexer.request: Transport::SendMessage"),
                 GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::create_send_message(to, payload),
                 ),
@@ -60,6 +60,7 @@ impl<'engine> GhostEngine<'engine> {
             DhtRequestToParent::GossipTo(gossip_data) => {
                 let from_peer_name = &self.this_net_peer.peer_name;
                 handle_GossipTo(
+                    span.child("handle_GossipTo"),
                     self.config.network_id.id.clone(),
                     self.multiplexer.as_mut(),
                     from_peer_name,
@@ -124,7 +125,7 @@ impl<'engine> GhostEngine<'engine> {
             transport::protocol::RequestToParent::Unbind(uri) => {
                 let data = UnboundData { uri: uri.clone() };
                 self.lib3h_endpoint
-                    .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
+                    .publish(span.child("publish Unbind"), Lib3hToClient::Unbound(data))?;
             }
             transport::protocol::RequestToParent::Disconnect(uri) => {
                 debug!("disconnect from {}", uri);
@@ -172,7 +173,7 @@ impl<'engine> GhostEngine<'engine> {
         let net_location_copy = net_location.clone();
         self.multiplexer
             .request(
-                span.child("handle_incoming_connection, .request"),
+                span.child("request Dht::RequestPeerList"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
                 Box::new(move |me, response| {
                     let response = {
@@ -237,8 +238,10 @@ impl<'engine> GhostEngine<'engine> {
                 request_id: "".to_string(),
                 uri: net_location.clone(),
             };
-            self.lib3h_endpoint
-                .publish(Span::fixme(), Lib3hToClient::Connected(data))?;
+            self.lib3h_endpoint.publish(
+                span.child("publish Connected"),
+                Lib3hToClient::Connected(data),
+            )?;
         }
         let _ = self.network_connections.insert(net_location.to_owned());
         Ok(())

@@ -3,7 +3,7 @@ use crate::{
     engine::GatewayId,
     gateway::{GatewayOutputWrapType, P2pGateway},
     message_encoding::*,
-    transport,
+    new_root_span, transport,
 };
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;
@@ -48,12 +48,12 @@ impl P2pGateway {
             identifier: identifier,
             inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
                 inner_transport,
-                "to_child_transport_",
+                "gateway_to_child_transport_",
             )),
             inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
             message_encoding: Detach::new(GhostParentWrapper::new(
                 MessageEncoding::new(),
-                "to_message_encoding_",
+                "gateway_to_message_encoding_",
             )),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
@@ -73,7 +73,7 @@ impl P2pGateway {
         let inner_dht = &mut self.inner_dht;
         inner_dht
             .request(
-                holochain_tracing::Span::fixme(),
+                crate::new_root_span("get_peer_list"),
                 crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
                 Box::new(|_, r| {
                     eprintln!("1 got: {:?}", r);

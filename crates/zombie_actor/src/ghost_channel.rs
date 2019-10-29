@@ -130,6 +130,7 @@ impl<
     /// send a response back to the origin of this request
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
+            println!("respond: span = {:?}", self.span);
             self.sender.send(GhostEndpointMessage::Response {
                 responder_bt: Backtwrap::new(),
                 request_id: request_id.clone(),
@@ -398,21 +399,21 @@ impl<
     ) -> GhostResult<()> {
         let span_bookmark = span.child("bookmark");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(span_bookmark, cb),
+            None => self
+                .pending_responses_tracker
+                .bookmark(Span::todo("default"), cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                span_bookmark,
+                Span::todo("options"),
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
-        // trace!("ghost_channel: send request {:?}", request_id);
-        span.event(format!("ghost_channel: send request {:?}", request_id));
+        span.event(format!("{:?}", request_id));
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: Backtwrap::new(),
             request_id: Some(request_id),
             payload,
-            span: span.follower("send request"),
-            // span: span.child("request", |o| o.start()).into(),
+            span: span_bookmark.follower("send request"),
         })?;
         Ok(())
     }
@@ -445,12 +446,12 @@ impl<
 {
     /// publish an event to the remote side, not expecting a response
     fn publish(&mut self, mut span: Span, payload: RequestToOther) -> GhostResult<()> {
-        span.event("GhostChannel::publish");
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: Backtwrap::new(),
             request_id: None,
             payload,
-            span,
+            // span,
+            span: Span::fixme(),
         })?;
         Ok(())
     }
@@ -463,13 +464,7 @@ impl<
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
-        span.event("GhostChannel::request");
-        self.priv_request(
-            span.child("priv_request"),
-            payload,
-            cb,
-            GhostTrackRequestOptions::default(),
-        )
+        self.priv_request(span, payload, cb, GhostTrackRequestOptions::default())
     }
 
     /// make a request of the other side. When a response is sent back to us
@@ -481,8 +476,7 @@ impl<
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        span.event("GhostChannel::request_options");
-        self.priv_request(span.child("priv_request"), payload, cb, options)
+        self.priv_request(span, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -514,7 +508,7 @@ impl<
                                 request_id,
                                 payload,
                                 self.sender.clone(),
-                                span.child("outbox_messages"),
+                                span,
                             ));
                         }
                         GhostEndpointMessage::Response {
