@@ -341,7 +341,7 @@ impl<
         let mut span = if let Some(parent_span) = maybe_span {
             parent_span.child("send_protocol")
         } else {
-            let tracer = TRACER_SINGLETON.lock().unwrap();
+            let tracer = GHOST_TRACER.lock().unwrap();
             tracer.span("(root).send_protocol").start().into()
         };
         let id = message.discriminant().clone().id().to_string();

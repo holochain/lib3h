@@ -24,13 +24,12 @@ pub use ghost_mutex::*;
 mod ghost_deep_ref;
 pub(crate) use ghost_deep_ref::*;
 
-use holochain_tracing::tracer_console::ConsoleTracer;
+use holochain_tracing::{null_tracer, Tracer};
 use std::sync::Mutex;
 
-// Tracer used by the Ghost actor system
+// Tracer used by the Ghost actor system, a.k.a pacman
 lazy_static! {
-    // TODO change to a more genereic Tracer instead
-    pub static ref TRACER_SINGLETON: Mutex<ConsoleTracer> = Mutex::new(ConsoleTracer::new());
+    pub static ref GHOST_TRACER: Mutex<Tracer> = Mutex::new(null_tracer());
 }
 
 /// Keep track of pending requests using unique request identifiers

@@ -11,9 +11,15 @@ use std::{thread, time::Duration};
 
 #[test]
 fn manual_example() {
+    // Create tracer & reporter
+    let (tracer, mut reporter) = tracer_console::new_tracer_with_console_reporter();
+    {
+        let mut singleton = GHOST_TRACER.lock().unwrap();
+        *singleton = tracer;
+    }
     // Starts "root" span
     {
-        let mut root_span: HSpan = TRACER_SINGLETON
+        let mut root_span: HSpan = GHOST_TRACER
             .lock()
             .unwrap()
             .span("manual_example_root_span")
@@ -111,7 +117,7 @@ fn manual_example() {
             &actor_ref.as_mut().test_mut_method()
         );
     }
-    let count = TRACER_SINGLETON.lock().unwrap().drain();
+    let count = reporter.drain();
     println!("span count = {}", count);
-    TRACER_SINGLETON.lock().unwrap().print(false);
+    reporter.print(false);
 }

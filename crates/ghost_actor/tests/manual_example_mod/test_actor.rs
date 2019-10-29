@@ -130,7 +130,7 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
         // if we are the lowest level, send some events/requests to owner
         if maybe_sub_actor.is_none() {
             let name_clone = name.to_string();
-            let tracer = TRACER_SINGLETON.lock().unwrap();
+            let tracer = GHOST_TRACER.lock().unwrap();
             let mut span: Span = tracer.span("TestActor leaf creation").start().into();
             span.set_tag(|| Tag::new("actor", name_clone.clone()));
             owner_ref.event_to_owner_print(
