@@ -149,7 +149,7 @@ fn basic_track_test_wss() {
     basic_track_test(&mut engine);
     // Print spans
     let count = reporter.drain();
-    println!("span count = {}", count);
+    println!("Report span count = {}", count);
     reporter.print(false);
 }
 
