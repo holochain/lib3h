@@ -15,7 +15,7 @@ repository = "https://github.com/holochain/lib3h"
 backtrace = "=0.3.27"
 crossbeam-channel = "=0.3.8"
 detach = { version = "=0.0.20", path = "../detach" }
-holochain_tracing = "=0.0.3"
+holochain_tracing = { version = "=0.0.3", git = "https://github.com/holochain/holochain-tracing" }
 nanoid = "=0.2.0"
 parking_lot = "=0.7.1"
 shrinkwraprs = "=0.2.1"
