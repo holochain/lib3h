@@ -342,8 +342,11 @@ impl
         }
         let (did_work, command_list) = self.internal_process().unwrap(); // FIXME unwrap
         for command in command_list {
-            self.endpoint_self
-                .publish(Span::todo("where does span come from?"), command)?;
+            self.endpoint_self.publish(
+                Span::todo("get span from engine.process() in ghost-actor-v2 ?"),
+                // holochain_tracing::new_root_span("debug mirro_dht process command"),
+                command,
+            )?;
         }
         Ok(did_work.into())
     }
