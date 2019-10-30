@@ -10,9 +10,8 @@ pub struct TestActor<'lt, S: GhostSystemRef<'lt>> {
     name: String,
     #[allow(dead_code)]
     sys_ref: GhostActorSystem<'lt, Self, S>,
-    owner_ref: GhostEndpointFull<'lt, TestProtocol, (), Self, TestActorHandler<'lt, Self>, S>,
-    maybe_sub_actor:
-        Option<GhostEndpointFull<'lt, TestProtocol, Self, Self, TestOwnerHandler<'lt, Self>, S>>,
+    owner_ref: TestProtocolOwnerEndpointRef<'lt, Self, S>,
+    maybe_sub_actor: Option<TestProtocolActorEndpointRef<'lt, Self, Self, S>>,
 }
 
 impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {

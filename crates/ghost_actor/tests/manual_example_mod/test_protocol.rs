@@ -249,3 +249,8 @@ impl<
     > TestOwnerRef<'lt, X> for GhostEndpointFull<'lt, TestProtocol, A, X, H, S>
 {
 }
+
+// -- utility typedefs -- //
+
+pub type TestProtocolOwnerEndpointRef<'lt, X, S> = GhostEndpointFull<'lt, TestProtocol, (), X, TestActorHandler<'lt, X>, S>;
+pub type TestProtocolActorEndpointRef<'lt, D, X, S> = GhostEndpointFull<'lt, TestProtocol, D, X, TestOwnerHandler<'lt, X>, S>;
