@@ -2,13 +2,15 @@ use crate::*;
 use holochain_tracing::{Span, Tag};
 use std::sync::Arc;
 
-pub trait GhostSystemRef<'lt>: Send + Sync + Clone {
-    fn enqueue_processor(
-        &mut self,
-        start_delay_ms: u64,
-        cb: GhostProcessCb<'lt>,
-    ) -> GhostResult<()>;
-}
+/// callback for spawning a new actor
+pub type GhostActorSpawnCb<'lt, A, P, S> = Box<
+    dyn FnOnce(GhostActorSystem<'lt, A, S>, GhostEndpointSeed<'lt, P, (), S>) -> GhostResult<A>
+        + 'lt,
+>;
+
+/// periodic callback signature including the mutable context (or self) ref
+pub type GhostActorPeriodicCb<'lt, X> =
+    Box<dyn FnMut(Option<&mut X>) -> GhostResult<GhostProcessInstructions> + 'lt + Send + Sync>;
 
 /// an actor system ref with local context
 /// in general, this is passed into actor constructors
@@ -19,18 +21,29 @@ pub struct GhostActorSystem<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> {
     deep_user_data: DeepRef<'lt, X>,
 }
 
-/// callback for spawning a new actor
-pub type GhostActorSpawnCb<'lt, A, P, S> = Box<
-    dyn FnOnce(GhostActorSystem<'lt, A, S>, GhostEndpointSeed<'lt, P, (), S>) -> GhostResult<A>
-        + 'lt,
->;
-
 impl<'lt, X: 'lt + Send + Sync, S: GhostSystemRef<'lt>> GhostActorSystem<'lt, X, S> {
+    /// the system creates GhostActorSystem instances
     pub(crate) fn new(sys_ref: S, deep_user_data: DeepRef<'lt, X>) -> Self {
         Self {
             sys_ref,
             deep_user_data,
         }
+    }
+
+    /// schedule a periodic task
+    pub fn schedule_periodic_task(
+        &mut self,
+        start_delay_ms: u64,
+        mut cb: GhostActorPeriodicCb<'lt, X>,
+    ) -> GhostResult<()> {
+        let deep_ref = self.deep_user_data.clone();
+        self.sys_ref.enqueue_processor(
+            start_delay_ms,
+            Box::new(move || match deep_ref.lock().upgrade() {
+                Some(strong) => cb(Some(&mut *strong.lock())),
+                None => cb(None),
+            }),
+        )
     }
 
     /// expand an endpoint seed with local context / handling
@@ -380,5 +393,41 @@ pub trait GhostActor<'lt, P: GhostProtocol, A: GhostActor<'lt, P, A>>: Send + Sy
     /// default "no-op" implementation of GhostActor::process()
     fn process(&mut self) -> GhostResult<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_should_schedule_periodic_task() {
+        let mut sys = SingleThreadedGhostSystem::new();
+
+        #[derive(Debug)]
+        struct Test {
+            call_count: i32,
+        }
+
+        let test = Arc::new(GhostMutex::new(Test { call_count: 0 }));
+
+        let (mut sys_ref, finalize) = sys.create_external_system_ref();
+        finalize(Arc::downgrade(&test)).unwrap();
+
+        sys_ref
+            .schedule_periodic_task(
+                0,
+                Box::new(move |me| {
+                    let me = me.unwrap();
+                    me.call_count += 1;
+                    Ok(GhostProcessInstructions::default().set_should_continue(true))
+                }),
+            )
+            .unwrap();
+
+        sys.process().unwrap();
+        sys.process().unwrap();
+
+        assert_eq!("Test { call_count: 2 }", &format!("{:?}", test.lock()));
     }
 }
