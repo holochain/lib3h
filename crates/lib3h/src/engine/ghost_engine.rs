@@ -35,7 +35,7 @@ impl<'engine> CanAdvertise for GhostEngine<'engine> {
 impl<'engine> GhostEngine<'engine> {
     /// Constructor with for GhostEngine
     pub fn new(
-        mut span: Span,
+        span: Span,
         crypto: Box<dyn CryptoSystem>,
         config: EngineConfig,
         name: &str,
@@ -85,7 +85,7 @@ impl<'engine> GhostEngine<'engine> {
         // Bind & create this_net_peer
         // TODO: Find better way to do init with GhostEngine
         multiplexer.as_mut().request(
-            span.child("request Bind"),
+            span.child("request GatewayRequestToChild::Transport::Bind"),
             GatewayRequestToChild::Transport(RequestToChild::Bind {
                 spec: config.bind_url.clone(),
             }),
@@ -135,7 +135,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         detach_run!(engine.multiplexer, |e| e.process(&mut engine))?;
         engine.multiplexer.as_mut().publish(
-            span.child("publish UpdateAdvertise"),
+            span.child("send event GatewayRequestToChild::DhtRequestToChild::UpdateAdvertise"),
             GatewayRequestToChild::Dht(DhtRequestToChild::UpdateAdvertise(
                 engine.this_net_peer.peer_location.clone(),
             )),
@@ -154,7 +154,7 @@ impl<'engine> GhostEngine<'engine> {
                 bootstrap_uri: bs,
             });
             self.multiplexer.request(
-                span.child("request Bootstrap"),
+                span.child("request GatewayRequestToChild::Bootstrap"),
                 cmd,
                 Box::new(|_, response| {
                     let response = match response {
@@ -213,7 +213,6 @@ impl<'engine> GhostEngine<'engine> {
         &mut self,
         mut msg: ClientToLib3hMessage,
     ) -> GhostResult<()> {
-        let span = msg.span().child("handle_msg_from_client");
         match msg.take_message().expect("exists") {
             ClientToLib3h::Bootstrap(data) => {
                 trace!("ClientToLib3h::Bootstrap: {:?}", &data);
@@ -222,31 +221,31 @@ impl<'engine> GhostEngine<'engine> {
             ClientToLib3h::JoinSpace(data) => {
                 trace!("ClientToLib3h::JoinSpace: {:?}", data);
                 let result = self
-                    .handle_join(span.follower("handle_join"), &data)
+                    .handle_join_space(msg.span().child("handle JoinSpace"), &data)
                     .map(|_| ClientToLib3hResponse::JoinSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::LeaveSpace(data) => {
                 trace!("ClientToLib3h::LeaveSpace: {:?}", data);
                 let result = self
-                    .handle_leave_space(span.follower("handle_leave"), &data)
+                    .handle_leave_space(msg.span().child("handle LeaveSpace"), &data)
                     .map(|_| ClientToLib3hResponse::LeaveSpaceResult);
                 msg.respond(result)
             }
             ClientToLib3h::SendDirectMessage(data) => {
                 trace!("ClientToLib3h::SendDirectMessage: {:?}", data);
-                self.handle_direct_message(span.follower("handle_direct_message"), msg, data)
+                self.handle_direct_message(msg.span().child("handle SendDirectMessage"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::PublishEntry(data) => {
                 trace!("ClientToLib3h::PublishEntry: {:?}", data);
-                self.handle_publish_entry(span.follower("handle_publish_entry"), &data)
+                self.handle_publish_entry(msg.span().child("handle PublishEntry"), &data)
                     .map_err(|e| GhostError::from(e.to_string()))
             }
             ClientToLib3h::QueryEntry(data) => {
                 trace!("ClientToLib3h::QueryEntry: {:?}", data);
                 let res = self
-                    .handle_query_entry(span.follower("handle_query_entry"), msg, data)
+                    .handle_query_entry(msg.span().child("handle QueryEntry"), msg, data)
                     .map_err(|e| GhostError::from(e.to_string()));
                 trace!("ClientToLib3h::QueryEntry: res = {:?}", res);
                 res
@@ -300,7 +299,7 @@ impl<'engine> GhostEngine<'engine> {
         Ok(chain_id)
     }
 
-    fn broadcast_join(
+    fn broadcast_join_space(
         &mut self,
         span: Span,
         space_address: SpaceHash,
@@ -318,8 +317,10 @@ impl<'engine> GhostEngine<'engine> {
             space_address,
             peer.peer_name,
         );
-        self.multiplexer
-            .publish(span, GatewayRequestToChild::SendAll(payload))
+        self.multiplexer.publish(
+            span.child("send event GatewayRequestToChild::SendAll"),
+            GatewayRequestToChild::SendAll(payload),
+        )
         // TODO END
     }
 
@@ -339,10 +340,10 @@ impl<'engine> GhostEngine<'engine> {
             let provider_agent_id = entry_list.provider_agent_id.clone();
             let span_fetch = span.child("request Lib3hToClient::HandleFetchEntry");
             let span_fetch_result =
-                span.child("publish Lib3hToClientResponse::HandleFetchEntryResult");
+                span.child("send event Lib3hToClientResponse::HandleFetchEntryResult");
             // Check aspects and only request entry with new aspects
             space_gateway.request(
-                span.child("request DHT::RequestAspectsOf"),
+                span.child("request GatewayRequestToChild::Dht::RequestAspectsOf"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestAspectsOf(
                     entry_address.clone(),
                 )),
@@ -447,7 +448,7 @@ impl<'engine> GhostEngine<'engine> {
             };
             space_gateway
                 .publish(
-                    span.child("publish DHT::HoldEntryAspectAddress"),
+                    span.child("send event GatewayRequestToChild::DhtRequestToChild::HoldEntryAspectAddress"),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HoldEntryAspectAddress(
                         shallow_entry,
                     )),
@@ -459,7 +460,7 @@ impl<'engine> GhostEngine<'engine> {
 
     /// Create a gateway for this agent in this space, if not already part of it.
     /// Must not already be part of this space.
-    fn handle_join(&mut self, span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
+    fn handle_join_space(&mut self, span: Span, join_msg: &SpaceData) -> Lib3hResult<()> {
         let chain_id =
             self.add_gateway(join_msg.space_address.clone(), join_msg.agent_id.clone())?;
 
@@ -468,7 +469,7 @@ impl<'engine> GhostEngine<'engine> {
 
         // Have DHT broadcast our PeerData
         space_gateway.publish(
-            span.follower("space_gateway.publish"),
+            span.follower("space_gateway send event GatewayRequestToChild::Dht::HoldPeer"),
             GatewayRequestToChild::Dht(DhtRequestToChild::HoldPeer(this_peer.clone())),
         )?;
 
@@ -480,7 +481,7 @@ impl<'engine> GhostEngine<'engine> {
         };
         let span_list_result = span.follower("handle_HandleGetGossipingEntryListResult");
         self.lib3h_endpoint.request(
-            span.follower("TODO"),
+            span.follower("request HandleGetGossipingEntryList"),
             Lib3hToClient::HandleGetGossipingEntryList(list_data.clone()),
             Box::new(|me, response| match response {
                 GhostCallbackData::Response(Ok(
@@ -509,8 +510,8 @@ impl<'engine> GhostEngine<'engine> {
             )
             .map_err(|e| Lib3hError::new(ErrorKind::Other(e.to_string())))?;
 
-        self.broadcast_join(
-            span.child("broadcast_join"),
+        self.broadcast_join_space(
+            span.child("broadcast_join_space"),
             join_msg.space_address.clone(),
             this_peer.clone(),
         )?;
@@ -638,7 +639,7 @@ impl<'engine> GhostEngine<'engine> {
             };
 
             self.lib3h_endpoint.request(
-                span.child("TODO add tags"),
+                span.child("request Lib3hToClient::HandleStoreEntryAspect"),
                 Lib3hToClient::HandleStoreEntryAspect(data),
                 Box::new(move |_me, response| {
                     // should just be OK
@@ -873,7 +874,7 @@ mod tests {
         // Attempt to use ghost actor v1
         // _e1_endpoint
         //     .request(
-        //         Span::fixme(),
+        //         holochain_tracing::test_span("test"),
         //         crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
         //         Box::new(|_, r| {
         //             println!("1 got: {:?}", r);
@@ -917,10 +918,10 @@ mod tests {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_join");
 
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 1);
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
         assert_eq!(
             "Err(Lib3hError(Other(\"Already joined space\")))",
             format!("{:?}", result)
@@ -931,7 +932,7 @@ mod tests {
     fn test_ghost_engine_leave() {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_leave");
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
         let result = lib3h.as_mut().handle_leave_space(test_span(""), &req_data);
         assert!(result.is_ok());
@@ -954,7 +955,7 @@ mod tests {
         let network_name = "test_ghost_engine_unbind";
         let mut engine = make_test_engine_wrapper(network_name);
         let req_data = make_test_join_request();
-        let result = engine.as_mut().handle_join(test_span(""), &req_data);
+        let result = engine.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
         let network = {
             let mut verse = memory_server::get_memory_verse();
@@ -978,7 +979,7 @@ mod tests {
     fn test_ghost_engine_dm() {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_dm");
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let direct_message = DirectMessageData {
@@ -1022,7 +1023,7 @@ mod tests {
 
         let mut engine = make_test_engine_wrapper("test_ghost_engine_publish");
         let req_data = make_test_join_request();
-        let result = engine.as_mut().handle_join(test_span(""), &req_data);
+        let result = engine.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -1085,7 +1086,7 @@ mod tests {
 
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_query");
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {

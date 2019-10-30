@@ -156,7 +156,7 @@ impl<'engine> GhostEngine<'engine> {
                                 Some(RealEngineTrackerData::HoldEntryRequested),
                             );
                             self.lib3h_endpoint.publish(
-                                Span::fixme(),
+                                span.child("send event Lib3hToClient::HandleStoreEntryAspect"),
                                 Lib3hToClient::HandleStoreEntryAspect(lib3h_msg),
                             )?;
                         }
@@ -175,7 +175,7 @@ impl<'engine> GhostEngine<'engine> {
                         };
                         self.lib3h_endpoint
                             .request(
-                                Span::fixme(),
+                                span.child("send request HandleFetchEntry"),
                                 Lib3hToClient::HandleFetchEntry(msg.clone()),
                                 Box::new(move |me, response| {
                                     let mut is_data_for_author_list = false;
@@ -215,7 +215,7 @@ impl<'engine> GhostEngine<'engine> {
                                                 is_data_for_author_list);
                                             if is_data_for_author_list {
                                                 space_gateway.publish(
-                                                    Span::fixme(),
+                                                    span.child("send event GatewayRequestToChild::DhtRequestToChild::BroadcastEntry"),
                                                     GatewayRequestToChild::Dht(DhtRequestToChild::BroadcastEntry(entry)))?;
                                             } else {
                                                 request.respond(Ok(
@@ -283,7 +283,7 @@ impl<'engine> GhostEngine<'engine> {
         match p2p_msg {
             P2pProtocol::DirectMessage(dm_data) => {
                 self.lib3h_endpoint.request(
-                    span,
+                    span.child("request Lib3hToClient::HandleSendDirectMessage"),
                     Lib3hToClient::HandleSendDirectMessage(dm_data),
                     Box::new(move |me, resp| match resp {
                         GhostCallbackData::Response(Ok(
@@ -306,7 +306,9 @@ impl<'engine> GhostEngine<'engine> {
                             );
 
                             space_gateway.publish(
-                                Span::fixme(),
+                                span.child(
+                                    "send event GatewayRequestToChild::Transport::SendMessage",
+                                ),
                                 GatewayRequestToChild::Transport(
                                     RequestToChild::create_send_message(
                                         Lib3hUri::with_agent_id(&to_agent_id),
@@ -351,7 +353,7 @@ impl<'engine> GhostEngine<'engine> {
                     &gossip_data.to_peer_name.agent_id(),
                 )?;
                 space_gateway.publish(
-                    span.follower("TODO"),
+                    span.child("send event GatewayRequestToChild::DhtRequestToChild::HandleGossip"),
                     GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(remote_gossip)),
                 )?;
             }

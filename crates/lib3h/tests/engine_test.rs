@@ -75,7 +75,7 @@ fn basic_setup_mock_bootstrap<'engine>(
     let root_span: Span = LIB3H_TRACER
         .lock()
         .unwrap()
-        .span("basic_setup_mock_root: GhostEngine::new()")
+        .span("(root) basic_setup_mock: GhostEngine::new()")
         .start()
         .into();
     let engine = GhostEngine::new(
@@ -113,7 +113,7 @@ fn basic_setup_wss<'engine>(name: &str) -> GhostEngine<'engine> {
     let root_span: Span = LIB3H_TRACER
         .lock()
         .unwrap()
-        .span("basic_setup_mock_root: GhostEngine::new()")
+        .span("(root) basic_setup_mock: GhostEngine::new()")
         .start()
         .into();
     let engine = GhostEngine::new(
@@ -176,7 +176,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
     let mut root_span: Span = LIB3H_TRACER
         .lock()
         .unwrap()
-        .span("basic_track_test_root")
+        .span("(root) basic_track_test")
         .start()
         .into();
     root_span.event("start");
@@ -200,8 +200,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
 
     parent_endpoint
         .publish(
-            // root_span.child("publish join space"),
-            Span::fixme(),
+            root_span.child("send event ClientToLib3h::JoinSpace"),
             ClientToLib3h::JoinSpace(track_space.clone()),
         )
         .unwrap();

@@ -124,8 +124,10 @@ impl<'engine> GhostEngine<'engine> {
         match request {
             transport::protocol::RequestToParent::Unbind(uri) => {
                 let data = UnboundData { uri: uri.clone() };
-                self.lib3h_endpoint
-                    .publish(span.child("publish Unbind"), Lib3hToClient::Unbound(data))?;
+                self.lib3h_endpoint.publish(
+                    span.child("send event Lib3hToClient::Unbound"),
+                    Lib3hToClient::Unbound(data),
+                )?;
             }
             transport::protocol::RequestToParent::Disconnect(uri) => {
                 debug!("disconnect from {}", uri);
@@ -173,7 +175,7 @@ impl<'engine> GhostEngine<'engine> {
         let net_location_copy = net_location.clone();
         self.multiplexer
             .request(
-                span.child("request Dht::RequestPeerList"),
+                span.child("request GatewayRequestToChild::DhtRequestToChild::RequestPeerList"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
                 Box::new(move |me, response| {
                     let response = {
@@ -239,7 +241,7 @@ impl<'engine> GhostEngine<'engine> {
                 uri: net_location.clone(),
             };
             self.lib3h_endpoint.publish(
-                span.child("publish Connected"),
+                span.child("send event Lib3hToClient::Connected"),
                 Lib3hToClient::Connected(data),
             )?;
         }
@@ -264,9 +266,10 @@ impl<'engine> GhostEngine<'engine> {
                     bundle: msg.bundle.clone(),
                 };
                 // Check if its for the multiplexer
+                let span_gossip = span.follower("publish Dht::HandleGossip");
                 if msg.space_address == self.config.network_id.id.clone().into() {
                     let _ = self.multiplexer.publish(
-                        span.follower("TODO"),
+                        span_gossip,
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                     );
                 } else {
@@ -276,7 +279,7 @@ impl<'engine> GhostEngine<'engine> {
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_name.agent_id()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
-                            span.follower("TODO"),
+                            span_gossip,
                             GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                         );
                     } else {

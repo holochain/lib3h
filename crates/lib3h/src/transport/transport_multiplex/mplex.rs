@@ -1,10 +1,11 @@
 use crate::{
     error::{Lib3hError, Lib3hResult},
     gateway::protocol::*,
+    new_root_span,
     transport::{error::*, protocol::*},
 };
 use detach::prelude::*;
-use holochain_tracing::Span;
+use holochain_tracing::{Span, Tag};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, types::*, uri::Lib3hUri};
 use std::collections::HashMap;
@@ -138,8 +139,10 @@ impl<
                 route_spec
             ))),
             Some(ep) => {
+                let mut span = new_root_span("multiplexer ReceivedData");
+                span.set_tag(|| Tag::new("from", path.clone().to_string()));
                 ep.publish(
-                    Span::fixme(),
+                    span,
                     RequestToParent::ReceivedData {
                         uri: path,
                         payload: unpacked_payload,
@@ -160,16 +163,19 @@ impl<
             Lib3hError,
         >,
     ) -> Lib3hResult<()> {
+        let span = msg
+            .span()
+            .child("request GatewayRequestToParent::Transport::ReceivedData");
         let data = msg.take_message().expect("exists");
         if let GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }) =
             data
         {
-            self.handle_received_data(uri, payload)?;
+            self.handle_received_data(span, uri, payload)?;
             Ok(())
         } else {
             if msg.is_request() {
                 self.endpoint_self.request(
-                    Span::fixme(),
+                    span,
                     data,
                     Box::new(move |_, response| {
                         match response {
@@ -185,7 +191,7 @@ impl<
                     }),
                 )?;
             } else {
-                self.endpoint_self.publish(Span::fixme(), data)?;
+                self.endpoint_self.publish(span, data)?;
             }
 
             Ok(())
@@ -193,10 +199,15 @@ impl<
     }
 
     /// private handler for inner transport ReceivedData events
-    fn handle_received_data(&mut self, uri: Lib3hUri, payload: Opaque) -> Lib3hResult<()> {
+    fn handle_received_data(
+        &mut self,
+        span: Span,
+        uri: Lib3hUri,
+        payload: Opaque,
+    ) -> Lib3hResult<()> {
         // forward
         self.endpoint_self.publish(
-            Span::fixme(),
+            span,
             GatewayRequestToParent::Transport(RequestToParent::ReceivedData { uri, payload }),
         )?;
         Ok(())
@@ -229,7 +240,8 @@ impl<
     ) -> Lib3hResult<()> {
         // forward the bind to our inner_gateway
         self.inner_gateway.as_mut().request(
-            Span::fixme(),
+            msg.span()
+                .child("request GatewayRequestToChild::Transport::Bind"),
             GatewayRequestToChild::Transport(RequestToChild::Bind { spec }),
             Box::new(|_, response| {
                 let response = {
@@ -269,7 +281,8 @@ impl<
     ) -> Lib3hResult<()> {
         // forward the request to our inner_gateway
         self.inner_gateway.as_mut().request(
-            Span::fixme(),
+            msg.span()
+                .child("request GatewayRequestToChild::Transport::SendMessage"),
             GatewayRequestToChild::Transport(RequestToChild::create_send_message(uri, payload)),
             Box::new(|_, response| {
                 let response = {

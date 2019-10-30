@@ -8,7 +8,6 @@ use crate::{
 use std::convert::TryInto;
 
 use detach::Detach;
-use holochain_tracing::Span;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
     data_types::{ConnectedData, GenericResultData, Opaque},

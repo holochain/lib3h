@@ -2,7 +2,6 @@
 extern crate detach;
 
 use detach::Detach;
-use holochain_tracing::*;
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{engine_actor::*, *},
@@ -75,7 +74,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
         let dht_factory = MirrorDht::new_with_config;
 
         let e1 = GhostEngine::new(
-            Span::fixme(),
+            holochain_tracing::test_span("demo"),
             crypto.clone(),
             config.clone(),
             "send-demo-e1",
@@ -92,8 +91,14 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
             config.bind_url = Url::parse("wss://127.0.0.1:63519").unwrap().into();
         }
 
-        let e2 =
-            GhostEngine::new(Span::fixme(), crypto, config, "send-demo-e2", dht_factory).unwrap();
+        let e2 = GhostEngine::new(
+            holochain_tracing::test_span("demo"),
+            crypto,
+            config,
+            "send-demo-e2",
+            dht_factory,
+        )
+        .unwrap();
         let e2_addr = e2.advertise();
         println!("e2: {}", e2_addr);
 
@@ -111,7 +116,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 
         out.engine1
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("demo"),
                 ClientToLib3h::Bootstrap(BootstrapData {
                     network_or_space_address: NET_ID.into(),
                     bootstrap_uri: out.engine2_addr.clone(),
@@ -128,7 +133,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 
         out.engine1
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("demo"),
                 ClientToLib3h::JoinSpace(SpaceData {
                     request_id: "".to_string(),
                     space_address: SPACE_ADDR.into(),
@@ -143,7 +148,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
 
         out.engine2
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("demo"),
                 ClientToLib3h::JoinSpace(SpaceData {
                     request_id: "".to_string(),
                     space_address: SPACE_ADDR.into(),
@@ -226,7 +231,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
     pub fn send_1_to_2(&mut self) {
         self.engine1
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("demo"),
                 ClientToLib3h::SendDirectMessage(DirectMessageData {
                     space_address: SPACE_ADDR.into(),
                     request_id: "TEST_REQ_ID".to_string(),
@@ -252,7 +257,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
     pub fn query_1(&mut self) {
         self.engine1
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("demo"),
                 ClientToLib3h::QueryEntry(QueryEntryData {
                     space_address: SPACE_ADDR.into(),
                     entry_address: ENTRY_ADDR.into(),
@@ -272,7 +277,7 @@ impl<'lt> EngineContainer<GhostEngine<'lt>> {
     pub fn publish_1(&mut self) {
         self.engine1
             .publish(
-                Span::fixme(),
+                holochain_tracing::test_span("demo"),
                 ClientToLib3h::PublishEntry(ProvidedEntryData {
                     space_address: SPACE_ADDR.into(),
                     provider_agent_id: A_1_ID.into(),

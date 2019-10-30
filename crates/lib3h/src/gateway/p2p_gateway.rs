@@ -3,7 +3,7 @@ use crate::{
     engine::GatewayId,
     gateway::{GatewayOutputWrapType, P2pGateway},
     message_encoding::*,
-    new_root_span, transport,
+    transport,
 };
 use detach::prelude::*;
 use lib3h_ghost_actor::prelude::*;

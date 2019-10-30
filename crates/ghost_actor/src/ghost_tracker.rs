@@ -254,7 +254,7 @@ mod tests {
 
         track
             .bookmark_with_options(
-                Span::fixme(),
+                holochain_tracing::test_span("test"),
                 Box::new(|_span, me, response| {
                     assert_eq!(
                         "Err(GhostError(Other(\"timeout\")))",
@@ -296,7 +296,7 @@ mod tests {
 
         let rid = track
             .bookmark(
-                Span::fixme(),
+                holochain_tracing::test_span("test"),
                 Box::new(|_span, me, response| {
                     me.got_response = format!("{:?}", response);
                     Ok(())
@@ -305,7 +305,11 @@ mod tests {
             .unwrap();
 
         track
-            .handle(Span::fixme(), rid, "test-response".to_string())
+            .handle(
+                holochain_tracing::test_span("test"),
+                rid,
+                "test-response".to_string(),
+            )
             .unwrap();
 
         sys.process().unwrap();

@@ -47,7 +47,7 @@ lazy_static! {
 
 pub fn new_root_span(op_name: &str) -> holochain_tracing::Span {
     let tracer = LIB3H_TRACER.lock().unwrap();
-    tracer.span(format!("(root).{}", op_name)).start().into()
+    tracer.span(format!("(root) {}", op_name)).start().into()
 }
 
 #[cfg(test)]

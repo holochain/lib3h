@@ -107,7 +107,7 @@ mod tests {
                 }
             }
             loop {
-                let span = Span::fixme();
+                let span = holochain_tracing::test_span("");
                 match self.mock_receiver.try_recv() {
                     Ok((uri, payload)) => {
                         self.endpoint_self.publish(
@@ -153,7 +153,7 @@ mod tests {
         // send a message from route A
         route_a
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span(""),
                 RequestToChild::create_send_message(addr_none.clone(), "hello-from-a".into()),
                 Box::new(|_, response| {
                     assert_eq!(&format!("{:?}", response), "");

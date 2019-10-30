@@ -2,7 +2,7 @@ use crate::{
     ghost_error::ErrorKind, Backtwrap, GhostCallback, GhostError, GhostResult, GhostTracker,
     GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone,
 };
-use holochain_tracing::Span;
+use holochain_tracing::{test_span, Span};
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -86,7 +86,7 @@ impl<
             request_id: None,
             message: None,
             sender,
-            span: Span::fixme(),
+            span: test_span("test"),
         }
     }
 
@@ -130,7 +130,6 @@ impl<
     /// send a response back to the origin of this request
     pub fn respond(self, payload: Result<RequestToSelfResponse, Error>) -> GhostResult<()> {
         if let Some(request_id) = &self.request_id {
-            println!("respond: span = {:?}", self.span);
             self.sender.send(GhostEndpointMessage::Response {
                 responder_bt: Backtwrap::new(),
                 request_id: request_id.clone(),
@@ -445,13 +444,12 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, mut span: Span, payload: RequestToOther) -> GhostResult<()> {
+    fn publish(&mut self, span: Span, payload: RequestToOther) -> GhostResult<()> {
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: Backtwrap::new(),
             request_id: None,
             payload,
-            // span,
-            span: Span::fixme(),
+            span,
         })?;
         Ok(())
     }
@@ -460,7 +458,7 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        mut span: Span,
+        span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
@@ -471,7 +469,7 @@ impl<
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        mut span: Span,
+        span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,

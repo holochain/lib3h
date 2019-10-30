@@ -319,7 +319,7 @@ impl
                                         // if so we can add the message directly to our own inbox
                                         trace!("Send-to-self: payload:{:?}", payload);
                                         self.endpoint_self.publish(
-                                            span.child("publish ReceivedData"),
+                                            span.child("send event RequestToParent::ReceivedData"),
                                             RequestToParent::ReceivedData { uri: uri, payload },
                                         )?;
                                     } else {

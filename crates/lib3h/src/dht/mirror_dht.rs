@@ -409,6 +409,7 @@ impl MirrorDht {
             // Owner is asking us to hold a peer info
             DhtRequestToChild::HoldPeer(new_peer_data) => {
                 trace!("DhtRequestToChild::HoldPeer: {:?}", new_peer_data);
+                let span_hold = span.child("handle DhtRequestToChild::HoldPeer");
                 // Get peer_list before adding new peer (to use when doing gossipTo)
                 let others_list = self.get_other_peer_list();
                 // Store it
@@ -436,8 +437,10 @@ impl MirrorDht {
                     peer_name_list: others_list,
                     bundle: buf.into(),
                 };
+
                 self.endpoint_self.publish(
-                    span.follower("TODO-name DhtRequestToChild::HoldPeer"),
+                    span_hold
+                        .child("send event DhtRequestToParent::GossipTo all the received PeerData"),
                     DhtRequestToParent::GossipTo(gossip_evt),
                 )?;
 
@@ -446,7 +449,9 @@ impl MirrorDht {
                     let gossip_data = self.gossip_self(vec![new_peer_data.peer_name.clone()]);
                     if gossip_data.peer_name_list.len() > 0 {
                         self.endpoint_self.publish(
-                            span.follower("TODO-name DhtRequestToChild::HoldPeer"),
+                            span_hold.child(
+                                "send event DhtRequestToParent::GossipTo all our own PeerData",
+                            ),
                             DhtRequestToParent::GossipTo(gossip_data),
                         )?;
                     }
