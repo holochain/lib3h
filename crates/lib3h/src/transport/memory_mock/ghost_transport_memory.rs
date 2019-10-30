@@ -14,11 +14,7 @@ use lib3h_protocol::{
     types::*,
     uri::Lib3hUri,
 };
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{collections::HashSet, sync::Arc, time::Instant};
 
 pub type UserData = GhostTransportMemory;
 
@@ -51,7 +47,7 @@ pub type GhostTransportMemoryEndpointContextParent = GhostContextEndpoint<
 #[allow(dead_code)]
 pub struct GhostTransportMemory {
     node_id: NodePubKey,
-    network: Arc<Mutex<MemoryNet>>,
+    network: Arc<GhostMutex<MemoryNet>>,
     endpoint_parent: Option<GhostTransportMemoryEndpoint>,
     endpoint_self: Detach<GhostTransportMemoryEndpointContext>,
     /// My peer uri on the network layer (not None after a bind)
@@ -68,14 +64,11 @@ impl Discovery for GhostTransportMemory {
             .maybe_my_address
             .clone()
             .ok_or_else(|| DiscoveryError::new_other("must bind before advertising"))?;
-        self.network
-            .lock()
-            .unwrap()
-            .advertise(uri, self.node_id.clone());
+        self.network.lock().advertise(uri, self.node_id.clone());
         Ok(())
     }
     fn discover(&mut self) -> DiscoveryResult<Vec<Lib3hUri>> {
-        let nodes = self.network.lock().unwrap().discover();
+        let nodes = self.network.lock().discover();
         Ok(nodes.into_iter().map(|(uri, _)| uri).collect())
     }
     fn release(&mut self) -> DiscoveryResult<()> {
@@ -128,7 +121,7 @@ impl GhostTransportMemory {
                             // if not already connected, request a connections
                             if self.connections.get(&found_uri).is_none() {
                                 // Get other node's server
-                                match self.network.lock().unwrap().get_server(&found_uri) {
+                                match self.network.lock().get_server(&found_uri) {
                                     Some(remote_server) => {
                                         let _result = remote_server.request_connect(&my_addr);
                                         self.connections.insert(found_uri.clone());
@@ -186,7 +179,7 @@ impl
         if let Some(my_addr) = &self.maybe_my_address {
             // get our own server
             let (success, event_list) = {
-                match self.network.lock().unwrap().get_server(&my_addr) {
+                match self.network.lock().get_server(&my_addr) {
                     None => return Err(format!("No Memory server at this uri: {}", my_addr).into()),
                     Some(server) => server.process()?,
                 }
@@ -221,7 +214,7 @@ impl
                     // if not already connected, request a connection
                     if self.connections.get(&remote_addr).is_none() {
                         // Get other node's server
-                        match self.network.lock().unwrap().get_server(&remote_addr) {
+                        match self.network.lock().get_server(&remote_addr) {
                             Some(server) => {
                                 server.request_connect(&my_addr)?;
                                 self.connections.insert(remote_addr.clone());
@@ -278,7 +271,7 @@ impl
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
-                    let bound_url = { self.network.lock().unwrap().bind() };
+                    let bound_url = { self.network.lock().bind() };
                     self.maybe_my_address = Some(bound_url.clone());
                     self.advertise()
                         .map_err(|e| GhostError::from(e.to_string()))?;
@@ -305,7 +298,7 @@ impl
                         }
                         Some(my_addr) => {
                             // get destinations server
-                            match self.network.lock().unwrap().get_server(&uri) {
+                            match self.network.lock().get_server(&uri) {
                                 None => {
                                     msg.respond(Err(TransportError::new(format!(
                                         "No Memory server at this uri: {}",
@@ -614,7 +607,7 @@ mod tests {
                 let mut verse = get_memory_verse();
                 verse.get_network(netname)
             };
-            let mut net = network.lock().unwrap();
+            let mut net = network.lock();
             let server = net
                 .get_server(&t2_uri)
                 .expect("there should be a server for to_uri");

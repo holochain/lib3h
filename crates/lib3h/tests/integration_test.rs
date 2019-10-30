@@ -238,7 +238,7 @@ fn test_two_memory_nodes_get_lists_suite() {
 }
 
 #[test]
-#[ignore] // test is flakey
+#[ignore] // test is flaky
 fn test_two_memory_nodes_spaces_suite() {
     enable_logging_for_test(true);
     // Create tracer & reporter

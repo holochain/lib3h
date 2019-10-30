@@ -964,7 +964,7 @@ mod tests {
 
         let my_url = &Lib3hUri::with_memory("addr_1");
         //let my_url = &engine.as_ref().advertise();
-        assert!(network.lock().unwrap().unbind(my_url));
+        assert!(network.lock().unbind(my_url));
         wait_can_track_did_work!(engine, core, ProcessingOptions::with_should_abort(false));
         let mut msgs = engine.drain_messages();
         println!("engine.drain() -> {:?}", msgs);
