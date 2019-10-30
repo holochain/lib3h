@@ -232,7 +232,6 @@ impl<'lt, X: 'lt + Send + Sync, T: 'lt + Send + Sync> GhostTracker<'lt, X, T> {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use holochain_tracing::Span;
     use std::sync::Arc;
 
     #[test]

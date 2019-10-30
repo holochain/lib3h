@@ -5,7 +5,7 @@ extern crate lazy_static;
 extern crate lib3h_zombie_actor as lib3h_ghost_actor;
 
 use detach::prelude::*;
-use holochain_tracing::{test_span, Span};
+use holochain_tracing::test_span;
 use lib3h::transport::{error::*, protocol::*};
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};

@@ -27,7 +27,6 @@ mod tests {
     use crate::{error::Lib3hError, gateway::protocol::*, transport::protocol::*};
     use detach::prelude::*;
     use holochain_persistence_api::hash::HashString;
-    use holochain_tracing::Span;
     use lib3h_ghost_actor::prelude::*;
     use lib3h_protocol::{data_types::Opaque, uri::Lib3hUri};
 
