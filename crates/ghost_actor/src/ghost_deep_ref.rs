@@ -3,7 +3,7 @@ use std::sync::{Arc, Weak};
 
 /// will be invoked when the internal ref is updated
 pub(crate) type DeepRefSetCb<'lt, X> =
-    Box<dyn FnMut(Weak<GhostMutex<X>>) -> GhostResult<bool> + 'lt>;
+    Box<dyn FnMut(Weak<GhostMutex<X>>) -> GhostResult<bool> + 'lt + Send + Sync>;
 
 /// internal deep ref data
 struct DeepRefInner<'lt, X: 'lt + Send + Sync> {
@@ -72,9 +72,6 @@ pub(crate) struct DeepRef<'lt, X: 'lt + Send + Sync> {
     p: std::marker::PhantomData<&'lt i8>,
     r: Arc<GhostMutex<DeepRefInner<'lt, X>>>,
 }
-
-unsafe impl<'lt, X: 'lt + Send + Sync> Send for DeepRef<'lt, X> {}
-unsafe impl<'lt, X: 'lt + Send + Sync> Sync for DeepRef<'lt, X> {}
 
 impl<'lt, X: 'lt + Send + Sync> Clone for DeepRef<'lt, X> {
     fn clone(&self) -> Self {
