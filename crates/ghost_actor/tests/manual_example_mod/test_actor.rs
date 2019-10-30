@@ -106,10 +106,10 @@ impl<'lt, S: GhostSystemRef<'lt>> TestActor<'lt, S> {
                     {
                         None => {
                             me.owner_ref.event_to_owner_print(
-                                Some(span),
+                                Some(span.child("print request")),
                                 format!("({} add 1 to {})", me.name, message),
                             )?;
-                            cb(Span::fixme(), Ok(message + 1))
+                            cb(span, Ok(message + 1))
                         }
                         Some(sub_actor) => sub_actor.request_to_actor_add_1(
                             Some(span),

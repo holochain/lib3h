@@ -1,13 +1,13 @@
 use crate::{
     engine::{engine_actor::GhostEngineParentWrapper, CanAdvertise, GhostEngine},
     error::*,
+    new_root_span,
     track::Tracker,
 };
 
 use std::convert::TryInto;
 
 use detach::Detach;
-use holochain_tracing::Span;
 use lib3h_ghost_actor::*;
 use lib3h_protocol::{
     data_types::{ConnectedData, GenericResultData, Opaque},
@@ -226,10 +226,11 @@ where
         if let Ok(client_to_lib3h) = maybe_client_to_lib3h {
             debug!("client_to_lib3h: {:?}", client_to_lib3h);
             let result = if request_id == "" {
-                self.engine.publish(Span::fixme(), client_to_lib3h)
+                self.engine
+                    .publish(new_root_span("client_to_lib3h event"), client_to_lib3h)
             } else {
                 self.engine.request(
-                    Span::fixme(),
+                    new_root_span("client_to_lib3h request"),
                     client_to_lib3h,
                     LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
                 )

@@ -7,7 +7,6 @@ use crate::transport::{
     },
 };
 use detach::Detach;
-use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{
     data_types::Opaque,
@@ -21,6 +20,7 @@ use lib3h_protocol::{
 use std::{collections::HashSet, time::Instant};
 
 // Use mDNS for bootstrapping
+use crate::new_root_span;
 use holochain_persistence_api::hash::HashString;
 use lib3h_mdns::{MulticastDns, MulticastDnsBuilder};
 
@@ -273,6 +273,7 @@ impl GhostTransportWebsocket {
 
     fn process_stream_events(&mut self, stream_events: Vec<StreamEvent>) -> TransportResult<()> {
         for event in stream_events {
+            let span = new_root_span("StreamEvent");
             match event {
                 StreamEvent::ErrorOccured(uri, error) => {
                     warn!(
@@ -296,7 +297,8 @@ impl GhostTransportWebsocket {
                             error,
                         },
                     };
-                    self.endpoint_self.publish(Span::fixme(), response)?;
+                    self.endpoint_self
+                        .publish(span.child("publish ErrorOccured"), response)?;
                 }
                 StreamEvent::ConnectResult(uri_connnected, _) => {
                     trace!("StreamEvent::ConnectResult: {:?}", uri_connnected);
@@ -304,7 +306,7 @@ impl GhostTransportWebsocket {
                 StreamEvent::IncomingConnectionEstablished(uri) => {
                     trace!("StreamEvent::IncomingConnectionEstablished: {:?}", uri);
                     self.endpoint_self.publish(
-                        Span::fixme(),
+                        span.child("send event RequestToParent::IncomingConnection"),
                         RequestToParent::IncomingConnection { uri: uri.into() },
                     )?;
                 }
@@ -314,7 +316,7 @@ impl GhostTransportWebsocket {
                         String::from_utf8(payload.clone())
                     );
                     self.endpoint_self.publish(
-                        Span::fixme(),
+                        span.child("send event RequestToParent::ReceivedData"),
                         RequestToParent::ReceivedData {
                             uri: uri.into(),
                             payload: Opaque::from(payload),
@@ -323,8 +325,10 @@ impl GhostTransportWebsocket {
                 }
                 StreamEvent::ConnectionClosed(uri) => {
                     trace!("StreamEvent::ConnectionClosed: {}", uri);
-                    self.endpoint_self
-                        .publish(Span::fixme(), RequestToParent::Disconnect(uri.into()))?;
+                    self.endpoint_self.publish(
+                        span.child("send event RequestToParent::ConnectionClosed"),
+                        RequestToParent::Disconnect(uri.into()),
+                    )?;
                 }
             }
         }
@@ -599,7 +603,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("test"),
                 RequestToChild::create_send_message(
                     expected_transport2_address.clone(),
                     b"test message".to_vec().into(),
@@ -780,7 +784,7 @@ mod tests {
                 .into();
         t1_endpoint
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("test"),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -805,7 +809,7 @@ mod tests {
                 .into();
         t2_endpoint
             .request(
-                Span::fixme(),
+                holochain_tracing::test_span("test"),
                 RequestToChild::Bind {
                     spec: expected_transport2_address.clone(),
                 },

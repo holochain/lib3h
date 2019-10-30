@@ -2,7 +2,7 @@ use crate::{
     ghost_error::ErrorKind, Backtwrap, GhostCallback, GhostError, GhostResult, GhostTracker,
     GhostTrackerBookmarkOptions, GhostTrackerBuilder, RequestId, WorkWasDone,
 };
-use holochain_tracing::Span;
+use holochain_tracing::{test_span, Span};
 
 /// enum used internally as the protocol for our crossbeam_channels
 /// allows us to be explicit about which messages are requests or responses.
@@ -86,7 +86,7 @@ impl<
             request_id: None,
             message: None,
             sender,
-            span: Span::fixme(),
+            span: test_span("test"),
         }
     }
 
@@ -398,21 +398,21 @@ impl<
     ) -> GhostResult<()> {
         let span_bookmark = span.child("bookmark");
         let request_id = match options.timeout {
-            None => self.pending_responses_tracker.bookmark(span_bookmark, cb),
+            None => self
+                .pending_responses_tracker
+                .bookmark(Span::todo("default"), cb),
             Some(timeout) => self.pending_responses_tracker.bookmark_options(
-                span_bookmark,
+                Span::todo("options"),
                 cb,
                 GhostTrackerBookmarkOptions::default().timeout(timeout),
             ),
         };
-        // trace!("ghost_channel: send request {:?}", request_id);
-        span.event(format!("ghost_channel: send request {:?}", request_id));
+        span.event(format!("{:?}", request_id));
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: Backtwrap::new(),
             request_id: Some(request_id),
             payload,
-            span: span.follower("send request"),
-            // span: span.child("request", |o| o.start()).into(),
+            span: span_bookmark.follower("send request"),
         })?;
         Ok(())
     }
@@ -444,8 +444,7 @@ impl<
     >
 {
     /// publish an event to the remote side, not expecting a response
-    fn publish(&mut self, mut span: Span, payload: RequestToOther) -> GhostResult<()> {
-        span.event("GhostChannel::publish");
+    fn publish(&mut self, span: Span, payload: RequestToOther) -> GhostResult<()> {
         self.sender.send(GhostEndpointMessage::Request {
             requester_bt: Backtwrap::new(),
             request_id: None,
@@ -459,30 +458,23 @@ impl<
     /// the callback will be invoked.
     fn request(
         &mut self,
-        mut span: Span,
+        span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
     ) -> GhostResult<()> {
-        span.event("GhostChannel::request");
-        self.priv_request(
-            span.child("priv_request"),
-            payload,
-            cb,
-            GhostTrackRequestOptions::default(),
-        )
+        self.priv_request(span, payload, cb, GhostTrackRequestOptions::default())
     }
 
     /// make a request of the other side. When a response is sent back to us
     /// the callback will be invoked, override the default timeout.
     fn request_options(
         &mut self,
-        mut span: Span,
+        span: Span,
         payload: RequestToOther,
         cb: GhostCallback<UserData, RequestToOtherResponse, Error>,
         options: GhostTrackRequestOptions,
     ) -> GhostResult<()> {
-        span.event("GhostChannel::request_options");
-        self.priv_request(span.child("priv_request"), payload, cb, options)
+        self.priv_request(span, payload, cb, options)
     }
 
     /// fetch any messages (requests or events) sent to us from the other side
@@ -514,7 +506,7 @@ impl<
                                 request_id,
                                 payload,
                                 self.sender.clone(),
-                                span.child("outbox_messages"),
+                                span,
                             ));
                         }
                         GhostEndpointMessage::Response {

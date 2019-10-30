@@ -355,7 +355,7 @@ impl<
             parent_span.child("send_protocol")
         } else {
             let tracer = GHOST_TRACER.lock().unwrap();
-            tracer.span("(root).send_protocol").start().into()
+            tracer.span("(root) send_protocol").start().into()
         };
         let id = message.discriminant().clone().id().to_string();
         span.set_tag(move || Tag::new("message_type", id));
