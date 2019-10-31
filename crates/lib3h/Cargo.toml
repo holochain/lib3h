@@ -14,6 +14,7 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 backtrace = "=0.3.27"
+crossbeam-channel = "=0.3.8"
 detach = { version = "=0.0.20", path = "../detach" }
 env_logger = "=0.6.1"
 hcid = "=0.0.6"

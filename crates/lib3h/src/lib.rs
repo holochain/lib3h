@@ -1,6 +1,7 @@
 #![feature(test)]
 
 extern crate backtrace;
+extern crate crossbeam_channel;
 #[macro_use]
 extern crate detach;
 extern crate hcid;
@@ -34,6 +35,7 @@ pub mod message_encoding;
 pub mod rrdht_util;
 pub mod time;
 pub mod track;
+pub mod mem_stream;
 #[macro_use]
 pub mod transport;
 // FIXME
