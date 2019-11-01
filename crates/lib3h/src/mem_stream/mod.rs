@@ -1,12 +1,9 @@
-use url::Url;
 use lib3h_ghost_actor::GhostMutex;
 use std::{
-    collections::{
-        hash_map::Entry,
-        HashMap,
-    },
+    collections::{hash_map::Entry, HashMap},
     io::{Read, Write},
 };
+use url::Url;
 
 // -- mem listener -- //
 
@@ -29,13 +26,13 @@ impl MemListener {
     }
 
     /// bind to a virtual "memory" interface
-    pub fn bind(url: Url) -> std::io::Result<MemListener> {
+    pub fn bind(url: &Url) -> std::io::Result<MemListener> {
         MEM_MANAGER.lock().bind(url)
     }
 
     /// get the url bound to
-    pub fn get_url(&self) -> Url {
-        self.url.clone()
+    pub fn get_url(&self) -> &Url {
+        &self.url
     }
 
     /// accept a stream on this listener interface
@@ -53,14 +50,14 @@ impl MemListener {
                     // wait until our user has accepted all pending connections
                     // before letting them know the channel is broken
                     if self.accept_queue.is_empty() {
-                        return Err(std::io::ErrorKind::BrokenPipe.into())
+                        return Err(std::io::ErrorKind::BrokenPipe.into());
                     }
                 }
             }
         }
         if self.accept_queue.is_empty() {
             // acceptor is non-blocking we have nothing to return
-            return Err(std::io::ErrorKind::WouldBlock.into())
+            return Err(std::io::ErrorKind::WouldBlock.into());
         }
         // pull the next item off the queue
         Ok(self.accept_queue.remove(0))
@@ -101,13 +98,13 @@ impl MemStream {
 
     /// connect to a virtual memory listening interface
     /// will return ConnectionRefused if there is not one
-    pub fn connect(url: Url) -> std::io::Result<MemStream> {
+    pub fn connect(url: &Url) -> std::io::Result<MemStream> {
         MEM_MANAGER.lock().connect(url)
     }
 
     /// get the Url we are connected to
-    pub fn get_url(&self) -> Url {
-        self.url.clone()
+    pub fn get_url(&self) -> &Url {
+        &self.url
     }
 }
 
@@ -191,14 +188,14 @@ impl MemManager {
     }
 
     /// manage binding a new MemListener interface
-    fn bind(&mut self, url: Url) -> std::io::Result<MemListener> {
+    fn bind(&mut self, url: &Url) -> std::io::Result<MemListener> {
         match self.listeners.entry(url.clone()) {
             Entry::Occupied(_) => Err(std::io::ErrorKind::AddrInUse.into()),
             Entry::Vacant(e) => {
                 // the url is not in use, let's create a new listener
                 let (send, recv) = crossbeam_channel::unbounded();
                 e.insert(send);
-                Ok(MemListener::priv_new(url, recv))
+                Ok(MemListener::priv_new(url.clone(), recv))
             }
         }
     }
@@ -209,7 +206,7 @@ impl MemManager {
     }
 
     /// connect to an existing MemListener interface
-    fn connect(&mut self, url: Url) -> std::io::Result<MemStream> {
+    fn connect(&mut self, url: &Url) -> std::io::Result<MemStream> {
         let mut disconnected = false;
         if let Entry::Occupied(mut e) = self.listeners.entry(url.clone()) {
             // there is a listener bound to this url
@@ -225,7 +222,7 @@ impl MemManager {
             }
         }
         if disconnected {
-            self.listeners.remove(&url);
+            self.listeners.remove(url);
         }
         Err(std::io::ErrorKind::ConnectionRefused.into())
     }
@@ -233,9 +230,7 @@ impl MemManager {
 
 // this is the actual singleton global reference
 lazy_static! {
-    static ref MEM_MANAGER: GhostMutex<MemManager> = {
-        GhostMutex::new(MemManager::new())
-    };
+    static ref MEM_MANAGER: GhostMutex<MemManager> = { GhostMutex::new(MemManager::new()) };
 }
 
 #[cfg(test)]
@@ -245,17 +240,15 @@ mod tests {
     /// create a unique listener && establish connection pair
     fn setup() -> (MemListener, MemStream, MemStream) {
         let url = Url::parse(&format!("test:{}", nanoid::simple())).unwrap();
-        let mut listener =
-            MemListener::bind(url.clone()).unwrap();
-        let client =
-            MemStream::connect(url).unwrap();
+        let mut listener = MemListener::bind(&url).unwrap();
+        let client = MemStream::connect(&url).unwrap();
         let server = listener.accept().unwrap();
         (listener, client, server)
     }
 
     #[test]
     fn it_should_connection_refused() {
-        match MemStream::connect(Url::parse("badconnection:").unwrap()) {
+        match MemStream::connect(&Url::parse("badconnection:").unwrap()) {
             Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionRefused => (),
             _ => panic!("unexpected"),
         }

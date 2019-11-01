@@ -31,11 +31,11 @@ pub mod engine;
 pub mod error;
 pub mod gateway;
 pub mod keystore;
+pub mod mem_stream;
 pub mod message_encoding;
 pub mod rrdht_util;
 pub mod time;
 pub mod track;
-pub mod mem_stream;
 #[macro_use]
 pub mod transport;
 // FIXME
