@@ -104,6 +104,8 @@ impl TlsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::websocket::streams::StreamManager;
+    use url2::prelude::*;
     use std::io::{Read, Write};
 
     #[derive(Debug)]
@@ -383,5 +385,13 @@ mod tests {
     #[test]
     fn it_can_use_self_signed_ephemeral_tls() {
         test_enc_dec(TlsConfig::build_from_entropy());
+    }
+
+    #[test]
+    fn it_should_work_with_mem_stream() {
+        let url1 = Url2::parse("mem://test1").into();
+        let mut manager = StreamManager::with_mem_stream(TlsConfig::FakeServer);
+        assert_eq!(url1, manager.bind(&url1).unwrap());
+        manager.connect(&url1).unwrap();
     }
 }

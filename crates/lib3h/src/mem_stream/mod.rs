@@ -224,6 +224,7 @@ impl MemManager {
         if disconnected {
             self.listeners.remove(url);
         }
+        println!("#@##@#@ {} {:#?}", url, self.listeners);
         Err(std::io::ErrorKind::ConnectionRefused.into())
     }
 }

@@ -18,7 +18,19 @@ impl StreamManager<MemStream> {
     }
 
     fn mem_bind(url: &Url2) -> TransportResult<Acceptor<MemStream>> {
-        let mut listener = MemListener::bind(url)?;
+        if "mem" != url.scheme() {
+            return Err("mem bind: url scheme must be mem".into());
+        }
+        if url.port().is_some() {
+            return Err("mem bind: port must not be set".into());
+        }
+        if url.host_str().is_none() {
+            return Err("mem bind: host_str must be set".into());
+        }
+        let mut url = url.clone();
+        url.set_port(Some(4242)).map_err(|()| TransportError::from("failed to set port"))?;
+
+        let mut listener = MemListener::bind(&url)?;
         Ok(Box::new(move || match listener.accept() {
             Ok(stream) => Ok(WssInfo::server(stream.get_url().clone().into(), stream)),
             Err(ref err) if err.kind() == std::io::ErrorKind::WouldBlock => {
