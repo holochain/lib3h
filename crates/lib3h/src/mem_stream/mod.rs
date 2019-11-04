@@ -3,21 +3,21 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     io::{Read, Write},
 };
-use url::Url;
+use url2::prelude::*;
 
 // -- mem listener -- //
 
 #[derive(Debug)]
 /// equivalent to TcpListener, the network interface bind point
 pub struct MemListener {
-    url: Url,
+    url: Url2,
     recv: crossbeam_channel::Receiver<MemStream>,
     accept_queue: Vec<MemStream>,
 }
 
 impl MemListener {
     /// private constructor, you probably want `bind`
-    fn priv_new(url: Url, recv: crossbeam_channel::Receiver<MemStream>) -> Self {
+    fn priv_new(url: Url2, recv: crossbeam_channel::Receiver<MemStream>) -> Self {
         Self {
             url,
             recv,
@@ -26,12 +26,12 @@ impl MemListener {
     }
 
     /// bind to a virtual "memory" interface
-    pub fn bind(url: &Url) -> std::io::Result<MemListener> {
+    pub fn bind(url: &Url2) -> std::io::Result<MemListener> {
         MEM_MANAGER.lock().bind(url)
     }
 
     /// get the url bound to
-    pub fn get_url(&self) -> &Url {
+    pub fn get_url(&self) -> &Url2 {
         &self.url
     }
 
@@ -75,7 +75,7 @@ impl Drop for MemListener {
 #[derive(Debug)]
 /// equivalent to TcpStream, represents one end of a virtual memory connection
 pub struct MemStream {
-    url: Url,
+    url: Url2,
     send: crossbeam_channel::Sender<Vec<u8>>,
     recv: crossbeam_channel::Receiver<Vec<u8>>,
     recv_buf: Vec<u8>,
@@ -84,7 +84,7 @@ pub struct MemStream {
 impl MemStream {
     /// private constructor, you probably want `connect`
     fn priv_new(
-        url: Url,
+        url: Url2,
         send: crossbeam_channel::Sender<Vec<u8>>,
         recv: crossbeam_channel::Receiver<Vec<u8>>,
     ) -> MemStream {
@@ -98,12 +98,12 @@ impl MemStream {
 
     /// connect to a virtual memory listening interface
     /// will return ConnectionRefused if there is not one
-    pub fn connect(url: &Url) -> std::io::Result<MemStream> {
+    pub fn connect(url: &Url2) -> std::io::Result<MemStream> {
         MEM_MANAGER.lock().connect(url)
     }
 
     /// get the Url we are connected to
-    pub fn get_url(&self) -> &Url {
+    pub fn get_url(&self) -> &Url2 {
         &self.url
     }
 }
@@ -163,7 +163,7 @@ impl Write for MemStream {
 // -- utility functions -- //
 
 /// private stream pair constructor, these streams can message each other
-fn create_mem_stream_pair(url: Url) -> (MemStream, MemStream) {
+fn create_mem_stream_pair(url: Url2) -> (MemStream, MemStream) {
     let (send1, recv1) = crossbeam_channel::unbounded();
     let (send2, recv2) = crossbeam_channel::unbounded();
     (
@@ -176,7 +176,7 @@ fn create_mem_stream_pair(url: Url) -> (MemStream, MemStream) {
 
 /// private singleton for managing virtual memory listening interfaces
 struct MemManager {
-    listeners: HashMap<Url, crossbeam_channel::Sender<MemStream>>,
+    listeners: HashMap<Url2, crossbeam_channel::Sender<MemStream>>,
 }
 
 impl MemManager {
@@ -188,7 +188,7 @@ impl MemManager {
     }
 
     /// manage binding a new MemListener interface
-    fn bind(&mut self, url: &Url) -> std::io::Result<MemListener> {
+    fn bind(&mut self, url: &Url2) -> std::io::Result<MemListener> {
         match self.listeners.entry(url.clone()) {
             Entry::Occupied(_) => Err(std::io::ErrorKind::AddrInUse.into()),
             Entry::Vacant(e) => {
@@ -201,12 +201,12 @@ impl MemManager {
     }
 
     /// unbind a previously bound MemListener interface (happens on Drop)
-    fn unbind(&mut self, url: &Url) {
+    fn unbind(&mut self, url: &Url2) {
         self.listeners.remove(url);
     }
 
     /// connect to an existing MemListener interface
-    fn connect(&mut self, url: &Url) -> std::io::Result<MemStream> {
+    fn connect(&mut self, url: &Url2) -> std::io::Result<MemStream> {
         let mut disconnected = false;
         if let Entry::Occupied(mut e) = self.listeners.entry(url.clone()) {
             // there is a listener bound to this url
@@ -239,7 +239,7 @@ mod tests {
 
     /// create a unique listener && establish connection pair
     fn setup() -> (MemListener, MemStream, MemStream) {
-        let url = Url::parse(&format!("test:{}", nanoid::simple())).unwrap();
+        let url = Url2::parse(&format!("test:{}", nanoid::simple()));
         let mut listener = MemListener::bind(&url).unwrap();
         let client = MemStream::connect(&url).unwrap();
         let server = listener.accept().unwrap();
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn it_should_connection_refused() {
-        match MemStream::connect(&Url::parse("badconnection:").unwrap()) {
+        match MemStream::connect(&Url2::parse("badconnection:")) {
             Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionRefused => (),
             _ => panic!("unexpected"),
         }

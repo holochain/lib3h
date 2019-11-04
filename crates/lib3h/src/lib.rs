@@ -23,6 +23,7 @@ extern crate serde_json;
 extern crate shrinkwraprs;
 #[macro_use]
 extern crate log;
+extern crate url2;
 
 // -- mod -- //
 

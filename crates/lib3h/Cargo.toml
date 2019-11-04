@@ -30,6 +30,7 @@ lib3h_mdns = { version = "=0.0.20", path = "../mdns" }
 nanoid = "=0.2.0"
 tungstenite = "=0.9.1"
 url = { version = "=2.1.0", features = ["serde"] }
+url2 = "=0.0.3"
 native-tls = "=0.2.2"
 rmp-serde = "=0.13.7"
 serde = "=1.0.89"
