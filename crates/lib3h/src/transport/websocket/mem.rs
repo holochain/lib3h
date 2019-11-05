@@ -17,26 +17,18 @@ impl StreamManager<MemStream> {
         )
     }
 
-    fn mem_bind(url: &Url2) -> TransportResult<Acceptor<MemStream>> {
-        if "mem" != url.scheme() {
-            return Err("mem bind: url scheme must be mem".into());
-        }
-        if url.port().is_some() {
-            return Err("mem bind: port must not be set".into());
-        }
-        if url.host_str().is_none() {
-            return Err("mem bind: host_str must be set".into());
-        }
-        let mut url = url.clone();
-        url.set_port(Some(4242)).map_err(|()| TransportError::from("failed to set port"))?;
-
+    fn mem_bind(url: &Url2) -> TransportResult<(Url2, Acceptor<MemStream>)> {
         let mut listener = MemListener::bind(&url)?;
-        Ok(Box::new(move || match listener.accept() {
-            Ok(stream) => Ok(WssInfo::server(stream.get_url().clone().into(), stream)),
-            Err(ref err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                Err(TransportError::new_kind(ErrorKind::Ignore(err.to_string())))
-            }
-            Err(e) => Err(e.into()),
-        }))
+        let url = listener.get_url().clone();
+        Ok((
+            url,
+            Box::new(move || match listener.accept() {
+                Ok(stream) => Ok(WssInfo::server(stream.get_url().clone().into(), stream)),
+                Err(ref err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                    Err(TransportError::new_kind(ErrorKind::Ignore(err.to_string())))
+                }
+                Err(e) => Err(e.into()),
+            }),
+        ))
     }
 }

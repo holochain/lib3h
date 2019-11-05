@@ -189,13 +189,36 @@ impl MemManager {
 
     /// manage binding a new MemListener interface
     fn bind(&mut self, url: &Url2) -> std::io::Result<MemListener> {
-        match self.listeners.entry(url.clone()) {
+        if "mem" != url.scheme() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "mem bind: url scheme must be mem",
+            ));
+        }
+        match url.port() {
+            Some(4242) | None => (),
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "mem bind: url port must be None or 4242",
+                ));
+            }
+        }
+        if url.host_str().is_none() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "mem bind: host_str must be set",
+            ));
+        }
+        let new_url = Url2::parse(&format!("{}:4242", url.host_str().unwrap(),));
+        let new_url_w_proto = Url2::parse(&format!("mem://{}", new_url));
+        match self.listeners.entry(new_url) {
             Entry::Occupied(_) => Err(std::io::ErrorKind::AddrInUse.into()),
             Entry::Vacant(e) => {
                 // the url is not in use, let's create a new listener
                 let (send, recv) = crossbeam_channel::unbounded();
                 e.insert(send);
-                Ok(MemListener::priv_new(url.clone(), recv))
+                Ok(MemListener::priv_new(new_url_w_proto, recv))
             }
         }
     }
@@ -207,6 +230,16 @@ impl MemManager {
 
     /// connect to an existing MemListener interface
     fn connect(&mut self, url: &Url2) -> std::io::Result<MemStream> {
+        let url = if url.scheme() == "mem" {
+            Url2::parse(&format!(
+                "{}:{}",
+                url.host_str().unwrap(),
+                url.port().unwrap(),
+            ))
+        } else {
+            url.clone()
+        };
+
         let mut disconnected = false;
         if let Entry::Occupied(mut e) = self.listeners.entry(url.clone()) {
             // there is a listener bound to this url
@@ -222,9 +255,9 @@ impl MemManager {
             }
         }
         if disconnected {
-            self.listeners.remove(url);
+            self.listeners.remove(&url);
         }
-        println!("#@##@#@ {} {:#?}", url, self.listeners);
+        // println!("#@##@#@ {} {:#?}", url, self.listeners);
         Err(std::io::ErrorKind::ConnectionRefused.into())
     }
 }
@@ -240,9 +273,14 @@ mod tests {
 
     /// create a unique listener && establish connection pair
     fn setup() -> (MemListener, MemStream, MemStream) {
-        let url = Url2::parse(&format!("test:{}", nanoid::simple()));
+        let url = Url2::parse(&format!(
+            "mem://test-{}",
+            nanoid::simple().replace("_", "-").replace("~", "+")
+        ));
+        println!("SETUP USING URL: {}", url);
         let mut listener = MemListener::bind(&url).unwrap();
-        let client = MemStream::connect(&url).unwrap();
+        println!("LISTENER GOT BOUND URL: {}", listener.get_url());
+        let client = MemStream::connect(listener.get_url()).unwrap();
         let server = listener.accept().unwrap();
         (listener, client, server)
     }
@@ -251,7 +289,7 @@ mod tests {
     fn it_should_connection_refused() {
         match MemStream::connect(&Url2::parse("badconnection:")) {
             Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionRefused => (),
-            _ => panic!("unexpected"),
+            e @ _ => panic!("unexpected {:?}", e),
         }
     }
 
@@ -260,7 +298,7 @@ mod tests {
         let (listener, _c, _s) = setup();
         match MemListener::bind(listener.get_url()) {
             Err(ref e) if e.kind() == std::io::ErrorKind::AddrInUse => (),
-            _ => panic!("unexpected"),
+            e @ _ => panic!("unexpected {:?}", e),
         }
     }
 
@@ -287,17 +325,17 @@ mod tests {
 
         match listener.accept() {
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
-            _ => panic!("unexpected"),
+            e @ _ => panic!("unexpected {:?}", e),
         }
 
         match client.read(&mut buf) {
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
-            _ => panic!("unexpected"),
+            e @ _ => panic!("unexpected {:?}", e),
         }
 
         match server.read(&mut buf) {
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => (),
-            _ => panic!("unexpected"),
+            e @ _ => panic!("unexpected {:?}", e),
         }
     }
 

@@ -105,8 +105,8 @@ impl TlsConfig {
 mod tests {
     use super::*;
     use crate::transport::websocket::streams::StreamManager;
-    use url2::prelude::*;
     use std::io::{Read, Write};
+    use url2::prelude::*;
 
     #[derive(Debug)]
     struct MockStream {
@@ -390,8 +390,9 @@ mod tests {
     #[test]
     fn it_should_work_with_mem_stream() {
         let url1 = Url2::parse("mem://test1").into();
+        let url1_bound: url::Url = Url2::parse("mem://test1:4242").into();
         let mut manager = StreamManager::with_mem_stream(TlsConfig::FakeServer);
-        assert_eq!(url1, manager.bind(&url1).unwrap());
-        manager.connect(&url1).unwrap();
+        assert_eq!(url1_bound, manager.bind(&url1).unwrap());
+        manager.connect(&url1_bound).unwrap();
     }
 }
