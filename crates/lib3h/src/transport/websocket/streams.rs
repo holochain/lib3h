@@ -116,7 +116,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
 
     /// close a currently tracked connection
     #[allow(dead_code)]
-    fn close(&mut self, uri: &Url) -> TransportResult<()> {
+    pub fn close(&mut self, uri: &Url) -> TransportResult<()> {
         if let Some(mut info) = self.stream_sockets.remove(uri) {
             info.close()?;
         }

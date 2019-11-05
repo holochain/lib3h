@@ -162,13 +162,22 @@ impl Write for MemStream {
 
 // -- utility functions -- //
 
+/// create a protocol safe unique url bind point
+fn random_url(prefix: &str) -> Url2 {
+    Url2::parse(&format!(
+        "mem://{}-{}",
+        prefix,
+        nanoid::simple().replace("_", "-").replace("~", "+"),
+    ))
+}
+
 /// private stream pair constructor, these streams can message each other
-fn create_mem_stream_pair(url: Url2) -> (MemStream, MemStream) {
+fn create_mem_stream_pair(url_a: Url2, url_b: Url2) -> (MemStream, MemStream) {
     let (send1, recv1) = crossbeam_channel::unbounded();
     let (send2, recv2) = crossbeam_channel::unbounded();
     (
-        MemStream::priv_new(url.clone(), send1, recv2),
-        MemStream::priv_new(url, send2, recv1),
+        MemStream::priv_new(url_a, send1, recv2),
+        MemStream::priv_new(url_b, send2, recv1),
     )
 }
 
@@ -210,15 +219,14 @@ impl MemManager {
                 "mem bind: host_str must be set",
             ));
         }
-        let new_url = Url2::parse(&format!("{}:4242", url.host_str().unwrap(),));
-        let new_url_w_proto = Url2::parse(&format!("mem://{}", new_url));
-        match self.listeners.entry(new_url) {
+        let new_url = Url2::parse(&format!("mem://{}:4242", url.host_str().unwrap(),));
+        match self.listeners.entry(new_url.clone()) {
             Entry::Occupied(_) => Err(std::io::ErrorKind::AddrInUse.into()),
             Entry::Vacant(e) => {
                 // the url is not in use, let's create a new listener
                 let (send, recv) = crossbeam_channel::unbounded();
                 e.insert(send);
-                Ok(MemListener::priv_new(new_url_w_proto, recv))
+                Ok(MemListener::priv_new(new_url, recv))
             }
         }
     }
@@ -230,12 +238,8 @@ impl MemManager {
 
     /// connect to an existing MemListener interface
     fn connect(&mut self, url: &Url2) -> std::io::Result<MemStream> {
-        let url = if url.scheme() == "mem" {
-            Url2::parse(&format!(
-                "{}:{}",
-                url.host_str().unwrap(),
-                url.port().unwrap(),
-            ))
+        let url = if url.scheme() != "mem" || url.host_str().is_none() {
+            Url2::parse(&format!("mem://{}", url,))
         } else {
             url.clone()
         };
@@ -246,7 +250,7 @@ impl MemManager {
             // create a new stream pair
             // send one to the listener's accept queue
             // return the other one
-            let (one, two) = create_mem_stream_pair(url.clone());
+            let (one, two) = create_mem_stream_pair(random_url("assigned"), url.clone());
             // if the send fails, we must have a broken listener connection
             // we'll clean that up after
             match e.get_mut().send(one) {
@@ -273,10 +277,7 @@ mod tests {
 
     /// create a unique listener && establish connection pair
     fn setup() -> (MemListener, MemStream, MemStream) {
-        let url = Url2::parse(&format!(
-            "mem://test-{}",
-            nanoid::simple().replace("_", "-").replace("~", "+")
-        ));
+        let url = random_url("test");
         println!("SETUP USING URL: {}", url);
         let mut listener = MemListener::bind(&url).unwrap();
         println!("LISTENER GOT BOUND URL: {}", listener.get_url());
