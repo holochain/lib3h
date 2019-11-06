@@ -7,10 +7,11 @@ use crate::transport::{
         WssSrvAcceptResult, WssSrvMidHandshake, WssStream,
     },
 };
+use lib3h_zombie_actor::GhostMutex;
 use lib3h_protocol::{uri::Lib3hUri, DidWork};
 use std::{
     io::{Read, Write},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use url::Url;
@@ -66,7 +67,7 @@ pub enum StreamEvent {
 pub type StreamFactory<T> = fn(uri: &str) -> TransportResult<T>;
 
 lazy_static! {
-    static ref TRANSPORT_COUNT: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+    static ref TRANSPORT_COUNT: Arc<GhostMutex<u64>> = Arc::new(GhostMutex::new(0));
 }
 
 /// A function that produces accepted sockets of type R wrapped in a TransportInfo
@@ -115,7 +116,7 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
 
     /// close a currently tracked connection
     #[allow(dead_code)]
-    fn close(&mut self, uri: &Url) -> TransportResult<()> {
+    pub fn close(&mut self, uri: &Url) -> TransportResult<()> {
         if let Some(mut info) = self.stream_sockets.remove(uri) {
             info.close()?;
         }
@@ -200,10 +201,9 @@ impl<T: Read + Write + std::fmt::Debug> StreamManager<T> {
         self.stream_sockets
             .get(url)
             .map(|info| match info.stateful_socket {
-                WebsocketStreamState::TlsReady(_)
-                | WebsocketStreamState::TlsSrvReady(_)
-                | WebsocketStreamState::ReadyWs(_)
-                | WebsocketStreamState::ReadyWss(_) => ConnectionStatus::Ready,
+                WebsocketStreamState::ReadyWs(_) | WebsocketStreamState::ReadyWss(_) => {
+                    ConnectionStatus::Ready
+                }
                 _ => ConnectionStatus::Initializing,
             })
             .unwrap_or(ConnectionStatus::None)
