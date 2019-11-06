@@ -1,9 +1,6 @@
-use crate::{
-    mem_stream::*,
-    transport::{
-        error::*,
-        websocket::{streams::*, tls::TlsConfig, wss_info::WssInfo},
-    },
+use crate::transport::{
+    error::*,
+    websocket::{mem_stream::*, streams::*, tls::TlsConfig, wss_info::WssInfo},
 };
 use url2::prelude::*;
 

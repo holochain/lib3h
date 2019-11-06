@@ -104,7 +104,10 @@ impl TlsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transport::websocket::streams::{StreamEvent, StreamManager};
+    use crate::transport::websocket::{
+        mem_stream::*,
+        streams::{StreamEvent, StreamManager},
+    };
     use std::io::{Read, Write};
     use url2::prelude::*;
 
@@ -388,7 +391,7 @@ mod tests {
 
     struct StreamTester {
         tls_config: TlsConfig,
-        managers: HashMap<Url2, StreamManager<crate::mem_stream::MemStream>>,
+        managers: HashMap<Url2, StreamManager<MemStream>>,
     }
 
     impl StreamTester {

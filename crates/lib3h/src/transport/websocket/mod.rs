@@ -7,6 +7,7 @@
 /// Module tcp implements a concrete type based on std::net::TcpStream.
 pub mod actor;
 mod mem;
+mod mem_stream;
 pub mod streams;
 mod tcp;
 pub mod tls;
