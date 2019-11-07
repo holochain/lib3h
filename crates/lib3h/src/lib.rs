@@ -1,6 +1,7 @@
 #![feature(test)]
 
 extern crate backtrace;
+extern crate crossbeam_channel;
 #[macro_use]
 extern crate detach;
 extern crate hcid;
@@ -22,6 +23,7 @@ extern crate serde_json;
 extern crate shrinkwraprs;
 #[macro_use]
 extern crate log;
+extern crate url2;
 
 // -- mod -- //
 
