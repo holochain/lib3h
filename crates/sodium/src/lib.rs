@@ -5,9 +5,8 @@ extern crate rust_sodium_sys;
 extern crate lazy_static;
 extern crate lib3h_crypto_api;
 
-lazy_static! {
-    /// we only need to call sodium_init once
-    static ref INIT: bool = {
+thread_local! {
+    pub static DID_INIT: bool = {
         unsafe {
             rust_sodium_sys::sodium_init();
         }
@@ -17,7 +16,9 @@ lazy_static! {
 
 /// make sure sodium_init is called
 pub fn check_init() {
-    assert_eq!(true, *INIT);
+    DID_INIT.with(|i| {
+        assert_eq!(true, *i);
+    });
 }
 
 /// make invoking ffi functions taking SecBuf references more readable
