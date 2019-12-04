@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_mdns"
-version = "0.0.23"
+version = "0.0.24"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h mdns LAN discovery module"
@@ -20,8 +20,8 @@ log = "0.4.8"
 zeroize = "0.10.0"
 url = "=2.1.0"
 nanoid = "0.2.0"
-lib3h_protocol = { version = "=0.0.23", path = "../lib3h_protocol" }
+lib3h_protocol = { version = "=0.0.24", path = "../lib3h_protocol" }
 
 [dev-dependencies]
-lib3h_sodium = { version = "=0.0.23", path = "../sodium" }
+lib3h_sodium = { version = "=0.0.24", path = "../sodium" }
 get_if_addrs = "0.5.3"
