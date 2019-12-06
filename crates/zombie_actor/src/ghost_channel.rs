@@ -79,7 +79,7 @@ impl<
     }
 
     //#[cfg(test)]
-    pub fn test_constructor() -> (Self) {
+    pub fn test_constructor() -> Self {
         let (sender, _receiver) = crossbeam_channel::unbounded();
         Self {
             requester_bt: Backtwrap::new(),
