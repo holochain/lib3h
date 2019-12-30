@@ -185,7 +185,7 @@ impl
                 }
             };
             if success {
-                let mut to_connect_list: Vec<(Lib3hUri)> = Vec::new();
+                let mut to_connect_list: Vec<Lib3hUri> = Vec::new();
                 let mut non_connect_events = Vec::new();
 
                 // process any connection events
