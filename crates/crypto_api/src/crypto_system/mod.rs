@@ -91,7 +91,7 @@ macro_rules! aead_decrypt {
 /// A trait describing a cryptographic system implementation compatible
 /// with Lib3h and Holochain.
 #[allow(clippy::borrowed_box)]
-pub trait CryptoSystem: Sync {
+pub trait CryptoSystem: Sync + Send {
     /// Crypto System is designed to be used as a trait-object
     /// Since we can't get a sized clone, provide clone in a Box.
     fn box_clone(&self) -> Box<dyn CryptoSystem>;
