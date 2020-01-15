@@ -28,7 +28,7 @@ fn main() {
     transit_file.push("transit_encoding.capnp");
     let transit_file = transit_file.to_string_lossy().to_string();
 
-    let mut output = path.to_path_buf();
+    let mut output = path;
     output.push("src");
     let output = output.to_string_lossy().to_string();
 
