@@ -12,14 +12,14 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "v0.0.37";
+   ref = "v0.0.56";
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "1dhv61x6lvpxvrs6ij44piqswb62hgn0q9fdxv7fnhc1a9grqcr3";
+   sha256 = "1xaw8sjxy23pc0ivqsci4h7pyw493f2q9w0k1dqzm47h7ybavwyy";
 
    # the github owner of the holonix repo
    owner = "holochain";
@@ -60,15 +60,15 @@ l3h-release-hook-publish
   # the commit hash that the release process should target
   # this will always be behind what ends up being deployed
   # the release process needs to add some commits for changelog etc.
-  commit = "8f19775b72c6fe3f47c5d9de4ae5f0b00acc03f5";
+  commit = "8d8aaa5cf3d82abb6bafc38b4f2d2a21bcf37920";
 
   # the semver for prev and current releases
   # the previous version will be scanned/bumped by release scripts
   # the current version is what the release scripts bump *to*
   version = {
-   current = "0.0.25";
+   current = "0.0.26";
    # not used by version hooks in this repo
-   previous = "0.0.24";
+   previous = "0.0.25";
   };
 
   github = {
