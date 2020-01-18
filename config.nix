@@ -60,15 +60,15 @@ echo 'Check circle CI for crates-io publishing!'
   # the commit hash that the release process should target
   # this will always be behind what ends up being deployed
   # the release process needs to add some commits for changelog etc.
-  commit = "eca0d4652c1a4f6caf58f6a01970d086511bfb6e";
+  commit = "91eaecce2eea7aa123b63117040c14163a48bc49";
 
   # the semver for prev and current releases
   # the previous version will be scanned/bumped by release scripts
   # the current version is what the release scripts bump *to*
   version = {
-   current = "0.0.28";
+   current = "0.0.29";
    # not used by version hooks in this repo
-   previous = "0.0.27";
+   previous = "0.0.28";
   };
 
   github = {
