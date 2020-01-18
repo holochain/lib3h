@@ -89,7 +89,7 @@ impl<
 
         if self
             .route_endpoints
-            .insert(route_spec.clone(), endpoint_self)
+            .insert(route_spec, endpoint_self)
             .is_some()
         {
             panic!("create_agent_space_route can only be called ONCE!");

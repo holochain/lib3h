@@ -574,5 +574,4 @@ mod tests {
             format!("{:?}", wrapped_child.as_ref().internal_state[0])
         )
     }
-
 }
