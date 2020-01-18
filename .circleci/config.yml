@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 
 jobs:
  build:
@@ -61,11 +61,11 @@ workflows:
 #   - linux_bench
    - macos
 #   - macos_bench
-  deploy:
-   jobs:
-    - deploy-crates:
-       filters:
-        branches:
-         ignore: /.*/
-        tags:
-         only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
+ deploy:
+  jobs:
+   - deploy-crates:
+      filters:
+       branches:
+        ignore: /.*/
+       tags:
+        only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
