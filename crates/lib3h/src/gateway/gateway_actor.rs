@@ -101,7 +101,7 @@ impl P2pGateway {
                 self.send_with_full_low_uri(
                     SendWithFullLowUri {
                         span,
-                        full_low_uri: data.bootstrap_uri.clone(),
+                        full_low_uri: data.bootstrap_uri,
                         payload,
                     },
                     Box::new(move |response| {

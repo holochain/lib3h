@@ -122,7 +122,7 @@ impl P2pGateway {
                 }
                 let peer = PeerData {
                     peer_name,
-                    peer_location: uri.clone(),
+                    peer_location: uri,
                     timestamp,
                 };
                 debug!(
@@ -233,7 +233,7 @@ impl P2pGateway {
                 self.send_with_partial_high_uri(
                     SendWithPartialHighUri {
                         span: span.child("send_with_partial_high_uri"),
-                        partial_high_uri: uri.clone(),
+                        partial_high_uri: uri,
                         payload,
                     },
                     Box::new(|response| {

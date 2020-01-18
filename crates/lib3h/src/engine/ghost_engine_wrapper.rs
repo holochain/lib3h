@@ -232,13 +232,13 @@ where
                 self.engine.request(
                     new_root_span("client_to_lib3h request"),
                     client_to_lib3h,
-                    LegacyLib3h::make_callback(request_id.to_string(), space_addr, agent_id),
+                    LegacyLib3h::make_callback(request_id, space_addr, agent_id),
                 )
             };
             result.map_err(|e| Lib3hProtocolError::new(ErrorKind::Other(e.to_string())))
         } else {
             // TODO This will result will fail if its a failure result - what is proper error handling behavior?
-            let lib3h_to_client_response: Lib3hToClientResponse = client_msg.clone().try_into()?;
+            let lib3h_to_client_response: Lib3hToClientResponse = client_msg.try_into()?;
             debug!("lib3h_to_client_response: {:?}", lib3h_to_client_response);
             let maybe_ghost_message: Option<GhostMessage<_, _, Lib3hToClientResponse, _>> =
                 self.tracker.remove(request_id.as_str());
@@ -260,11 +260,11 @@ where
                             data.request_id,
                             request_id
                         );
-                        data.request_id = request_id.clone();
+                        data.request_id = request_id;
                     }
                     Lib3hToClientResponse::HandleSendDirectMessageResult(data)
                 }
-                _ => lib3h_to_client_response.clone(),
+                _ => lib3h_to_client_response,
             };
 
             ghost_message

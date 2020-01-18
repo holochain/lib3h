@@ -38,7 +38,7 @@ impl From<UriScheme> for String {
             UriScheme::Agent => AGENT_SCHEME.into(),
             UriScheme::Node => NODE_SCHEME.into(),
             UriScheme::Memory => MEMORY_SCHEME.into(),
-            UriScheme::Other(s) => s.clone(),
+            UriScheme::Other(s) => s,
         }
     }
 }

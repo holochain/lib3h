@@ -1,6 +1,6 @@
 [package]
 name = "lib3h"
-version = "0.0.20"
+version = "0.0.30"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 # crates.io stuff
@@ -15,23 +15,23 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 backtrace = "=0.3.27"
 crossbeam-channel = "=0.3.8"
-detach = { version = "=0.0.20", path = "../detach" }
+detach = { version = "=0.0.30", path = "../detach" }
 env_logger = "=0.6.1"
 hcid = "=0.0.6"
-holochain_persistence_api = "=0.0.10"
-holochain_tracing = "=0.0.3"
+holochain_persistence_api = "=0.0.13"
+holochain_tracing = "=0.0.13"
 # version on the left for release regex
-lib3h_protocol = { version = "=0.0.20", path = "../lib3h_protocol" }
-lib3h_p2p_protocol = { version = "=0.0.20", path = "../p2p_protocol" }
-lib3h_crypto_api = { version = "=0.0.20", path = "../crypto_api" }
-lib3h_zombie_actor = { version = "=0.0.20", path = "../zombie_actor" }
-lib3h_sodium = { version = "=0.0.20", path = "../sodium" }
-lib3h_mdns = { version = "=0.0.20", path = "../mdns" }
+lib3h_protocol = { version = "=0.0.30", path = "../lib3h_protocol" }
+lib3h_p2p_protocol = { version = "=0.0.30", path = "../p2p_protocol" }
+lib3h_crypto_api = { version = "=0.0.30", path = "../crypto_api" }
+lib3h_zombie_actor = { version = "=0.0.30", path = "../zombie_actor" }
+lib3h_sodium = { version = "=0.0.30", path = "../sodium" }
+lib3h_mdns = { version = "=0.0.30", path = "../mdns" }
 nanoid = "=0.2.0"
-tungstenite = "=0.9.1"
+tungstenite = "=0.9.2"
 url = { version = "=2.1.0", features = ["serde"] }
 url2 = "=0.0.3"
-native-tls = "=0.2.2"
+native-tls = "=0.2.3"
 rmp-serde = "=0.13.7"
 serde = "=1.0.89"
 serde_derive = "=1.0.89"
@@ -40,7 +40,7 @@ shrinkwraprs = "=0.2.1"
 log = "=0.4.8"
 predicates = "=1.0.1"
 # Should be dev only
-lazy_static = "=1.2.0"
+lazy_static = "=1.4.0"
 openssl = "0.10.25"
 rand = "0.7.2"
 

@@ -29,12 +29,6 @@ with holonix.pkgs;
    ++ holonix.darwin.buildInputs
    ++ holonix.shell.buildInputs
 
-   # release hooks
-   ++ (holonix.pkgs.callPackage ./nix/release {
-    pkgs = holonix.pkgs;
-    config = config;
-   }).buildInputs
-
    # main test script
    ++ (holonix.pkgs.callPackage ./nix/test {
     pkgs = holonix.pkgs;

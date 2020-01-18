@@ -168,7 +168,7 @@ impl<'engine> GhostEngine<'engine> {
                     DhtRequestToParent::RequestEntry(entry_address) => {
                         let msg = FetchEntryData {
                             space_address: chain_id.0.clone(),
-                            entry_address: entry_address.clone(),
+                            entry_address: entry_address,
                             request_id: "FIXME".to_string(),
                             provider_agent_id: chain_id.1.clone(),
                             aspect_address_list: None,
