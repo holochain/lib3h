@@ -16,5 +16,5 @@ repository = "https://github.com/holochain/lib3h"
 lib3h_crypto_api = { version = "=0.0.27", path = "../crypto_api" }
 lazy_static = "=1.4.0"
 libc = "=0.2.58"
-rust_sodium = { git = "https://github.com/maidsafe/rust_sodium", rev = "bf2688a29aaf3f0198bf1c73d4b83e945a33a175" }
-rust_sodium-sys = { git = "https://github.com/maidsafe/rust_sodium", rev = "bf2688a29aaf3f0198bf1c73d4b83e945a33a175" }
+rust_sodium_holochain_fork = "=0.10.2"
+rust_sodium_holochain_fork-sys = "=0.10.3"
