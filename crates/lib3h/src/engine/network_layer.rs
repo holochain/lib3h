@@ -240,7 +240,7 @@ impl<'engine> GhostEngine<'engine> {
             self.lib3h_endpoint
                 .publish(Span::fixme(), Lib3hToClient::Connected(data))?;
         }
-        let _ = self.network_connections.insert(net_location.to_owned());
+        let _ = self.network_connections.insert(net_location);
         Ok(())
     }
 
