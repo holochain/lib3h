@@ -1,6 +1,6 @@
 #![warn(unused_extern_crates)]
 #![allow(warnings)]
-extern crate rust_sodium_sys;
+extern crate rust_sodium_holochain_fork_sys as rust_sodium_sys;
 #[macro_use]
 extern crate lazy_static;
 extern crate lib3h_crypto_api;
