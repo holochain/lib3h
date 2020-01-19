@@ -1,6 +1,6 @@
 [package]
 name = "ghost_actor"
-version = "0.0.30"
+version = "0.0.31"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "Actor System designed for ergonomic async request callbacks"
