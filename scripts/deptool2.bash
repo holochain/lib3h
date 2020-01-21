@@ -1,5 +1,4 @@
 #!/bin/bash
-set +e
 CRATE=$1
 REPO=$2
 BRANCH=$3
@@ -9,8 +8,9 @@ dirs=`ls`
 for d in $dirs
 do 
     cd $d 
-    echo Processing crate from directory \"$d\"...
+if grep "$CRATE" Cargo.toml > /dev/null; then
     cargo-add add $CRATE --git $REPO --branch $BRANCH
-    cd .. 
+fi
+cd ..
 done
 cd $ROOT

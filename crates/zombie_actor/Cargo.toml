@@ -24,6 +24,6 @@ log = "=0.4.8"
 predicates = "=1.0.1"
 lazy_static = "=1.4.0"
 regex = "=1.1.2"
-holochain_persistence_api = { git = "https://github.com/holochain/holochain-persistence", branch = "transactional" }
+
 [dev-dependencies]
 env_logger = "=0.6.1"

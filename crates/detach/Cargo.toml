@@ -11,5 +11,3 @@ readme = "README.md"
 documentation = "https://docs.rs/detach"
 repository = "https://github.com/holochain/lib3h"
 
-[dependencies]
-holochain_persistence_api = { git = "https://github.com/holochain/holochain-persistence", branch = "transactional" }
