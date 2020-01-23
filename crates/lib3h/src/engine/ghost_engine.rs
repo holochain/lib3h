@@ -386,10 +386,7 @@ impl<'engine> GhostEngine<'engine> {
                                 Lib3hToClient::HandleFetchEntry(msg_data),
                                 Box::new(move |me, response| {
                                     let space_gateway = me
-                                        .get_space(
-                                            &space_address.to_owned(),
-                                            &provider_agent_id.to_owned(),
-                                        )
+                                        .get_space(&space_address.to_owned(), &provider_agent_id)
                                         .map_err(|e| GhostError::from(e.to_string()))?;
                                     match response {
                                         GhostCallbackData::Response(Ok(
@@ -397,9 +394,7 @@ impl<'engine> GhostEngine<'engine> {
                                         )) => space_gateway.publish(
                                             Span::fixme(),
                                             GatewayRequestToChild::Dht(
-                                                DhtRequestToChild::BroadcastEntry(
-                                                    msg.entry.clone(),
-                                                ),
+                                                DhtRequestToChild::BroadcastEntry(msg.entry),
                                             ),
                                         ),
                                         GhostCallbackData::Response(Err(e)) => Err(e.into()),
@@ -495,7 +490,7 @@ impl<'engine> GhostEngine<'engine> {
         self.lib3h_endpoint
             .request(
                 span.follower("TODO"),
-                Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
+                Lib3hToClient::HandleGetAuthoringEntryList(list_data),
                 Box::new(|me, response| match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
@@ -510,7 +505,7 @@ impl<'engine> GhostEngine<'engine> {
         self.broadcast_join(
             span.child("broadcast_join"),
             join_msg.space_address.clone(),
-            this_peer.clone(),
+            this_peer,
         )?;
 
         Ok(())
@@ -672,7 +667,7 @@ impl<'engine> GhostEngine<'engine> {
         self.lib3h_endpoint
             .request(
                 span,
-                Lib3hToClient::HandleQueryEntry(data.clone()),
+                Lib3hToClient::HandleQueryEntry(data),
                 Box::new(move |_me, response| {
                     match response {
                         GhostCallbackData::Response(Ok(

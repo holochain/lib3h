@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_p2p_protocol"
-version = "0.0.26"
+version = "0.0.31"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "Lib3h Protocol definition for inter-node p2p communication."

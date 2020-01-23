@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 
 jobs:
  build:
@@ -44,11 +44,28 @@ jobs:
        export PATH=$HOME/.cargo/bin:$PATH
        MAKE_ENV=local make benchmarks
 
+ deploy-crates:
+  docker:
+   - image: holochain/holonix:latest
+  steps:
+   - checkout
+   - run:
+      no_output_timeout: 20m
+      command: nix-shell --run "hn-release-hook-publish-crates-io 'crypto_api detach sodium zombie_actor ghost_actor lib3h_protocol mdns p2p_protocol lib3h'"
+
 workflows:
- version: 2
+ version: 2.1
  tests:
   jobs:
    - build
 #   - linux_bench
    - macos
 #   - macos_bench
+ deploy:
+  jobs:
+   - deploy-crates:
+      filters:
+       branches:
+        ignore: /.*/
+       tags:
+        only: /^v[0-9]+\.[0-9]+\.[0-9]+$/

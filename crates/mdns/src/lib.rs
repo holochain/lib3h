@@ -300,7 +300,7 @@ impl MulticastDns {
                             let own_networkids: Vec<String> = self
                                 .own_networkids()
                                 .iter()
-                                .map(|v| v.to_string())
+                                .map(|v| (*v).to_string())
                                 .collect();
 
                             // Only update our cache with the answers for our own NetworkId

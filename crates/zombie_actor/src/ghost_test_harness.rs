@@ -634,5 +634,4 @@ mod tests {
         assert!(is_match);
         assert!(retried);
     }
-
 }
