@@ -1,6 +1,6 @@
 [package]
 name = "ghost_actor"
-version = "0.0.26"
+version = "0.0.31"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "Actor System designed for ergonomic async request callbacks"
@@ -14,7 +14,7 @@ repository = "https://github.com/holochain/lib3h"
 [dependencies]
 crossbeam-channel = "=0.3.8"
 Inflector = "=0.11.4"
-lazy_static = "=1.2.0"
+lazy_static = "=1.4.0"
 log = "=0.4.8"
 nanoid = "=0.2.0"
 proc-macro2 = "=1.0.3"

@@ -68,7 +68,7 @@ impl MirrorDht {
 
         let this_peer = match maybe_this_peer {
             None => PeerData {
-                peer_name: config.this_peer_name().to_owned(),
+                peer_name: config.this_peer_name(),
                 peer_location: Lib3hUri::with_undefined(),
                 timestamp,
             },
@@ -392,7 +392,7 @@ impl MirrorDht {
                             None => {
                                 self.endpoint_self.publish(
                                     span,
-                                    DhtRequestToParent::HoldPeerRequested(gossiped_peer.clone()),
+                                    DhtRequestToParent::HoldPeerRequested(gossiped_peer),
                                 )?;
                             }
                             Some(known_peer) => {
@@ -465,7 +465,7 @@ impl MirrorDht {
                 if entry.aspect_list.len() > 0 && entry.aspect_list[0].aspect.len() == 0 {
                     self.endpoint_self.publish(
                         span.follower("DhtRequestToChild::HoldEntryAspectAddress"),
-                        DhtRequestToParent::RequestEntry(entry.entry_address.clone()),
+                        DhtRequestToParent::RequestEntry(entry.entry_address),
                     )?;
                     return Ok(());
                 }

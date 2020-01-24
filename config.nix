@@ -12,14 +12,14 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "v0.0.56";
+   ref = "v0.0.65";
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "1xaw8sjxy23pc0ivqsci4h7pyw493f2q9w0k1dqzm47h7ybavwyy";
+   sha256 = "1frw8z1d3qdly2lcs7z4liwkkqgb344h7p7n1xzpwaqhhm0xa0kd";
 
    # the github owner of the holonix repo
    owner = "holochain";
@@ -48,27 +48,27 @@ hn-release-hook-preflight-manual
    # bump versions in the repo
    version = ''
 hn-release-hook-version-rust
-l3h-release-hook-version
+hn-release-hook-version-rust-deps 'lib3h_crypto_api detach ghost_actor lib3h lib3h_protocol lib3h_mdns lib3h_p2p_protocol lib3h_sodium lib3h_zombie_actor'
 '';
 
    # publish artifacts to the world
    publish = ''
-l3h-release-hook-publish
+echo 'Check circle CI for crates-io publishing!'
 '';
   };
 
   # the commit hash that the release process should target
   # this will always be behind what ends up being deployed
   # the release process needs to add some commits for changelog etc.
-  commit = "8d8aaa5cf3d82abb6bafc38b4f2d2a21bcf37920";
+  commit = "fa34e2b8a350af95e26ddce0b295d5b2a0a75b8c";
 
   # the semver for prev and current releases
   # the previous version will be scanned/bumped by release scripts
   # the current version is what the release scripts bump *to*
   version = {
-   current = "0.0.26";
+   current = "0.0.31";
    # not used by version hooks in this repo
-   previous = "0.0.25";
+   previous = "0.0.30";
   };
 
   github = {

@@ -596,5 +596,4 @@ pub mod tests {
         let _ = String::from(&NodePubKey::default());
         let _ = String::from(NodePubKey::from("foo"));
     }
-
 }
