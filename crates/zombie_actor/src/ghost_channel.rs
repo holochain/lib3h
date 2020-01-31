@@ -607,7 +607,7 @@ mod tests {
                 Backtwrap::new(),
                 TestMsgIn("this is an event message from an internal child".into()),
                 child_send,
-                test_span(""),
+                test_span(),
             );
         assert_eq!("GhostMessage {request_id: None, ..}", format!("{:?}", msg));
         let payload = msg.take_message().unwrap();
@@ -637,7 +637,7 @@ mod tests {
                 request_id.clone(),
                 TestMsgIn("this is a request message from an internal child".into()),
                 child_send,
-                test_span(""),
+                test_span(),
             );
         msg.respond(Ok(TestMsgInResponse("response back to child".into())))
             .unwrap();
@@ -691,10 +691,7 @@ mod tests {
         let mut endpoint = child_side.as_context_endpoint_builder().build();
 
         endpoint
-            .publish(
-                test_span("context data"),
-                TestMsgOut("event to my parent".into()),
-            )
+            .publish(test_span(), TestMsgOut("event to my parent".into()))
             .unwrap();
         // check to see if the event was sent to the parent
         let msg = parent_side.receiver.recv();
@@ -716,7 +713,7 @@ mod tests {
 
         endpoint
             .request(
-                test_span("context data"),
+                test_span(),
                 TestMsgOut("request to my parent".into()),
                 cb_factory(),
             )
@@ -761,7 +758,7 @@ mod tests {
         // Now we'll send a request that should timeout
         endpoint
             .request_options(
-                test_span("context data"),
+                test_span(),
                 TestMsgOut("another request to my parent".into()),
                 cb_factory(),
                 GhostTrackRequestOptions::default().timeout(std::time::Duration::from_millis(1)),
@@ -780,7 +777,7 @@ mod tests {
                 requester_bt: Backtwrap::new(),
                 request_id: None,
                 payload: TestMsgIn("event from a parent".into()),
-                span: test_span(""),
+                span: test_span(),
             })
             .expect("should send");
 
