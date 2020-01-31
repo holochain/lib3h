@@ -691,10 +691,7 @@ mod tests {
         let mut endpoint = child_side.as_context_endpoint_builder().build();
 
         endpoint
-            .publish(
-                test_span(),
-                TestMsgOut("event to my parent".into()),
-            )
+            .publish(test_span(), TestMsgOut("event to my parent".into()))
             .unwrap();
         // check to see if the event was sent to the parent
         let msg = parent_side.receiver.recv();

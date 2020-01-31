@@ -160,10 +160,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
         .build::<Option<String>>();
 
     parent_endpoint
-        .publish(
-            test_span(),
-            ClientToLib3h::JoinSpace(track_space.clone()),
-        )
+        .publish(test_span(), ClientToLib3h::JoinSpace(track_space.clone()))
         .unwrap();
     let handle_get_gossip_entry_list_regex =
         "HandleGetGossipingEntryList\\(GetListData \\{ space_address: SpaceHash\\(HashString\\(\"appA\"\\)\\), provider_agent_id: AgentPubKey\\(HashString\\(\"alex\"\\)\\), request_id: \"[\\w\\d_~]*\" \\}\\)";

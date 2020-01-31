@@ -337,11 +337,7 @@ macro_rules! wait1_for_callback {
         });
 
         $ghost_can_track
-            .request(
-                holochain_tracing::test_span(),
-                $request,
-                f,
-            )
+            .request(holochain_tracing::test_span(), $request, f)
             .unwrap();
 
         let mut work_to_do = true;

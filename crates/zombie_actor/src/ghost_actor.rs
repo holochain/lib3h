@@ -529,11 +529,7 @@ mod tests {
             });
 
         parent_endpoint
-            .request(
-                test_span(),
-                TestMsgIn("event from parent".into()),
-                cb,
-            )
+            .request(test_span(), TestMsgIn("event from parent".into()), cb)
             .unwrap();
         assert!(child_actor.process().is_ok());
         assert!(parent_endpoint.process(&mut fake_parent).is_ok());

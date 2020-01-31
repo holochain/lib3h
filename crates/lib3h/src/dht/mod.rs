@@ -512,10 +512,7 @@ pub mod tests {
                 bundle,
             };
             dht_b
-                .publish(
-                    test_span(),
-                    DhtRequestToChild::HandleGossip(remote_gossip),
-                )
+                .publish(test_span(), DhtRequestToChild::HandleGossip(remote_gossip))
                 .unwrap();
         }
         dht_b.process(&mut ud).unwrap();
@@ -604,10 +601,7 @@ pub mod tests {
                 bundle,
             };
             dht_b
-                .publish(
-                    test_span(),
-                    DhtRequestToChild::HandleGossip(remote_gossip),
-                )
+                .publish(test_span(), DhtRequestToChild::HandleGossip(remote_gossip))
                 .unwrap();
         }
         dht_b.process(&mut ud).unwrap();
