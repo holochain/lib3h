@@ -161,7 +161,7 @@ fn basic_track_test<'engine>(mut engine: &mut GhostEngine<'engine>) {
 
     parent_endpoint
         .publish(
-            test_span("publish join space"),
+            test_span(),
             ClientToLib3h::JoinSpace(track_space.clone()),
         )
         .unwrap();

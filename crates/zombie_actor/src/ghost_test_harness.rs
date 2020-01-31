@@ -338,7 +338,7 @@ macro_rules! wait1_for_callback {
 
         $ghost_can_track
             .request(
-                holochain_tracing::test_span("wait1_for_callback"),
+                holochain_tracing::test_span(),
                 $request,
                 f,
             )

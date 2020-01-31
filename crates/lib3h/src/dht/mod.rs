@@ -131,7 +131,7 @@ pub mod tests {
     fn get_this_peer(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> PeerData {
         let mut ud = DhtData::new();
         dht.request(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut ud, response| {
                 let response = {
@@ -163,7 +163,7 @@ pub mod tests {
     ) -> Option<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::RequestPeer(peer_name.clone()),
             Box::new(|mut ud, response| {
                 let response = {
@@ -192,7 +192,7 @@ pub mod tests {
     fn get_peer_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<PeerData> {
         let mut ud = DhtData::new();
         dht.request(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::RequestPeerList,
             Box::new(|mut ud, response| {
                 let response = {
@@ -221,7 +221,7 @@ pub mod tests {
     fn get_entry_address_list(dht: &mut Detach<ChildDhtWrapperDyn<DhtData>>) -> Vec<EntryHash> {
         let mut ud = DhtData::new();
         dht.request(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::RequestEntryAddressList,
             Box::new(|mut ud, response| {
                 let response = {
@@ -254,7 +254,7 @@ pub mod tests {
     ) -> Option<Vec<AspectHash>> {
         let mut ud = DhtData::new();
         dht.request(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::RequestAspectsOf(entry_address.clone()),
             Box::new(|mut ud, response| {
                 let response = {
@@ -306,7 +306,7 @@ pub mod tests {
         assert_eq!(peer_list.len(), 0);
         // Add a peer
         dht.publish(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::HoldPeer(create_PeerData(&*PEER_B)),
         )
         .unwrap();
@@ -319,7 +319,7 @@ pub mod tests {
         assert_eq!(peer_list[0].peer_name, *PEER_B);
         // Add a peer again
         dht.publish(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::HoldPeer(create_PeerData(&*PEER_C)),
         )
         .unwrap();
@@ -343,7 +343,7 @@ pub mod tests {
         let entry = create_EntryData(&*ENTRY_ADDRESS_1, &*ASPECT_ADDRESS_1, &*ASPECT_CONTENT_1);
         println!("dht.process(HoldEntryAspectAddress)...");
         dht.publish(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::HoldEntryAspectAddress(entry.clone()),
         )
         .unwrap();
@@ -360,7 +360,7 @@ pub mod tests {
         // Fetch it
         // ========
         dht.request(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::RequestEntry(ENTRY_ADDRESS_1.clone()),
             Box::new(|_ud, response| {
                 println!("5. In DhtRequestToChild::RequestEntry Response Closure");
@@ -420,7 +420,7 @@ pub mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         let mut peer_b_data = create_PeerData(&*PEER_B);
         dht.publish(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::HoldPeer(peer_b_data.clone()),
         )
         .unwrap();
@@ -432,7 +432,7 @@ pub mod tests {
         let ref_time = peer_b_data.timestamp;
         peer_b_data.timestamp -= 1;
         dht.publish(
-            test_span(""),
+            test_span(),
             DhtRequestToChild::HoldPeer(peer_b_data.clone()),
         )
         .unwrap();
@@ -445,7 +445,7 @@ pub mod tests {
         // TODO #211
         std::thread::sleep(std::time::Duration::from_millis(10));
         peer_b_data.timestamp = ref_time + 1;
-        dht.publish(test_span(""), DhtRequestToChild::HoldPeer(peer_b_data))
+        dht.publish(test_span(), DhtRequestToChild::HoldPeer(peer_b_data))
             .unwrap();
         dht.process(&mut ud).unwrap();
         // Should have unchanged timestamp
@@ -462,7 +462,7 @@ pub mod tests {
         // Add a peer
         dht_a
             .publish(
-                test_span(""),
+                test_span(),
                 DhtRequestToChild::HoldPeer(create_PeerData(&*PEER_B)),
             )
             .unwrap();
@@ -480,7 +480,7 @@ pub mod tests {
             create_EntryData(&*ENTRY_ADDRESS_1, &*ASPECT_ADDRESS_1, &*ASPECT_CONTENT_1);
         dht_a
             .publish(
-                test_span(""),
+                test_span(),
                 DhtRequestToChild::BroadcastEntry(entry_data.clone()),
             )
             .unwrap();
@@ -513,7 +513,7 @@ pub mod tests {
             };
             dht_b
                 .publish(
-                    test_span(""),
+                    test_span(),
                     DhtRequestToChild::HandleGossip(remote_gossip),
                 )
                 .unwrap();
@@ -539,7 +539,7 @@ pub mod tests {
         // Tell DHT B to hold it
         dht_b
             .publish(
-                test_span(""),
+                test_span(),
                 DhtRequestToChild::HoldEntryAspectAddress(entry_data),
             )
             .unwrap();
@@ -560,7 +560,7 @@ pub mod tests {
         assert_eq!(peer_b_data.peer_name, *PEER_B);
         dht_a
             .publish(
-                test_span(""),
+                test_span(),
                 DhtRequestToChild::HoldPeer(peer_b_data.clone()),
             )
             .unwrap();
@@ -572,7 +572,7 @@ pub mod tests {
         let peer_c_data = create_PeerData(&*PEER_C);
         dht_a
             .publish(
-                test_span(""),
+                test_span(),
                 DhtRequestToChild::HoldPeer(peer_c_data.clone()),
             )
             .unwrap();
@@ -605,7 +605,7 @@ pub mod tests {
             };
             dht_b
                 .publish(
-                    test_span(""),
+                    test_span(),
                     DhtRequestToChild::HandleGossip(remote_gossip),
                 )
                 .unwrap();
@@ -627,7 +627,7 @@ pub mod tests {
         for peer in peer_to_hold_list {
             // Accept HoldPeerRequested
             dht_b
-                .publish(test_span(""), DhtRequestToChild::HoldPeer(peer.clone()))
+                .publish(test_span(), DhtRequestToChild::HoldPeer(peer.clone()))
                 .unwrap();
         }
         dht_b.process(&mut ud).unwrap();

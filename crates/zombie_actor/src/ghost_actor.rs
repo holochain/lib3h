@@ -504,7 +504,7 @@ mod tests {
             .request_id_prefix("parent")
             .build();
 
-        let span = test_span("test_ghost_actor");
+        let span = test_span();
 
         // now lets post an event from the parent
         parent_endpoint
@@ -530,7 +530,7 @@ mod tests {
 
         parent_endpoint
             .request(
-                test_span("context data"),
+                test_span(),
                 TestMsgIn("event from parent".into()),
                 cb,
             )
@@ -563,7 +563,7 @@ mod tests {
 
         // use it to publish an event via the wrapper
         wrapped_child
-            .publish(test_span(""), TestMsgIn("event from parent".into()))
+            .publish(test_span(), TestMsgIn("event from parent".into()))
             .unwrap();
 
         // process via the wrapper
