@@ -267,7 +267,7 @@ impl
             .process(self))?;
 
         for mut msg in self.endpoint_self.drain_messages() {
-            let _span = msg.span().child("process_concrete");
+            let mut span = msg.span().child("process_concrete");
             match msg.take_message().expect("exists") {
                 RequestToChild::Bind { spec: _url } => {
                     // get a new bound url from the memory server (we ignore the spec here)
@@ -275,7 +275,9 @@ impl
                     self.maybe_my_address = Some(bound_url.clone());
                     self.advertise()
                         .map_err(|e| GhostError::from(e.to_string()))?;
+                    span.event(format!("Bind {{{}}}", bound_url));
                     // respond to our parent
+                    //msg.span = span.child("response");
                     msg.respond(Ok(RequestToChildResponse::Bind(BindResultData {
                         bound_url: bound_url,
                     })))?;
@@ -284,6 +286,8 @@ impl
                     trace!("mem send: {:?}", payload);
                     // make sure we have bound and get our address if so
                     //let my_addr = is_bound!(self, request_id, SendMessage);
+
+                    span.event(format!("SendMessage to '{}'", uri));
 
                     // make sure we have bound and get our address if so
                     match &self.maybe_my_address {
@@ -308,7 +312,7 @@ impl
                                         // if so we can add the message directly to our own inbox
                                         trace!("Send-to-self: payload:{:?}", payload);
                                         self.endpoint_self.publish(
-                                            Span::fixme(),
+                                            span.child("send event RequestToParent::ReceivedData"),
                                             RequestToParent::ReceivedData { uri: uri, payload },
                                         )?;
                                     } else {

@@ -18,12 +18,13 @@ extern crate multihash;
 mod node_mock;
 mod test_suites;
 
-use holochain_tracing::Span;
+use holochain_tracing::{tracer_console::*, Span};
 use lib3h::{
     dht::mirror_dht::MirrorDht,
     engine::{ghost_engine_wrapper::WrappedGhostLib3h, EngineConfig, GhostEngine, TransportConfig},
     error::Lib3hResult,
     transport::websocket::tls::TlsConfig,
+    LIB3H_TRACER,
 };
 use lib3h_protocol::{types::*, uri::Lib3hUri};
 use node_mock::NodeMock;
@@ -209,16 +210,30 @@ fn print_test_name(print_str: &str, test_fn: *mut std::os::raw::c_void) {
 #[test]
 fn test_two_memory_nodes_basic_suite() {
     enable_logging_for_test(true);
+    // Create tracer & reporter
+    let (tracer, mut reporter) = new_tracer_with_console_reporter();
+    {
+        let mut singleton = LIB3H_TRACER.lock().unwrap();
+        *singleton = tracer;
+    }
+    // Launch each test
     for (test_fn, can_setup) in TWO_NODES_BASIC_TEST_FNS.iter() {
-        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_memory_nodes_test(*test_fn, *can_setup, &mut reporter).unwrap();
     }
 }
 
 #[test]
 fn test_two_memory_nodes_get_lists_suite() {
     enable_logging_for_test(true);
+    // Create tracer & reporter
+    let (tracer, mut reporter) = new_tracer_with_console_reporter();
+    {
+        let mut singleton = LIB3H_TRACER.lock().unwrap();
+        *singleton = tracer;
+    }
+    // Launch each test
     for (test_fn, can_setup) in TWO_NODES_GET_LISTS_TEST_FNS.iter() {
-        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_memory_nodes_test(*test_fn, *can_setup, &mut reporter).unwrap();
     }
 }
 
@@ -226,8 +241,15 @@ fn test_two_memory_nodes_get_lists_suite() {
 #[ignore] // test is flaky
 fn test_two_memory_nodes_spaces_suite() {
     enable_logging_for_test(true);
+    // Create tracer & reporter
+    let (tracer, mut reporter) = new_tracer_with_console_reporter();
+    {
+        let mut singleton = LIB3H_TRACER.lock().unwrap();
+        *singleton = tracer;
+    }
+    // Launch each test
     for (test_fn, can_setup) in TWO_NODES_SPACES_TEST_FNS.iter() {
-        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_memory_nodes_test(*test_fn, *can_setup, &mut reporter).unwrap();
     }
 }
 
@@ -242,13 +264,24 @@ fn test_three_memory_nodes_basic_suite() {
 #[ignore]
 fn test_two_memory_nodes_connection_suite() {
     enable_logging_for_test(true);
+    // Create tracer & reporter
+    let (tracer, mut reporter) = new_tracer_with_console_reporter();
+    {
+        let mut singleton = LIB3H_TRACER.lock().unwrap();
+        *singleton = tracer;
+    }
+    // Launch each test
     for (test_fn, can_setup) in TWO_NODES_CONNECTION_TEST_FNS.iter() {
-        launch_two_memory_nodes_test(*test_fn, *can_setup).unwrap();
+        launch_two_memory_nodes_test(*test_fn, *can_setup, &mut reporter).unwrap();
     }
 }
 
 // Do general test with config
-fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Result<(), ()> {
+fn launch_two_memory_nodes_test(
+    test_fn: TwoNodesTestFn,
+    can_setup: bool,
+    reporter: &mut ConsoleReporter,
+) -> Result<(), ()> {
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     debug!("");
     print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
@@ -267,9 +300,13 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     test_fn(&mut alex, &mut billy, options);
 
     // Wrap-up test
-    debug!("========================");
+    debug!("-----------------------");
     print_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn_ptr);
-
+    // Print spans
+    let count = reporter.drain();
+    println!("Report: span count = {}", count);
+    reporter.print(false);
+    debug!("========================");
     // Done
     Ok(())
 }

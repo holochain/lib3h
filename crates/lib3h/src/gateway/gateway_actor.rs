@@ -4,7 +4,6 @@ use crate::{
     error::*,
     gateway::{protocol::*, send_data_types::*, P2pGateway},
 };
-use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_p2p_protocol::p2p::P2pMessage;
 
@@ -40,7 +39,8 @@ impl
 
         // Update this_peer cache
         self.inner_dht.request(
-            Span::fixme(),
+            // new_root_span("Update this_peer cache"),
+            holochain_tracing::test_span("debug"),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {
@@ -119,7 +119,7 @@ impl P2pGateway {
             GatewayRequestToChild::SendAll(payload) => {
                 trace!("send all: {:?}", String::from_utf8_lossy(&payload));
                 self.inner_dht.request(
-                    Span::fixme(),
+                    span.child("request DhtRequestToChild::RequestPeerList"),
                     DhtRequestToChild::RequestPeerList,
                     Box::new(move |me, response| {
                         match response {
@@ -136,7 +136,7 @@ impl P2pGateway {
                                     let uri = peer.get_uri();
                                     me.send_with_full_low_uri(
                                         SendWithFullLowUri {
-                                            span: Span::fixme(),
+                                            span: span.child("send_with_full_low_uri"),
                                             full_low_uri: uri,
                                             payload: payload.clone().into(),
                                         },

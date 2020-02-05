@@ -20,14 +20,14 @@ impl P2pGateway {
         // TODO #199: This is prbably wrong in that a different level of URI should be being bubbled up.
         // depends on how & what we decide to send up to the client.
         self.endpoint_self.publish(
-            Span::fixme(),
+            span.child("send event GatewayRequestToParent::Transport::IncomingConnection"),
             GatewayRequestToParent::Transport(
                 transport::protocol::RequestToParent::IncomingConnection { uri: uri.clone() },
             ),
         )?;
 
         self.inner_dht.request(
-            span.child("handle_incoming_connection"),
+            span.child("request DhtRequestToChild::RequestThisPeer"),
             DhtRequestToChild::RequestThisPeer,
             Box::new(move |me, response| {
                 let response = {
@@ -55,8 +55,8 @@ impl P2pGateway {
                     let buf = our_peer_name.into_bytes().into();
                     me.send_with_full_low_uri(
                         SendWithFullLowUri {
-                            span: span.follower("TODO send"),
-                            full_low_uri: uri,
+                            span: span.follower("SendWithFullLowUri"),
+                            full_low_uri: uri.clone(),
                             payload: buf,
                         },
                         Box::new(|response| {
@@ -146,7 +146,7 @@ impl P2pGateway {
                         .into();
                         self.send_with_full_low_uri(
                             SendWithFullLowUri {
-                                span: Span::fixme(),
+                                span: span.child("send_with_full_low_uri"),
                                 full_low_uri: uri,
                                 payload: pong,
                             },
@@ -280,20 +280,20 @@ impl P2pGateway {
         match &msg {
             transport::protocol::RequestToParent::Unbind(_uri) => {
                 self.endpoint_self.publish(
-                    Span::fixme(),
+                    span.child("send event GatewayRequestToParent::Transport::Unbind"),
                     GatewayRequestToParent::Transport(msg.clone()),
                 )?;
             }
             transport::protocol::RequestToParent::Disconnect(_uri) => {
                 self.endpoint_self.publish(
-                    Span::fixme(),
+                    span.child("send event GatewayRequestToParent::Transport::Disconnect"),
                     GatewayRequestToParent::Transport(msg.clone()),
                 )?;
             }
             transport::protocol::RequestToParent::ErrorOccured { uri: _, error: _ } => {
                 // pass any errors back up the chain so network layer can handle them (i.e.)
                 self.endpoint_self.publish(
-                    Span::fixme(),
+                    span.child("send event GatewayRequestToParent::Transport::ErrorOccured"),
                     GatewayRequestToParent::Transport(msg.clone()),
                 )?;
             }
@@ -304,7 +304,7 @@ impl P2pGateway {
                     self.identifier.nickname, uri
                 );
                 self.handle_incoming_connection(
-                    span.child("transport::protocol::RequestToParent::IncomingConnection"),
+                    span.child("handle_incoming_connection: IncomingConnection"),
                     uri.clone(),
                 )?;
             }

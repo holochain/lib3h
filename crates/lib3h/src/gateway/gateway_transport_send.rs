@@ -5,7 +5,6 @@ use crate::{
     message_encoding::encoding_protocol,
     transport,
 };
-use holochain_tracing::Span;
 use lib3h_ghost_actor::prelude::*;
 use lib3h_protocol::{data_types::*, types::*};
 use rmp_serde::Serializer;
@@ -139,7 +138,7 @@ impl P2pGateway {
                         trace!("send to {}", uri);
                         me.priv_send_with_full_low_uri(
                             SendWithFullLowUri {
-                                span: Span::fixme(),
+                                span: send_data.span.child("SendWithFullLowUri"),
                                 full_low_uri: uri,
                                 payload: send_data.payload,
                             },
@@ -200,7 +199,9 @@ impl P2pGateway {
         let payload = send_data.payload.clone();
 
         self.message_encoding.request(
-            Span::fixme(),
+            send_data
+                .span
+                .child("request RequestToChild::EncodePayload"),
             encoding_protocol::RequestToChild::EncodePayload { payload },
             Box::new(move |me, resp| {
                 match resp {
@@ -268,7 +269,7 @@ impl P2pGateway {
         uri.clear_agent_id();
 
         self.inner_transport.request(
-            Span::fixme(),
+            send_data.span.child("request RequestToChild::SendMessage"),
             transport::protocol::RequestToChild::SendMessage { uri, payload },
             Box::new(move |me, resp| {
                 match resp {

@@ -104,8 +104,11 @@ impl P2pGateway {
                 unreachable!();
             }
             DhtRequestToParent::RequestEntry(_) => {
+                let span_request = span.child("request GatewayRequestToParent::Dht::RequestEntry");
+                let span_broadcast =
+                    span_request.child("request GatewayRequestToParent::Dht::BroadcastEntry");
                 self.endpoint_self.request(
-                    span,
+                    span_request,
                     GatewayRequestToParent::Dht(payload),
                     Box::new(|me, response| {
                         trace!("Received requestEntry response in Gateway");
@@ -118,8 +121,10 @@ impl P2pGateway {
                         // #fullsync - received entry response after request from gossip list handling,
                         // treat it as an entry from author list handling.
                         if let DhtRequestToParentResponse::RequestEntry(entry) = dht_response {
-                            me.inner_dht
-                                .publish(Span::fixme(), DhtRequestToChild::BroadcastEntry(entry))?;
+                            me.inner_dht.publish(
+                                span_broadcast,
+                                DhtRequestToChild::BroadcastEntry(entry),
+                            )?;
                         }
                         Ok(())
                     }),

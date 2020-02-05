@@ -3,7 +3,7 @@ use crate::{
     engine::{ghost_engine::handle_GossipTo, p2p_protocol::P2pProtocol, GhostEngine},
     error::{ErrorKind, Lib3hError, Lib3hResult},
     gateway::protocol::*,
-    transport,
+    new_root_span, transport,
 };
 
 use holochain_tracing::Span;
@@ -37,7 +37,7 @@ impl<'engine> GhostEngine<'engine> {
         for (to, payload) in self.multiplexer_defered_sends.drain(..) {
             // println!("########## {} {}", to, payload);
             self.multiplexer.request(
-                Span::fixme(),
+                new_root_span("multiplexer.request: Transport::SendMessage"),
                 GatewayRequestToChild::Transport(
                     transport::protocol::RequestToChild::create_send_message(to, payload),
                 ),
@@ -60,6 +60,7 @@ impl<'engine> GhostEngine<'engine> {
             DhtRequestToParent::GossipTo(gossip_data) => {
                 let from_peer_name = &self.this_net_peer.peer_name;
                 handle_GossipTo(
+                    span.child("handle_GossipTo"),
                     self.config.network_id.id.clone(),
                     self.multiplexer.as_mut(),
                     from_peer_name,
@@ -123,8 +124,10 @@ impl<'engine> GhostEngine<'engine> {
         match request {
             transport::protocol::RequestToParent::Unbind(uri) => {
                 let data = UnboundData { uri: uri.clone() };
-                self.lib3h_endpoint
-                    .publish(Span::fixme(), Lib3hToClient::Unbound(data))?;
+                self.lib3h_endpoint.publish(
+                    span.child("send event Lib3hToClient::Unbound"),
+                    Lib3hToClient::Unbound(data),
+                )?;
             }
             transport::protocol::RequestToParent::Disconnect(uri) => {
                 debug!("disconnect from {}", uri);
@@ -172,7 +175,7 @@ impl<'engine> GhostEngine<'engine> {
         let net_location_copy = net_location.clone();
         self.multiplexer
             .request(
-                span.child("handle_incoming_connection, .request"),
+                span.child("request GatewayRequestToChild::DhtRequestToChild::RequestPeerList"),
                 GatewayRequestToChild::Dht(DhtRequestToChild::RequestPeerList),
                 Box::new(move |me, response| {
                     let response = {
@@ -237,8 +240,10 @@ impl<'engine> GhostEngine<'engine> {
                 request_id: "".to_string(),
                 uri: net_location.clone(),
             };
-            self.lib3h_endpoint
-                .publish(Span::fixme(), Lib3hToClient::Connected(data))?;
+            self.lib3h_endpoint.publish(
+                span.child("send event Lib3hToClient::Connected"),
+                Lib3hToClient::Connected(data),
+            )?;
         }
         let _ = self.network_connections.insert(net_location);
         Ok(())
@@ -261,9 +266,10 @@ impl<'engine> GhostEngine<'engine> {
                     bundle: msg.bundle.clone(),
                 };
                 // Check if its for the multiplexer
+                let span_gossip = span.follower("publish Dht::HandleGossip");
                 if msg.space_address == self.config.network_id.id.clone().into() {
                     let _ = self.multiplexer.publish(
-                        span.follower("TODO"),
+                        span_gossip,
                         GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                     );
                 } else {
@@ -273,7 +279,7 @@ impl<'engine> GhostEngine<'engine> {
                         .get_mut(&(msg.space_address.to_owned(), msg.to_peer_name.agent_id()));
                     if let Some(space_gateway) = maybe_space_gateway {
                         let _ = space_gateway.publish(
-                            span.follower("TODO"),
+                            span_gossip,
                             GatewayRequestToChild::Dht(DhtRequestToChild::HandleGossip(gossip)),
                         );
                     } else {

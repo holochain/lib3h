@@ -48,12 +48,12 @@ impl P2pGateway {
             identifier: identifier,
             inner_transport: Detach::new(transport::protocol::TransportActorParentWrapperDyn::new(
                 inner_transport,
-                "to_child_transport_",
+                "gateway_to_child_transport_",
             )),
             inner_dht: Detach::new(ChildDhtWrapperDyn::new(dht, "gateway_dht_")),
             message_encoding: Detach::new(GhostParentWrapper::new(
                 MessageEncoding::new(),
-                "to_message_encoding_",
+                "gateway_to_message_encoding_",
             )),
             endpoint_parent: Some(endpoint_parent),
             endpoint_self,
@@ -64,5 +64,24 @@ impl P2pGateway {
 
     pub fn this_peer(&self) -> PeerData {
         self.this_peer.clone()
+    }
+
+    /// Retrieve the list of peer from a dht.
+    /// TODO: Find a way to actually retrive this list from an async call :)
+    pub fn get_peer_list(&mut self) -> Vec<String> {
+        // pub fn get_peer_list(&mut self) -> Vec<PeerData> {
+        let inner_dht = &mut self.inner_dht;
+        inner_dht
+            .request(
+                crate::new_root_span("get_peer_list"),
+                crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
+                Box::new(|_, r| {
+                    eprintln!("1 got: {:?}", r);
+                    Ok(())
+                }),
+            )
+            .unwrap();
+
+        vec!["TODO: get_peer_list's result".to_string()]
     }
 }

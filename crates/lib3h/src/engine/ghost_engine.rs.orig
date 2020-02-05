@@ -913,10 +913,17 @@ mod tests {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_join");
 
         let req_data = make_test_join_request();
+<<<<<<< HEAD
+        let result = lib3h.as_mut().handle_join(test_span(), &req_data);
+        assert!(result.is_ok());
+        assert_eq!(lib3h.as_ref().space_gateway_map.len(), 1);
+        let result = lib3h.as_mut().handle_join(test_span(), &req_data);
+=======
         let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
         assert!(result.is_ok());
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 1);
         let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+>>>>>>> edge
         assert_eq!(
             "Err(Lib3hError(Other(\"Already joined space\")))",
             format!("{:?}", result)
@@ -927,7 +934,11 @@ mod tests {
     fn test_ghost_engine_leave() {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_leave");
         let req_data = make_test_join_request();
+<<<<<<< HEAD
+        let result = lib3h.as_mut().handle_join(test_span(), &req_data);
+=======
         let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+>>>>>>> edge
         assert!(result.is_ok());
         let result = lib3h.as_mut().handle_leave_space(test_span(), &req_data);
         assert!(result.is_ok());
@@ -950,7 +961,11 @@ mod tests {
         let network_name = "test_ghost_engine_unbind";
         let mut engine = make_test_engine_wrapper(network_name);
         let req_data = make_test_join_request();
+<<<<<<< HEAD
+        let result = engine.as_mut().handle_join(test_span(), &req_data);
+=======
         let result = engine.as_mut().handle_join_space(test_span(""), &req_data);
+>>>>>>> edge
         assert!(result.is_ok());
         let network = {
             let mut verse = memory_server::get_memory_verse();
@@ -974,7 +989,11 @@ mod tests {
     fn test_ghost_engine_dm() {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_dm");
         let req_data = make_test_join_request();
+<<<<<<< HEAD
+        let result = lib3h.as_mut().handle_join(test_span(), &req_data);
+=======
         let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+>>>>>>> edge
         assert!(result.is_ok());
 
         let direct_message = DirectMessageData {
@@ -1018,7 +1037,11 @@ mod tests {
 
         let mut engine = make_test_engine_wrapper("test_ghost_engine_publish");
         let req_data = make_test_join_request();
+<<<<<<< HEAD
+        let result = engine.as_mut().handle_join(test_span(), &req_data);
+=======
         let result = engine.as_mut().handle_join_space(test_span(""), &req_data);
+>>>>>>> edge
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -1081,7 +1104,11 @@ mod tests {
 
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_query");
         let req_data = make_test_join_request();
+<<<<<<< HEAD
+        let result = lib3h.as_mut().handle_join(test_span(), &req_data);
+=======
         let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+>>>>>>> edge
         assert!(result.is_ok());
 
         let mut core = MockCore {
