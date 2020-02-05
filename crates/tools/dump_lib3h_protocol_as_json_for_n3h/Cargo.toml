@@ -1,6 +1,6 @@
 [package]
 name = "dump_lib3h_protocol_as_json_for_n3h"
-version = "0.0.32"
+version = "0.0.33"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "delete me once n3h is deprecated"

@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_sodium"
-version = "0.0.32"
+version = "0.0.33"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "lib3h libsodium wrapper providing memory secure api access"
