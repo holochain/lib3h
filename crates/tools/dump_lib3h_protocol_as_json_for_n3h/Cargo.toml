@@ -8,6 +8,6 @@ license = "Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-serde_json = { version = "=1.0.39", features = ["preserve_order"] }
+serde_json = { version = "=1.0.47", features = ["preserve_order"] }
 lib3h_protocol = { version = "=0.0.35", path = "../../lib3h_protocol" }
 url = { version = "=2.1.0", features = ["serde"] }
