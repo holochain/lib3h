@@ -313,7 +313,7 @@ fn ghost_transport() {
 
     // bind t1 to the network
     t1.request(
-        test_span(""),
+        test_span(),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t1").expect("can parse url").into(),
         },
@@ -333,7 +333,7 @@ fn ghost_transport() {
     // lets do some things to test out returning of error messages, i.e. sending messages
     // to someone not bount to the network
     t1.request(
-        test_span(""),
+        test_span(),
         RequestToChild::create_send_message(
             Url::parse("mocknet://t2").expect("can parse url").into(),
             "won't be received!".into(),
@@ -354,7 +354,7 @@ fn ghost_transport() {
 
     // bind t2 to the network
     t2.request(
-        test_span(""),
+        test_span(),
         RequestToChild::Bind {
             spec: Url::parse("mocknet://t2").expect("can parse url").into(),
         },
@@ -372,7 +372,7 @@ fn ghost_transport() {
     );
 
     t1.request(
-        test_span(""),
+        test_span(),
         RequestToChild::create_send_message(
             Url::parse("mocknet://t2").expect("can parse url").into(),
             "foo".into(),

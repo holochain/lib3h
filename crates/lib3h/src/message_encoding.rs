@@ -250,7 +250,7 @@ mod tests {
         let mut in_out = String::new();
 
         e.request(
-            holochain_tracing::test_span(""),
+            holochain_tracing::test_span(),
             RequestToChild::EncodeHandshake {
                 network_or_space_address: "space-1".into(),
                 id: "id-1".to_string(),
@@ -275,7 +275,7 @@ mod tests {
         assert_eq!("{\n  \"Handshake\": {\n    \"magic\": 8044,\n    \"network_id\": \"space-1\",\n    \"id\": \"id-1\"\n  }\n}", &in_out);
 
         e.request(
-            holochain_tracing::test_span(""),
+            holochain_tracing::test_span(),
             RequestToChild::Decode {
                 payload: in_out.as_bytes().into(),
             },
@@ -311,7 +311,7 @@ mod tests {
         let mut in_out = "".to_string();
 
         e.request(
-            holochain_tracing::test_span(""),
+            holochain_tracing::test_span(),
             RequestToChild::EncodePayload {
                 payload: b"test".to_vec().into(),
             },
@@ -338,7 +338,7 @@ mod tests {
         );
 
         e.request(
-            holochain_tracing::test_span(""),
+            holochain_tracing::test_span(),
             RequestToChild::Decode {
                 payload: in_out.as_bytes().into(),
             },
