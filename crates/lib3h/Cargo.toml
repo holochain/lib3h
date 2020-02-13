@@ -18,7 +18,7 @@ detach = { version = "=0.0.38", path = "../detach" }
 env_logger = "=0.6.1"
 hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.17"
-holochain_tracing = "=0.0.19"
+holochain_tracing = "=0.0.20"
 # version on the left for release regex
 lib3h_protocol = { version = "=0.0.38", path = "../lib3h_protocol" }
 lib3h_p2p_protocol = { version = "=0.0.38", path = "../p2p_protocol" }
