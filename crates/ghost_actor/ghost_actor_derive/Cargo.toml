@@ -12,8 +12,8 @@ documentation = "https://docs.rs/ghost_actor_derive"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-ghost_actor = { version = "=0.0.38", path = ".." }
-quote = "=1.0.2"
+ghost_actor = { version = "0.0.38", path = ".." }
+quote = "1.0.2"
 
 [lib]
 proc-macro = true

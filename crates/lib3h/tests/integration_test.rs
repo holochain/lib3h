@@ -252,7 +252,7 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     debug!("");
     print_test_name("IN-MEMORY TWO NODES TEST: ", test_fn_ptr);
-    debug!("========================");
+    debug!("=======================");
 
     let options = &TWO_MEMORY_NODES_PROCESSING_OPTIONS;
     let fn_name = fn_name(test_fn_ptr);
@@ -267,7 +267,7 @@ fn launch_two_memory_nodes_test(test_fn: TwoNodesTestFn, can_setup: bool) -> Res
     test_fn(&mut alex, &mut billy, options);
 
     // Wrap-up test
-    debug!("========================");
+    debug!("=======================");
     print_test_name("IN-MEMORY TWO NODES TEST END: ", test_fn_ptr);
 
     // Done
@@ -279,7 +279,7 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     debug!("");
     print_test_name("IN-MEMORY THREE NODES TEST: ", test_fn_ptr);
-    debug!("==========================");
+    debug!("=========================");
 
     // Setup
     let mut alex = setup_memory_node("alex", ALEX_AGENT_ID.clone(), &fn_name(test_fn_ptr));
@@ -295,7 +295,7 @@ fn launch_three_memory_nodes_test(test_fn: ThreeNodesTestFn, can_setup: bool) ->
     test_fn(&mut alex, &mut billy, &mut camille, options);
 
     // Wrap-up test
-    debug!("==========================");
+    debug!("=========================");
     print_test_name("IN-MEMORY THREE NODES TEST END: ", test_fn_ptr);
 
     // Done
@@ -315,7 +315,7 @@ fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), (
     let test_fn_ptr = test_fn as *mut std::os::raw::c_void;
     debug!("");
     print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
-    debug!("==========================");
+    debug!("=========================");
 
     let options = &MIRROR_TEST_PROCESSING_OPTIONS;
 
@@ -334,7 +334,7 @@ fn launch_mirror_test(test_fn: MultiNodeTestFn, can_setup: bool) -> Result<(), (
     test_fn(&mut nodes, &MIRROR_TEST_PROCESSING_OPTIONS);
 
     // Wrap-up test
-    debug!("==========================");
+    debug!("=========================");
     print_test_name("IN-MEMORY MIRROR TEST: ", test_fn_ptr);
 
     // Done
@@ -446,7 +446,7 @@ fn launch_two_wss_nodes_test(
         format!("WSS TWO NODES TEST ({:?}): ", tls_config.clone()).as_str(),
         test_fn_ptr,
     );
-    println!("========================");
+    println!("=======================");
 
     // Setup
     let mut alex = setup_wss_node(
@@ -469,7 +469,7 @@ fn launch_two_wss_nodes_test(
     test_fn(&mut alex, &mut billy, &TWO_WSS_NODES_PROCESSING_OPTIONS);
 
     // Wrap-up test
-    println!("========================");
+    println!("=======================");
     print_test_name(
         format!("WSS TWO NODES TEST END ({:?}):", tls_config.clone()).as_str(),
         test_fn_ptr,
@@ -492,7 +492,7 @@ fn launch_three_wss_nodes_test(
         test_fn_ptr,
     );
 
-    println!("==========================");
+    println!("=========================");
 
     // Setup
     let mut alex = setup_wss_node(
@@ -532,7 +532,7 @@ fn launch_three_wss_nodes_test(
     );
 
     // Wrap-up test
-    debug!("==========================");
+    debug!("=========================");
     print_test_name(
         format!("WSS THREE NODES TEST END ({:?}):", tls_config.clone()).as_str(),
         test_fn_ptr,

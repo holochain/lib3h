@@ -12,7 +12,7 @@ documentation = "https://docs.rs/lib3h_p2p_protocol"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-capnp = "=0.10.0"
-serde = "=1.0.104"
-serde_derive = "=1.0.104"
-serde_json = "=1.0.47"
+capnp = "0.10.0"
+serde = "1.0.104"
+serde_derive = "1.0.104"
+serde_json = "1.0.47"
