@@ -45,7 +45,7 @@ rand = "0.7.2"
 [dev-dependencies]
 crossbeam-channel = "=0.3.8"
 unwrap_to = "=0.1.0"
-bincode = "=1.1.4"
+bincode = "=1.2.1"
 multihash = "=0.8.0"
 regex = "=1.1.2"
 xoroshiro128 = "0.3.0"
