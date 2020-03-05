@@ -18,7 +18,7 @@ detach = { version = "=0.0.38", path = "../detach" }
 env_logger = "=0.6.1"
 hcid = "=0.0.6"
 holochain_persistence_api = "=0.0.17"
-holochain_tracing = "=0.0.19"
+holochain_tracing = "=0.0.21"
 # version on the left for release regex
 lib3h_protocol = { version = "=0.0.38", path = "../lib3h_protocol" }
 lib3h_p2p_protocol = { version = "=0.0.38", path = "../p2p_protocol" }
@@ -45,7 +45,7 @@ rand = "0.7.2"
 [dev-dependencies]
 crossbeam-channel = "=0.3.8"
 unwrap_to = "=0.1.0"
-bincode = "=1.1.4"
+bincode = "=1.2.1"
 multihash = "=0.8.0"
 regex = "=1.1.2"
 xoroshiro128 = "0.3.0"
