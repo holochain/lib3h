@@ -13,7 +13,7 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 ghost_actor = { version = "=0.0.38", path = ".." }
-quote = "=1.0.2"
+quote = "=1.0.3"
 
 [lib]
 proc-macro = true
