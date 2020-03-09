@@ -1,6 +1,6 @@
 [package]
 name = "ghost_actor_derive"
-version = "0.0.39"
+version = "0.0.40"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "This is a procedural macro support crate for GhostActor: Actor System designed for ergonomic async request callbacks"
@@ -12,7 +12,7 @@ documentation = "https://docs.rs/ghost_actor_derive"
 repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
-ghost_actor = { version = "=0.0.39", path = ".." }
+ghost_actor = { version = "=0.0.40", path = ".." }
 quote = "=1.0.3"
 
 [lib]
