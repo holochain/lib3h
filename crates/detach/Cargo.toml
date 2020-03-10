@@ -1,6 +1,6 @@
 [package]
 name = "detach"
-version = "0.0.41"
+version = "0.0.42"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "helper type for being able to detach/reatach a member item"
