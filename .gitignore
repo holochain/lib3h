@@ -7,6 +7,7 @@ target
 .idea
 .DS_Store
 .vs
+*.orig
 *~
 .\#*
 \#*\#

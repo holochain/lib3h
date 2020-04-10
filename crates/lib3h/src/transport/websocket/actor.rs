@@ -603,7 +603,7 @@ mod tests {
         // now send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                holochain_tracing::test_span("test"),
+                holochain_tracing::test_span(),
                 RequestToChild::create_send_message(
                     expected_transport2_address.clone(),
                     b"test message".to_vec().into(),
@@ -784,7 +784,7 @@ mod tests {
                 .into();
         t1_endpoint
             .request(
-                holochain_tracing::test_span("test"),
+                holochain_tracing::test_span(),
                 RequestToChild::Bind {
                     spec: expected_transport1_address.clone(),
                 },
@@ -809,7 +809,7 @@ mod tests {
                 .into();
         t2_endpoint
             .request(
-                holochain_tracing::test_span("test"),
+                holochain_tracing::test_span(),
                 RequestToChild::Bind {
                     spec: expected_transport2_address.clone(),
                 },

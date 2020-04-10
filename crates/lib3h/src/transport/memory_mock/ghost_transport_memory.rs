@@ -376,7 +376,7 @@ mod tests {
     fn do_bind(endpoint: &mut GhostTransportMemoryEndpointContextParent) {
         endpoint
             .request(
-                test_span(""),
+                test_span(),
                 RequestToChild::Bind {
                     spec: Lib3hUri::with_memory(""),
                 },
@@ -468,7 +468,7 @@ mod tests {
         // send a message from transport1 to transport2 over the bound addresses
         t1_endpoint
             .request(
-                test_span(""),
+                test_span(),
                 RequestToChild::create_send_message(
                     Lib3hUri::with_memory("addr_2"),
                     b"test message".to_vec().into(),
@@ -484,7 +484,7 @@ mod tests {
         // and also a message to a non-existent address
         t1_endpoint
             .request(
-                test_span(""),
+                test_span(),
                 RequestToChild::create_send_message (
                     Lib3hUri::with_memory("addr_3"),
                     b"test message".to_vec().into(),
@@ -540,7 +540,7 @@ mod tests {
         // send a message from transport1 to self over the bound addresses
         t1_endpoint
             .request(
-                test_span(""),
+                test_span(),
                 RequestToChild::SendMessage {
                     uri: Lib3hUri::with_memory("addr_1"),
                     payload: b"test message".to_vec().into(),
@@ -582,7 +582,7 @@ mod tests {
         // send a message from transport1 to transport2 over the bound addresses to establish the connection
         t1_endpoint
             .request(
-                test_span(""),
+                test_span(),
                 RequestToChild::create_send_message(
                     Lib3hUri::with_memory("addr_2"),
                     b"test message".to_vec().into(),

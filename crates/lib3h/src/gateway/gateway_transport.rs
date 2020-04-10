@@ -56,7 +56,7 @@ impl P2pGateway {
                     me.send_with_full_low_uri(
                         SendWithFullLowUri {
                             span: span.follower("SendWithFullLowUri"),
-                            full_low_uri: uri.clone(),
+                            full_low_uri: uri,
                             payload: buf,
                         },
                         Box::new(|response| {

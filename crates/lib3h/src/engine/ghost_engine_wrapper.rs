@@ -449,9 +449,7 @@ mod tests {
 
         /// create a fake lib3h publish event
         pub fn inject_lib3h_publish(&mut self, msg: Lib3hToClient) {
-            let _ = self
-                .lib3h_endpoint
-                .publish(test_span("inject_lib3h_event"), msg);
+            let _ = self.lib3h_endpoint.publish(test_span(), msg);
         }
 
         /// create a fake lib3h request
@@ -461,9 +459,7 @@ mod tests {
                 Ok(())
             });
 
-            let _ = self
-                .lib3h_endpoint
-                .request(test_span("inject_lib3h_request"), msg, f);
+            let _ = self.lib3h_endpoint.request(test_span(), msg, f);
         }
     }
 

@@ -493,7 +493,7 @@ impl<'engine> GhostEngine<'engine> {
         self.lib3h_endpoint
             .request(
                 span.child("Lib3hToClient::HandleGetAuthoringEntryList"),
-                Lib3hToClient::HandleGetAuthoringEntryList(list_data.clone()),
+                Lib3hToClient::HandleGetAuthoringEntryList(list_data),
                 Box::new(|me, response| match response {
                     GhostCallbackData::Response(Ok(
                         Lib3hToClientResponse::HandleGetAuthoringEntryListResult(msg),
@@ -803,7 +803,7 @@ mod tests {
         let dht_factory = MirrorDht::new_with_config;
 
         let engine =
-            GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap();
+            GhostEngine::new(test_span(), crypto, config, "test_engine", dht_factory).unwrap();
         engine
     }
 
@@ -822,7 +822,7 @@ mod tests {
         };
         let dht_factory = MirrorDht::new_with_config;
 
-        GhostEngine::new(test_span(""), crypto, config, "test_engine", dht_factory).unwrap()
+        GhostEngine::new(test_span(), crypto, config, "test_engine", dht_factory).unwrap()
     }
 
     fn make_test_engine_wrapper(
@@ -869,7 +869,7 @@ mod tests {
         // Attempt to use ghost actor v1
         // _e1_endpoint
         //     .request(
-        //         holochain_tracing::test_span("test"),
+        //         holochain_tracing::test_span(),
         //         crate::dht::dht_protocol::DhtRequestToChild::RequestPeerList,
         //         Box::new(|_, r| {
         //             println!("1 got: {:?}", r);
@@ -913,10 +913,10 @@ mod tests {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_join");
 
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(), &req_data);
         assert!(result.is_ok());
         assert_eq!(lib3h.as_ref().space_gateway_map.len(), 1);
-        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(), &req_data);
         assert_eq!(
             "Err(Lib3hError(Other(\"Already joined space\")))",
             format!("{:?}", result)
@@ -927,11 +927,11 @@ mod tests {
     fn test_ghost_engine_leave() {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_leave");
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(), &req_data);
         assert!(result.is_ok());
-        let result = lib3h.as_mut().handle_leave_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_leave_space(test_span(), &req_data);
         assert!(result.is_ok());
-        let result = lib3h.as_mut().handle_leave_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_leave_space(test_span(), &req_data);
         assert_eq!(
             "Err(Lib3hError(Other(\"Not part of that space\")))",
             format!("{:?}", result)
@@ -950,7 +950,7 @@ mod tests {
         let network_name = "test_ghost_engine_unbind";
         let mut engine = make_test_engine_wrapper(network_name);
         let req_data = make_test_join_request();
-        let result = engine.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = engine.as_mut().handle_join_space(test_span(), &req_data);
         assert!(result.is_ok());
         let network = {
             let mut verse = memory_server::get_memory_verse();
@@ -974,7 +974,7 @@ mod tests {
     fn test_ghost_engine_dm() {
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_dm");
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(), &req_data);
         assert!(result.is_ok());
 
         let direct_message = DirectMessageData {
@@ -989,7 +989,7 @@ mod tests {
 
         let result = lib3h
             .as_mut()
-            .handle_direct_message(test_span(""), msg, direct_message);
+            .handle_direct_message(test_span(), msg, direct_message);
         assert!(result.is_ok());
         // TODO: assert somehow that the message got queued to the right place
 
@@ -1018,7 +1018,7 @@ mod tests {
 
         let mut engine = make_test_engine_wrapper("test_ghost_engine_publish");
         let req_data = make_test_join_request();
-        let result = engine.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = engine.as_mut().handle_join_space(test_span(), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -1032,7 +1032,7 @@ mod tests {
 
         let result = engine
             .as_mut()
-            .handle_publish_entry(test_span(""), &entry_data);
+            .handle_publish_entry(test_span(), &entry_data);
         assert!(result.is_ok());
 
         /* what should we observe to know that the entry was published?
@@ -1081,7 +1081,7 @@ mod tests {
 
         let mut lib3h = make_test_engine_wrapper("test_ghost_engine_query");
         let req_data = make_test_join_request();
-        let result = lib3h.as_mut().handle_join_space(test_span(""), &req_data);
+        let result = lib3h.as_mut().handle_join_space(test_span(), &req_data);
         assert!(result.is_ok());
 
         let mut core = MockCore {
@@ -1094,7 +1094,7 @@ mod tests {
         let query = make_test_query(req_data.space_address.clone());
 
         let _result = lib3h.request(
-            test_span(""),
+            test_span(),
             ClientToLib3h::QueryEntry(query),
             Box::new(move |_me, _response| {
                 panic!("BANG");

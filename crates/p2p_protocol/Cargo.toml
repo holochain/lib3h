@@ -1,6 +1,6 @@
 [package]
 name = "lib3h_p2p_protocol"
-version = "0.0.30"
+version = "0.0.42"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2018"
 description = "Lib3h Protocol definition for inter-node p2p communication."
@@ -13,6 +13,6 @@ repository = "https://github.com/holochain/lib3h"
 
 [dependencies]
 capnp = "=0.10.0"
-serde = "=1.0.89"
-serde_derive = "=1.0.89"
-serde_json = "=1.0.39"
+serde = "=1.0.104"
+serde_derive = "=1.0.104"
+serde_json = "=1.0.47"

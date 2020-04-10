@@ -12,14 +12,14 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "v0.0.65";
+   ref = "v0.0.67";
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "1frw8z1d3qdly2lcs7z4liwkkqgb344h7p7n1xzpwaqhhm0xa0kd";
+   sha256 = "1rbajpads9w5gnrq89x8xw65ain6z4vxx57wj47m87768zzjadi7";
 
    # the github owner of the holonix repo
    owner = "holochain";
@@ -60,15 +60,15 @@ echo 'Check circle CI for crates-io publishing!'
   # the commit hash that the release process should target
   # this will always be behind what ends up being deployed
   # the release process needs to add some commits for changelog etc.
-  commit = "16cbc77b3b9ec3814c1d5d5e65cc9f5191a73462";
+  commit = "419f9f623253fa6d01d231bee33a3b44f37ef225";
 
   # the semver for prev and current releases
   # the previous version will be scanned/bumped by release scripts
   # the current version is what the release scripts bump *to*
   version = {
-   current = "0.0.30";
+   current = "0.0.41";
    # not used by version hooks in this repo
-   previous = "0.0.29";
+   previous = "_._._";
   };
 
   github = {

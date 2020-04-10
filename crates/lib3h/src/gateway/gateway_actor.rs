@@ -40,7 +40,7 @@ impl
         // Update this_peer cache
         self.inner_dht.request(
             // new_root_span("Update this_peer cache"),
-            holochain_tracing::test_span("debug"),
+            holochain_tracing::test_span(),
             DhtRequestToChild::RequestThisPeer,
             Box::new(|mut me, response| {
                 let response = {
